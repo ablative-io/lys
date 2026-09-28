@@ -45,7 +45,7 @@
 //!    the judge still checks it for the stranger, who is the only reader whose
 //!    check counts.
 //!
-//! [non-oracle]: crate::AnchorError::CascadeJoinMismatch
+//! [non-oracle]: crate::CascadeError::CascadeJoinMismatch
 //!
 //! # An empty cascade is a bundle, and it says something true
 //!
@@ -71,7 +71,7 @@ use lys_log_store::LeafStore;
 
 use crate::admission::AdmissionPolicy;
 use crate::anchor::Anchor;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, CascadeError, ProofError};
 use crate::keys::InProcessSigner;
 
 use super::pin::UpwardPin;
@@ -109,14 +109,14 @@ impl UpwardPin {
 ///
 /// # Errors
 ///
-/// - [`AnchorError::CascadeTooDeep`] if `chain` is longer than `MAX_LINKS`.
-/// - [`AnchorError::NoSuchLeaf`] if `leaf_index` is not in the log — propagated
+/// - [`CascadeError::CascadeTooDeep`] if `chain` is longer than `MAX_LINKS`.
+/// - [`ProofError::NoSuchLeaf`] if `leaf_index` is not in the log — propagated
 ///   from [`Anchor::inclusion_artifact`], which is the one place that refusal is
 ///   made. A second guard here would be a check no drift could distinguish from
 ///   that one, and two guards on one rule leave the rule proven by neither.
-/// - [`AnchorError::InclusionArtifact`] if the artifact could not be built or
+/// - [`ProofError::InclusionArtifact`] if the artifact could not be built or
 ///   failed `lys-core`'s own self-verification.
-/// - [`AnchorError::CascadeJoinMismatch`] if `chain[0]`'s checkpoint is not the
+/// - [`CascadeError::CascadeJoinMismatch`] if `chain[0]`'s checkpoint is not the
 ///   one the artifact carries — see the [module docs](self) for the race that
 ///   causes it and the remedy.
 pub fn bundle_for<S, K, P>(
@@ -130,11 +130,11 @@ where
     P: AdmissionPolicy,
 {
     if chain.len() > MAX_LINKS {
-        return Err(AnchorError::CascadeTooDeep {
+        return Err(AnchorError::Cascade(CascadeError::CascadeTooDeep {
             origin: anchor.origin().to_string(),
             links: chain.len(),
             max: MAX_LINKS,
-        });
+        }));
     }
 
     // Refuses a missing index; the artifact self-verifies before it is returned.
@@ -142,12 +142,12 @@ where
 
     if let Some(first) = chain.first() {
         if first.checkpoint.note != artifact.checkpoint {
-            return Err(AnchorError::CascadeJoinMismatch {
+            return Err(AnchorError::Cascade(CascadeError::CascadeJoinMismatch {
                 origin: anchor.origin().to_string(),
                 leaf_index,
                 pinned_tree_size: first.checkpoint.body.tree_size(),
                 artifact_tree_size: artifact.tree_size,
-            });
+            }));
         }
     }
 
@@ -155,11 +155,11 @@ where
     // `else` is the refusal this crate owes rather than an assumption it makes,
     // and it reports the same fact under the same name the artifact would have.
     let Some(leaf) = anchor.leaf_bytes(leaf_index) else {
-        return Err(AnchorError::NoSuchLeaf {
+        return Err(AnchorError::Proof(ProofError::NoSuchLeaf {
             origin: anchor.origin().to_string(),
             leaf_index,
             tree_size: anchor.tree_size(),
-        });
+        }));
     };
 
     let links = chain.iter().map(UpwardPin::to_bundle_link).collect();

@@ -21,8 +21,8 @@
 //!
 //! Reachability is the only axis on which DP19 is a claim at all. It is
 //! deliberately **not** a claim about algorithm, language, toolchain or
-//! platform: the cross-language work belongs to `stranger_verification.rs`,
-//! `checkpoint_note_conformance.rs` and `anchor_receipt_conformance.rs`, and is
+//! platform: the cross-language work belongs to `stranger_verification/`,
+//! `checkpoint_note_conformance.rs` and `anchor_receipt_conformance/`, and is
 //! not restated here.
 //!
 //! # Why this test could not exist before the append was ungated

@@ -57,7 +57,7 @@
 use lys_log_store::{LeafStore, Log};
 
 use crate::config::AnchorConfig;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, GenesisError};
 
 use super::open::Anchor;
 
@@ -163,16 +163,16 @@ impl<S: LeafStore> Anchor<S, NoSigner, NoPolicy> {
     ///
     /// # Errors
     ///
-    /// [`AnchorError::NoGenesisLeaf`] if the log has no leaves, and
+    /// [`GenesisError::NoGenesisLeaf`] if the log has no leaves, and
     /// [`AnchorError::Store`] for anything the log or its storage refuses —
     /// notably `StoreError::PinMismatch` when the stored leaves no longer
     /// rebuild to the pinned root.
     pub fn open_read_only(store: S, config: AnchorConfig) -> AnchorResult<Self> {
         let log = Log::open(store)?;
         if log.tree().is_empty() {
-            return Err(AnchorError::NoGenesisLeaf {
+            return Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf {
                 origin: log.origin().to_string(),
-            });
+            }));
         }
         Ok(Self {
             log,

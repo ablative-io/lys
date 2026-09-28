@@ -285,8 +285,8 @@ wire format nobody here has read the spec for. §4 avoids needing it in v1.
   of issue*, and mapping it to an origin requires the anchor's log. A consequence, not a
   defect; state it in module docs.
 - **`chunk_proof_bytes` is private** (`tlog/build.rs:153`), and every caller of
-  `sign_receipt` in the repo does its own `.chunks_exact(32)` (`receipt/sign_tests.rs:35`,
-  `receipt/consistency_tests.rs:54`, `bundle/verify_tests.rs:59`,
+  `sign_receipt` in the repo does its own `.chunks_exact(32)` (`receipt/sign_tests.rs:44`,
+  `receipt/consistency_tests.rs:54`, `bundle/verify_tests.rs:66`,
   `tests/receipt_conformance.rs:62`). `lys-anchor` will do the same. **Do not add it to
   `lys-core`** — six lines is not worth a semver-bound public item.
 - **DP22 leans on `leaf_index`'s authentication, and that load is already carried.** DP22
@@ -294,10 +294,10 @@ wire format nobody here has read the spec for. §4 avoids needing it in v1.
   entry to its position — which makes `leaf_index`'s authentication-by-consequence
   load-bearing in a way it was not before. It holds: altering the index changes the
   left/right walk and therefore the reconstructed root, and it is tested
-  (`a_tampered_leaf_index_is_refused`, `receipt/sign_tests.rs:182`). Note the contrast with
+  (`a_tampered_leaf_index_is_refused`, `receipt/sign_tests/verification.rs:132`). Note the contrast with
   `tree_size`, whose authentication is *incomplete* and known to be — sizes 3 and 4 share a
   walk at index 0, pinned as a passing test
-  (`tree_size_is_malleable_within_its_walk_equivalence_class`, `receipt/sign_tests.rs:243`;
+  (`tree_size_is_malleable_within_its_walk_equivalence_class`, `receipt/sign_tests/issuance.rs:14`;
   the format-level ruling is `WIRE-DRAFTS.md:546-588`). **So DP22 is sound for *position*
   and would not have been sound for *size*.** `lys-anchor` must add no position field
   anywhere — the receipt is where that claim lives, and a second statement of the same fact
@@ -475,7 +475,7 @@ crates/lys-anchor/
 
   tests/
     standalone_is_complete.rs     the whole core path with zero peers
-    stranger_verification.rs      the shell + Go stranger gate
+    stranger_verification/        the shell + Go stranger gate
     receipt_conformance.rs        go-cose parity over anchor-issued receipts
     cascade.rs                    [fed] two-anchor cascade → verify_bundle
     origin_is_not_a_constant.rs   the lexical gate, with a positive control
@@ -559,9 +559,9 @@ pub struct SubmissionOutcome {
 - **Not signed, authenticated by consequence:** `leaf_index`, `tree_size`, and the
   inclusion path — they sit in the unprotected header and cannot be altered without
   producing a root the anchor never signed (`receipt/mod.rs:36-58`). `leaf_index` is fully
-  pinned by the reconstruction and tested (`receipt/sign_tests.rs:182`), which is what DP22
+  pinned by the reconstruction and tested (`receipt/sign_tests/verification.rs:132`), which is what DP22
   now leans on. `tree_size` carries a **documented residual malleability**
-  (`WIRE-DRAFTS.md:546-588`, `receipt/sign_tests.rs:243`): at some `(index, size)` pairs
+  (`WIRE-DRAFTS.md:546-588`, `receipt/sign_tests/issuance.rs:14`): at some `(index, size)` pairs
   two sizes share a walk. Cross-check it against a checkpoint, which the bundle's rung
   already does (`bundle/verify.rs:~218-224`).
 - **Not signed at all:** `leaf_hash` (a convenience — recomputable as
@@ -1060,7 +1060,7 @@ disclosure.
 
 ### 7.3 The stranger gate — the second party for the whole submit path
 
-`tests/stranger_verification.rs`. Build an anchor in a temp directory, submit a leaf,
+`tests/stranger_verification/`. Build an anchor in a temp directory, submit a leaf,
 publish a checkpoint. Then, **with no `lys` code in the loop**:
 
 - Recompute the leaf hash with a shell pipeline: `(printf '\x00'; cat leaf) | shasum -a 256`
@@ -1068,7 +1068,7 @@ publish a checkpoint. Then, **with no `lys` code in the loop**:
 - Recompute the root from the JSON artifact with `scripts/verify_inclusion.py` — **committed
   2026-08-08, because the "independent script from Phase 2" this line used to name had never
   been committed at all** (`ROADMAP.md:39` carries the full account). This gate now exists as
-  `crates/lys-anchor/tests/stranger_verification.rs`.
+  `crates/lys-anchor/tests/stranger_verification/`.
 - Verify the receipt with the vendored Go `veraison/go-cose`.
 
 **Second party: a different language and a shell.** The axis is *algorithm and toolchain*,

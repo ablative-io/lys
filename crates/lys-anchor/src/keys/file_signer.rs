@@ -26,7 +26,7 @@ use std::path::Path;
 
 use lys_core::Ed25519Identity;
 
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, SigningError};
 use crate::keys::signer::{InProcessSigner, Signer};
 
 /// A [`Signer`] backed by an Ed25519 key file.
@@ -62,12 +62,14 @@ impl FileSigner {
     ///
     /// # Errors
     ///
-    /// [`AnchorError::SignerKey`] if the file is absent, unreadable, or not
+    /// [`SigningError::SignerKey`] if the file is absent, unreadable, or not
     /// exactly 32 bytes long, carrying the path and `lys-core`'s own reason.
     pub fn load(path: &Path) -> AnchorResult<Self> {
-        let identity = Ed25519Identity::load(path).map_err(|source| AnchorError::SignerKey {
-            path: path.display().to_string(),
-            source,
+        let identity = Ed25519Identity::load(path).map_err(|source| {
+            AnchorError::Signing(SigningError::SignerKey {
+                path: path.display().to_string(),
+                source,
+            })
         })?;
         Ok(Self { identity })
     }

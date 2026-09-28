@@ -149,12 +149,12 @@ THE SYSTEM SHALL make `#![cfg(test)]` line 1 of each of the 139 files in files.m
 - modify: crates/lys-anchor/src/witness/fixture.rs
 - modify: crates/lys-anchor/src/witness/observe_tests.rs
 - modify: crates/lys-anchor/src/witness/projection_tests.rs
-- modify: crates/lys-anchor/tests/anchor_receipt_conformance.rs
+- modify: crates/lys-anchor/tests/anchor_receipt_conformance/
 - modify: crates/lys-anchor/tests/cascade.rs
 - modify: crates/lys-anchor/tests/checkpoint_note_conformance.rs
 - modify: crates/lys-anchor/tests/harness/mod.rs
 - modify: crates/lys-anchor/tests/standalone_is_complete.rs
-- modify: crates/lys-anchor/tests/stranger_verification.rs
+- modify: crates/lys-anchor/tests/stranger_verification/
 - modify: crates/lys-core/src/attestation/artifact_tests.rs
 - modify: crates/lys-core/src/attestation/encoding_tests.rs
 - modify: crates/lys-core/src/attestation/sign_tests.rs
@@ -188,12 +188,12 @@ THE SYSTEM SHALL make `#![cfg(test)]` line 1 of each of the 139 files in files.m
 - modify: crates/lys-core/src/tlog/artifact_tests.rs
 - modify: crates/lys-core/src/tlog/build_tests.rs
 - modify: crates/lys-core/src/tlog/verify_tests.rs
-- modify: crates/lys-core/tests/bundle_conformance.rs
+- modify: crates/lys-core/tests/bundle_conformance/
 - modify: crates/lys-core/tests/consistency_conformance.rs
 - modify: crates/lys-core/tests/consistency_receipt_conformance.rs
 - modify: crates/lys-core/tests/cose_conformance.rs
-- modify: crates/lys-core/tests/delegation_conformance.rs
-- modify: crates/lys-core/tests/delegation_vector.rs
+- modify: crates/lys-core/tests/delegation_conformance/
+- modify: crates/lys-core/tests/delegation_vector/
 - modify: crates/lys-core/tests/go_conformance.rs
 - modify: crates/lys-core/tests/harness/mod.rs
 - modify: crates/lys-core/tests/openssl_csr_interop.rs
@@ -303,15 +303,15 @@ THE SYSTEM SHALL remove every `let _ = <expr>;` statement under crates/. There a
 
 **Files:**
 - modify: crates/lys-anchor-cli/src/commands/hex.rs
-- modify: crates/lys-anchor/tests/anchor_receipt_conformance.rs
+- modify: crates/lys-anchor/tests/anchor_receipt_conformance/
 - modify: crates/lys-core/src/keys/identity_tests.rs
 - modify: crates/lys-core/src/lib.rs
 - modify: crates/lys-core/src/seal/sealed_envelope_tests.rs
-- modify: crates/lys-core/tests/bundle_conformance.rs
+- modify: crates/lys-core/tests/bundle_conformance/
 - modify: crates/lys-core/tests/consistency_conformance.rs
 - modify: crates/lys-core/tests/consistency_receipt_conformance.rs
-- modify: crates/lys-core/tests/delegation_conformance.rs
-- modify: crates/lys-core/tests/delegation_vector.rs
+- modify: crates/lys-core/tests/delegation_conformance/
+- modify: crates/lys-core/tests/delegation_vector/
 - modify: crates/lys-core/tests/receipt_conformance.rs
 - modify: crates/lys-core/tests/signed_note_crosscheck.rs
 - modify: crates/lys-home/src/harness/claude_code/given_tests.rs
@@ -329,12 +329,12 @@ THE SYSTEM SHALL remove every `let _ = <expr>;` statement under crates/. There a
 
 ### R7: Move the logic out of three mod.rs files into named sibling files
 
-THE SYSTEM SHALL move every item of crates/lys-core/tests/harness/mod.rs, with its module docs, `use` lines, doc comments and attributes, into crates/lys-core/tests/harness/go.rs, and the same from crates/lys-anchor/tests/harness/mod.rs into crates/lys-anchor/tests/harness/go.rs, the two #[test] fns included. Each harness mod.rs keeps R4's `#![cfg(test)]` as its first line, then a one-line module doc naming go.rs, `mod go;` and a `pub use go::{...};` of exactly the names its including test crates reach as `harness::<name>` today: build_go_tool, go_or_skip and run_built_tool for lys-core, and GoScaffold with the same three for lys-anchor. From crates/lys-home/src/harness/claude_code/mod.rs, HARNESS, PROVIDER, API and AUTHORED move into crates/lys-home/src/harness/claude_code/names.rs, with a module doc; claude_code/mod.rs keeps its module docs and declarations and adds `mod names;` and `pub use names::{API, AUTHORED, HARNESS, PROVIDER};`, so every caller's path is unchanged. lys_core_harness() in the lys-anchor harness SHALL read ../lys-core/tests/harness/go.rs, the file that then holds the phrase `Shared Go-toolchain harness` and the `.env("GOFLAGS", "-mod=vendor")`, `.env("GOPROXY", "off")`, `.env("GOTOOLCHAIN", "local")` and `.env("GOCACHE", gocache)` clauses. In the module docs of crates/lys-anchor/tests/stranger_verification.rs, the citation `lys-core/tests/harness/mod.rs` SHALL become `lys-core/tests/harness/go.rs`. THE SYSTEM SHALL NOT change the body of any moved item other than that one path, and SHALL NOT change crates/lys-home/src/record/mod.rs.
+THE SYSTEM SHALL move every item of crates/lys-core/tests/harness/mod.rs, with its module docs, `use` lines, doc comments and attributes, into crates/lys-core/tests/harness/go.rs, and the same from crates/lys-anchor/tests/harness/mod.rs into crates/lys-anchor/tests/harness/go.rs, the two #[test] fns included. Each harness mod.rs keeps R4's `#![cfg(test)]` as its first line, then a one-line module doc naming go.rs, `mod go;` and a `pub use go::{...};` of exactly the names its including test crates reach as `harness::<name>` today: build_go_tool, go_or_skip and run_built_tool for lys-core, and GoScaffold with the same three for lys-anchor. From crates/lys-home/src/harness/claude_code/mod.rs, HARNESS, PROVIDER, API and AUTHORED move into crates/lys-home/src/harness/claude_code/names.rs, with a module doc; claude_code/mod.rs keeps its module docs and declarations and adds `mod names;` and `pub use names::{API, AUTHORED, HARNESS, PROVIDER};`, so every caller's path is unchanged. lys_core_harness() in the lys-anchor harness SHALL read ../lys-core/tests/harness/go.rs, the file that then holds the phrase `Shared Go-toolchain harness` and the `.env("GOFLAGS", "-mod=vendor")`, `.env("GOPROXY", "off")`, `.env("GOTOOLCHAIN", "local")` and `.env("GOCACHE", gocache)` clauses. In the module docs of crates/lys-anchor/tests/stranger_verification/, the citation `lys-core/tests/harness/mod.rs` SHALL become `lys-core/tests/harness/go.rs`. THE SYSTEM SHALL NOT change the body of any moved item other than that one path, and SHALL NOT change crates/lys-home/src/record/mod.rs.
 
 **Acceptance:**
 - `for f in crates/lys-core/tests/harness/mod.rs crates/lys-anchor/tests/harness/mod.rs crates/lys-home/src/harness/claude_code/mod.rs; do ast-grep scan --inline-rules '{id: mod-rs-logic, language: rust, severity: error, rule: {any: [{kind: function_item}, {kind: struct_item}, {kind: enum_item}, {kind: trait_item}, {kind: impl_item}, {kind: const_item}, {kind: static_item}]}}' --json=stream "$f" | wc -l; done` prints 0 three times (it prints 4, 12 and 4 at 4dd1c33).
 - `cargo test -p lys-anchor --test checkpoint_note_conformance the_go_environment_contract_matches_the_one_lys_core_wrote_down` reports `1 passed; 0 failed`, and with the line `.env("GOPROXY", "off")` deleted from crates/lys-core/tests/harness/go.rs the same command reports `0 passed; 1 failed`, its message naming GOPROXY. The line is restored afterwards.
-- `git grep -n 'lys-core/tests/harness/mod.rs' -- crates` prints nothing, and `git grep -c 'lys-core/tests/harness/go.rs' -- crates/lys-anchor/tests/harness/go.rs crates/lys-anchor/tests/stranger_verification.rs` prints 1 for each file.
+- `git grep -n 'lys-core/tests/harness/mod.rs' -- crates` prints nothing, and `git grep -c 'lys-core/tests/harness/go.rs' -- crates/lys-anchor/tests/harness/go.rs crates/lys-anchor/tests/stranger_verification/` prints 1 for each file.
 - `cargo test -p lys-home` exits 0.
 
 **Files:**
@@ -344,7 +344,7 @@ THE SYSTEM SHALL move every item of crates/lys-core/tests/harness/mod.rs, with i
 - modify: crates/lys-core/tests/harness/mod.rs
 - modify: crates/lys-anchor/tests/harness/mod.rs
 - modify: crates/lys-home/src/harness/claude_code/mod.rs
-- modify: crates/lys-anchor/tests/stranger_verification.rs
+- modify: crates/lys-anchor/tests/stranger_verification/
 
 **Checklist:**
 - C91 — crates/lys-core/tests/harness/mod.rs, crates/lys-anchor/tests/harness/mod.rs and crates/lys-home/src/harness/claude_code/mod.rs hold no fn, struct, enum, trait, impl, const or static item.
