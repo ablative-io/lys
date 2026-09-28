@@ -213,7 +213,7 @@ impl Api {
             format!("A refusal, by name: {}.", route.refusals.join(", "))
         };
         let mut operation = json!({
-            "operationId": format!("{}{}", route.method.word(), route.path.replace(['/', '{', '}', '-'], "_")),
+            "operationId": format!("{}{}", route.method.word(), route.path.replace(['/', '{', '}'], "_")),
             "summary": route.summary,
             "security": security,
             "parameters": parameters,
