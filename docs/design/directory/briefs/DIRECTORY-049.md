@@ -8,7 +8,7 @@ title: Lys MCP server, secure and compact: three tools over the published API, t
 # DIRECTORY-049: Lys MCP server, secure and compact: three tools over the published API, the caller's own identity on every call
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-048
+> **Depends on:** DIRECTORY-047, DIRECTORY-048, DIRECTORY-050, SECRETS-006
 > **Design anchor:**
 > - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
 > **Checklist:**
@@ -32,12 +32,15 @@ Serve MCP from lys-identity-server at /mcp and from 'lys mcp' over stdio for age
 
 ### R1: Three tools over the published API
 
-Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI operation ids of DIRECTORY-048 R6) in one line each; with a verb, answers its request and response schema. lys_read: calls a reading verb (GET) with its members. lys_write: calls a writing verb with its request. Verbs come from the generated OpenAPI document, so a new route is reachable with no MCP change. Each tool call is dispatched in-process into the router as a request carrying the caller's identity; there is no second implementation of any verb. Tools carry MCP annotations: lys_read readOnlyHint, lys_write destructiveHint.
+Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI operation ids of DIRECTORY-048 R6) in one line each, marking each read, write or not served through MCP; with a verb, answers its request and response schema. lys_read calls a verb the document marks as a read, whatever its method, so DIRECTORY-048 R5's batch check and its which route (reads sent by POST) are lys_read verbs. lys_write calls a verb the document marks as a write. The read or write mark is the document's own (an x-lys-effect member on each operation, set in openapi.rs from the route's declaration), never inferred from the method. Verbs come from the generated OpenAPI document, so a new route is reachable with no MCP change. Each tool call is dispatched in-process into the router; there is no second implementation of any verb. Dispatch carries the caller as a VerifiedCaller value: a type whose only constructors are the MCP edge's verification of a person's token or an agent's signature (R2) and the HTTP edge's own verification, with no public constructor and no header, extension or query member that can produce one. A route reached in-process takes the VerifiedCaller and does not check a signature over its own method and path again; a route reached over HTTP verifies at its edge exactly as today. Tools carry MCP annotations: lys_read readOnlyHint, lys_write destructiveHint. A verb whose route holds the call open until something happens (DIRECTORY-050's wait route) stays open as one tool call; the caller ends it by closing the call or the session, as 050 says for the route, and nothing in MCP ends it by a clock.
 
 **Acceptance:**
 - tools/list answers exactly three tools.
-- Every OpenAPI operation is reachable through lys_read or lys_write, walked by a test.
+- Every OpenAPI operation is reachable through lys_read, lys_write or listed as not served through MCP, walked by a test.
+- The batch check and the which route of DIRECTORY-048 R5 are reached through lys_read, and carry readOnlyHint.
 - A route added in a test router is reachable through MCP with no MCP code change.
+- An agent-signed route reached through MCP by a verified agent applies; the same route reached over HTTP with a forged caller header and no signature is refused, and no header produces a VerifiedCaller (a compile-fail test on constructing one outside the edges).
+- A call to the wait route through MCP ends when the client closes it, and the server holds nothing for it afterwards.
 
 **Files:**
 - create: crates/lys-identity-server/src/mcp.rs
@@ -46,6 +49,8 @@ Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI opera
 - modify: crates/lys-identity-server/src/routes.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/Cargo.toml
+- modify: crates/lys-identity-server/src/openapi.rs
+- modify: crates/lys-identity-server/src/agent_signature.rs
 
 **Checklist:**
 - C369 — The MCP server offers exactly three tools over the published API; the tool list is under 2 KB (DIRECTORY-049 R1, R5).
@@ -55,13 +60,16 @@ Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI opera
 
 ### R2: Every call is the caller's own: a person's Lys token or an agent's signature
 
-Behavioural. /mcp speaks streamable HTTP and follows the MCP authorization specification with Lys as the authorization server: it answers 401 with the protected-resource metadata at /.well-known/oauth-protected-resource; a client signs the person in on Lys's own pages with authorization code and PKCE; the token is bound to the /mcp audience and is refused anywhere else, and /mcp refuses any token not issued for it (no token passthrough). An agent's call carries lys-agent-signature (agent_signature.rs) over the MCP request, with the same checks. There is no API key, shared secret, static token or unauthenticated mode, and loopback is not trust. The Origin header is checked against Lys's own origin and registered clients, and the listener binds 127.0.0.1 unless configured.
+Behavioural. /mcp speaks streamable HTTP and follows the MCP authorization specification with Lys as the authorization server: it answers 401 with the protected-resource metadata at /.well-known/oauth-protected-resource; a client signs the person in on Lys's own pages with authorization code and PKCE; the token is bound to the /mcp audience and is refused anywhere else, and /mcp refuses any token not issued for it (no token passthrough). An agent's call carries lys-agent-signature (agent_signature.rs) over the MCP request itself (method, path /mcp and the body's digest), checked once at the MCP edge with the existing nonce and certificate checks; the result is the VerifiedCaller that R1 hands to the route. The GET that opens the streamable HTTP event stream is signed and checked when it opens; the stream carries that caller for its life and ends when the certificate is withdrawn. MCP clients such as Claude Code are apps registered and approved through DIRECTORY-048: a client with no approved registration is refused app_not_approved, and dynamic registration answers with a pending app for an administrator to approve, never a working client. A registered loopback redirect (127.0.0.1 or [::1]) matches on any port, as RFC 8252 requires; every other redirect matches exactly. There is no API key, shared secret, static token or unauthenticated mode, and loopback is not trust. The Origin header is checked against Lys's own origin and registered clients, and the listener binds 127.0.0.1 unless configured.
 
 **Acceptance:**
 - An unauthenticated call is answered 401 with the metadata address.
 - A token issued for another audience is refused token_wrong_audience.
 - A replayed agent signature is refused by the existing nonce check.
 - A request with a foreign Origin is refused origin_refused.
+- The event-stream GET without a valid signature is refused at open; withdrawing the certificate ends an open stream.
+- A client not approved through DIRECTORY-048 is refused app_not_approved; after approval it signs in.
+- A loopback redirect registered as http://127.0.0.1/callback is accepted at any port; a non-loopback redirect differing only in port is refused.
 
 **Files:**
 - create: crates/lys-identity-server/src/mcp_auth.rs
@@ -95,11 +103,12 @@ Behavioural. Each call runs the route's own grant check as the caller; the MCP l
 
 ### R4: No secret value ever; destructive writes need the target repeated
 
-Behavioural. No MCP answer carries a secret's value, a private key, a token or a password: secret verbs answer the handle and its metadata only, and a test walks every response schema in the OpenAPI document and fails on any field marked secret that MCP would return. A write the document marks destructive (retire an identity, revoke a grant, stop, delete a secret, retire an app) is refused confirm_required unless the call carries confirm equal to the target's id; the refusal says in words what the write would do.
+Behavioural. No MCP answer carries a secret's value, a private key, a token or a password: secret verbs answer the handle and its metadata only. A verb whose response schema carries a member marked secret (x-lys-secret; for example DIRECTORY-048's approval that shows an app's client secret once) is listed by lys_schema as not served through MCP and is refused by name, mcp_secret_answer_not_served, pointing to the Lys screen that serves it. A test walks every response schema in the OpenAPI document and fails if any verb served through MCP has a member marked secret. A write the document marks destructive (retire an identity, revoke a grant, stop, delete a secret, retire an app) is refused confirm_required unless the call carries confirm equal to the target's id; the refusal says in words what the write would do.
 
 **Acceptance:**
 - Reading a secret through MCP answers its handle and never its value.
-- The response-schema walk fails on a planted secret field.
+- Approving an app through MCP is refused mcp_secret_answer_not_served and lys_schema lists it as not served.
+- The response-schema walk fails on a planted secret field in a served verb.
 - A revoke without confirm is refused confirm_required naming the grant; with it, it applies.
 
 **Files:**
@@ -149,10 +158,11 @@ Behavioural. Every lys_write that applies leaves a receipt (receipts_api.rs) nam
 
 ### R7: Agents reach it with 'lys mcp', signing with their own key
 
-Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed with the agent's certificate key, which it reads by handle from lys-secrets at each call and never writes to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
+Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the request's signing digest and the agent's key handle to lys-secrets, which signs under its ordinary admission (SECRETS-006) and returns the signature only. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
 
 **Acceptance:**
 - An agent launched from a profile asking for it lists the three tools and reads its own identity.
+- The 'lys mcp' process never receives key material: the broker call answers a signature, and a test on the process's memory-held values and its arguments finds no key.
 - The rendered configuration and the process arguments carry no key material, checked by a test.
 - A withdrawn certificate refuses the next call by name.
 
@@ -178,6 +188,8 @@ Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call t
 - SHALL NOT give the MCP layer any credential, service account or authority of its own.
 - SHALL NOT return any secret value, key, token or password through any tool.
 - SHALL NOT add a fourth tool; a new capability is a new route, reached through the three.
+- SHALL NOT read a private key out of lys-secrets; signing is a use the broker admits (SECRETS-006).
+- SHALL NOT let any header, extension or query member produce a verified caller.
 
 ## Verification
 
