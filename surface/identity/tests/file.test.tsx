@@ -47,7 +47,7 @@ describe("An agent's file", () => {
   });
 
   it('marks every section with no server as not built', async () => {
-    for (const tab of ['provisioning', 'memory', 'credentials', 'sessions', 'certificate']) {
+    for (const tab of ['memory', 'sessions', 'certificate']) {
       unmountAll();
       document.body.innerHTML = '';
       await mount(`#/file/${SCRIBE}/${tab}`);

@@ -1,3 +1,5 @@
+import { AgentCredentials } from './AgentCredentials';
+import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, useLoad } from '../../api';
@@ -208,11 +210,11 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
-      return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <NotBuilt>Provisioning profiles (model access, tools, skills, MCP servers, instructions) have no server yet.</NotBuilt>;
+      return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <Provisioning id={data.x.id} />;
     case 'memory':
       return <NotBuilt>Memories and the home have no server here yet: what each memory came from, who can see it, and the last context given.</NotBuilt>;
     case 'credentials':
-      return person ? <PersonCredentials id={data.x.id} /> : <Table title="Handles" note="An agent holds a handle, never the credential. Dropping the handle ends its use." heads={['Handle', 'Behind it', 'Value', 'Lease', 'Use', '']} why="Handles come from the secrets broker (SECRETS-002)." />;
+      return person ? <PersonCredentials id={data.x.id} /> : <AgentCredentials id={data.x.id} />;
     case 'sessions':
       return person ? <PersonSessions id={data.x.id} /> : <Table title="Sessions" note="As the runtimes report them. Stopped only when the runtime confirms it." heads={['Where', 'Runtime', 'Acting for', 'Started', 'Status', 'Context given']} why="Sessions come from runtime reports naming a launch record (conformance 5.4 to 5.6)." />;
     case 'certificate':
