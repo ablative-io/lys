@@ -77,7 +77,8 @@
     "ADR-055",
     "ADR-047",
     "ADR-093",
-    "ADR-107"
+    "ADR-107",
+    "ADR-108"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -286,6 +287,10 @@
     {
       "text": "Anchoring or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for), and signing any record other than what a session was given, which HOME-022 signs as the given statement.",
       "reason": "Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it. It is lifted for the given statement alone because CONFORMANCE row 6.5, marked test, is part of the conformance test Tom set as the definition of done, and he asked for all of it to be done (HOME-022). Anchoring and receipts into a lys log are still not asked for."
+    },
+    {
+      "text": "Recovering a session whose last line a crash tore, by extending reconcile or trimming an unsynced tail.",
+      "reason": "The original bytes are never rewritten (P1); a staged import (ADR-108) never leaves such a tail under a session's name, and recovering one is its own decision."
     }
   ],
   "structure": [
@@ -2038,6 +2043,31 @@
       "path": "docs/design/home/briefs/HOME-022.md",
       "note": "its rendered markdown",
       "brief": "HOME-022"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_map.rs",
+      "note": "the call-id map a Session builds once per open and keeps current on append",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/reads.rs",
+      "note": "a Session's reads by seeking (entry, path, context_path, customs, customs_everywhere)",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/record_tests.rs",
+      "note": "gates on the session record: append, reconcile, the head and the path",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_tests.rs",
+      "note": "gates on call ingest: idempotency and the call found after a crash",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/tests/cached_index.rs",
+      "note": "the cached index is a cache: stale rows rebuild from the file",
+      "brief": "HOME-001"
     }
   ],
   "inventory": [
