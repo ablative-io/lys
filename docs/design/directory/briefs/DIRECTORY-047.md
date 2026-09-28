@@ -81,15 +81,14 @@ Behavioural. Today first-run setup (crates/lys-identity-server/src/setup.rs, sur
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [ ] A first install with no --admin-email creates no administrator, prints the setup address, and the setup route answers the setup screen. — The route passes in the harness (tests/setup_page.rs the_setup_route_answers_the_setup_screen_for_the_pending_code_only: ok, my run). On a real first install the directory service never starts: deployment.template.toml:13 public_origin http plus :19 non-empty trusted_proxies gives RAUTHY_PROXY_MODE=true (prepare.rs:207-209). Rauthy v0.36.2 rauthy_config.rs:113-120 then names the issuer https, and oidc.rs discover refuses the http issuer that server_config.rs:35-38 configures. So no setup screen answers on a first install.
-  - [x] The setup route refuses by name once an administrator exists, and with a wrong or used code. — setup.rs refuses with SetupClosed/SetupCodeRefused, and admission.rs set_administrator refuses a second login. tests/setup_page.rs a_wrong_code_makes_nothing_and_a_weak_password_is_refused_before_anything_is_sent and completing_setup_makes_one_administrator_and_signs_them_in: ok.
-  - [x] Completing setup creates exactly one administrator with the entered email and leaves the person signed in to Lys. — tests/setup_page.rs completing_setup_makes_one_administrator_and_signs_them_in: ok (my run).
-  - [x] A test sets git user.email and every EMAIL-like environment variable to a marker and proves the marker appears nowhere in state, deployment.toml or the issuer. — crates/lys/tests/cli_tests/identity_setup.rs:92 nothing_about_a_person_is_taken_from_the_machine. The measured tests leg passed (exit 0).
-  - [x] The bootstrap account names no person, and a people count after setup is one. — prepare.rs BOOTSTRAP_ACCOUNT_EMAIL is a fixed machine address (asserted in identity_setup.rs). setup_page.rs completing_setup... asserts one person: ok.
-  - [x] No output line or log holds the setup code; `lys identity setup-code` lets a sole administrator set a new password. — identity_setup.rs:142 the_setup_code_is_never_printed_and_is_kept_only_as_its_digest passes (tests leg). setup_page.rs a_password_code_sets_the_administrator_a_new_password: ok. The setup files hold only the sha256 digest (setup.rs PendingCode).
+  - [x] A first install with no --admin-email creates no administrator, prints the setup address, and the setup route answers the setup screen. — install.rs:278 prints the setup field (Layout::setup_url); identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer passed on a real install in my run (43.92s); setup_page.rs the_setup_route_answers_the_setup_screen_for_the_pending_code_only ok
+  - [x] The setup route refuses by name once an administrator exists, and with a wrong or used code. — error.rs SetupClosed/SetupCodeRefused; admission.rs set_administrator refuses a second login; setup_page.rs a_wrong_code_makes_nothing_and_a_weak_password_is_refused_before_anything_is_sent ok
+  - [x] Completing setup creates exactly one administrator with the entered email and leaves the person signed in to Lys. — setup_page.rs completing_setup_makes_one_administrator_and_signs_them_in ok; a_setup_retried_after_its_account_was_made_signs_in_with_the_password_it_set ok
+  - [x] A test sets git user.email and every EMAIL-like environment variable to a marker and proves the marker appears nowhere in state, deployment.toml or the issuer. — crates/lys/tests/cli_tests/identity_setup.rs:48-66 run_marked (GIT_CONFIG_GLOBAL .gitconfig + EMAIL_VARIABLES); nothing_about_a_person_is_taken_from_the_machine scans every written file (>=10), stdout, stderr, and asserts the issuer's bootstrap email is the machine address
+  - [x] The bootstrap account names no person, and a people count after setup is one. — identity_setup.rs asserts RAUTHY_BOOTSTRAP_ADMIN_EMAIL=bootstrap@machine.lys.test (BOOTSTRAP_ACCOUNT_EMAIL); setup_page.rs completing_setup_makes_one_administrator_and_signs_them_in counts one person
+  - [x] No output line or log holds the setup code; `lys identity setup-code` lets a sole administrator set a new password. — setup_code.rs:116-134 hand_over never prints the code (fragment or 0600 file); identity_install.rs reads the code from the headless file and scans the install output; setup_page.rs a_password_code_sets_the_administrator_a_new_password ok
 - Issues:
-  - Make a real first install start the directory service, so the setup route answers. Today the issuer scheme mismatch caused by PROXY_MODE stops it at start. This needs the brief revision named under R2.
-  - Show and check the issuer's own password policy, as the spec says, by reading the issuer's /auth/v1/password_policy through sign_in_api. Today accounts.rs:41-58 hard-codes PASSWORD_MIN=14, PASSWORD_MAX=128 and the character classes, a copy of Rauthy's default that goes wrong as soon as the issuer's policy is changed.
+  - The spec asks for the issuer's own password policy, shown before submit. accounts.rs:41-43 hard-codes PASSWORD_MIN=14 and PASSWORD_MAX=128, copied from Rauthy's default, because Rauthy v0.36.2 serves /auth/v1/password_policy only to a signed-in session. A brief revision must choose how the policy is read: a non-admin machine account that signs in to read it, or Lys owning the policy and writing it with Secrets:update. Then implement that choice and remove the hard-coded copy.
 
 ### R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages
 
@@ -144,17 +143,21 @@ Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today red
 
 **Review (recorded):**
 
-- Alignment: drifted
+- Alignment: fixed
 - Acceptance verdicts:
-  - [ ] An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin. — The harness test sign_in_page.rs every_address_the_browser_is_sent_to_is_on_lys_origin passes (my run). The real-install version, crates/lys/tests/identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer, cannot pass because the service refuses to start (Rauthy v0.36.2 rauthy_config.rs:113-120 proxy_mode forces an https issuer, against the http one configured in server_config.rs:35-38).
-  - [x] A wrong password and an unknown email give the same Lys refusal, and neither names the issuer. — sign_in_page.rs a_wrong_password_and_an_unknown_email_are_one_refusal: ok. error.rs SignInRefused has one message.
-  - [ ] A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's. — The harness test sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only passes against a fake. On the shipped install, Rauthy with proxy_mode names its provider callback https://localhost:8490/auth/v1/providers/callback (rauthy_config.rs:129-144), which Lys does not serve over http, so a real provider sign-in cannot return.
-  - [ ] A surface test renders the sign-in and setup screens and finds only the shared form, button and layout classes and no unstyled default control; an end-to-end check loads the served sign-in page and finds no stylesheet or asset served from the issuer. — The surface leg passed (surface/identity/tests/sign-in.test.tsx), and the harness test sign_in_page.rs the_served_sign_in_page_loads_nothing_from_the_issuer passes. The end-to-end check on a served real install (identity_install.rs) cannot run past service start.
-  - [x] Repeated wrong passwords from one address do not bar a sign-in from another address. — sign_in_page.rs failed_sign_ins_from_one_address_do_not_bar_another: ok (harness). main.rs serves with connect info, and sign_in.rs forwards x-forwarded-for.
-  - [x] An account with a passkey is refused second_factor_unsupported. — sign_in_page.rs an_account_asking_for_a_second_factor_is_refused_by_name: ok. error.rs SecondFactorUnsupported maps to 403.
+  - [x] An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin. — sign_in_page.rs every_address_the_browser_is_sent_to_is_on_lys_origin ok; identity_install.rs passed on a real install in my run (redirects relative or on http://localhost:8490)
+  - [x] A wrong password and an unknown email give the same Lys refusal, and neither names the issuer. — sign_in_page.rs a_wrong_password_and_an_unknown_email_are_one_refusal ok; error.rs SignInRefused has one message
+  - [x] A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's. — sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only ok; prepare.rs sets RAUTHY_PROXY_MODE from public_tls(), so an http install's callback is http://localhost:8490/auth/v1/providers/callback (sign_in.rs:193 PROVIDER_CALLBACK_PATH)
+  - [x] A surface test renders the sign-in and setup screens and finds only the shared form, button and layout classes and no unstyled default control; an end-to-end check loads the served sign-in page and finds no stylesheet or asset served from the issuer. — surface/identity/tests/sign-in.test.tsx 'is built from the shared page, field and button styling' (surface leg exit 0); sign_in_page.rs the_served_sign_in_page_loads_nothing_from_the_issuer ok; identity_install.rs scans the served page's assets on a real install
+  - [x] Repeated wrong passwords from one address do not bar a sign-in from another address. — sign_in_page.rs failed_sign_ins_from_one_address_do_not_bar_another ok; main.rs serves with connect info, and sign_in.rs forwards x-forwarded-for; compose.yaml PEER_IP_HEADER_NAME, trusted_proxies limited to the network gateway (config_tests only_the_networks_gateway_may_be_a_trusted_proxy, 5 refusals counted)
+  - [x] An account with a passkey is refused second_factor_unsupported. — sign_in_page.rs an_account_asking_for_a_second_factor_is_refused_by_name ok; error.rs SecondFactorUnsupported → 403
+- Checklist verified: C356
+- Stories verified: S150
 - Issues:
-  - Get a brief revision that settles the conflict between R2 and R4 under Rauthy v0.36.2: proxy mode on (R2's throttling) forces both an https issuer name and an https provider callback (rauthy_config.rs:113-120, 129-144), while R4 requires the callback on Lys's http origin. Choose between serving Lys over https, turning proxy mode off, or another ruling, then make identity_install.rs pass on a real install.
-  - deployment.template.toml:19 trusts 172.16.0.0/12 and 192.168.0.0/16 as proxies, but the spec says the issuer trusts the forwarded header 'from the service's address only'. Narrow trusted_proxies to the address the service reaches the issuer from.
+  - validate.rs network_gateway accepted 10.0.0.0/7, which starts private but runs into the public 11.0.0.0/8. A trusted_proxies gateway could then be derived from a range that is not private.
+  - The spec's mechanism (proxy mode on) is replaced by Rauthy's peer_ip_header_name with proxy mode off on http, because proxy mode forces an https issuer. The intent holds: the forwarded address is trusted only from the gateway, and throttling is per person. I could not check this against Rauthy's source (utils.rs:131-143) because vendor/rauthy is not initialised in this clone. The evidence is the harness test and the passing real install.
+- Fixes:
+  - validate.rs network_gateway: a range's last address must also be private ("the range runs past its private block"). config_tests.rs the_network_is_a_private_range_written_from_its_first_address now also refuses 10.0.0.0/7, and its count went from 6 to 7. With the check reverted, exactly this test fails (71 passed, 1 failed).
 
 ### R3: Lys is the OpenID provider every product is registered with
 
@@ -202,15 +205,14 @@ Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of 
 
 **Review (recorded):**
 
-- Alignment: drifted
+- Alignment: aligned
 - Acceptance verdicts:
-  - [ ] a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's. — crates/lys-identity-server/tests/provider.rs:39-75 builds ProviderSettings and the ProductClient by hand in the test (start_adjusted), not from what install writes (server_config.rs). identity_install.rs registers no fixture product and cannot start the service anyway.
-  - [x] Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks. — provider.rs a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys: ok (my run), using the openidconnect client as the second party.
-  - [x] No page, refusal or redirect from Lys contains the issuer's loopback address or port. — sign_in_page.rs and provider.rs scan bodies and redirects for the loopback address. configuration.rs and connections.rs check it is absent. All ok in my run (harness).
-  - [x] Each of the four refusals has its own test. — provider.rs a_redirect_address_not_registered_is_refused_and_never_followed, a_code_used_twice_is_refused, a_wrong_pkce_verifier_is_refused, a_code_past_its_instant_is_refused: all ok.
-- Issues:
-  - Configure the fixture product from install's actual output (the server config install writes) and sign it in against that, as row 1 asks.
-  - provider.rs:47 TOKEN_SECONDS=300 and provider.rs:50 CODE_SECONDS=60 are durations that trace to no brief, design or named outside limit. The row needs an expiry instant, but the brief must state these lifetimes (or trace them to a named outside limit) before they stand; a bigger or smaller number is not the fix.
+  - [x] a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's. — crates/lys/tests/identity_install/product.rs:56-84 reads install's identity.json, asserts provider.clients==[], adds the product, reruns install and checks it is kept; identity_install.rs passed on a real install in my run
+  - [x] Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks. — provider.rs a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys ok (openidconnect client as second party); product.rs runs discovery, token, userinfo, jwks on a real install
+  - [x] No page, refusal or redirect from Lys contains the issuer's loopback address or port. — identity_install.rs scans 27 texts for the issuer's name and loopback port (passed); configuration.rs and connections.rs assert the loopback address is absent
+  - [x] Each of the four refusals has its own test. — provider.rs a_redirect_address_not_registered_is_refused_and_never_followed, a_code_used_twice_is_refused, a_wrong_pkce_verifier_is_refused, a_code_past_its_instant_is_refused: all ok (5 passed)
+- Checklist verified: C357
+- Stories verified: S150
 
 ### R4: Providers are set up inside Lys with every step shown
 
@@ -254,12 +256,12 @@ Behavioural. surface/identity/src/features/connections/SignInProviders.tsx: for 
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [x] The redirect address shown equals the one the service sends to the provider. — sign_in_providers.rs the_redirect_address_shown_is_the_one_the_provider_is_asked_with: ok. On a proxy-mode install, though, Rauthy's own callback is https and differs from the http address shown (see issues).
-  - [x] Saving a provider with a client id the provider rejects is refused with the provider's words. — sign_in_providers.rs a_client_id_the_provider_rejects_is_refused_in_the_providers_words: ok. error.rs ProviderRefused carries the provider's reason.
-  - [x] A saved provider appears as a button on R2's sign-in screen. — sign_in_providers.rs a_saved_provider_is_offered_on_the_sign_in_page: ok. The surface test sign-in.test.tsx 'offers one button per provider' passes (surface leg).
-  - [ ] A Google sign-in goes from Lys's page to Google and back to a Lys page with no issuer page in the browser's history. — Only proved against a fake provider in the harness. On the shipped install, Rauthy v0.36.2 with proxy_mode builds its provider callback as https://<pub_url>/auth/v1/providers/callback (rauthy_config.rs:129-144), which does not match the http address Lys shows and serves.
+  - [x] The redirect address shown equals the one the service sends to the provider. — sign_in_providers.rs the_redirect_address_shown_is_the_one_the_provider_is_asked_with ok; the http callback now matches, since proxy mode follows the public origin (prepare.rs)
+  - [x] Saving a provider with a client id the provider rejects is refused with the provider's words. — sign_in_providers.rs a_client_id_the_provider_rejects_is_refused_in_the_providers_words ok; error.rs ProviderRefused carries the provider's reason
+  - [x] A saved provider appears as a button on R2's sign-in screen. — sign_in_providers.rs a_saved_provider_is_offered_on_the_sign_in_page ok; sign-in.test.tsx 'offers one button per provider, each starting at Lys'
+  - [ ] A Google sign-in goes from Lys's page to Google and back to a Lys page with no issuer page in the browser's history. — Proved only against the harness fake provider (sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only). No run against real Google exists.
 - Issues:
-  - Resolve the provider callback scheme on a real install, through the same brief revision named under R2, then prove a provider round trip on a real install.
+  - Row 4 needs a real Google OAuth client and a Google account. CN2 allows only disposable test provider registrations, and CN5 says a live demonstration is never a loop acceptance row. A brief revision must turn this row into a verification step a person performs after landing, keeping the fake-provider round trip as the loop evidence, or it must name a test Google registration the loop may use.
 
 ### R5: A person's own account, and administration of accounts, are Lys screens
 
@@ -301,12 +303,12 @@ Behavioural. A You-screen section changes the signed-in person's email (confirme
 
 - Alignment: drifted
 - Acceptance verdicts:
-  - [x] Changing one's email on the You screen changes it in the issuer, and the person signs in with the new email. — tests/accounts.rs a_changed_email_signs_in_and_the_old_one_does_not: ok (harness, my run).
-  - [x] An administrator's reset lets the person sign in with the new password and refuses the old one. — tests/accounts.rs the_administrator_resets_a_password_and_disables_a_person: ok (harness, my run).
-  - [ ] A browser request from the host to the issuer's admin path fails to connect. — deploy/identity/compose.yaml:114-115 publishes the issuer on 127.0.0.1:${RAUTHY_LISTEN_PORT}, as R3's amendment requires, so a host browser does connect to its admin path. No test of this row exists.
+  - [x] Changing one's email on the You screen changes it in the issuer, and the person signs in with the new email. — tests/accounts.rs a_changed_email_signs_in_and_the_old_one_does_not ok (harness)
+  - [x] An administrator's reset lets the person sign in with the new password and refuses the old one. — tests/accounts.rs the_administrator_resets_a_password_and_disables_a_person ok (harness)
+  - [ ] A browser request from the host to the issuer's admin path fails to connect. — deploy/identity/compose.yaml:118 publishes the issuer on 127.0.0.1:${RAUTHY_LISTEN_PORT}, as R3 requires, so a host browser does connect to /auth/v1/admin. No test of this row exists.
 - Issues:
-  - Get a brief revision that reconciles R5 row 3 (the admin path unreachable from the host) with R3's ruling that the issuer's port stays on loopback. For example, block the admin path at the issuer, or move the service into the compose network as its own card. Then add a test for the row.
-  - Implement the upgrade clause (an existing install gains Users create/update through its configure key, or the upgrade is refused naming the missing right) once DIRECTORY-045 lands; it is not in the tree.
+  - Get a brief revision that reconciles row 3 (the admin path unreachable from the host) with R3's ruling that the issuer's port stays on loopback. Options: refuse the admin path at the issuer, or move the service into the compose network as its own card. Then add the test.
+  - Implement the upgrade clause once DIRECTORY-045's upgrade code is in the tree: an existing install gains Users create/update through its configure key, or the upgrade is refused naming the missing right. The clause must also cover the new required deployment.network field, which an existing deployment.toml lacks and which is now refused as config_invalid.
 
 ### R6: Nothing a person reads names the issuer
 
@@ -352,14 +354,12 @@ Behavioural. Install output, every refusal returned to a browser, every served s
 
 **Review (recorded):**
 
-- Alignment: drifted
+- Alignment: aligned
 - Acceptance verdicts:
-  - [ ] A test runs a first install and a sign-in and scans stdout, stderr, every served page and every refusal body for the issuer's name: none. — crates/lys/tests/identity_install.rs:297 a_first_install_and_a_sign_in_never_name_the_issuer is written (test = false in Cargo.toml; it runs on the identity leg). It cannot pass: the service refuses to start on the issuer scheme mismatch (rauthy_config.rs:113-120 against server_config.rs:35-38).
-  - [x] The built screens contain no occurrence of the issuer's name. — `npx vite build` into a scratch outDir, then grep -rio rauthy: 0 hits (my run). surface/identity/tests/sign-in.test.tsx:147 scans every source file and index.html (surface leg passed).
-- Issues:
-  - Make identity_install.rs pass on a real install once the R2/R4 brief revision settles the issuer scheme.
-- Fixes:
-  - accounts.rs check_email: named the outside limit behind the 254-octet bound (RFC 5321 4.5.3.1.3, also the issuer's email validation). accounts.rs issuer_name: named the limit behind 32 characters (Rauthy v0.36.2 RE_USER_NAME). The bounds are unchanged; they now trace to named outside limits.
+  - [x] A test runs a first install and a sign-in and scans stdout, stderr, every served page and every refusal body for the issuer's name: none. — crates/lys/tests/identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer: 1 passed in 43.92s on a real install (my run, exit 0)
+  - [x] The built screens contain no occurrence of the issuer's name. — surface/identity/tests/sign-in.test.tsx 'never names the sign-in service behind Lys in any screen source' (surface leg exit 0)
+- Checklist verified: C360
+- Stories verified: S150
 
 ## Boundaries
 
