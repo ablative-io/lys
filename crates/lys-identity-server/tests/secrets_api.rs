@@ -273,6 +273,32 @@ async fn a_revocation_is_asked_by_handle_and_the_query_is_signed() -> TestResult
 }
 
 #[tokio::test]
+async fn a_secrets_settings_are_asked_by_name_and_the_query_is_signed() -> TestResult {
+    let setup = setup().await?;
+    let cookie = setup.service.sign_in(login(ADA)).await?;
+    let (status, body) = setup
+        .service
+        .get("/secrets/settings?secret=api%20token", Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = setup
+        .service
+        .get("/secrets/settings", Some(&cookie))
+        .await?;
+    assert_eq!(status, 400, "{body}");
+    let (status, body) = setup
+        .service
+        .get("/secrets/settings?secret=token", None)
+        .await?;
+    assert_eq!(status, 401, "{body}");
+    let asked = received(&setup.log);
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0].path, "/_lys/settings?secret=api%20token");
+    signed_as_received(&asked[0], &setup.key)?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_login_bound_to_no_person_is_refused_by_name() -> TestResult {
     let setup = setup().await?;
     let cookie = setup.service.sign_in(login("nobody-subject")).await?;

@@ -74,6 +74,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/secrets/grants", get(grants))
         .route("/secrets/audit", get(audit))
         .route("/secrets/revocation", get(revocation))
+        .route("/secrets/settings", get(settings))
         .route("/secrets/scope", post(scope))
         .route("/secrets/recipients", post(recipients))
 }
@@ -190,6 +191,19 @@ async fn revocation(
         reason: "name the handle as ?handle=<id>".to_owned(),
     })?;
     let path = format!("/_lys/revocation?{query}");
+    let answer = ask(&state, &headers, Method::GET, &path, Bytes::new()).await?;
+    Ok(Json(answer))
+}
+
+async fn settings(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    RawQuery(query): RawQuery,
+) -> Result<Json<Value>, ServerError> {
+    let query = query.ok_or_else(|| ServerError::RequestMalformed {
+        reason: "name the secret as ?secret=<name>".to_owned(),
+    })?;
+    let path = format!("/_lys/settings?{query}");
     let answer = ask(&state, &headers, Method::GET, &path, Bytes::new()).await?;
     Ok(Json(answer))
 }
