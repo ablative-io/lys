@@ -1,3 +1,4 @@
+import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect } from 'react';
@@ -16,12 +17,6 @@ import type { Load } from '../../api';
 import { Preview } from './Preview';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 import type { RolesLoad } from '../roles/AssignedRoles';
-
-const NOT_YET = (
-  <span className="open-q" title="Its server does not exist yet">
-    not built yet
-  </span>
-);
 
 function PeopleHead() {
   const shell = useShell();
@@ -50,15 +45,14 @@ function PeopleHead() {
   );
 }
 
-function Stat({ n, l, warn }: { n: number | null; l: string; warn?: boolean }) {
+function Stat({ n, l, warn }: { n: number; l: string; warn?: boolean }) {
   return (
     <div className="stat">
       <div className="n" style={warn && n ? { color: 'var(--warn)' } : undefined}>
-        {n === null ? <span className="dim">—</span> : n}
+        {n}
       </div>
       <div className="l">
         {l}
-        {n === null ? <> · {NOT_YET}</> : null}
       </div>
     </div>
   );
@@ -85,8 +79,7 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
         <Stat n={active('person')} l="people active" />
         <Stat n={active('agent')} l="agents active" />
         <Stat n={all.filter(needsNewPerson).length} l="with no one answering" warn />
-        <Stat n={null} l="found, not registered" />
-        <Stat n={null} l="sessions running" />
+        <RuntimeCounts />
       </div>
       <div className="split">
         <div>

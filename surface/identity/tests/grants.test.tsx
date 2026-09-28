@@ -174,7 +174,7 @@ describe("What you can't give (conformance 2.4)", () => {
     expect(reasons).toEqual([
       ['viewer of project:ledger', `You may use it; G/${LEDGER_G.slice(6, 14)} does not let you pass it on.`],
       ['owner of project:identity', 'More than you hold.'],
-      ['Service accounts', 'not built yet The directory records no service accounts yet, so none is listed here.'],
+      ['Service accounts', 'A service-account record does not grant permission. Delegate access through a grant; manage account records in Service accounts.'],
       ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
     ]);
   });

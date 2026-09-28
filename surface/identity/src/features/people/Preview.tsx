@@ -1,6 +1,5 @@
 import { RoleSummary } from '../roles/AssignedRoles';
 import type { RolesLoad } from '../roles/AssignedRoles';
-import { useShell } from '../../shell/ShellContext';
 import type { Entry } from './directory';
 import type { Load } from '../../api';
 import { Reach } from './reach';
@@ -9,7 +8,6 @@ import { Pill } from './Pill';
 
 /** The selected row, without leaving the list. */
 export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach: Load<DirectoryReach> }) {
-  const shell = useShell();
   const person = x.person;
   const agent = x.kind === 'agent';
   return (
@@ -37,7 +35,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
         <>
           <div className="section-h">Now</div>
           <div className="note">
-            <span className="open-q">not built yet</span> sessions show only when a runtime reports them.
+            <a href={'#/file/' + x.id + '/sessions'}>Read runtime reports</a>. A report is required to confirm running or stopped.
           </div>
         </>
       ) : null}
@@ -45,9 +43,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
         <a className="btn" href={'#/file/' + x.id}>Open file</a>
         <a className="btn" href={'#/graph/' + x.id}>Show in graph</a>
         {agent && x.state === 'active' ? (
-          <button className="btn" data-act="start" onClick={() => shell.toast('Starting an agent is not built yet')}>
-            Start…
-          </button>
+          <a className="btn" data-act="start" href={'#/file/' + x.id + '/provisioning'}>Prepare start…</a>
         ) : null}
       </div>
     </div>

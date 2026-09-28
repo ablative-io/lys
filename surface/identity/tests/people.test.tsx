@@ -32,10 +32,11 @@ describe('People and agents', () => {
     expect($$('.stat .n')[2].textContent).toBe('4');
   });
 
-  it('shows no sample data and marks what has no server', async () => {
-    await mount('#/people');
+  it('shows no sample data and reads reported counts', async () => {
+    await mount('#/people', { ...SERVICE, '/runtime/sessions': ok({ sessions: [{ agent: null, shown: 'unconfirmed' }, { agent: SCRIBE, shown: 'running' }] }) });
     for (const sample of ['Tom Whiting', 'Dana Reyes', 'Night builder', 'mock-up · sample data']) expect(text()).not.toContain(sample);
-    expect(text()).toContain('not built yet');
+    expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['1', '1']);
+    expect(text()).not.toContain('not built yet');
   });
 
   it('moves with j and k, previews the row, and opens it with Enter', async () => {
@@ -97,4 +98,13 @@ describe('People and agents', () => {
     expect(text()).toContain('your login is bound to no person');
     expect(ADA).toMatch(/^person-/);
   });
+  it('names a refused runtime read instead of reporting zero', async () => {
+    await mount('#/people', { ...SERVICE, '/runtime/sessions': refused(503, 'RuntimeUnavailable', 'No reports store') });
+    expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['—', '—']); expect(text()).toContain('RuntimeUnavailable');
+  });
+  it('takes the agent preview start action to the real profile screen', async () => {
+    await mount('#/people'); await click($('[data-kind="agent"]'));
+    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+  });
+
 });

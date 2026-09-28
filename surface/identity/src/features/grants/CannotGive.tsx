@@ -14,7 +14,7 @@ export function CannotGive({ w, source }: { w: GrantWorld; source: Grant | null 
       ))}
       <div className="why-not">
         <b>Service accounts</b>
-        <div className="note"><span className="open-q">not built yet</span> The directory records no service accounts yet, so none is listed here.</div>
+        <div className="note">A service-account record does not grant permission. Delegate access through a grant; manage account records in <a href="#/service-accounts">Service accounts</a>.</div>
       </div>
       <div className="why-not">
         <b>Your sign-in identities</b>
