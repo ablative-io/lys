@@ -275,8 +275,9 @@ fn a_missing_snapshot_is_refused_by_name_and_rewritten() -> TestResult {
     assert_eq!(reads, 6);
     drop(rebuilt);
 
-    let (_again, reads) = place.open()?;
+    let (again, reads) = place.open()?;
     assert_eq!(reads, 0, "the rebuild wrote a snapshot at the whole log");
+    drop(again);
     Ok(())
 }
 
@@ -318,7 +319,8 @@ fn a_signed_snapshot_whose_state_does_not_read_is_refused_and_rewritten() -> Tes
     assert_eq!(projection_of(&mut rebuilt)?, before);
     drop(rebuilt);
 
-    let (_again, reads) = place.open()?;
+    let (again, reads) = place.open()?;
     assert_eq!(reads, 0, "the rebuild wrote a snapshot at the whole log");
+    drop(again);
     Ok(())
 }

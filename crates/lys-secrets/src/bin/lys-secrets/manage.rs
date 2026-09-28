@@ -126,7 +126,7 @@ struct SettingsAsked {
 /// it. A screen reads this to settle a change whose
 /// answer it never received.
 pub async fn settings(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let (parts, _body) = request.into_parts();
+    let (parts, _) = request.into_parts();
     let Query(asked) = Query::<SettingsAsked>::try_from_uri(&parts.uri)
         .map_err(|error| malformed("query", error.body_text()))?;
     if asked.secret.is_empty() {
@@ -155,7 +155,7 @@ struct RevocationAsked {
 /// Where the revocation of the handle named by the `handle` query member
 /// stands, when the caller may discover its secret.
 pub async fn revocation(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let (parts, _body) = request.into_parts();
+    let (parts, _) = request.into_parts();
     let Query(asked) = Query::<RevocationAsked>::try_from_uri(&parts.uri)
         .map_err(|error| malformed("query", error.body_text()))?;
     let handle = asked.handle;

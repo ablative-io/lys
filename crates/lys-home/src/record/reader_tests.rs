@@ -77,7 +77,7 @@ fn session_file(home: &Home) -> Result<std::path::PathBuf, Box<dyn Error>> {
 
 #[test]
 fn a_held_session_is_read_in_file_order() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let owner = home.open_session(FIXTURE)?;
     let reader = home.read_session(FIXTURE)?;
     let ids: Vec<&str> = reader.ids().collect();
@@ -86,12 +86,13 @@ fn a_held_session_is_read_in_file_order() -> Gate {
     assert_eq!(reader.header().id, FIXTURE);
     assert_eq!(reader.entry("e3")?.parent_id(), Some("e2"));
     drop(owner);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn without_an_index_the_reader_scans_in_memory_and_writes_nothing() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let file = session_file(&home)?;
     {
         let mut owner = home.open_session(FIXTURE)?;
@@ -112,12 +113,13 @@ fn without_an_index_the_reader_scans_in_memory_and_writes_nothing() -> Gate {
     assert_eq!(read.len(), 1);
     assert_eq!(snapshot(&home)?, before);
     assert!(!Index::index_path(&file).exists());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn an_absent_lock_stays_absent_across_a_read() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let file = session_file(&home)?;
     let lock = Index::lock_path(&file);
     std::fs::remove_file(&lock)?;
@@ -126,6 +128,7 @@ fn an_absent_lock_stays_absent_across_a_read() -> Gate {
     assert_eq!(reader.ids().count(), 5);
     assert!(!lock.exists());
     assert_eq!(snapshot(&home)?, before);
+    drop(dir);
     Ok(())
 }
 
@@ -152,7 +155,7 @@ fn a_missing_sessions_directory_lists_nothing() -> Gate {
 
 #[test]
 fn the_owner_opens_and_appends_after_a_read() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let reader = home.read_session(FIXTURE)?;
     assert!(reader.contains("e5"));
     let mut owner = home.open_session(FIXTURE)?;
@@ -164,5 +167,6 @@ fn the_owner_opens_and_appends_after_a_read() -> Gate {
     })?;
     assert_eq!(owner.head()?, Some(id.as_str()));
     assert!(!reader.contains(&id));
+    drop(dir);
     Ok(())
 }

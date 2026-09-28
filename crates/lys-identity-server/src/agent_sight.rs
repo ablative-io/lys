@@ -26,7 +26,9 @@ pub(crate) fn seen_agent(
     id: &str,
 ) -> Result<SeenAgent, ServerError> {
     let actor = signed_in(state, headers)?;
-    let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     with_directory(state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(state, headers, directory)?;

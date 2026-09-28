@@ -8,7 +8,7 @@ use super::*;
 
 #[test]
 fn sign_note_emits_exact_golden_bytes() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let note = sign_note(GOLDEN_BODY, GOLDEN_NAME, &identity).unwrap();
     assert_eq!(note, golden_note());
 }
@@ -28,7 +28,7 @@ fn signature_line_prefix_is_exact_em_dash_bytes() {
 
 #[test]
 fn key_id_matches_golden_and_hand_computed_sha256() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let pubkey = identity.public_key_bytes();
     assert_eq!(
         crate::hex_lower(&pubkey),
@@ -50,14 +50,14 @@ fn key_id_matches_golden_and_hand_computed_sha256() {
 
 #[test]
 fn key_id_rejects_invalid_name() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let err = key_id("bad name", &identity.public_key_bytes()).unwrap_err();
     assert!(matches!(err, TrustError::VerifierKey { .. }));
 }
 
 #[test]
 fn signature_covers_body_including_trailing_newline_golden_hex() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let signature = identity.sign(GOLDEN_BODY.as_bytes());
     assert_eq!(crate::hex_lower(&signature), GOLDEN_SIG_HEX);
 
@@ -88,7 +88,7 @@ fn verify_checkpoint_accepts_golden_and_parses_body() {
 
 #[test]
 fn sign_then_verify_round_trips_for_other_bodies() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let verifier = golden_verifier();
     for body in [
         "example.com/lys/test\n0\n47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=\n",
@@ -103,7 +103,7 @@ fn sign_then_verify_round_trips_for_other_bodies() {
 
 #[test]
 fn sign_note_rejects_invalid_bodies_and_names() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     // (a) of the trailing-newline boundary: body lacking the trailing
     // newline is refused at signing time.
     let no_newline = GOLDEN_BODY.trim_end_matches('\n');
@@ -132,7 +132,7 @@ fn signature_over_body_without_trailing_newline_is_rejected() {
     // (b): construct a signature over the body WITHOUT its trailing
     // newline, splice it into an otherwise-valid note. Verification signs
     // the body WITH the newline, so this must fail.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let body_without_newline = GOLDEN_BODY.trim_end_matches('\n');
     let signature = identity.sign(body_without_newline.as_bytes());
     let mut blob = GOLDEN_KEY_ID.to_vec();

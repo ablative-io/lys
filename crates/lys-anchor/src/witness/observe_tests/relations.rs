@@ -11,7 +11,7 @@ use super::*;
 
 #[test]
 fn a_conflicting_checkpoint_is_still_appended() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut child = Child::new(CHILD_ORIGIN);
     child.grow(3);
 
@@ -52,6 +52,7 @@ fn a_conflicting_checkpoint_is_still_appended() {
     // deliberately not asserted here.
     assert!(observed.previous.is_some());
     assert!(observed.relation.is_some());
+    drop(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,7 @@ fn a_conflicting_checkpoint_is_still_appended() {
 
 #[test]
 fn resubmitting_the_identical_checkpoint_is_identical() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut child = Child::new(CHILD_ORIGIN);
     child.grow(3);
     see(&mut anchor, &child.checkpoint());
@@ -84,6 +85,7 @@ fn resubmitting_the_identical_checkpoint_is_identical() {
     let previous = repeat.previous.unwrap();
     assert_eq!(previous.tree_size, child.tree_size());
     assert_eq!(previous.root, child.root());
+    drop(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +94,7 @@ fn resubmitting_the_identical_checkpoint_is_identical() {
 
 #[test]
 fn a_smaller_tree_size_is_rollback() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut child = Child::new(CHILD_ORIGIN);
     child.grow(5);
     let remembered_size = child.tree_size();
@@ -115,6 +117,7 @@ fn a_smaller_tree_size_is_rollback() {
     let observed = see(&mut anchor, &shrunk);
     assert_eq!(observed.relation, Some(Relation::Rollback));
     assert_eq!(observed.previous.unwrap().tree_size, remembered_now);
+    drop(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +126,7 @@ fn a_smaller_tree_size_is_rollback() {
 
 #[test]
 fn the_same_size_with_a_different_root_is_conflicting() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut child = Child::new(CHILD_ORIGIN);
     child.grow(4);
     let remembered_size = child.tree_size();
@@ -153,6 +156,7 @@ fn the_same_size_with_a_different_root_is_conflicting() {
     let previous = observed.previous.unwrap();
     assert_eq!(previous.tree_size, size, "same size");
     assert_eq!(previous.root, honest_root, "different root");
+    drop(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +184,7 @@ fn a_forged_consistency_path_is_unrelated() {
 
     // Positive control, first, on its own witness: the genuine path does not
     // come back `Unrelated`, so `Unrelated` is not this path's only answer.
-    let (_control_dir, mut control_anchor) = staged();
+    let (control_dir, mut control_anchor) = staged();
     see(&mut control_anchor, &remembered);
     let control = see_with(&mut control_anchor, &grown, &genuine);
     assert_ne!(
@@ -190,11 +194,13 @@ fn a_forged_consistency_path_is_unrelated() {
     );
 
     // The claim: the forged path is not accepted as an extension.
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     see(&mut anchor, &remembered);
     let observed = see_with(&mut anchor, &grown, &forged);
     assert_eq!(observed.relation, Some(Relation::Unrelated));
     assert_eq!(observed.previous.unwrap().tree_size, remembered_size);
+    drop(control_dir);
+    drop(dir);
 }
 
 #[test]
@@ -209,7 +215,7 @@ fn a_size_increase_with_no_proof_offered_is_unrelated() {
 
     // Positive control, first: with a proof, the same growth does not come
     // back `Unrelated`.
-    let (_control_dir, mut control_anchor) = staged();
+    let (control_dir, mut control_anchor) = staged();
     see(&mut control_anchor, &remembered);
     let control = see_with(&mut control_anchor, &grown, &genuine);
     assert_ne!(
@@ -219,10 +225,12 @@ fn a_size_increase_with_no_proof_offered_is_unrelated() {
     );
 
     // The claim: a witness offered no proof holds no proof, and says so.
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     see(&mut anchor, &remembered);
     let observed = see(&mut anchor, &grown);
     assert_eq!(observed.relation, Some(Relation::Unrelated));
+    drop(control_dir);
+    drop(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +239,7 @@ fn a_size_increase_with_no_proof_offered_is_unrelated() {
 
 #[test]
 fn a_first_sighting_reports_previous_none() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut known = Child::new(CHILD_ORIGIN);
     known.grow(2);
 
@@ -265,11 +273,12 @@ fn a_first_sighting_reports_previous_none() {
         anchor.leaf_bytes(unseen.recorded.leaf_index).unwrap(),
         stranger.checkpoint().as_slice()
     );
+    drop(dir);
 }
 
 #[test]
 fn a_leaf_that_is_not_a_checkpoint_is_recorded_and_compared_against_nothing() {
-    let (_dir, mut anchor) = staged();
+    let (dir, mut anchor) = staged();
     let mut child = Child::new(CHILD_ORIGIN);
     child.grow(2);
 
@@ -292,4 +301,5 @@ fn a_leaf_that_is_not_a_checkpoint_is_recorded_and_compared_against_nothing() {
         statement.as_slice(),
         "an unreadable submission is still recorded verbatim"
     );
+    drop(dir);
 }

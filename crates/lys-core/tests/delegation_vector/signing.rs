@@ -12,8 +12,8 @@ use super::*;
 /// inside another.
 #[test]
 fn the_seeds_derive_the_public_keys_the_vectors_name() {
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
     assert_eq!(to_hex(&root.public_key_bytes()), HEX_ROOT_PUBLIC_KEY);
     assert_eq!(
         to_hex(&delegated.public_key_bytes()),
@@ -25,8 +25,8 @@ fn the_seeds_derive_the_public_keys_the_vectors_name() {
 /// specification independently, for every vector.
 #[test]
 fn delegation_preimage_matches_the_frozen_sig_structure() {
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
 
     let mut checked = 0;
     for v in all_vectors() {
@@ -63,8 +63,8 @@ fn delegation_preimage_matches_the_frozen_sig_structure() {
 /// exactly one correct output; this is byte-identity, not mutual acceptance.
 #[test]
 fn sign_delegation_reproduces_the_frozen_artifacts() {
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
 
     let mut checked = 0;
     for v in all_vectors() {
@@ -111,8 +111,8 @@ fn sign_delegation_reproduces_the_frozen_artifacts() {
 /// under one.
 #[test]
 fn the_frozen_artifacts_verify_and_parse_back() {
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
     let root_public_key: [u8; 32] = from_hex(HEX_ROOT_PUBLIC_KEY).try_into().unwrap();
 
     let mut checked = 0;

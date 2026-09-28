@@ -232,7 +232,8 @@ pub fn certificate_subject_public_key(cert_der: &[u8]) -> TrustResult<[u8; 32]> 
 
     let data = spki.subject_public_key.data.as_ref();
     data.try_into()
-        .map_err(|_err| TrustError::CertificateParsing {
+        .ok()
+        .ok_or_else(|| TrustError::CertificateParsing {
             reason: format!(
                 "certificate subject key must be 32 bytes for Ed25519, got {}",
                 data.len()

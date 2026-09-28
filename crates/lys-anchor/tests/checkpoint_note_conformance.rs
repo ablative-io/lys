@@ -198,7 +198,7 @@ fn go_sumdb_note_reproduces_the_anchors_checkpoints_byte_for_byte() {
     let tampered = lines.join("\n");
     assert_ne!(tampered, last_note, "the tamper must change a byte");
 
-    let (ok, _stdout) = harness::run_built_tool(&bin, &["verify", &spec], tampered.as_bytes());
+    let (ok, _) = harness::run_built_tool(&bin, &["verify", &spec], tampered.as_bytes());
     assert!(!ok, "Go accepted a checkpoint whose root line was altered");
 
     let verifier = NoteVerifierKey::new(ORIGIN, open_anchor(dir).signer().public_key()).unwrap();

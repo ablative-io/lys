@@ -175,7 +175,7 @@ fn inspect_attestation_collapses_garbage_into_the_generic_failure() {
 #[test]
 fn inspect_cert_prints_unverified_subject_and_claims_without_an_issuer_key() {
     let dir = tempfile::tempdir().unwrap();
-    let (cert_path, _issuer_pub) = ca_issue_fixture(dir.path(), "1");
+    let (cert_path, _) = ca_issue_fixture(dir.path(), "1");
 
     // No issuer key is supplied anywhere in this invocation.
     let output = run_lys(&["inspect", "cert", "--cert", path_str(&cert_path)]);

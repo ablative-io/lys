@@ -187,7 +187,8 @@ fn parse_root_line(line: &str) -> TrustResult<[u8; 32]> {
         decoded
             .as_slice()
             .try_into()
-            .map_err(|_err| TrustError::CheckpointParsing {
+            .ok()
+            .ok_or_else(|| TrustError::CheckpointParsing {
                 reason: format!("root hash must decode to 32 bytes, got {}", decoded.len()),
             })?;
     Ok(root)

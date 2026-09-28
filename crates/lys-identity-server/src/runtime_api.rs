@@ -174,7 +174,8 @@ fn report(
     reported_by: String,
 ) -> Result<Report, ServerError> {
     let session = OperationId::from_str(session)
-        .map_err(|_unread| malformed("a session is named `op-` and 32 hex digits"))?;
+        .ok()
+        .ok_or_else(|| malformed("a session is named `op-` and 32 hex digits"))?;
     let confirmation = words("confirmation", &body.confirmation)?;
     match body.state {
         Reported::StopAsked => {
@@ -264,7 +265,9 @@ async fn report_agent(
 ) -> Result<Json<SessionView>, ServerError> {
     let body: ReportBody =
         serde_json::from_slice(&bytes).map_err(|refused| malformed(refused.to_string()))?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let signed = signed_agent(&state, directory, &headers, ("POST", uri.path(), &bytes))?;
@@ -336,7 +339,9 @@ async fn agent_sessions(
     Path(id): Path<String>,
 ) -> Result<Json<SessionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(&state, &headers, directory)?;

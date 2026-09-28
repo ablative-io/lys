@@ -71,14 +71,17 @@ pub fn verify_inclusion_artifact(
     }
     let proof_bytes = decode_hashes(&artifact.hashes)?;
     let body = verify_checkpoint(artifact.checkpoint.as_bytes(), verifier)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     if body.tree_size() != artifact.tree_size {
         return Err(TrustError::LogArtifactVerification);
     }
     let proof = InclusionProof::try_from_bytes(proof_bytes)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     verify_inclusion_raw(&body.to_root(), leaf_bytes, artifact.leaf_index, &proof)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     Ok(body)
 }
 
@@ -116,16 +119,20 @@ pub fn verify_consistency_artifact(
     }
     let proof_bytes = decode_hashes(&artifact.hashes)?;
     let body_1 = verify_checkpoint(artifact.checkpoint_1.as_bytes(), verifier)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     let body_2 = verify_checkpoint(artifact.checkpoint_2.as_bytes(), verifier)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     if body_1.tree_size() != artifact.tree_size_1 || body_2.tree_size() != artifact.tree_size_2 {
         return Err(TrustError::LogArtifactVerification);
     }
     let proof = ConsistencyProof::try_from_bytes(proof_bytes)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     verify_consistency(&body_1.to_root(), &body_2.to_root(), &proof)
-        .map_err(|_err| TrustError::LogArtifactVerification)?;
+        .ok()
+        .ok_or(TrustError::LogArtifactVerification)?;
     Ok((body_1, body_2))
 }
 
@@ -138,7 +145,8 @@ fn decode_hashes(hashes: &[String]) -> TrustResult<Vec<u8>> {
     for entry in hashes {
         let decoded = STANDARD
             .decode(entry)
-            .map_err(|_err| TrustError::LogArtifactVerification)?;
+            .ok()
+            .ok_or(TrustError::LogArtifactVerification)?;
         if decoded.len() != 32 {
             return Err(TrustError::LogArtifactVerification);
         }

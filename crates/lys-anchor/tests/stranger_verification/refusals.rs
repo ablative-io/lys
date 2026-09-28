@@ -21,6 +21,7 @@ fn the_script_refuses_a_leaf_with_one_byte_changed() {
     std::fs::write(&case.leaf_path, &corrupted).unwrap();
 
     assert_refused(&python, &case, None, "a leaf with one byte flipped");
+    case.close().unwrap();
 }
 
 #[test]
@@ -47,6 +48,7 @@ fn the_script_refuses_a_flipped_node_in_the_inclusion_path() {
     rewrite_artifact(&case, &value);
 
     assert_refused(&python, &case, None, "a flipped node in the inclusion path");
+    case.close().unwrap();
 }
 
 #[test]
@@ -67,6 +69,7 @@ fn the_script_refuses_a_changed_leaf_index() {
     rewrite_artifact(&case, &value);
 
     assert_refused(&python, &case, None, "a changed leaf_index");
+    case.close().unwrap();
 }
 
 #[test]
@@ -95,6 +98,7 @@ fn the_script_refuses_a_tree_size_that_contradicts_the_checkpoint() {
         None,
         "a tree_size the checkpoint contradicts",
     );
+    case.close().unwrap();
 }
 
 #[test]
@@ -113,6 +117,7 @@ fn the_script_refuses_an_artifact_carrying_an_unknown_field() {
     rewrite_artifact(&case, &value);
 
     assert_refused(&python, &case, None, "an artifact with an unknown field");
+    case.close().unwrap();
 }
 
 #[test]
@@ -136,4 +141,5 @@ fn the_script_refuses_an_artifact_labelled_with_the_wrong_format() {
         None,
         "an artifact labelled as the wrong kind",
     );
+    case.close().unwrap();
 }

@@ -31,7 +31,7 @@ impl<P: PermissionCheck> Broker<P> {
             .and_then(|()| {
                 self.permissions
                     .may_use(seat, secret)
-                    .map(|_permit| ())
+                    .map(|_| ())
                     .map_err(|denied| denied.reason)
             })
             .map_err(|reason| SecretsError::PermissionDenied {

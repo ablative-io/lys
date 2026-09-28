@@ -96,9 +96,9 @@ impl OnBehalf {
             service: service.to_owned(),
         };
         let operation_id = unhex(operation).ok_or_else(invalid)?;
-        let signed_at_ms = signed_at.parse::<i64>().map_err(|_number| invalid())?;
+        let signed_at_ms = signed_at.parse::<i64>().ok().ok_or_else(invalid)?;
         let cose = unhex(signature).ok_or_else(invalid)?;
-        let attestation = Attestation::from_cose_bytes(&cose).map_err(|_cose| invalid())?;
+        let attestation = Attestation::from_cose_bytes(&cose).ok().ok_or_else(invalid)?;
         Ok(Self {
             service: service.to_owned(),
             person: person.to_owned(),
@@ -173,7 +173,7 @@ impl ServiceWindow {
             }
             .into());
         }
-        self.seen.retain(|_key, signed_at| {
+        self.seen.retain(|_, signed_at| {
             now_ms.saturating_sub(*signed_at) <= 2 * PRESENTATION_SKEW_MS
         });
         let key = (service.clone(), asked.operation_id.clone());

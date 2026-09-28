@@ -210,7 +210,8 @@ pub fn verify_receipt(
         receipt.tree_size,
         &flattened,
     )
-    .map_err(|_err| TrustError::ReceiptVerification)?;
+    .ok()
+    .ok_or(TrustError::ReceiptVerification)?;
 
     let protected = encoding::protected_bytes(encoding::CONTENT_TYPE, &receipt.anchor_public_key);
     let sig_structure = cbor::sig_structure_bytes(&protected, &root);
@@ -225,7 +226,8 @@ pub fn verify_receipt(
         &sig_structure,
         &receipt.signature,
     )
-    .map_err(|_err| TrustError::ReceiptVerification)
+    .ok()
+    .ok_or(TrustError::ReceiptVerification)
 }
 
 /// Parse a tagged `COSE_Sign1` receipt and verify it against `leaf` and the

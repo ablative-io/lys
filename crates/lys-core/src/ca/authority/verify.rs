@@ -94,7 +94,8 @@ pub fn verify_certificate_chain_at(
     let signature_array: &[u8; 64] =
         signature_bytes
             .try_into()
-            .map_err(|_err| TrustError::CertificateVerification {
+            .ok()
+            .ok_or_else(|| TrustError::CertificateVerification {
                 reason: format!(
                     "certificate signature must be 64 bytes for Ed25519, got {}",
                     signature_bytes.len()
@@ -102,15 +103,17 @@ pub fn verify_certificate_chain_at(
             })?;
     let signature = Signature::from_bytes(signature_array);
 
-    let verifying_key = VerifyingKey::from_bytes(issuer_public_key).map_err(|_err| {
-        TrustError::CertificateVerification {
-            reason: "issuer public key is not a valid Ed25519 point".to_string(),
-        }
-    })?;
+    let verifying_key =
+        VerifyingKey::from_bytes(issuer_public_key)
+            .ok()
+            .ok_or_else(|| TrustError::CertificateVerification {
+                reason: "issuer public key is not a valid Ed25519 point".to_string(),
+            })?;
 
     verifying_key
         .verify_strict(tbs, &signature)
-        .map_err(|_err| TrustError::CertificateVerification {
+        .ok()
+        .ok_or_else(|| TrustError::CertificateVerification {
             reason: "certificate signature did not verify against the issuer public key"
                 .to_string(),
         })?;

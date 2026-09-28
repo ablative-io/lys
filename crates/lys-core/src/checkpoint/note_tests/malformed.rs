@@ -68,7 +68,7 @@ fn oversized_note_is_rejected() {
 /// bypassing `sign_note`'s own size cap so verify-side behavior can be
 /// tested in isolation.
 fn hand_signed_note_with_body_len(body_len: usize) -> String {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let mut body = "a".repeat(body_len - 1);
     body.push('\n');
     let signature = identity.sign(body.as_bytes());
@@ -108,7 +108,7 @@ fn sign_note_refuses_bodies_that_would_exceed_the_cap() {
     // a body whose note lands exactly on the cap signs AND re-verifies;
     // one byte more and sign_note refuses instead of emitting a note that
     // verify_note would reject.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let verifier = golden_verifier();
 
     let mut at_cap_body = "a".repeat(MAX_NOTE_BYTES - GOLDEN_NOTE_OVERHEAD - 1);

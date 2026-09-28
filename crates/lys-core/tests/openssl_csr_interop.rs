@@ -162,7 +162,14 @@ struct OpensslRequest {
     /// `openssl pkey -pubout` — an extraction lys plays no part in.
     public_key: [u8; 32],
     /// Keeps the temporary directory alive for the lifetime of the fixture.
-    _dir: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
+}
+
+impl OpensslRequest {
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
+    }
 }
 
 /// Generates an Ed25519 key and a PKCS#10 request for `subject` with the real
@@ -223,7 +230,7 @@ fn openssl_request(bin: &Path, subject: &str) -> OpensslRequest {
     OpensslRequest {
         der,
         public_key,
-        _dir: dir,
+        temp_dir: dir,
     }
 }
 
@@ -272,7 +279,7 @@ fn assert_pristine_is_accepted(request: &OpensslRequest) {
 fn openssl_request_is_certified_over_the_key_openssl_generated() {
     let bin = resolve_openssl();
     let request = openssl_request(&bin, SUBJECT);
-    let (_dir, ca) = test_authority();
+    let (_, ca) = test_authority();
 
     let verified = verify_certificate_request(&request.der)
         .expect("a plain `openssl req` PKCS#10 request must verify");
@@ -306,6 +313,7 @@ fn openssl_request_is_certified_over_the_key_openssl_generated() {
     assert_eq!(certified.issuer_public_key, ca.public_key_bytes());
     ca.verify_certificate_chain(&certified.der_bytes)
         .expect("the issued certificate must verify against its issuer");
+    request.close().unwrap();
 }
 
 /// A single flipped bit in OpenSSL's own signature is refused — at
@@ -314,7 +322,7 @@ fn openssl_request_is_certified_over_the_key_openssl_generated() {
 fn openssl_request_with_a_flipped_signature_bit_is_refused() {
     let bin = resolve_openssl();
     let request = openssl_request(&bin, SUBJECT);
-    let (_dir, ca) = test_authority();
+    let (_, ca) = test_authority();
     assert_pristine_is_accepted(&request);
 
     let mut tampered = request.der.clone();
@@ -334,6 +342,7 @@ fn openssl_request_with_a_flipped_signature_bit_is_refused() {
         .issue_certificate_for_request(&tampered, SUBJECT, Duration::from_secs(3600), vec![])
         .expect_err("issuance must refuse a request whose proof of possession failed");
     assert!(matches!(error, TrustError::CertificateVerification { .. }));
+    request.close().unwrap();
 }
 
 /// The misattribution attack the `request` module exists to prevent, built
@@ -348,7 +357,7 @@ fn openssl_request_with_a_flipped_signature_bit_is_refused() {
 fn openssl_request_re_subjected_to_another_name_is_refused() {
     let bin = resolve_openssl();
     let request = openssl_request(&bin, SUBJECT);
-    let (_dir, ca) = test_authority();
+    let (_, ca) = test_authority();
     assert_pristine_is_accepted(&request);
 
     assert_eq!(
@@ -391,4 +400,5 @@ fn openssl_request_re_subjected_to_another_name_is_refused() {
         .issue_certificate_for_request(&tampered, IMPOSTOR, Duration::from_secs(3600), vec![])
         .expect_err("the authority must not certify a key under a name its holder never signed");
     assert!(matches!(error, TrustError::CertificateVerification { .. }));
+    request.close().unwrap();
 }

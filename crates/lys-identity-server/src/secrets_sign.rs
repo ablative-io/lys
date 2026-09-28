@@ -82,8 +82,9 @@ impl Fields {
     }
 
     fn field(&mut self, bytes: &[u8]) -> Result<&mut Self, ServerError> {
-        let len =
-            u32::try_from(bytes.len()).map_err(|_overflow| ServerError::SecretsUnavailable {
+        let len = u32::try_from(bytes.len())
+            .ok()
+            .ok_or_else(|| ServerError::SecretsUnavailable {
                 reason: format!("a field of {} bytes is too long to sign", bytes.len()),
             })?;
         self.0.extend_from_slice(&len.to_be_bytes());

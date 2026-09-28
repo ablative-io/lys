@@ -26,24 +26,24 @@ fn golden_tree() -> AppendOnlyTree<RawLeaf> {
 }
 
 fn golden_verifier() -> NoteVerifierKey {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     NoteVerifierKey::new(GOLDEN_ORIGIN, identity.public_key_bytes()).unwrap()
 }
 
 fn golden_inclusion() -> InclusionProofArtifact {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     build_inclusion_artifact(&golden_tree(), b"leaf-1", GOLDEN_ORIGIN, &identity, 1).unwrap()
 }
 
 fn golden_consistency() -> ConsistencyProofArtifact {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let prefix = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves([b"leaf-0", b"leaf-1"]);
     build_consistency_artifact(&prefix, &golden_tree(), GOLDEN_ORIGIN, &identity).unwrap()
 }
 
 /// Signs a checkpoint note for the golden log at the given prefix size.
 fn checkpoint_for_size(size: usize) -> String {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let leaves: Vec<&[u8]> = [b"leaf-0".as_slice(), b"leaf-1", b"leaf-2"][..size].to_vec();
     let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(leaves);
     let body = crate::checkpoint::CheckpointBody::from_root(GOLDEN_ORIGIN, &tree.root()).unwrap();
@@ -88,7 +88,7 @@ fn valid_consistency_artifact_verifies_and_returns_both_bodies() {
 
 #[test]
 fn empty_hashes_are_legal_for_a_single_leaf_tree() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let mut tree = AppendOnlyTree::<RawLeaf>::new();
     tree.append_raw(b"only-leaf");
     let artifact =
@@ -255,7 +255,7 @@ fn inclusion_rejects_checkpoint_substitution_and_tampers() {
 
     // Checkpoint validly re-signed under a different origin/keyname by the
     // same key: candidate filtering + origin binding kill it.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let foreign_body = "other.example/log\n3\nz3Y6BByBzu8VeKYIP3XGG+8uABTyo+aDqX/Pylvn8Zo=\n";
     let mut artifact = golden_inclusion();
     artifact.checkpoint = sign_note(foreign_body, "other.example/log", &identity).unwrap();
@@ -330,7 +330,7 @@ fn consistency_rejects_checkpoint_swaps_and_substitution() {
     assert_consistency_rejected(&artifact, "checkpoints swapped");
 
     // checkpoint_2 replaced by a same-key note for a different origin.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let foreign_body = "other.example/log\n3\nz3Y6BByBzu8VeKYIP3XGG+8uABTyo+aDqX/Pylvn8Zo=\n";
     let mut artifact = golden_consistency();
     artifact.checkpoint_2 = sign_note(foreign_body, "other.example/log", &identity).unwrap();

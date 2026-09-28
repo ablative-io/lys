@@ -111,7 +111,8 @@ async fn the_certificates_of_an_agent_are_shown_with_a_proof_that_verifies() -> 
         let size = entry["tree_size"].as_u64().ok_or("no tree size")?;
         let root: [u8; 32] = bytes(entry["root"].as_str().ok_or("no root")?)?
             .try_into()
-            .map_err(|_short| "the root is not 32 bytes")?;
+            .ok()
+            .ok_or("the root is not 32 bytes")?;
         let proof =
             InclusionProof::try_from_bytes(bytes(entry["proof"].as_str().ok_or("no proof")?)?)?;
         let leaf = bytes(entry["leaf_bytes"].as_str().ok_or("no leaf")?)?;

@@ -15,7 +15,7 @@ use super::{COMPACTED, Gate, NOTE, PARENT, SENTINELS, fixture_home, lantern_entr
 
 #[test]
 fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let before = session_files(&home)?;
     let mut refusals: Vec<HomeError> = Vec::new();
 
@@ -71,12 +71,13 @@ fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
             .join("A.jsonl")
             .exists()
     );
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
+    let (dir, home, _) = fixture_home()?;
     {
         let reader = home.read_session(PARENT)?;
         let mut copy = home.create_session("A", "/fixture", None)?;
@@ -102,12 +103,13 @@ fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate 
         refusals += 1;
     }
     assert_eq!(refusals, 3);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
+    let (dir, home, _) = fixture_home()?;
     {
         let reader = home.read_session(PARENT)?;
         let mut copy = home.create_session("A", "/fixture", None)?;
@@ -161,5 +163,6 @@ fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
     }
     assert_eq!(refusals, 8);
     assert_eq!(session_files(&home)?, before);
+    drop(dir);
     Ok(())
 }

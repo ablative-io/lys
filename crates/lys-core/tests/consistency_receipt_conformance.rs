@@ -91,7 +91,7 @@ fn tree_of(size: u64) -> AppendOnlyTree<RawLeaf> {
 }
 
 fn root_of(size: u64) -> [u8; 32] {
-    let (root, _size) = tree_of(size).root().to_parts();
+    let (root, _) = tree_of(size).root().to_parts();
     root
 }
 
@@ -133,7 +133,7 @@ fn go_cose_consistency_receipt_conformance_round_trips() {
     let bin = workdir.path().join("cosetool");
     build_go_tool(&go, &gocache, &bin);
 
-    let (_dir, key) = anchor_identity();
+    let (_, key) = anchor_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());
     let seed_hex = to_hex(ANCHOR_SEED);
 
@@ -144,7 +144,7 @@ fn go_cose_consistency_receipt_conformance_round_trips() {
     let mut prepended = 0usize;
     for new_size in 2u64..=17 {
         for old_size in 1u64..new_size {
-            let (receipt, _old_root) = issue(old_size, new_size, &key);
+            let (receipt, _) = issue(old_size, new_size, &key);
             let expected_new_root = root_of(new_size);
 
             // lys signs, go-cose verifies. The Go side computes the older root
@@ -224,7 +224,7 @@ fn go_cose_refuses_what_lys_refuses() {
     let bin = workdir.path().join("cosetool");
     build_go_tool(&go, &gocache, &bin);
 
-    let (_dir, key) = anchor_identity();
+    let (_, key) = anchor_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());
     let (old_size, new_size) = (5u64, 13u64);
 
@@ -235,7 +235,7 @@ fn go_cose_refuses_what_lys_refuses() {
     // character — the sweep above failed, and this test passed unchanged. So the
     // first thing asserted here is that an honest receipt is still accepted.
     let (honest, honest_old_root) = issue(old_size, new_size, &key);
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, old_size, new_size),
         &honest.to_cose_bytes(),
@@ -258,7 +258,7 @@ fn go_cose_refuses_what_lys_refuses() {
     // lys rejects it because the derived root is one the anchor never signed.
     let (mut tampered, old_root) = issue(old_size, new_size, &key);
     tampered.consistency_path[0][0] ^= 0x01;
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, old_size, new_size),
         &tampered.to_cose_bytes(),
@@ -281,7 +281,7 @@ fn go_cose_refuses_what_lys_refuses() {
     // is indistinguishable from one that never runs.
     let (mut forged, old_root) = issue(old_size, new_size, &key);
     forged.signature[0] ^= 0x01;
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, old_size, new_size),
         &forged.to_cose_bytes(),
@@ -301,14 +301,14 @@ fn go_cose_refuses_what_lys_refuses() {
     // content type is what separates the two receipt kinds, and if that were a
     // lys-only convention an independently written verifier would happily open
     // one as the other.
-    let (consistency, _old_root) = issue(old_size, new_size, &key);
+    let (consistency, _) = issue(old_size, new_size, &key);
     let mut args = vec![
         "receipt-verify".to_string(),
         pubkey_hex.clone(),
         "0".to_string(),
     ];
     args.extend((0..new_size).map(|index| to_hex(&leaf(index))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &consistency.to_cose_bytes());
+    let (ok, _) = run_built_tool(&bin, &args, &consistency.to_cose_bytes());
     assert!(
         !ok,
         "go-cose opened a consistency receipt as an inclusion receipt"
@@ -322,7 +322,7 @@ fn go_cose_refuses_what_lys_refuses() {
         .map(|chunk| <[u8; 32]>::try_from(chunk).unwrap())
         .collect();
     let inclusion = sign_receipt(&leaf(0), 0, new_size, &inclusion_path, &key).unwrap();
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, old_size, new_size),
         &inclusion.to_cose_bytes(),
@@ -335,7 +335,7 @@ fn go_cose_refuses_what_lys_refuses() {
     // ---- A receipt presented against a log the verifier does not hold. The
     // older root the Go side computes is its own, so a receipt from elsewhere
     // has nothing to attach to.
-    let (receipt, _old_root) = issue(old_size, new_size, &key);
+    let (receipt, _) = issue(old_size, new_size, &key);
     let mut args = vec![
         "consistency-verify".to_string(),
         pubkey_hex,
@@ -343,6 +343,6 @@ fn go_cose_refuses_what_lys_refuses() {
         new_size.to_string(),
     ];
     args.extend((0..new_size).map(|index| to_hex(&leaf(index + 100))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
+    let (ok, _) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
     assert!(!ok, "go-cose accepted a receipt against the wrong log");
 }

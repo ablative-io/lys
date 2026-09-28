@@ -81,7 +81,7 @@ fn every_recall(home: &Home) -> Vec<Result<RecallReport, HomeError>> {
 
 #[test]
 fn recall_by_note_finds_a_phrase_inside_one_text_only() -> Gate {
-    let (_dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
+    let (dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
     let fold = recall_by_note(&home, "fold")?;
     assert_eq!(ids(&fold), [l1.as_str(), l3.as_str()]);
     assert!(fold.skipped.is_empty());
@@ -108,21 +108,23 @@ fn recall_by_note_finds_a_phrase_inside_one_text_only() -> Gate {
             Err(HomeError::EmptyNote { what }) if what == "words"
         ));
     }
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn recall_all_lists_every_lantern_of_every_session() -> Gate {
-    let (_dir, home, [l1, l2, _e1, _e2, l3]) = recall_fixture()?;
+    let (dir, home, [l1, l2, _, _, l3]) = recall_fixture()?;
     let report = recall_all(&home)?;
     assert_eq!(ids(&report), [l1.as_str(), l2.as_str(), l3.as_str()]);
     assert!(report.skipped.is_empty());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn recall_by_point_lists_every_lantern_on_the_entry_and_refuses_unknown_names() -> Gate {
-    let (_dir, home, [l1, l2, _, _, _]) = recall_fixture()?;
+    let (dir, home, [l1, l2, _, _, _]) = recall_fixture()?;
     assert_eq!(
         ids(&recall_by_point(&home, FIXTURE, "e2")?),
         [l1.as_str(), l2.as_str()]
@@ -138,12 +140,13 @@ fn recall_by_point_lists_every_lantern_on_the_entry_and_refuses_unknown_names() 
         recall_by_point(&home, FIXTURE, "no-such-entry"),
         Err(HomeError::UnknownEntry { session, id }) if session == FIXTURE && id == "no-such-entry"
     ));
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_row_carries_exactly_its_fields() -> Gate {
-    let (_dir, home, _) = recall_fixture()?;
+    let (dir, home, _) = recall_fixture()?;
     let report = serde_json::to_value(recall_by_note(&home, "fold")?)?;
     assert_eq!(keys(&report), ["lanterns", "skipped"]);
     let rows = report["lanterns"].as_array().ok_or("no rows")?;
@@ -169,23 +172,25 @@ fn a_row_carries_exactly_its_fields() -> Gate {
         }
     }
     assert_eq!(epilogues, 2);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_held_session_is_still_recalled() -> Gate {
-    let (_dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
+    let (dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
     let owner = home.open_session(FIXTURE)?;
     let fold = recall_by_note(&home, "fold")?;
     assert_eq!(ids(&fold), [l1.as_str(), l3.as_str()]);
     assert!(fold.skipped.is_empty());
     drop(owner);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_broken_session_is_skipped_by_name_and_the_rest_listed() -> Gate {
-    let (_dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
+    let (dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
     std::fs::write(home.session_path("fixture-broken")?, "not json\n")?;
     let fold = recall_by_note(&home, "fold")?;
     assert_eq!(ids(&fold), [l1.as_str(), l3.as_str()]);
@@ -193,12 +198,13 @@ fn a_broken_session_is_skipped_by_name_and_the_rest_listed() -> Gate {
     let skipped = fold.skipped.first().ok_or("nothing skipped")?;
     assert_eq!(skipped.session, "fixture-broken");
     assert!(!skipped.reason.is_empty());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn every_recall_writes_nothing_and_prints_no_transcript() -> Gate {
-    let (_dir, home, _) = recall_fixture()?;
+    let (dir, home, _) = recall_fixture()?;
     std::fs::write(home.session_path("fixture-broken")?, "not json\n")?;
     let before = snapshot(&home)?;
     let results = every_recall(&home);
@@ -211,12 +217,13 @@ fn every_recall_writes_nothing_and_prints_no_transcript() -> Gate {
         assert!(!text.contains(TRANSCRIPT_LINE));
     }
     assert_eq!(snapshot(&home)?, before);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_lantern_whose_data_is_not_the_shape_is_named_not_dropped() -> Gate {
-    let (_dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
+    let (dir, home, [l1, _, _, _, l3]) = recall_fixture()?;
     let bad = {
         let mut owner = home.open_session(OTHER)?;
         owner.append(EntryBody::Custom {
@@ -237,12 +244,13 @@ fn a_lantern_whose_data_is_not_the_shape_is_named_not_dropped() -> Gate {
     ));
     assert_eq!(ids(&recall_by_point(&home, FIXTURE, "e2")?).len(), 2);
     drop(l3);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_row_carries_the_id_the_home_lists_the_session_under() -> Gate {
-    let (_dir, home, [_, _, _, _, l3]) = recall_fixture()?;
+    let (dir, home, [_, _, _, _, l3]) = recall_fixture()?;
     // A file copied under another name keeps its header's id; recall names
     // the session by the file the home lists, which is how the row is found.
     std::fs::copy(
@@ -257,6 +265,7 @@ fn a_row_carries_the_id_the_home_lists_the_session_under() -> Gate {
         .collect();
     assert_eq!(found, [("fixture-copy", l3.as_str()), (OTHER, l3.as_str())]);
     assert!(report.skipped.is_empty());
+    drop(dir);
     Ok(())
 }
 
@@ -277,7 +286,7 @@ fn lantern_by_hand(id: &str, parent: &str, data: Value) -> Entry {
 
 #[test]
 fn a_row_carries_the_session_the_light_act_recorded() -> Gate {
-    let (_dir, home, _) = recall_fixture()?;
+    let (dir, home, _) = recall_fixture()?;
     let by_point = recall_by_point(&home, OTHER, "o1")?;
     assert_eq!(by_point.lanterns.len(), 1);
     let row = by_point.lanterns.first().ok_or("no row")?;
@@ -287,12 +296,13 @@ fn a_row_carries_the_session_the_light_act_recorded() -> Gate {
     for row in &fold.lanterns {
         assert_eq!(row.lit_in, Some(row.session.clone()));
     }
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn an_older_lantern_without_lit_in_is_listed_with_lit_in_null() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     {
         let mut owner = home.open_session(FIXTURE)?;
         owner.append_entry(&lantern_by_hand(
@@ -315,12 +325,13 @@ fn an_older_lantern_without_lit_in_is_listed_with_lit_in_null() -> Gate {
     let by_note = recall_by_note(&home, "older record")?;
     assert_eq!(ids(&by_note), ["older"]);
     assert!(by_note.skipped.is_empty());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_lit_in_that_is_not_a_session_id_is_skipped_and_refused_by_name() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let cases = [
         ("bad-null", json!(null), "is null"),
         ("bad-number", json!(5), "is not a string"),
@@ -376,5 +387,6 @@ fn a_lit_in_that_is_not_a_session_id_is_skipped_and_refused_by_name() -> Gate {
         refusals += 1;
     }
     assert_eq!((skips, refusals), (4, 4));
+    drop(dir);
     Ok(())
 }

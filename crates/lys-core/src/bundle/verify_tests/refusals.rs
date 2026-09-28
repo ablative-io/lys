@@ -12,6 +12,8 @@ fn a_bundle_does_not_verify_under_an_anchor_the_caller_did_not_get_a_receipt_fro
     let s = one_link();
     let other = Party::new("anchor-z.example", b"lys-bundle-test-anchor-z-seed-01");
     assert!(verify_bundle(&s.bundle, &s.child.verifier(), &[other.verifier()]).is_err());
+    s.close().unwrap();
+    other.close().unwrap();
 }
 
 #[test]
@@ -19,6 +21,8 @@ fn a_bundle_does_not_verify_under_the_wrong_log_key() {
     let s = one_link();
     let other = Party::new("child.example", b"lys-bundle-test-otherlog-seed-01");
     assert!(verify_bundle(&s.bundle, &other.verifier(), &[s.anchor.verifier()]).is_err());
+    s.close().unwrap();
+    other.close().unwrap();
 }
 
 #[test]
@@ -42,6 +46,7 @@ fn the_anchor_key_must_serve_both_roles() {
         )
         .is_err()
     );
+    s.close().unwrap();
 }
 
 // --------------------------------------------------------- container checks
@@ -54,6 +59,7 @@ fn an_unrecognised_format_is_refused_before_anything_else() {
         bundle.format = format.to_string();
         assert!(verify_bundle(&bundle, &s.child.verifier(), &[s.anchor.verifier()]).is_err());
     }
+    s.close().unwrap();
 }
 
 #[test]
@@ -64,6 +70,7 @@ fn a_populated_counter_anchor_is_refused_while_nothing_can_check_one() {
     let mut bundle = s.bundle.clone();
     bundle.counter_anchor = Some("AAAA".to_string());
     assert!(verify_bundle(&bundle, &s.child.verifier(), &[s.anchor.verifier()]).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -75,6 +82,7 @@ fn a_tampered_leaf_is_refused() {
         b"entry-1-tampered",
     );
     assert!(verify_bundle(&bundle, &s.child.verifier(), &[s.anchor.verifier()]).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -89,6 +97,7 @@ fn malformed_base64_is_refused() {
         bundle.links[0].receipt = bad.to_string();
         assert!(verify_bundle(&bundle, &s.child.verifier(), &[s.anchor.verifier()]).is_err());
     }
+    s.close().unwrap();
 }
 
 #[test]
@@ -100,6 +109,7 @@ fn a_tampered_checkpoint_in_a_link_is_refused() {
     bytes[0] ^= 0x01;
     bundle.links[0].checkpoint = String::from_utf8(bytes).unwrap();
     assert!(verify_bundle(&bundle, &s.child.verifier(), &[s.anchor.verifier()]).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -125,6 +135,7 @@ fn the_anchor_count_must_match_the_link_count_exactly() {
         .is_err(),
         "too many anchors must be refused"
     );
+    s.close().unwrap();
 }
 
 #[test]
@@ -137,6 +148,7 @@ fn a_chain_beyond_the_link_cap_is_refused_before_any_work() {
     }
     let anchors = vec![s.anchor.verifier(); bundle.links.len()];
     assert!(verify_bundle(&bundle, &s.child.verifier(), &anchors).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -178,4 +190,6 @@ fn every_failure_is_the_same_error() {
             "{name} produced a distinguishable message"
         );
     }
+    s.child.close().unwrap();
+    s.anchor.close().unwrap();
 }

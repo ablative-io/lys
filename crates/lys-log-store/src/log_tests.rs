@@ -125,7 +125,7 @@ fn append_then_reopen_reproduces_the_root_and_the_golden_leaf_hash() {
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
     let (index0, hash0) = log.append(b"leaf-0").unwrap();
-    let (index1, _hash1) = log.append(b"leaf-1").unwrap();
+    let (index1, _) = log.append(b"leaf-1").unwrap();
     assert_eq!((index0, index1), (0, 1));
     // Golden vector: SHA-256(0x00 || "leaf-0"), the RFC 6962 leaf hash. Pinned
     // as a literal so a change to the preimage cannot pass by agreeing with a
@@ -153,7 +153,7 @@ fn an_empty_leaf_is_legal() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
-    let (_index, hash) = log.append(b"").unwrap();
+    let (_, hash) = log.append(b"").unwrap();
     assert_eq!(hash, raw_leaf_hash(b""));
     assert_eq!(reopen(&dir).unwrap().tree().len(), 1);
 }
@@ -306,22 +306,22 @@ fn a_store_that_breaks_its_contiguity_promise_is_named_as_the_culprit() {
         fn extent(&self) -> u64 {
             3
         }
-        fn leaf(&self, _index: u64) -> StoreResult<Option<Vec<u8>>> {
+        fn leaf(&self, _: u64) -> StoreResult<Option<Vec<u8>>> {
             Ok(None)
         }
-        fn put_leaf(&mut self, _index: u64, _bytes: &[u8]) -> StoreResult<()> {
+        fn put_leaf(&mut self, _: u64, _: &[u8]) -> StoreResult<()> {
             Ok(())
         }
         fn pinned(&self) -> PinnedRoot {
             self.0
         }
-        fn pin(&mut self, _pin: PinnedRoot) -> StoreResult<()> {
+        fn pin(&mut self, _: PinnedRoot) -> StoreResult<()> {
             Ok(())
         }
         fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
             Ok(None)
         }
-        fn put_snapshot(&mut self, _bytes: &[u8]) -> StoreResult<()> {
+        fn put_snapshot(&mut self, _: &[u8]) -> StoreResult<()> {
             Ok(())
         }
     }

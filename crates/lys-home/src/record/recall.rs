@@ -138,7 +138,7 @@ fn mentions(row: &LanternRow, folded: &str) -> bool {
 /// Every lantern of the home, by session id then file position. A session
 /// that cannot be read is skipped and named.
 pub fn recall_all(home: &Home) -> Result<RecallReport, HomeError> {
-    recall_where(home, |_row| true)
+    recall_where(home, |_| true)
 }
 
 /// Every lantern of the home whose note or one of whose epilogues contains

@@ -1,0 +1,35 @@
+id: no-underscore-binding
+language: rust
+severity: error
+message: "Underscore-prefixed binding: the leading underscore silences the unused warning instead of fixing its cause."
+note: "CLAUDE.md, Coding standards: a _-prefixed unused variable is a bypass, not a fix. Name a guard and drop it by name where its life should end; write a bare `_` where a value has no use; a trait parameter one implementation has no use for, which another implementation needs or a published trait asks for, is a bare `_`."
+ignores:
+  - "vendor/**"
+rule:
+  any:
+    - kind: identifier
+      regex: "^_."
+      any:
+        - inside: {kind: let_declaration, field: pattern}
+        - inside: {kind: parameter, field: pattern}
+        - inside: {kind: for_expression, field: pattern}
+        - inside: {kind: let_condition, field: pattern}
+        - inside: {kind: field_pattern, field: pattern}
+        - inside: {kind: closure_parameters}
+        - inside:
+            any:
+              - kind: match_pattern
+              - kind: tuple_pattern
+              - kind: slice_pattern
+              - kind: or_pattern
+              - kind: ref_pattern
+              - kind: mut_pattern
+              - kind: reference_pattern
+              - kind: captured_pattern
+        - all:
+            - inside: {kind: tuple_struct_pattern}
+            - not:
+                inside: {kind: tuple_struct_pattern, field: type}
+    - kind: shorthand_field_identifier
+      regex: "^_."
+      inside: {kind: field_pattern}

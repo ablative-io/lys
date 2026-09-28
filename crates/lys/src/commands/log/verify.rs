@@ -58,7 +58,8 @@ pub fn inclusion(
     let leaf_bytes = read_file(leaf, "leaf file")?;
     let verifier = NoteVerifierKey::from_spec(verifier_key)?;
     let body = verify_inclusion_artifact(&artifact, &leaf_bytes, &verifier)
-        .map_err(|_err| CliError::LogInclusionVerificationFailed)?;
+        .ok()
+        .ok_or(CliError::LogInclusionVerificationFailed)?;
     let mut emit = Emitter::new(json);
     emit.flag("inclusion verified", "verified");
     emit.field("origin", "origin", body.origin());
@@ -93,7 +94,8 @@ pub fn consistency(artifact_path: &Path, verifier_key: &str, json: bool) -> CliR
         })?;
     let verifier = NoteVerifierKey::from_spec(verifier_key)?;
     let (body_1, body_2) = verify_consistency_artifact(&artifact, &verifier)
-        .map_err(|_err| CliError::LogConsistencyVerificationFailed)?;
+        .ok()
+        .ok_or(CliError::LogConsistencyVerificationFailed)?;
     let mut emit = Emitter::new(json);
     emit.flag("consistency verified", "verified");
     emit.field("origin", "origin", body_2.origin());

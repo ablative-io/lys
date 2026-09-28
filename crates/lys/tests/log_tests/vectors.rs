@@ -45,6 +45,7 @@ fn golden_log_reproduces_design_vectors_byte_for_byte() {
         note_bytes.windows(4).any(|w| w == [0xe2, 0x80, 0x94, 0x20]),
         "note must contain the em-dash-space signature prefix bytes"
     );
+    log.close().unwrap();
 }
 
 // ---------------------------------------------------- third-party verification
@@ -156,4 +157,5 @@ fn e2e_third_party_verifies_with_only_artifacts_leaf_and_verifier_key() {
             "private seed leaked into output"
         );
     }
+    log.close().unwrap();
 }

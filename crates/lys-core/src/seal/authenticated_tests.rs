@@ -116,7 +116,7 @@ fn generic_attestation_over_bare_envelope_bytes_is_rejected() {
     // tag) must not be accepted by the authenticated composition.
     let sender = identity();
     let recipient = identity();
-    let (env, _att) = sign_and_seal(b"payload", &sender, &recipient.x25519_public_key()).unwrap();
+    let (env, _) = sign_and_seal(b"payload", &sender, &recipient.x25519_public_key()).unwrap();
     let generic = crate::attestation::sign::sign_attestation(&env.attestation_bytes(), &sender);
     let err = open_and_verify(
         &env,

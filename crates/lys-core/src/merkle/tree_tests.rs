@@ -316,7 +316,7 @@ fn empty_leaf_bytes_are_a_valid_raw_leaf() {
     assert_eq!(tree.append_raw(b""), 1);
 
     // The empty leaf's hash is SHA-256(0x00) and equals the 1-leaf root.
-    let (root, _count) = tree.root().to_parts();
+    let (root, _) = tree.root().to_parts();
     assert_eq!(root, raw_leaf_hash(b""));
 
     let proof = tree.prove_inclusion(0).unwrap();

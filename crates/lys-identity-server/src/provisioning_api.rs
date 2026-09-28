@@ -289,7 +289,9 @@ async fn set(
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         if directory.record(IdentityId::Agent(agent)).is_none() {
@@ -327,7 +329,9 @@ async fn review(
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let record = directory

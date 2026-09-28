@@ -41,7 +41,7 @@ fn tree_of(size: u64) -> AppendOnlyTree<RawLeaf> {
 }
 
 fn root_of(size: u64) -> [u8; 32] {
-    let (root, _size) = tree_of(size).root().to_parts();
+    let (root, _) = tree_of(size).root().to_parts();
     root
 }
 
@@ -70,7 +70,7 @@ fn signed(old_size: u64, new_size: u64, key: &Ed25519Identity) -> ConsistencyRec
 
 #[test]
 fn a_signed_receipt_verifies_and_returns_the_newer_root() {
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let mut verified = 0;
     for new_size in 2u64..=13 {
         for old_size in 1u64..new_size {
@@ -98,7 +98,7 @@ fn a_relabelled_inclusion_receipt_is_refused() {
     // artifact whose proof derives exactly R, and the signature is genuine over
     // exactly the right bytes — the ONLY thing standing in the way is the
     // content type inside the signed bucket.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let (old_size, new_size) = (5u64, 13u64);
 
     // A real inclusion receipt from this anchor over the size-13 tree, whose
@@ -154,7 +154,7 @@ fn a_relabelled_inclusion_receipt_is_refused() {
 fn an_inclusion_artifact_does_not_parse_as_a_consistency_receipt() {
     // The same separation one layer earlier: refused at the protected header,
     // before any proof is examined.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let tree = tree_of(8);
     let path: Vec<[u8; 32]> = tree
         .prove_inclusion(3)
@@ -180,7 +180,7 @@ fn issuance_refuses_equal_sizes() {
     // The ruling reversed in `308d95e`: an equal-size proof leaves no derivation
     // standing, so the signature check would degenerate to an existential query
     // over the anchor's signing history.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let err = sign_consistency_receipt(&root_of(7), 7, 7, &[], &key).unwrap_err();
     assert!(format!("{err}").contains("strictly below"), "{err}");
 }
@@ -191,7 +191,7 @@ fn verification_refuses_equal_sizes_even_with_a_genuine_signature() {
     // passes through `sign_consistency_receipt`. This is the verifier's own
     // refusal, with a signature the anchor really did produce over the value
     // an equal-size "derivation" would return.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let old_root = root_of(7);
     let protected = crate::receipt::encoding::protected_bytes(
         crate::receipt::encoding::CONSISTENCY_CONTENT_TYPE,
@@ -213,7 +213,7 @@ fn verification_refuses_equal_sizes_even_with_a_genuine_signature() {
 fn the_older_root_must_be_the_callers_own() {
     // A verifier that took the older root from the artifact would let the anchor
     // pick both endpoints. Here the caller supplies a root it did not hold.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let receipt = signed(5, 13, &key);
     let mut wrong = root_of(5);
     wrong[0] ^= 0x01;
@@ -225,7 +225,7 @@ fn the_older_root_must_be_the_callers_own() {
 fn a_receipt_from_another_anchor_is_refused() {
     // A receipt verifies against whatever key it carries, so the caller must
     // name the anchor it expects — the same trap as a self-signed certificate.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let other_dir = tempfile::tempdir().unwrap();
     let other_path = other_dir.path().join("other.key");
     std::fs::write(&other_path, OTHER_SEED).unwrap();
@@ -239,7 +239,7 @@ fn a_receipt_from_another_anchor_is_refused() {
 
 #[test]
 fn tampering_with_the_path_is_refused() {
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let mut tampered = signed(5, 13, &key);
     tampered.consistency_path[0][0] ^= 0x01;
     let err =
@@ -249,7 +249,7 @@ fn tampering_with_the_path_is_refused() {
 
 #[test]
 fn round_trip_is_identity_on_the_bytes() {
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let mut swept = 0;
     for new_size in 2u64..=9 {
         for old_size in 1u64..new_size {
@@ -268,7 +268,7 @@ fn round_trip_is_identity_on_the_bytes() {
 fn a_non_canonical_encoding_is_refused_even_when_the_signature_would_verify() {
     // Canonical-encoding strictness: trailing bytes make the artifact differ
     // from the canonical re-encoding of its own fields.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let mut bytes = signed(5, 13, &key).to_cose_bytes();
     bytes.push(0x00);
     assert!(ConsistencyReceipt::from_cose_bytes(&bytes).is_err());
@@ -276,7 +276,7 @@ fn a_non_canonical_encoding_is_refused_even_when_the_signature_would_verify() {
 
 #[test]
 fn verify_bytes_returns_the_same_root_as_the_two_step_path() {
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let bytes = signed(5, 13, &key).to_cose_bytes();
     let (parsed, root) =
         verify_consistency_receipt_bytes(&bytes, &key.public_key_bytes(), &root_of(5)).unwrap();
@@ -290,7 +290,7 @@ fn every_verification_failure_is_the_same_error() {
     // anchor, a bad older root, or a malformed proof. This held once by variant
     // coincidence and broke the moment receipts stopped reusing
     // `InvalidSignature` — hence the explicit case count.
-    let (_dir, key) = anchor();
+    let (_, key) = anchor();
     let good = signed(5, 13, &key);
 
     let mut wrong_key = good.clone();

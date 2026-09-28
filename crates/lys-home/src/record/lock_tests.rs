@@ -20,7 +20,7 @@ fn home() -> Result<(tempfile::TempDir, Home), Box<dyn std::error::Error>> {
 #[test]
 fn a_child_holding_a_duplicate_descriptor_does_not_keep_the_session_held() -> Gate {
     use std::process::{Command, Stdio};
-    let (_dir, home) = home()?;
+    let (dir, home) = home()?;
     let session = home.create_session("s1", "/work", None)?;
     let duplicate = session.lock_file().try_clone()?;
     let mut child = Command::new("/bin/sleep")
@@ -35,12 +35,13 @@ fn a_child_holding_a_duplicate_descriptor_does_not_keep_the_session_held() -> Ga
     child.wait()?;
     let reopened = reopened?;
     assert_eq!(reopened.header().id, "s1");
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_second_owner_in_this_process_is_refused_naming_this_process() -> Gate {
-    let (_dir, home) = home()?;
+    let (dir, home) = home()?;
     let session = home.create_session("s1", "/work", None)?;
     let file = session.file().to_path_buf();
     let respelled = home
@@ -62,5 +63,6 @@ fn a_second_owner_in_this_process_is_refused_naming_this_process() -> Gate {
     drop(session);
     let reopened = Session::open(&file)?;
     assert_eq!(reopened.header().id, "s1");
+    drop(dir);
     Ok(())
 }

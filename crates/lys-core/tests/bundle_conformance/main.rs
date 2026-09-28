@@ -111,7 +111,7 @@ struct Party {
     origin: String,
     identity: Ed25519Identity,
     tree: AppendOnlyTree<RawLeaf>,
-    _dir: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
 }
 
 impl Party {
@@ -123,8 +123,13 @@ impl Party {
             origin: origin.to_string(),
             identity: Ed25519Identity::load(&path).unwrap(),
             tree: AppendOnlyTree::<RawLeaf>::new(),
-            _dir: dir,
+            temp_dir: dir,
         }
+    }
+
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 
     fn verifier(&self) -> NoteVerifierKey {

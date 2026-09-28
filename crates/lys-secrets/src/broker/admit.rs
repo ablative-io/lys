@@ -107,7 +107,7 @@ impl<P: PermissionCheck> Broker<P> {
             })?;
         self.permissions
             .may_use(&record.identity, &record.secret)
-            .map(|_permit| ())
+            .map(|_| ())
             .map_err(|denied| SecretsError::PermissionDenied {
                 holder: record.identity.clone(),
                 secret: record.secret.clone(),
@@ -141,7 +141,7 @@ impl<P: PermissionCheck> Broker<P> {
         self.permitted(record)?;
         let reserved = match record.spend_cap {
             None => None,
-            Some(_cap) if reserve == 0 => {
+            Some(_) if reserve == 0 => {
                 return Err(SecretsError::ReservationMissing {
                     handle: record.id.clone(),
                 });

@@ -56,7 +56,7 @@ impl<P: PermissionCheck> Broker<P> {
         };
         let took_effect = change
             .rsplit_once(" to ")
-            .is_some_and(|(_old, new)| new == self.store_key.id().as_str());
+            .is_some_and(|(_, new)| new == self.store_key.id().as_str());
         let settled = if took_effect { ROTATED } else { ABANDONED };
         self.record_rotation(settled, change)
     }
@@ -127,6 +127,6 @@ mod tests {
 
     #[test]
     fn a_rotation_whose_index_write_never_happened_settles_as_abandoned() -> TestResult {
-        settles(|_current| "another-key".to_owned(), ABANDONED)
+        settles(|_| "another-key".to_owned(), ABANDONED)
     }
 }

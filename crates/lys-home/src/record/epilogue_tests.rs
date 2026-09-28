@@ -44,7 +44,7 @@ fn file_len(home: &Home) -> Result<u64, Box<dyn Error>> {
 
 #[test]
 fn an_epilogue_hangs_under_the_head_and_names_its_lantern() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let l1 = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?.id;
     let l2 = light(&home, FIXTURE, "e2", "second look", LIGHTER)?.id;
     let file = home.session_path(FIXTURE)?;
@@ -90,12 +90,13 @@ fn an_epilogue_hangs_under_the_head_and_names_its_lantern() -> Gate {
         assert!(!text.contains(WORDS_ONE));
         assert!(!text.contains("cobalt"));
     }
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn each_refusal_names_itself_and_writes_nothing() -> Gate {
-    let (_dir, home, [l1, _, e1, _]) = lit_fixture()?;
+    let (dir, home, [l1, _, e1, _]) = lit_fixture()?;
     let len = file_len(&home)?;
     let mut refusals = Vec::new();
     for id in ["no-such-lantern", "e2", e1.as_str()] {
@@ -137,12 +138,13 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
         assert!(!text.contains(WORDS_ONE));
     }
     assert_eq!(file_len(&home)?, len);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn the_session_and_the_lantern_are_checked_before_the_words() -> Gate {
-    let (_dir, home, [l1, _, _, _]) = lit_fixture()?;
+    let (dir, home, [l1, _, _, _]) = lit_fixture()?;
     assert!(matches!(
         add_epilogue(&home, "no-such-session", &l1, "", ANNOTATOR),
         Err(HomeError::UnknownSession { session }) if session == "no-such-session"
@@ -161,12 +163,13 @@ fn the_session_and_the_lantern_are_checked_before_the_words() -> Gate {
         add_epilogue(&home, FIXTURE, &l1, "", ANNOTATOR),
         Err(HomeError::EmptyNote { what: "epilogue" })
     ));
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn an_entry_whose_data_is_not_its_shape_is_refused_by_name() -> Gate {
-    let (_dir, home, [l1, _, _, _]) = lit_fixture()?;
+    let (dir, home, [l1, _, _, _]) = lit_fixture()?;
     let len = file_len(&home)?;
     let bad_lantern = {
         let mut owner = home.open_session(FIXTURE)?;
@@ -196,5 +199,6 @@ fn an_entry_whose_data_is_not_its_shape_is_refused_by_name() -> Gate {
         Err(HomeError::EntryShape { id, custom_type, .. })
             if id == bad_epilogue && custom_type == CUSTOM_LANTERN_EPILOGUE
     ));
+    drop(dir);
     Ok(())
 }

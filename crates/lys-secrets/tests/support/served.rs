@@ -241,7 +241,7 @@ impl Served {
             }
         }
         (0..CONNECT_ATTEMPTS)
-            .find_map(|_attempt| TcpStream::connect(self.address).ok())
+            .find_map(|_| TcpStream::connect(self.address).ok())
             .map(drop)
             .ok_or_else(|| format!("no connection reached {}", self.address).into())
     }

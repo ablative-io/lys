@@ -34,6 +34,7 @@ fn prove_inclusion_out_of_range_index_is_actionable() {
     let stderr = stderr_of(&output);
     assert!(stderr.contains("leaf index 3"), "{stderr}");
     assert!(stderr.contains("3 leaves"), "{stderr}");
+    log.close().unwrap();
 }
 
 #[test]
@@ -75,6 +76,7 @@ fn prove_consistency_enforces_strict_size_rules() {
         path_str(&out),
     ]);
     assert_eq!(zero.status.code(), Some(2));
+    log.close().unwrap();
 }
 
 // -------------------------------------------------- tamper matrix — inclusion
@@ -186,6 +188,8 @@ fn verify_inclusion_rejects_every_tamper_class_with_one_identical_message() {
         stderrs.windows(2).all(|w| w[0] == w[1]),
         "tamper classes must be indistinguishable"
     );
+    other.close().unwrap();
+    log.close().unwrap();
 }
 
 #[test]
@@ -236,6 +240,7 @@ fn verify_inclusion_shape_errors_are_actionable_json_parse_failures() {
     let (code, stderr) = verify_inclusion_raw_output(&log.inclusion_artifact, leaf1, "not-a-key");
     assert_eq!(code, Some(1));
     assert!(stderr.contains("invalid note verifier key"), "{stderr}");
+    log.close().unwrap();
 }
 
 // ------------------------------------------------ tamper matrix — consistency
@@ -362,4 +367,5 @@ fn verify_consistency_rejects_every_tamper_class_with_one_identical_message() {
         stderr.contains("failed to parse consistency proof artifact JSON"),
         "{stderr}"
     );
+    log.close().unwrap();
 }

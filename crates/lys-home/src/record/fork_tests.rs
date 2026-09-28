@@ -76,7 +76,7 @@ fn custom_data(home: &Home, session: &str, id: &str) -> Result<(String, Value), 
 
 #[test]
 fn the_child_holds_the_parent_lines_then_forked_from_as_its_head() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let parent_file = home.session_path(PARENT)?;
     let report = fork(&home, &lanterns.l5, None)?;
     assert_ne!(report.child, PARENT);
@@ -109,12 +109,13 @@ fn the_child_holds_the_parent_lines_then_forked_from_as_its_head() -> Gate {
     );
     assert!(!report.coordinate_carried);
     assert_eq!(report.carried, None);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_user_point_is_carried_and_counted_and_never_copied() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let report = fork(&home, &lanterns.l6, None)?;
     assert_eq!(report.cut_at, "e5");
     assert_eq!(report.point, "e6");
@@ -130,12 +131,13 @@ fn a_user_point_is_carried_and_counted_and_never_copied() -> Gate {
         json!({"parent_session": "parent", "lantern": lanterns.l6, "point": "e6", "cut_at": "e5",
             "coordinate_carried": true, "carried": "e6", "seed_left_out": {"image": 1}})
     );
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn the_parent_gains_one_fork_line_at_its_head_and_no_earlier_byte_changes() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let parent_file = home.session_path(PARENT)?;
     let before = std::fs::read(&parent_file)?;
     let head_before = home.open_session(PARENT)?.head()?.map(str::to_owned);
@@ -155,24 +157,26 @@ fn the_parent_gains_one_fork_line_at_its_head_and_no_earlier_byte_changes() -> G
     let head_after = home.open_session(PARENT)?.head()?.map(str::to_owned);
     assert_eq!(head_after, line["id"].as_str().map(str::to_owned));
     assert!(head_after.is_some());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_fork_writes_no_block() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let blocks = home.root().join("blocks");
     let before = files_and_bytes(&blocks)?;
     assert!(before.0 > 0);
     fork(&home, &lanterns.l5, None)?;
     fork(&home, &lanterns.l6, None)?;
     assert_eq!(files_and_bytes(&blocks)?, before);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_parent_another_owner_holds_is_refused_and_nothing_is_written() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let before = session_files(&home)?;
     let held = home.open_session(PARENT)?;
     let refused = fork(&home, &lanterns.l5, None);
@@ -184,6 +188,7 @@ fn a_parent_another_owner_holds_is_refused_and_nothing_is_written() -> Gate {
     let after = session_files(&home)?;
     assert_eq!(after.len(), before.len());
     assert_eq!(after.get("parent.jsonl"), before.get("parent.jsonl"));
+    drop(dir);
     Ok(())
 }
 
@@ -228,7 +233,7 @@ fn block_file(home: &Home, hash: &str) -> bool {
 
 #[test]
 fn the_report_counts_the_entries_copied_and_the_blocks_the_store_holds() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let report = fork(&home, &lanterns.l5, None)?;
     assert_eq!((report.entries, report.blocks, report.unstored), (7, 5, 0));
     let l6 = fork(&home, &lanterns.l6, None)?;
@@ -236,12 +241,13 @@ fn the_report_counts_the_entries_copied_and_the_blocks_the_store_holds() -> Gate
     assert_eq!(l6.point, "e6");
     assert!(l6.coordinate_carried);
     assert_eq!(l6.carried.as_deref(), Some("e6"));
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn an_inline_part_whose_source_form_is_the_stored_block_counts_as_unstored() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
+    let (dir, home, _) = fixture_home()?;
     let blocks = home.blocks()?;
     let m1_part = text_part("fixture-text-1");
     put_parts(&blocks, std::slice::from_ref(&m1_part))?;
@@ -270,12 +276,13 @@ fn an_inline_part_whose_source_form_is_the_stored_block_counts_as_unstored() -> 
     let held: Vec<&String> = hashes.iter().filter(|h| block_file(&home, h)).collect();
     assert_eq!(held.len(), 1);
     assert_eq!(hashes.len() - held.len(), 2);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn two_forks_of_one_lantern_name_two_children_with_the_same_hashes() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let first = fork(&home, &lanterns.l5, None)?;
     let second = fork(&home, &lanterns.l5, None)?;
     assert_ne!(first.child, second.child);
@@ -305,12 +312,13 @@ fn two_forks_of_one_lantern_name_two_children_with_the_same_hashes() -> Gate {
     for hash in &a {
         assert!(!text.contains(hash.as_str()));
     }
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn the_report_carries_no_content_sentinel() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let report = serde_json::to_string(&fork(&home, &lanterns.l6, None)?)?;
     let mut checked = 0;
     for sentinel in SENTINELS {
@@ -318,6 +326,7 @@ fn the_report_carries_no_content_sentinel() -> Gate {
         checked += 1;
     }
     assert_eq!(checked, 8);
+    drop(dir);
     Ok(())
 }
 
@@ -345,7 +354,7 @@ fn session_with_carried(home: &Home, id: &str, content: &Value) -> Result<String
 
 #[test]
 fn a_carried_part_without_a_type_is_refused_and_nothing_is_written() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
+    let (dir, home, _) = fixture_home()?;
     let lantern = session_with_carried(&home, "untyped", &json!([{"text": "fixture-text-x"}]))?;
     let before = session_files(&home)?;
     let refused = fork(&home, &lantern, None);
@@ -354,6 +363,7 @@ fn a_carried_part_without_a_type_is_refused_and_nothing_is_written() -> Gate {
         "{refused:?}"
     );
     assert_eq!(session_files(&home)?, before);
+    drop(dir);
     Ok(())
 }
 
@@ -426,7 +436,7 @@ fn a_hash_of_the_wrong_shape_in_a_copied_entry_is_refused_as_its_shape() -> Gate
 #[test]
 fn a_fork_that_fails_after_the_child_was_created_removes_the_child() -> Gate {
     use std::os::unix::fs::PermissionsExt;
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let parent_file = home.session_path(PARENT)?;
     let before = session_files(&home)?;
     let writable = std::fs::metadata(&parent_file)?.permissions();
@@ -440,5 +450,6 @@ fn a_fork_that_fails_after_the_child_was_created_removes_the_child() -> Gate {
         "{refused:?}"
     );
     assert_eq!(session_files(&home)?, before);
+    drop(dir);
     Ok(())
 }

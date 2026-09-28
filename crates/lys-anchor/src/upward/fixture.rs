@@ -45,7 +45,7 @@ pub struct Node<P: AdmissionPolicy> {
     /// The anchor itself.
     pub anchor: Anchor<FileLeafStore, FileSigner, P>,
     origin: String,
-    _dir: TempDir,
+    temp_dir: TempDir,
 }
 
 impl<P: AdmissionPolicy> Node<P> {
@@ -67,7 +67,7 @@ impl<P: AdmissionPolicy> Node<P> {
         Self {
             anchor,
             origin: origin.to_string(),
-            _dir: dir,
+            temp_dir: dir,
         }
     }
 
@@ -82,6 +82,11 @@ impl<P: AdmissionPolicy> Node<P> {
     /// literal above, and the public key the signer advertises.
     pub fn verifier(&self) -> NoteVerifierKey {
         NoteVerifierKey::new(&self.origin, self.anchor.signer().public_key()).unwrap()
+    }
+
+    /// Removes the fixture's temporary directory, failing on error.
+    pub fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 }
 

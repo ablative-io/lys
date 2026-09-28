@@ -67,7 +67,73 @@
       ],
       "stories": [
         "S25"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/witness/observe_tests/relations.rs",
+            "change": "modified",
+            "note": "the staged() guards are named and each ended by one drop"
+          },
+          {
+            "path": "crates/lys-anchor/tests/anchor_receipt_conformance/inclusion_path.rs",
+            "change": "modified",
+            "note": "(_, bin_dir, bin) with drop(bin_dir)"
+          },
+          {
+            "path": "crates/lys-anchor/tests/anchor_receipt_conformance/mis_chunked.rs",
+            "change": "modified",
+            "note": "(_, bin_dir, bin) with drop(bin_dir)"
+          },
+          {
+            "path": "crates/lys-core/tests/delegation_conformance/refusals.rs",
+            "change": "modified",
+            "note": "workdir with drop(workdir)"
+          },
+          {
+            "path": "crates/lys-core/tests/delegation_conformance/signing.rs",
+            "change": "modified",
+            "note": "workdir with drop(workdir)"
+          },
+          {
+            "path": "crates/lys-home/src/record/*_tests.rs",
+            "change": "modified",
+            "note": "45 Home fixture guards named dir and dropped"
+          },
+          {
+            "path": "crates/lys-home/tests/cached_index.rs",
+            "change": "modified",
+            "note": "4 guards named dir and dropped"
+          },
+          {
+            "path": "crates/lys-identity/tests/restart_snapshots.rs",
+            "change": "modified",
+            "note": "the open store is named again and dropped"
+          },
+          {
+            "path": "crates/lys-identity-server/tests/sign_in_providers.rs",
+            "change": "modified",
+            "note": "the running fake server is named rauthy and dropped"
+          }
+        ],
+        "how": "Blocked: the edits are made but not reviewed, and nothing has been compiled.",
+        "deviation": "Files are split into submodules on this tree. Where a test ends in an `Ok(())` tail, drop(name) goes directly before `Ok(())`.",
+        "checklist": [
+          {
+            "id": "C78",
+            "done": false,
+            "note": "not reviewed"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S25",
+            "satisfied": false,
+            "note": "not reviewed"
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -100,7 +166,93 @@
       ],
       "stories": [
         "S25"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src/bundle/verify_tests.rs",
+            "change": "modified",
+            "note": "Party has temp_dir and close(); the OneLink and TwoLink holders close their parts"
+          },
+          {
+            "path": "crates/lys-core/src/bundle/verify_tests/chain.rs",
+            "change": "modified",
+            "note": "every Party closed"
+          },
+          {
+            "path": "crates/lys-core/src/bundle/verify_tests/refusals.rs",
+            "change": "modified",
+            "note": "every Party closed"
+          },
+          {
+            "path": "crates/lys-core/src/bundle/verify_tests/wire.rs",
+            "change": "modified",
+            "note": "every Party closed"
+          },
+          {
+            "path": "crates/lys-anchor/src/upward/fixture.rs",
+            "change": "modified",
+            "note": "Node has temp_dir and a pub close()"
+          },
+          {
+            "path": "crates/lys-anchor/src/upward/pin_tests.rs",
+            "change": "modified",
+            "note": "every Node closed"
+          },
+          {
+            "path": "crates/lys-anchor/src/upward/bundle_tests.rs",
+            "change": "modified",
+            "note": "Staged closes both Nodes"
+          },
+          {
+            "path": "crates/lys-anchor/tests/cascade.rs",
+            "change": "modified",
+            "note": "Party has temp_dir and close(); every value closed"
+          },
+          {
+            "path": "crates/lys-anchor/tests/stranger_verification/main.rs",
+            "change": "modified",
+            "note": "Case has temp_dir and close()"
+          },
+          {
+            "path": "crates/lys-anchor-cli/tests/anchor_cli.rs",
+            "change": "modified",
+            "note": "Fixture has temp_dir and close(); every value closed"
+          },
+          {
+            "path": "crates/lys-core/tests/openssl_csr_interop.rs",
+            "change": "modified",
+            "note": "OpensslRequest has temp_dir and close(); every value closed"
+          },
+          {
+            "path": "crates/lys-core/tests/bundle_conformance/main.rs",
+            "change": "modified",
+            "note": "Party has temp_dir and close()"
+          },
+          {
+            "path": "crates/lys/tests/log_tests.rs",
+            "change": "modified",
+            "note": "ProvenLog has temp_dir and close()"
+          }
+        ],
+        "how": "Blocked: all 8 structs are done but not reviewed or compiled, and the panic-injection proof has not been run.",
+        "deviation": "Node::close is pub because the tests that build a Node sit beside its module. OneLink, TwoLink and Staged hold Party or Node values, so each got its own close. Some closes land in submodule files not on the brief's list.",
+        "checklist": [
+          {
+            "id": "C84",
+            "done": false,
+            "note": "not reviewed"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S25",
+            "satisfied": false,
+            "note": "not reviewed"
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -129,7 +281,53 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/admission/trivial.rs",
+            "change": "modified",
+            "note": "bare _ parameters"
+          },
+          {
+            "path": "crates/lys-anchor/src/admission/certificate.rs",
+            "change": "modified",
+            "note": "bare _ submission; .ok().ok_or(NotAdmitted)"
+          },
+          {
+            "path": "crates/lys-anchor/src/anchor/genesis_tests.rs",
+            "change": "modified",
+            "note": "fn sign(&self, _: &[u8])"
+          },
+          {
+            "path": "crates/lys-anchor-cli/src/commands/anchor/policy_tests.rs",
+            "change": "modified",
+            "note": "run(self, _: P)"
+          },
+          {
+            "path": "crates/lys-log-store/src/log_tests.rs",
+            "change": "modified",
+            "note": "LyingStore takes bare _ parameters"
+          }
+        ],
+        "how": "Blocked: made but not reviewed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C81",
+            "done": false,
+            "note": "not reviewed"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": false,
+            "note": "not reviewed"
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -154,7 +352,43 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src/keys/identity/persist.rs",
+            "change": "modified",
+            "note": "fn warn_if_loose_permissions(_: &Path) {}"
+          },
+          {
+            "path": "crates/lys-log-store/src/file/leaves.rs",
+            "change": "modified",
+            "note": "the non-unix sync_dir stub takes a bare _"
+          },
+          {
+            "path": "crates/lys/src/identity/install/services.rs",
+            "change": "modified",
+            "note": "the non-unix detach stub takes a bare _"
+          }
+        ],
+        "how": "Blocked: made but not reviewed, and cargo fmt has not been run.",
+        "deviation": "fsync_dir is no longer cfg-split; the non-unix stub is sync_dir in file/leaves.rs.",
+        "checklist": [
+          {
+            "id": "C82",
+            "done": false,
+            "note": "not reviewed"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "not reviewed"
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -211,7 +445,38 @@
       ],
       "stories": [
         "S26"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src",
+            "change": "modified",
+            "note": "52 discarded errors rewritten with unchanged error values"
+          },
+          {
+            "path": "crates/lys-core/src/merkle/consistency_tests.rs",
+            "change": "modified",
+            "note": "if let Ok(derived) replaces the two single-arm matches"
+          }
+        ],
+        "how": "Blocked: lys-secrets is still being edited.",
+        "deviation": "In merkle/consistency_tests.rs, `Err(_) => {}` trips clippy::single_match, so both matches became `if let Ok(derived)`.",
+        "checklist": [
+          {
+            "id": "C79",
+            "done": false,
+            "note": "in progress"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S26",
+            "satisfied": false,
+            "note": "in progress"
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -272,7 +537,33 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-core/src/seal/sealed_envelope.rs",
+            "change": "modified",
+            "note": "(key_bytes, _); comment unchanged"
+          }
+        ],
+        "how": "Blocked: lys-secrets is still being edited.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C80",
+            "done": false,
+            "note": "in progress"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "in progress"
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -301,7 +592,48 @@
       "stories": [
         "S24",
         "S28"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "rules/ast-grep/no-underscore-binding.yml",
+            "change": "created",
+            "note": "rule no-underscore-binding at severity error, ignores vendor/**, message and note exactly as the brief words them"
+          }
+        ],
+        "how": "Blocked: lys-secrets still has hits. On /tmp copies of the two scratch files the rule gives 19 hits for 19 positions, and exactly 1 hit on _unused with exit 1.",
+        "deviation": "The scratch proofs were run in /tmp, not yet in the repo.",
+        "checklist": [
+          {
+            "id": "C75",
+            "done": true,
+            "note": "the rule file exists as specified"
+          },
+          {
+            "id": "C76",
+            "done": true,
+            "note": "19 hits on a /tmp copy; not yet re-run in the repo"
+          },
+          {
+            "id": "C77",
+            "done": false,
+            "note": "the tree still has hits"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": false,
+            "note": "in progress"
+          },
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "the in-repo proof has not been run"
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -322,7 +654,27 @@
       ],
       "stories": [
         "S29"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: not measured. The brief does not allow running tests by hand.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C83",
+            "done": false,
+            "note": "not measured"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S29",
+            "satisfied": false,
+            "note": "not measured"
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

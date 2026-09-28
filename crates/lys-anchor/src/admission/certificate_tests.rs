@@ -82,7 +82,7 @@ fn authenticated(credential: &[u8]) -> SubmitterContext<'_> {
 
 #[test]
 fn a_certificate_from_the_configured_authority_is_admitted() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-01!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-01!");
     let issued = ca
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();
@@ -98,7 +98,7 @@ fn a_certificate_from_the_configured_authority_is_admitted() {
 
 #[test]
 fn both_provenances_are_admitted_identically() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-12!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-12!");
     let issued = ca
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();
@@ -121,7 +121,7 @@ fn both_provenances_are_admitted_identically() {
 
     // And a refusal is a refusal on both arms too, so the equal treatment is
     // not "admits everything on one of them".
-    let (other, _other_tmp) = authority(b"lys-anchor-admission-ca-seed-13!");
+    let (other, _) = authority(b"lys-anchor-admission-ca-seed-13!");
     let foreign = other
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();
@@ -138,7 +138,7 @@ fn both_provenances_are_admitted_identically() {
 
 #[test]
 fn a_submission_with_no_credential_at_all_is_refused() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-02!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-02!");
     let policy = RecognisedCertificate::issued_by(ca.public_key_bytes());
     assert_eq!(
         policy.admit(&statement(), &SubmitterContext::Unidentified),
@@ -148,8 +148,8 @@ fn a_submission_with_no_credential_at_all_is_refused() {
 
 #[test]
 fn a_certificate_from_another_authority_is_refused() {
-    let (ours, _ours_tmp) = authority(b"lys-anchor-admission-ca-seed-03!");
-    let (theirs, _theirs_tmp) = authority(b"lys-anchor-admission-ca-seed-04!");
+    let (ours, _) = authority(b"lys-anchor-admission-ca-seed-03!");
+    let (theirs, _) = authority(b"lys-anchor-admission-ca-seed-04!");
     assert_ne!(
         ours.public_key_bytes(),
         theirs.public_key_bytes(),
@@ -181,7 +181,7 @@ fn a_certificate_from_another_authority_is_refused() {
 
 #[test]
 fn an_expired_certificate_is_refused() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-05!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-05!");
     let short_lived = ca
         .issue_certificate("submitter-a", Duration::from_secs(1), vec![])
         .unwrap();
@@ -209,7 +209,7 @@ fn an_expired_certificate_is_refused() {
 
 #[test]
 fn a_credential_that_is_not_a_certificate_is_refused() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-06!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-06!");
     let policy = RecognisedCertificate::issued_by(ca.public_key_bytes());
 
     let mut refused = 0;
@@ -235,7 +235,7 @@ fn a_credential_that_is_not_a_certificate_is_refused() {
 
 #[test]
 fn the_subject_allow_list_admits_a_listed_key_and_refuses_an_unlisted_one() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-07!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-07!");
     let listed = ca
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();
@@ -269,7 +269,7 @@ fn the_subject_allow_list_admits_a_listed_key_and_refuses_an_unlisted_one() {
 
 #[test]
 fn an_empty_allow_list_admits_nothing() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-08!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-08!");
     let issued = ca
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();
@@ -291,7 +291,7 @@ fn an_empty_allow_list_admits_nothing() {
 
 #[test]
 fn a_copied_certificate_is_admitted_because_presenting_is_not_proving() {
-    let (ca, _tmp) = authority(b"lys-anchor-admission-ca-seed-09!");
+    let (ca, _) = authority(b"lys-anchor-admission-ca-seed-09!");
     let alice = ca.issue_certificate("alice", LONG_TTL, vec![]).unwrap();
 
     let mut allowed = BTreeSet::new();
@@ -315,8 +315,8 @@ fn a_copied_certificate_is_admitted_because_presenting_is_not_proving() {
 
 #[test]
 fn every_refusal_is_the_same_value_whatever_tripped_it() {
-    let (ours, _ours_tmp) = authority(b"lys-anchor-admission-ca-seed-10!");
-    let (theirs, _theirs_tmp) = authority(b"lys-anchor-admission-ca-seed-11!");
+    let (ours, _) = authority(b"lys-anchor-admission-ca-seed-10!");
+    let (theirs, _) = authority(b"lys-anchor-admission-ca-seed-11!");
     let foreign = theirs
         .issue_certificate("submitter-a", LONG_TTL, vec![])
         .unwrap();

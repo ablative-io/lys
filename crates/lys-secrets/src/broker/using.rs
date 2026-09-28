@@ -181,7 +181,7 @@ impl<P: PermissionCheck> Broker<P> {
         let (credential, class) = match opened {
             Ok(opened) => opened,
             Err(refusal) => {
-                let spend = reserved.map(|_reserved| 0);
+                let spend = reserved.map(|_| 0);
                 self.close(
                     &id,
                     (&identity, &secret),
@@ -249,7 +249,7 @@ impl<P: PermissionCheck> Broker<P> {
             reserved,
             ..
         } = ticket;
-        let settled = reserved.map(|_reserved| spent);
+        let settled = reserved.map(|_| spent);
         let finished = outcome == COMPLETED || outcome == COMPLETED_UNMETERED;
         let outcome = if finished && self.cut_off(&handle, &identity, &secret) {
             COMPLETED_AFTER_DROP
@@ -270,7 +270,7 @@ impl<P: PermissionCheck> Broker<P> {
     pub(super) fn settle_unknown_outcomes(&mut self) -> Result<(), SecretsError> {
         let mut unsettled = Vec::new();
         for record in self.handles.values() {
-            for (operation, (_outcome, mark)) in &record.operations {
+            for (operation, (_, mark)) in &record.operations {
                 let Some(reserved) = record.open.get(operation) else {
                     continue;
                 };
@@ -278,7 +278,7 @@ impl<P: PermissionCheck> Broker<P> {
                     record.id.clone(),
                     (record.identity.clone(), record.secret.clone()),
                     (operation.clone(), mark.clone()),
-                    record.spend_cap.map(|_cap| *reserved),
+                    record.spend_cap.map(|_| *reserved),
                 ));
             }
         }

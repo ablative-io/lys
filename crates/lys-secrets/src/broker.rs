@@ -314,7 +314,7 @@ impl<P: PermissionCheck> Broker<P> {
         }
         self.recipient_admitted(&holder.identity, secret)?;
         match self.permissions.may_use(&holder.identity, secret) {
-            Ok(_permit) => {}
+            Ok(_) => {}
             Err(denied) if denied.no_person_root => {
                 return Err(SecretsError::NoPersonRoot {
                     holder: holder.identity.clone(),
@@ -420,8 +420,8 @@ impl<P: PermissionCheck> Broker<P> {
             handle: handle.map(str::to_owned),
             identity: identity.map(str::to_owned),
             secret: secret.map(str::to_owned),
-            operation: call.map(|(operation, _mark)| operation.to_owned()),
-            request: call.map(|(_operation, mark)| mark.to_owned()),
+            operation: call.map(|(operation, _)| operation.to_owned()),
+            request: call.map(|(_, mark)| mark.to_owned()),
             uses,
             spend: None,
             outcome: outcome.to_owned(),

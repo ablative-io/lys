@@ -181,7 +181,7 @@ fn root_of(size: u64) -> [u8; 32] {
     for index in 0..size {
         tree.append_raw(&leaf(index));
     }
-    let (root, _size) = tree.root().to_parts();
+    let (root, _) = tree.root().to_parts();
     root
 }
 

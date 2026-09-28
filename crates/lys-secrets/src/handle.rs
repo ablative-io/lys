@@ -152,9 +152,9 @@ impl Presentation {
             handle: handle_id.to_owned(),
         };
         let operation_id = unhex(operation).ok_or_else(invalid)?;
-        let signed_at_ms = signed_at.parse::<i64>().map_err(|_number| invalid())?;
+        let signed_at_ms = signed_at.parse::<i64>().ok().ok_or_else(invalid)?;
         let cose = unhex(signature).ok_or_else(invalid)?;
-        let attestation = Attestation::from_cose_bytes(&cose).map_err(|_cose| invalid())?;
+        let attestation = Attestation::from_cose_bytes(&cose).ok().ok_or_else(invalid)?;
         Ok(Self {
             handle_id: HandleId(handle_id.to_owned()),
             operation_id,
@@ -197,7 +197,7 @@ impl Presentation {
             self.signed_at_ms,
             &self.request,
         )?;
-        verify_attestation_by_signer(&self.attestation, &payload, registered).map_err(|_invalid| {
+        verify_attestation_by_signer(&self.attestation, &payload, registered).ok().ok_or_else(|| {
             SecretsError::PresentationInvalid {
                 handle: self.handle_id.to_string(),
             }

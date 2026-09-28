@@ -59,7 +59,7 @@ fn hex_of(bytes: &[u8]) -> String {
 
 #[test]
 fn key_id_matches_cloudflare_derivation() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let lys_id = key_id(GOLDEN_NAME, &identity.public_key_bytes()).unwrap();
 
     let mut alg_pubkey = vec![0x01u8];
@@ -71,7 +71,7 @@ fn key_id_matches_cloudflare_derivation() {
 
 #[test]
 fn verifier_key_spec_parses_in_cloudflare_verifier() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let spec = NoteVerifierKey::new(GOLDEN_NAME, identity.public_key_bytes())
         .unwrap()
         .to_spec();
@@ -81,7 +81,7 @@ fn verifier_key_spec_parses_in_cloudflare_verifier() {
 
 #[test]
 fn lys_signed_note_verifies_under_cloudflare_implementation() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let note_text = sign_note(GOLDEN_BODY, GOLDEN_NAME, &identity).unwrap();
 
     let spec = NoteVerifierKey::new(GOLDEN_NAME, identity.public_key_bytes())
@@ -101,7 +101,7 @@ fn lys_signed_note_verifies_under_cloudflare_implementation() {
 
 #[test]
 fn cloudflare_signed_note_verifies_under_lys_and_is_byte_identical() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
 
     let signer = StandardSigner::new(&golden_cloudflare_signer_key(&identity))
         .expect("Cloudflare signer rejected the lys seed material");
@@ -126,7 +126,7 @@ fn cloudflare_signed_note_verifies_under_lys_and_is_byte_identical() {
 
 #[test]
 fn tampered_note_is_rejected_by_both_implementations() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let note_text = sign_note(GOLDEN_BODY, GOLDEN_NAME, &identity).unwrap();
     let tampered = note_text.replacen("\n3\n", "\n4\n", 1);
 

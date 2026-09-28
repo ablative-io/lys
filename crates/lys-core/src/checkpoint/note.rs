@@ -205,7 +205,9 @@ pub fn verify_checkpoint(
     verifier: &NoteVerifierKey,
 ) -> TrustResult<CheckpointBody> {
     let body_text = verify_note(note_bytes, verifier)?;
-    let body = CheckpointBody::parse(&body_text).map_err(|_err| TrustError::NoteVerification)?;
+    let body = CheckpointBody::parse(&body_text)
+        .ok()
+        .ok_or(TrustError::NoteVerification)?;
     if body.origin() != verifier.name() {
         return Err(TrustError::NoteVerification);
     }
@@ -219,7 +221,9 @@ fn parse_note(note_bytes: &[u8]) -> TrustResult<(&str, Vec<SignatureLine<'_>>)> 
     if note_bytes.len() > MAX_NOTE_BYTES {
         return Err(TrustError::NoteVerification);
     }
-    let text = std::str::from_utf8(note_bytes).map_err(|_err| TrustError::NoteVerification)?;
+    let text = std::str::from_utf8(note_bytes)
+        .ok()
+        .ok_or(TrustError::NoteVerification)?;
     if text.chars().any(|c| c < ' ' && c != '\n') {
         return Err(TrustError::NoteVerification);
     }
@@ -255,7 +259,8 @@ fn parse_signature_line(line: &str) -> TrustResult<SignatureLine<'_>> {
     }
     let blob = STANDARD
         .decode(blob_b64)
-        .map_err(|_err| TrustError::NoteVerification)?;
+        .ok()
+        .ok_or(TrustError::NoteVerification)?;
     if blob.len() < 5 {
         return Err(TrustError::NoteVerification);
     }

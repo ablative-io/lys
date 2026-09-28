@@ -105,7 +105,8 @@ impl<S: LeafStore, K, P: AdmissionPolicy> Anchor<S, K, P> {
         // and the variant it becomes has nowhere to put it if there were.
         self.policy
             .admit(&submission, &context)
-            .map_err(|_refusal| AnchorError::NotAdmitted)?;
+            .ok()
+            .ok_or(AnchorError::NotAdmitted)?;
         let (leaf_index, leaf_hash) = self.log.append(submission.statement)?;
         Ok(AppendOutcome {
             leaf_index,

@@ -39,7 +39,7 @@ impl<P: PermissionCheck> Broker<P> {
             &handle,
             (&identity, &secret),
             (&operation, &mark),
-            reserved.map(|_reserved| 0),
+            reserved.map(|_| 0),
             CANCELLED_AT_BOUNDARY,
         )?;
         Err(SecretsError::HandleDropped { handle })

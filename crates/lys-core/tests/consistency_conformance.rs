@@ -74,7 +74,7 @@ fn tree_of(size: u64) -> AppendOnlyTree<RawLeaf> {
 }
 
 fn root_of(size: u64) -> [u8; 32] {
-    let (root, _size) = tree_of(size).root().to_parts();
+    let (root, _) = tree_of(size).root().to_parts();
     root
 }
 

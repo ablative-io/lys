@@ -125,8 +125,8 @@ fn reopening_restores_the_persisted_head_not_the_last_entry() {
     let file = {
         let mut s = home.create_session("s3", "/work", None).unwrap();
         let a = s.append(message("user", "a")).unwrap();
-        let _b = s.append(message("assistant", "b")).unwrap();
-        let _c = s.append(message("user", "c")).unwrap();
+        s.append(message("assistant", "b")).unwrap();
+        s.append(message("user", "c")).unwrap();
         s.move_head(Some(&a)).unwrap();
         s.file().to_path_buf()
     };

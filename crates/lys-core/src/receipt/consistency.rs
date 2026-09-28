@@ -226,7 +226,8 @@ pub fn verify_consistency_receipt(
         receipt.tree_size_2,
         &receipt.flattened_path(),
     )
-    .map_err(|_err| TrustError::ReceiptVerification)?;
+    .ok()
+    .ok_or(TrustError::ReceiptVerification)?;
 
     // Re-derived from a constant, not read from the artifact: at this point the
     // content type separating the two receipt kinds is not attacker-supplied.
@@ -240,7 +241,8 @@ pub fn verify_consistency_receipt(
         &sig_structure,
         &receipt.signature,
     )
-    .map_err(|_err| TrustError::ReceiptVerification)?;
+    .ok()
+    .ok_or(TrustError::ReceiptVerification)?;
     Ok(new_root)
 }
 

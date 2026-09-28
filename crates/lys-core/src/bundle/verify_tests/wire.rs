@@ -39,6 +39,7 @@ fn the_serialized_shape_is_exactly_the_five_wire_fields_in_order() {
     // Nor any key material.
     assert!(!json.contains("anchor_key"));
     assert!(!json.contains("verifier"));
+    s.close().unwrap();
 }
 
 #[test]
@@ -50,6 +51,7 @@ fn an_unknown_field_is_not_a_valid_v1_bundle() {
         "\"counter_anchor\":null,\"extra\":1",
     );
     assert!(serde_json::from_str::<VerificationBundle>(&smuggled).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -61,6 +63,7 @@ fn a_duplicate_key_is_not_a_valid_v1_bundle() {
         "\"counter_anchor\":null,\"format\":\"lys/verification-bundle/v1\"",
     );
     assert!(serde_json::from_str::<VerificationBundle>(&duplicated).is_err());
+    s.close().unwrap();
 }
 
 #[test]
@@ -73,6 +76,7 @@ fn a_bundle_round_trips_through_json_and_still_verifies() {
     let verified = verify_bundle(&restored, &s.child.verifier(), &[s.anchor.verifier()]).unwrap();
     assert_eq!(verified.leaf(), CHILD_LEAF);
     assert_eq!(verified.notarizations().len(), 1);
+    s.close().unwrap();
 }
 
 #[test]
@@ -81,6 +85,7 @@ fn the_constructor_sets_the_frozen_format_and_an_empty_slot() {
     assert_eq!(s.bundle.format, VERIFICATION_BUNDLE_FORMAT);
     assert_eq!(s.bundle.format, "lys/verification-bundle/v1");
     assert!(s.bundle.counter_anchor.is_none());
+    s.close().unwrap();
 }
 
 #[test]
@@ -92,4 +97,5 @@ fn the_debug_form_carries_no_private_material() {
     for forbidden in ["seed", "secret", "private", "signingkey"] {
         assert!(!rendered.to_lowercase().contains(forbidden));
     }
+    s.close().unwrap();
 }

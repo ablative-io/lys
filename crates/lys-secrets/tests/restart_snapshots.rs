@@ -120,7 +120,7 @@ fn calls(
     times: usize,
 ) -> Result<u64, Box<dyn std::error::Error>> {
     let mut left = 0;
-    for _call in 0..times {
+    for _ in 0..times {
         let presentation = present(world, issued)?;
         match broker.use_handle(&issued.token, &presentation, Secret::len)? {
             Used::Forwarded { uses_left, .. } => left = uses_left,

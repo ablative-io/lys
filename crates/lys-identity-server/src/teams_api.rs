@@ -223,7 +223,8 @@ fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
 fn team_id(id: &str) -> Result<String, ServerError> {
     OperationId::from_str(id)
         .map(|id| id.to_string())
-        .map_err(|_unread| ServerError::TeamUnknown)
+        .ok()
+        .ok_or(ServerError::TeamUnknown)
 }
 
 async fn create(
@@ -297,8 +298,9 @@ fn member_holds(
 ) -> Result<(), ServerError> {
     let identity = PersonId::from_str(member)
         .map(IdentityId::Person)
-        .or_else(|_unread| AgentId::from_str(member).map(IdentityId::Agent))
-        .map_err(|_unread| ServerError::TeamMemberUnknown)?;
+        .or_else(|_| AgentId::from_str(member).map(IdentityId::Agent))
+        .ok()
+        .ok_or(ServerError::TeamMemberUnknown)?;
     let record = projection
         .record(identity)
         .ok_or(ServerError::TeamMemberUnknown)?;

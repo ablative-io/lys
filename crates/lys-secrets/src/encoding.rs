@@ -77,10 +77,12 @@ impl Canonical {
 
     /// Appends one length-prefixed field.
     pub(crate) fn field(&mut self, bytes: &[u8]) -> Result<&mut Self, SecretsError> {
-        let len = u32::try_from(bytes.len()).map_err(|_overflow| SecretsError::Encoding {
-            context: "canonical field",
-            reason: format!("a field of {} bytes exceeds the 4 GiB limit", bytes.len()),
-        })?;
+        let len = u32::try_from(bytes.len())
+            .ok()
+            .ok_or_else(|| SecretsError::Encoding {
+                context: "canonical field",
+                reason: format!("a field of {} bytes exceeds the 4 GiB limit", bytes.len()),
+            })?;
         self.0.extend_from_slice(&len.to_be_bytes());
         self.0.extend_from_slice(bytes);
         Ok(self)
@@ -124,12 +126,12 @@ impl<'a> Reader<'a> {
         let (len_bytes, after_len) = self.rest.split_at_checked(4).ok_or_else(|| self.short(4))?;
         let mut len_array = [0u8; 4];
         len_array.copy_from_slice(len_bytes);
-        let len = usize::try_from(u32::from_be_bytes(len_array)).map_err(|_overflow| {
-            SecretsError::Encoding {
+        let len = usize::try_from(u32::from_be_bytes(len_array))
+            .ok()
+            .ok_or_else(|| SecretsError::Encoding {
                 context: self.context,
                 reason: "a field length does not fit this platform".to_string(),
-            }
-        })?;
+            })?;
         let (field, rest) = after_len
             .split_at_checked(len)
             .ok_or_else(|| self.short(len))?;
@@ -145,10 +147,13 @@ impl<'a> Reader<'a> {
     /// The next field, read as a `u64`.
     pub(crate) fn number(&mut self) -> Result<u64, SecretsError> {
         let field = self.field()?;
-        let array: [u8; 8] = field.try_into().map_err(|_length| SecretsError::Encoding {
-            context: self.context,
-            reason: format!("a number field holds {} bytes, not 8", field.len()),
-        })?;
+        let array: [u8; 8] = field
+            .try_into()
+            .ok()
+            .ok_or_else(|| SecretsError::Encoding {
+                context: self.context,
+                reason: format!("a number field holds {} bytes, not 8", field.len()),
+            })?;
         Ok(u64::from_be_bytes(array))
     }
 }

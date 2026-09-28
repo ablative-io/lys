@@ -180,7 +180,7 @@ impl AuditLog {
     ) -> Result<Self, SecretsError> {
         fs::create_dir_all(dir).map_err(io(format!("creating {}", dir.display())))?;
         ensure_outside(anchor, guarded)?;
-        let (log, _tail) = FrontierLog::open(FileLeafStore::create(dir, origin)?)?;
+        let (log, _) = FrontierLog::open(FileLeafStore::create(dir, origin)?)?;
         let audit = Self {
             log,
             dir: dir.to_path_buf(),
@@ -321,7 +321,7 @@ impl AuditLog {
         let mut signed = Canonical::new(SIGNED_DOMAIN)?;
         signed.field(&body)?.field(&signature)?;
         let bytes = signed.into_bytes();
-        let (index, _leaf_hash) = self.log.append(&bytes)?;
+        let (index, _) = self.log.append(&bytes)?;
         self.head = sha256(&bytes);
         self.write_anchor(key)?;
         Ok(index)
@@ -426,7 +426,8 @@ impl AuditLog {
             .ok_or(SecretsError::AuditSignatureInvalid { index: anchor.len })?;
         let body = Self::anchor_body(anchor.len, &digest)?;
         Ed25519Identity::verify(&self.verifying_key, &body, &signature)
-            .map_err(|_invalid| SecretsError::AuditSignatureInvalid { index: anchor.len })?;
+            .ok()
+            .ok_or(SecretsError::AuditSignatureInvalid { index: anchor.len })?;
         if self.len() < anchor.len {
             return Err(SecretsError::AuditLineMissing {
                 index: anchor.len,

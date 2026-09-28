@@ -106,7 +106,8 @@ pub fn parse_validity(spec: &str) -> CliResult<Duration> {
 
     let count: u64 = count
         .parse()
-        .map_err(|_err| invalid("count is too large to represent"))?;
+        .ok()
+        .ok_or_else(|| invalid("count is too large to represent"))?;
     let seconds = count
         .checked_mul(seconds_per_unit)
         .ok_or_else(|| invalid("window is too long to represent in seconds"))?;

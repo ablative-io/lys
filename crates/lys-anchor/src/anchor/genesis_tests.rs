@@ -271,7 +271,7 @@ impl Signer for DecliningSigner {
         self.public_key
     }
 
-    fn sign(&self, _message: &[u8]) -> AnchorResult<[u8; 64]> {
+    fn sign(&self, _: &[u8]) -> AnchorResult<[u8; 64]> {
         Err(AnchorError::Signing(SigningError::SignerDeclined {
             reason: DECLINED_REASON.to_string(),
         }))

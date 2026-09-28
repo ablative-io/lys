@@ -232,12 +232,13 @@ pub fn open(
         return Err(TrustError::UnsealFailed);
     }
 
-    let (key_bytes, _derived_nonce) = derive_key_and_nonce(
+    let (key_bytes, _) = derive_key_and_nonce(
         shared.as_bytes(),
         &envelope.ephemeral_public_key,
         &recipient_public.to_bytes(),
     )
-    .map_err(|_err| TrustError::UnsealFailed)?;
+    .ok()
+    .ok_or(TrustError::UnsealFailed)?;
 
     // The envelope's own nonce is the operative nonce; the derived nonce is
     // intentionally not compared against it. If the envelope nonce was
@@ -254,7 +255,8 @@ pub fn open(
                 aad: &[],
             },
         )
-        .map_err(|_err| TrustError::UnsealFailed)
+        .ok()
+        .ok_or(TrustError::UnsealFailed)
 }
 
 /// HKDF-SHA256 expansion of the X25519 shared secret into the AES key and

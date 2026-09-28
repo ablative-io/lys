@@ -165,7 +165,7 @@ impl<P: PermissionCheck> Broker<P> {
             Some((recorded, outcome)) if *recorded == digest => {
                 Ok(Admission::Repeated(outcome.clone()))
             }
-            Some(_other) => Err(SecretsError::from(OwnerChangeRefusal::Reused {
+            Some(_) => Err(SecretsError::from(OwnerChangeRefusal::Reused {
                 operation: operation.to_owned(),
                 secret: secret.to_owned(),
             })),

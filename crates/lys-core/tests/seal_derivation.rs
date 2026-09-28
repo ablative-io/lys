@@ -173,7 +173,7 @@ fn assert_matches_documented_derivation(
 /// The derivation as built matches the derivation as documented.
 #[test]
 fn seal_derives_key_material_exactly_as_documented() {
-    let (_dir, identity) = recipient_identity();
+    let (_, identity) = recipient_identity();
     let recipient_secret = identity.x25519_static_secret();
     let recipient_public = identity.x25519_public_key();
 
@@ -191,7 +191,7 @@ fn seal_derives_key_material_exactly_as_documented() {
 /// quietly degenerate into running the same case twice.
 #[test]
 fn derivation_holds_across_distinct_ephemeral_keys() {
-    let (_dir, identity) = recipient_identity();
+    let (_, identity) = recipient_identity();
     let recipient_secret = identity.x25519_static_secret();
     let recipient_public = identity.x25519_public_key();
 

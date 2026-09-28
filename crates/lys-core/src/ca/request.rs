@@ -285,7 +285,8 @@ pub fn verify_certificate_request(request_der: &[u8]) -> TrustResult<VerifiedReq
     let subject_public_key: [u8; ED25519_KEY_LEN] =
         subject_public_key
             .try_into()
-            .map_err(|_err| TrustError::CertificateParsing {
+            .ok()
+            .ok_or_else(|| TrustError::CertificateParsing {
                 reason: "subject public key length check did not yield 32 bytes".to_string(),
             })?;
 
@@ -298,7 +299,8 @@ pub fn verify_certificate_request(request_der: &[u8]) -> TrustResult<VerifiedReq
     let signature_bytes: [u8; ED25519_SIGNATURE_LEN] =
         signature_bytes
             .try_into()
-            .map_err(|_err| TrustError::CertificateParsing {
+            .ok()
+            .ok_or_else(|| TrustError::CertificateParsing {
                 reason: "signature length check did not yield 64 bytes".to_string(),
             })?;
 
@@ -318,16 +320,18 @@ pub fn verify_certificate_request(request_der: &[u8]) -> TrustResult<VerifiedReq
         }
     }
 
-    let verifying_key = VerifyingKey::from_bytes(&subject_public_key).map_err(|_err| {
-        TrustError::CertificateVerification {
-            reason: "certificate-signing request subject key is not a valid Ed25519 point"
-                .to_string(),
-        }
-    })?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&subject_public_key)
+            .ok()
+            .ok_or_else(|| TrustError::CertificateVerification {
+                reason: "certificate-signing request subject key is not a valid Ed25519 point"
+                    .to_string(),
+            })?;
     let signature = Signature::from_bytes(&signature_bytes);
     verifying_key
         .verify_strict(info.raw, &signature)
-        .map_err(|_err| TrustError::CertificateVerification {
+        .ok()
+        .ok_or_else(|| TrustError::CertificateVerification {
             reason: "certificate-signing request signature did not verify under the subject \
                      key it presents — proof of possession failed"
                 .to_string(),

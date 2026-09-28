@@ -38,7 +38,7 @@ fn tree_of(size: u64) -> AppendOnlyTree<RawLeaf> {
 
 /// The root of the raw-leaf tree of `size` leaves.
 fn root_of(size: u64) -> [u8; 32] {
-    let (root, _size) = tree_of(size).root().to_parts();
+    let (root, _) = tree_of(size).root().to_parts();
     root
 }
 
@@ -136,12 +136,11 @@ fn a_power_of_two_older_size_still_binds_the_callers_root() {
                 .expect("honest derivation");
             let mut wrong = root_of(old_size);
             wrong[31] ^= 0x80;
-            match root_from_consistency_path(&wrong, old_size, new_size, &path) {
-                Ok(derived) => assert_ne!(
+            if let Ok(derived) = root_from_consistency_path(&wrong, old_size, new_size, &path) {
+                assert_ne!(
                     derived, honest,
                     "({old_size} -> {new_size}) a wrong older root derived the honest newer root"
-                ),
-                Err(_refused) => {}
+                );
             }
             cases += 1;
         }
@@ -168,9 +167,8 @@ fn tampering_with_any_path_node_changes_the_derived_root_or_is_refused() {
         for bit in 0..8u32 {
             let mut path = honest_path.clone();
             path[byte] ^= 1u8 << bit;
-            match root_from_consistency_path(&old_root, old_size, new_size, &path) {
-                Ok(derived) => assert_ne!(derived, honest, "byte {byte} bit {bit} kept the root"),
-                Err(_refused) => {}
+            if let Ok(derived) = root_from_consistency_path(&old_root, old_size, new_size, &path) {
+                assert_ne!(derived, honest, "byte {byte} bit {bit} kept the root");
             }
             flipped += 1;
         }

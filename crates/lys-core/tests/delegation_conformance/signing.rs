@@ -11,10 +11,10 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
     let Some(go) = go_or_skip("go-cose delegation conformance") else {
         return;
     };
-    let (_workdir, bin) = cose_tool(&go);
+    let (workdir, bin) = cose_tool(&go);
 
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
     let root_public_key = root.public_key_bytes();
     let root_hex = to_hex(&root_public_key);
     let delegated_public_key = delegated.public_key_bytes();
@@ -159,4 +159,5 @@ fn go_cose_signs_over_exactly_the_bytes_delegation_preimage_builds() {
         long_subject_cases, 12,
         "cases whose subject value needs a two-byte tstr length"
     );
+    drop(workdir);
 }

@@ -126,7 +126,7 @@ fn reject() -> TrustError {
 /// Parse one CBOR value from `bytes` with ciborium. Trailing garbage is not
 /// detected here; the caller's re-encode-and-compare gate covers it.
 fn parse_value(bytes: &[u8]) -> TrustResult<Value> {
-    ciborium::de::from_reader(bytes).map_err(|_err| reject())
+    ciborium::de::from_reader(bytes).ok().ok_or_else(reject)
 }
 
 /// Extract a fixed-size byte array from a CBOR bstr value.
@@ -134,7 +134,7 @@ fn fixed_bytes<const N: usize>(value: &Value) -> TrustResult<[u8; N]> {
     let Value::Bytes(bytes) = value else {
         return Err(reject());
     };
-    bytes.as_slice().try_into().map_err(|_err| reject())
+    bytes.as_slice().try_into().ok().ok_or_else(reject)
 }
 
 /// Extract an integer value equal to `expected`, used for map-key pins.
@@ -225,7 +225,7 @@ pub(crate) fn decode_fields(bytes: &[u8]) -> TrustResult<DecodedFields> {
     let Value::Integer(ts_int) = ts else {
         return Err(reject());
     };
-    let timestamp: i64 = (*ts_int).try_into().map_err(|_err| reject())?;
+    let timestamp: i64 = (*ts_int).try_into().ok().ok_or_else(reject)?;
 
     Ok(DecodedFields {
         signer_public_key,

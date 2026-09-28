@@ -34,7 +34,7 @@ fn reject() -> TrustError {
 /// Parse one CBOR value from `bytes` with ciborium. Trailing garbage is not
 /// detected here; the caller's re-encode-and-compare gate covers it.
 fn parse_value(bytes: &[u8]) -> TrustResult<Value> {
-    ciborium::de::from_reader(bytes).map_err(|_err| reject())
+    ciborium::de::from_reader(bytes).ok().ok_or_else(reject)
 }
 
 /// Extract a fixed-size byte array from a CBOR bstr value.
@@ -42,7 +42,7 @@ fn fixed_bytes<const N: usize>(value: &Value) -> TrustResult<[u8; N]> {
     let Value::Bytes(bytes) = value else {
         return Err(reject());
     };
-    bytes.as_slice().try_into().map_err(|_err| reject())
+    bytes.as_slice().try_into().ok().ok_or_else(reject)
 }
 
 /// Extract an integer value equal to `expected`, used for map-key and
@@ -63,7 +63,7 @@ fn unsigned(value: &Value) -> TrustResult<u64> {
     let Value::Integer(int) = value else {
         return Err(reject());
     };
-    u64::try_from(i128::from(*int)).map_err(|_err| reject())
+    u64::try_from(i128::from(*int)).ok().ok_or_else(reject)
 }
 
 /// Decode the protected bucket, returning the anchor key from `kid`.

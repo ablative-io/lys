@@ -61,6 +61,14 @@ struct Staged {
     pinned: UpwardPin,
 }
 
+impl Staged {
+    /// Removes both parties' temporary directories, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.child.close()?;
+        self.parent.close()
+    }
+}
+
 fn staged() -> Staged {
     let (child, index) = child_with_statement();
     let mut parent = parent();
@@ -104,6 +112,7 @@ fn a_cascade_one_link_past_the_cap_is_refused() {
         }
         other => panic!("expected CascadeTooDeep, got {other:?}"),
     }
+    staged.close().unwrap();
 }
 
 #[test]
@@ -151,6 +160,7 @@ fn a_checkpoint_that_moved_under_the_anchor_is_refused() {
         }
         other => panic!("expected CascadeJoinMismatch, got {other:?}"),
     }
+    staged.close().unwrap();
 }
 
 #[test]
@@ -179,6 +189,7 @@ fn an_index_the_log_lacks_is_refused() {
         }
         other => panic!("expected NoSuchLeaf, got {other:?}"),
     }
+    staged.close().unwrap();
 }
 
 #[test]
@@ -211,6 +222,7 @@ fn the_container_carries_the_frozen_format_and_the_leaf() {
     // And the parent really is the notarizer, so the link above is not the
     // child notarizing itself.
     assert_ne!(staged.parent.origin(), staged.child.origin());
+    staged.close().unwrap();
 }
 
 #[test]
@@ -231,6 +243,7 @@ fn assembly_never_populates_the_counter_anchor() {
     }
     // Count what fired: a loop over nothing satisfies every assertion inside it.
     assert_eq!(checked, 2);
+    staged.close().unwrap();
 }
 
 #[test]
@@ -243,4 +256,5 @@ fn an_empty_cascade_assembles() {
          claim, not an invalid bundle"
     );
     assert_eq!(bundle.format, VERIFICATION_BUNDLE_FORMAT);
+    staged.close().unwrap();
 }

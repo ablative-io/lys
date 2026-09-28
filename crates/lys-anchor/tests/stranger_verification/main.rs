@@ -228,7 +228,7 @@ fn python_or_skip(gate: &str) -> Option<PathBuf> {
 /// would have been told out of band.
 struct Case {
     /// Kept alive for the lifetime of the case; dropping it deletes the files.
-    _tmp: TempDir,
+    temp_dir: TempDir,
     artifact_path: PathBuf,
     leaf_path: PathBuf,
     /// The parsed artifact, for the tests that mutate a field before rewriting.
@@ -294,12 +294,19 @@ fn build_case(leaf_index: u64) -> Case {
     std::fs::write(&leaf_path, &leaf).unwrap();
 
     Case {
-        _tmp: tmp,
+        temp_dir: tmp,
         artifact_path,
         leaf_path,
         artifact: value,
         leaf,
         root_b64,
+    }
+}
+
+impl Case {
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 }
 

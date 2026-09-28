@@ -56,7 +56,7 @@ use super::*;
 
 #[test]
 fn the_outcome_is_the_cores_submission_outcome() {
-    let (child, _index) = child_with_statement();
+    let (child, _) = child_with_statement();
     let mut parent = parent();
 
     let pinned = pin(
@@ -90,11 +90,13 @@ fn the_outcome_is_the_cores_submission_outcome() {
         outcomes[0].leaf_index, outcomes[1].leaf_index,
         "the two submissions must be two events at two indices"
     );
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
 fn the_parent_records_the_child_note_verbatim() {
-    let (child, _index) = child_with_statement();
+    let (child, _) = child_with_statement();
     let mut parent = parent();
 
     let pinned = pin(
@@ -125,11 +127,13 @@ fn the_parent_records_the_child_note_verbatim() {
         .expect("the recorded leaf is an ordinary signed checkpoint note");
     assert_eq!(body.origin(), CHILD_ORIGIN);
     assert_eq!(body.tree_size(), child.anchor.tree_size());
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
 fn the_returned_checkpoint_is_the_one_that_was_pinned() {
-    let (child, _index) = child_with_statement();
+    let (child, _) = child_with_statement();
     let mut parent = parent();
 
     let pinned = pin(
@@ -162,11 +166,13 @@ fn the_returned_checkpoint_is_the_one_that_was_pinned() {
         "a receipt that verified against altered note bytes would prove nothing \
          about which note was pinned"
     );
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
 fn the_parents_receipt_is_what_a_plain_submission_would_have_got() {
-    let (child, _index) = child_with_statement();
+    let (child, _) = child_with_statement();
     let note = child.anchor.publish_checkpoint().unwrap().note;
 
     // Two parents, same origin, same key, same genesis, driven to the same tree
@@ -199,6 +205,9 @@ fn the_parents_receipt_is_what_a_plain_submission_would_have_got() {
     );
     assert_eq!(via_pin.recorded.leaf_index, via_submit.leaf_index);
     assert_eq!(via_pin.recorded.leaf_hash, via_submit.leaf_hash);
+    child.close().unwrap();
+    pinned_parent.close().unwrap();
+    plain_parent.close().unwrap();
 }
 
 #[test]
@@ -231,11 +240,13 @@ fn pinning_appends_nothing_to_the_childs_own_log() {
     // pin that quietly did nothing at all.
     assert_eq!(parent.anchor.tree_size(), 2);
     assert_eq!(pinned.recorded.leaf_index, 1);
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
 fn a_parent_that_refuses_leaves_both_logs_untouched() {
-    let (child, _index) = child_with_statement();
+    let (child, _) = child_with_statement();
     let note_len = child.anchor.publish_checkpoint().unwrap().note.len();
 
     // A parent whose policy admits nothing this large. The threshold is derived
@@ -275,6 +286,8 @@ fn a_parent_that_refuses_leaves_both_logs_untouched() {
     );
     assert_eq!(child.anchor.tree_size(), child_size_before);
     assert_eq!(strict.anchor.tree_size(), parent_size_before);
+    child.close().unwrap();
+    strict.close().unwrap();
 }
 
 #[test]
@@ -302,4 +315,6 @@ fn a_bare_child_can_still_be_pinned() {
             .unwrap(),
         pinned.checkpoint.note.as_bytes()
     );
+    child.close().unwrap();
+    parent.close().unwrap();
 }

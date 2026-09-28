@@ -36,7 +36,7 @@ fn warn_if_loose_permissions(path: &Path) {
 }
 
 #[cfg(not(unix))]
-fn warn_if_loose_permissions(_path: &Path) {}
+fn warn_if_loose_permissions(_: &Path) {}
 
 /// Loads an identity from an existing key file (raw 32-byte seed).
 ///

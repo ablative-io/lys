@@ -21,7 +21,7 @@ fn key(dir: &tempfile::TempDir, name: &str) -> Ed25519Identity {
 
 /// A log of `count` leaves with a snapshot written at `snapshot_at`.
 fn logged(count: u64, snapshot_at: u64, key: &Ed25519Identity) -> Disk {
-    let (mut log, _tail) = FrontierLog::open(CountingStore::new()).unwrap();
+    let (mut log, _) = FrontierLog::open(CountingStore::new()).unwrap();
     for index in 0..count {
         if index == snapshot_at {
             log.write_snapshot(DOMAIN, format!("state@{index}").as_bytes(), key)
@@ -222,8 +222,7 @@ fn a_crash_between_a_leaf_and_its_pin_after_a_snapshot_is_repaired_on_resume() {
     let key = key(&dir, "key");
     let mut store = CountingStore::over(logged(5, 5, &key));
     store.fail_next_pin();
-    let (mut log, _tail) =
-        FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf))).unwrap();
+    let (mut log, _) = FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf))).unwrap();
     assert!(log.append(&leaf(5)).is_err());
     let started = started(log.store().disk.clone(), &key);
     assert_eq!(
@@ -243,7 +242,7 @@ fn the_file_store_keeps_its_snapshot_across_a_reopen() {
     let key = key(&dir, "key");
     let log_dir = dir.path().join("log");
     FileLeafStore::create(&log_dir, ORIGIN).unwrap();
-    let (mut log, _tail) = FrontierLog::open(FileLeafStore::open(&log_dir).unwrap()).unwrap();
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&log_dir).unwrap()).unwrap();
     for index in 0..5 {
         log.append(&leaf(index)).unwrap();
     }

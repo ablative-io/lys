@@ -158,7 +158,7 @@ fn load_or_generate_creates_parent_dir() {
     let path = dir.path().join("nested").join("deep").join("identity.key");
     assert!(!path.parent().unwrap().exists());
 
-    let _id = Ed25519Identity::load_or_generate(&path).unwrap();
+    Ed25519Identity::load_or_generate(&path).unwrap();
     assert!(path.exists());
     assert!(path.parent().unwrap().exists());
 }

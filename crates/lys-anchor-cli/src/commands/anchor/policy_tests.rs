@@ -15,7 +15,7 @@ struct RecordPolicy<'a> {
 }
 
 impl AnchorTask for RecordPolicy<'_> {
-    fn run<P: AdmissionPolicy>(self, _policy: P) -> CliResult<()> {
+    fn run<P: AdmissionPolicy>(self, _: P) -> CliResult<()> {
         self.seen.borrow_mut().push(std::any::type_name::<P>());
         Ok(())
     }

@@ -164,7 +164,7 @@ fn artifact_bytes_matches_golden() {
 /// signing path end to end.
 #[test]
 fn golden_identity_reproduces_golden_signature() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     assert_eq!(identity.public_key_bytes(), golden_pubkey());
     let signature = identity.sign(&hex_to_bytes(GOLDEN_SIG_STRUCTURE_HEX));
     assert_eq!(signature, golden_signature());
@@ -219,7 +219,7 @@ fn decode_fields_rejects_non_cbor_input() {
 fn coset_builds_byte_identical_artifact() {
     use coset::{CoseSign1Builder, HeaderBuilder, TaggedCborSerializable, iana};
 
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let claims = claims_bytes(&golden_hash(), GOLDEN_TIMESTAMP);
     let protected = HeaderBuilder::new()
         .algorithm(iana::Algorithm::EdDSA)

@@ -60,13 +60,16 @@ pub fn chain(depth: usize) -> Scenario {
         links.push(BundleLink::new(&notarized, &receipt));
         anchors.push(anchor.spec());
         notarized = anchor.checkpoint();
+        anchor.close().unwrap();
     }
 
-    Scenario {
+    let scenario = Scenario {
         bundle: VerificationBundle::new(CHILD_LEAF, artifact, links),
         log_key: log.spec(),
         anchors,
-    }
+    };
+    log.close().unwrap();
+    scenario
 }
 
 /// Distinct 32-byte seeds per chain level, checked for length at the source so
@@ -123,7 +126,7 @@ pub fn divergent_rung() -> Scenario {
     );
     let receipt_1 = anchor_1.receipt_over(diverged_note.as_bytes(), NOTARIZED_INDEX);
 
-    Scenario {
+    let scenario = Scenario {
         bundle: VerificationBundle::new(
             CHILD_LEAF,
             artifact,
@@ -134,7 +137,11 @@ pub fn divergent_rung() -> Scenario {
         ),
         log_key: log.spec(),
         anchors: vec![anchor_0.spec(), anchor_1.spec()],
-    }
+    };
+    log.close().unwrap();
+    anchor_0.close().unwrap();
+    anchor_1.close().unwrap();
+    scenario
 }
 
 /// A two-link chain in which anchor 0 **equivocates**: it vouches for one root
@@ -163,6 +170,7 @@ pub fn equivocating_anchor() -> Scenario {
         b"a-second-entry-that-was-never-notarized",
     );
     let published_note = published.checkpoint();
+    published.close().unwrap();
 
     let anchor_1 = anchor_over(
         "anchor-1.example",
@@ -171,7 +179,7 @@ pub fn equivocating_anchor() -> Scenario {
     );
     let receipt_1 = anchor_1.receipt_over(published_note.as_bytes(), NOTARIZED_INDEX);
 
-    Scenario {
+    let scenario = Scenario {
         bundle: VerificationBundle::new(
             CHILD_LEAF,
             artifact,
@@ -182,7 +190,11 @@ pub fn equivocating_anchor() -> Scenario {
         ),
         log_key: log.spec(),
         anchors: vec![vouched.spec(), anchor_1.spec()],
-    }
+    };
+    log.close().unwrap();
+    vouched.close().unwrap();
+    anchor_1.close().unwrap();
+    scenario
 }
 
 /// A chain whose first receipt **relabels its tree size**, exercising the one
@@ -239,13 +251,17 @@ pub fn relabelled_tree_size(with_second_link: bool) -> Scenario {
             &anchor_1.receipt_over(a0_note.as_bytes(), NOTARIZED_INDEX),
         ));
         anchors.push(anchor_1.spec());
+        anchor_1.close().unwrap();
     }
+    anchor_0.close().unwrap();
 
-    Scenario {
+    let scenario = Scenario {
         bundle: VerificationBundle::new(CHILD_LEAF, artifact, links),
         log_key: log.spec(),
         anchors,
-    }
+    };
+    log.close().unwrap();
+    scenario
 }
 
 /// An entirely separate log-and-anchor pair, used to build the splice attacks:
@@ -268,7 +284,7 @@ pub fn unrelated() -> Scenario {
     );
     let receipt = anchor.receipt_over(checkpoint.as_bytes(), NOTARIZED_INDEX);
 
-    Scenario {
+    let scenario = Scenario {
         bundle: VerificationBundle::new(
             CHILD_LEAF,
             artifact,
@@ -276,5 +292,8 @@ pub fn unrelated() -> Scenario {
         ),
         log_key: log.spec(),
         anchors: vec![anchor.spec()],
-    }
+    };
+    log.close().unwrap();
+    anchor.close().unwrap();
+    scenario
 }

@@ -65,10 +65,12 @@ struct TokenAnswer {
 }
 
 fn text(secret: &Secret, what: &'static str) -> Result<String, SecretsError> {
-    String::from_utf8(secret.expose().to_vec()).map_err(|_utf8| SecretsError::Encoding {
-        context: what,
-        reason: "not UTF-8".to_owned(),
-    })
+    String::from_utf8(secret.expose().to_vec())
+        .ok()
+        .ok_or_else(|| SecretsError::Encoding {
+            context: what,
+            reason: "not UTF-8".to_owned(),
+        })
 }
 
 impl OAuthGrant {
@@ -201,11 +203,12 @@ impl OAuthGrant {
     ///
     /// `Encoding` when the answer is not a token answer.
     pub fn apply_refresh(&mut self, answer: &[u8], now_ms: i64) -> Result<(), SecretsError> {
-        let answer: TokenAnswer =
-            serde_json::from_slice(answer).map_err(|_json| SecretsError::Encoding {
+        let answer: TokenAnswer = serde_json::from_slice(answer).ok().ok_or_else(|| {
+            SecretsError::Encoding {
                 context: "token endpoint answer",
                 reason: "not a token answer".to_owned(),
-            })?;
+            }
+        })?;
         self.access_token = Secret::new(answer.access_token.into_bytes());
         let lifetime_ms = answer.expires_in.unwrap_or(0).saturating_mul(1_000);
         self.access_expires_ms = now_ms.saturating_add(lifetime_ms);

@@ -73,7 +73,7 @@ fn assemble(protected: &[u8], unprotected: &[u8], claims: &[u8], signature: &[u8
 /// assemble the artifact — the signature is internally consistent even for
 /// shapes the verifier must reject.
 fn signed_custom(protected: &[u8], claims: &[u8]) -> Vec<u8> {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let signature = identity.sign(&cbor::sig_structure_bytes(protected, claims));
     assemble(protected, &[0xa0], claims, &signature)
 }
@@ -82,7 +82,7 @@ fn signed_custom(protected: &[u8], claims: &[u8]) -> Vec<u8> {
 
 #[test]
 fn golden_artifact_parses_to_expected_fields() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let att = golden_attestation();
     assert_eq!(att.signer_public_key, identity.public_key_bytes());
     assert_eq!(att.timestamp, GOLDEN_TIMESTAMP);
@@ -159,7 +159,7 @@ fn mutant_d_oversized_length_head_is_rejected() {
 /// on canonicality.
 #[test]
 fn mutant_d_noncanonical_timestamp_head_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let protected = encoding::protected_bytes(&identity.public_key_bytes());
     let canonical_claims = encoding::claims_bytes(&[0x11; 32], 1);
     // Re-encode timestamp 1 with an oversized 8-byte head: `02 1b …01`.
@@ -174,7 +174,7 @@ fn mutant_d_noncanonical_timestamp_head_is_rejected() {
 /// internally consistent under that bucket.
 #[test]
 fn mutant_e_alg_substitution_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let mut protected = encoding::protected_bytes(&identity.public_key_bytes());
     assert_eq!(protected[2], 0x27); // -8
     protected[2] = 0x26; // -7 (ES256)
@@ -190,7 +190,7 @@ fn mutant_e_alg_substitution_is_rejected() {
 /// design: a `Sig_structure` begins 0x84, which cannot start a v1 preimage).
 #[test]
 fn mutant_f_old_v1_preimage_signature_parses_but_fails_verification() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let payload_hash: [u8; 32] = {
         use sha2::{Digest, Sha256};
         Sha256::digest(GOLDEN_PAYLOAD).into()
@@ -242,7 +242,7 @@ fn empty_and_truncated_inputs_are_rejected() {
 /// rejected even with internally consistent signatures.
 #[test]
 fn empty_claims_and_extra_claims_are_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let protected = encoding::protected_bytes(&identity.public_key_bytes());
 
     let empty_claims = vec![0xa0];
@@ -257,7 +257,7 @@ fn empty_claims_and_extra_claims_are_rejected() {
 /// A kid that is not exactly 32 bytes is rejected.
 #[test]
 fn wrong_kid_length_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let canonical = encoding::protected_bytes(&identity.public_key_bytes());
     // Rebuild the protected bucket with a 31-byte kid: shrink the bstr head
     // and drop the final key byte.
@@ -273,7 +273,7 @@ fn wrong_kid_length_is_rejected() {
 /// requires exactly `{1: …, 2: …}`).
 #[test]
 fn duplicate_claims_keys_are_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let protected = encoding::protected_bytes(&identity.public_key_bytes());
     let mut claims = vec![0xa2];
     for _ in 0..2 {
@@ -289,7 +289,7 @@ fn duplicate_claims_keys_are_rejected() {
 /// enforced positionally at decode and again by the byte-compare).
 #[test]
 fn reordered_protected_keys_are_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let canonical = encoding::protected_bytes(&identity.public_key_bytes());
     // Canonical layout: a3 | 01 27 | 03 78 27 <39 CT> | 04 58 20 <32 pk>.
     // Reorder to {3, 1, 4}.
@@ -305,7 +305,7 @@ fn reordered_protected_keys_are_rejected() {
 /// A signature bstr that is not exactly 64 bytes is rejected.
 #[test]
 fn wrong_signature_length_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let protected = encoding::protected_bytes(&identity.public_key_bytes());
     let claims = encoding::claims_bytes(&[0x88; 32], GOLDEN_TIMESTAMP);
     let artifact = assemble(&protected, &[0xa0], &claims, &[0xab; 63]);
@@ -317,7 +317,7 @@ fn wrong_signature_length_is_rejected() {
 /// domain discriminator.
 #[test]
 fn wrong_content_type_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let mut protected = encoding::protected_bytes(&identity.public_key_bytes());
     // Uppercase one content-type byte (offset 6 is inside the CT string).
     protected[6] = protected[6].to_ascii_uppercase();
@@ -333,7 +333,7 @@ fn wrong_content_type_is_rejected() {
 /// parse, round-trip byte-identically, and cryptographically verify.
 #[test]
 fn full_i64_timestamp_range_parses_round_trips_and_verifies() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let payload_hash: [u8; 32] = {
         use sha2::{Digest, Sha256};
         Sha256::digest(GOLDEN_PAYLOAD).into()
@@ -355,7 +355,7 @@ fn full_i64_timestamp_range_parses_round_trips_and_verifies() {
 /// `i64::MIN`) are both valid CBOR integers the contract excludes.
 #[test]
 fn out_of_i64_range_timestamp_is_rejected() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let protected = encoding::protected_bytes(&identity.public_key_bytes());
     // Canonical claims for timestamp 0 end `02 00` (key 2, value 0); swap
     // the value byte for a canonical 9-byte integer head outside i64.

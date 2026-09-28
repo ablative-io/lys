@@ -183,7 +183,7 @@ fn is_usable_ed25519_public_key_refuses_every_non_canonical_spelling() {
     let mut refused = 0;
     let mut refused_that_dalek_would_accept = 0;
 
-    for (non_canonical, _canonical) in non_canonical_spellings() {
+    for (non_canonical, _) in non_canonical_spellings() {
         assert!(
             !is_usable_ed25519_public_key(&non_canonical),
             "a non-canonical y-coordinate was accepted as a key: {}",
@@ -276,7 +276,7 @@ fn verify_refuses_every_non_canonical_public_key_spelling() {
     let signature = id.sign(b"msg");
 
     let mut refused = 0;
-    for (non_canonical, _canonical) in non_canonical_spellings() {
+    for (non_canonical, _) in non_canonical_spellings() {
         assert!(
             matches!(
                 Ed25519Identity::verify(&non_canonical, b"msg", &signature),
@@ -309,7 +309,7 @@ fn the_narrowing_is_unreachable_through_verify() {
         let message: &[u8] = b"a message somebody actually signed";
         let signature = id.sign(message);
 
-        for (non_canonical, _canonical) in non_canonical_spellings() {
+        for (non_canonical, _) in non_canonical_spellings() {
             // The pre-rule path, spelled out rather than referenced, so that
             // editing `verify` cannot silently edit the baseline it is being
             // compared against.

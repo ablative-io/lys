@@ -169,7 +169,8 @@ pub fn assemble_delegation(
     encoding::check_encodable(root_public_key, claim)?;
     let preimage = delegation_preimage(root_public_key, claim);
     Ed25519Identity::verify(root_public_key, &preimage, signature)
-        .map_err(|_err| TrustError::DelegationVerification)?;
+        .ok()
+        .ok_or(TrustError::DelegationVerification)?;
     Ok(encoding::artifact_bytes(root_public_key, claim, signature))
 }
 

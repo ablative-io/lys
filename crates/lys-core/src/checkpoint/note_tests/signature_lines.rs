@@ -10,7 +10,7 @@ use super::*;
 fn signature_under_different_name_is_filtered_not_accepted() {
     // Origin-confusion half 1: the same key signing under a different
     // keyname is filtered out (different name AND different key ID).
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let note = sign_note(GOLDEN_BODY, "other.example/log", &identity).unwrap();
     assert_rejected(note.as_bytes(), "signature under a different keyname");
 }
@@ -75,7 +75,7 @@ fn golden_signature_spliced_onto_different_body_is_rejected() {
 fn resigned_extension_line_is_tolerated_by_checkpoint_verification() {
     // A timestamp-like fourth line WITH a re-signed note is accepted as an
     // extension line by design; the parsed body ignores it.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let body_with_extension = format!("{GOLDEN_BODY}1234567890\n");
     let note = sign_note(&body_with_extension, GOLDEN_NAME, &identity).unwrap();
     let body = verify_checkpoint(note.as_bytes(), &golden_verifier()).unwrap();
@@ -96,7 +96,7 @@ fn em_dash_line_inside_body_stays_signed_content() {
     // Signature-line smuggling: a body line that LOOKS like a signature
     // line remains part of the signed body (split happens at the LAST
     // blank line), and the note still verifies with the line intact.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let smuggled = format!("{GOLDEN_BODY}\u{2014} {GOLDEN_NAME} {GOLDEN_SIG_BLOB_B64}\n");
     let note = sign_note(&smuggled, GOLDEN_NAME, &identity).unwrap();
     let body = verify_note(note.as_bytes(), &golden_verifier()).unwrap();
@@ -110,7 +110,7 @@ fn verify_note_splits_at_the_last_blank_line() {
     // line, and Go note.Open splits at bytes.LastIndex("\n\n"). lys
     // sign_note refuses such bodies, so hand-sign one here: verify_note
     // must split at the LAST blank line and return the body intact.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let blank_line_body = "A\n\nB\n";
     let signature = identity.sign(blank_line_body.as_bytes());
     let mut blob = GOLDEN_KEY_ID.to_vec();
@@ -132,7 +132,7 @@ fn verify_note_splits_at_the_last_blank_line() {
 fn checkpoint_origin_must_equal_verifier_name() {
     // Origin-confusion half 2: an honest key, a validly signed note, but
     // the body's origin differs from the verifier's name (R1 binding).
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let foreign_body = "other.example/log\n3\nz3Y6BByBzu8VeKYIP3XGG+8uABTyo+aDqX/Pylvn8Zo=\n";
     let note = sign_note(foreign_body, GOLDEN_NAME, &identity).unwrap();
 
@@ -145,7 +145,7 @@ fn checkpoint_origin_must_equal_verifier_name() {
 
 #[test]
 fn unparseable_body_collapses_to_note_verification() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     // Valid note, but the body is not a checkpoint (one line only).
     let note = sign_note("not-a-checkpoint\n", GOLDEN_NAME, &identity).unwrap();
     let err = verify_checkpoint(note.as_bytes(), &golden_verifier()).unwrap_err();
@@ -161,7 +161,7 @@ fn tree_size_tamper_in_checkpoint_note_is_rejected() {
 
     // Leading-zero tree size WITH a valid re-sign: rejected by the strict
     // body parse inside verify_checkpoint.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let leading_zero_body = GOLDEN_BODY.replacen("\n3\n", "\n03\n", 1);
     let note = sign_note(&leading_zero_body, GOLDEN_NAME, &identity).unwrap();
     let err = verify_checkpoint(note.as_bytes(), &golden_verifier()).unwrap_err();

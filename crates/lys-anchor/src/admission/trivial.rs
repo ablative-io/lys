@@ -63,11 +63,7 @@ impl AdmissionPolicy for AcceptAll {
     ///
     /// Never. The signature is the trait's, and a policy that cannot refuse
     /// still has to have somewhere to say so.
-    fn admit(
-        &self,
-        _submission: &Submission<'_>,
-        _context: &SubmitterContext<'_>,
-    ) -> Result<(), NotAdmitted> {
+    fn admit(&self, _: &Submission<'_>, _: &SubmitterContext<'_>) -> Result<(), NotAdmitted> {
         Ok(())
     }
 }
@@ -138,7 +134,7 @@ impl AdmissionPolicy for MaxSize {
     fn admit(
         &self,
         submission: &Submission<'_>,
-        _context: &SubmitterContext<'_>,
+        _: &SubmitterContext<'_>,
     ) -> Result<(), NotAdmitted> {
         if submission.statement.len() > self.max_bytes {
             return Err(NotAdmitted);

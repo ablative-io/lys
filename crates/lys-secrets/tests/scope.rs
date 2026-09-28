@@ -75,7 +75,7 @@ fn a_personal_secret_is_closed_to_every_other_person_and_their_agents() -> TestR
     let keys = root.path().join("keys");
     let mut broker = broker(root.path())?;
     let people = [("tom", "dana"), ("dana", "tom")];
-    for (person, _other) in people {
+    for (person, _) in people {
         let owner = format!("person:{person}");
         broker.seal(
             &format!("{person}-token"),

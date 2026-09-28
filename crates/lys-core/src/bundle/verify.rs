@@ -178,12 +178,13 @@ pub fn verify_bundle(
         return Err(reject());
     }
 
-    let leaf = STANDARD.decode(&bundle.leaf).map_err(|_err| reject())?;
+    let leaf = STANDARD.decode(&bundle.leaf).ok().ok_or_else(reject)?;
 
     // The inclusion proof carries its own checkpoint and is verified against it,
     // including the origin/key-name binding.
     let log_checkpoint = verify_inclusion_artifact(&bundle.inclusion_proof, &leaf, log_verifier)
-        .map_err(|_err| reject())?;
+        .ok()
+        .ok_or_else(reject)?;
 
     let mut notarizations = Vec::with_capacity(bundle.links.len());
     for (index, link) in bundle.links.iter().enumerate() {
@@ -198,28 +199,31 @@ pub fn verify_bundle(
             return Err(reject());
         }
 
-        let receipt_bytes = STANDARD.decode(&link.receipt).map_err(|_err| reject())?;
+        let receipt_bytes = STANDARD.decode(&link.receipt).ok().ok_or_else(reject)?;
         let anchor = anchors.get(index).ok_or_else(reject)?;
         let receipt = verify_receipt_bytes(
             &receipt_bytes,
             link.checkpoint.as_bytes(),
             &anchor.public_key(),
         )
-        .map_err(|_err| reject())?;
+        .ok()
+        .ok_or_else(reject)?;
 
         // Recompute rather than read: the root is a detached payload and appears
         // nowhere in the receipt.
         let anchor_root = receipt
             .reconstructed_root(link.checkpoint.as_bytes())
-            .map_err(|_err| reject())?;
+            .ok()
+            .ok_or_else(reject)?;
 
         // The rung: where a next link exists, its checkpoint must be *this*
         // anchor's own published checkpoint, signed by this anchor, stating
         // exactly the root and size this anchor's receipt vouched for. Two
         // independently signed statements forced to agree.
         if let Some(next) = bundle.links.get(index + 1) {
-            let next_body =
-                verify_checkpoint(next.checkpoint.as_bytes(), anchor).map_err(|_err| reject())?;
+            let next_body = verify_checkpoint(next.checkpoint.as_bytes(), anchor)
+                .ok()
+                .ok_or_else(reject)?;
             if next_body.root_hash() != anchor_root || next_body.tree_size() != receipt.tree_size {
                 return Err(reject());
             }

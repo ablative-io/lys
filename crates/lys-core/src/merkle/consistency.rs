@@ -145,7 +145,7 @@ pub fn root_from_consistency_path(
     }
 
     // Step 4.
-    let mut older: [u8; DIGEST_LEN] = seed.try_into().map_err(|_err| TrustError::MerkleTree {
+    let mut older: [u8; DIGEST_LEN] = seed.try_into().ok().ok_or_else(|| TrustError::MerkleTree {
         reason: "consistency path node is not a 32-byte digest".to_string(),
     })?;
     let mut newer = older;

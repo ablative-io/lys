@@ -191,7 +191,8 @@ pub fn unseal(
         return Err(SnapshotRefusal::Unsigned);
     }
     Ed25519Identity::verify(public_key, body, signature)
-        .map_err(|_invalid| SnapshotRefusal::SignatureInvalid)?;
+        .ok()
+        .ok_or(SnapshotRefusal::SignatureInvalid)?;
     let mut reader = Reader::new(body);
     if reader.field("format")? != SNAPSHOT_FORMAT.as_bytes() {
         return Err(malformed("the body does not open with the snapshot format"));
@@ -271,27 +272,32 @@ impl<'a> Reader<'a> {
         let bytes = self.take(8, what)?;
         <[u8; 8]>::try_from(bytes)
             .map(u64::from_be_bytes)
-            .map_err(|_length| malformed("a number is not 8 bytes"))
+            .ok()
+            .ok_or_else(|| malformed("a number is not 8 bytes"))
     }
 
     fn hash(&mut self, what: &str) -> Result<[u8; 32], SnapshotRefusal> {
         let bytes = self.take(32, what)?;
-        <[u8; 32]>::try_from(bytes).map_err(|_length| malformed("a hash is not 32 bytes"))
+        <[u8; 32]>::try_from(bytes).ok().ok_or_else(|| malformed("a hash is not 32 bytes"))
     }
 
     fn field(&mut self, what: &str) -> Result<&'a [u8], SnapshotRefusal> {
         let len = self.number(what)?;
-        let len = usize::try_from(len).map_err(|_width| SnapshotRefusal::Malformed {
-            reason: format!("the {what} is longer than this machine can address"),
-        })?;
+        let len = usize::try_from(len)
+            .ok()
+            .ok_or_else(|| SnapshotRefusal::Malformed {
+                reason: format!("the {what} is longer than this machine can address"),
+            })?;
         self.take(len, what)
     }
 
     fn text(&mut self, what: &str) -> Result<String, SnapshotRefusal> {
         let bytes = self.field(what)?;
-        String::from_utf8(bytes.to_vec()).map_err(|_utf8| SnapshotRefusal::Malformed {
-            reason: format!("the {what} is not UTF-8"),
-        })
+        String::from_utf8(bytes.to_vec())
+            .ok()
+            .ok_or_else(|| SnapshotRefusal::Malformed {
+                reason: format!("the {what} is not UTF-8"),
+            })
     }
 
     fn finish(&self) -> Result<(), SnapshotRefusal> {

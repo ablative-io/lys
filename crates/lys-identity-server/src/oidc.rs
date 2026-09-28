@@ -127,7 +127,8 @@ impl Oidc {
             .map_err(|error| failed(&error))?;
         let authenticated = claims.auth_time().unwrap_or_else(|| claims.issue_time());
         let at = u64::try_from(authenticated.timestamp())
-            .map_err(|_error| failed(&"the authentication time is before the epoch"))?;
+            .ok()
+            .ok_or_else(|| failed(&"the authentication time is before the epoch"))?;
         let binding = LoginBinding::new(claims.issuer().as_str(), claims.subject().as_str())?;
         Ok(Actor::new(binding, Provenance::new(AuthMethod::Oidc, at)))
     }

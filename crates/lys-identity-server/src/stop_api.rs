@@ -124,7 +124,9 @@ fn admitted(
     actor: &lys_identity::Actor,
     id: &str,
 ) -> Result<(AgentId, String, LifecycleState), ServerError> {
-    let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     let administrator = state.admission.administrator(actor).is_ok();
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -145,7 +147,7 @@ async fn stops(
     Path(id): Path<String>,
 ) -> Result<Json<StopsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let (agent, _by, _lifecycle) = admitted(&state, &actor, &id)?;
+    let (agent, _, _) = admitted(&state, &actor, &id)?;
     with_stops(&state, |store| {
         Ok(StopsView {
             stops: store

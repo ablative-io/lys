@@ -96,7 +96,7 @@ fn assert_success(output: &Output) {
 
 /// A fully built log: key, three leaves, checkpoint, and both artifacts.
 struct ProvenLog {
-    _tmp: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
     dir: PathBuf,
     key: PathBuf,
     leaf_files: Vec<PathBuf>,
@@ -108,6 +108,13 @@ struct ProvenLog {
     consistency_artifact: PathBuf,
     /// Every stdout/stderr captured while building, for leak checks.
     transcripts: Vec<String>,
+}
+
+impl ProvenLog {
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
+    }
 }
 
 /// Builds a log with three leaves and produces a checkpoint, an inclusion
@@ -202,7 +209,7 @@ fn build_proven_log(origin: &str, seed: Option<&[u8; 32]>) -> ProvenLog {
     transcripts.push(stdout_of(&prove_consistency));
     transcripts.push(stderr_of(&prove_consistency));
     ProvenLog {
-        _tmp: tmp,
+        temp_dir: tmp,
         dir,
         key,
         leaf_files,

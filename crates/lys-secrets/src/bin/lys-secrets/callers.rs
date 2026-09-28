@@ -66,7 +66,7 @@ pub fn caller(shared: &Shared, parts: &Parts, body: &[u8]) -> Result<Caller, (St
     if header(parts, "lys-service").is_some() {
         return on_behalf(shared, parts, body);
     }
-    let (token, presentation) = signed(parts, body).map_err(|(_status, error)| refused(&error))?;
+    let (token, presentation) = signed(parts, body).map_err(|(_, error)| refused(&error))?;
     let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
     let identity = broker
         .caller(&token, &presentation)

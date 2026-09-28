@@ -81,7 +81,7 @@ impl SpiceGrants {
 fn identity(text: &str) -> Option<IdentityId> {
     PersonId::from_str(text)
         .map(IdentityId::Person)
-        .or_else(|_person| AgentId::from_str(text).map(IdentityId::Agent))
+        .or_else(|_| AgentId::from_str(text).map(IdentityId::Agent))
         .ok()
 }
 

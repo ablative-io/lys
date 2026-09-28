@@ -201,11 +201,7 @@ impl AdmissionPolicy for RecognisedCertificate {
     /// authority, a certificate outside its validity window, and a certificate
     /// over an unlisted subject key. The five are indistinguishable to the
     /// caller by construction, since there is one value to return.
-    fn admit(
-        &self,
-        _submission: &Submission<'_>,
-        context: &SubmitterContext<'_>,
-    ) -> Result<(), NotAdmitted> {
+    fn admit(&self, _: &Submission<'_>, context: &SubmitterContext<'_>) -> Result<(), NotAdmitted> {
         // Both credential-bearing arms, written out and treated alike. The
         // match is exhaustive with no `_`, so a third provenance could not be
         // added without this policy having to say what it thinks of it — and
@@ -220,11 +216,13 @@ impl AdmissionPolicy for RecognisedCertificate {
         // Chain first. Everything read out of the certificate below is
         // attacker-chosen until this has succeeded.
         verify_certificate_chain(credential, &self.issuer_public_key)
-            .map_err(|_err| NotAdmitted)?;
+            .ok()
+            .ok_or(NotAdmitted)?;
 
         if let Some(allowed) = &self.subject_keys {
-            let subject_key =
-                certificate_subject_public_key(credential).map_err(|_err| NotAdmitted)?;
+            let subject_key = certificate_subject_public_key(credential)
+                .ok()
+                .ok_or(NotAdmitted)?;
             if !allowed.contains(&subject_key) {
                 return Err(NotAdmitted);
             }

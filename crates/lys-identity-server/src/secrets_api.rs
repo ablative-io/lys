@@ -272,5 +272,6 @@ fn now_ms() -> Result<i64, ServerError> {
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|error| unreadable(format!("the clock reads before the epoch: {error}")))?;
     i64::try_from(since.as_millis())
-        .map_err(|_overflow| unreadable("the clock is past what a signing time holds".to_owned()))
+        .ok()
+        .ok_or_else(|| unreadable("the clock is past what a signing time holds".to_owned()))
 }

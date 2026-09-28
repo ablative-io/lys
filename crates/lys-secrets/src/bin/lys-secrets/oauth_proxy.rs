@@ -29,7 +29,8 @@ fn form(pairs: &[(&'static str, Secret)]) -> Result<Secret, Failed> {
         let mut query = url.query_pairs_mut();
         for (name, value) in pairs {
             let value = std::str::from_utf8(value.expose())
-                .map_err(|_utf8| upstream("form encoding", format!("{name} is not UTF-8")))?;
+                .ok()
+                .ok_or_else(|| upstream("form encoding", format!("{name} is not UTF-8")))?;
             query.append_pair(name, value);
         }
     }

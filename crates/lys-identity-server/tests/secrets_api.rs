@@ -41,8 +41,8 @@ impl Received {
     fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
-            .find(|(known, _value)| known == name)
-            .map(|(_name, value)| value.as_str())
+            .find(|(known, _)| known == name)
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -91,7 +91,7 @@ fn answer(path: &str, body: &Bytes) -> Response {
             .into_response(),
         "/_lys/recipients" => match serde_json::from_slice::<Value>(body) {
             Ok(asked) => axum::Json(asked).into_response(),
-            Err(_error) => (StatusCode::BAD_REQUEST, "Encoding: not JSON\n").into_response(),
+            Err(_) => (StatusCode::BAD_REQUEST, "Encoding: not JSON\n").into_response(),
         },
         _ => axum::Json(json!({ "path": path })).into_response(),
     }
@@ -382,7 +382,7 @@ async fn a_login_bound_to_no_person_is_refused_by_name() -> TestResult {
 
 #[tokio::test]
 async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
-    let (service, _seeded) =
+    let (service, _) =
         Service::start_with(|config| Ok(seed_configured(config, [ADA, BEA])?)).await?;
     let cookie = service.sign_in(login(ADA)).await?;
     let (status, body) = service.get("/secrets", Some(&cookie)).await?;

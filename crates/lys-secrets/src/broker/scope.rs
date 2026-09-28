@@ -47,7 +47,7 @@ impl<P: PermissionCheck> Broker<P> {
         }
         self.permissions
             .member_of(identity, &scope.target())
-            .map(|_permit| ())
+            .map(|_| ())
             .map_err(|denied| format!("outside the secret's scope: {}", denied.reason))
     }
 
@@ -55,7 +55,8 @@ impl<P: PermissionCheck> Broker<P> {
     /// the scope of `secret`.
     pub(super) fn discoverable(&self, identity: &str, secret: &str) -> Result<(), SecretsError> {
         self.within_scope(identity, secret)
-            .map_err(|_reason| SecretsError::SecretUnknown {
+            .ok()
+            .ok_or_else(|| SecretsError::SecretUnknown {
                 name: secret.to_owned(),
             })
     }
@@ -109,7 +110,7 @@ impl<P: PermissionCheck> Broker<P> {
     pub fn metadata(&self, identity: &str, secret: &str) -> Result<EntryView, SecretsError> {
         self.store
             .entry(secret)
-            .filter(|_entry| self.discovers(identity, secret))
+            .filter(|_| self.discovers(identity, secret))
             .cloned()
             .ok_or_else(|| SecretsError::SecretUnknown {
                 name: secret.to_owned(),

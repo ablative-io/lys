@@ -128,7 +128,7 @@ impl<P: PermissionCheck> Broker<P> {
                 }
                 .into());
             }
-            UpstreamRevocation::Unconfirmed(_reason) => {}
+            UpstreamRevocation::Unconfirmed(_) => {}
         }
         let grant = self
             .oauth_grant_of(id)?

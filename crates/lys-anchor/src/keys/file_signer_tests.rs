@@ -65,7 +65,7 @@ fn fixture_signer(dir: &Path) -> (PathBuf, FileSigner) {
 #[test]
 fn the_public_key_is_the_one_the_seed_on_disk_determines() {
     let tmp = TempDir::new().unwrap();
-    let (_path, signer) = fixture_signer(tmp.path());
+    let (_, signer) = fixture_signer(tmp.path());
 
     // Keyed on a string produced by Go and lys-core agreeing, not on anything
     // this crate computed.
@@ -80,7 +80,7 @@ fn the_public_key_is_the_one_the_seed_on_disk_determines() {
 #[test]
 fn the_identity_it_signs_with_is_the_key_it_advertises() {
     let tmp = TempDir::new().unwrap();
-    let (_path, signer) = fixture_signer(tmp.path());
+    let (_, signer) = fixture_signer(tmp.path());
 
     // `InProcessSigner`'s written contract: `identity` is the identity whose
     // public key is `Signer::public_key`. An implementation that returned a
@@ -95,7 +95,7 @@ fn the_identity_it_signs_with_is_the_key_it_advertises() {
 #[test]
 fn a_signature_verifies_under_the_public_key_it_reports() {
     let tmp = TempDir::new().unwrap();
-    let (_path, signer) = fixture_signer(tmp.path());
+    let (_, signer) = fixture_signer(tmp.path());
     let message = b"bytes the signer did not choose";
 
     let signature = signer.sign(message).unwrap();
@@ -127,7 +127,7 @@ fn a_missing_key_file_is_refused_and_no_key_is_minted() {
 
     // Positive control: this loader accepts a key file that exists, so the
     // refusal below is about absence and not about `load` refusing everything.
-    let (present, _signer) = fixture_signer(tmp.path());
+    let (present, _) = fixture_signer(tmp.path());
     assert!(present.exists());
 
     let absent = tmp.path().join("not-created-by-anyone.key");
@@ -150,7 +150,7 @@ fn a_missing_key_file_is_refused_and_no_key_is_minted() {
 #[test]
 fn the_debug_output_carries_the_public_key_and_not_the_seed() {
     let tmp = TempDir::new().unwrap();
-    let (_path, signer) = fixture_signer(tmp.path());
+    let (_, signer) = fixture_signer(tmp.path());
 
     let rendered = format!("{signer:?}");
 

@@ -24,6 +24,7 @@ fn a_one_link_bundle_verifies_and_reports_what_it_established() {
         notarizations[0].anchor_root(),
         s.anchor.tree.root().to_parts().0
     );
+    s.close().unwrap();
 }
 
 #[test]
@@ -45,6 +46,7 @@ fn a_two_link_bundle_verifies_and_the_rung_holds() {
         verified.notarizations()[1].anchor_root(),
         s.anchor_b.tree.root().to_parts().0
     );
+    s.close().unwrap();
 }
 
 #[test]
@@ -56,6 +58,7 @@ fn an_unnotarized_bundle_verifies_and_says_so_rather_than_pretending() {
     let verified = verify_bundle(&bundle, &s.child.verifier(), &[]).unwrap();
     assert!(verified.notarizations().is_empty());
     assert_eq!(verified.leaf(), CHILD_LEAF);
+    s.close().unwrap();
 }
 
 #[test]
@@ -66,6 +69,7 @@ fn dropping_the_last_link_leaves_a_true_weaker_bundle() {
     let mut truncated = s.bundle.clone();
     truncated.links.truncate(1);
     verify_bundle(&truncated, &s.child.verifier(), &[s.anchor_a.verifier()]).unwrap();
+    s.close().unwrap();
 }
 
 // ------------------------------------------------ THE JOIN: each half valid
@@ -119,6 +123,9 @@ fn a_receipt_over_an_unrelated_log_can_never_satisfy_the_join() {
         verify_bundle(&spliced, &s.child.verifier(), &[decoy_anchor.verifier()]),
         Err(TrustError::BundleVerification)
     ));
+    s.close().unwrap();
+    decoy.close().unwrap();
+    decoy_anchor.close().unwrap();
 }
 
 /// The middle-of-chain analog: a second link that is a genuine, valid
@@ -167,6 +174,9 @@ fn a_valid_but_unrelated_link_cannot_be_spliced_into_the_chain() {
         )
         .is_err()
     );
+    s.close().unwrap();
+    anchor_a_grown.close().unwrap();
+    anchor_b.close().unwrap();
 }
 
 #[test]
@@ -192,6 +202,7 @@ fn a_reordered_chain_is_refused() {
         )
         .is_err()
     );
+    s.close().unwrap();
 }
 
 #[test]
@@ -218,4 +229,6 @@ fn an_extra_link_from_an_unrelated_anchor_is_refused() {
         )
         .is_err()
     );
+    s.close().unwrap();
+    stranger.close().unwrap();
 }

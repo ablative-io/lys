@@ -125,7 +125,7 @@ impl Table {
 #[tokio::test]
 async fn a_memory_is_shown_by_where_it_stands_and_never_by_its_words() -> TestResult {
     let table = Table::set().await?;
-    let (_home, lantern, entry) = table.home(1)?;
+    let (_, lantern, entry) = table.home(1)?;
     let (status, seen) = table.service.get(&table.route(1), Some(&table.bea)).await?;
     assert_eq!(status, 200, "{seen}");
     assert_eq!(seen["agent"], table.agent(1));

@@ -284,7 +284,7 @@ fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
 
 #[test]
 fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let mut cuts = Vec::new();
 
     let l5 = cut(&home, &lanterns.l5, None)?;
@@ -329,12 +329,13 @@ fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gat
             assert_eq!(row.id, entry.id());
         }
     }
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn resolving_and_cutting_reads_the_lantern_row_and_the_ancestry_only() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     let file = home.session_path(PARENT)?;
     let (_, index, scanned) = Index::read(&file)?;
     assert!(!scanned);
@@ -354,12 +355,13 @@ fn resolving_and_cutting_reads_the_lantern_row_and_the_ancestry_only() -> Gate {
     let taken = cut(&home, &lanterns.l5, None)?;
     assert_eq!(taken.bytes_read, expected);
     assert!(taken.bytes_read < std::fs::metadata(&file)?.len());
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
+    let (dir, home, lanterns) = fixture_home()?;
     {
         let reader = home.read_session(PARENT)?;
         let mut copy = home.create_session("A", "/fixture", None)?;
@@ -396,5 +398,6 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert_eq!(named.session, PARENT);
     assert_eq!(named.ids(), ["e1", "e2"]);
     assert_eq!(named.lit_in, None);
+    drop(dir);
     Ok(())
 }

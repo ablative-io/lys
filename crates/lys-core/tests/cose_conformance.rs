@@ -123,7 +123,7 @@ fn indefinite_length_mutant() -> Vec<u8> {
 /// skips.
 #[test]
 fn golden_vectors_pure_rust() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     assert_eq!(
         identity.public_key_bytes().to_vec(),
         hex_to_bytes(GOLDEN_PUBKEY_HEX)
@@ -202,7 +202,7 @@ fn go_cose_conformance_round_trips() {
     // Negative parity: one flipped claims byte, rejected by BOTH.
     let mut tampered = golden_artifact();
     tampered[OFFSET_CLAIMS + 5] ^= 0x01;
-    let (ok, _stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &tampered);
+    let (ok, _) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &tampered);
     assert!(!ok, "go-cose accepted a tampered artifact");
     assert!(verify_attestation_bytes(&tampered, GOLDEN_PAYLOAD).is_err());
 
@@ -237,7 +237,7 @@ fn go_cose_conformance_round_trips() {
     // by BOTH (empirically re-checked during this build; the D4 design
     // draft expected go-cose to accept it).
     let indefinite = indefinite_length_mutant();
-    let (ok, _stdout) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &indefinite);
+    let (ok, _) = run_built_tool(&bin, &["verify", GOLDEN_PUBKEY_HEX], &indefinite);
     assert!(!ok, "go-cose accepted an indefinite-length artifact");
     assert!(Attestation::from_cose_bytes(&indefinite).is_err());
 }

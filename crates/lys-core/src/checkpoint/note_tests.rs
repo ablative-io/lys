@@ -47,7 +47,7 @@ fn golden_identity() -> (tempfile::TempDir, Ed25519Identity) {
 }
 
 fn golden_verifier() -> NoteVerifierKey {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     NoteVerifierKey::new(GOLDEN_NAME, identity.public_key_bytes()).unwrap()
 }
 

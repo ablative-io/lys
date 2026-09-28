@@ -66,7 +66,7 @@ pub fn proof_nodes(proof_bytes: &[u8]) -> AnchorResult<Vec<[u8; DIGEST_LEN]>> {
             // exactly `DIGEST_LEN`, so this conversion cannot fail today, and
             // it is mapped to a refusal instead of an `unwrap` so that it
             // still cannot panic if that ever stops being true.
-            <[u8; DIGEST_LEN]>::try_from(chunk).map_err(|_err| {
+            <[u8; DIGEST_LEN]>::try_from(chunk).ok().ok_or_else(|| {
                 AnchorError::Proof(ProofError::MalformedInclusionPath {
                     byte_len: proof_bytes.len(),
                 })

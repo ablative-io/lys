@@ -30,7 +30,7 @@ struct Party {
     origin: String,
     identity: Ed25519Identity,
     tree: AppendOnlyTree<RawLeaf>,
-    _dir: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
 }
 
 impl Party {
@@ -42,8 +42,13 @@ impl Party {
             origin: origin.to_string(),
             identity: Ed25519Identity::load(&path).unwrap(),
             tree: AppendOnlyTree::<RawLeaf>::new(),
-            _dir: dir,
+            temp_dir: dir,
         }
+    }
+
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 
     fn verifier(&self) -> NoteVerifierKey {
@@ -98,6 +103,14 @@ struct OneLink {
     bundle: VerificationBundle,
 }
 
+impl OneLink {
+    /// Removes both parties' temporary directories, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.child.close()?;
+        self.anchor.close()
+    }
+}
+
 fn one_link() -> OneLink {
     let child = child_log();
     let artifact =
@@ -130,6 +143,15 @@ struct TwoLink {
     anchor_a: Party,
     anchor_b: Party,
     bundle: VerificationBundle,
+}
+
+impl TwoLink {
+    /// Removes all three parties' temporary directories, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.child.close()?;
+        self.anchor_a.close()?;
+        self.anchor_b.close()
+    }
 }
 
 fn two_link() -> TwoLink {

@@ -127,7 +127,7 @@ fn lantern_data_with_an_extra_key_is_refused() {
 
 #[test]
 fn lighting_appends_one_line_under_the_head_and_moves_the_head_onto_it() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let file = home.session_path(FIXTURE)?;
     let before = std::fs::read(&file)?;
     let lit = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?;
@@ -153,33 +153,36 @@ fn lighting_appends_one_line_under_the_head_and_moves_the_head_onto_it() -> Gate
     assert_eq!(lantern_data(&home, &second.id)?.point, "e2");
     let again = std::fs::read(&file)?;
     assert_eq!(&again[..after.len()], &after[..]);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn the_light_act_records_and_reports_the_session_it_appends_to() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let lit = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?;
     assert_eq!(lit.lit_in, FIXTURE);
     assert_eq!(
         lantern_data(&home, &lit.id)?.lit_in,
         Some(LitIn::Session(FIXTURE.to_owned()))
     );
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_note_is_stored_byte_for_byte() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let note = "  kept as written  ";
     let lit = light(&home, FIXTURE, "e4", note, LIGHTER)?;
     assert_eq!(lantern_data(&home, &lit.id)?.note, note);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn each_refusal_names_itself_and_writes_nothing() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     let first = light(&home, FIXTURE, "e2", NOTE, LIGHTER)?;
     let epilogue = {
         let mut owner = home.open_session(FIXTURE)?;
@@ -249,12 +252,13 @@ fn each_refusal_names_itself_and_writes_nothing() -> Gate {
     }
     assert_eq!(file_len(&home)?, len);
     assert_eq!(home.open_session(FIXTURE)?.head()?.map(str::to_owned), head);
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn the_session_and_the_point_are_checked_before_the_note() -> Gate {
-    let (_dir, home) = fixture_home()?;
+    let (dir, home) = fixture_home()?;
     assert!(matches!(
         light(&home, "no-such-session", "e2", "", LIGHTER),
         Err(HomeError::UnknownSession { session }) if session == "no-such-session"
@@ -273,5 +277,6 @@ fn the_session_and_the_point_are_checked_before_the_note() -> Gate {
         light(&home, FIXTURE, "e2", "", LIGHTER),
         Err(HomeError::EmptyNote { what: "note" })
     ));
+    drop(dir);
     Ok(())
 }

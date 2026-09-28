@@ -137,7 +137,8 @@ pub fn open_and_verify(
         return Err(TrustError::AttestationFailed);
     }
     verify_attestation(attestation, &contextualized_envelope_bytes(envelope))
-        .map_err(|_err| TrustError::AttestationFailed)?;
+        .ok()
+        .ok_or(TrustError::AttestationFailed)?;
     open(envelope, recipient_x25519_secret)
 }
 

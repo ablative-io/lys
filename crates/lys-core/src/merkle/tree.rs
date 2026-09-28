@@ -115,9 +115,11 @@ impl<L> AppendOnlyTree<L> {
                 ),
             });
         }
-        let idx = usize::try_from(leaf_index).map_err(|_err| TrustError::MerkleTree {
-            reason: format!("inclusion proof leaf index {leaf_index} does not fit in usize"),
-        })?;
+        let idx = usize::try_from(leaf_index)
+            .ok()
+            .ok_or_else(|| TrustError::MerkleTree {
+                reason: format!("inclusion proof leaf index {leaf_index} does not fit in usize"),
+            })?;
         Ok(InclusionProof::from_inner(self.inner.prove_inclusion(idx)))
     }
 
@@ -160,8 +162,9 @@ impl<L> AppendOnlyTree<L> {
         // old_size > 0 and old_size <= new_size = self.len(), so this never
         // wraps around.
         let num_additions = new_size - old_size;
-        let num_additions_usize =
-            usize::try_from(num_additions).map_err(|_err| TrustError::MerkleTree {
+        let num_additions_usize = usize::try_from(num_additions)
+            .ok()
+            .ok_or_else(|| TrustError::MerkleTree {
                 reason: format!(
                     "consistency proof num_additions {num_additions} does not fit in usize"
                 ),

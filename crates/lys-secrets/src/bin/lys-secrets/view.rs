@@ -25,7 +25,7 @@ fn failed(error: &lys_secrets::SecretsError) -> (StatusCode, String) {
 /// The identity the request's caller speaks for. A screen route carries no
 /// body, so the signature covers an empty one.
 fn caller(shared: &Shared, request: Request) -> Result<String, (StatusCode, String)> {
-    let (parts, _body) = request.into_parts();
+    let (parts, _) = request.into_parts();
     callers::caller(shared, &parts, &[]).map(|who| who.identity)
 }
 
@@ -63,7 +63,7 @@ struct HeldAsked {
 /// it was ended, and where the provider's part of its revocation stands,
 /// never the handle.
 pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let (parts, _body) = request.into_parts();
+    let (parts, _) = request.into_parts();
     let Query(asked) = Query::<HeldAsked>::try_from_uri(&parts.uri).map_err(|error| {
         failed(&lys_secrets::SecretsError::Encoding {
             context: "query",
@@ -114,7 +114,7 @@ pub async fn grants(State(shared): State<Arc<Shared>>, request: Request) -> Answ
         .map_err(|error| failed(&error))?;
     let grants: Vec<Value> = rows
         .into_iter()
-        .filter(|(_identity, secret, _relation, _by)| broker.discovers(&identity, secret))
+        .filter(|(_, secret, _, _)| broker.discovers(&identity, secret))
         .map(|(identity, secret, relation, granted_by)| {
             json!({ "identity": identity, "secret": secret, "relation": relation, "granted_by": granted_by })
         })
@@ -140,7 +140,7 @@ struct AuditAsked {
 /// `from` the first index read, and `older` the `before` that reads the
 /// window before this one, null when this one starts the log.
 pub async fn audit(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let (parts, _body) = request.into_parts();
+    let (parts, _) = request.into_parts();
     let Query(asked) = Query::<AuditAsked>::try_from_uri(&parts.uri).map_err(|error| {
         failed(&lys_secrets::SecretsError::Encoding {
             context: "query",

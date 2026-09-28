@@ -178,7 +178,7 @@ pub fn open(
         })?;
     let attestation_bytes = read_file(attestation, "seal attestation file")?;
     let seal_attestation =
-        Attestation::from_cose_bytes(&attestation_bytes).map_err(|_err| CliError::OpenFailed)?;
+        Attestation::from_cose_bytes(&attestation_bytes).ok().ok_or(CliError::OpenFailed)?;
 
     // Non-oracle by design: every cryptographic rejection — a malformed or
     // non-canonical attestation artifact, mismatched or forged sender
@@ -191,7 +191,8 @@ pub fn open(
         &sender,
         &identity.x25519_static_secret(),
     )
-    .map_err(|_err| CliError::OpenFailed)?;
+    .ok()
+    .ok_or(CliError::OpenFailed)?;
 
     // The payload was confidential enough to be sealed; the recovered
     // plaintext lands owner-readable only (0600 on Unix), not umask-default,

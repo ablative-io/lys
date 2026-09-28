@@ -13,11 +13,11 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
     let Some(go) = go_or_skip("go-cose delegation negatives") else {
         return;
     };
-    let (_workdir, bin) = cose_tool(&go);
+    let (workdir, bin) = cose_tool(&go);
 
-    let (_root_dir, root) = identity(&ROOT_SEED);
-    let (_delegated_dir, delegated) = identity(&DELEGATED_SEED);
-    let (_other_dir, other_root) = identity(&OTHER_ROOT_SEED);
+    let (_, root) = identity(&ROOT_SEED);
+    let (_, delegated) = identity(&DELEGATED_SEED);
+    let (_, other_root) = identity(&OTHER_ROOT_SEED);
     let root_public_key = root.public_key_bytes();
     let other_root_public_key = other_root.public_key_bytes();
     assert_ne!(
@@ -68,7 +68,7 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
         honest[..sig_start],
         "the flip must land in the signature, not in the signed bytes"
     );
-    let (ok, _stdout) = run_built_tool(&bin, &["delegation-verify", root_hex.as_str()], &flipped);
+    let (ok, _) = run_built_tool(&bin, &["delegation-verify", root_hex.as_str()], &flipped);
     assert!(
         !ok,
         "go-cose accepted a delegation with a flipped signature bit"
@@ -87,7 +87,7 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
     // ---- The central trap (spec §3.2), from the Go side. The artifact is
     // untouched and perfectly signed; only the key the verifier was TOLD to use
     // changes. A tool that read the key out of `kid` would accept this.
-    let (ok, _stdout) = run_built_tool(&bin, &["delegation-verify", other_hex.as_str()], &honest);
+    let (ok, _) = run_built_tool(&bin, &["delegation-verify", other_hex.as_str()], &honest);
     assert!(
         !ok,
         "go-cose accepted an honest delegation against a root key that did not \
@@ -100,7 +100,7 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
     // checked. A delegation genuinely signed by the OTHER root key is
     // cryptographically perfect and vouches for nothing.
     let attacker = sign_delegation(&other_root, &claim).unwrap();
-    let (ok, _stdout) = run_built_tool(&bin, &["delegation-verify", other_hex.as_str()], &attacker);
+    let (ok, _) = run_built_tool(&bin, &["delegation-verify", other_hex.as_str()], &attacker);
     assert!(
         ok,
         "the control failed: an attacker's delegation must be internally valid, \
@@ -127,4 +127,5 @@ fn go_cose_refuses_a_flipped_signature_and_the_wrong_root_key() {
         "the control failed: the attacker's own delegation must verify under \
          the attacker's own key"
     );
+    drop(workdir);
 }

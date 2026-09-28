@@ -101,7 +101,7 @@ fn with_certificates<T>(
 }
 
 fn view(proven: Proven) -> CertificateView {
-    let (root, _leaves) = proven.root.to_parts();
+    let (root, _) = proven.root.to_parts();
     let issued = proven.entered.issued;
     CertificateView {
         serial: issued.serial,

@@ -53,15 +53,16 @@ fn write_rows(index: &PathBuf, rows: &[Value]) {
 
 #[test]
 fn an_untouched_index_is_taken_as_it_stands() {
-    let (_dir, file, _index) = two_entries();
+    let (dir, file, _) = two_entries();
     let session = lys_home::Session::open(&file).unwrap();
     assert!(!session.index_was_rebuilt());
     assert_eq!(session.path().unwrap().0.len(), 2);
+    drop(dir);
 }
 
 #[test]
 fn a_self_parent_row_in_the_cache_is_rebuilt_from_the_file() {
-    let (_dir, file, index) = two_entries();
+    let (dir, file, index) = two_entries();
     let mut cached = rows(&index);
     assert_eq!(cached.len(), 2);
     let own = cached[1]["id"].clone();
@@ -72,22 +73,24 @@ fn a_self_parent_row_in_the_cache_is_rebuilt_from_the_file() {
     let (path, _) = session.path().unwrap();
     assert_eq!(path.len(), 2);
     assert_eq!(rows(&index)[1]["parent"], rows(&index)[0]["id"]);
+    drop(dir);
 }
 
 #[test]
 fn a_row_naming_a_parent_not_yet_indexed_is_rebuilt_from_the_file() {
-    let (_dir, file, index) = two_entries();
+    let (dir, file, index) = two_entries();
     let mut cached = rows(&index);
     cached[1]["parent"] = json!("nobody");
     write_rows(&index, &cached);
     let session = lys_home::Session::open(&file).unwrap();
     assert!(session.index_was_rebuilt());
     assert_eq!(session.path().unwrap().0.len(), 2);
+    drop(dir);
 }
 
 #[test]
 fn a_row_that_does_not_start_where_the_last_ended_is_rebuilt_from_the_file() {
-    let (_dir, file, index) = two_entries();
+    let (dir, file, index) = two_entries();
     let mut cached = rows(&index);
     let first_len = cached[0]["len"].as_u64().unwrap();
     let second_len = cached[1]["len"].as_u64().unwrap();
@@ -100,4 +103,5 @@ fn a_row_that_does_not_start_where_the_last_ended_is_rebuilt_from_the_file() {
     let session = lys_home::Session::open(&file).unwrap();
     assert!(session.index_was_rebuilt());
     assert_eq!(session.path().unwrap().0.len(), 2);
+    drop(dir);
 }

@@ -197,7 +197,7 @@ async fn forward(
     let (token, presentation) = signed(&parts, &body)?;
     let reserve = match header(&parts.headers, "lys-reserve") {
         None => 0,
-        Some(text) => text.parse::<u64>().map_err(|_number| {
+        Some(text) => text.parse::<u64>().ok().ok_or_else(|| {
             bad(SecretsError::Encoding {
                 context: "lys-reserve",
                 reason: "not a whole number".to_owned(),
@@ -268,7 +268,7 @@ async fn forward(
         }
     }
     .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
-    called.map(|(response, _reported)| response)
+    called.map(|(response, _)| response)
 }
 
 /// Sends the request upstream with the credential in the route's header,
@@ -312,7 +312,7 @@ async fn call_upstream(
             },
         )
     })?;
-    let mut value = HeaderValue::from_bytes(header_value.expose()).map_err(|_value| {
+    let mut value = HeaderValue::from_bytes(header_value.expose()).ok().ok_or_else(|| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             SecretsError::Encoding {

@@ -61,14 +61,14 @@ pub fn build_inclusion_artifact(
         checkpoint,
     };
     let verifier = self_verifier(origin, identity)?;
-    verify_inclusion_artifact(&artifact, leaf_bytes, &verifier).map_err(|_err| {
-        TrustError::LogArtifactEncoding {
+    verify_inclusion_artifact(&artifact, leaf_bytes, &verifier)
+        .ok()
+        .ok_or_else(|| TrustError::LogArtifactEncoding {
             reason: "self-verification of freshly built inclusion artifact failed \
                      (the supplied leaf bytes do not match the leaf at the given index, \
                      or the tree is internally inconsistent)"
                 .to_string(),
-        }
-    })?;
+        })?;
     Ok(artifact)
 }
 
@@ -125,13 +125,13 @@ pub fn build_consistency_artifact(
         checkpoint_2,
     };
     let verifier = self_verifier(origin, identity)?;
-    verify_consistency_artifact(&artifact, &verifier).map_err(|_err| {
-        TrustError::LogArtifactEncoding {
+    verify_consistency_artifact(&artifact, &verifier)
+        .ok()
+        .ok_or_else(|| TrustError::LogArtifactEncoding {
             reason: "self-verification of freshly built consistency artifact failed \
                      (the old tree is not a prefix of the new tree)"
                 .to_string(),
-        }
-    })?;
+        })?;
     Ok(artifact)
 }
 

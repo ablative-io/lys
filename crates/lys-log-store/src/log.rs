@@ -127,7 +127,7 @@ impl<S: LeafStore> Log<S> {
         }
         if rebuilt_size == pinned.tree_size + 1 {
             let prefix = self.prefix_tree(pinned.tree_size)?;
-            let (prefix_root, _prefix_size) = prefix.root().to_parts();
+            let (prefix_root, _) = prefix.root().to_parts();
             if prefix_root == pinned.root {
                 self.store.pin(PinnedRoot {
                     tree_size: rebuilt_size,

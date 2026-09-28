@@ -86,7 +86,7 @@ impl<P: PermissionCheck> Broker<P> {
             .handles
             .get(id.as_str())
             .ok_or(SecretsError::HandleUnknown)?;
-        let (entry, _account) = self.store.current_entry(&record.secret)?;
+        let (entry, _) = self.store.current_entry(&record.secret)?;
         if self.store.entry(&entry).map(|view| view.class) != Some(EntryClass::OAuth) {
             return Ok(None);
         }

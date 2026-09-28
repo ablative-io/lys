@@ -168,7 +168,7 @@ fn interior_node_preimage_does_not_verify_as_a_leaf() {
     // separation): a crafted "leaf" whose bytes are the concatenated child
     // hashes must not verify at any position implying the interior node.
     let tree = raw_tree(&[b"leaf-0", b"leaf-1"]);
-    let (root2_bytes, _count) = tree.root().to_parts();
+    let (root2_bytes, _) = tree.root().to_parts();
 
     let mut forged_leaf = Vec::with_capacity(64);
     forged_leaf.extend_from_slice(&raw_leaf_hash(b"leaf-0"));

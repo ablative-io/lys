@@ -164,7 +164,9 @@ async fn start_command(
     body: Result<Json<Launch>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&id)
+        .ok()
+        .ok_or(ServerError::AgentNotVisible)?;
     let Json(Launch { machine, operation }) =
         body.map_err(|refused| ServerError::RequestMalformed {
             reason: refused.body_text(),
@@ -288,11 +290,11 @@ fn reaches(machine: &Machine, version: &Version) -> Result<(), ServerError> {
 
 /// The host of `url`, lower-cased, without scheme, credentials, port or path.
 fn url_host(url: &str) -> Option<String> {
-    let (_scheme, rest) = url.split_once("://")?;
+    let (_, rest) = url.split_once("://")?;
     let authority = rest.split(['/', '?', '#']).next()?;
     let located = authority
         .rsplit_once('@')
-        .map_or(authority, |(_user, host)| host);
+        .map_or(authority, |(_, host)| host);
     let host = located.split(':').next()?.to_ascii_lowercase();
     (!host.is_empty()).then_some(host)
 }

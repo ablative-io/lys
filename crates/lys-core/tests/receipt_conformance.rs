@@ -92,7 +92,7 @@ fn go_cose_receipt_conformance_round_trips() {
     let bin = workdir.path().join("cosetool");
     build_go_tool(&go, &gocache, &bin);
 
-    let (_dir, key) = receipt_identity();
+    let (_, key) = receipt_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());
     let seed_hex = to_hex(RECEIPT_SEED);
 
@@ -147,7 +147,7 @@ fn go_cose_receipt_conformance_round_trips() {
     // deterministic and both sides encode core-deterministic CBOR, so the two
     // implementations produce the same artifact rather than merely compatible
     // ones. If this ever fails, check the encoders before the crypto.
-    let (ours, _root) = issue(size, index, &key);
+    let (ours, _) = issue(size, index, &key);
     assert_eq!(
         go_receipt,
         ours.to_cose_bytes(),
@@ -157,7 +157,7 @@ fn go_cose_receipt_conformance_round_trips() {
     // ---- Negative parity: a tampered path node must be rejected by BOTH. The
     // Go side rejects it at the path comparison; lys rejects it because the
     // recomputed root is one the anchor never signed.
-    let (mut tampered, _root) = issue(size, index, &key);
+    let (mut tampered, _) = issue(size, index, &key);
     tampered.inclusion_path[0][0] ^= 0x01;
     let mut args = vec![
         "receipt-verify".to_string(),
@@ -165,7 +165,7 @@ fn go_cose_receipt_conformance_round_trips() {
         index.to_string(),
     ];
     args.extend((0..size).map(|i| to_hex(&receipt_leaf(i))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &tampered.to_cose_bytes());
+    let (ok, _) = run_built_tool(&bin, &args, &tampered.to_cose_bytes());
     assert!(!ok, "go-cose accepted a receipt with a tampered path");
     assert!(
         verify_receipt_bytes(
@@ -178,9 +178,9 @@ fn go_cose_receipt_conformance_round_trips() {
 
     // ---- And a receipt presented against the wrong leaf: the Go side computes
     // a root over different leaves, so the detached payload no longer matches.
-    let (receipt, _root) = issue(size, index, &key);
+    let (receipt, _) = issue(size, index, &key);
     let mut args = vec!["receipt-verify".to_string(), pubkey_hex, index.to_string()];
     args.extend((0..size).map(|i| to_hex(&receipt_leaf(i + 100))));
-    let (ok, _stdout) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
+    let (ok, _) = run_built_tool(&bin, &args, &receipt.to_cose_bytes());
     assert!(!ok, "go-cose accepted a receipt against the wrong leaves");
 }

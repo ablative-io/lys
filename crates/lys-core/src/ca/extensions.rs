@@ -79,9 +79,12 @@ pub fn decode_extension(cert_der: &[u8], oid: &[u64]) -> TrustResult<Option<Vec<
             reason: format!("failed to parse certificate DER: {e:?}"),
         })?;
 
-    let target = Oid::from(oid).map_err(|_err| TrustError::CertificateParsing {
-        reason: "extension lookup OID is not a well-formed object identifier".to_string(),
-    })?;
+    let target =
+        Oid::from(oid)
+            .ok()
+            .ok_or_else(|| TrustError::CertificateParsing {
+                reason: "extension lookup OID is not a well-formed object identifier".to_string(),
+            })?;
 
     match certificate.tbs_certificate.get_extension_unique(&target) {
         Ok(Some(extension)) => Ok(Some(extension.value.to_vec())),

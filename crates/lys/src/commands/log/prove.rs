@@ -93,8 +93,8 @@ pub fn consistency(dir: &Path, key: &Path, old_size: u64, out: &Path, json: bool
     let old_tree = log.prefix_tree(old_size)?;
     let artifact = build_consistency_artifact(&old_tree, log.tree(), log.origin(), &identity)?;
     write_artifact(out, &artifact, "consistency proof artifact")?;
-    let (old_root, _old) = old_tree.root().to_parts();
-    let (new_root, _new) = log.tree().root().to_parts();
+    let (old_root, _) = old_tree.root().to_parts();
+    let (new_root, _) = log.tree().root().to_parts();
     let mut emit = Emitter::new(json);
     emit.field("old tree size", "old_tree_size", old_size);
     emit.field("new tree size", "new_tree_size", new_size);

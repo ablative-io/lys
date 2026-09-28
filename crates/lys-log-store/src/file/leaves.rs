@@ -172,7 +172,7 @@ pub(super) fn sync_dir(dir: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(not(unix))]
-pub(super) fn sync_dir(_dir: &Path) -> std::io::Result<()> {
+pub(super) fn sync_dir(_: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
@@ -271,10 +271,12 @@ pub(super) fn contiguous_extent(dir: &Path) -> StoreResult<u64> {
             });
         }
     }
-    u64::try_from(indices.len()).map_err(|_source| StoreError::Corrupt {
-        path: dir.to_path_buf(),
-        reason: format!("{} leaves is more than u64 can index", indices.len()),
-    })
+    u64::try_from(indices.len())
+        .ok()
+        .ok_or_else(|| StoreError::Corrupt {
+            path: dir.to_path_buf(),
+            reason: format!("{} leaves is more than u64 can index", indices.len()),
+        })
 }
 
 /// Builds the corruption error for an unexpected `leaves/` entry.

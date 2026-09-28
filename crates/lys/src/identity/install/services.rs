@@ -281,7 +281,7 @@ fn detach(command: &mut Command) {
 }
 
 #[cfg(not(unix))]
-fn detach(_command: &mut Command) {}
+fn detach(_: &mut Command) {}
 
 /// Whether the loopback service on `port` answers `path` with a status.
 pub fn answers(port: u16, path: &str) -> bool {

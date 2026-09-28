@@ -8,7 +8,7 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
     let Some(go) = go_or_skip("lys-anchor receipt negatives") else {
         return;
     };
-    let (_gocache_dir, _bin_dir, bin) = cose_tool(&go);
+    let (_, bin_dir, bin) = cose_tool(&go);
 
     // Grown here rather than in a helper: a helper would have to name
     // `Anchor<..>`'s type parameters, and this file has no business pinning
@@ -96,7 +96,7 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
          with. If this ever fails, lys grew a second party and this gate's \
          premise needs rewriting, not deleting"
     );
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, index, size),
         &mis_ordered.to_cose_bytes(),
@@ -117,7 +117,7 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
         verify_receipt(&mis_hashed, &statement, &anchor_key).is_ok(),
         "lys was expected to ACCEPT its own receipt over a corrupted path node"
     );
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, index, size),
         &mis_hashed.to_cose_bytes(),
@@ -137,7 +137,7 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
         verify_receipt(&tampered, &statement, &anchor_key).is_err(),
         "lys accepted a receipt whose path was altered after signing"
     );
-    let (ok, _stdout) = run_built_tool(
+    let (ok, _) = run_built_tool(
         &bin,
         &verify_args(&pubkey_hex, index, size),
         &tampered.to_cose_bytes(),
@@ -153,9 +153,10 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
     // arguments entirely.
     let mut wrong_log = vec!["receipt-verify".to_string(), pubkey_hex, index.to_string()];
     wrong_log.extend((0..size).map(|i| to_hex(&leaf(i + 100))));
-    let (ok, _stdout) = run_built_tool(&bin, &wrong_log, &honest.to_cose_bytes());
+    let (ok, _) = run_built_tool(&bin, &wrong_log, &honest.to_cose_bytes());
     assert!(
         !ok,
         "go-cose accepted a receipt against leaves it does not describe"
     );
+    drop(bin_dir);
 }

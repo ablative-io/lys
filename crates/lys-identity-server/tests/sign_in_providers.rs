@@ -150,7 +150,7 @@ async fn github_has_fixed_endpoints_and_microsoft_names_its_tenant() -> TestResu
 
 #[tokio::test]
 async fn only_the_administrator_sets_providers_and_bad_credentials_are_refused() -> TestResult {
-    let (service, _rauthy, ada) = table().await?;
+    let (service, rauthy, ada) = table().await?;
     let body = json!({ "provider": "google", "client_id": "id", "client_secret": SECRET });
     refused(
         &service.post("/sign-in-providers", None, &body).await?,
@@ -183,6 +183,7 @@ async fn only_the_administrator_sets_providers_and_bad_credentials_are_refused()
             "RequestMalformed",
         );
     }
+    drop(rauthy);
     Ok(())
 }
 

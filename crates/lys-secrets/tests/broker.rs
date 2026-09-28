@@ -198,8 +198,8 @@ fn a_retry_is_answered_from_the_log_and_counts_no_use() -> TestResult {
     let issued = broker.issue(&world.holder, "token", 1, START_MS + 60_000)?;
     let presentation = present(&world, &issued, &world.agent)?;
     let mut forwarded = 0;
-    broker.use_handle(&issued.token, &presentation, |_credential| forwarded += 1)?;
-    let retried = broker.use_handle(&issued.token, &presentation, |_credential| forwarded += 1)?;
+    broker.use_handle(&issued.token, &presentation, |_| forwarded += 1)?;
+    let retried = broker.use_handle(&issued.token, &presentation, |_| forwarded += 1)?;
     assert!(matches!(retried, Used::Retried { .. }));
     assert_eq!(forwarded, 1);
     Ok(())
@@ -294,11 +294,12 @@ fn uses_and_drops_survive_a_restart_because_they_are_read_from_the_log() -> Test
 #[test]
 fn a_second_broker_cannot_open_a_held_store() -> TestResult {
     let world = world()?;
-    let _broker = started(&world)?;
+    let broker = started(&world)?;
     assert_eq!(
         refusal(Broker::open(&world.paths, granted(), clock(&world))),
         "StoreLocked"
     );
+    drop(broker);
     Ok(())
 }
 

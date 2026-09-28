@@ -31,7 +31,7 @@ const GENESIS: &[u8] = b"genesis for the anchor CLI gate";
 
 /// A temporary anchor directory, key file and genesis file.
 struct Fixture {
-    _tmp: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
     dir: PathBuf,
     key: PathBuf,
     genesis: PathBuf,
@@ -48,7 +48,7 @@ impl Fixture {
             dir: tmp.path().join("anchor"),
             key,
             genesis,
-            _tmp: tmp,
+            temp_dir: tmp,
         }
     }
 
@@ -71,6 +71,11 @@ impl Fixture {
             "--admit",
             "accept-all",
         ])
+    }
+
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 }
 
@@ -210,6 +215,7 @@ fn init_status_checkpoint_and_prove_produce_a_verifiable_proof() {
         .expect("the artifact the CLI wrote must verify for a third party");
     assert_eq!(body.origin(), ORIGIN);
     assert_eq!(body.tree_size(), 1);
+    fixture.close().unwrap();
 }
 
 /// A directory holding no anchor is refused, and the refusal names the command
@@ -230,6 +236,7 @@ fn an_uninitialized_directory_is_refused_with_a_remedy() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("not initialized"), "{stderr}");
     assert!(stderr.contains("lys-anchor init"), "{stderr}");
+    fixture.close().unwrap();
 }
 
 /// A `--json` caller receives JSON on the failure path too.
@@ -259,6 +266,7 @@ fn a_failure_under_json_is_still_json() {
         !String::from_utf8_lossy(&output.stderr).is_empty(),
         "the operator's diagnostic must still reach stderr"
     );
+    fixture.close().unwrap();
 }
 
 /// A flag the chosen policy does not read stops the command rather than being
@@ -282,6 +290,7 @@ fn an_unread_admission_flag_stops_the_command() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("does not read"), "{stderr}");
     assert!(stderr.contains("--max-bytes"), "{stderr}");
+    fixture.close().unwrap();
 }
 
 /// Without `unstable-anchor` the subcommand is absent, not merely refused.
@@ -362,6 +371,7 @@ fn a_submitted_statement_yields_a_verifiable_receipt_and_proof() {
         receipt.reconstructed_root(statement).unwrap(),
         "the checkpoint's root and the receipt's reconstructed root are one tree"
     );
+    fixture.close().unwrap();
 }
 
 /// A refused submission appends nothing, and the refusal discloses no rule.
@@ -449,4 +459,5 @@ fn a_refused_submission_leaves_the_log_untouched() {
         "accept-all",
     ]);
     assert_eq!(grown["tree_size"], Value::from(2u64));
+    fixture.close().unwrap();
 }

@@ -133,7 +133,7 @@ fn an_unsettled_call_counts_in_full_after_a_restart_and_is_never_forwarded_again
     let mut reopened = Broker::open(&world.paths(), grants(), Box::new(|| NOW_MS))?;
     match reopened.admit_use(&issued.token, &presented, 80)? {
         Admitted::Retried { outcome } => assert_eq!(outcome, "outcome_unknown"),
-        Admitted::Fresh(_ticket) => return Err("forwarded again".into()),
+        Admitted::Fresh(_) => return Err("forwarded again".into()),
     }
     assert_eq!(
         refusal(reopened.admit_use(&issued.token, &world.present(&issued.id)?, 21)),
@@ -183,7 +183,7 @@ fn a_drop_between_admission_and_forwarding_cancels_the_call_and_releases_its_use
     );
     match broker.admit_use(&issued.token, &presented, 40)? {
         Admitted::Retried { outcome } => assert_eq!(outcome, "cancelled_at_boundary"),
-        Admitted::Fresh(_ticket) => return Err("forwarded after a drop".into()),
+        Admitted::Fresh(_) => return Err("forwarded after a drop".into()),
     }
     Ok(())
 }

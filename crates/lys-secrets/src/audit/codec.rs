@@ -17,7 +17,7 @@ fn optional(encoding: &mut Canonical, value: Option<&str>) -> Result<(), Secrets
             encoding.field(&bytes)
         }
     }
-    .map(|_encoding| ())
+    .map(|_| ())
 }
 
 fn read_optional(reader: &mut Reader<'_>) -> Result<Option<String>, SecretsError> {
@@ -27,7 +27,8 @@ fn read_optional(reader: &mut Reader<'_>) -> Result<Option<String>, SecretsError
         Some((1, text)) => {
             String::from_utf8(text.to_vec())
                 .map(Some)
-                .map_err(|_utf8| SecretsError::Encoding {
+                .ok()
+                .ok_or_else(|| SecretsError::Encoding {
                     context: "audit line",
                     reason: "a text field is not UTF-8".to_owned(),
                 })
@@ -73,7 +74,8 @@ pub(super) fn decode_signed(
     let body = signed.field()?;
     let signature = signed.field()?;
     Ed25519Identity::verify(key, body, signature)
-        .map_err(|_invalid| SecretsError::AuditSignatureInvalid { index })?;
+        .ok()
+        .ok_or(SecretsError::AuditSignatureInvalid { index })?;
     let mut reader = Reader::new(body, "audit line");
     if reader.field()? != LINE_DOMAIN.as_bytes() {
         return Err(unreadable("not an audit line".to_owned()));
@@ -83,7 +85,8 @@ pub(super) fn decode_signed(
     let at: [u8; 8] = reader
         .field()?
         .try_into()
-        .map_err(|_length| unreadable("the time is not 8 bytes".to_owned()))?;
+        .ok()
+        .ok_or_else(|| unreadable("the time is not 8 bytes".to_owned()))?;
     let handle = read_optional(&mut reader)?;
     let identity = read_optional(&mut reader)?;
     let secret = read_optional(&mut reader)?;
@@ -92,17 +95,20 @@ pub(super) fn decode_signed(
     let uses = read_optional(&mut reader)?
         .map(|text| {
             text.parse::<u64>()
-                .map_err(|_number| unreadable("the use count is not a number".to_owned()))
+                .ok()
+                .ok_or_else(|| unreadable("the use count is not a number".to_owned()))
         })
         .transpose()?;
     let spend = read_optional(&mut reader)?
         .map(|text| {
             text.parse::<u64>()
-                .map_err(|_number| unreadable("the spend is not a number".to_owned()))
+                .ok()
+                .ok_or_else(|| unreadable("the spend is not a number".to_owned()))
         })
         .transpose()?;
     let outcome = String::from_utf8(reader.field()?.to_vec())
-        .map_err(|_utf8| unreadable("the outcome is not UTF-8".to_owned()))?;
+        .ok()
+        .ok_or_else(|| unreadable("the outcome is not UTF-8".to_owned()))?;
     Ok(AuditLine {
         kind,
         at_ms: i64::from_be_bytes(at),

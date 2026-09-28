@@ -64,7 +64,7 @@ fn golden_verifier() -> NoteVerifierKey {
 /// skips.
 #[test]
 fn golden_vectors_pure_rust() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
 
     let note = sign_note(GOLDEN_BODY, GOLDEN_NAME, &identity).unwrap();
     assert_eq!(note, GOLDEN_NOTE);
@@ -154,7 +154,7 @@ fn go_conformance_round_trips() {
     let gocache_dir = tempfile::tempdir().unwrap();
     let gocache = gocache_dir.path().join("gocache");
 
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let verifier = golden_verifier();
     let rust_note = sign_note(GOLDEN_BODY, GOLDEN_NAME, &identity).unwrap();
 
@@ -194,7 +194,7 @@ fn go_conformance_round_trips() {
 
     // Negative parity: one flipped body byte, rejected by BOTH.
     let tampered = rust_note.replacen("\n3\n", "\n4\n", 1);
-    let (ok, _stdout) = run_go_tool(
+    let (ok, _) = run_go_tool(
         &go,
         &gocache,
         &["verify", GOLDEN_VERIFIER_SPEC],
@@ -241,7 +241,7 @@ fn go_conformance_round_trips() {
     );
     let valid_sig_line = &GOLDEN_NOTE[GOLDEN_BODY.len() + 1..];
     let poisoned = format!("{GOLDEN_BODY}\n{garbage_line}{valid_sig_line}");
-    let (ok, _stdout) = run_go_tool(
+    let (ok, _) = run_go_tool(
         &go,
         &gocache,
         &["verify", GOLDEN_VERIFIER_SPEC],

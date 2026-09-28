@@ -181,7 +181,7 @@ fn render_successor(model: &str) -> Result<Rendered, Box<dyn Error>> {
 
 #[test]
 fn a_successor_rendered_for_another_model_carries_its_thinking_as_text() -> Gate {
-    let (_dir, report, records, part) = render_successor("claude-other-model")?;
+    let (dir, report, records, part) = render_successor("claude-other-model")?;
     let counts = [
         report.thinking_as_text,
         report.thinking_kept,
@@ -209,12 +209,13 @@ fn a_successor_rendered_for_another_model_carries_its_thinking_as_text() -> Gate
         dropped[0]["reason"],
         "signed thinking rendered as text: different provider, api or model"
     );
+    drop(dir);
     Ok(())
 }
 
 #[test]
 fn a_successor_rendered_for_its_own_model_keeps_its_signed_thinking() -> Gate {
-    let (_dir, report, records, _) = render_successor("claude-fixture-model")?;
+    let (_, report, records, _) = render_successor("claude-fixture-model")?;
     assert_eq!((report.thinking_kept, report.dropped), (1, 0));
     let part = &records[0]["message"]["content"][0];
     assert_eq!(

@@ -63,7 +63,9 @@ fn unreadable(reason: impl Into<String>) -> SecretsError {
 }
 
 fn text(reader: &mut Reader<'_>) -> Result<String, SecretsError> {
-    String::from_utf8(reader.field()?.to_vec()).map_err(|_utf8| unreadable("a text is not UTF-8"))
+    String::from_utf8(reader.field()?.to_vec())
+        .ok()
+        .ok_or_else(|| unreadable("a text is not UTF-8"))
 }
 
 impl Folded {
@@ -89,7 +91,7 @@ impl Folded {
                 };
                 (id.clone(), lease)
             })
-            .filter(|(_id, lease)| *lease != Lease::default())
+            .filter(|(_, lease)| *lease != Lease::default())
             .collect();
         Self {
             leases,
@@ -97,7 +99,7 @@ impl Folded {
             rotating: rotating.map(str::to_owned),
             owners: owners
                 .iter()
-                .filter(|(_secret, operations)| **operations != Operations::default())
+                .filter(|(_, operations)| **operations != Operations::default())
                 .map(|(secret, operations)| (secret.clone(), operations.clone()))
                 .collect(),
         }
@@ -176,8 +178,11 @@ impl Folded {
 
     /// The state in its canonical encoding.
     pub(super) fn encode(&self) -> Result<Vec<u8>, SecretsError> {
-        let count =
-            |len: usize| u64::try_from(len).map_err(|_size| unreadable("a count is past 64 bits"));
+        let count = |len: usize| {
+            u64::try_from(len)
+                .ok()
+                .ok_or_else(|| unreadable("a count is past 64 bits"))
+        };
         let mut state = Canonical::new(STATE_FORMAT)?;
         state.number(count(self.leases.len())?)?;
         for (id, lease) in &self.leases {
@@ -249,7 +254,7 @@ impl Folded {
             )));
         }
         let mut leases = BTreeMap::new();
-        for _lease in 0..reader.number()? {
+        for _ in 0..reader.number()? {
             let id = text(&mut reader)?;
             let used = reader.number()?;
             let dropped = match reader.field()? {
@@ -259,13 +264,13 @@ impl Folded {
             };
             let settled = reader.number()?;
             let mut operations = BTreeMap::new();
-            for _operation in 0..reader.number()? {
+            for _ in 0..reader.number()? {
                 let operation = text(&mut reader)?;
                 let outcome = text(&mut reader)?;
                 operations.insert(operation, (outcome, text(&mut reader)?));
             }
             let mut open = BTreeMap::new();
-            for _reservation in 0..reader.number()? {
+            for _ in 0..reader.number()? {
                 let operation = text(&mut reader)?;
                 open.insert(operation, reader.number()?);
             }
@@ -288,7 +293,7 @@ impl Folded {
             leases.insert(id, lease);
         }
         let mut readers = BTreeSet::new();
-        for _reader in 0..reader.number()? {
+        for _ in 0..reader.number()? {
             let identity = text(&mut reader)?;
             readers.insert((identity, text(&mut reader)?));
         }
@@ -330,7 +335,7 @@ fn decode_ended(reader: &mut Reader<'_>) -> Result<Option<Ended>, SecretsError> 
 /// Each secret's owner changes, as the state encodes them.
 fn decode_owners(reader: &mut Reader<'_>) -> Result<Owners, SecretsError> {
     let mut owners = Owners::new();
-    for _secret in 0..reader.number()? {
+    for _ in 0..reader.number()? {
         let secret = text(reader)?;
         let last = match reader.field()? {
             [0] => None,
@@ -338,7 +343,7 @@ fn decode_owners(reader: &mut Reader<'_>) -> Result<Owners, SecretsError> {
             _ => return Err(unreadable("a last operation is neither absent nor present")),
         };
         let mut applied = BTreeMap::new();
-        for _operation in 0..reader.number()? {
+        for _ in 0..reader.number()? {
             let operation = text(reader)?;
             let digest = text(reader)?;
             applied.insert(operation, (digest, text(reader)?));

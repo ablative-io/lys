@@ -30,13 +30,13 @@ fn golden_prefix_tree() -> AppendOnlyTree<RawLeaf> {
 }
 
 fn golden_verifier() -> crate::checkpoint::NoteVerifierKey {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     crate::checkpoint::NoteVerifierKey::new(GOLDEN_ORIGIN, identity.public_key_bytes()).unwrap()
 }
 
 #[test]
 fn inclusion_artifact_matches_golden_vectors() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     let artifact = build_inclusion_artifact(&tree, b"leaf-1", GOLDEN_ORIGIN, &identity, 1).unwrap();
 
@@ -55,7 +55,7 @@ fn inclusion_artifact_matches_golden_vectors() {
 
 #[test]
 fn consistency_artifact_matches_golden_vectors() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let artifact = build_consistency_artifact(
         &golden_prefix_tree(),
         &golden_tree(),
@@ -85,7 +85,7 @@ fn consistency_artifact_matches_golden_vectors() {
 
 #[test]
 fn built_artifacts_self_verify_and_verify_externally() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     let verifier = golden_verifier();
 
@@ -103,7 +103,7 @@ fn built_artifacts_self_verify_and_verify_externally() {
 
 #[test]
 fn inclusion_build_rejects_out_of_range_index_with_actionable_error() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     let err = build_inclusion_artifact(&tree, b"leaf-3", GOLDEN_ORIGIN, &identity, 3).unwrap_err();
     assert!(matches!(err, TrustError::MerkleTree { .. }));
@@ -113,7 +113,7 @@ fn inclusion_build_rejects_out_of_range_index_with_actionable_error() {
 fn inclusion_build_rejects_mismatched_leaf_bytes_via_self_verification() {
     // No silent emission of a broken artifact: leaf bytes that do not
     // match the leaf at the index fail the build-time self-check.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     let err = build_inclusion_artifact(&tree, b"leaf-0", GOLDEN_ORIGIN, &identity, 1).unwrap_err();
     assert!(matches!(err, TrustError::LogArtifactEncoding { .. }));
@@ -121,7 +121,7 @@ fn inclusion_build_rejects_mismatched_leaf_bytes_via_self_verification() {
 
 #[test]
 fn inclusion_build_rejects_invalid_origin() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     let err = build_inclusion_artifact(&tree, b"leaf-1", "bad origin", &identity, 1).unwrap_err();
     assert!(matches!(err, TrustError::CheckpointEncoding { .. }));
@@ -129,7 +129,7 @@ fn inclusion_build_rejects_invalid_origin() {
 
 #[test]
 fn consistency_build_rejects_size_invariant_violations() {
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
 
     // Empty old tree (R8: old >= 1).
@@ -152,7 +152,7 @@ fn consistency_build_rejects_size_invariant_violations() {
 fn consistency_build_rejects_non_prefix_old_tree_via_self_verification() {
     // The old tree is a different log entirely: proof recomputation fails
     // in the build-time self-check, never emitting the broken artifact.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let unrelated =
         AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves([b"other-0", b"other-1"]);
     let err = build_consistency_artifact(&unrelated, &golden_tree(), GOLDEN_ORIGIN, &identity)
@@ -170,7 +170,7 @@ fn consistency_build_rejects_non_prefix_old_tree_via_self_verification() {
 fn builders_run_the_json_safety_guard_first() {
     // With a small tree the guard passes and later checks fire — proving
     // the call ordering compiles and the guard does not false-positive.
-    let (_dir, identity) = golden_identity();
+    let (_, identity) = golden_identity();
     let tree = golden_tree();
     build_inclusion_artifact(&tree, b"leaf-0", GOLDEN_ORIGIN, &identity, 0).unwrap();
 }

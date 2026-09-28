@@ -30,6 +30,7 @@ fn the_script_recomputes_the_root_for_every_leaf_in_the_log() {
         );
         path_lengths.push(case.artifact["hashes"].as_array().unwrap().len());
         verified += 1;
+        case.close().unwrap();
     }
 
     // Count what fired: a loop that ran zero times satisfies every assertion in
@@ -76,4 +77,5 @@ fn the_supplied_root_argument_decides_in_both_directions() {
         "the script refused the log's own root\nstdout: {stdout}\nstderr: {stderr}"
     );
     assert!(stdout.contains("INCLUSION VERIFIED"), "stdout: {stdout}");
+    case.close().unwrap();
 }

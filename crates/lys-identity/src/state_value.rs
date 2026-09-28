@@ -62,7 +62,9 @@ pub(crate) fn nullable(value: Option<Value>) -> Value {
 pub(crate) fn tuple<const N: usize>(value: Value, what: &str) -> Result<[Value; N], Unreadable> {
     let items = list(value, what)?;
     let found = items.len();
-    <[Value; N]>::try_from(items).map_err(|_items| format!("{what} holds {found} items, not {N}"))
+    <[Value; N]>::try_from(items)
+        .ok()
+        .ok_or_else(|| format!("{what} holds {found} items, not {N}"))
 }
 
 /// The items of an array.
@@ -77,7 +79,9 @@ pub(crate) fn list(value: Value, what: &str) -> Result<Vec<Value>, Unreadable> {
 pub(crate) fn read_uint(value: &Value, what: &str) -> Result<u64, Unreadable> {
     match value {
         Value::Integer(integer) => {
-            u64::try_from(*integer).map_err(|_sign| format!("{what} is not an unsigned integer"))
+            u64::try_from(*integer)
+                .ok()
+                .ok_or_else(|| format!("{what} is not an unsigned integer"))
         }
         _ => Err(format!("{what} is not an integer")),
     }
@@ -95,7 +99,9 @@ pub(crate) fn read_text(value: Value, what: &str) -> Result<String, Unreadable> 
 pub(crate) fn read_fixed<const N: usize>(value: Value, what: &str) -> Result<[u8; N], Unreadable> {
     match value {
         Value::Bytes(bytes) => {
-            <[u8; N]>::try_from(bytes).map_err(|_bytes| format!("{what} is not {N} bytes"))
+            <[u8; N]>::try_from(bytes)
+                .ok()
+                .ok_or_else(|| format!("{what} is not {N} bytes"))
         }
         _ => Err(format!("{what} is not a byte string")),
     }

@@ -250,6 +250,7 @@ fn interrupted_append_is_recovered_with_a_notice() {
         "{stderr}"
     );
     assert_eq!(field(&stdout_of(&append), "tree size:"), "4");
+    log.close().unwrap();
 }
 
 /// Recomputes the root over the first `n` golden-style leaves of a log by
@@ -263,22 +264,22 @@ fn prefix_root_of(log: &ProvenLog, n: usize) -> [u8; 32] {
         lys_core::merkle::AppendOnlyTree::<lys_core::merkle::RawLeaf>::reconstruct_from_raw_leaves(
             &leaves,
         );
-    let (root, _size) = tree.root().to_parts();
+    let (root, _) = tree.root().to_parts();
     root
 }
 
 #[test]
 fn corrupted_log_directories_are_refused() {
     // Modified leaf byte.
-    let log = build_proven_log("example.com/lys/corrupt-a", None);
-    std::fs::write(log.dir.join("leaves").join(format!("{:020}", 0)), b"leaf-X").unwrap();
-    let leaf = log.dir.join("../again.bin");
+    let modified = build_proven_log("example.com/lys/corrupt-a", None);
+    std::fs::write(modified.dir.join("leaves").join(format!("{:020}", 0)), b"leaf-X").unwrap();
+    let leaf = modified.dir.join("../again.bin");
     std::fs::write(&leaf, b"more").unwrap();
     let output = run_lys(&[
         "log",
         "append",
         "--dir",
-        path_str(&log.dir),
+        path_str(&modified.dir),
         "--leaf",
         path_str(&leaf),
     ]);
@@ -290,13 +291,13 @@ fn corrupted_log_directories_are_refused() {
     );
 
     // Gap: a missing middle leaf.
-    let log = build_proven_log("example.com/lys/corrupt-b", None);
-    std::fs::remove_file(log.dir.join("leaves").join(format!("{:020}", 1))).unwrap();
+    let gapped = build_proven_log("example.com/lys/corrupt-b", None);
+    std::fs::remove_file(gapped.dir.join("leaves").join(format!("{:020}", 1))).unwrap();
     let output = run_lys(&[
         "log",
         "append",
         "--dir",
-        path_str(&log.dir),
+        path_str(&gapped.dir),
         "--leaf",
         path_str(&leaf),
     ]);
@@ -308,13 +309,13 @@ fn corrupted_log_directories_are_refused() {
     );
 
     // Extra non-dot entry in leaves/.
-    let log = build_proven_log("example.com/lys/corrupt-c", None);
-    std::fs::write(log.dir.join("leaves").join("stray.txt"), b"junk").unwrap();
+    let strayed = build_proven_log("example.com/lys/corrupt-c", None);
+    std::fs::write(strayed.dir.join("leaves").join("stray.txt"), b"junk").unwrap();
     let output = run_lys(&[
         "log",
         "append",
         "--dir",
-        path_str(&log.dir),
+        path_str(&strayed.dir),
         "--leaf",
         path_str(&leaf),
     ]);
@@ -326,15 +327,20 @@ fn corrupted_log_directories_are_refused() {
     );
 
     // Dotfiles (e.g. .DS_Store) are ignored, not corruption.
-    let log = build_proven_log("example.com/lys/corrupt-d", None);
-    std::fs::write(log.dir.join("leaves").join(".DS_Store"), b"junk").unwrap();
+    let dotfiled = build_proven_log("example.com/lys/corrupt-d", None);
+    std::fs::write(dotfiled.dir.join("leaves").join(".DS_Store"), b"junk").unwrap();
     let output = run_lys(&[
         "log",
         "append",
         "--dir",
-        path_str(&log.dir),
+        path_str(&dotfiled.dir),
         "--leaf",
         path_str(&leaf),
     ]);
     assert_success(&output);
+    dotfiled.close().unwrap();
+    strayed.close().unwrap();
+    gapped.close().unwrap();
+    // Closed last: `leaf`, read by every case above, lives in its directory.
+    modified.close().unwrap();
 }

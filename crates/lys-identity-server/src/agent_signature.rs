@@ -65,16 +65,19 @@ pub fn signed_agent(
     };
     let text = value
         .to_str()
-        .map_err(|_unread| refused("the header is not text"))?;
+        .ok()
+        .ok_or_else(|| refused("the header is not text"))?;
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let [agent, signed_at, nonce, signature] = words.as_slice() else {
         return Err(refused("the header is not four words"));
     };
-    let agent =
-        AgentId::from_str(agent).map_err(|_unread| refused("the agent id does not read"))?;
+    let agent = AgentId::from_str(agent)
+        .ok()
+        .ok_or_else(|| refused("the agent id does not read"))?;
     let signed_at: u64 = signed_at
         .parse()
-        .map_err(|_unread| refused("the signing time does not read"))?;
+        .ok()
+        .ok_or_else(|| refused("the signing time does not read"))?;
     let nonce_bytes = unhex(nonce).ok_or_else(|| refused("the nonce is not hex"))?;
     if nonce_bytes.len() < NONCE_MIN {
         return Err(refused("the nonce is shorter than sixteen bytes"));
@@ -104,7 +107,7 @@ pub fn signed_agent(
         .agent_nonces
         .lock()
         .unwrap_or_else(PoisonError::into_inner);
-    seen.retain(|_nonce, at| now.abs_diff(*at) <= WINDOW_MS);
+    seen.retain(|_, at| now.abs_diff(*at) <= WINDOW_MS);
     if seen.insert(nonce.to_ascii_lowercase(), signed_at).is_some() {
         return Err(refused("the nonce was already used"));
     }
@@ -128,9 +131,11 @@ fn certified_keys(state: &AppState, agent: &str) -> Result<Vec<[u8; 32]>, Server
 fn now_ms() -> Result<u64, ServerError> {
     let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|_before| refused("this service's clock is before the Unix epoch"))?;
+        .ok()
+        .ok_or_else(|| refused("this service's clock is before the Unix epoch"))?;
     u64::try_from(elapsed.as_millis())
-        .map_err(|_large| refused("this service's clock does not fit"))
+        .ok()
+        .ok_or_else(|| refused("this service's clock does not fit"))
 }
 
 fn hex(bytes: &[u8]) -> String {

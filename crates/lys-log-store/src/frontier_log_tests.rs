@@ -14,7 +14,7 @@ fn leaf(index: u64) -> Vec<u8> {
 }
 
 fn filled(count: u64) -> Disk {
-    let (mut log, _tail) = FrontierLog::open(CountingStore::new()).unwrap();
+    let (mut log, _) = FrontierLog::open(CountingStore::new()).unwrap();
     for index in 0..count {
         log.append(&leaf(index)).unwrap();
     }
@@ -59,8 +59,7 @@ fn an_append_interrupted_before_its_pin_is_repaired_on_a_resumed_open() {
     let disk = filled(5);
     let mut store = CountingStore::over(disk);
     store.fail_next_pin();
-    let (mut log, _tail) =
-        FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf))).unwrap();
+    let (mut log, _) = FrontierLog::resume(store, Frontier::from_leaves((0..5).map(leaf))).unwrap();
     let err = log.append(&leaf(5)).unwrap_err();
     assert!(matches!(err, StoreError::Io { .. }), "{err}");
     assert!(matches!(log.append(&leaf(6)), Err(StoreError::Poisoned)));
@@ -79,7 +78,7 @@ fn an_append_interrupted_before_its_pin_is_repaired_on_a_resumed_open() {
 #[test]
 fn the_proof_tree_is_built_on_first_use_and_proves_inclusion() {
     let disk = filled(12);
-    let (mut log, _tail) = FrontierLog::resume(
+    let (mut log, _) = FrontierLog::resume(
         CountingStore::over(disk),
         Frontier::from_leaves((0..12).map(leaf)),
     )
@@ -97,7 +96,7 @@ fn the_proof_tree_is_built_on_first_use_and_proves_inclusion() {
 fn a_leaf_damaged_before_the_frontier_is_refused_when_the_proof_tree_is_built() {
     let mut disk = filled(8);
     disk.leaves[2] = b"not leaf-2".to_vec();
-    let (log, _tail) = FrontierLog::resume(
+    let (log, _) = FrontierLog::resume(
         CountingStore::over(disk),
         Frontier::from_leaves((0..8).map(leaf)),
     )
@@ -109,7 +108,7 @@ fn a_leaf_damaged_before_the_frontier_is_refused_when_the_proof_tree_is_built() 
 #[test]
 fn leaf_bytes_reads_from_the_store_and_answers_none_past_the_end() {
     let disk = filled(3);
-    let (log, _tail) = FrontierLog::resume(
+    let (log, _) = FrontierLog::resume(
         CountingStore::over(disk),
         Frontier::from_leaves((0..3).map(leaf)),
     )
@@ -125,7 +124,7 @@ fn a_poisoned_log_writes_no_snapshot() {
     let key = Ed25519Identity::load_or_generate(&dir.path().join("key")).unwrap();
     let mut store = CountingStore::new();
     store.fail_next_pin();
-    let (mut log, _tail) = FrontierLog::open(store).unwrap();
+    let (mut log, _) = FrontierLog::open(store).unwrap();
     assert!(log.append(&leaf(0)).is_err());
     let err = log
         .write_snapshot("test/state", b"state", &key)

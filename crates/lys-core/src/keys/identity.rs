@@ -131,15 +131,18 @@ impl Ed25519Identity {
     pub fn verify(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> TrustResult<()> {
         let sig_bytes: &[u8; 64] = signature
             .try_into()
-            .map_err(|_err| TrustError::InvalidSignature)?;
+            .ok()
+            .ok_or(TrustError::InvalidSignature)?;
         let signature = ed25519_dalek::Signature::from_bytes(sig_bytes);
         if !is_usable_ed25519_public_key(public_key) {
             return Err(TrustError::InvalidSignature);
         }
         let vk = ed25519_dalek::VerifyingKey::from_bytes(public_key)
-            .map_err(|_err| TrustError::InvalidSignature)?;
+            .ok()
+            .ok_or(TrustError::InvalidSignature)?;
         vk.verify_strict(message, &signature)
-            .map_err(|_err| TrustError::InvalidSignature)
+            .ok()
+            .ok_or(TrustError::InvalidSignature)
     }
 
     /// Derives the X25519 static secret from the Ed25519 signing key.
@@ -249,15 +252,16 @@ impl Ed25519Identity {
     /// Holds every rule [`Self::from_env`] applies to the variable's value,
     /// so tests reach those rules without writing the process environment.
     fn from_env_value(read: Result<String, std::env::VarError>) -> TrustResult<Self> {
-        let raw = read.map_err(|_err| TrustError::KeyManagement {
+        let raw = read.ok().ok_or_else(|| TrustError::KeyManagement {
             reason: format!("environment variable {KEY_ENV_VAR} not set"),
         })?;
         let trimmed = raw.trim();
         let decoded = Zeroizing::new(
             URL_SAFE_NO_PAD
                 .decode(trimmed.trim_end_matches('='))
-                .or_else(|_err| STANDARD.decode(trimmed))
-                .map_err(|_err| TrustError::KeyManagement {
+                .or_else(|_| STANDARD.decode(trimmed))
+                .ok()
+                .ok_or_else(|| TrustError::KeyManagement {
                     reason: format!("environment variable {KEY_ENV_VAR} contains invalid base64"),
                 })?,
         );
@@ -409,7 +413,7 @@ pub(crate) fn is_usable_ed25519_public_key(bytes: &[u8; 32]) -> bool {
     }
     match ed25519_dalek::VerifyingKey::from_bytes(bytes) {
         Ok(key) => !key.is_weak(),
-        Err(_err) => false,
+        Err(_) => false,
     }
 }
 

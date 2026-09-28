@@ -97,7 +97,7 @@ const GRANDPARENT_SEED: &[u8; 32] = b"lys-anchor-cascade-gate-grandpar";
 struct Party {
     anchor: Anchor<FileLeafStore, FileSigner, AcceptAll>,
     origin: String,
-    _dir: TempDir,
+    temp_dir: TempDir,
 }
 
 impl Party {
@@ -106,7 +106,7 @@ impl Party {
         Self {
             anchor: build(dir.path(), origin, seed),
             origin: origin.to_string(),
-            _dir: dir,
+            temp_dir: dir,
         }
     }
 
@@ -114,6 +114,11 @@ impl Party {
     /// the public key the signer advertises.
     fn verifier(&self) -> NoteVerifierKey {
         NoteVerifierKey::new(&self.origin, self.anchor.signer().public_key()).unwrap()
+    }
+
+    /// Removes the fixture's temporary directory, failing on error.
+    fn close(self) -> std::io::Result<()> {
+        self.temp_dir.close()
     }
 }
 
@@ -190,6 +195,8 @@ fn a_two_anchor_cascade_verifies() {
         verified.notarizations()[0].anchor_tree_size(),
         parent.anchor.tree_size()
     );
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
@@ -231,6 +238,9 @@ fn a_three_anchor_cascade_verifies_both_rungs() {
         verified.notarizations()[1].anchor_tree_size(),
         grandparent.anchor.tree_size()
     );
+    child.close().unwrap();
+    parent.close().unwrap();
+    grandparent.close().unwrap();
 }
 
 #[test]
@@ -283,6 +293,8 @@ fn a_notarization_of_another_moment_does_not_join() {
          must notarize the very checkpoint the inclusion proof was verified \
          against"
     );
+    child.close().unwrap();
+    parent.close().unwrap();
 }
 
 #[test]
@@ -352,6 +364,9 @@ fn a_parent_checkpoint_from_a_later_size_breaks_the_rung() {
          nothing about their relationship, and an implementation that verified \
          each and skipped the joins would accept a fabricated history"
     );
+    child.close().unwrap();
+    parent.close().unwrap();
+    grandparent.close().unwrap();
 }
 
 #[test]
@@ -369,4 +384,5 @@ fn an_unnotarized_bundle_verifies_and_reports_no_notarization() {
         "the judge must report the absence rather than let a reader assume \
          otherwise"
     );
+    child.close().unwrap();
 }

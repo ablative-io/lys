@@ -96,7 +96,7 @@ fn each_spawn_takes_the_next_login_and_the_log_names_the_seat() -> TestResult {
     broker.add_account("logins", "b", &Secret::from_slice(b"login-b"))?;
     let (first, one) = broker.spawn_login("seat:one", "logins")?;
     let (second, two) = broker.spawn_login("seat:two", "logins")?;
-    let (third, _three) = broker.spawn_login("seat:three", "logins")?;
+    let (third, _) = broker.spawn_login("seat:three", "logins")?;
     assert_eq!(
         (first.as_str(), second.as_str(), third.as_str()),
         ("primary", "b", "primary")
