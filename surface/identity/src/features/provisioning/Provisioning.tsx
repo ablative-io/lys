@@ -10,7 +10,7 @@ import { ChangeStatus } from '../roles/ChangeStatus';
 
 interface Server { name: string; url: string }
 export interface ProvisioningProfile { version: number; operation: string; model_access: string[]; tools: string[]; skills: string[]; mcp_servers: Server[]; instructions: string; note: string; set_by: string; set_at: number }
-export interface ProvisioningAnswer { agent: string; profile: ProvisioningProfile | null; versions: { version: number; set_by: string; set_at: number; note: string }[]; enforced: boolean }
+export interface ProvisioningAnswer { agent: string; recorded?: { operation: string; version: number } | null; profile: ProvisioningProfile | null; versions: { version: number; set_by: string; set_at: number; note: string }[]; enforced: boolean }
 const pathOf = (id: string) => '/agents/' + encodeURIComponent(id) + '/provisioning';
 const lines = (data: FormData, name: string) => field(data, name).split('\n').map((line) => line.trim()).filter(Boolean);
 
@@ -44,7 +44,7 @@ function ProfileEditor({ id, person, profile, changed }: { id: string; person: s
   const [nextKey, setNextKey] = useState(servers.length);
   const [error, setError] = useState('');
   const change = useRoleChange<ProvisioningAnswer>('lys.pending.provisioning.' + person + '.' + id, pathOf(id),
-    (answer, body) => answer.agent === id && answer.profile?.operation === body.operation, changed);
+    (answer, body) => answer.agent === id && (answer.recorded ? answer.recorded.operation === body.operation && answer.recorded.version === Number(body.from_version) + 1 : answer.profile !== null && answer.profile.operation === body.operation && answer.profile.version === Number(body.from_version) + 1), changed);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (change.blocked) return;
     try {

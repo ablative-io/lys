@@ -1,3 +1,4 @@
+import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { api, useLoad } from '../../api';
@@ -160,7 +161,7 @@ export function People() {
     return (
       <div className="page">
         <PeopleHead />
-        <Elsewhere which={shell.filterKind} />
+        {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Elsewhere which="teams" />}
       </div>
     );
   }

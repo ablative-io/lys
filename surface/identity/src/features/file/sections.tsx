@@ -1,3 +1,5 @@
+import { RuntimeSessions } from '../runtime/RuntimeSessions';
+import { AgentMemory } from './AgentMemory';
 import { AgentCredentials } from './AgentCredentials';
 import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
@@ -135,21 +137,6 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   );
 }
 
-function Table({ heads, note, title, why }: { heads: string[]; note: string; title: string; why: string }) {
-  return (
-    <div className="card">
-      <div className="row" style={{ padding: '0 0 6px' }}>
-        <h2>{title}</h2>
-        <span className="note">{note}</span>
-      </div>
-      <table>
-        <thead><tr>{heads.map((h) => <th key={h}>{h}</th>)}</tr></thead>
-        <tbody><tr><td colSpan={heads.length} className="dim"><span className="open-q">not built yet</span> {why}</td></tr></tbody>
-      </table>
-    </div>
-  );
-}
-
 function Record({ data }: { data: FileData }) {
   if (!data.agent) return <PersonRecord id={data.x.id} />;
   return <RecordView receipts={data.receipts} />;
@@ -212,11 +199,11 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
     case 'provisioning':
       return person ? <div className="dim">A person has no provisioning profile. Their own tools are their own.</div> : <Provisioning id={data.x.id} />;
     case 'memory':
-      return <NotBuilt>Memories and the home have no server here yet: what each memory came from, who can see it, and the last context given.</NotBuilt>;
+      return person ? <p>A person’s memories are not kept in an agent home.</p> : <AgentMemory id={data.x.id} />;
     case 'credentials':
       return person ? <PersonCredentials id={data.x.id} /> : <AgentCredentials id={data.x.id} />;
     case 'sessions':
-      return person ? <PersonSessions id={data.x.id} /> : <Table title="Sessions" note="As the runtimes report them. Stopped only when the runtime confirms it." heads={['Where', 'Runtime', 'Acting for', 'Started', 'Status', 'Context given']} why="Sessions come from runtime reports naming a launch record (conformance 5.4 to 5.6)." />;
+      return person ? <PersonSessions id={data.x.id} /> : <RuntimeSessions agent={data.x.id} />;
     case 'certificate':
       return person ? (
         <div className="card"><div className="sec">People sign in; they are not issued certificates here.</div></div>
