@@ -83,6 +83,41 @@ impl ErrorKind {
             Self::Unready => "unready",
         }
     }
+
+    /// The name a person reads when the failure reaches them through
+    /// `lys identity install`: the same kind, with the sign-in service
+    /// named by what it does rather than by the product it is.
+    pub fn lys_name(self) -> &'static str {
+        match self {
+            Self::RauthyUnreachable => "sign_in_service_unreachable",
+            Self::RauthyUncertain => "sign_in_service_outcome_uncertain",
+            Self::RauthyUnauthorized => "sign_in_service_unauthorized",
+            Self::RauthyForbidden => "sign_in_service_forbidden",
+            Self::RauthyBadRequest => "sign_in_service_bad_request",
+            Self::RauthyServerError => "sign_in_service_server_error",
+            Self::RauthyUnexpected => "sign_in_service_unexpected_response",
+            other => other.name(),
+        }
+    }
+}
+
+/// `text` as a person reads it: every service named by what it does, never
+/// by the product it is. Operator log files keep the products' names.
+pub fn in_lys_words(text: &str) -> String {
+    [
+        ("PostgreSQL", "database"),
+        ("postgres", "database"),
+        ("RAUTHY", "SIGN_IN_SERVICE"),
+        ("Rauthy", "sign-in service"),
+        ("rauthy", "sign-in service"),
+        ("SpiceDB", "permission service"),
+        ("SPICEDB", "PERMISSION_SERVICE"),
+        ("spicedb", "permission service"),
+    ]
+    .iter()
+    .fold(text.to_owned(), |text, (product, what)| {
+        text.replace(product, what)
+    })
 }
 
 /// A failure of `lys identity`, carrying operation, resource and path.
@@ -93,6 +128,7 @@ pub struct IdentityError {
     resource: String,
     path: Option<PathBuf>,
     detail: String,
+    in_lys_words: bool,
 }
 
 impl IdentityError {
@@ -110,7 +146,18 @@ impl IdentityError {
             resource: resource.into(),
             path: None,
             detail: detail.into(),
+            in_lys_words: false,
         }
+    }
+
+    /// The same failure, said in Lys's words wherever it is shown: its
+    /// kind by [`ErrorKind::lys_name`] and its operation, resource and
+    /// detail by [`in_lys_words`]. The path is kept exactly, because it is
+    /// the file an operator acts on.
+    #[must_use]
+    pub fn said_in_lys_words(mut self) -> Self {
+        self.in_lys_words = true;
+        self
     }
 
     /// The same failure, naming the file it touched.
@@ -128,18 +175,29 @@ impl IdentityError {
 
 impl fmt::Display for IdentityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let said = |text: &str| {
+            if self.in_lys_words {
+                in_lys_words(text)
+            } else {
+                text.to_owned()
+            }
+        };
+        let kind = if self.in_lys_words {
+            self.kind.lys_name()
+        } else {
+            self.kind.name()
+        };
         write!(
             f,
-            "{}: {} {}",
-            self.kind.name(),
-            self.operation,
-            self.resource
+            "{kind}: {} {}",
+            said(self.operation),
+            said(&self.resource)
         )?;
         if let Some(path) = &self.path {
             write!(f, " ({})", path.display())?;
         }
         if !self.detail.is_empty() {
-            write!(f, ": {}", self.detail)?;
+            write!(f, ": {}", said(&self.detail))?;
         }
         Ok(())
     }

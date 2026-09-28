@@ -5,13 +5,21 @@
 node = "this-machine"
 project = "lys-identity"
 state_dir = "state"
-admin_email = "{{admin_email}}"
-
+# The compose network's private range. Its gateway, 172.29.47.1, is the one
+# address the directory service reaches the sign-in service from.
+network = "172.29.47.0/24"
+{{admin_email_line}}
 [issuer]
-public_origin = "http://localhost:{{rauthy_port}}"
+# The sign-in service's public address is Lys's own origin: a browser only
+# ever sees Lys, and a sign-in provider sends people back to Lys, which
+# finishes the sign-in server-side. Lys reaches the service at admin_url.
+public_origin = "http://localhost:{{service_port}}"
 listen_port = {{rauthy_port}}
 admin_url = "http://127.0.0.1:{{rauthy_port}}"
-trusted_proxies = []
+# The address the directory service reaches the sign-in service from, as the
+# container sees it: the network's gateway. Only it may name a person's
+# address in X-Forwarded-For.
+trusted_proxies = ["172.29.47.1/32"]
 
 [database]
 bundled = true
@@ -36,11 +44,3 @@ redirect_uris = ["http://localhost:{{service_port}}/api/callback"]
 post_logout_redirect_uris = ["http://localhost:{{service_port}}/"]
 token_alg = "EdDSA"
 challenges = ["S256"]
-
-[clients.cambium]
-id = "cambium"
-name = "Cambium"
-redirect_uris = ["http://localhost:8400/auth/oidc/callback"]
-post_logout_redirect_uris = ["http://localhost:8400/"]
-token_alg = "RS256"
-challenges = []

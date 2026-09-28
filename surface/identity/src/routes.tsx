@@ -18,6 +18,7 @@ import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
 import { StartPage } from './features/start/StartDrawer';
+import { AccountPage } from './features/people/Account';
 
 /** Every screen and tab has its own address (conformance 9.1). */
 export function AppRoutes() {
@@ -41,6 +42,7 @@ export function AppRoutes() {
       <Route path="/file/:id/start" element={<StartPage />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
+      <Route path="/account/:id" element={<AccountPage />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
       <Route path="*" element={<People />} />

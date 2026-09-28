@@ -4206,6 +4206,11 @@
       "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
       "note": "R6: Prepare the fresh-account proof and its evidence record",
       "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config.rs",
+      "note": "R4: Providers are set up inside Lys with every step shown",
+      "brief": "DIRECTORY-047"
     }
   ],
   "inventory": [

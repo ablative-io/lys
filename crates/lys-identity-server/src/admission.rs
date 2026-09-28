@@ -3,8 +3,15 @@
 //! name (P9, R3).
 //!
 //! Admission compares the login the service authenticated, issuer and subject
-//! exactly, with the configured one. An email is never compared, and a first
+//! exactly, with the administrator's. An email is never compared, and a first
 //! visit admits nobody and registers nobody.
+//!
+//! The administrator is either configured, for an install that named one
+//! before this service started, or recorded once by first-run setup
+//! (`setup`), which makes the account on the setup page and then names its
+//! login here. Until one of the two has happened there is no administrator
+//! and every administrator act is refused by name. Once there is one it is
+//! never replaced: recording a second, different login is refused.
 //!
 //! The link-audit source may also be an agent whose signed request the
 //! service verified. The agent is admitted when the person responsible for it
@@ -16,6 +23,8 @@
 //! answers for nothing, so neither their session nor their agent's signature
 //! is admitted as the link-audit source.
 
+use std::sync::{PoisonError, RwLock};
+
 use lys_identity::projection::{Projection, Record};
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
 
@@ -25,34 +34,57 @@ use crate::error::ServerError;
 pub const AUTHORITY: &str = "Step 1 of the directory has one administrator, configured by issuer and subject. The administrator may register people, register agents under themselves, change profiles, bind logins and record lifecycle states. Every other caller may read only their own person, sign-in identities and agents, and changes no directory record. Grants are the one other write. The person bound to the administrator's login issues root grants, a holder passes on only what their grant lets them pass on, a grant is revoked by its issuer, by a holder it derives from or by the root authority, and any signed-in person may ask why they may act and who can. A grant held by an identity that is not active permits nothing.";
 
 /// The two callers step 1 admits.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Admission {
-    administrator: LoginBinding,
+    administrator: RwLock<Option<LoginBinding>>,
     link_audit_source: LoginBinding,
 }
 
 impl Admission {
-    /// Admission for the configured administrator and link-audit source.
-    pub fn new(administrator: LoginBinding, link_audit_source: LoginBinding) -> Self {
+    /// Admission for the administrator, when one is known yet, and the
+    /// configured link-audit source.
+    pub fn new(administrator: Option<LoginBinding>, link_audit_source: LoginBinding) -> Self {
         Self {
-            administrator,
+            administrator: RwLock::new(administrator),
             link_audit_source,
         }
     }
 
-    /// The configured administrator's login.
-    pub fn administrator_login(&self) -> &LoginBinding {
-        &self.administrator
+    /// The administrator's login, when there is an administrator yet.
+    pub fn administrator_login(&self) -> Option<LoginBinding> {
+        self.administrator
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Record `login` as the administrator. Recording the login already
+    /// recorded changes nothing; recording another is refused by name.
+    pub fn set_administrator(&self, login: LoginBinding) -> Result<(), ServerError> {
+        let mut held = self
+            .administrator
+            .write()
+            .unwrap_or_else(PoisonError::into_inner);
+        match &*held {
+            Some(existing) if existing == &login => Ok(()),
+            Some(_) => Err(ServerError::SetupClosed),
+            None => {
+                *held = Some(login);
+                Ok(())
+            }
+        }
     }
 
     /// Admit `actor` as the administrator, or refuse by name.
     pub fn administrator(&self, actor: &Actor) -> Result<(), ServerError> {
-        if actor.binding() == &self.administrator {
-            Ok(())
-        } else {
-            Err(ServerError::NotAdmitted {
-                reason: "only the configured administrator may do this in step 1",
-            })
+        match self.administrator_login() {
+            Some(login) if actor.binding() == &login => Ok(()),
+            Some(_) => Err(ServerError::NotAdmitted {
+                reason: "only the administrator may do this in step 1",
+            }),
+            None => Err(ServerError::NotAdmitted {
+                reason: "no administrator is set up yet (act: finish first-run setup on the setup page)",
+            }),
         }
     }
 

@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, header};
+use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::receipt::Receipt;
@@ -37,6 +37,14 @@ pub struct AppState {
     pub directory: Mutex<Directory<FileLeafStore>>,
     /// Sign-in.
     pub oidc: Oidc,
+    /// The issuer's own sign-in, carried server-side from Lys's sign-in page.
+    pub sign_in: crate::sign_in::IssuerSignIn,
+    /// Lys's `OpenID` provider, when the configuration names it.
+    pub provider: Option<crate::provider::OpenIdProvider>,
+    /// First-run setup, when the configuration names it.
+    pub setup: Option<crate::setup::SetupSettings>,
+    /// One setup act at a time, so one code makes one administrator.
+    pub setup_lock: tokio::sync::Mutex<()>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -117,9 +125,19 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
+        sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
+        provider: config
+            .provider
+            .as_ref()
+            .map(|settings| {
+                crate::provider::OpenIdProvider::open(settings, crate::sign_in::lys_origin(config)?)
+            })
+            .transpose()?,
+        setup: config.setup.clone(),
+        setup_lock: tokio::sync::Mutex::new(()),
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
         admission: Admission::new(
-            config.administrator_binding()?,
+            crate::setup::administrator(config)?,
             config.link_audit_binding()?,
         ),
         grants: Mutex::new(None),
@@ -148,7 +166,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         sign_in_providers: config
             .sign_in_providers
             .as_ref()
-            .map(crate::sign_in_providers::SignInProviders::open)
+            .map(|settings| {
+                crate::sign_in_providers::SignInProviders::open(
+                    settings,
+                    config.provider_origins.clone(),
+                )
+            })
             .transpose()?,
         agent_nonces: Mutex::default(),
         say,
@@ -158,11 +181,14 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
     let starts = start::routes(start_service(config, &state)?);
+    let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
+        .merge(crate::provider::routes(Arc::clone(&state)));
     let api = router(state).merge(configured).merge(starts);
-    Ok(match &config.surface_dir {
+    let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
-    })
+    };
+    Ok(served.merge(provider_callback))
 }
 
 /// The start route's service over the directory `state` holds. The route
@@ -205,9 +231,7 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
 pub fn router(state: Shared) -> Router {
     Router::new()
         .route("/authority", get(authority))
-        .route("/login", get(login))
         .route("/callback", get(callback))
-        .route("/setup", post(crate::setup::finish))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identities", get(list))
@@ -215,6 +239,9 @@ pub fn router(state: Shared) -> Router {
         .route("/identities/{id}/profile", post(change_profile))
         .route("/identities/{id}/transitions", post(transition))
         .route("/people/{id}/logins", post(bind_login))
+        .merge(crate::sign_in::routes())
+        .merge(crate::setup::routes())
+        .merge(crate::accounts::routes())
         .merge(crate::read_api::routes())
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
@@ -316,11 +343,6 @@ async fn authority() -> &'static str {
     AUTHORITY
 }
 
-async fn login(State(state): State<Shared>) -> Result<Response, ServerError> {
-    let url = state.oidc.begin()?;
-    Ok((StatusCode::SEE_OTHER, [(header::LOCATION, url)]).into_response())
-}
-
 #[derive(Deserialize)]
 struct Answer {
     code: String,
@@ -333,12 +355,8 @@ async fn callback(
     Query(answer): Query<Answer>,
 ) -> Result<Response, ServerError> {
     let actor = state.oidc.finish(answer.code, &answer.state).await?;
-    let body = json!({
-        "signed_in": { "issuer": actor.binding().issuer(), "subject": actor.binding().subject() },
-        "authority": AUTHORITY,
-    });
-    let cookie = state.sessions.begin(actor)?;
     if wants_page(&headers) {
+        let cookie = state.sessions.begin(actor)?;
         return Ok((
             StatusCode::SEE_OTHER,
             [
@@ -348,7 +366,7 @@ async fn callback(
         )
             .into_response());
     }
-    Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
+    crate::sign_in::begin_session(&state, &actor)
 }
 
 /// Whether the caller is a browser following the sign-in, which is taken to the
