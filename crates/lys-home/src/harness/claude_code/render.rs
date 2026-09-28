@@ -12,8 +12,22 @@
 //! message the report names the seed file written beside the rendered file
 //! ([`super::seed`]); no launch line is printed here, since a launch line
 //! comes only from the template's render (`render-launch`).
+//!
+//! The render never writes a default in place of a value the record did not
+//! carry (ADR-055). Every value it copies from a message entry is read
+//! through the checked readers of `render_fields`: a missing field, or one
+//! of another type than the target takes, refuses the render by the home
+//! session's id, the entry id, the field and the expected type, and an
+//! assistant stopReason Claude Code has no value for refuses by that value.
+//! A message whose role is a string the render does not know is skipped.
+//! Every refusal is decided before anything is written, and the writing
+//! itself is `render_write`'s, which serialises everything first. The only
+//! values written that no record carries are the format constants Claude
+//! Code's file requires on every record: `gitBranch` `""`, `usage`
+//! `{input_tokens 0, output_tokens 0}` and `stop_sequence` `null`. The only
+//! field read from its absence is a thinking part's `redacted`: absent means
+//! not redacted.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -21,10 +35,13 @@ use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
 
 use crate::error::HomeError;
-use crate::harness::claude_code::seed::{seed_of, seed_path, write_seed};
-use crate::harness::claude_code::{API, PROVIDER, projects_slug};
+use crate::harness::claude_code::render_fields::{
+    array, array_or_string, boolean, field_refusal, object, stop_reason, string,
+};
+use crate::harness::claude_code::seed::{seed_of, seed_path};
+use crate::harness::claude_code::{API, PROVIDER, projects_slug, render_fields, render_write};
 use crate::record::blocks::{Hash, hex_of};
-use crate::record::entries::{CUSTOM_AUTHORED, EntryBody};
+use crate::record::entries::{CUSTOM_AUTHORED, Entry, EntryBody};
 use crate::record::{Session, safe_component};
 
 /// Where and for whom to render.
@@ -126,169 +143,232 @@ pub fn render_claude_code(
         return Err(HomeError::Exists { path: file.clone() });
     }
     let authored = entries.iter().any(|e| e.is_custom(CUSTOM_AUTHORED));
-    let mut records: Vec<Value> = Vec::new();
-    let mut losses: Vec<Loss> = Vec::new();
-    let mut kept = 0u64;
-    let mut as_text = 0u64;
-    let mut prev: Option<String> = None;
+    let mut walk = Walk {
+        session: &session.header().id,
+        target,
+        records: Vec::new(),
+        losses: Vec::new(),
+        kept: 0,
+        as_text: 0,
+        prev: None,
+    };
     for entry in &entries {
-        match &entry.body {
-            EntryBody::Message { message } => {
-                let uuid = record_uuid(&session.header().id, entry.id());
-                let role = message.get("role").and_then(Value::as_str).unwrap_or("");
-                let ts = &entry.base.timestamp;
-                let base = |kind: &str, msg: Value| {
-                    json!({
-                        "parentUuid": prev,
-                        "isSidechain": false,
-                        "userType": "external",
-                        "cwd": target.cwd,
-                        "sessionId": target.session_id,
-                        "version": target.version,
-                        "gitBranch": "",
-                        "uuid": uuid,
-                        "timestamp": ts,
-                        "type": kind,
-                        "message": msg,
-                    })
-                };
-                match role {
-                    "user" => {
-                        let content = user_parts(message);
-                        records.push(base("user", json!({"role": "user", "content": content})));
-                    }
-                    "toolResult" => {
-                        let part = json!({
-                            "type": "tool_result",
-                            "tool_use_id": message.get("toolCallId").cloned().unwrap_or(Value::String(String::new())),
-                            "content": message.get("content").cloned().unwrap_or(Value::Array(Vec::new())),
-                            "is_error": message.get("isError").cloned().unwrap_or(Value::Bool(false)),
-                        });
-                        records.push(base("user", json!({"role": "user", "content": [part]})));
-                    }
-                    "assistant" => {
-                        let same = message.get("provider").and_then(Value::as_str)
-                            == Some(PROVIDER)
-                            && message.get("api").and_then(Value::as_str) == Some(API)
-                            && message.get("model").and_then(Value::as_str)
-                                == Some(target.model.as_str());
-                        let mut content = Vec::new();
-                        for part in message
-                            .get("content")
-                            .and_then(Value::as_array)
-                            .cloned()
-                            .unwrap_or_default()
-                        {
-                            match part.get("type").and_then(Value::as_str) {
-                                Some("text") => content.push(json!({"type": "text", "text": part.get("text").cloned().unwrap_or(Value::String(String::new()))})),
-                                Some("thinking") => {
-                                    let redacted = part.get("redacted").and_then(Value::as_bool).unwrap_or(false);
-                                    let sig = part.get("thinkingSignature").cloned();
-                                    let text = part.get("thinking").and_then(Value::as_str).unwrap_or("");
-                                    if same && redacted {
-                                        content.push(json!({"type": "redacted_thinking", "data": sig.unwrap_or(Value::Null)}));
-                                        kept += 1;
-                                    } else if same && sig.is_some() {
-                                        content.push(json!({"type": "thinking", "thinking": text, "signature": sig.unwrap_or(Value::Null)}));
-                                        kept += 1;
-                                    } else if !text.trim().is_empty() && !redacted {
-                                        content.push(json!({"type": "text", "text": text}));
-                                        as_text += 1;
-                                        if sig.is_some() {
-                                            losses.push(loss(&part, "signed thinking rendered as text: different provider, api or model"));
-                                        }
-                                    } else {
-                                        losses.push(loss(&part, if redacted { "redacted thinking dropped: different provider, api or model" } else { "empty thinking dropped" }));
-                                    }
-                                }
-                                Some("toolCall") => content.push(json!({
-                                    "type": "tool_use",
-                                    "id": part.get("id").cloned().unwrap_or(Value::String(String::new())),
-                                    "name": part.get("name").cloned().unwrap_or(Value::String(String::new())),
-                                    "input": part.get("arguments").cloned().unwrap_or(Value::Object(serde_json::Map::new())),
-                                })),
-                                _ => content.push(part.clone()),
-                            }
-                        }
-                        let stop = match message.get("stopReason").and_then(Value::as_str) {
-                            Some("toolUse") => "tool_use",
-                            Some("length") => "max_tokens",
-                            _ => "end_turn",
-                        };
-                        let msg = json!({
-                            "id": format!("msg_{}", &uuid[..8]),
-                            "type": "message",
-                            "role": "assistant",
-                            "model": message.get("model").cloned().unwrap_or(Value::String(String::new())),
-                            "content": content,
-                            "stop_reason": stop,
-                            "stop_sequence": Value::Null,
-                            "usage": {"input_tokens": 0, "output_tokens": 0},
-                        });
-                        records.push(base("assistant", msg));
-                    }
-                    _ => continue,
-                }
-                prev = Some(uuid);
-            }
-            EntryBody::Compaction { summary, .. } => {
-                records.push(json!({"type": "summary", "summary": summary, "leafUuid": prev}));
-            }
-            _ => {}
-        }
+        walk.entry(entry)?;
     }
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)
-            .map_err(|e| HomeError::io("creating the render directory", dir, e))?;
-    }
-    {
-        let mut f = std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
-            .map_err(|e| HomeError::io("creating the rendered file", &path, e))?;
-        for r in &records {
-            let line = serde_json::to_string(r).map_err(|source| HomeError::Json {
-                context: "a record could not be serialised",
-                source,
-            })?;
-            f.write_all(line.as_bytes())
-                .map_err(|e| HomeError::io("writing the rendered file", &path, e))?;
-            f.write_all(b"\n")
-                .map_err(|e| HomeError::io("writing the rendered file", &path, e))?;
-        }
-        f.sync_all()
-            .map_err(|e| HomeError::io("syncing the rendered file", &path, e))?;
-    }
-    let loss_path = path.with_extension("loss.json");
-    let account = json!({"session_id": target.session_id, "model": target.model, "authored": authored, "dropped": losses});
-    std::fs::write(
-        &loss_path,
-        serde_json::to_vec_pretty(&account).unwrap_or_default(),
-    )
-    .map_err(|e| HomeError::io("writing the loss account", &loss_path, e))?;
-    if let (Some(seed), Some(file)) = (&seed, &seed_file) {
-        write_seed(file, seed)?;
-    }
+    let account = LossAccount {
+        authored,
+        dropped: &walk.losses,
+        model: &target.model,
+        session_id: &target.session_id,
+    };
+    let seed_write = seed.as_ref().zip(seed_file.as_deref());
+    let loss_path =
+        render_write::write_render(walk.session, &path, &walk.records, &account, seed_write)?;
     Ok(RenderReport {
         path,
         loss_path,
-        records: records.len() as u64,
-        thinking_kept: kept,
-        thinking_as_text: as_text,
-        dropped: losses.len() as u64,
+        records: walk.records.len() as u64,
+        thinking_kept: walk.kept,
+        thinking_as_text: walk.as_text,
+        dropped: walk.losses.len() as u64,
         authored,
         inherited,
         seed: seed_file,
     })
 }
 
-fn loss(part: &Value, reason: &str) -> Loss {
-    let bytes = serde_json::to_vec(part).unwrap_or_default();
-    Loss {
+/// The loss account beside a rendered file. Its fields stand in the order
+/// of their names, the order the JSON object written before ADR-055 held
+/// them in, so the account's bytes did not move.
+#[derive(Serialize)]
+struct LossAccount<'a> {
+    authored: bool,
+    dropped: &'a [Loss],
+    model: &'a str,
+    session_id: &'a str,
+}
+
+/// The walk of a render's entries: the records shaped so far, each beside
+/// the id of the entry it came from, and the loss account's rows.
+struct Walk<'a> {
+    /// The home session's header id, which every refusal names.
+    session: &'a str,
+    target: &'a RenderTarget,
+    /// Each record beside the id of the entry it came from; `None` for a
+    /// `summary`.
+    records: Vec<(Value, Option<String>)>,
+    losses: Vec<Loss>,
+    kept: u64,
+    as_text: u64,
+    /// The uuid of the last record written, the next record's parent.
+    prev: Option<String>,
+}
+
+impl Walk<'_> {
+    /// Shape one entry: a message becomes a record, a compaction a
+    /// `summary`, anything else nothing.
+    fn entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
+        match &entry.body {
+            EntryBody::Message { message } => self.message(entry, message),
+            EntryBody::Compaction { summary, .. } => {
+                let record = json!({"type": "summary", "summary": summary, "leafUuid": self.prev});
+                self.records.push((record, None));
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn message(&mut self, entry: &Entry, message: &Value) -> Result<(), HomeError> {
+        let id = entry.id();
+        let uuid = record_uuid(self.session, id);
+        let (kind, msg) = match string(self.session, id, message, "role")? {
+            "user" => {
+                let content = user_parts(self.session, id, message)?;
+                ("user", json!({"role": "user", "content": content}))
+            }
+            "toolResult" => {
+                let part = self.tool_result(id, message)?;
+                ("user", json!({"role": "user", "content": [part]}))
+            }
+            "assistant" => ("assistant", self.assistant(id, &uuid, message)?),
+            _ => return Ok(()),
+        };
+        let record = json!({
+            "parentUuid": self.prev,
+            "isSidechain": false,
+            "userType": "external",
+            "cwd": self.target.cwd,
+            "sessionId": self.target.session_id,
+            "version": self.target.version,
+            "gitBranch": "",
+            "uuid": uuid,
+            "timestamp": entry.base.timestamp,
+            "type": kind,
+            "message": msg,
+        });
+        self.records.push((record, Some(id.to_owned())));
+        self.prev = Some(uuid);
+        Ok(())
+    }
+
+    fn tool_result(&self, id: &str, message: &Value) -> Result<Value, HomeError> {
+        let tool_use_id = string(self.session, id, message, "toolCallId")?;
+        let content = array_or_string(self.session, id, message, "content")?;
+        let is_error = boolean(self.session, id, message, "isError")?;
+        Ok(json!({
+            "type": "tool_result",
+            "tool_use_id": tool_use_id,
+            "content": content,
+            "is_error": is_error,
+        }))
+    }
+
+    fn assistant(&mut self, id: &str, uuid: &str, message: &Value) -> Result<Value, HomeError> {
+        let provider = string(self.session, id, message, "provider")?;
+        let api = string(self.session, id, message, "api")?;
+        let model = string(self.session, id, message, "model")?;
+        let parts = array(self.session, id, message, "content")?;
+        let stop = stop_reason(self.session, id, message)?;
+        let same = provider == PROVIDER && api == API && model == self.target.model;
+        let mut content = Vec::new();
+        for part in parts {
+            match part.get("type").and_then(Value::as_str) {
+                Some("text") => {
+                    let text = string(self.session, id, part, "text")?;
+                    content.push(json!({"type": "text", "text": text}));
+                }
+                Some("thinking") => self.thinking(id, part, same, &mut content)?,
+                Some("toolCall") => {
+                    let call_id = string(self.session, id, part, "id")?;
+                    let name = string(self.session, id, part, "name")?;
+                    let input = object(self.session, id, part, "arguments")?;
+                    content.push(json!({
+                        "type": "tool_use",
+                        "id": call_id,
+                        "name": name,
+                        "input": input,
+                    }));
+                }
+                _ => content.push(part.clone()),
+            }
+        }
+        Ok(json!({
+            "id": format!("msg_{}", &uuid[..8]),
+            "type": "message",
+            "role": "assistant",
+            "model": model,
+            "content": content,
+            "stop_reason": stop,
+            "stop_sequence": Value::Null,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        }))
+    }
+
+    /// A thinking part: whole for the same provider, api and model, as text
+    /// when readable otherwise, and dropped into the loss account when not.
+    fn thinking(
+        &mut self,
+        id: &str,
+        part: &Value,
+        same: bool,
+        content: &mut Vec<Value>,
+    ) -> Result<(), HomeError> {
+        const SIGNATURE: &str = "thinkingSignature";
+        let redacted = render_fields::redacted(self.session, id, part)?;
+        let sig = match part.get(SIGNATURE) {
+            Some(_) => Some(string(self.session, id, part, SIGNATURE)?),
+            None => None,
+        };
+        let text = string(self.session, id, part, "thinking")?;
+        if redacted && sig.is_none() {
+            return Err(field_refusal(self.session, id, SIGNATURE, "string", true));
+        }
+        match sig {
+            Some(data) if same && redacted => {
+                content.push(json!({"type": "redacted_thinking", "data": data}));
+                self.kept += 1;
+            }
+            Some(signature) if same => {
+                let whole = json!({"type": "thinking", "thinking": text, "signature": signature});
+                content.push(whole);
+                self.kept += 1;
+            }
+            _ if !text.trim().is_empty() && !redacted => {
+                content.push(json!({"type": "text", "text": text}));
+                self.as_text += 1;
+                if sig.is_some() {
+                    let reason =
+                        "signed thinking rendered as text: different provider, api or model";
+                    self.losses.push(loss(self.session, id, part, reason)?);
+                }
+            }
+            _ => {
+                let reason = if redacted {
+                    "redacted thinking dropped: different provider, api or model"
+                } else {
+                    "empty thinking dropped"
+                };
+                self.losses.push(loss(self.session, id, part, reason)?);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The loss account's row for a part of entry `entry` of session `session`
+/// the render could not carry: the part's hash as stored, and why.
+fn loss(session: &str, entry: &str, part: &Value, reason: &str) -> Result<Loss, HomeError> {
+    let bytes = serde_json::to_vec(part).map_err(|source| HomeError::RenderUnserialisable {
+        session: session.to_owned(),
+        what: "dropped part",
+        entry: Some(entry.to_owned()),
+        source,
+    })?;
+    Ok(Loss {
         hash: Hash::of(&bytes).to_string(),
         reason: reason.to_owned(),
-    }
+    })
 }
 
 /// The lys render namespace, fixed: UUID version 5 of the RFC 9562 URL namespace
@@ -372,19 +452,15 @@ pub fn record_uuid(session_id: &str, id: &str) -> String {
     }
 }
 
-fn user_parts(message: &Value) -> Value {
-    match message.get("content") {
-        Some(Value::String(s)) => Value::String(s.clone()),
-        Some(Value::Array(parts)) => {
-            if parts.len() == 1 && parts[0].get("type").and_then(Value::as_str) == Some("text") {
-                parts[0]
-                    .get("text")
-                    .cloned()
-                    .unwrap_or(Value::String(String::new()))
-            } else {
-                Value::Array(parts.clone())
-            }
-        }
-        _ => Value::String(String::new()),
+/// A user message's content: a string as it stands, one text part as its
+/// text, and any other list of parts as it stands.
+fn user_parts(session: &str, entry: &str, message: &Value) -> Result<Value, HomeError> {
+    let content = array_or_string(session, entry, message, "content")?;
+    if let Value::Array(parts) = content
+        && let [only] = parts.as_slice()
+        && only.get("type").and_then(Value::as_str) == Some("text")
+    {
+        return Ok(Value::String(string(session, entry, only, "text")?.to_owned()));
     }
+    Ok(content.clone())
 }

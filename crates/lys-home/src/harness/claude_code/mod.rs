@@ -38,8 +38,16 @@ pub mod paths;
 #[cfg(test)]
 mod paths_tests;
 pub mod render;
+mod render_fields;
+#[cfg(test)]
+mod render_fields_tests;
+#[cfg(test)]
+mod render_refusal_tests;
 #[cfg(test)]
 mod render_tests;
+mod render_write;
+#[cfg(test)]
+mod render_write_tests;
 pub mod seed;
 #[cfg(test)]
 mod seed_tests;
