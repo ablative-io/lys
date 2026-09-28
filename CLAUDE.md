@@ -52,7 +52,7 @@ Non-negotiable, enforced by CI (`clippy --all-targets -- -D warnings`):
 - **No `unwrap` / `expect` / `panic` / `todo` / `unimplemented` / `unreachable` in library code.** Tests are exempt through `clippy.toml`'s `allow-unwrap-in-tests`, `allow-expect-in-tests` and `allow-panic-in-tests`, which clippy applies to code it knows is test code; a `*_tests.rs` file, a fixture file and an integration test root carry `#![cfg(test)]` as their first line so the whole file is test code.
 - **No silent failures.** Every error handled or propagated with operation-specific context. `thiserror` for the library error type; the CLI may use `anyhow` at the top level only.
 - **Private key material never appears in `Debug`, logs, or error messages.** Redaction is tested, not assumed. Seed buffers are `Zeroizing`.
-- **No file over 500 lines** of code (excluding tests/comments/whitespace). `mod.rs` carries only `pub mod` / `pub use` / module docs. Logic goes in named files; tests in sibling `*_tests.rs` files.
+- **No file over 500 lines** of code (excluding tests/comments/whitespace), measured by the file-length gate leg. `mod.rs` carries only `pub mod` / `pub use` / module docs. Logic goes in named files; tests in sibling `*_tests.rs` files.
 - **`unsafe_code = "deny"`.** All dependencies pure Rust.
 - **Every public item documented** (`missing_docs = "warn"` under `-D warnings`). Module-level `//!` docs state invariants, not just descriptions.
 - **Cryptographic changes require an adversarial review** before landing. Not a light-model pass — construct actual attacks (forgeries, malleability, cross-protocol confusion, timing oracles) and prove they fail. See the meridian-trust hardening in `docs/ROADMAP.md` for the standard.
@@ -110,6 +110,7 @@ Tom's rules, in his words, with the date and time each was given.
 ## Gates before any commit
 
 ```
+sh scripts/design/gate.sh
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
@@ -117,9 +118,11 @@ cargo test --workspace --all-features --no-fail-fast
 cargo doc --no-deps --all-features
 cargo doc --no-deps
 cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
+ast-grep scan --config sgconfig.yml
+sh scripts/file-length.sh
 ```
 
-All five clean. No exceptions.
+Every line clean. No exceptions.
 
 **`--all-features` is not optional decoration.** The `unstable-anchor` feature is
 off by default, and **81 tests compile out without it** — a bare

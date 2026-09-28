@@ -487,6 +487,16 @@
             "tool:ast-grep"
           ],
           "cadence": "round"
+        },
+        {
+          "name": "file-length",
+          "command": "sh scripts/file-length.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3",
+            "tool:git"
+          ],
+          "cadence": "round"
         }
       ]
     }

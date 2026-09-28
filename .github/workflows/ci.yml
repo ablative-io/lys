@@ -53,6 +53,9 @@ jobs:
       - name: ast-grep rules (any hit fails the job)
         run: ast-grep scan --config sgconfig.yml
 
+      - name: File length (any file over 500 lines of code fails the job)
+        run: sh scripts/file-length.sh
+
   # Cryptographic dependencies carry real risk; audit them on every change.
   audit:
     name: cargo-deny
