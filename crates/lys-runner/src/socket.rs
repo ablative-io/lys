@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 
+use crate::admitted::Admitted;
 use crate::error::RunnerError;
 use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request};
 use crate::scrollback::whole_text;
@@ -266,7 +267,12 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
     match act {
         Act::Start { launch } => {
             let session = launch.session.clone();
-            let (pid, started_at) = sessions.start(launch)?;
+            let policy = launch
+                .policy
+                .clone()
+                .map(|admitted| Admitted::verified(*admitted))
+                .transpose()?;
+            let (pid, started_at) = sessions.begin(launch, policy, None)?;
             Ok(Answer::Started {
                 session,
                 pid,

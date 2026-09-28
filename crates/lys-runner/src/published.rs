@@ -68,7 +68,7 @@ pub fn section() -> Value {
                 "answered": "only on the connection whose greeting it names, by the runner it names: once",
             },
             "acts": {
-                "start": {"launch": {"session": "string", "program": "string", "arguments": ["string"], "directory": "string, empty for the runner's own", "environment": {"NAME": "value; a handle's id, never a credential"}, "columns": "u16", "rows": "u16", "rotation": "optional: accounts (handles), variable, limit {signal: exit_status, status} or {signal: words, words}, resume_arguments"}},
+                "start": {"launch": {"session": "string", "program": "string", "arguments": ["string"], "directory": "string, empty for the runner's own", "environment": {"NAME": "value; a handle's id, never a credential"}, "columns": "u16", "rows": "u16", "rotation": "optional: accounts (handles), variable, limit {signal: exit_status, status} or {signal: words, words}, resume_arguments", "policy": "optional: {policy: {version, agent, rules}, digest: lowercase hex SHA-256 of \"lys-agent-policy/v1\\n\" then the policy's JSON}; recomputed and refused on a difference"}},
                 "input": {"session": "string", "text": "string", "enter": "bool"},
                 "keys": {"session": "string", "keys": ["enter", "tab", "escape", "backspace", "delete", "up", "down", "left", "right", "home", "end", "page_up", "page_down", "space", "ctrl_c", "ctrl_d", "ctrl_l", "ctrl_r", "ctrl_z"]},
                 "read": {"session": "string", "cursor": "optional u64", "lines": "optional u32", "bytes": "optional u64", "follow": "bool: answer once output follows the cursor or the session ends"},
@@ -83,7 +83,8 @@ pub fn section() -> Value {
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
             "request_refusals": REQUEST_REFUSALS,
-            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown"],
+            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch"],
+            "judged_under": "a status's session names the policy its launch carried as policy {version, digest}; absent when none was carried",
             "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null"},
             "dial": {
                 "description": "A runner on another machine is reached through a bridge that dials the server; the server never dials it. The bridge carries its runner connection's greeting to next, and the request it is answered is signed over it. TLS for https://; cleartext http:// only to the machine's own loopback address.",

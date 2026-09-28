@@ -411,6 +411,10 @@ impl Launcher for DirectoryLauncher {
                 Ok(settings) => settings.and_then(|settings| settings.accounts),
                 Err(refused) => return Some(Err(refused)),
             };
+            let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
+                Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
@@ -429,6 +433,7 @@ impl Launcher for DirectoryLauncher {
                 columns: COLUMNS,
                 rows: ROWS,
                 rotation,
+                policy,
             };
             run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch)
                 .await

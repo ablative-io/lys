@@ -36,6 +36,7 @@ use std::collections::BTreeMap;
 use lys_core::Ed25519Identity;
 use serde::{Deserialize, Serialize};
 
+use crate::admitted::{Admitted, JudgedUnder};
 use crate::error::RunnerError;
 use crate::rotation::{Move, Rotation};
 
@@ -139,6 +140,10 @@ pub struct Launch {
     /// The accounts the session moves between at a usage limit, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<Rotation>,
+    /// The agent's tool-boundary policy and the digest it was admitted
+    /// under, when the session is judged at its tool boundary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<Box<Admitted>>,
 }
 
 /// One act a request asks for.
@@ -304,6 +309,10 @@ pub struct SessionView {
     pub moves: Vec<Move>,
     /// Its end, once it has ended.
     pub ended: Option<Ended>,
+    /// The policy its tool boundary is judged under, when its launch
+    /// carried one; none for a session a restarted runner reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<JudgedUnder>,
 }
 
 /// What a runner is and holds.

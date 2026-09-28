@@ -27,11 +27,10 @@ use lys_log_store::{
 };
 use lys_runner::judge::Policy;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 use crate::error::ServerError;
-use crate::routes::{Say, hex};
+use crate::routes::Say;
 
 /// The origin the policies' leaf store is created with.
 pub const ORIGIN: &str = "lys/identity/agent-policies";
@@ -40,21 +39,18 @@ pub const ORIGIN: &str = "lys/identity/agent-policies";
 pub const DOMAIN: &str = "lys/identity/agent-policies-state/v1";
 
 /// The domain line a policy's canonical encoding begins with.
-pub const ENCODING: &str = "lys-agent-policy/v1";
+pub const ENCODING: &str = lys_runner::admitted::ENCODING;
 
 const FORMAT: &str = "lys-agent-policies-state/v1";
 
-/// `policy`'s canonical encoding.
+/// `policy`'s canonical encoding, the one the runner checks at a launch.
 pub fn canonical(policy: &Policy) -> Result<Vec<u8>, ServerError> {
-    let mut bytes = ENCODING.as_bytes().to_vec();
-    bytes.push(b'\n');
-    serde_json::to_writer(&mut bytes, policy).map_err(unavailable)?;
-    Ok(bytes)
+    lys_runner::admitted::canonical(policy).map_err(unavailable)
 }
 
 /// `policy`'s digest: the lowercase hex SHA-256 of its canonical encoding.
 pub fn digest(policy: &Policy) -> Result<String, ServerError> {
-    Ok(hex(&Sha256::digest(canonical(policy)?)))
+    lys_runner::admitted::digest(policy).map_err(unavailable)
 }
 
 /// Every version of every agent's policy, as the log folds them.

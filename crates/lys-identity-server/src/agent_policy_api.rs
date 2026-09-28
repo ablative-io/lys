@@ -76,6 +76,25 @@ pub(crate) fn with_policies<T>(
     act(&mut store)
 }
 
+/// The policy a launch of `agent` carries: its latest version with the
+/// digest the runner checks, or none when it has none or the configuration
+/// keeps no policies.
+pub(crate) fn launch_policy(
+    state: &AppState,
+    agent: &str,
+) -> Result<Option<Box<lys_runner::admitted::Admitted>>, ServerError> {
+    if state.policies.is_none() {
+        return Ok(None);
+    }
+    let latest = with_policies(state, |store| Ok(store.held().latest(agent).cloned()))?;
+    latest
+        .map(|policy| lys_runner::admitted::Admitted::of(policy).map(Box::new))
+        .transpose()
+        .map_err(|error| ServerError::PolicyUnavailable {
+            reason: error.to_string(),
+        })
+}
+
 fn admitted(state: &AppState, headers: &HeaderMap, agent: &str) -> Result<(), ServerError> {
     let actor = signed_in(state, headers)?;
     let holder = Holder {

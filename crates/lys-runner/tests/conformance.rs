@@ -102,6 +102,7 @@ fn shell(id: &str) -> Launch {
         columns: 80,
         rows: 24,
         rotation: None,
+        policy: None,
     }
 }
 

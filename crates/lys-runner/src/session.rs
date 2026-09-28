@@ -33,6 +33,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
 
+use crate::admitted::Admitted;
 use crate::error::RunnerError;
 use crate::judge::Policy;
 use crate::operations::Operations;
@@ -145,6 +146,11 @@ impl Session {
                 .map(|rotation| rotation.moves().to_vec())
                 .unwrap_or_default(),
             ended: self.ended.clone(),
+            policy: self
+                .launch
+                .as_ref()
+                .and_then(|launch| launch.policy.as_deref())
+                .map(Admitted::judged_under),
         }
     }
 

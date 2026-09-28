@@ -83,6 +83,7 @@ fn cat(client: &Client, session: &str) -> TestResult {
         columns: 80,
         rows: 24,
         rotation: None,
+        policy: None,
     };
     match client.ask(&Act::Start { launch })? {
         Answer::Started { .. } => {}

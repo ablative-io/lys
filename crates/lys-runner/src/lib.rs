@@ -31,6 +31,7 @@
 //! in [`protocol`], and the conformance suite in `tests/conformance.rs` runs
 //! against any runner given its socket.
 
+pub mod admitted;
 pub mod client;
 pub mod codex_judge;
 pub mod codex_judge_client;
