@@ -28,7 +28,7 @@ use serde::Deserialize;
 use crate::error::ServerError;
 use crate::grants::caller;
 use crate::read_api::own_person;
-use crate::roles_records::{Ending, Holding, Role, Template, Version, Words};
+use crate::roles_records::{Ending, Holding, Move, Role, Template, Version, Words};
 use crate::roles_store::RolesStore;
 use crate::roles_views::{
     HolderView, MoveView, MovedView, POLICY, RoleList, RoleView, VersionView,
@@ -98,7 +98,15 @@ struct AssignBody {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MoveBody {
+    assignment: String,
+    from_version: u32,
     to_version: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EndBody {
+    assignment: String,
 }
 
 /// The role routes.
@@ -164,6 +172,7 @@ fn holder_view(directory: &Projection, role: &Role, holding: &Holding, at: u64) 
         .and_then(|identity| directory.record(identity))
         .map(|record| record.profile().display_name().to_owned());
     HolderView {
+        assignment: holding.operation.clone(),
         holder: holding.holder.clone(),
         display_name,
         version: holding.version,
@@ -375,9 +384,19 @@ async fn move_holder(
         let by = own_person(directory, &actor)?.to_string();
         let at = now();
         with_roles(&state, |store| {
-            let from = store.move_holder(&id, &holder, body.to_version, &by, at)?;
+            let moved = Move {
+                from: body.from_version,
+                to: body.to_version,
+                by,
+                at,
+            };
+            store.move_holder(&id, &holder, &body.assignment, moved)?;
             let role = store.role(&id).ok_or(ServerError::RoleUnknown)?;
-            let holding = role.holding(&holder).ok_or(ServerError::HolderUnknown)?;
+            let holding = role
+                .holdings
+                .iter()
+                .find(|kept| kept.operation == body.assignment)
+                .ok_or(ServerError::HolderUnknown)?;
             let version = |number| {
                 role.version(number)
                     .map(VersionView::from)
@@ -386,8 +405,8 @@ async fn move_holder(
             Ok(Json(MovedView {
                 role: role.id.clone(),
                 holder: holder_view(directory, role, holding, at),
-                from: version(from)?,
-                to: version(holding.version)?,
+                from: version(body.from_version)?,
+                to: version(body.to_version)?,
             }))
         })
     })
@@ -397,14 +416,16 @@ async fn end(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((id, holder)): Path<(String, String)>,
+    body: Result<Json<EndBody>, JsonRejection>,
 ) -> Result<Json<RoleView>, ServerError> {
     let actor = administrator(&state, &headers)?;
+    let body = taken(body)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
         let at = now();
         with_roles(&state, |store| {
-            store.end(&id, &holder, Ending { by, at })?;
+            store.end(&id, &holder, &body.assignment, Ending { by, at })?;
             let role = store.role(&id).ok_or(ServerError::RoleUnknown)?;
             Ok(Json(view(directory, role, at)))
         })

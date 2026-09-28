@@ -10,7 +10,7 @@ use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::roles_records::{Holding, Version, Words};
+use lys_identity_server::roles_records::{Holding, Move, Version, Words};
 use lys_identity_server::roles_store::RolesStore;
 use serde_json::{Value, json};
 
@@ -200,7 +200,10 @@ async fn row_4_2_editing_a_role_makes_a_new_version_and_no_holder_changes_by_its
 async fn row_4_3_moving_a_holder_is_a_deliberate_act_recorded_with_who_did_it() -> TestResult {
     let table = Table::set().await?;
     let id = table.role().await?;
-    table.assigned(&id, None).await?;
+    let assigned = table.assigned(&id, None).await?;
+    let assignment = assigned["holders"][0]["assignment"].clone();
+    assert!(assignment.is_string(), "{assigned}");
+    let to = |from: u32, to: u32| json!({ "assignment": assignment, "from_version": from, "to_version": to });
     let revised = table
         .done(&format!("/roles/{id}/versions"), &second(&operation()?))
         .await?;
@@ -208,16 +211,16 @@ async fn row_4_3_moving_a_holder_is_a_deliberate_act_recorded_with_who_did_it() 
 
     let by_bea = table
         .service
-        .post(&path, Some(&table.bea), &json!({ "to_version": 2 }))
+        .post(&path, Some(&table.bea), &to(1, 2))
         .await?;
     refused(&by_bea, 403, "NotAdmitted");
     let absent = table
         .service
-        .post(&path, Some(&table.ada), &json!({ "to_version": 9 }))
+        .post(&path, Some(&table.ada), &to(1, 9))
         .await?;
     refused(&absent, 404, "RoleVersionUnknown");
 
-    let moved = table.done(&path, &json!({ "to_version": 2 })).await?;
+    let moved = table.done(&path, &to(1, 2)).await?;
     assert_eq!(moved["role"], id);
     assert_eq!(moved["from"], revised["versions"][0], "what the holder had");
     assert_eq!(
@@ -232,13 +235,28 @@ async fn row_4_3_moving_a_holder_is_a_deliberate_act_recorded_with_who_did_it() 
     assert_eq!(record[0]["to"], 2);
     assert_eq!(record[0]["by"], table.seeded.people[0].id.to_string());
 
-    let again = table.done(&path, &json!({ "to_version": 2 })).await?;
-    assert_eq!(again, moved, "a holder already there stays as it is");
+    let again = table.done(&path, &to(1, 2)).await?;
+    assert_eq!(
+        again, moved,
+        "a move made again in the same words is kept once"
+    );
     let back = table
         .service
-        .post(&path, Some(&table.ada), &json!({ "to_version": 1 }))
+        .post(&path, Some(&table.ada), &to(2, 1))
         .await?;
     refused(&back, 400, "RequestMalformed");
+    table
+        .done(&format!("/roles/{id}/versions"), &second(&operation()?))
+        .await?;
+    let stale = table
+        .service
+        .post(&path, Some(&table.ada), &to(1, 3))
+        .await?;
+    refused(&stale, 409, "HoldingChanged");
+    let mut other = to(2, 3);
+    other["assignment"] = json!(operation()?);
+    let elsewhere = table.service.post(&path, Some(&table.ada), &other).await?;
+    refused(&elsewhere, 409, "HoldingChanged");
     Ok(())
 }
 
@@ -280,7 +298,7 @@ async fn row_4_5_a_version_change_never_extends_a_provisional_holding() -> TestR
     let moved = table
         .done(
             &format!("/roles/{id}/holders/{}/move", table.bea_id()),
-            &json!({ "to_version": 2 }),
+            &json!({ "assignment": assigned["holders"][0]["assignment"], "from_version": 1, "to_version": 2 }),
         )
         .await?;
     assert_eq!(moved["holder"]["ends_at"], FAR);
@@ -302,6 +320,15 @@ fn words(note: &str) -> Words {
         profile: String::new(),
         grant_templates: Vec::new(),
         note: note.to_owned(),
+    }
+}
+
+fn moved(from: u32, to: u32, at: u64) -> Move {
+    Move {
+        from,
+        to,
+        by: "person-a".to_owned(),
+        at,
     }
 }
 
@@ -335,10 +362,7 @@ fn row_4_5_a_provisional_holding_lapses_and_is_never_renewed_quietly() -> TestRe
         store.revise("role-1", "version-2", words("second"), "person-a", 30)?,
         2
     );
-    assert_eq!(
-        store.move_holder("role-1", "person-b", 2, "person-a", 40)?,
-        1
-    );
+    store.move_holder("role-1", "person-b", "hold-1", moved(1, 2, 40))?;
     assert_eq!(
         store.revise("role-1", "version-3", words("third"), "person-a", 50)?,
         3
@@ -353,13 +377,13 @@ fn row_4_5_a_provisional_holding_lapses_and_is_never_renewed_quietly() -> TestRe
     assert_eq!(kept.state(99), "holding");
     assert_eq!(kept.state(100), "lapsed");
 
-    let moved = store.move_holder("role-1", "person-b", 3, "person-a", 150);
+    let late = store.move_holder("role-1", "person-b", "hold-1", moved(2, 3, 150));
     assert!(
         matches!(
-            moved,
+            late,
             Err(lys_identity_server::error::ServerError::HoldingOver { state: "lapsed" })
         ),
-        "{moved:?}"
+        "{late:?}"
     );
     let role = store.role("role-1").ok_or("no role")?;
     assert_eq!(

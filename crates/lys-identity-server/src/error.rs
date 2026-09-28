@@ -169,6 +169,12 @@ pub enum ServerError {
         /// `lapsed` or `ended`.
         state: &'static str,
     },
+    /// The holding is not the one the change was asked of, or not where it
+    /// was when the change was asked.
+    #[error(
+        "HoldingChanged: the holding is not as it was when this change was asked: read the role again and ask the change of the holding as it stands"
+    )]
+    HoldingChanged,
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -205,7 +211,8 @@ impl ServerError {
             | Self::MachineReused { .. }
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
-            | Self::HoldingOver { .. } => StatusCode::CONFLICT,
+            | Self::HoldingOver { .. }
+            | Self::HoldingChanged => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }

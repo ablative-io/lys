@@ -1,3 +1,4 @@
+import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
 import { Connections } from './features/connections/Connections';
 import { SecretsPage } from './features/secrets/SecretsPage';
@@ -21,6 +22,7 @@ import { Resources } from './features/access/Resources';
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/directory/manage" element={<Manage />} />
@@ -38,7 +40,7 @@ export function AppRoutes() {
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
-      {[...Object.keys(SCREENS).filter((view) => view !== 'network' && view !== 'connections' && view !== 'model' && view !== 'resources' && view !== 'graph' && view !== 'sessions' && view !== 'reviews' && view !== 'secrets' && view !== 'requests')].map((view) => (
+      {[...Object.keys(SCREENS).filter((view) => view !== 'roles' && view !== 'network' && view !== 'connections' && view !== 'model' && view !== 'resources' && view !== 'graph' && view !== 'sessions' && view !== 'reviews' && view !== 'secrets' && view !== 'requests')].map((view) => (
         <Route key={view} path={`/${view}/*`} element={<NotYet />} />
       ))}
       <Route path="*" element={<People />} />

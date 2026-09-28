@@ -107,9 +107,12 @@ async fn only_the_administrator_changes_a_role() -> TestResult {
         (format!("/roles/{id}/holders"), assign),
         (
             format!("/roles/{id}/holders/{bea}/move"),
-            json!({ "to_version": 1 }),
+            json!({ "assignment": operation()?, "from_version": 1, "to_version": 1 }),
         ),
-        (format!("/roles/{id}/holders/{bea}/end"), json!({})),
+        (
+            format!("/roles/{id}/holders/{bea}/end"),
+            json!({ "assignment": operation()? }),
+        ),
     ] {
         let by_bea = table.service.post(&path, Some(&table.bea), &body).await?;
         refused(&by_bea, 403, "NotAdmitted");
@@ -162,7 +165,7 @@ async fn a_holder_nobody_knows_or_who_already_holds_the_role_is_refused_by_name(
     let unheld = table
         .post(
             &format!("/roles/{id}/holders/{bea}/move"),
-            &json!({ "to_version": 1 }),
+            &json!({ "assignment": operation()?, "from_version": 1, "to_version": 1 }),
         )
         .await?;
     refused(&unheld, 404, "HolderUnknown");
@@ -200,19 +203,26 @@ async fn a_holding_that_was_ended_stays_ended_and_is_not_moved() -> TestResult {
     assert_eq!(status, 200, "{revised}");
 
     let path = format!("/roles/{id}/holders/{bea}/end");
-    let (status, ended) = table.post(&path, &json!({})).await?;
+    let assignment = assigned["holders"][0]["assignment"].clone();
+    let end = json!({ "assignment": assignment });
+    refused(
+        &table.post(&path, &json!({})).await?,
+        400,
+        "RequestMalformed",
+    );
+    let (status, ended) = table.post(&path, &end).await?;
     assert_eq!(status, 200, "{ended}");
     let holder = &ended["holders"][0];
     assert_eq!(holder["state"], "ended");
     assert_eq!(holder["ended_by"], table.seeded.people[0].id.to_string());
-    let (status, twice) = table.post(&path, &json!({})).await?;
+    let (status, twice) = table.post(&path, &end).await?;
     assert_eq!(status, 200, "{twice}");
     assert_eq!(twice["holders"][0]["ended_at"], holder["ended_at"]);
 
     let moved = table
         .post(
             &format!("/roles/{id}/holders/{bea}/move"),
-            &json!({ "to_version": 2 }),
+            &json!({ "assignment": assignment, "from_version": 1, "to_version": 2 }),
         )
         .await?;
     refused(&moved, 409, "HoldingOver");
@@ -222,6 +232,12 @@ async fn a_holding_that_was_ended_stays_ended_and_is_not_moved() -> TestResult {
     assert_eq!(held["holders"].as_array().map(Vec::len), Some(2));
     assert_eq!(held["holders"][0]["state"], "ended");
     assert_eq!(held["holders"][1]["version"], 2);
+    let (status, late) = table.post(&path, &end).await?;
+    assert_eq!(status, 200, "{late}");
+    assert_eq!(
+        late["holders"][1]["state"], "holding",
+        "an end asked of the earlier holding leaves the later one: {late}"
+    );
     Ok(())
 }
 
@@ -272,7 +288,7 @@ fn the_roles_are_read_back_from_one_file_as_they_were_kept() -> TestResult {
         by: "person-a".to_owned(),
         at: 40,
     };
-    store.end("role-1", "person-b", ending.clone())?;
+    store.end("role-1", "person-b", "hold-1", ending.clone())?;
     let kept = store.roles().to_vec();
     drop(store);
 

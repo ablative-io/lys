@@ -42,6 +42,27 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
     }
 }
 
+/// The holding of `holder` that was assigned as `assignment`.
+fn assigned<'a>(
+    role: &'a Role,
+    holder: &str,
+    assignment: &str,
+) -> Result<&'a Holding, ServerError> {
+    if role.holding(holder).is_none() {
+        return Err(ServerError::HolderUnknown);
+    }
+    role.holdings
+        .iter()
+        .find(|kept| kept.operation == assignment && kept.holder == holder)
+        .ok_or(ServerError::HoldingChanged)
+}
+
+/// Whether the holding assigned as `assignment` is the last of `holder`.
+fn stands_last(role: &Role, holder: &str, assignment: &str) -> bool {
+    role.holding(holder)
+        .is_some_and(|last| last.operation == assignment)
+}
+
 fn reused(operation: &str) -> ServerError {
     ServerError::RoleReused {
         operation: operation.to_owned(),
@@ -255,30 +276,36 @@ impl RolesStore {
         })
     }
 
-    /// Move `holder` to the newer version `to` of the role `id`, and answer
-    /// the version it was moved from. A holder already there stays as it is.
-    /// The end of the holding is not changed.
+    /// Move the holding of `holder` assigned as `assignment` by `moved`,
+    /// from the version it was seen at to a newer one. A move already made
+    /// in the same words stays as it was made. A holding that is no longer
+    /// the holder's last, or no longer at the version moved from, is
+    /// refused. The end of the holding is not changed.
     pub fn move_holder(
         &mut self,
         id: &str,
         holder: &str,
-        to: u32,
-        by: &str,
-        at: u64,
-    ) -> Result<u32, ServerError> {
+        assignment: &str,
+        moved: Move,
+    ) -> Result<(), ServerError> {
         self.settle()?;
         let role = self.role(id).ok_or(ServerError::RoleUnknown)?;
-        if role.version(to).is_none() {
+        let (from, to) = (moved.from, moved.to);
+        if role.version(to).is_none() || role.version(from).is_none() {
             return Err(ServerError::RoleVersionUnknown);
         }
-        let kept = role.holding(holder).ok_or(ServerError::HolderUnknown)?;
-        let from = kept.version;
-        if let Some(last) = kept.moves.last()
-            && from == to
-        {
-            return Ok(last.from);
+        let kept = assigned(role, holder, assignment)?;
+        let made = kept
+            .moves
+            .last()
+            .is_some_and(|last| last.from == from && last.to == to);
+        if made {
+            return Ok(());
         }
-        let state = kept.state(at);
+        if !stands_last(role, holder, assignment) || kept.version != from {
+            return Err(ServerError::HoldingChanged);
+        }
+        let state = kept.state(moved.at);
         if state != "holding" {
             return Err(ServerError::HoldingOver { state });
         }
@@ -290,12 +317,6 @@ impl RolesStore {
             });
         }
         let operation = kept.operation.clone();
-        let moved = Move {
-            from,
-            to,
-            by: by.to_owned(),
-            at,
-        };
         self.change(id, |role| {
             let holding = role
                 .holdings
@@ -305,18 +326,27 @@ impl RolesStore {
             holding.version = to;
             holding.moves.push(moved);
             Ok(())
-        })?;
-        Ok(from)
+        })
     }
 
-    /// End the holding of `holder` in the role `id`. A holding already ended
-    /// stays as it was ended.
-    pub fn end(&mut self, id: &str, holder: &str, ending: Ending) -> Result<(), ServerError> {
+    /// End the holding of `holder` assigned as `assignment` in the role
+    /// `id`. A holding already ended stays as it was ended. A holding that
+    /// is no longer the holder's last is refused.
+    pub fn end(
+        &mut self,
+        id: &str,
+        holder: &str,
+        assignment: &str,
+        ending: Ending,
+    ) -> Result<(), ServerError> {
         self.settle()?;
         let role = self.role(id).ok_or(ServerError::RoleUnknown)?;
-        let kept = role.holding(holder).ok_or(ServerError::HolderUnknown)?;
+        let kept = assigned(role, holder, assignment)?;
         if kept.ended.is_some() {
             return Ok(());
+        }
+        if !stands_last(role, holder, assignment) {
+            return Err(ServerError::HoldingChanged);
         }
         let operation = kept.operation.clone();
         self.change(id, |role| {

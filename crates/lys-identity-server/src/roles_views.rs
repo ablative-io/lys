@@ -105,6 +105,9 @@ impl From<&Move> for MoveView {
 /// One identity holding a role.
 #[derive(Debug, Clone, Serialize)]
 pub struct HolderView {
+    /// The operation id the holding was assigned with. A move or an end
+    /// names it, so neither acts on a later holding of the same holder.
+    pub assignment: String,
     /// The identity that holds the role.
     pub holder: String,
     /// Its display name, null when the directory no longer holds it.

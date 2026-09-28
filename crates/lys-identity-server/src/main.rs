@@ -3,16 +3,17 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use lys_identity_server::{Config, ServerError, service};
+use lys_identity_server::{Config, ServerError, service_saying};
 
 async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
     let config = Config::load(&config_path)?;
-    let app = service(&config).await?;
+    let app = service_saying(&config, &|line| println!("lys-identity-server {line}")).await?;
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .map_err(|error| ServerError::ConfigInvalid {
             reason: format!("{} could not be bound: {error}", config.listen),
         })?;
+    println!("lys-identity-server listening on {}", config.listen);
     axum::serve(listener, app)
         .await
         .map_err(|error| ServerError::DirectoryUnavailable {

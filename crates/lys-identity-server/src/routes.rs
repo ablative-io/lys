@@ -56,7 +56,51 @@ type Shared = Arc<AppState>;
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
-    let directory = open_directory(config)?;
+    service_saying(config, &|_| {}).await
+}
+
+/// As `service`, saying through `say` how each thing kept was started: the
+/// directory log from its snapshot or from every leaf, and each store with
+/// what it read and how much it holds.
+pub async fn service_saying(
+    config: &Config,
+    say: &(dyn Fn(&str) + Sync),
+) -> Result<Router, ServerError> {
+    let mut directory = open_directory(config)?;
+    say(&format!("directory log {}", directory.log()?.start()));
+    let requests = config
+        .requests_dir
+        .as_deref()
+        .map(crate::requests_store::RequestStore::open)
+        .transpose()?;
+    if let Some(store) = &requests {
+        say(&format!(
+            "requests read from the whole log, holding {} requests",
+            store.requests().count()
+        ));
+    }
+    let network = config
+        .network_file
+        .as_deref()
+        .map(crate::network_store::NetworkStore::open)
+        .transpose()?;
+    if let Some(store) = &network {
+        say(&format!(
+            "machines read from one file, holding {} machines",
+            store.machines().len()
+        ));
+    }
+    let roles = config
+        .roles_file
+        .as_deref()
+        .map(crate::roles_store::RolesStore::open)
+        .transpose()?;
+    if let Some(store) = &roles {
+        say(&format!(
+            "roles read from one file, holding {} roles",
+            store.roles().len()
+        ));
+    }
     Ok(router(Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -78,24 +122,9 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             .as_ref()
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
-        requests: config
-            .requests_dir
-            .as_deref()
-            .map(crate::requests_store::RequestStore::open)
-            .transpose()?
-            .map(Mutex::new),
-        network: config
-            .network_file
-            .as_deref()
-            .map(crate::network_store::NetworkStore::open)
-            .transpose()?
-            .map(Mutex::new),
-        roles: config
-            .roles_file
-            .as_deref()
-            .map(crate::roles_store::RolesStore::open)
-            .transpose()?
-            .map(Mutex::new),
+        requests: requests.map(Mutex::new),
+        network: network.map(Mutex::new),
+        roles: roles.map(Mutex::new),
     })))
 }
 
