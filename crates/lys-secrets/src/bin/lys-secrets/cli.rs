@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::args::{PermissionSource, RecordClass, RelationArg};
+use crate::args::{Page, PermissionSource, RecordClass, RelationArg};
 
 #[derive(Parser)]
 #[command(name = "lys-secrets", about = "The lys secrets broker")]
@@ -228,8 +228,18 @@ pub enum Command {
         #[arg(long)]
         body: Option<PathBuf>,
     },
-    /// Print the audit log, every line's signature checked.
-    Log(Where),
+    /// Print the last lines of the audit log, oldest first, each line's
+    /// signature checked, then the `--before` that prints the page older
+    /// than this one. Reads only the lines it prints.
+    Log {
+        #[command(flatten)]
+        at: Where,
+        #[command(flatten)]
+        page: Page,
+    },
+    /// Read every line of the audit log and check its signature, naming the
+    /// first line that fails. This reads the whole log however long it is.
+    Audit(Where),
     /// Serve the proxy on a local address.
     Serve {
         #[command(flatten)]

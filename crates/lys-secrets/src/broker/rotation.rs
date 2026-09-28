@@ -96,7 +96,7 @@ mod tests {
     fn last_rotation(broker: &Broker<LocalGrants>) -> Result<Option<String>, crate::SecretsError> {
         Ok(broker
             .audit()
-            .replay()?
+            .audit_every_line()?
             .into_iter()
             .rev()
             .find(|recorded| recorded.line.kind == AuditKind::Rotation)

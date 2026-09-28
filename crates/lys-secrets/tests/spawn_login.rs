@@ -23,7 +23,7 @@ fn sec3_spawn_refusals_accounts_rested() -> TestResult {
     assert!(refused.starts_with("AccountsRested: "), "{refused}");
     assert!(refused.contains(ACT_ACCOUNT), "{refused}");
     let handed = |broker: &lys_secrets::Broker<lys_secrets::LocalGrants>| {
-        broker.audit().replay().map(|lines| {
+        broker.audit().audit_every_line().map(|lines| {
             lines
                 .into_iter()
                 .filter(|recorded| {

@@ -47,7 +47,7 @@ fn sec3_store_refusals_lease_beyond_grant() -> TestResult {
     assert!(refused.contains(ACT_WINDOW), "{refused}");
     let issued = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Issue)
         .count();
@@ -88,7 +88,7 @@ fn sec3_store_refusals_outside_scope() -> TestResult {
     assert!(refused.contains(ACT_SCOPE), "{refused}");
     let uses: Vec<String> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Use)
         .map(|recorded| recorded.line.outcome)

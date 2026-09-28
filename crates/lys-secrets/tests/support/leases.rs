@@ -191,7 +191,7 @@ impl Leases {
         Ok(self
             .broker
             .audit()
-            .replay()?
+            .audit_every_line()?
             .iter()
             .filter(|recorded| recorded.line.handle.as_deref() == Some(lease.id.as_str()))
             .filter(|recorded| recorded.line.outcome.starts_with(opening))

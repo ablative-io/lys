@@ -30,14 +30,17 @@
     {
       "id": "R1",
       "title": "An app is a record, registered through the API and approved on a Lys screen",
-      "spec": "Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs, apps_store.rs, following the *_api/_state/_store shape of teams and service accounts). POST /apps takes an id (lower-case letters, digits and hyphens, 2 to 32, not 'lys'), a display name, redirect addresses and a permission schema (R2); it is accepted from a signed-in administrator or from a service account holding register_app, and creates the app as pending with its sign-in client prepared but not enabled. An administrator approves or declines it on a new Apps screen (surface/identity/src/features/apps) that shows the name, the redirect addresses and the full schema in words before the button; only on approval is the sign-in client enabled at Lys's provider (DIRECTORY-047 R3) and the schema written to the permission store. GET /apps and GET /apps/{app} answer what the caller may see. Retiring an app disables its client and refuses every check on its kinds by name; its grants stay in the log. An app id is 3 to 40 characters of lowercase letters, digits and underscores, starting with a letter, the same alphabet the permission store's names allow, so the id is the store prefix unchanged; a hyphen or dot is refused app_id_invalid. Registering writes only the pending registration: the sign-in client is created at the provider on approval and never before. On approval the app's client secret is shown once, to the approving administrator, on the approval screen and in the approval's API answer, and is never written to a log, a receipt or a stored record in the clear.",
+      "spec": "Behavioural. Add apps as log events and a projection (apps_api.rs, apps_state.rs, apps_store.rs, following the *_api/_state/_store shape of teams and service accounts). POST /apps takes an id (lower-case letters, digits and hyphens, 2 to 32, not 'lys'), a display name, redirect addresses and a permission schema (R2); it is accepted from a signed-in administrator or from a service account holding register_app, and creates the app as pending with its sign-in client prepared but not enabled. An administrator approves or declines it on a new Apps screen (surface/identity/src/features/apps) that shows the name, the redirect addresses and the full schema in words before the button; only on approval is the sign-in client enabled at Lys's provider (DIRECTORY-047 R3) and the schema written to the permission store. GET /apps and GET /apps/{app} answer what the caller may see. Retiring an app disables its client and refuses every check on its kinds by name; its grants stay in the log. An app id is 3 to 40 characters of lowercase letters, digits and underscores, starting with a letter, the same alphabet the permission store's names allow, so the id is the store prefix unchanged; a hyphen or dot is refused app_id_invalid. Registering writes only the pending registration: the sign-in client is created at the provider on approval and never before. On approval the app's client secret is shown once, to the approving administrator, on the approval screen and in the approval's API answer, and is never written to a log, a receipt or a stored record in the clear. Correction ruling, Waffles 29 September 2026 06:43 Melbourne: there is no separate registrar credential. A service account must hold register_app as an ordinary grant, checked by the ordinary permission engine on each registration; ownership of a service-account record or possession of a registrar bearer is not that grant. The app binding record is written on approval. Against the landed DIRECTORY-047 R3 provider, connect the production client lookup to apps_binding::sign_in_client; app bearer access to /apps/me is not proof of app-client sign-in. Keep pending, declined and retired clients unable to complete sign-in. Remove the registrar-credential substitution from the delivered authority path. Preserve the existing grant and identity wire contracts: if ordinary service-account grant authority requires a missing identity-model prerequisite, stop this row naming that prerequisite and its files; do not borrow a person's or agent's identity or invent a second permission system.",
       "acceptance": [
         "A pending app's client cannot complete a sign-in and checks on its kinds answer app_not_approved.",
         "Approval on the screen enables the client and the schema; a sign-in and a check then pass.",
         "A second registration of the same id is refused app_exists.",
         "A retired app's checks answer app_retired and its grants remain readable.",
         "An id with a hyphen, a dot or under three characters is refused app_id_invalid.",
-        "Registering creates nothing at the provider; approving creates the client and shows its secret once to the approver; no log line holds it."
+        "Registering creates nothing at the provider; approving creates the client and shows its secret once to the approver; no log line holds it.",
+        "The production provider client lookup reaches apps_binding::sign_in_client: a pending app is refused, approval permits an OIDC round trip using that app's own client and registered redirect, and retirement refuses another round trip; GET /apps/me does not satisfy this assertion.",
+        "A service account with a standing register_app grant can register; the same account without that grant, after its revocation, after its expiry, or after the account is retired is refused by name with no registration event. An administrator can register; a registrar bearer alone grants nothing.",
+        "Registration writes no app binding; approval records the app binding. The secret is answered only to the approving administrator and no persisted record, receipt, or captured log contains its clear value."
       ],
       "files": {
         "create": [
@@ -46,11 +49,21 @@
           "crates/lys-identity-server/src/apps_store.rs",
           "crates/lys-identity-server/tests/apps.rs",
           "surface/identity/src/features/apps/Apps.tsx",
-          "surface/identity/src/features/apps/apps.css"
+          "surface/identity/src/features/apps/apps.css",
+          "crates/lys-identity-server/src/apps_binding.rs",
+          "crates/lys-identity-server/src/apps_views.rs",
+          "crates/lys-identity-server/src/apps_error.rs",
+          "crates/lys-identity-server/src/apps_binding_tests.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/routes.rs",
-          "crates/lys-identity-server/src/lib.rs"
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/provider.rs",
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/service_accounts_api.rs",
+          "crates/lys-identity-server/src/service_accounts_store.rs",
+          "crates/lys-identity-server/src/service_accounts_state.rs",
+          "tests/identity_contract/src/harness.rs"
         ],
         "delete": []
       },
@@ -274,7 +287,10 @@
     "SHALL NOT add a silent fallback: every failure is a named refusal.",
     "SHALL NOT let a registration or schema change take effect before an administrator approves it on a Lys screen.",
     "SHALL NOT revoke or rewrite a grant as a side effect of a schema change.",
-    "SHALL NOT create anything at the provider, or grant anything, before an administrator approves."
+    "SHALL NOT create anything at the provider, or grant anything, before an administrator approves.",
+    "SHALL NOT start this continuation before DIRECTORY-047 R3's provider has landed and is present in the card's integrated tree.",
+    "SHALL NOT replace the main branch's DIRECTORY-049 structure descriptions in design.json with older card wording; preserve main's descriptions and regenerate DESIGN.md during integration.",
+    "SHALL NOT claim complete or green for this card while any required provider integration, ordinary register_app authority, file-wall correction or measured acceptance remains unresolved."
   ],
   "verification": [
     "The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.",

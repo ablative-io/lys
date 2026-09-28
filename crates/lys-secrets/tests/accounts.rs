@@ -108,7 +108,7 @@ fn each_spawn_takes_the_next_login_and_the_log_names_the_seat() -> TestResult {
     );
     let handed: Vec<(Option<String>, Option<String>)> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| {
             recorded.line.kind == lys_secrets::AuditKind::SpawnLogin
