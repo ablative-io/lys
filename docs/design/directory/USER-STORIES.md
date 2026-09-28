@@ -34,10 +34,18 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Grant conformance reader — Reads the grant screens and the conformance table and verifies each row against a test
+## Keyboard user — Working the identity screens without a mouse
 
-**S141.** As a signed-in person, I want You to show each grant I hold with its source and whether I may pass it on, and only my own agents and grants, while an administrator's People screen shows others, so what I see is what I hold.
+**S132.** As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me.
 
-**S142.** As a person giving an agent part of a grant, I want the form to show the source grant, the actions it allows, whether I may pass it on and the end the new grant can last no later than, as the service judged them, so I give only what my chain allows.
+## Responsible person — Sharing and returning to a place in the screens
 
-**S143.** As a stranger checking the conformance table, I want each grant row to name the test that passes it and the command that runs it, and each test to fail when its row's fact is taken away, so the row can be verified without trusting the author.
+**S133.** As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
+
+## Newcomer to the screens — Learning what a screen shows
+
+**S134.** As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place.
+
+## Identity line lead — Keeping the mock-up and the build in step
+
+**S135.** As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to.

@@ -14,11 +14,13 @@ An operator installs the identity product without Cambium or Manifold, signs in,
 
 ## Problem
 
-IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.
+IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. Separately, conformance rows 9.1 to 9.3, the identity surface's shell, name no brief, and the mock-up that defines the shell falls short of rows 9.2 and 9.3 itself: its help overlay does not return focus to the element that had it, and the network map's nodes, the palette's rows and the j and k cursor are not fully usable by keyboard.
 
 ## Solution
 
 Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
+
+DIRECTORY-037 builds the shell to the mock-up on the surface pull request 35 lands, which already carries a shell under surface/identity/src/shell. It adds one route table (surface/identity/src/shell/routeTable.ts) naming every rail screen and every hash-routed tab with a built column; the tests read it as the list the router is checked against, so routes.tsx does not read it. It closes the two gaps in the built shell (keyable.ts, Palette.tsx, keys.ts) and in the mock-up, written as index.v6.html beside v5, with CONFORMANCE.md's reference line moved to it and carrying its path and sha256; DIRECTORY-006 pins no file and no hash, so this is the first pin of the mock-up (ADR-104), and adds the surface's test command to .land/gates.sh, to the project setup's trees and, as one appended leg, to this design's gate, so every clause is proved on every landing.
 
 ## Principles
 
@@ -42,7 +44,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-- ADR-109 — The server judges a grant's standing and effective end over its chain; the screens render them and walk nothing — GrantView carries each grant's effective standing ({stands: true}, or {stands: false, refusal, grant, reason} read through the service's sight rules, so a withheld refusal names no grant or identity the caller may not see) and its effective end, both worked out on the server by the same judgement a check makes, and every screen renders those two members and walks no chain, compares no window with the clock and reads no holder's lifecycle state to decide standing. Rejected: keeping the client chain walk beside the server's judgement, and a screen-side derivation of the effective end.
+- ADR-104 — The shell and its mock-up change together, and a corrected mock-up is a new version beside the prior — A change to the shell's behaviour is made in the built shell and in the mock-up in the same change, and the corrected mock-up is written as a new file, index.v6.html, beside the prior, the way v4 was kept beside v5. CONFORMANCE.md's reference line moves to the new file in that change and carries its path and sha256; DIRECTORY-006 pins no file and no hash, so DIRECTORY-037 is the first brief to pin one, and DIRECTORY-006 does not change. Rejected: fixing only the build, which lets the definition drift from what is built; and editing index.v5.html in place, which changes the file the conformance table was written against.
 
 ## Goals
 
@@ -51,6 +53,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
+- DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.
 
 ## Non-Goals
 
@@ -65,6 +68,10 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
+- Building the screens and sections the route table marks not yet: roles, resources, graph, requests, reviews, secrets, connections, network, sessions, model, and the six Configuration sections other than Layout — Each is screen content, which DIRECTORY-037 leaves unchanged, and each belongs to its own conformance rows and card; its row is marked built when that card lands.
+- The assistant's composer in the dock (conformance 9.4) — Row 9.4 is proposed with no brief and its runtime is open; the dock holds a not-yet note in its place.
+- A digit key for the identity file's eighth tab — The mock-up's digit keys stop at 7 while v5 has eight tabs; changing that departs from the mock-up and needs its own decision.
+- Pointing the Brief cells of CONFORMANCE.md rows 9.1 to 9.3 at DIRECTORY-037 — The words change only line 3 of that file in this card; the Brief cells follow once the brief id is fixed on main.
 
 ## Structure
 
@@ -166,22 +173,26 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
-| `docs/design/directory/briefs/DIRECTORY-035.json` | the grant conformance rows of the directory, each named to the test that passes it | DIRECTORY-035 |
-| `docs/design/directory/briefs/DIRECTORY-035.md` | rendered markdown | DIRECTORY-035 |
-| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end | DIRECTORY-035 |
-| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 | DIRECTORY-035 |
-| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields | DIRECTORY-035 |
-| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk | DIRECTORY-035 |
-| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) | DIRECTORY-035 |
-| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound | DIRECTORY-035 |
-| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 | DIRECTORY-035 |
-| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use | DIRECTORY-035 |
-| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand | DIRECTORY-035 |
-| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers | DIRECTORY-035 |
-| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test | DIRECTORY-035 |
-| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test | DIRECTORY-035 |
-| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg | DIRECTORY-035 |
-| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 | DIRECTORY-035 |
+| `docs/design/directory/briefs/DIRECTORY-037.json` | the identity surface shell brief: the route table, the two keyboard gaps closed in the shell and the mock-up, and the gate leg | DIRECTORY-037 |
+| `docs/design/directory/briefs/DIRECTORY-037.md` | rendered markdown | DIRECTORY-037 |
+| `.land/gates.sh` | the repository gate; DIRECTORY-037 adds the surface's test leg, surface_leg | DIRECTORY-037 |
+| `docs/design/project.json` | the project setup; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test | DIRECTORY-037 |
+| `surface/identity/package.json` | the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event 14.6.7 and its peer @testing-library/dom 10.4.2 as development dependencies | DIRECTORY-005 |
+| `surface/identity/package-lock.json` | the surface lock file, arriving with pull request 35 (DIRECTORY-005); follows package.json | DIRECTORY-005 |
+| `surface/identity/src/shell/keyable.ts` | makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 keeps keyable(activate) and makes Enter and Space dispatch the click that runs it | DIRECTORY-005 |
+| `surface/identity/src/shell/Palette.tsx` | the command palette; arrives with pull request 35, DIRECTORY-037 makes its rows keyboard-reachable | DIRECTORY-005 |
+| `surface/identity/src/shell/keys.ts` | the shell key registry; arrives with pull request 35, DIRECTORY-037 makes j and k move focus and Enter open the focused row | DIRECTORY-005 |
+| `surface/identity/src/shell/routeTable.ts` | the one table of every screen and tab route, with its built column | DIRECTORY-037 |
+| `surface/identity/tests/routes.test.tsx` | route table checks: the 44 rows, built rows followed, drawn hashes matched | DIRECTORY-037 |
+| `surface/identity/tests/rail.test.tsx` | rail labels and dock side, by control and key, kept across a reload | DIRECTORY-037 |
+| `surface/identity/tests/goto.test.tsx` | palette Go to entries and g go-to letters reach every screen | DIRECTORY-037 |
+| `surface/identity/tests/keyable.test.tsx` | Enter and Space on click actions and palette rows | DIRECTORY-037 |
+| `surface/identity/tests/cursor.test.tsx` | j and k move focus; Enter opens the focused row | DIRECTORY-037 |
+| `surface/identity/tests/overlay.test.tsx` | the help overlay's count, dismissal and focus return | DIRECTORY-037 |
+| `surface/identity/tests/walk.test.tsx` | the counted Tab walk over every built route | DIRECTORY-037 |
+| `surface/identity/tests/mockup.test.tsx` | index.v6.html's two fixes, proved on v6 and shown failing on v5 | DIRECTORY-037 |
+| `docs/design/identity/mockup/index.v6.html` | the mock-up with the focus fix and the keyboard fix, beside v5 (ADR-104) | DIRECTORY-037 |
+| `docs/design/identity/CONFORMANCE.md` | the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html, with its sha256, as the reference and v5 as the prior | DIRECTORY-037 |
 
 ## Inventory
 
@@ -196,6 +207,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
+- `docs/design/identity/mockup/index.v5.html` — the accepted mock-up, 1680 lines, sha256 e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f; the shell's definition; kept as the prior, never changed
 
 ## Constraints
 
