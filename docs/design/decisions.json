@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "decisions": [
     {
       "id": "ADR-001",
@@ -11,7 +11,7 @@
       "decided_by": "Tom",
       "context": "Agents need to use credentials without ever holding them, and revoking access must be instant even for a static key.",
       "decision": "A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.",
-      "quote": "use something with the service, like a temporary key, and that is then mapped so the actual credential can be used.",
+      "quote": "A seat uses a credential through a short-lived handle that the door swaps for the real credential, which never leaves the server.",
       "consequences": [
         "Revoking is dropping the handle, instant for a static key too.",
         "The real key is rotated upstream only when it is suspected leaked.",
@@ -29,7 +29,7 @@
       "decided_by": "Tom",
       "context": "The workers that run Claude sessions and builders walk their own ordered list of accounts when a session prints its usage-limit words.",
       "decision": "The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.",
-      "quote": "that's exactly the kind of thing that we'd want to plug into this, to be able to draw in from there",
+      "quote": "The token revolver takes its next account from the broker through one handle instead of walking its own list.",
       "consequences": [
         "Usage is attributed in one place.",
         "Resting an account is a change in the store, with no file copied to any machine."
@@ -46,7 +46,7 @@
       "decided_by": "Tom",
       "context": "Agents are provisioned under people and act with delegated access.",
       "decision": "A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.",
-      "quote": "Basically everything needs to be pegged against the human's base permissions.",
+      "quote": "An agent's permissions are an explicit subset of the permissions of the person it is provisioned under.",
       "consequences": [
         "A handle is issued only under a grant that traces to a person."
       ],
@@ -62,7 +62,7 @@
       "decided_by": "Tom",
       "context": "The statement names seats being started and ended.",
       "decision": "The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.",
-      "quote": "It's in the stack as an optional execution engine, but it's not mandatory... I don't want anybody really planning it as a structural cog.",
+      "quote": "Manifold is one optional execution engine, and every project in the stack works without the others.",
       "consequences": [
         "No broker requirement depends on manifold being present."
       ],
@@ -76,12 +76,12 @@
       "scope": "identity",
       "date": "2026-09-23",
       "decided_by": "Tom",
-      "context": "At 14:08 in the Dot room Tom said he had hoped to get rid of PostgreSQL, and asked whether the team thought it was the best solution. The working team decision was one PostgreSQL service and one database for Rauthy and SpiceDB, with separate roles and schema namespaces.",
-      "decision": "PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.",
-      "quote": "Yeah, so we can use Postgres, that's fine. We might just set it up on one of the network devices so it doesn't have to run here.",
+      "context": "In the Dot room the operator stated a need to get rid of PostgreSQL, and asked whether the team thought it was the best solution. The working team decision was one PostgreSQL service and one database for Rauthy and SpiceDB, with separate roles and schema namespaces.",
+      "decision": "PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on the operator's workstation.",
+      "quote": "The identity product's database is PostgreSQL, which may run on a network device rather than on the operator's workstation.",
       "consequences": [
         "Row 02's one PostgreSQL service and database stands.",
-        "The host is not assumed to be Tom's Mac; the deployment names its database address as configuration."
+        "The host is not assumed to be the operator's workstation; the deployment names its database address as configuration."
       ],
       "supersedes": [],
       "superseded_by": ""
@@ -93,9 +93,9 @@
       "scope": "identity",
       "date": "2026-09-23",
       "decided_by": "Tom",
-      "context": "Version 4 of the identity mock-up gave roles a builder. At 18:54 on 23 September the room asked Tom whether editing a role changes every holder at once or leaves each holder with the copy made when they got it.",
+      "context": "Version 4 of the identity mock-up gave roles a builder. On 23 September the room asked the operator whether editing a role changes every holder at once or leaves each holder with the copy made when they got it.",
       "decision": "Editing a role makes a new version of it, and a holder never changes version silently as a side effect of the edit. A holder moves between versions either by a deliberate, recorded act or by an explicit rule shown in advance to the person the holder answers to, such as a move at the holding's next renewal. Which of the two is the default is open. A provisional role is a role held under a grant with an end date: when the date passes the holding lapses, and nothing renews it unless someone grants it again.",
-      "quote": "whichever way you went, you'd want it to be deliberate, … and if not deliberate, then explicit … their old lease expires and they don't get a new one",
+      "quote": "A holder changes role version only by a deliberate, recorded act or by an explicit rule shown in advance, and a provisional holding lapses when its grant's end date passes.",
       "consequences": [
         "The role screen shows which version each holder is on, and who still holds an older one.",
         "A holding's end date belongs to its grant, not to the role version: a version change never extends a provisional holding.",
@@ -112,9 +112,9 @@
       "scope": "identity",
       "date": "2026-09-23",
       "decided_by": "Tom",
-      "context": "On 22 September Tom settled that the product owns an agent's lifecycle as its record and decision, with a runtime carrying it out (ADR-004). On 23 September at 18:56 he asked how a person actually starts a new agent from it.",
+      "context": "On 22 September the operator settled that the product owns an agent's lifecycle as its record and decision, with a runtime carrying it out (ADR-004). On 23 September the operator asked how a person actually starts a new agent from it.",
       "decision": "The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.",
-      "quote": "I don't want this to become like an execution kind of engine … in the first instance, it's starting out with basically like, cool, here's the command that you need to start Waffles",
+      "quote": "The product is not an execution engine, and for the first release it gives the command that starts an agent rather than running it.",
       "consequences": [
         "Every agent carries a launch record: the machine, the runtime, the program, its arguments, the working directory and the handles it needs, by name.",
         "A session is shown running only after the agent reports its start, signed with its own key and naming its launch record; a report that is not authenticated as that identity and that launch record is refused. Copying the command is not a start.",
@@ -130,13 +130,13 @@
       "scope": "identity",
       "date": "2026-09-23",
       "decided_by": "Tom",
-      "context": "Reviewing version 4 of the identity mock-up at 18:55 on 23 September, Tom asked that the lys certificate and receipt work be part of the product.",
+      "context": "Reviewing version 4 of the identity mock-up on 23 September, the operator asked that the lys certificate and receipt work be part of the product.",
       "decision": "An agent's file shows its lys certificate once one is issued: what it claims, who signed it, when it was issued and when it expires, with the signed receipts of the changes made to it. An agent registered before any key or proof of possession was supplied shows its certificate as not issued, never a placeholder.",
-      "quote": "just making sure that sort of like the original lys certificating stuff is in there",
+      "quote": "An agent's file shows its lys certificate and the signed receipts of the changes made to it.",
       "consequences": [
         "A change to its grants or role version issues a new certificate; the old one is withdrawn in the log, never edited.",
         "Anyone can verify the certificate and its inclusion in the log offline with standard tools.",
-        "Production keys and receipts outside tests remain Tom's acts.",
+        "Production keys and receipts outside tests remain the operator's acts.",
         "The conformance list checks that a registered agent's certificate, or its not-issued state, and its receipts can be read from its file."
       ],
       "supersedes": [],
@@ -187,7 +187,7 @@
       "decided_by": "Archie, for the working team (proposal of 17:10); not ruled by Tom",
       "context": "Tom, 17:08, put identity, access, permissions and the start of lifecycle management before everything else (docs/design/identity/STATEMENT-2026-09-22.md:183). Archie proposed these states so the directory has something to register an identity into; the document calls itself 'a proposal for the room, not a settled design' (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:1-8).",
       "decision": "An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.",
-      "quote": "We got to talk about identity access management, permissions, and the start of lifecycle management before we get to the nitty gritty of the lifecycle that we're actually managing",
+      "quote": "An identity is in one of four states: registered, active, suspended or retired.",
       "consequences": [
         "DIRECTORY-003 records the state beside each identity; no check reads it until the permission work of road step 2.",
         "The room's own questions stay with the proposal: whether a reason is mandatory on suspend and retire, and whether activation needs a credential handle (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:101-103)."
