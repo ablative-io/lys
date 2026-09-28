@@ -58,7 +58,33 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/AUDIT-RECEIPT.md",
+            "change": "created",
+            "note": "The audit receipt contract in the ten sections R1 orders: (1) the contract sentence of IDENTITY-001.md:57 word for word, plus the test tag as the one field a lead's ruling added; (2) the signer rule; (3) the leaf rule; (4) the 7-row emitter table; (5) the step-1 sign-in boundary, including how main corrected A7; (6) changes only; (7) test receipts; (8) the verifier's order and refusal classes; (9) what IDENTITY-EVENTS.md must carry before R2 to R5 start; (10) the release rule. It fixes no encoding, tag or content type."
+          }
+        ],
+        "how": "Leg 1: met. The grep for the contract sentence prints 1 (docs/design/identity/AUDIT-RECEIPT.md:13, a blockquote under section 1). Leg 2: met. The emitter table (AUDIT-RECEIPT.md:42-50) has exactly 7 data rows in the order the brief gives. The grep for the five emitter names prints 6, against a floor of 5. The provisioning row (line 50) names 'None' as emitter and cites docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:26-28. Leg 3: met. 'main corrected A7' prints 1 (section 5) and 'supply the test key' prints 1 (section 8). Leg 4: met. The only change is the new file under docs/design/identity/; nothing under docs/design/identity/briefs, the lifecycle states document, IDENTITY-EVENTS.md, crates, deploy, surface or vendor is touched. Leg 5: I did not run it, as instructed. I expect it to pass: gate.sh only measures clusters with a design.json, and docs/design/identity has none, so the new file is outside the render/validate/coverage loop.",
+        "deviation": "CN1 says nothing outside docs/design/directory/ and docs/design/decisions.json is created, yet R1's spec names docs/design/identity/AUDIT-RECEIPT.md. I followed the requirement's named file. CN1 reads as the DIRECTORY-001 planning constraint carried into this brief.",
+        "checklist": [
+          {
+            "id": "C31",
+            "done": false,
+            "note": "C31 (render-brief.py byte-identical to the method's copy at the prose-list-rule commit, named in SOURCE.md) is not an acceptance row of R1 and is outside R1's file wall. The method repository's commit is not available here. It looks mis-assigned to this brief and needs a brief revision."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "S13 (each prose list entry rendered on its own line) rides on the render-brief.py change, which this brief's walls do not include."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -94,7 +120,27 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no code written, so none of legs 1-7 is met. R2 requires receipt.rs to define the typed receipt 'exactly as docs/design/identity/IDENTITY-EVENTS.md writes it at its ratified version', carrying a test tag and a signature over 'the receipt's signed bytes', with the operation read as a string of IDENTITY-EVENTS.md's vocabulary. The ratified IDENTITY-EVENTS.md (lys/identity-event/v1, lines 9-76) defines the COSE_Sign1 event envelope only. It has no receipt encoding, no receipt signature or signed bytes, no test tag (rg 'test' finds nothing relevant), and no string operation vocabulary: change kinds are integer codes 1-7 and the operation is a 16-byte id. The landed crates/lys-identity/src/receipt.rs Receipt also carries no signature and no test tag. The brief also conflicts with the file on the commitment: step (d) hashes the leaf bytes, while IDENTITY-EVENTS.md:67 names SHA-256 over the body bytes and the RFC 6962 hash over the whole message. Building R2 would mean inventing a signed wire format and an encoding, which the brief forbids (CN18, Boundaries: 'No wire format is frozen by this brief'). A cryptographic format would also need an adversarial review first. What would unblock it: DIRECTORY-003's joint review extending IDENTITY-EVENTS.md with the receipt's signed encoding, the test tag and the operation vocabulary. R1 section 9 lists these as review inputs.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C32",
+            "done": false,
+            "note": "C32 (prose blocked_by rendered as list items) belongs to the render-brief.py change, which is outside this row's file wall. The row itself is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked; also rides on the render-brief.py change."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -128,7 +174,27 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no code written, so none of legs 1-6 is met. R3 is the CLI surface over crates/lys-receipt's verifier, which does not exist because R2 is blocked (see R2). Its tamper and test-tag legs also depend on the receipt signature and test tag that IDENTITY-EVENTS.md does not yet define. crates/lys/src/cli.rs, main.rs, commands/error.rs, commands/log/mod.rs, crates/lys/Cargo.toml and Cargo.lock are unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C33",
+            "done": false,
+            "note": "C33 (bare-id lists joined on one line, is_bare_id docstring) is a render-brief.py item outside this row's wall. The row itself is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked; also rides on the render-brief.py change."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -156,7 +222,27 @@
       ],
       "stories": [
         "S15"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by four of the brief's own blocked_by entries, all checked against the working tree. (1) IDENTITY-EVENTS.md carries no test tag and no sign-in or sign-in-refused operation: its change-kind table (lines 36-45 and the kind-7 extension at line 47) lists only register person, register agent, change profile, bind login, lifecycle transition, link audit accepted and setup person. The brief says the answer is a DIRECTORY-003 revision through the lead, never an edit here. (2) docs/design/directory/briefs/DIRECTORY-003.json has no execution record: its 'execution' key is absent, not 'landed'. (3) The one-line hook's file, DIRECTORY-003's OIDC resolution point (candidates crates/lys-identity-server/src/oidc.rs or session.rs), has not been named by a brief revision, and R4's files list does not include it, so editing it would breach CN9. (4) Without a sign-in change kind, crates/lys-identity has no commit path that accepts a sign-in payload, and nothing under crates/lys-identity/ may be edited. No leg is met.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C34",
+            "done": false,
+            "note": "C34 (re-render every brief markdown) is a render-brief.py item outside this row's wall. The row itself is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S15",
+            "satisfied": false,
+            "note": "S15 (an agent's own machine account accepted as its binding) is not addressed by any acceptance row of R4, and the row is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -182,7 +268,27 @@
       ],
       "stories": [
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no leg is met. R5 proves R3's lys log verify receipt and R4's sign-in receipts end to end on the development install. Both are blocked (see R2 to R4). The brief's blocked_by also holds R5 on the same IDENTITY-EVENTS.md test-tag and sign-in vocabulary gaps and on the missing DIRECTORY-003 landed record. deploy/identity/README.md is unchanged and docs/design/identity/reports/DIRECTORY-007-receipts.md was not created, because a report of a run that cannot happen would be false.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C35",
+            "done": false,
+            "note": "C35 (scripts/design/tests/test_render_brief.py, run by gate.sh) is a render-brief.py item outside this row's wall. The row itself is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "S14 (the renderer stays the method's copy) rides on the render-brief.py change, which is outside this brief's walls."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
