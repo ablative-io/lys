@@ -24,11 +24,11 @@ title: Lys controls context and delivers goals through managed harness channels
 
 ## Purpose
 
-Waffles's 29 September 07:32 assignment relays Tom's 07:02 intent: Lys drives context compaction, goals and reminders behind the scenes, with plain controls and no terminal typing. DIRECTORY-051 at 17eeac97 already owns tracking, budgets, goals, operation identities and the Usage screen. Its R3/R4 leave delivery at a generic runner/terminal seam; this brief closes that gap without implementing those owners twice. Card k7sAzdWw.
+Waffles's 29 September 07:32 assignment relays Tom's 07:02 intent: Lys drives context compaction, goals and reminders behind the scenes, with plain controls and no terminal typing. The DIRECTORY-051 brief at 17eeac97 assigns tracking, budgets, goals, operation identities and the Usage screen to 051. That commit contains brief documents only, not their implementation. Its R3/R4 leave delivery at a generic runner/terminal seam; this brief closes that gap without implementing those owners twice. Card k7sAzdWw.
 
 ## Task
 
-Extend 051 with one managed harness control channel, verified turn boundaries, real compaction and reminder admission evidence, no PTY automation, and explicit unknown-outcome reconciliation. Keep tracking and policy in their existing owners. The new Codex event owner is also the integration seam for DIRECTORY-065.
+Extend 051 with one managed harness control channel, verified turn boundaries, real compaction and reminder admission evidence, no PTY automation, and explicit unknown-outcome reconciliation. Keep tracking and policy in their existing owners. The new Codex event owner is also the integration seam for DIRECTORY-065. Use an integrated base containing the actual DIRECTORY-051 implementation before measuring these requirements. A brief publication or an active 051 run does not satisfy that code dependency. Do not create 051 owners again in 064.
 
 ## Requirements
 
