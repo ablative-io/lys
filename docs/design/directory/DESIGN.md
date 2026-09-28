@@ -616,8 +616,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
 | `rules/no-app-names.yml` | DIRECTORY-048 R7: the ast-grep rule that refuses an app named in Lys code | DIRECTORY-048 |
 | `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
-| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API | DIRECTORY-049 |
-| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature | DIRECTORY-049 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools that cover the whole published API | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, where the caller is always an agent, so each tool call carries the agent's signature; a person's token is only for the /mcp route over the network | DIRECTORY-049 |
 
 ## Inventory
 

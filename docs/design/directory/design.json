@@ -2623,12 +2623,12 @@
     },
     {
       "path": "crates/lys/src/cli/mcp.rs",
-      "note": "DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API",
+      "note": "DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools that cover the whole published API",
       "brief": "DIRECTORY-049"
     },
     {
       "path": "crates/lys/tests/mcp_stdio.rs",
-      "note": "DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature",
+      "note": "DIRECTORY-049 R7: the MCP server driven over standard input and output, where the caller is always an agent, so each tool call carries the agent's signature; a person's token is only for the /mcp route over the network",
       "brief": "DIRECTORY-049"
     }
   ],
