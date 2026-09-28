@@ -16,7 +16,7 @@ lys-core.workspace = true
 # never by polling on a clock.
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
 # A peer's process id and user are read from the connected socket.
-nix = { version = "0.28", default-features = false, features = ["socket", "user"] }
+nix = { version = "0.28", default-features = false, features = ["fs", "socket", "user"] }
 # Each session's pseudo-terminal: opening it, making it the child's
 # controlling terminal and resizing it, behind a safe interface.
 portable-pty.workspace = true
