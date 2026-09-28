@@ -52,6 +52,10 @@
         {
           "id": "S72",
           "text": "As an agent, I want each of my arrived sessions to carry an arrival naming where it came from and a fresh execution id of its own, with its head unchanged, so that my continuation is a distinct execution whose ancestry is on the record."
+        },
+        {
+          "id": "S77",
+          "text": "As an agent whose memory view is read many times a session, I want each read to decode and scan once, so that recall stays light under everything else."
         }
       ]
     },

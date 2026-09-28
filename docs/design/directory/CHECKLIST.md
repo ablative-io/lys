@@ -264,3 +264,13 @@
 - [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
 - [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
 - [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).
+
+## Hot paths do their work once (DIRECTORY-046)
+
+- [ ] **C348** — GET /reviews filters by viewer first and finds each latest decision by index (DIRECTORY-046 R1).
+- [ ] **C349** — A request is found by id, not by scanning every request (DIRECTORY-046 R2).
+- [ ] **C350** — Certificate issue uses the service key the server already holds (DIRECTORY-046 R3).
+- [ ] **C351** — Served screens never block an async worker and index.html is read once (DIRECTORY-046 R4).
+- [ ] **C352** — A record is serialised without cloning it (DIRECTORY-046 R5).
+- [ ] **C353** — The grants screens ask for reach in one concurrent batch (DIRECTORY-046 R6).
+- [ ] **C354** — The screens choose the right route first and fetch independent reads together (DIRECTORY-046 R7).

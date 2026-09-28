@@ -1045,6 +1045,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Hot paths do their work once (DIRECTORY-046)",
+      "items": [
+        {
+          "id": "C348",
+          "text": "GET /reviews filters by viewer first and finds each latest decision by index (DIRECTORY-046 R1).",
+          "done": false
+        },
+        {
+          "id": "C349",
+          "text": "A request is found by id, not by scanning every request (DIRECTORY-046 R2).",
+          "done": false
+        },
+        {
+          "id": "C350",
+          "text": "Certificate issue uses the service key the server already holds (DIRECTORY-046 R3).",
+          "done": false
+        },
+        {
+          "id": "C351",
+          "text": "Served screens never block an async worker and index.html is read once (DIRECTORY-046 R4).",
+          "done": false
+        },
+        {
+          "id": "C352",
+          "text": "A record is serialised without cloning it (DIRECTORY-046 R5).",
+          "done": false
+        },
+        {
+          "id": "C353",
+          "text": "The grants screens ask for reach in one concurrent batch (DIRECTORY-046 R6).",
+          "done": false
+        },
+        {
+          "id": "C354",
+          "text": "The screens choose the right route first and fetch independent reads together (DIRECTORY-046 R7).",
+          "done": false
+        }
+      ]
     }
   ]
 }

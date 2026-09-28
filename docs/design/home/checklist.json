@@ -790,6 +790,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Hot paths do their work once (HOME-036)",
+      "items": [
+        {
+          "id": "C186",
+          "text": "Records decode without a deep copy (HOME-036 R1).",
+          "done": false
+        },
+        {
+          "id": "C187",
+          "text": "Recall scans epilogues once for all lanterns (HOME-036 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

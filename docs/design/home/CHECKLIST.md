@@ -203,3 +203,8 @@
 - [ ] **C183** — Bulk writers append in batches with one fsync per file (HOME-035 R3), proved by a counting test that fails at the base.
 - [ ] **C184** — Rendering a launch moves data once and hashes what it writes as it writes (HOME-035 R4), proved by a counting test that fails at the base.
 - [ ] **C185** — Call parts are borrowed and each body file read once (HOME-035 R5), proved by a counting test that fails at the base.
+
+## Hot paths do their work once (HOME-036)
+
+- [ ] **C186** — Records decode without a deep copy (HOME-036 R1).
+- [ ] **C187** — Recall scans epilogues once for all lanterns (HOME-036 R2).

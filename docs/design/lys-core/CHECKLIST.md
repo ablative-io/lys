@@ -153,3 +153,8 @@
 - [ ] **C92** — sgconfig.yml names rules/ast-grep, which holds mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes and no-unwrap-expect-panic-outside-tests, each at severity error.
 - [ ] **C93** — The leg `ast-grep scan --config sgconfig.yml` is in docs/design/project.json requiring tool:ast-grep, in .land/gates.sh and in CI.
 - [ ] **C94** — The scan reports zero hits over the landed tree, and exactly one hit on an uncommitted scratch file holding an unwrap outside test code.
+
+## Hot paths do their work once (LYSCORE-006)
+
+- [ ] **C95** — The issuer certificate is built once per authority (LYSCORE-006 R1).
+- [ ] **C96** — One key decompression per verify (LYSCORE-006 R2).

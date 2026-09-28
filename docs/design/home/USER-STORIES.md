@@ -26,6 +26,8 @@
 
 **S72.** As an agent, I want each of my arrived sessions to carry an arrival naming where it came from and a fresh execution id of its own, with its head unchanged, so that my continuation is a distinct execution whose ancestry is on the record.
 
+**S77.** As an agent whose memory view is read many times a session, I want each read to decode and scan once, so that recall stays light under everything else.
+
 ## Tom — Owns the platform and reads what a session was given
 
 **S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.

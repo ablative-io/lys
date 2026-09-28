@@ -1978,6 +1978,81 @@
         "RM-079"
       ],
       "notes": "Written by hand straight to main; ids the next free on main."
+    },
+    {
+      "id": "RM-081",
+      "title": "Sign and decompress once: the issuer certificate per authority and one key decompression per verify",
+      "status": "briefed",
+      "kind": "efficiency",
+      "summary": "Every certificate the authority issues rebuilds and self-signs its own issuer certificate (an extra Ed25519 signature and DER encode per issue), and every Ed25519 verification in Lys decompresses the public key twice. Both sit under every certificate and every signature check.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T17:30:00+10:00",
+        "quote": "make sure there's no lazy code in there. Nothing re-replaying, nothing taking extra time... no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "On 28 September 2026 an audit of Lys main listed 30 lower-confidence efficiency findings beside the 26 already briefed under ADR-112. Each was re-read on main e301473 and checked against all 82 briefs: 13 are real on a path that runs per request or per event, 17 are minor (one-shot CLI, once per start, or tiny bounded N), none false. This brief carries the real ones no brief already covers."
+      },
+      "links": {
+        "cluster": "lys-core",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "LYSCORE-006"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main from the verified low findings (scratchpad audit-low-verified.json)."
+    },
+    {
+      "id": "RM-082",
+      "title": "Identity server reads without repeated work: reviews, requests, issuance key, served screens, record reads and the screens' calls",
+      "status": "briefed",
+      "kind": "efficiency",
+      "summary": "Six per-request paths in the identity server and two in its screens do work that is thrown away or repeated: whole-lineage walks before a cheap filter, linear scans over every request ever asked, a key file re-read per certificate, blocking file reads inside async handlers, a whole-record clone to serialise, and screens making serial or refused calls.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T17:30:00+10:00",
+        "quote": "make sure there's no lazy code in there. Nothing re-replaying, nothing taking extra time... no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "On 28 September 2026 an audit of Lys main listed 30 lower-confidence efficiency findings beside the 26 already briefed under ADR-112. Each was re-read on main e301473 and checked against all 82 briefs: 13 are real on a path that runs per request or per event, 17 are minor (one-shot CLI, once per start, or tiny bounded N), none false. This brief carries the real ones no brief already covers."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "DIRECTORY-046"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main from the verified low findings (scratchpad audit-low-verified.json)."
+    },
+    {
+      "id": "RM-083",
+      "title": "Memory view reads without deep copies or per-lantern rescans",
+      "status": "briefed",
+      "kind": "efficiency",
+      "summary": "Every memory view request deep-copies stored JSON before decoding it, and rescans every epilogue once per lantern cloning its text.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T17:30:00+10:00",
+        "quote": "make sure there's no lazy code in there. Nothing re-replaying, nothing taking extra time... no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "On 28 September 2026 an audit of Lys main listed 30 lower-confidence efficiency findings beside the 26 already briefed under ADR-112. Each was re-read on main e301473 and checked against all 82 briefs: 13 are real on a path that runs per request or per event, 17 are minor (one-shot CLI, once per start, or tiny bounded N), none false. This brief carries the real ones no brief already covers."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "HOME-036"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main from the verified low findings (scratchpad audit-low-verified.json)."
     }
   ]
 }

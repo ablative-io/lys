@@ -1,0 +1,187 @@
+{
+  "id": "DIRECTORY-046",
+  "cluster": "directory",
+  "title": "Identity server reads without repeated work: reviews, requests, issuance key, served screens, record reads and the screens' calls",
+  "depends_on": [],
+  "blocked_by": [
+    "DIRECTORY-043 landed on main (identity server hot paths; it edits lys-identity/src/directory.rs and the directory write path): the build starts only when `git log --oneline origin/main --grep=DIRECTORY-043` names its last requirement's commit."
+  ],
+  "checklist": [
+    "C348",
+    "C349",
+    "C350",
+    "C351",
+    "C352",
+    "C353",
+    "C354"
+  ],
+  "stories": [
+    "S148"
+  ],
+  "design_anchor": [
+    "ADR-112"
+  ],
+  "purpose": "Six per-request paths in the identity server and two in its screens do work that is thrown away or repeated: whole-lineage walks before a cheap filter, linear scans over every request ever asked, a key file re-read per certificate, blocking file reads inside async handlers, a whole-record clone to serialise, and screens making serial or refused calls.",
+  "task": "Remove the repeated work named in each requirement, keeping every answer identical, each saving proved by a counting test.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "GET /reviews filters by viewer first and finds each latest decision by index",
+      "spec": "Behavioural. crates/lys-identity-server/src/reviews_api.rs (about line 207) runs stands() on every grant before the viewer filter and finds each grant's latest decision by a reverse linear scan (last_for). Apply the viewer filter first, then stands() only on what remains; keep the latest decision per grant in a map built once per read (or maintained on write).",
+      "acceptance": [
+        "A counting test with G grants of which V are the viewer's shows V stands() walks, not G, and one pass over decisions; the answer equals today's."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/reviews_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C348"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A request is found by id, not by scanning every request",
+      "spec": "Behavioural. crates/lys-identity-server/src/requests_store.rs request(id) (about line 305) scans every request ever asked, and ask, intend and decide call it on every write. Keep an id index beside the list, maintained on the same writes, loaded once on open.",
+      "acceptance": [
+        "A counting test with N stored requests shows request(id) touches one entry; ask, intend and decide answers are unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/requests_store.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C349"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Certificate issue uses the service key the server already holds",
+      "spec": "Behavioural. crates/lys-identity-server/src/certificates_issue.rs (about line 162) calls load_service_key on every issue, while routes.rs already holds the same key. Pass the held key into issuance; read the file never per request.",
+      "acceptance": [
+        "A test issues several certificates and shows no key-file read after start; certificates are byte-identical."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/certificates_issue.rs",
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C350"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Served screens never block an async worker and index.html is read once",
+      "spec": "Behavioural. crates/lys-identity-server/src/surface.rs (about line 50) does std::fs::read inside the async handler for every page and asset and re-reads index.html per navigation. Read the verified screens package once at start (it is verified and immutable while the server runs), serve from memory, and keep any remaining file I/O off the async workers.",
+      "acceptance": [
+        "A test serves index.html and an asset many times and counts one read of each; bytes and headers are unchanged; grep shows no std::fs call in an async fn in surface.rs."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/surface.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C351"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "A record is serialised without cloning it",
+      "spec": "Behavioural. crates/lys-identity/src/directory.rs Directory::record (about line 136) clones the whole Record, event history included, so GET /identities/{id} can serialise it. Serialise from a borrow (a read guard or a closure given &Record), never a copy.",
+      "acceptance": [
+        "A test shows the route's JSON is byte-identical and the Record type is not cloned on the path (a counting Clone seam or a borrow-only signature)."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/src/directory.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C352"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "The grants screens ask for reach in one concurrent batch",
+      "spec": "Behavioural. surface/identity/src/features/grants/check.ts reachMap (about line 75) awaits resources x actions x pages /grants/who calls one after another before the Access, Graph and people reach views render. Issue them concurrently with a bounded pool, or through one batched read if the server offers it by then, with the same result map.",
+      "acceptance": [
+        "A vitest with a counting fetch shows the calls are in flight together (peak concurrency above one) and the rendered reach is unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/grants/check.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C353"
+      ],
+      "stories": [
+        "S148"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "The screens choose the right route first and fetch independent reads together",
+      "spec": "Behavioural. surface/identity/src/api.ts widest() (about line 63) sends every non-admin people or agent read to the admin route first and takes a refusal; several screens fetch /me and then /people one after the other. Choose the route from the signed-in person's role already known from /me, and fetch independent reads together.",
+      "acceptance": [
+        "A vitest with a counting fetch shows no refused admin call for a non-admin and /me with /people in flight together; screens render the same."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/api.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C354"
+      ],
+      "stories": [
+        "S148"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT change any answer, stored byte, hash, signature or wire shape: every change is the same result with less work, and a test pins the result before and after.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, cache expiry by clock, #[allow], #[ignore] or any bypass.",
+    "Every file stays under 500 lines of code and ast-grep stays at zero hits.",
+    "A counting test proves each saving (calls, reads, clones, scans or round trips counted), never a wall-clock timing.",
+    "Where a line number has moved, the function named is the target; the dev record names where it now is."
+  ],
+  "verification": [
+    "The full Lys gate and, where the screens change, the surface checks exit 0 at the card's head, measured by the card round.",
+    "Each requirement's counting test is red on the base and green at the head."
+  ]
+}

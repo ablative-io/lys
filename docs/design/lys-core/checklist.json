@@ -570,6 +570,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Hot paths do their work once (LYSCORE-006)",
+      "items": [
+        {
+          "id": "C95",
+          "text": "The issuer certificate is built once per authority (LYSCORE-006 R1).",
+          "done": false
+        },
+        {
+          "id": "C96",
+          "text": "One key decompression per verify (LYSCORE-006 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

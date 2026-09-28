@@ -46,6 +46,10 @@
         {
           "id": "S26",
           "text": "As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed."
+        },
+        {
+          "id": "S34",
+          "text": "As anyone verifying Lys signatures or issuing certificates at volume, I want each key decompressed and each issuer certificate built once, so that verification and issuance cost what they must and nothing more."
         }
       ]
     },

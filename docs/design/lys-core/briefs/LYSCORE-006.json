@@ -1,0 +1,76 @@
+{
+  "id": "LYSCORE-006",
+  "cluster": "lys-core",
+  "title": "Sign and decompress once: the issuer certificate per authority and one key decompression per verify",
+  "depends_on": [],
+  "blocked_by": [
+    "LYSCORE-002 and LYSCORE-005 landed on main (both edit ca/authority.rs and keys/identity.rs): the build starts only when `git log --oneline origin/main --grep=LYSCORE-005` and `--grep=LYSCORE-002` each name their last requirement's commit."
+  ],
+  "checklist": [
+    "C95",
+    "C96"
+  ],
+  "stories": [
+    "S34"
+  ],
+  "design_anchor": [
+    "ADR-112"
+  ],
+  "purpose": "Every certificate the authority issues rebuilds and self-signs its own issuer certificate (an extra Ed25519 signature and DER encode per issue), and every Ed25519 verification in Lys decompresses the public key twice. Both sit under every certificate and every signature check.",
+  "task": "Remove the repeated work named in each requirement, keeping every answer identical, each saving proved by a counting test.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The issuer certificate is built once per authority",
+      "spec": "Behavioural. crates/lys-core/src/ca/authority.rs, issue_certificate (about line 252) calls issuer_certificate, which builds and self-signs the issuer certificate on every issue. Build it when the authority is constructed or first used, hold it on the authority, and hand out the held one. The issued certificates are byte-identical to today's.",
+      "acceptance": [
+        "A test issues ten certificates from one authority and counts one issuer signature, not ten; each issued certificate's DER equals the one the current code gives for the same inputs."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-core/src/ca/authority.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C95"
+      ],
+      "stories": [
+        "S34"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "One key decompression per verify",
+      "spec": "Behavioural. crates/lys-core/src/keys/identity.rs, Ed25519Identity::verify (about line 139) decompresses the public key in is_usable_ed25519_public_key and again for verify_strict. Decompress once and use the one point for both the usability check and verify_strict (or hold the decompressed VerifyingKey on the identity). Every verdict, including each refusal of a weak or unusable key, stays the same.",
+      "acceptance": [
+        "A test over the existing accepted and refused key vectors gives the same verdicts, and a counting seam shows one decompression per verify."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-core/src/keys/identity.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C96"
+      ],
+      "stories": [
+        "S34"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT change any answer, stored byte, hash, signature or wire shape: every change is the same result with less work, and a test pins the result before and after.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, cache expiry by clock, #[allow], #[ignore] or any bypass.",
+    "Every file stays under 500 lines of code and ast-grep stays at zero hits.",
+    "A counting test proves each saving (calls, reads, clones, scans or round trips counted), never a wall-clock timing.",
+    "Where a line number has moved, the function named is the target; the dev record names where it now is."
+  ],
+  "verification": [
+    "The full Lys gate and, where the screens change, the surface checks exit 0 at the card's head, measured by the card round.",
+    "Each requirement's counting test is red on the base and green at the head."
+  ]
+}

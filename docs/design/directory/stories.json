@@ -194,6 +194,10 @@
         {
           "id": "S18",
           "text": "As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory."
+        },
+        {
+          "id": "S148",
+          "text": "As someone using the identity screens and API all day, I want every read to do its work once, so that the service stays light while it runs beside everything else."
         }
       ]
     },

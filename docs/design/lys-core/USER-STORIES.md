@@ -20,6 +20,8 @@
 
 **S26.** As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed.
 
+**S34.** As anyone verifying Lys signatures or issuing certificates at volume, I want each key decompressed and each issuer certificate built once, so that verification and issuance cost what they must and nothing more.
+
 ## Consumer of lys-log-store — Implementing LeafStore
 
 **S27.** As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release.

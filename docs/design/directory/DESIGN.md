@@ -607,6 +607,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/install.rs` | DIRECTORY-045 R3: The install and the server say which build is running | DIRECTORY-045 |
 | `surface/identity/src/shell/About.tsx` | DIRECTORY-045 R3: The install and the server say which build is running | DIRECTORY-045 |
 | `docs/design/directory/PROOF-UPGRADE.md` | DIRECTORY-045 R4: Prove it on the live install | DIRECTORY-045 |
+| `crates/lys-identity-server/src/reviews_api.rs` | DIRECTORY-046 R1: GET /reviews filters by viewer first and finds each latest decision by index | DIRECTORY-046 |
+| `crates/lys-identity-server/src/requests_store.rs` | DIRECTORY-046 R2: A request is found by id, not by scanning every request | DIRECTORY-046 |
+| `crates/lys-identity-server/src/certificates_issue.rs` | DIRECTORY-046 R3: Certificate issue uses the service key the server already holds | DIRECTORY-046 |
+| `crates/lys-identity-server/src/surface.rs` | DIRECTORY-046 R4: Served screens never block an async worker and index.html is read once | DIRECTORY-046 |
+| `surface/identity/src/features/grants/check.ts` | DIRECTORY-046 R6: The grants screens ask for reach in one concurrent batch | DIRECTORY-046 |
+| `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
 
 ## Inventory
 

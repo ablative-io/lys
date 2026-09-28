@@ -70,7 +70,8 @@
     "ADR-055",
     "ADR-063",
     "ADR-064",
-    "ADR-065"
+    "ADR-065",
+    "ADR-112"
   ],
   "goals": [
     "crates/lys-core/src/ca/authority.rs contains no call to .subject() or .issuer() on a parsed certificate.",
