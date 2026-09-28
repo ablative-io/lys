@@ -230,6 +230,12 @@ pub enum ServerError {
         "LaunchRecordMissing: the agent has no provisioning profile to start it from: set its profile first"
     )]
     LaunchRecordMissing,
+    /// The agent is not active, so it is not started.
+    #[error("AgentNotActive: the agent is {state} and only an active agent is started")]
+    AgentNotActive {
+        /// The agent's lifecycle state.
+        state: String,
+    },
     /// The machine is retired, so nothing is started on it.
     #[error("MachineRetired: the machine is retired and nothing is started on it")]
     MachineRetired,
@@ -327,6 +333,7 @@ impl ServerError {
             | Self::CertificateReused { .. }
             | Self::CertificateWithdrawn { .. }
             | Self::MachineRetired
+            | Self::AgentNotActive { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
             | Self::RuntimeSessionStarted { .. }

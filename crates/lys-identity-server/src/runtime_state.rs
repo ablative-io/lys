@@ -57,6 +57,10 @@ pub struct Report {
     pub reported_by: String,
     /// When it was received, in seconds since the Unix epoch.
     pub at: u64,
+    /// For a start the service admitted, the whole start as it was answered,
+    /// so the same request sent again answers it exactly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch: Option<serde_json::Value>,
 }
 
 /// One session, with every report on it in order.

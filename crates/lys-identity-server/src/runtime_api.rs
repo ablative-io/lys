@@ -191,6 +191,7 @@ fn report(
         confirmation,
         reported_by,
         at: now(),
+        launch: None,
     })
 }
 

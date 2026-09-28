@@ -38,6 +38,7 @@ fn report(operation: &str, session: &str, agent: Option<&str>, state: Reported) 
             String::new()
         },
         reported_by: agent.unwrap_or("person-a").to_owned(),
+        launch: None,
         at: 5,
     }
 }
