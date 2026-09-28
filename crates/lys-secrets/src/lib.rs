@@ -27,7 +27,7 @@ pub mod store;
 pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
 pub use broker::{
     Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome,
-    Ticket, UpstreamRevocation, UseError, Used,
+    SecretSettings, Ticket, UpstreamRevocation, UseError, Used,
 };
 pub use error::{RevocationRefusal, SecretsError, ServiceRefusal};
 pub use handle::{

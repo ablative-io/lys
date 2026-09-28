@@ -1,6 +1,7 @@
 //! Routes a screen changes a secret through, as the identity its caller
 //! speaks for (see `callers`): a secret's scope and who it may be handed to, both
-//! as its owner, and where a handle's revocation stands. The presentation
+//! as its owner, those two settings as they stand, and where a handle's
+//! revocation stands. The presentation
 //! is bound to the request's body, so a signed change cannot be replayed
 //! with another body.
 
@@ -82,6 +83,35 @@ pub async fn recipients(State(shared): State<Arc<Shared>>, request: Request) -> 
     Ok(Json(
         json!({ "secret": asked.secret, "recipients": asked.recipients.label() }),
     ))
+}
+
+/// The query of a settings read: the secret, percent-decoded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettingsAsked {
+    secret: String,
+}
+
+/// A secret's scope and who it may be handed to, as they stand, when the
+/// caller may discover it. A screen reads this to settle a change whose
+/// answer it never received.
+pub async fn settings(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+    let (parts, _body) = request.into_parts();
+    let Query(asked) = Query::<SettingsAsked>::try_from_uri(&parts.uri)
+        .map_err(|error| malformed("query", error.body_text()))?;
+    if asked.secret.is_empty() {
+        return Err(malformed("query", "no secret named".to_owned()));
+    }
+    let who = caller(&shared, &parts, &[])?;
+    let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+    let settings = broker
+        .settings(&who.identity, &asked.secret)
+        .map_err(|error| refused(&error))?;
+    Ok(Json(json!({
+        "secret": asked.secret,
+        "scope": settings.scope.map(|scope| scope.target()),
+        "recipients": settings.recipients.label(),
+    })))
 }
 
 /// The query of a revocation read: the handle, percent-decoded.

@@ -373,6 +373,44 @@ fn only_the_owner_changes_a_secret() -> TestResult {
 }
 
 #[test]
+fn the_settings_route_reads_what_a_change_left() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let target = format!("/_lys/settings?secret={OWNED}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let before: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        before,
+        json!({ "secret": OWNED, "scope": null, "recipients": "anyone" })
+    );
+
+    let scope = serde_json::to_vec(&json!({ "secret": OWNED, "scope": "personal:person-owner" }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/scope", &scope, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let recipients = serde_json::to_vec(&json!({ "secret": OWNED, "recipients": "people_only" }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/recipients", &recipients, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let after: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        after,
+        json!({ "secret": OWNED, "scope": "person/person-owner", "recipients": "people_only" })
+    );
+
+    let (status, body) = served.ask(&Method::GET, &target, b"", OTHER)?;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.starts_with("SecretUnknown:"), "{body}");
+
+    let (status, body) = served.ask(&Method::GET, "/_lys/settings?secret=", b"", OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+#[test]
 fn the_revocation_route_reads_a_percent_encoded_handle() -> TestResult {
     let served = Served::start(Seeded::new()?)?;
     let owned = served.seeded.owned_handle.clone();
