@@ -50,7 +50,27 @@
       ],
       "stories": [
         "S156"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no acceptance row is met. (1) The spec measures 'each session the runner holds', and the runner (DIRECTORY-050 R1/R2: crates/lys-runner/*, crates/lys-identity-server/src/runner_client.rs) does not exist in the tree, so there are no runner sessions to follow. (2) Following 'driven by the file's change notification, never a poll' needs a filesystem-notification dependency (for example notify), and no such crate is in Cargo.lock. Adding one means modifying Cargo.toml, crates/lys-identity-server/Cargo.toml (and probably crates/lys-home/Cargo.toml) and Cargo.lock, none of which are in R1's file list. Under CN9 I am naming these files, not editing them, until a brief revision is approved. Acceptance row 1 (fixture yields hand-counted per-turn figures), row 2 (unreadable line listed with offset and reason) and row 3 (growing transcript, no poll, checked by ast-grep) are all not met.",
+        "deviation": "Not implemented: the brief depends on DIRECTORY-050, which is unbuilt (CN12), and it needs files outside its wall (CN9): Cargo.toml, crates/lys-identity-server/Cargo.toml, Cargo.lock.",
+        "checklist": [
+          {
+            "id": "C381",
+            "done": false,
+            "note": "Blocked on DIRECTORY-050's runner and on a file-notification dependency outside the file list."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S156",
+            "satisfied": false,
+            "note": "Blocked with R1."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -76,7 +96,27 @@
       ],
       "stories": [
         "S156"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no acceptance row is met. Budgets could be recorded and resolved on their own, but a budget's measures are R1's usage figures and its acts are R3's runner acts. Both depend on DIRECTORY-050, and CN12 forbids dispatching a dependency-blocked brief, so I did not land this part alone ahead of its foundation. Row 1 (a team budget applies unless an agent's own is tighter) and row 2 (not_permitted without authority) are not met.",
+        "deviation": "Not implemented: part of a brief that depends on the unbuilt DIRECTORY-050 (CN12).",
+        "checklist": [
+          {
+            "id": "C382",
+            "done": false,
+            "note": "Blocked with the brief's dependency on DIRECTORY-050."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S156",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -102,7 +142,27 @@
       ],
       "stories": [
         "S156"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no acceptance row is met. R3 is told to modify crates/lys-identity-server/src/runner_api.rs, but that file does not exist. DIRECTORY-050 R4 is meant to create it and has not landed. Compact at the next turn boundary and stop confirmed through the runner both need the runner protocol (DIRECTORY-050 R2), which does not exist. Rows 1 to 3 (one compaction, stop shown confirmed, each act once in receipts) are not met.",
+        "deviation": "Not implemented: the file to modify, runner_api.rs, is missing because DIRECTORY-050 is unbuilt.",
+        "checklist": [
+          {
+            "id": "C383",
+            "done": false,
+            "note": "Blocked: runner_api.rs and the runner protocol do not exist."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S156",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -130,7 +190,27 @@
       ],
       "stories": [
         "S157"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no acceptance row is met. Reminders are to be 'typed into the session' 'through the runner', and there is no runner (DIRECTORY-050) to type into. Rows 1 to 4 (fires once at its instant, survives a restart, stops when met, evidence_missing) are not met.",
+        "deviation": "Not implemented: depends on DIRECTORY-050's runner, which is unbuilt.",
+        "checklist": [
+          {
+            "id": "C384",
+            "done": false,
+            "note": "Blocked on the runner."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S157",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -155,7 +235,32 @@
       "stories": [
         "S156",
         "S157"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked; no acceptance row is met. The screen shows and sets what R1, R2 and R4 serve, and those APIs do not exist because they are blocked. Rows 1 to 3 (lists agents with figures and budgets, setting takes effect, surface tests) are not met.",
+        "deviation": "Not implemented: the APIs it depends on (R1, R2, R4) are blocked.",
+        "checklist": [
+          {
+            "id": "C385",
+            "done": false,
+            "note": "Blocked with R1, R2 and R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S156",
+            "satisfied": false,
+            "note": "Blocked."
+          },
+          {
+            "id": "S157",
+            "satisfied": false,
+            "note": "Blocked."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
