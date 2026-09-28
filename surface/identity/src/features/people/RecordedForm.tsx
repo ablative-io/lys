@@ -10,6 +10,23 @@ export interface Change {
   body: Record<string, unknown>;
 }
 
+interface PendingChange extends Change { operation: string }
+const pendingPaths: Record<string, RegExp> = {
+  'register-person': /^\/people$/,
+  'register-agent': /^\/agents$/,
+  'bind-login': /^\/people\/[^/?#]+\/logins$/,
+  'change-profile': /^\/identities\/[^/?#]+\/profile$/,
+  lifecycle: /^\/identities\/[^/?#]+\/transitions$/,
+  'root-grant': /^\/grants\/roots$/,
+};
+function restored(value: unknown, name: string): PendingChange | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!('path' in value) || typeof value.path !== 'string' || !pendingPaths[name]?.test(value.path)) return null;
+  if (!('operation' in value) || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)) return null;
+  if (!('body' in value) || !value.body || typeof value.body !== 'object' || Array.isArray(value.body)) return null;
+  return { path: value.path, operation: value.operation, body: { ...value.body } };
+}
+
 export function RecordedForm({ name, title, heading, description, submitLabel, children, change, done }: {
   name: string;
   title: string;
@@ -26,7 +43,8 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     if (!saved) return null;
     try {
       const record: unknown = JSON.parse(saved);
-      if (record && typeof record === 'object' && 'operation' in record && typeof record.operation === 'string') return record.operation;
+      const valid = restored(record, name);
+      if (valid) return valid;
     } catch {
       // A damaged pending record cannot establish that resubmission is safe.
     }
@@ -46,7 +64,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
       const operation = operationId();
       // Persist before sending. Failure to retain the request refuses the send.
       sessionStorage.setItem(key, JSON.stringify({ ...asked, operation }));
-      setPending(operation);
+      setPending({ ...asked, operation });
       try {
         const result = await request<unknown>(asked.path, { ...asked.body, operation });
         confirmReceipt(result, operation, asked.path);
@@ -67,6 +85,24 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
       busy.current = false;
     }
   };
+  const recover = async () => {
+    if (busy.current || !pending || typeof pending === 'string') return;
+    busy.current = true;
+    setFailure('');
+    try {
+      const result = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
+      confirmReceipt(result, pending.operation, pending.path);
+      sessionStorage.removeItem(key);
+      setPending(null);
+      setAnswer(JSON.stringify(result, null, 2));
+      done();
+    } catch (error) {
+      // Even a later refusal cannot establish that the original uncertain call did not commit.
+      setFailure(error instanceof Refused ? `${error.refusal.refusal}: ${error.refusal.reason}` : String(error));
+    } finally {
+      busy.current = false;
+    }
+  };
   return <form className="card recorded-form" onSubmit={submit} aria-label={title}>
     <h2>{heading ?? title}</h2>
     {description ? <p className="recorded-description">{description}</p> : null}
@@ -74,7 +110,8 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
       {children}
       <button className="btn primary" type="submit">{submitLabel ?? title}</button>
     </fieldset>
-    {pending ? <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{pending}</code>.</p> : null}
+    {pending ? <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
+    {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>Check original change</button> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
     {answer ? <details open><summary>Recorded receipt</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
   </form>;
