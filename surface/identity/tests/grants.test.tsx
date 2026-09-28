@@ -270,3 +270,36 @@ describe('A grant card', () => {
     expect(card?.textContent).toContain('Last used: 27 Sep 12:00 · tool');
   });
 });
+
+describe('A grant that ends with a role assignment (conformance 4.5)', () => {
+  const ROLE_END = 1_760_000_000;
+  const routes = {
+    ...SERVICE,
+    '/roles': ok({ roles: [{
+      id: 'role-0000000000000000000000000000000000000000000000000000000000000001', name: 'Scribe', latest: 1, policy: 'stays_until_moved', versions: [],
+      holders: [{
+        assignment: 'op-00000000000000000000000000000001', holder: SCRIBE, display_name: 'Scribe', version: 1, behind: false, assigned_by: ADA,
+        assigned_at: 1_759_000_000, ends_at: ROLE_END, moves_at: null, state: 'holding', moves: [], ended_by: null, ended_at: null,
+      }],
+    }] }),
+  };
+
+  it('offers each dated holding of the recipient as an end, and posts that end', async () => {
+    const { posted } = await mount('#/me', routes);
+    await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    await choose($('#dTo'), SCRIBE);
+    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with Scribe assignment (9 Oct)', 'no end']);
+    await choose($('#dLease'), 'assignment:op-00000000000000000000000000000001');
+    await click($('[data-act="delegatedo"]'));
+    const body = posted.find((p) => p.path === '/grants')?.body as DelegateBody;
+    expect(body.window.ends_at).toBe(ROLE_END);
+  });
+
+  it('greys the choice, saying why, when the recipient holds no dated role', async () => {
+    await mount('#/me');
+    await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    const option = $$('#dLease option')[1];
+    expect(option?.hasAttribute('disabled')).toBe(true);
+    expect(option?.getAttribute('title')).toBe('the agent holds no role with an end date');
+  });
+});
