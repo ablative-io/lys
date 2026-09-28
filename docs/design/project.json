@@ -61,6 +61,29 @@
           "cadence": "round"
         }
       ]
+    },
+    {
+      "tree": "surface/identity",
+      "legs": [
+        {
+          "name": "ci",
+          "command": "npm ci",
+          "requires": [
+            "tool:node",
+            "tool:npm"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "test",
+          "command": "npm test",
+          "requires": [
+            "tool:node",
+            "tool:npm"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ],
   "roots": {

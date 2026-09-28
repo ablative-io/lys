@@ -1,6 +1,6 @@
 # Identity: conformance to the mock-up
 
-Reference: `docs/design/identity/mockup/index.v5.html` (v4 kept beside it as the prior).
+Reference: `docs/design/identity/mockup/index.v6.html` (sha256 72a86ad0405ff31cd8b8473b2b562e167e3a93f9855d8e4af25fc1194ba815fb; v5 kept beside it as the prior).
 
 This table is the conformance test. Each row below is one behaviour the mock-up shows. The build conforms when every row marked **test** passes as an acceptance check in the brief named against it. Rows marked **proposed** or **open** are shown in the mock-up as undecided; they become tests only when decided.
 
