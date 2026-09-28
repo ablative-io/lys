@@ -1,0 +1,172 @@
+{
+  "id": "DIRECTORY-051",
+  "cluster": "directory",
+  "title": "Lys tracks every agent session's tokens, context and time, and holds its budgets, goals, expectations and deliverables; Argus's job moves into Lys",
+  "depends_on": [
+    "DIRECTORY-050"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C381",
+    "C382",
+    "C383",
+    "C384",
+    "C385"
+  ],
+  "stories": [
+    "S156",
+    "S157"
+  ],
+  "design_anchor": [
+    "ADR-118"
+  ],
+  "purpose": "Tom, 28 September 2026 19:50 to 19:51, on Dot: 'Argus is not going to be able to do what we need, to be able to track budgets and token usage, time, goals and everything like that through Lys. We're going to completely rewrite that, in Rust.' Argus keeps crashing, and the budgets and goals our agents run under must live with their identity, grants and sessions, in Lys. Tom, 19:51: 'Not the day-to-day operational tasks. That will still go into Cambium. But I want to start setting budgets and goals and expectations and deliverables that need to be done, and I think the only way to do that is through Lys.'",
+  "task": "Measure each running session's usage from its transcript; let budgets be set on agents, teams and people and act when reached; give agents goals with deadlines and reminders delivered through the runner; show it all on a Usage screen and in the API.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Usage measured from the transcript, per turn",
+      "spec": "Behavioural. For each session the runner holds, Lys follows the harness transcript the home keeps (lys-home) as it grows and records per turn: input, output and cache tokens, context in use against the model's window from the model's own figure, the turn's instant, and the account it was paid from. Following is driven by the file's change notification, never a poll. A transcript line it cannot read is recorded as unread with its offset and reason, never skipped silently. GET /agents/{id}/usage and GET /runtime/sessions/{id}/usage answer totals and per-turn rows, paged.",
+      "acceptance": [
+        "A recorded Claude Code transcript fixture yields the exact per-turn tokens and context figures, checked against hand-counted values.",
+        "An unreadable line is listed with its offset and reason.",
+        "A growing transcript adds rows as it grows, with no poll in the code (ast-grep)."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/usage_api.rs",
+          "crates/lys-identity-server/src/usage_state.rs",
+          "crates/lys-identity-server/src/usage_store.rs",
+          "crates/lys-home/src/harness/claude_code/usage.rs",
+          "crates/lys-identity-server/tests/usage.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C381"
+      ],
+      "stories": [
+        "S156"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Budgets on agents, teams and people",
+      "spec": "Behavioural. A budget names its holder (agent, team or person), its measure (context percent, tokens per period, running time per period), its limit, and its act (compact, stop or tell), set by the responsible person or an administrator. A narrower holder's budget applies before a wider one's; the tightest reached budget acts. Budgets are log events with versions, readable and changeable through the API.",
+      "acceptance": [
+        "A team budget applies to every agent in the team unless an agent's own is tighter.",
+        "A person without authority over the agent is refused not_permitted when setting its budget."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/budgets_api.rs",
+          "crates/lys-identity-server/src/budgets_state.rs",
+          "crates/lys-identity-server/tests/budgets.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C382"
+      ],
+      "stories": [
+        "S156"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "A reached budget acts once",
+      "spec": "Behavioural. When a measured figure reaches a budget, Lys does the budget's act once per crossing: compact sends the harness's compaction command through the runner at the next turn boundary; stop ends the session through the runner and reports it confirmed; tell delivers a notice to the responsible person. Each act leaves a receipt naming the budget, the figure and the instant. A compaction that does not bring context under the limit is reported, not retried in a loop.",
+      "acceptance": [
+        "Crossing a context budget sends one compaction at the next turn boundary.",
+        "Crossing a hard token cap stops the session and it shows confirmed.",
+        "Each act appears once in receipts."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/budgets_act.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-identity-server/src/receipts_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C383"
+      ],
+      "stories": [
+        "S156"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Goals, expectations and deliverables, with deadlines and reminders",
+      "spec": "Behavioural. A goal on an agent or a team is one of three kinds: a goal (an outcome), an expectation (a standard its work is held to) or a deliverable (a named thing handed over, with the evidence that proves it: a landed commit, a document, a passing check). Each has words, a deadline, a state (open, met, missed, dropped) and reminders (before the deadline, at intervals, or on events such as a compaction). Lys delivers each reminder into the agent's live session through the runner, with the goal's words and time left, and records the delivery or its refusal. Reminders are timers held in the log so a restart keeps them; none is lost or fired twice. Day-to-day operational tasks stay in the product that runs them; Lys holds only these three kinds.",
+      "acceptance": [
+        "A reminder due at a set instant is typed into the session at that instant, once.",
+        "A restart between setting and firing still fires it once.",
+        "Marking a goal met stops its reminders.",
+        "A deliverable is marked met only with its evidence named; without it the mark is refused evidence_missing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/goals_api.rs",
+          "crates/lys-identity-server/src/goals_state.rs",
+          "crates/lys-identity-server/tests/goals.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C384"
+      ],
+      "stories": [
+        "S157"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Usage screen",
+      "spec": "Behavioural. A Usage screen (surface/identity/src/features/usage) shows each agent's context, tokens and time against its budgets as bars from the design tokens, per-turn detail on opening one, and its goals with deadlines and state; budgets and goals are set there with styled controls, never default ones.",
+      "acceptance": [
+        "The screen lists every agent the caller may see with its figures and budgets.",
+        "Setting a budget and a goal from the screen takes effect.",
+        "Surface tests cover the list, the detail and the forms."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/usage/Usage.tsx",
+          "surface/identity/src/features/usage/usage.css"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C385"
+      ],
+      "stories": [
+        "S156",
+        "S157"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT call Argus or read its store; nothing in Lys depends on it.",
+    "SHALL NOT measure usage from a session's own claim; only the transcript.",
+    "SHALL NOT poll: following, reminders and budget checks run on change notifications and timers held in the log.",
+    "SHALL NOT add a timeout, deadline on a request, #[allow], #[ignore] or any bypass.",
+    "SHALL NOT add a silent fallback: every failure is a named refusal."
+  ],
+  "verification": [
+    "The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.",
+    "On a scratch install: run a session from a recorded transcript, see its usage, cross a context budget and see one compaction, get one goal reminder."
+  ]
+}
