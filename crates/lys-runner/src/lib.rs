@@ -37,6 +37,7 @@ pub mod codex_judge_client;
 pub mod codex_policy_contract;
 pub mod codex_refusals;
 pub mod collector;
+pub mod containment_policy;
 pub mod dial;
 pub mod error;
 pub mod judge;
