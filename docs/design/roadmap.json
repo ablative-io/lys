@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "items": [
     {
       "id": "RM-001",
@@ -156,7 +156,7 @@
     {
       "id": "RM-006",
       "title": "Launch a session from its home on Claude Code through a kept template",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "The home keeps a launch template per harness, starting with Claude Code, as an object named by its hash; lys-home render-launch turns a template and a session into the files a Claude Code launch needs and a printed launch line that resumes the rendered file by path, and records each render on the session so a stranger can tell which template a session was launched with.",
       "provenance": {
@@ -187,7 +187,7 @@
     {
       "id": "RM-007",
       "title": "Record what a session was given at render: the lys.given context record",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "At every launch-template render, lys-home appends a lys.given custom entry after the render event. It names each instruction document Claude Code will load for the session's working directory, and each file the render wrote, by path, byte length and SHA-256, in the load order measured on a named Claude Code version, with the environment variable names the template set and the kinds resolved and left unlisted, and never a document's content. Two subcommands list those records and check a file on disk against one by hash. This is step 4's context record: what a session was given, unsigned and unencrypted, shaped as hashes so that signing and encryption can be added later.",
       "provenance": {
@@ -218,7 +218,7 @@
     {
       "id": "RM-008",
       "title": "Light a lantern in the home and recall it by note and by point",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "Stage 5 of the home: a lantern is a note plus a point in a session, lit on purpose as a lys.lantern custom entry at the session's head, whose note grows only by lys.lantern_epilogue entries. Three lys-home subcommands light one, add an epilogue, and recall lanterns by an exact case-folded phrase of their note or epilogues, or by session and entry id, printing the lantern and its epilogues and never the transcript around the point. A lantern lives in the home and is never rendered into a Claude Code resume file.",
       "provenance": {
@@ -248,7 +248,7 @@
     {
       "id": "RM-009",
       "title": "Make the Claude Code render byte-deterministic for the same session head and version",
-      "status": "idea",
+      "status": "briefed",
       "kind": "fix",
       "summary": "Two renders of the same session head give different bytes whenever the context path holds an entry whose id is not uuid-shaped, which the importer writes for every tool record with more than one result: the render draws a fresh random uuid for each. The render derives those uuids from the record instead (UUIDv5 over a fixed lys namespace, the session id and the entry id with its role), a fixture carrying the defect is pinned by hash in a test and in PROOF-RESUME.md, and the resume is re-measured on the Claude Code installed on this Mac. A rendered file can then be told by its hash, a receipted render event can name what was written, and the launch template's identical-hash acceptance has ground to stand on.",
       "provenance": {
@@ -275,7 +275,7 @@
     {
       "id": "RM-010",
       "title": "Fork a session from a lantern's point and launch the child",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "Stage 5b of the home: lys-home fork takes a lantern id, resolves it to the session it was lit in, cuts that session's chain at the last assistant message at or before the lantern's point, and writes a child session holding the parent's own lines with its ancestry on both sides (the header's parentSession, a lys.forked_from entry in the child, a lys.fork entry at the parent's head), adding nothing to the block store and rewriting nothing in the parent. A user-message point is carried as a seed prompt the child's render writes beside the rendered file and the launch line passes as the first prompt. The child renders and launches through the launch template, measured on the installed Claude Code version.",
       "provenance": {
@@ -335,7 +335,7 @@
     {
       "id": "RM-028",
       "title": "Move the home record's logic out of record/mod.rs into named files",
-      "status": "idea",
+      "status": "briefed",
       "kind": "fix",
       "summary": "crates/lys-home/src/record/mod.rs carries Home, Session, their impls, the shared helpers and two constants, against the repository's rule that a mod.rs holds only pub mod, pub use and module docs. HOME-013 moves Home to record/home.rs, Session with the helpers only it calls to record/session.rs, and the shared helpers and constants to record/helpers.rs, re-exports every public item from mod.rs so no public path moves, and changes no behaviour, no test and no crate outside lys-home.",
       "provenance": {
@@ -358,7 +358,7 @@
     {
       "id": "RM-025",
       "title": "Revoke a certificate by appending a leaf and fold the live set from the log",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "Builds DP26 for certificates: revoking is one leaf appended to an append-only certificate log through lys-log-store, never a deletion or rewrite, and the live set is folded from the log. A revoked certificate fails revocation-aware verification, which takes the size N and a tolerance as explicit inputs with no default and names the revocation leaf, while its log proofs, its issuance record and the attestations logged before its revocation still verify, and an attestation by a certificate not revoked needs no log entry. A certificate carries one claim and is the revocable unit, only its issuing authority's key revokes it, a revocation is permanent, and a revocation naming a certificate with no earlier issuance is refused (ADR-039). The code lives in lys-identity; lys-core and every published format are unchanged, and lys ca verify keeps its meaning with help saying it does not check revocation. It stands beside DIRECTORY-006 R4 and leaves C25 open. DIRECTORY-013 carries it in seven rows.",
       "provenance": {
@@ -389,7 +389,7 @@
     {
       "id": "RM-013",
       "title": "Build the secrets broker in lys from a baseline, a reviewed contract and counted code rows",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "SECRETS-003, beside SECRETS-002 and without editing it: a documents-only baseline recorded from source, a contract with key custody and an adversarial review by a second commit author before any code, and code rows in crates/lys-secrets, ordered R3, then R4, then R5 to R8, that deliver SECRETS-002's R1 to R9 with counted acceptance legs, each with a runnable command and its exact result, a tested presenter check, anchored criterion searches, red-first tests, an injected clock and refusals that name their act, re-costed hours per row, and DIRECTORY-002, DIRECTORY-003 and DIRECTORY-006 R1 to R4 as blockers with runnable checks. The broker's home in lys is ADR-019, decided, amending ADR-001's placement of the broker; the lease is a broker record bounded by the lys-identity grant's window (ADR-020).",
       "provenance": {
@@ -422,7 +422,7 @@
     {
       "id": "RM-031",
       "title": "LanternData carries lit_in, the light act records it, recall reports it and the fork reads the typed field",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "A lantern records the session it was lit in. LanternData gains an optional lit_in; the light act writes it as the id of the session at whose head it appends the lantern and prints it in its report; recall rows carry it beside point, note and lit_by, null for a lantern lit before it; and HOME-006's fork reads it through a narrower typed view in place of the raw-data stopgap, with L2 in both fork fixtures lit by the light act and only the records the light act cannot produce written by hand. A lantern with no lit_in stays an older record resolved by its holders (ADR-017), and a present lit_in that is not a session id is refused lit_in_not_a_session by the fork and by recall, never read as any session (ADR-046).",
       "provenance": {
@@ -478,7 +478,7 @@
     {
       "id": "RM-012",
       "title": "Translate a session imported from Claude Code into a Codex rollout with a loss account",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "Stage 4b of the home: lys-home translate-codex renders a session imported from Claude Code as a Codex 0.156.0 rollout in the shape Codex writes for its own threads, carrying every text part, tool call and tool result whole, readable thinking as text and sidechains as marked text, with a JSON loss account beside it of what was kept, changed and lost by entry id and hash, a lys.translation side leaf on the session, and a resume on Codex 0.156.0 measured in a scratch Codex home. The Codex thread is a fork of the session, never the same session.",
       "provenance": {
@@ -512,7 +512,7 @@
     {
       "id": "RM-037",
       "title": "Hand an outgoing session's letter to a new successor home as inherited memory",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "HOME-001 row R12, the handover, built as the lead's answers correct it. lys-home handover reads the outgoing session of a home without owning it and takes a letter: one or more assistant message entries standing next to each other on its path. It writes a new successor home holding one session: a lys.inherited entry with no rule naming the outgoing session and every letter id, then each letter entry copied whole with its thinking blocks and signatures, then a session_info named `inherited from` the outgoing session. It prints a JSON report naming the successor home, the session and its file, with inherited true read from the successor's first entry. A letter entry that is not an assistant message, a run that is not contiguous, an entry that carries provider authored, a letter with no thinking block, and a successor path that holds anything are each refused by name, and nothing is written. The canon loader newly refuses a canon example without a rule. PROOF-HANDOVER.md records the handover of a letter elicited for the purpose on the build machine, whether the installed Claude Code carries the inherited signed block into a resumed continuation's own file beside the version the row named, and the seeded and plain card counts as not run.",
       "provenance": {
@@ -543,7 +543,7 @@
     {
       "id": "RM-040",
       "title": "Give lys the ast-grep rule set and a gate leg that fails on a hit",
-      "status": "idea",
+      "status": "briefed",
       "kind": "fix",
       "summary": "lys's rules against unwrap, expect and panic outside tests, lint bypasses, dropped Results and logic in mod.rs are caught only where clippy overlaps them, because the lys gate has no ast-grep leg. This item adds sgconfig.yml, four rules (three of Cambium's and lys's own unwrap/expect/panic rule, which recognises test code by structure the file carries), and the leg `ast-grep scan --config sgconfig.yml` in docs/design/project.json, .land/gates.sh and CI. It clears every existing hit at its cause in the same card, so the leg is green when it lands, and it keeps the hand-written lys-core documents as *-PRE-METHOD.md before rendering the cluster.",
       "provenance": {
@@ -601,7 +601,7 @@
     {
       "id": "RM-044",
       "title": "Sign what a session was given at render, checked offline with lys verify",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "The first of CONFORMANCE row 6.5's three signed statements: lys-home render-launch computes the SHA-256 of the lys.given entry's RFC 8785 data, reports it as given_sha256, and when given a key signs those bytes as a lys/attestation/v2 statement kept beside the lys.given entry and as the two files lys verify --attestation reads offline. A render with no key is unchanged and reports unsigned. Row 6.5 is partial until the start and role-move statements land with the START and ROLES cards.",
       "provenance": {
@@ -632,7 +632,7 @@
     {
       "id": "RM-024",
       "title": "Run every test binary in the gate's test leg with --no-fail-fast",
-      "status": "idea",
+      "status": "briefed",
       "kind": "fix",
       "summary": "The gate's test leg stops at the first failing test binary, so a red round hides every failure after the first. One commit changes it to `cargo test --workspace --all-features --no-fail-fast` in docs/design/project.json, the directory, home, secrets and lys-gate design.json gate arrays and .land/gates.sh, and, by the lead's rulings, in CLAUDE.md's 'Gates before any commit' block (so .land/gates.sh still matches it exactly) and CI's test step (which gains the one flag only; its missing --all-features is a finding left unchanged). Nothing else in any gate moves. Proved by a grep over the declared legs that prints 0, the green gate round's '$ command' line for the tests leg, one gate round over a local scratch branch with a planted failing test in crates/lys that never reaches origin, and a proof document that names that round's log by path, SHA-256 and counts.",
       "provenance": {
@@ -658,7 +658,7 @@
     {
       "id": "RM-019",
       "title": "Keep the enduring agent apart from each session's credential",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "Road adjustment 3 (docs/design/identity/STATEMENT-2026-09-22.md:162-167) as a directory contract brief, DIRECTORY-011: the directory contract gains the rules that the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, an agent may be registered before it ever runs, and a second session of the same agent presents the same enduring identity with a new session credential; and one lys-identity test proves an agent registered with no session appears in the directory under its responsible person with no session credential. The brief lands as documents; its build waits on DIRECTORY-003. The second-session proof waits on RM-029; the design's 'Road step 2 onward' non-goal and P6 stand.",
       "provenance": {
@@ -720,7 +720,7 @@
     {
       "id": "RM-045",
       "title": "Move a home by a pushed git ref and resume it in a second home on the same machine",
-      "status": "idea",
+      "status": "briefed",
       "kind": "feature",
       "summary": "The first block of the context roadmap's stage 3: a home becomes a git repository tracking exactly its session, index, head, block and template files; lys-home ship pushes it without force as the one ref refs/lys/home to a bare repository at a path on this machine, refusing by name an empty home, a stale or missing index or head, a held session, a foreign tracked file, a remote path that is not a bare repository, a diverged ref and any remote off this machine; lys-home fetch pulls the ref into an empty second home, verifies every index, head, block and template, hangs one arrival event with a fresh execution id beside each session's head, and commits the arrivals as one commit on the fetched commit; the fetched home is rendered through the Claude Code launch template and resumed on 2.1.283, measured as hashes, counts and paths.",
       "provenance": {
