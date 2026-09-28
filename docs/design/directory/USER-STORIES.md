@@ -285,3 +285,9 @@
 **S177.** As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
 
 **S178.** As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+## Person running a Codex agent — Sets policy and inspects its actual enforcement
+
+**S175.** As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings.
+
+**S176.** As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me.

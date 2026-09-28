@@ -1939,6 +1939,26 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-131",
+      "title": "Codex policy comes from Lys and refusal provenance follows the real harness contract",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at07:32 Melbourne. Recorded by Chippy.",
+      "context": "The inspected installed package manifest namesbd3798fa. Its relevant config/hooks/rollout/protocol/tool-event source is unchanged at7cbba483. Legacy notify is only after-turn. Modern PreToolUse exists separately. Declined may mean operational rejection and Failed may contain a sandbox error. These types cannot identify policy cause alone. Source paths and proof are pinned byDIRECTORY-065R1.",
+      "decision": "Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.",
+      "quote": "Lys renders a Codex agent's config with its own sandbox and approval settings from the same Lys policy, and collects Codex's own denials as refusal records",
+      "consequences": [
+        "No notify event or free-text command failure establishes a refusal.",
+        "Unattended approval never rejects escalation while sandboxing remains enabled.",
+        "051's unconditional Codex unsupported display is superseded only where065 proves the required capability.",
+        "The real installed binary and source contract are recorded independently.",
+        "062 and064 remain the owners of native containment and harness transport."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
