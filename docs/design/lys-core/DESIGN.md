@@ -1,126 +1,173 @@
 ---
 type: design
 cluster: lys-core
-title: Lys Core — no underscore-prefixed bindings
+title: lys-core — the ast-grep leg and test code by structure
 ---
 
-# Lys Core — no underscore-prefixed bindings
+# lys-core — the ast-grep leg and test code by structure
 
 > **Cluster:** lys-core
 
 ## Intention
 
-No name in lys starts with an underscore to quiet the compiler. Where a binding would go unused, the code says what the value is for. A guard that has to live is named and dropped by name where its life ends, and a test fixture that holds a temporary directory names that field and closes it where the test ends, so the directory's removal is checked. A value with no use is not bound at all. A trait parameter one implementation has no use for is written as a bare `_`, and only where another implementation needs it or the trait is published. The gate refuses a new underscore-prefixed binding, and the rule's message says why, so nobody has to remember it.
+The rules lys holds itself to are enforced by the gate, not by whoever happens to be reading the diff. A reader of CLAUDE.md, the rule directory, clippy.toml and the gate should find one policy stated four ways that agree, and a stranger should be able to run the same scan the landing runs and get the same answer.
 
-Nothing a caller, a verifier or a test sees changes. Every rewritten site returns the same value and the same error as before, every verification failure still collapses to the one error it collapses to today, and the full suite runs the same tests before and after.
+Test code is recognised by what the file itself says it is, never by a list of names someone keeps. A file that is only ever compiled as a test says so in its first line, and both clippy and ast-grep read that line. Nothing is exempted, nothing is rewritten to dodge a rule, and nothing is silenced: where the tree broke a rule, the cause is fixed.
+
+A rule is carried only where it can fire. A rule that cannot fire on this tree would only look like cover, and every claim of zero hits is paired with a scratch case the rule reports, so the rule is shown to fire before its silence is believed.
 
 ## Problem
 
-CLAUDE.md calls a _-prefixed unused variable a bypass, not a fix, but nothing enforces that. clippy's used_underscore_binding catches only uses of an underscored binding, never the declaration. Measured with this card's rule at 7b53625, the tree holds 303 underscore-prefixed bindings in 70 files. The words count 272; the rule counts 303, and the rule's count is the one this card clears. Of the 303, 59 are guards whose directory or state the test still uses (TempDir holders and four EnvCleanup guards), whose names hide the fact that they exist to hold a lifetime. 68 are discarded errors: 64 map_err closures written |_err|, |_refusal| or |_source| because the workspace's clippy::map_err_ignore refuses map_err(|_| …), plus one or_else closure and three match arms. 164 are values nobody reads, 105 of them TempDirs a fixture returns beside an identity or authority it has already loaded into memory, so the directory keeps nothing alive. 10 are trait parameters an implementation ignores, and 2 are parameters of cfg(not(unix)) stubs. Eight test fixture structs also hold a TempDir in an underscore-prefixed field only to keep its directory alive, where the underscore silences a dead_code warning; a struct field is not a binding, so the rule does not report them, and the words' guard sentence covers them. The ast-grep rule set that LYSCORE-001 (brief 6747ce61) brings to lys left this rule out for a card of its own.
+The lys gate (docs/design/project.json, run by scripts/design/gate.sh and by .land/gates.sh at landing) has no ast-grep leg, so unwrap, expect and panic outside tests, #[allow] and #[ignore] are caught only where clippy happens to overlap them, and mod.rs logic and `let _ =` discards are not caught at all. Cambium carries sgconfig.yml, a rule directory and an ast-grep leg; lys has none of them. Measured at 7b53625 with Cambium's rules and ast-grep 0.44.1 over crates/: 199 hits (113 no-lint-bypass-attributes, 67 mod-rs-declarations-only, 19 no-let-underscore-on-results). The 113 bypasses are 106 per-module #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] test opt-outs and 7 #[allow(unsafe_code)] around set_var and remove_var in lys-core's env-backed identity tests. A structural unwrap/expect/panic rule finds 224 calls outside a #[test] fn, a #[cfg(test)] mod and tests/, all in the 2 fixtures and 47 sibling *_tests.rs files, and none in library code. The tree's own documents say the opposite of the policy the gate should enforce: CLAUDE.md line 35 and Cargo.toml lines 69-70 tell tests to opt out per module with #![allow], and the lib.rs comment above the unsafe attribute explains it by a set_var #[allow] that this work removes. The lys-core cluster itself is three hand-written pre-method documents with no design.json, so scripts/design/gate.sh has never measured it.
 
 ## Solution
 
-One rule file joins the rule directory LYSCORE-001 lands. rules/ast-grep/no-underscore-binding.yml runs at severity error with vendor/** ignored. The existing leg `ast-grep scan --config sgconfig.yml` picks it up through sgconfig.yml's ruleDirs, so docs/design/project.json, .land/gates.sh and CI run it with the other ast-grep rules and none of the three changes (CN16). The rule reports an identifier that starts with an underscore and has at least one more character, wherever it binds: a let pattern, a function or closure parameter, a match arm, a for pattern, an if-let or while-let pattern, and the tuple, tuple-struct, struct (field and shorthand), slice, or, ref, mut, reference and @ patterns inside them. It never reports a bare `_`, which binds nothing (ADR-048), a struct field declaration, a field initialiser or a field access. Its message and note say why it refuses (ADR-047).
+Cluster documents. In the brief's own commit, the three hand-written documents are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md, byte for byte, before the cluster is rendered, and the rendering is committed with the JSON, so the earlier design is kept beside the rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md. gate.sh compares only the markdown render-cluster.py writes, and its temporary copy carries the *-PRE-METHOD.md files unchanged, so they pass the byte comparison. The kept files are not edited (P6 applies to comments in code, not to a kept record). The card itself checks that state rather than performing it.
 
-Each binding is cleared by what it does. A holder is classified by what happens after the binding, not by its name. A guard whose directory or state the test still uses is renamed without the underscore and ended with drop(name) after its last use; where a function's tail expression is its result, the result is bound, the guard dropped, and the binding returned. It is never made a bare `_`, which would drop it at the end of its statement and delete the directory under the test. Each of the eight fixture structs that holds a TempDir in an underscore-prefixed field names the field temp_dir and gains a close method returning TempDir::close's error, and every test closes each fixture value it builds after the value's last use, so the directory's removal is checked rather than silent. PhantomData's `_marker` in merkle/tree.rs is a type marker, not a held value, and stays. A discarded error is left unbound. A map_err becomes .ok().ok_or(E) when E is already built, and .ok().ok_or_else(…) when building E calls a function or a macro. No enabled clippy lint checks that split, so the brief measures it with an inline ast-grep rule. An or_else closure or a match arm writes the bare `_`. clippy::map_err_ignore stays (CN14). On the verification paths the single error is the design: a verifier must not say which check failed (P7). A value with no use becomes a bare `_` inside its pattern, including a TempDir a fixture returns beside a value it has already loaded into memory. A whole `let _x = expr;` becomes the expression statement `expr;`, never `let _ = expr;` (CN13). A trait parameter an implementation ignores becomes a bare `_` when another implementation of the same trait needs it or the trait is published, and no trait declaration changes (ADR-048, CN11). The two non-unix stubs take a bare `_`.
+Rule set. sgconfig.yml at the repository root names rules/ast-grep, as Cambium's does. Of Cambium's six rules at 1be80d8ec, three can fire on lys and are carried with their bodies unchanged: mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes (which also catches #[ignore]). no-std-mutex-in-async and the two door-timer rules are not carried (ADR-055). Cambium carries no _name rule and no unwrap rule; lys adds one rule of its own, no-unwrap-expect-panic-outside-tests, which reports `.unwrap()`, `.expect(..)` and `panic!(..)` except inside test code as ADR-054 defines it. Every rule carries an `ignores` entry for vendor/**, so an initialised vendor/rauthy is never scanned (ADR-009); target/ is already skipped because ast-grep honours .gitignore. The command stays exactly `ast-grep scan --config sgconfig.yml`, run from the root with no path.
 
-The card lands after LYSCORE-001 (brief 6747ce61), which lands sgconfig.yml, rules/ast-grep and the leg. It carries no second copy of any of them. The rule is shown to fire on a scratch file, with one hit for each binding position and none for the non-binding forms, before its zero hits on the tree are trusted (P9).
+Test code by structure (ADR-054). clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true, and every file that is only ever compiled as a test begins with #![cfg(test)]: the 2 fixtures, the 88 sibling *_tests.rs files under src/, the 28 integration roots under tests/ (4 of which are the *_tests.rs roots of crates/lys) and the 2 tests/harness/mod.rs files. Measured with clippy 0.1.97 on a probe crate: a #[cfg(test)] mod ancestor already covers a sibling file's helpers, the integration roots and harness modules are covered only once they carry the marker, and the outer #[cfg(test)] on the parent's `mod x;` beside the inner marker trips no lint, so the outer attribute stays. With that, all 106 #![allow] test opt-outs go. The 7 #[allow(unsafe_code)] go by fixing their cause: from_env reads the variable and passes the read's result to a private seam that holds today's decoding, and the tests feed the seam directly instead of mutating the process environment, so no test needs unsafe. The lib.rs comment is then rewritten to say what is true, and the attribute under it is left exactly as it is.
+
+Hits fixed at their cause. The 19 `let _ =` discards: the three hex writers take a form that returns no Result, the 14 test-code writes handle their Result, and the two discards of values that are not Results are removed with what they held. The lys-core hex writer at lib.rs line 59 takes the same no-Result form, and line 54's `use std::fmt::Write;`, which that form leaves unused, goes with it; no other code line of lib.rs changes. The logic in the two tests/harness/mod.rs files and in lys-home's harness/claude_code/mod.rs moves into named sibling files, leaving declarations and re-exports. The 47 hits in lys-home's record/mod.rs belong to HOME-013 and are not touched here.
+
+The leg. `ast-grep scan --config sgconfig.yml` requiring tool:ast-grep is added to docs/design/project.json, as a `leg` line to .land/gates.sh, and as a pinned install and scan step to .github/workflows/ci.yml, so a hit is refused on every path to main. CLAUDE.md's gates block gains the line. The leg lands only when the whole tree is at zero hits, which needs HOME-013 landed first; a scratch file without the marker, never landed, shows the leg red through .land/gates.sh while every other leg stays green.
 
 ## Principles
 
-- **P5** — Clear a binding by what it does: a guard is named and dropped by name, a value with no use is not bound at all, and an ignored trait parameter is a bare `_` only where the trait cannot drop it.
-- **P6** — Behaviour is held: each rewritten site returns the same value and the same error as before, and the suite runs the same tests before and after.
-- **P7** — A verifier never says which check failed. The one uniform error on a verification path is the design, so its discarded errors are not carried.
-- **P8** — A bare `_` binds nothing and is admitted; an underscore-prefixed name is a binding and is refused.
-- **P9** — Count what fired: the rule is shown to fire once for each binding position before zero hits on the tree is trusted.
+- **P1** — Test code is recognised by structure the file carries: a first-line #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under a crate's tests/ directory. No rule and no config holds a list of file names.
+- **P2** — A rule is carried only where it can fire on this tree; a rule that cannot fire is recorded as not carried with the finding and the act that brings it back.
+- **P3** — Count what fired: every zero-hit claim is paired with a never-landed scratch case the rule reports, and each structural marker has a case of its own.
+- **P4** — A bypass is fixed at its cause and never replaced by another bypass; one that cannot be fixed goes back to the lead as a question with its line.
+- **P5** — One leg on every landing path: project.json, .land/gates.sh and CI run the same command.
+- **P6** — A comment the code no longer bears out is corrected in the change that made it false.
 
 ## Decisions
 
-- ADR-047 — lys refuses an underscore-prefixed binding with an ast-grep rule at severity error — lys carries its own ast-grep rule, no-underscore-binding, at severity error beside the rule set LYSCORE-001 lands. It refuses an underscore-prefixed identifier in every binding position, admits the bare `_`, and its message says why it refuses. Each existing binding is cleared by what it does rather than renamed. Rejected: relying on used_underscore_binding and review, which never see the declaration, and clearing hits by renaming, #[allow] or an ignores entry.
-- ADR-048 — A trait parameter one implementation ignores is a bare `_` where the trait cannot drop it — An implementation that has no use for a parameter which another implementation of the same trait needs, or which a published trait asks for, writes the bare `_` pattern. The bare `_` binds nothing, so it is the words' 'not bound at all', and it is not the underscore-prefixed name the rule refuses. The trait is not changed. Rejected: changing AdmissionPolicy or LeafStore, adding a use to a parameter the implementation does not need, and keeping an underscore-prefixed name.
+- ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
+- ADR-054 — lys recognises test code by structure the file carries, for ast-grep and clippy alike — Test code is a file whose first line is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under a crate's tests/ directory; every file only ever compiled as a test carries the first-line marker, and clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests replace the per-module #![allow]. Rejected: an exemption list of file names in the rule, and rewriting the test helpers' calls.
+- ADR-055 — Cambium's ast-grep rules are carried into lys only where they can fire — lys carries mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes, and records no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers as not carried with the finding that they cannot fire; the _name rule is its own card. Rejected: copying all six rules, which would look like cover the scan cannot give.
 
 ## Goals
 
-- `ast-grep scan --config sgconfig.yml` reports 0 no-underscore-binding hits at the repository root of the landed tree.
-- An uncommitted scratch file holding one underscore-prefixed binding in each of the 19 binding positions gets exactly 19 no-underscore-binding hits. An uncommitted file holding `fn scratch(_: u8, _unused: u8) {}` gets exactly one hit, at `_unused`.
-- In each of the eight fixture files, the TempDir field reads `temp_dir`, and every test that builds one of those fixtures calls its close method.
-- `cargo test --workspace --all-features` exits 0 at the commit the build starts from and at its final commit, and reports the same number of tests passed at both.
-- The trait declarations of AdmissionPolicy, LeafStore, Signer and AnchorTask are byte-identical before and after the card.
-- Both clippy legs pass with -D warnings while Cargo.toml still sets map_err_ignore = "warn".
+- `ast-grep scan --config sgconfig.yml` from the repository root reports zero hits and exits 0 at the landed commit.
+- A never-landed scratch file with an unwrap and no #![cfg(test)] turns the ast-grep leg of .land/gates.sh red while every other leg stays green.
+- grep finds zero #[allow], #![allow], #[expect] and #[ignore] under crates/, and both clippy legs pass with -D warnings.
+- docs/design/project.json, .land/gates.sh and .github/workflows/ci.yml each run `ast-grep scan --config sgconfig.yml`.
+- sh scripts/design/gate.sh measures lys-core for the first time and exits 0, with the three pre-method documents kept byte for byte.
 
 ## Non-Goals
 
-- Offering the no-underscore-binding rule to Cambium's rule set — Cambium's tree is read only to this card; adopting the rule there is Cambium's own gated change.
-- Retiring or relaxing clippy::map_err_ignore — The lint stays; a discarded error is left unbound by .ok().ok_or(…) and .ok().ok_or_else(…) instead.
-- Renaming PhantomData's `_marker` field in merkle/tree.rs — It is a type marker, not a held value, and a struct field declaration is not a binding the rule refuses.
-- Changing the AdmissionPolicy, LeafStore, Signer or AnchorTask trait — Each parameter is needed by some implementation, and LeafStore is in the published lys-log-store 0.2.0 (ADR-048).
-- Carrying sgconfig.yml, the rule directory or the ast-grep leg — LYSCORE-001 (brief 6747ce61) lands them; this card adds one rule to them.
-- Changing how a verification path collapses its failures — The single error is the design (P7); this card keeps it exactly.
+- A _name binding rule and the handling of each underscore-prefixed binding — Cambium carries no such rule, so the same rule set does not include it; a card of its own writes the rule and handles each binding by its act.
+- Carrying no-std-mutex-in-async — lys has no async fn, no tokio and no std Mutex, so it cannot fire (ADR-055); the card that lands lys's first async code carries it.
+- Carrying no-timer-in-door-handlers and no-timer-import-in-door-handlers — lys has no door handlers, so they cannot fire (ADR-055).
+- Tightening #![cfg_attr(not(test), forbid(unsafe_code))] so tests forbid unsafe code too — The attribute stays exactly as it is in this work; tightening it is a further unit.
+- Splitting crates/lys-home/src/record/mod.rs — Its 47 hits are HOME-013's, which this work waits on.
+- Correcting CHECKLIST-PRE-METHOD.md's C4 — The kept documents are the historical record and stay exactly as they were; the rendered CHECKLIST.md is the current truth.
+- A rule for todo!, unimplemented! and unreachable! — The words and the survey name unwrap, expect and panic; the other three stay with clippy's workspace lints.
+- ast-grep rule tests (`ast-grep test`) in the repository — No gate leg would run them; the never-landed scratch cases in the brief's acceptance are the measurement the words ask for.
+- Editing Cambium's rules or config to match lys — Neither project is edited to match the other; lys takes the opposite clippy.toml setting on tests from Cambium's.
 
 ## Structure
 
 | Path | Note | Brief |
 |------|------|-------|
-| `rules/ast-grep/no-underscore-binding.yml` | lys's rule refusing an underscore-prefixed binding, severity error, vendor/** ignored | LYSCORE-002 |
-| `sgconfig.yml` | ast-grep root config naming rules/ast-grep; landed by LYSCORE-001 (brief 6747ce61), unchanged here |  |
-| `rules/ast-grep` | lys's ast-grep rule directory; landed by LYSCORE-001 (brief 6747ce61) |  |
-| `docs/design/lys-core/design.json` | this design | LYSCORE-002 |
-| `docs/design/lys-core/checklist.json` | the rows LYSCORE-002 delivers | LYSCORE-002 |
-| `docs/design/lys-core/stories.json` | the stories LYSCORE-002 serves | LYSCORE-002 |
-| `docs/design/lys-core/briefs/LYSCORE-002.json` | the brief | LYSCORE-002 |
-| `docs/design/lys-core/DESIGN.md` | rendered from design.json | LYSCORE-002 |
-| `docs/design/lys-core/CHECKLIST.md` | rendered from checklist.json | LYSCORE-002 |
-| `docs/design/lys-core/USER-STORIES.md` | rendered from stories.json | LYSCORE-002 |
-| `docs/design/lys-core/briefs/LYSCORE-002.md` | rendered from the brief | LYSCORE-002 |
-| `docs/design/lys-core/DESIGN-PRE-METHOD.md` | the hand-written pre-method design, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
-| `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` | the hand-written pre-method checklist, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
-| `docs/design/lys-core/USER-STORIES-PRE-METHOD.md` | the hand-written pre-method stories, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged |  |
-| `Cargo.toml` | workspace lint table; map_err_ignore and used_underscore_binding at warn, unchanged |  |
-| `crates/lys-core/src` | lys-core library and sibling *_tests.rs files |  |
-| `crates/lys-core/tests` | lys-core integration and conformance tests |  |
-| `crates/lys-anchor/src` | lys-anchor library and sibling *_tests.rs files |  |
-| `crates/lys-anchor/tests` | lys-anchor integration and conformance tests |  |
-| `crates/lys-anchor-cli/src` | the anchor CLI and its sibling *_tests.rs files |  |
-| `crates/lys-anchor-cli/tests` | the anchor CLI's integration tests |  |
-| `crates/lys-home/src` | lys-home library and sibling *_tests.rs files |  |
-| `crates/lys-home/tests` | lys-home integration tests |  |
-| `crates/lys-log-store/src` | lys-log-store library, its published LeafStore trait and sibling *_tests.rs files |  |
-| `crates/lys/src` | the lys CLI |  |
-| `crates/lys/tests` | the lys CLI's integration tests |  |
+| `docs/design/lys-core/design.json` | This design | LYSCORE-001 |
+| `docs/design/lys-core/checklist.json` | The rows LYSCORE-001 delivers | LYSCORE-001 |
+| `docs/design/lys-core/stories.json` | The stories LYSCORE-001 serves | LYSCORE-001 |
+| `docs/design/lys-core/briefs/LYSCORE-001.json` | The ast-grep leg brief | LYSCORE-001 |
+| `docs/design/lys-core/briefs/LYSCORE-001.md` | Its rendered markdown | LYSCORE-001 |
+| `docs/design/lys-core/DESIGN.md` | The rendering of design.json, committed with the brief; R1 checks it | LYSCORE-001 |
+| `docs/design/lys-core/CHECKLIST.md` | The rendering of checklist.json, committed with the brief; R1 checks it | LYSCORE-001 |
+| `docs/design/lys-core/USER-STORIES.md` | The rendering of stories.json, committed with the brief; R1 checks it | LYSCORE-001 |
+| `docs/design/lys-core/DESIGN-PRE-METHOD.md` | The hand-written lys-core design, renamed in the brief's own commit and kept byte for byte as it stood at 7b53625 | LYSCORE-001 |
+| `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` | The hand-written lys-core checklist (C1 to C65 of the extraction), renamed in the brief's own commit and kept byte for byte; its C4 sentence is not borne out by the code after R5 | LYSCORE-001 |
+| `docs/design/lys-core/USER-STORIES-PRE-METHOD.md` | The hand-written lys-core user stories, renamed in the brief's own commit and kept byte for byte | LYSCORE-001 |
+| `sgconfig.yml` | ast-grep project config naming rules/ast-grep as its one rule directory | LYSCORE-001 |
+| `rules/ast-grep/mod-rs-declarations-only.yml` | Carried from Cambium: mod.rs holds no function, struct, enum, trait, impl, const or static | LYSCORE-001 |
+| `rules/ast-grep/no-let-underscore-on-results.yml` | Carried from Cambium: no `let _ =` discard | LYSCORE-001 |
+| `rules/ast-grep/no-lint-bypass-attributes.yml` | Carried from Cambium: no #[allow], #![allow], #[expect] or #[ignore] | LYSCORE-001 |
+| `rules/ast-grep/no-unwrap-expect-panic-outside-tests.yml` | New: unwrap, expect and panic reported everywhere except test code recognised by structure | LYSCORE-001 |
+| `clippy.toml` | allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests set to true | LYSCORE-001 |
+| `crates/lys-core/tests/harness/go.rs` | The Go-toolchain logic moved out of lys-core's tests/harness/mod.rs | LYSCORE-001 |
+| `crates/lys-anchor/tests/harness/go.rs` | The Go-toolchain logic moved out of lys-anchor's tests/harness/mod.rs | LYSCORE-001 |
+| `crates/lys-anchor/tests/harness/scaffold.rs` | GO_ENV, GoScaffold, ALL_SCAFFOLDS and the path to lys-core's harness, moved out of lys-anchor's tests/harness/mod.rs | LYSCORE-001 |
+| `crates/lys-anchor/tests/harness/scaffold_tests.rs` | The two contract tests moved out of lys-anchor's tests/harness/mod.rs | LYSCORE-001 |
+| `crates/lys-home/src/harness/claude_code/names.rs` | HARNESS, PROVIDER, API and AUTHORED, moved out of claude_code/mod.rs | LYSCORE-001 |
+| `docs/design/project.json` | The tree's gate legs; gains the ast-grep leg |  |
+| `.land/gates.sh` | The whole gate the landing runs; gains `leg ast-grep scan --config sgconfig.yml` |  |
+| `.github/workflows/ci.yml` | CI; gains a pinned ast-grep install and the same scan |  |
+| `CLAUDE.md` | The test opt-out sentence and the gates block, corrected |  |
+| `Cargo.toml` | The workspace lint comment, corrected to name clippy.toml; the serial_test workspace dev-dependency, removed |  |
+| `crates/lys-core/Cargo.toml` | The serial_test dev-dependency, removed with the last #[serial_test::serial] |  |
+| `Cargo.lock` | Regenerated by cargo without serial_test and serial_test_derive |  |
+| `crates/lys-core/src/lib.rs` | The comment above #![cfg_attr(not(test), forbid(unsafe_code))], rewritten; the attribute stays byte-identical; hex_lower's line 59 takes a form that returns no Result and line 54's import goes |  |
+| `crates/lys-core/src/keys/identity.rs` | Ed25519Identity::from_env reads the variable and hands the result to a private seam the tests feed |  |
+| `crates/lys-core/src/keys/identity_tests.rs` | The env-backed tests call the seam; no set_var, remove_var, unsafe or #[serial] |  |
+| `crates/lys/src/commands/hex.rs` | hex_lower writes without a Result |  |
+| `crates/lys-anchor-cli/src/commands/hex.rs` | hex_lower writes without a Result |  |
+| `crates/lys-home/src/harness/claude_code/mod.rs` | Declarations and re-exports only after R6 |  |
+| `crates/lys-core/tests/harness/mod.rs` | Declarations and re-exports only after R6, first line #![cfg(test)] |  |
+| `crates/lys-anchor/tests/harness/mod.rs` | Declarations and re-exports only after R6, first line #![cfg(test)] |  |
+| `crates/lys-anchor/src/upward/fixture.rs` | Test fixture; first line becomes #![cfg(test)] |  |
+| `crates/lys-anchor/src/witness/fixture.rs` | Test fixture; first line becomes #![cfg(test)] |  |
+| `crates/lys/src` | lys sources; its 10 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `crates/lys/tests` | lys integration tests; its 4 roots gain #![cfg(test)] as their first line |  |
+| `crates/lys-anchor/src` | lys-anchor sources; its 17 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `crates/lys-anchor/tests` | lys-anchor integration tests; its 5 roots gain #![cfg(test)] as their first line |  |
+| `crates/lys-anchor-cli/src` | lys-anchor-cli sources; its 6 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `crates/lys-anchor-cli/tests` | lys-anchor-cli integration tests; its 1 roots gain #![cfg(test)] as their first line |  |
+| `crates/lys-core/src` | lys-core sources; its 33 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `crates/lys-core/tests` | lys-core integration tests; its 11 roots gain #![cfg(test)] as their first line |  |
+| `crates/lys-home/src` | lys-home sources; its 20 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `crates/lys-home/tests` | lys-home integration tests; its 7 roots gain #![cfg(test)] as their first line |  |
+| `crates/lys-log-store/src` | lys-log-store sources; its 2 sibling *_tests.rs files gain #![cfg(test)] as their first line |  |
+| `docs/design/roadmap.json` | RM-035 carries this work |  |
+| `docs/design/decisions.json` | ADR-054 and ADR-055 |  |
 
 ## Inventory
 
-- `crates` — At 7b53625 this card's rule reports 303 underscore-prefixed bindings in 70 files: 59 guards whose directory or state is still used, in 11 files (55 TempDir holders and four EnvCleanup guards in lys-core keys/identity_tests.rs), 68 discarded errors in 28 files (64 map_err closures, one or_else closure, three match arms), 164 unused values in 34 files (105 of them TempDirs returned beside an identity or authority already loaded into memory, 57 from golden_identity), 10 ignored trait parameters in 5 files and 2 cfg(not(unix)) stub parameters. Every underscore-prefixed identifier in the tree that is not a struct field is one of the 303; nine underscore-prefixed struct fields are not, the eight fixture TempDir fields and PhantomData's _marker.
-- `Cargo.toml` — [workspace.lints.clippy]: pedantic at warn, map_err_ignore = "warn" (line 87), used_underscore_binding = "warn" (line 108), all failing under -D warnings.
-- `crates/lys-core/src/tlog/verify.rs` — Eight map_err(|_err| TrustError::LogArtifactVerification) closures; every failure is that one error.
-- `crates/lys-core/src/bundle/verify.rs` — Six map_err(|_err| reject()) closures; reject() builds the file's one error.
-- `crates/lys-core/src/checkpoint/note.rs` — Three map_err(|_err| TrustError::NoteVerification) closures; every structural failure is that one error.
-- `crates/lys-core/src/seal/sealed_envelope.rs` — Line 235 binds (key_bytes, _derived_nonce) from derive_key_and_nonce; the comment after it says why the derived nonce is not compared. A cryptographic file.
-- `crates/lys-anchor/src/admission/policy.rs` — AdmissionPolicy::admit(&self, submission, context); AcceptAll ignores both parameters, MaxSize ignores context, the certificate policy ignores submission.
-- `crates/lys-log-store/src/store.rs` — LeafStore, public in the published lys-log-store 0.2.0; the LyingStore fake in log_tests.rs ignores index, bytes and pin.
-- `crates/lys-anchor/src/keys/signer.rs` — Signer::sign(&self, message); DecliningSigner in anchor/genesis_tests.rs ignores message.
-- `crates/lys-anchor-cli/src/commands/anchor/policy.rs` — AnchorTask::run(self, policy); RecordPolicy in policy_tests.rs ignores policy.
-- `crates/lys-log-store/src/file.rs` — Line 392: #[cfg(not(unix))] fn fsync_dir(_dir: &Path); no gate host compiles it.
-- `crates/lys-core/src/keys/identity.rs` — Line 431: #[cfg(not(unix))] fn warn_if_loose_permissions(_path: &Path) {}; no gate host compiles it. Also seven discarded-error sites.
-- `crates/lys-core/src/keys/identity_tests.rs` — Four `let _guard = EnvCleanup;` guards over the from_env tests; LYSCORE-001 plans to remove the environment mutation they guard.
-- `crates (test fixture structs)` — Eight test fixture structs hold a TempDir in an underscore-prefixed field only to keep the directory alive: OpensslRequest (lys-core tests/openssl_csr_interop.rs:166), Party (lys-core tests/bundle_conformance.rs:107), Party (lys-core src/bundle/verify_tests.rs:27), ProvenLog (lys tests/log_tests.rs:96), Party (lys-anchor tests/cascade.rs:100), Fixture (lys-anchor-cli tests/anchor_cli.rs:35), Case (lys-anchor tests/stranger_verification.rs:228) and Node (lys-anchor src/upward/fixture.rs:48, used by upward/pin_tests.rs and upward/bundle_tests.rs). None has a close method.
-- `crates/lys-core/src/merkle/tree.rs` — Line 68: the struct field _marker: PhantomData, not a binding.
-- `sgconfig.yml` — Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates it.
-- `rules` — Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates rules/ast-grep.
-- `docs/design/project.json` — Seven legs; no ast-grep leg at 7b53625. LYSCORE-001 adds `ast-grep scan --config sgconfig.yml` here, in .land/gates.sh and in CI.
-- `CLAUDE.md` — Coding standards: silencing a lint with #[allow], an #[ignore]d test, a _-prefixed unused variable or #[cfg(any())] is a bypass, not a fix.
-- `docs/design/lys-core` — Hand-written pre-method DESIGN.md, CHECKLIST.md (C1 to C65) and USER-STORIES.md (S1 to S23), renamed *-PRE-METHOD.md with their content unchanged as LYSCORE-001 (ADR-045) does, so this cluster's rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md take the plain names.
-- `$cambium/rules/ast-grep` — Six rules, none refusing underscore-prefixed bindings. Read only.
+- `docs/design/lys-core/DESIGN-PRE-METHOD.md` — Renamed byte for byte from DESIGN.md in the brief's own commit. Hand-written pre-method design of the Phase 1/2 extraction (255 lines); no design.json beside it
+- `docs/design/lys-core/CHECKLIST-PRE-METHOD.md` — Renamed byte for byte from CHECKLIST.md in the brief's own commit. Hand-written checklist C1 to C65 (101 lines); C4 records the forbid-to-deny relaxation for set_var tests under an explicit #[allow]
+- `docs/design/lys-core/USER-STORIES-PRE-METHOD.md` — Renamed byte for byte from USER-STORIES.md in the brief's own commit. Hand-written stories S1 to S23 (55 lines)
+- `docs/design/project.json` — Seven gate legs (fmt, clippy-all-features, clippy, tests, doc-all-features, doc, design); no ast-grep leg
+- `.land/gates.sh` — Seven `leg` lines, run by the landing as the whole gate; no ast-grep
+- `.github/workflows/ci.yml` — fmt, clippy and test steps on ubuntu-latest; ast-grep not installed
+- `scripts/design/gate.sh` — Validates, checks coverage of, and byte-compares the rendering of every cluster with a design.json; lys-core has none yet
+- `sgconfig.yml` — Absent
+- `rules/ast-grep` — Absent
+- `clippy.toml` — Absent
+- `Cargo.toml` — Lines 69-70 say tests opt out per-module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]; unsafe_code = "deny"; unwrap_used, expect_used and panic warn
+- `CLAUDE.md` — Line 35 says tests opt out per-module with #![allow]; the gates block lists six commands under 'All five clean' and no ast-grep
+- `crates/lys-core/src/lib.rs` — Lines 27-30 explain the relaxed forbid through the set_var tests' #[allow(unsafe_code)]; line 31 is the attribute; line 59 is `let _ = s.write_fmt(...)` in hex_lower, and line 54 is the `use std::fmt::Write;` that write needs
+- `crates/lys-core/src/keys/identity.rs` — from_env (line 241) reads LYS_IDENTITY_KEY with std::env::var and decodes it in place
+- `crates/lys-core/src/keys/identity_tests.rs` — Five #[serial] env tests and the EnvCleanup guard carry the 7 #[allow(unsafe_code)] around set_var and remove_var (lines 847-1068)
+- `crates/lys-anchor/src/upward/fixture.rs` — First line #![allow(clippy::unwrap_used, ...)]; declared only as #[cfg(test)] mod from pin.rs; 7 unwrap/expect/panic calls
+- `crates/lys-anchor/src/witness/fixture.rs` — First line #![allow(clippy::unwrap_used, ...)]; declared only as #[cfg(test)] mod from report.rs; 15 unwrap/expect/panic calls
+- `crates/*/src/**/*_tests.rs` — 88 sibling test files, 78 carrying #![allow]; none carries #![cfg(test)]
+- `crates/*/tests/*.rs` — 28 integration test roots, 24 carrying #![allow], among them the 4 *_tests.rs roots of crates/lys
+- `crates/lys-core/tests/harness/mod.rs` — 127 lines, #![allow] at line 18, 4 functions (mod-rs-declarations-only hits); lys-anchor's contract test reads this file's text
+- `crates/lys-anchor/tests/harness/mod.rs` — 252 lines, #![allow] at line 45, 12 mod-rs-declarations-only hits including two #[test] fns
+- `crates/lys-home/src/harness/claude_code/mod.rs` — 4 const items (HARNESS, PROVIDER, API, AUTHORED), mod-rs-declarations-only hits
+- `crates/lys-home/src/record/mod.rs` — 630 lines, 47 mod-rs-declarations-only hits covering 521 lines on origin/main at 7b53625; split by HOME-013, not here
+- `crates/lys/src/commands/hex.rs` — Line 15 `let _ = s.write_fmt(...)`
+- `crates/lys-anchor-cli/src/commands/hex.rs` — Line 15 `let _ = s.write_fmt(...)`
+- `vendor/rauthy` — Pinned Rauthy submodule (ADR-009), not initialised in a fresh clone
+- `$cambium/rules/ast-grep/mod-rs-declarations-only.yml` — Source of the carried rule at cambium 1be80d8ec
+- `$cambium/rules/ast-grep/no-let-underscore-on-results.yml` — Source of the carried rule at cambium 1be80d8ec
+- `$cambium/rules/ast-grep/no-lint-bypass-attributes.yml` — Source of the carried rule at cambium 1be80d8ec
+- `$cambium/rules/ast-grep/no-std-mutex-in-async.yml` — Not carried: lys has no async fn, tokio or std Mutex
+- `$cambium/rules/ast-grep/no-timer-in-door-handlers.yml` — Not carried: lys has no door handlers
+- `$cambium/rules/ast-grep/no-timer-import-in-door-handlers.yml` — Not carried: lys has no door handlers
 
 ## Constraints
 
-- **CN9** — Every rewritten site returns the same value and the same error (variant, fields and message) as before; every failure in tlog/verify.rs, bundle/verify.rs and checkpoint/note.rs still returns the one error it returns today.
-- **CN10** — No wire format, domain-separation tag, test vector or signed fixture changes.
-- **CN11** — The public API of lys-core, lys and lys-log-store does not change, and the AdmissionPolicy, LeafStore, Signer and AnchorTask declarations are byte-identical.
-- **CN12** — No hit is cleared by #[allow], #[expect], #[ignore], #[cfg(any())], a rename to another underscore-prefixed name, or an ignores or files entry beyond vendor/**.
-- **CN13** — No `let _ =` statement is introduced under crates/.
-- **CN14** — Cargo.toml keeps map_err_ignore = "warn" and used_underscore_binding = "warn".
-- **CN15** — Cambium's tree is not changed.
-- **CN16** — docs/design/project.json, .land/gates.sh, .github/workflows/ci.yml and sgconfig.yml are not changed.
-- **CN17** — The hand-written pre-method lys-core documents are not edited.
-- **CN18** — The rule is at severity error.
+- **CN1** — No unwrap, expect or panic call in a fixture or *_tests.rs file is rewritten: each such file's count of `.unwrap()`, `.expect(` and `panic!(` is not below its count at the base.
+- **CN2** — No rule and no config names a file or a list of file names to exempt; test code is recognised by structure only (P1).
+- **CN3** — No #[allow], #![allow], #[expect] or #[ignore] of any kind replaces a removed one, in tests or in library code.
+- **CN4** — #![cfg_attr(not(test), forbid(unsafe_code))] in crates/lys-core/src/lib.rs stays byte-identical, and the card's diff to lib.rs changes comment lines plus lines 54 and 59 only.
+- **CN5** — crates/lys-home/src/record/mod.rs is not changed by this work.
+- **CN6** — No wire format, domain-separation tag, public API signature or public behaviour of lys-core changes; Ed25519Identity::from_env keeps its signature and its three error texts.
+- **CN7** — vendor/rauthy is neither scanned nor edited, and no file under vendor/ is committed (ADR-009).
+- **CN8** — Cambium's rules and config are not edited.
+- **CN9** — The seven existing gate legs and their commands are unchanged in docs/design/project.json and .land/gates.sh.
+- **CN10** — Only this card writes under docs/design/lys-core.
