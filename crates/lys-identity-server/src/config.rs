@@ -68,10 +68,10 @@ pub struct Config {
     /// answer `SecretsUnavailable`.
     #[serde(default)]
     pub secrets: Option<crate::secrets_api::SecretsSettings>,
-    /// The file the access requests are kept in. Without it the request
-    /// routes answer `RequestsUnavailable`.
+    /// The directory the access requests are kept in, created when it does
+    /// not exist. Without it the request routes answer `RequestsUnavailable`.
     #[serde(default)]
-    pub requests_file: Option<PathBuf>,
+    pub requests_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

@@ -133,6 +133,21 @@ impl Harness {
         set(&self.plan, next);
     }
 
+    /// A way to open the log's leaf store that fails where the plan says.
+    pub fn leaves(&self) -> Box<dyn Fn() -> StoreResult<FaultStore> + Send> {
+        let path = self.log_path();
+        let plan = Arc::clone(&self.plan);
+        Box::new(move || {
+            if fault(&plan) == Fault::AfterLeafUnreadable {
+                return Err(injected("reopen"));
+            }
+            Ok(FaultStore {
+                inner: FileLeafStore::open(Path::new(&path))?,
+                plan: Arc::clone(&plan),
+            })
+        })
+    }
+
     /// Open the directory over the log, as a restarted service would.
     pub fn open(&self) -> Result<Directory<FaultStore>, Box<dyn Error>> {
         let path = self.log_path();
@@ -265,7 +280,7 @@ impl Service {
             grant_model_file: dir.path().join("grant-model.json"),
             spicedb,
             secrets,
-            requests_file: Some(dir.path().join("requests.jsonl")),
+            requests_dir: Some(dir.path().join("requests")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

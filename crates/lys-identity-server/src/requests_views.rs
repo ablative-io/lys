@@ -57,6 +57,8 @@ pub struct RequestView {
     pub state: &'static str,
     /// The people who could approve it as the grants stand now.
     pub approvers: Vec<PersonSummary>,
+    /// The grants the caller holds that the access could be lent from, as the grants stand now.
+    pub sources: Vec<String>,
     /// The decision, null while it waits.
     pub decision: Option<DecisionView>,
 }

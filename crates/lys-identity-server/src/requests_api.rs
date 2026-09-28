@@ -15,6 +15,10 @@
 //! those people and to the root authority, and to anyone else it is refused
 //! exactly as a request that is not kept.
 //!
+//! A request asked again with the operation id it was kept under is answered
+//! as it was kept, whatever the time is by then: the end it asks for is
+//! checked against now only when the request is new.
+//!
 //! A decision is kept after the grant is committed. If the service stops
 //! between the two, the request still waits, and approving it again with the
 //! same operation id answers the same grant and keeps the decision.
@@ -28,7 +32,7 @@ use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::grants::{
-    DelegateRequest, PassOn, RecipientKind, Relation, Resource, RootRequest, Window,
+    DelegateRequest, GrantId, PassOn, RecipientKind, Relation, Resource, RootRequest, Window,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::Deserialize;
@@ -123,9 +127,11 @@ fn with_requests<T>(
         .requests
         .as_ref()
         .ok_or_else(|| ServerError::RequestsUnavailable {
-            reason: "the configuration names no requests_file".to_owned(),
+            reason: "the configuration names no requests_dir".to_owned(),
         })?;
-    act(&mut store.lock().unwrap_or_else(PoisonError::into_inner))
+    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    store.settle()?;
+    act(&mut store)
 }
 
 /// A request read against the directory and the grants as they stand.
@@ -135,6 +141,7 @@ struct Weighed {
     resource: Resource,
     relation: Relation,
     approvers: Vec<PersonId>,
+    lenders: Vec<(PersonId, GrantId)>,
 }
 
 impl Weighed {
@@ -146,6 +153,7 @@ impl Weighed {
         let kind = RecipientKind::of(seeker);
         let book = judged.grants.book();
         let mut approvers = Vec::new();
+        let mut lenders = Vec::new();
         if kind == RecipientKind::Person {
             approvers.push(judged.root);
         }
@@ -158,10 +166,12 @@ impl Weighed {
                     .is_some_and(|actions| needed.is_subset(actions));
             if let IdentityId::Person(holder) = grant.holder()
                 && lends
-                && !approvers.contains(&holder)
                 && stands(book, record, at)
             {
-                approvers.push(holder);
+                lenders.push((holder, grant.id()));
+                if !approvers.contains(&holder) {
+                    approvers.push(holder);
+                }
             }
         }
         Ok(Self {
@@ -170,6 +180,7 @@ impl Weighed {
             resource,
             relation,
             approvers,
+            lenders,
         })
     }
 
@@ -188,6 +199,7 @@ impl Weighed {
     fn view(
         &self,
         judged: &Judged<'_>,
+        caller: IdentityId,
         asked: &Asked,
         decided: Option<&Decided>,
     ) -> Result<RequestView, ServerError> {
@@ -225,6 +237,12 @@ impl Weighed {
                 .iter()
                 .map(|person| summary(*person))
                 .collect::<Result<_, _>>()?,
+            sources: self
+                .lenders
+                .iter()
+                .filter(|(holder, _)| IdentityId::Person(*holder) == caller)
+                .map(|(_, grant)| grant.to_string())
+                .collect(),
             decision: decided.map(DecisionView::from),
         })
     }
@@ -287,7 +305,7 @@ async fn list(
             for (asked, decided) in store.requests() {
                 let weighed = Weighed::of(&judged, asked, at)?;
                 if weighed.shows(caller) || is_root(caller, judged.root) {
-                    requests.push(weighed.view(&judged, asked, decided)?);
+                    requests.push(weighed.view(&judged, caller, asked, decided)?);
                 }
             }
             Ok(Json(RequestList { requests }))
@@ -304,9 +322,6 @@ async fn ask(
         let caller = caller(&state, &headers, judged.directory)?;
         let body = taken(body)?;
         let at = now();
-        if body.ends_at.is_some_and(|ends_at| ends_at <= at) {
-            return Err(malformed("the end asked for is not after now"));
-        }
         let responsible = match caller {
             IdentityId::Person(person) => Some(person),
             IdentityId::Agent(_) => judged
@@ -328,11 +343,15 @@ async fn ask(
         };
         let weighed = Weighed::of(&judged, &asked, at)?;
         with_requests(&state, |store| {
+            let fresh = store.request(&asked.id).is_none();
+            if fresh && asked.ends_at.is_some_and(|ends_at| ends_at <= at) {
+                return Err(malformed("the end asked for is not after now"));
+            }
             store.ask(asked.clone())?;
             let (kept, decided) = store
                 .request(&asked.id)
                 .ok_or(ServerError::RequestUnknown)?;
-            Ok(Json(weighed.view(&judged, kept, decided)?))
+            Ok(Json(weighed.view(&judged, caller, kept, decided)?))
         })
     })
 }
@@ -352,7 +371,12 @@ async fn approve(
             let by = decider(&judged, caller, &weighed)?;
             if let Some(decided) = &decided {
                 settled(decided, by, true)?;
-                return Ok(Json(weighed.view(&judged, &asked, Some(decided))?));
+                return Ok(Json(weighed.view(
+                    &judged,
+                    caller,
+                    &asked,
+                    Some(decided),
+                )?));
             }
             let note = words("note", &body.note)?;
             let operation = OperationId::from_str(&body.operation)?;
@@ -404,7 +428,12 @@ async fn approve(
                 decided_at: at,
             };
             store.decide(decided.clone())?;
-            Ok(Json(weighed.view(&judged, &asked, Some(&decided))?))
+            Ok(Json(weighed.view(
+                &judged,
+                caller,
+                &asked,
+                Some(&decided),
+            )?))
         })
     })
 }
@@ -424,7 +453,12 @@ async fn decline(
             let by = decider(&judged, caller, &weighed)?;
             if let Some(decided) = &decided {
                 settled(decided, by, false)?;
-                return Ok(Json(weighed.view(&judged, &asked, Some(decided))?));
+                return Ok(Json(weighed.view(
+                    &judged,
+                    caller,
+                    &asked,
+                    Some(decided),
+                )?));
             }
             let decided = Decided {
                 id: asked.id.clone(),
@@ -435,7 +469,12 @@ async fn decline(
                 decided_at: at,
             };
             store.decide(decided.clone())?;
-            Ok(Json(weighed.view(&judged, &asked, Some(&decided))?))
+            Ok(Json(weighed.view(
+                &judged,
+                caller,
+                &asked,
+                Some(&decided),
+            )?))
         })
     })
 }

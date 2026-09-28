@@ -5,12 +5,15 @@
 //! the in-process issuer, and no other server.
 
 use std::error::Error;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, Fault, FaultStore, Harness, Service};
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::requests_store::{Asked, Decided, RequestStore};
+use lys_identity_server::requests_store::{Asked, Decided, Reopen, RequestStore};
+use lys_log_store::StoreError;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -322,12 +325,59 @@ async fn a_request_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
     Ok(())
 }
 
-#[test]
-fn the_requests_are_read_back_as_they_were_kept() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("requests.jsonl");
-    let asked = Asked {
-        id: operation()?,
+#[tokio::test]
+async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestResult {
+    let table = Table::set().await?;
+    let soon = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs()
+        + 2;
+    let mut body = Table::ask_body("4", "beta")?;
+    body["ends_at"] = json!(soon);
+    let (status, first) = table
+        .service
+        .post("/requests", Some(&table.bea), &body)
+        .await?;
+    assert_eq!(status, 200, "{first}");
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let (status, replayed) = table
+        .service
+        .post("/requests", Some(&table.bea), &body)
+        .await?;
+    assert_eq!(
+        status, 200,
+        "the kept request is answered, not judged again: {replayed}"
+    );
+    assert_eq!(replayed["id"], first["id"]);
+    assert_eq!(replayed["asked_at"], first["asked_at"]);
+    let mut late = Table::ask_body("4", "beta")?;
+    late["ends_at"] = json!(soon);
+    let fresh = table
+        .service
+        .post("/requests", Some(&table.bea), &late)
+        .await?;
+    refused(&fresh, 400, "RequestMalformed");
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_caller_is_shown_the_grants_it_could_lend_from() -> TestResult {
+    let table = Table::set().await?;
+    let source = table.lendable("1").await?;
+    let asked = table.ask(&table.ada, "1", "beta").await?;
+    assert_eq!(
+        asked["sources"],
+        json!([]),
+        "Ada holds no grant to lend from"
+    );
+    let (_, seen) = table.service.get("/requests", Some(&table.bea)).await?;
+    assert_eq!(seen["requests"][0]["sources"], json!([source]));
+    Ok(())
+}
+
+fn asked(id: &str) -> Asked {
+    Asked {
+        id: id.to_owned(),
         asked_by: "person-a".to_owned(),
         responsible: "person-a".to_owned(),
         resource_kind: "doc".to_owned(),
@@ -336,28 +386,120 @@ fn the_requests_are_read_back_as_they_were_kept() -> TestResult {
         ends_at: None,
         why: "to read".to_owned(),
         asked_at: 5,
-    };
-    let decided = Decided {
-        id: asked.id.clone(),
+    }
+}
+
+fn declined(id: &str) -> Decided {
+    Decided {
+        id: id.to_owned(),
         by: "person-b".to_owned(),
         approved: false,
         note: "no".to_owned(),
         grant: None,
         decided_at: 6,
-    };
+    }
+}
+
+#[test]
+fn the_requests_are_read_back_as_they_were_kept() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("requests");
+    let (first, decision) = (asked("op-1"), declined("op-1"));
     let mut store = RequestStore::open(&path)?;
-    store.ask(asked.clone())?;
-    store.decide(decided.clone())?;
+    store.ask(first.clone())?;
+    store.decide(decision.clone())?;
     drop(store);
     let store = RequestStore::open(&path)?;
     let kept: Vec<_> = store.requests().collect();
-    assert_eq!(kept, [(&asked, Some(&decided))]);
+    assert_eq!(kept, [(&first, Some(&decision))]);
+    Ok(())
+}
 
-    std::fs::write(&path, "{\"line\":\"asked\"")?;
-    let torn = RequestStore::open(&path)
+#[test]
+fn an_append_that_fails_is_settled_by_what_the_leaves_hold() -> TestResult {
+    let mut legs = 0;
+    for (fault, stored) in [
+        (Fault::None, true),
+        (Fault::BeforeLeaf, false),
+        (Fault::LeafStoredWriteFailed, true),
+    ] {
+        let harness = Harness::new(7)?;
+        let mut store = RequestStore::over(harness.leaves())?;
+        store.ask(asked("op-1"))?;
+        harness.fail(fault);
+        let answer = store.ask(asked("op-2"));
+        assert_eq!(answer.is_ok(), stored, "{fault:?}: {answer:?}");
+        assert_eq!(store.request("op-2").is_some(), stored, "{fault:?}: memory");
+        store.decide(declined("op-1"))?;
+        let again = store.ask(asked("op-2"));
+        assert!(
+            again.is_ok(),
+            "{fault:?}: asked again it is kept once: {again:?}"
+        );
+        drop(store);
+
+        let reopened = RequestStore::over(harness.leaves())?;
+        let ids: Vec<&str> = reopened
+            .requests()
+            .map(|(asked, _)| asked.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            ["op-1", "op-2"],
+            "{fault:?}: no leaf is lost or doubled"
+        );
+        assert_eq!(
+            reopened.request("op-1").and_then(|(_, decided)| decided),
+            Some(&declined("op-1")),
+            "{fault:?}"
+        );
+        legs += 1;
+    }
+    assert_eq!(legs, 3);
+    Ok(())
+}
+
+#[test]
+fn a_store_that_cannot_be_read_back_answers_nothing_until_it_can() -> TestResult {
+    let harness = Harness::new(7)?;
+    let blocked = Arc::new(AtomicBool::new(false));
+    let (leaves, gate) = (harness.leaves(), Arc::clone(&blocked));
+    let reopen: Reopen<FaultStore> = Box::new(move || {
+        if gate.load(Ordering::SeqCst) {
+            return Err(StoreError::Io {
+                context: "reopen".to_owned(),
+                source: std::io::Error::other("injected"),
+            });
+        }
+        leaves()
+    });
+    let mut store = RequestStore::over(reopen)?;
+    harness.fail(Fault::LeafStoredWriteFailed);
+    blocked.store(true, Ordering::SeqCst);
+    let failed = store
+        .ask(asked("op-1"))
         .err()
-        .ok_or("a torn line was read")?;
-    assert_eq!(torn.name(), "RequestsUnavailable");
-    assert!(torn.to_string().contains("line 1"), "{torn}");
+        .ok_or("the append was answered")?;
+    assert_eq!(failed.name(), "RequestsUnavailable");
+    for held in [
+        store.ask(asked("op-2")),
+        store.decide(declined("op-1")),
+        store.settle(),
+    ] {
+        let held = held.err().ok_or("answered while the outcome is unknown")?;
+        assert_eq!(held.name(), "RequestsUnavailable");
+    }
+    blocked.store(false, Ordering::SeqCst);
+    store.ask(asked("op-1"))?;
+    store.ask(asked("op-2"))?;
+    let ids: Vec<&str> = store
+        .requests()
+        .map(|(asked, _)| asked.id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        ["op-1", "op-2"],
+        "the stored leaf is read back once, not written twice"
+    );
     Ok(())
 }

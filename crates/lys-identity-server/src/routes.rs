@@ -75,7 +75,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
         requests: config
-            .requests_file
+            .requests_dir
             .as_deref()
             .map(crate::requests_store::RequestStore::open)
             .transpose()?

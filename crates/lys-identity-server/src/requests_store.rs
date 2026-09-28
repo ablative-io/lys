@@ -1,20 +1,23 @@
-//! The access requests as they are kept: one file, one JSON line for each
-//! request asked and each decision made, appended and synced before the
-//! request is answered.
+//! The access requests as they are kept: a leaf store of their own, one leaf
+//! for each request asked and each decision made, written before the request
+//! is answered. A leaf is stored whole or not at all.
+//!
+//! An append that fails leaves its outcome unknown. It is settled by opening
+//! the leaf store again and reading what it holds, before anything else is
+//! read or written, so memory never runs ahead of or behind the leaves.
 //!
 //! A request is a question and gives no access. The access an approval gives
-//! is a grant, signed and receipted by the grants like every other. So this
-//! file is not part of any signed log, and its lines carry no receipt.
+//! is a grant, signed and receipted by the grants like every other. So these
+//! leaves are not signed, and carry no receipt.
 //!
 //! A request is named by the operation id it was asked with, so asking again
 //! with the same operation and the same words answers the request already
 //! kept, and the same operation with other words is refused.
 
 use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use lys_log_store::{FileLeafStore, LeafStore, StoreResult};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -71,43 +74,85 @@ enum Line {
 /// A request with its decision, once it has one.
 pub type Kept<'a> = (&'a Asked, Option<&'a Decided>);
 
-/// The requests, read from their file and appended to it.
-#[derive(Debug)]
-pub struct RequestStore {
-    path: PathBuf,
+/// How the leaf store is opened again after an append whose outcome is not known.
+pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
+
+/// The origin the requests' leaf store is created with.
+pub const ORIGIN: &str = "lys/identity/access-requests";
+
+/// The requests, read from their leaf store and appended to it.
+pub struct RequestStore<S: LeafStore = FileLeafStore> {
+    reopen: Reopen<S>,
+    leaves: S,
+    folded: u64,
+    uncertain: bool,
     asked: Vec<Asked>,
     decided: BTreeMap<String, Decided>,
 }
 
-fn unavailable(path: &Path, what: impl std::fmt::Display) -> ServerError {
+fn unavailable(what: impl std::fmt::Display) -> ServerError {
     ServerError::RequestsUnavailable {
-        reason: format!("{}: {what}", path.display()),
+        reason: what.to_string(),
     }
 }
 
-impl RequestStore {
-    /// The requests kept at `path`, none if the file does not exist yet.
-    pub fn open(path: &Path) -> Result<Self, ServerError> {
+impl RequestStore<FileLeafStore> {
+    /// The requests kept in the directory `dir`, which is created when it does not exist.
+    pub fn open(dir: &Path) -> Result<Self, ServerError> {
+        if !dir.exists() {
+            FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
+        }
+        let dir = dir.to_owned();
+        Self::over(Box::new(move || FileLeafStore::open(&dir)))
+    }
+}
+
+impl<S: LeafStore> RequestStore<S> {
+    /// The requests kept in the leaf store `reopen` opens.
+    pub fn over(reopen: Reopen<S>) -> Result<Self, ServerError> {
+        let leaves = reopen().map_err(unavailable)?;
         let mut store = Self {
-            path: path.to_owned(),
+            reopen,
+            leaves,
+            folded: 0,
+            uncertain: false,
             asked: Vec::new(),
             decided: BTreeMap::new(),
         };
-        if !path.exists() {
-            return Ok(store);
-        }
-        let file = File::open(path).map_err(|error| unavailable(path, error))?;
-        for (number, line) in BufReader::new(file).lines().enumerate() {
-            let text = line.map_err(|error| unavailable(path, error))?;
-            let line = serde_json::from_str(&text).map_err(|error| {
-                unavailable(
-                    path,
-                    format!("line {} is not a request line: {error}", number + 1),
-                )
-            })?;
-            store.hold(line);
-        }
+        store.fold()?;
         Ok(store)
+    }
+
+    /// Read every leaf not yet read.
+    fn fold(&mut self) -> Result<(), ServerError> {
+        while self.folded < self.leaves.extent() {
+            let index = self.folded;
+            let bytes = self
+                .leaves
+                .leaf(index)
+                .map_err(unavailable)?
+                .ok_or_else(|| {
+                    unavailable(format!("leaf {index} is within the extent and absent"))
+                })?;
+            let line = serde_json::from_slice(&bytes).map_err(|error| {
+                unavailable(format!("leaf {index} is not a request line: {error}"))
+            })?;
+            self.hold(line);
+            self.folded += 1;
+        }
+        Ok(())
+    }
+
+    /// Resolve an append whose outcome is not known, by opening the leaf
+    /// store again and reading what it holds. Until that succeeds nothing is
+    /// answered from memory and nothing is appended.
+    pub fn settle(&mut self) -> Result<(), ServerError> {
+        if self.uncertain {
+            self.leaves = (self.reopen)().map_err(unavailable)?;
+            self.fold()?;
+            self.uncertain = false;
+        }
+        Ok(())
     }
 
     fn hold(&mut self, line: Line) {
@@ -119,20 +164,26 @@ impl RequestStore {
         }
     }
 
+    /// Append one line as one leaf. A failed append is settled by reading
+    /// back: the line is kept only if the leaf store holds exactly it.
     fn append(&mut self, line: Line) -> Result<(), ServerError> {
-        let mut text =
-            serde_json::to_string(&line).map_err(|error| unavailable(&self.path, error))?;
-        text.push('\n');
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(|error| unavailable(&self.path, error))?;
-        file.write_all(text.as_bytes())
-            .and_then(|()| file.sync_all())
-            .map_err(|error| unavailable(&self.path, error))?;
-        self.hold(line);
-        Ok(())
+        self.settle()?;
+        let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
+        let index = self.folded;
+        let Err(failure) = self.leaves.put_leaf(index, &bytes) else {
+            self.hold(line);
+            self.folded += 1;
+            return Ok(());
+        };
+        self.uncertain = true;
+        self.settle()?;
+        match self.leaves.leaf(index).map_err(unavailable)? {
+            Some(held) if held == bytes => Ok(()),
+            Some(_) => Err(unavailable(format!(
+                "leaf {index} was written by another writer: {failure}"
+            ))),
+            None => Err(unavailable(failure)),
+        }
     }
 
     /// Every request, in the order asked.
@@ -150,6 +201,7 @@ impl RequestStore {
     /// Keep `asked`. Asked again in the same words it is kept once; the same
     /// operation in other words is refused.
     pub fn ask(&mut self, asked: Asked) -> Result<(), ServerError> {
+        self.settle()?;
         match self.request(&asked.id) {
             Some((kept, _)) if same_words(kept, &asked) => Ok(()),
             Some(_) => Err(ServerError::RequestReused { request: asked.id }),
@@ -160,6 +212,7 @@ impl RequestStore {
     /// Keep the decision on a request that waits. Decided again the same way
     /// it is kept once; a request decided another way is refused.
     pub fn decide(&mut self, decided: Decided) -> Result<(), ServerError> {
+        self.settle()?;
         match self.request(&decided.id) {
             None => Err(ServerError::RequestUnknown),
             Some((_, None)) => self.append(Line::Decided(decided)),
