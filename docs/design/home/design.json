@@ -3,7 +3,7 @@
   "title": "The home: a session held under its identity, resumable by any harness that can be measured",
   "intention": "A session's history lives under the agent's identity, not under a harness. The record is what the model was given and what came back, in order, with each provider's native blocks kept whole. A harness's own resume file is rendered from that record on demand, so an agent moves machines, harnesses or providers and continues; the original bytes are never rewritten. Code this cluster built before the chain existed is judged by the chain as it stands, and a card is done only when that judgement holds on the rows it carries: done means judged, never merely merged.",
   "problem": "Today a session exists only as its harness's file. Archie's Claude Code file measured 141,931,097 bytes on 24 September 2026: the conversation itself is under 3% of it, tool results 14%, thinking 6%, and about 60% is harness bookkeeping the model never sees; Waffles' file is 3.37 GB and Claude Code loads it whole. Nothing central holds a session, so nothing can render a smaller working session, move one to another device, swap provider and come back, or say what a session was given. Norn already has the canonical event model (SessionEvent, conversion to provider messages, compaction as a derived event, provider epoch boundaries) proved by its own tests; Claude Code has no importer to it and no renderer from it. HOME-001's rows R1 to R11 were built by hand and reached main before every carded row had to pass through its board's chain, so nothing on main records the chain's judgement of crates/lys-home, lys has no ast-grep rule set to judge it with, and two of those rows (R7, R10) have no code on main at all.",
-  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A fork (HOME-002) is a launch from a lantern's point: the lantern is a lys.lantern entry the lantern card delivers, and the fork resolves it, cuts the parent's raw root-to-point chain through the index back to the last assistant message at or before the point (Claude Code's resume walks from an assistant-anchored leaf), and writes a new session whose header's parentSession is the parent file's path relative to the home and whose entry lines are the parent's own lines, byte for byte, so every part and block hash is the parent's and the block store gains nothing (P4). A lantern is forked from the session it was lit in, as its lys.lantern entry records it; a copy of its line inside a child is a copy, not a second lantern, and a lantern with no assistant message at or before its point is refused, since a cut there would carry only the seed. The fork then writes the ancestry on both sides as two custom entries, lys.forked_from in the child directly after the copy and lys.fork at the parent's head, appended only (P1, P2). When the point is a user message the cut stops at the assistant entry before it and that message is carried, not copied: the child's render writes its text parts beside the rendered file as a seed prompt under an in-band marker, and lys.forked_from counts the parts the seed left out, and the printed launch line passes it as the resumed session's first prompt. The child renders and launches like any session: the render prints the resume-by-path launch line, and whatever a launch supplies is supplied at launch, never copied from the parent (P8).",
+  "solution": "Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents. A home moves by the route a build tree takes (ADR-014): the home directory is a git repository whose tracked set is an allowlist (sessions/<id>.jsonl, its index and head files, blocks/ and templates/, never a lock, temporary, environment or render file), `lys-home ship` commits that set and pushes it as one ref, refs/lys-home/<commit>, to a remote named on the command line, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding either, and records the arrival on each session as a seventh lys.harness_event kind beside the head (ADR-015), naming the source commit, the remote, the ref and the target home's own execution id. Until encryption at rest exists, ship refuses a remote off this machine and any tracked file holding a named secret value.",
   "principles": [
     {
       "id": "P1",
@@ -85,7 +85,8 @@
     "A render given a test key signs what the session was given as one lys/attestation/v2 statement over the SHA-256 of the lys.given entry's canonical data, which `lys verify --attestation` accepts offline, refuses when one byte is altered, and attributes to the test key's public key by a stated comparison; a render with no key is unchanged and reports unsigned.",
     "A fixture home ships as one git ref to a bare repository at a path on this machine and is fetched into a second, empty home whose fetched tree hash-matches the source's sessions, index and head files, blocks and templates, with the source byte-identical, one arrival beside each session's head carrying a fresh execution id, committed in the target on the fetched commit, and the target rendered and resumed through the launch template on Claude Code 2.1.283, measured.",
     "PROOF-CHAIN.md records the chain's whole judgement of crates/lys-home at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff: every check by name, command and outcome, one Jev verdict per file, every finding as its own line, with no byte of the crate changed.",
-    "A session forked from a lit lantern at a past assistant entry renders, resumes by its printed launch line on a named Claude Code version and answers from the path up to the point, with the parent's earlier bytes and the block store unchanged."
+    "A session forked from a lit lantern at a past assistant entry renders, resumes by its printed launch line on a named Claude Code version and answers from the path up to the point, with the parent's earlier bytes and the block store unchanged.",
+    "A home ships as one pushed git ref to a named remote on this machine and is fetched into a second home whose tracked files match the source at the fetched commit, with an arrival on each session naming the source commit and a fresh execution id; the fetched home renders through the launch template and the printed launch line resumes it on the installed Claude Code version, measured."
   ],
   "non_goals": [
     {
@@ -175,6 +176,10 @@
     {
       "text": "Building the Claude Code launch template, and issuing a forked session's handles.",
       "reason": "The launch template card prints the same resume-by-path line when it lands, and handles arrive with the broker; the fork launches on what a launch supplies today and copies nothing from the parent."
+    },
+    {
+      "text": "Encryption at rest, and moving a home to a named second machine (stage 3's second block and its preconditions).",
+      "reason": "Stage 3's second block waits on read authority over the home and on encryption before bytes leave the machine, each a card on its own board; this cluster's move is the same-machine proof, whose shipped ref that block fetches."
     }
   ],
   "structure": [
@@ -1262,6 +1267,111 @@
       "path": "crates/lys-home/tests/fixtures/claude_code_compacted.jsonl",
       "note": "a hand-built Claude Code 2.1.281 file with two compactions and no real content",
       "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "the crate manifest; gains regex for the five standard secret patterns",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_tests.rs",
+      "note": "gates on the R4 render",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-004.json",
+      "note": "the fourth brief: ship and fetch a home as one git ref, the arrival event, the same-machine resume proof",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/PROOF-MOVE.md",
+      "note": "the measured move: the fixture home shipped, fetched, rendered and resumed on the installed Claude Code, as hashes, counts and paths",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify.rs",
+      "note": "an index and a head checked against their session file without rebuilding or writing anything",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify_tests.rs",
+      "note": "gates on the check-only verification: stale, missing and unindexed refused, nothing written",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/mod.rs",
+      "note": "the move module: declarations only",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/git.rs",
+      "note": "the git binary run with the person's git configuration, hooks, signing and prompts shut out",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/git_tests.rs",
+      "note": "gates on the isolated git runner",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/remote.rs",
+      "note": "the remote named: ship stays on this machine, no remote carries userinfo, the form the arrival records",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/remote_tests.rs",
+      "note": "gates on the remote rules",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/tracked.rs",
+      "note": "the tracked set by allowlist, and the scan for the named secret values and the five standard patterns",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/tracked_tests.rs",
+      "note": "gates on the tracked set, the value scan and each pattern with its near miss",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/ship.rs",
+      "note": "ship: check, scan, commit the tracked set, push one ref; the table of the five standard secret patterns",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/moves/fetch.rs",
+      "note": "fetch: into a staging directory, verify, record the arrival, rename into place",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/cli/moves.rs",
+      "note": "the ship and fetch subcommands, split out of cli.rs",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/home_ship.rs",
+      "note": "ship through the built binary: the report, the pushed tree, each refusal with nothing written",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/home_fetch.rs",
+      "note": "fetch through the built binary: the arrival, the execution id, each refusal with nothing left behind",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/home_move.rs",
+      "note": "the move end to end on the fixture home: hash match at the fetched commit, prefixes after, source unchanged, secret search with its control",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "the workspace manifest; gains regex among the workspace dependencies",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "the lockfile; gains regex and what it resolves to",
+      "brief": "HOME-004"
     }
   ],
   "inventory": [

@@ -740,6 +740,81 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Claude Code in and out",
+      "items": [
+        {
+          "id": "C3",
+          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The handover",
+      "items": [
+        {
+          "id": "C13",
+          "text": "At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Moving a home",
+      "items": [
+        {
+          "id": "C24",
+          "text": "lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.",
+          "done": false
+        },
+        {
+          "id": "C25",
+          "text": "Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.",
+          "done": false
+        },
+        {
+          "id": "C26",
+          "text": "Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.",
+          "done": false
+        },
+        {
+          "id": "C27",
+          "text": "No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.",
+          "done": false
+        },
+        {
+          "id": "C28",
+          "text": "lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.",
+          "done": false
+        },
+        {
+          "id": "C29",
+          "text": "Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.",
+          "done": false
+        },
+        {
+          "id": "C30",
+          "text": "On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.",
+          "done": false
+        },
+        {
+          "id": "C31",
+          "text": "PROOF-MOVE.md records the fetched home rendered by render-launch and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.",
+          "done": false
+        }
+      ]
     }
   ]
 }

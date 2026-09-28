@@ -2,158 +2,157 @@
 
 ## The words, as they were typed
 
-A compaction is the first derived record, because the harness itself produces it: Claude Code writes a summary record and keeps everything before it in its own file, and the importer already turns that record into Pi's compaction entry with its summary and first kept entry. What the home does not yet say is what the compaction could not keep, and nothing yet proves, on a compacted session, that the original is all still there. This card adds both. When a compaction entry enters a session, on import of a Claude Code file that carries a summary record, the importer appends directly after it a lys.loss custom entry that points at the compaction by entry id and names what fell outside the kept range: the first and last entry id of the span it summarises, from the root or the previous compaction to the entry before the first kept one, and the counts of entries, messages, tool calls, tool results and blocks in that span with their bytes, and the tokensBefore the harness reported; it names entry ids and hashes and never a word of content. The summarised entries are not touched: they stay on the tree, their blocks stay in the store, and the context path is Pi's reading as today, the compaction first, then the kept entries. A lys-home subcommand lists a session's compactions: for each, the compaction entry, its loss entry, and a check that every entry in the summarised span is still readable by id and every block it references is still held, printed as a JSON report of ids, counts and hashes. A render for Claude Code writes the summary record and the kept entries as R4 does now, and never the loss entry, so the harness sees what it expects while the home keeps the whole. Acceptance is that a fixture Claude Code file with a summary record imports to a session whose compaction entry is followed by a loss entry naming that compaction, the span's first and last ids and counts that match the fixture; that every entry before the first kept one is still on the tree with its blocks present, checked by the listing; that the context path is the compaction followed by the kept entries and nothing from the span; that the rendered file holds the summary record and the kept entries and no loss line; that importing the same fixture twice into two homes gives byte-identical loss entries apart from ids and timestamps; that a summary record whose first kept entry is not on record is refused by uuid as the importer refuses an unknown parent today; and that one real compacted Claude Code session is imported on this Mac and its listing recorded in a proof document as counts and hashes only. Not in scope: the home compacting a session itself; translation, which is stage 4b and its own card; changing what Claude Code writes; the handover letter, which is HOME-001 R12. Filed by Archie on Tom's roadmap stage 4 of 22 September 2026, a compaction is stored beside its original, points at it and says what it could not keep, the original never replaced, and on home DESIGN P1, P2 and P7 and HOME-001 R3 and R4 at lys main 0073b966, on 26 September 2026.
+A home is a directory of session files, their indexes and heads, and the blocks store, and today it lives on the machine that captured it and nowhere else. Roadmap stage 3 says a home moves by the same route as a build tree, a pushed ref that the target fetches, never a hand copy, and that the target gets a distinct execution id with its ancestry recorded. This card takes the first block of stage 3, the same-machine proof: a home shipped as a ref to a named remote and fetched into an isolated second home on this Mac, then rendered and resumed there through the Claude Code launch template. The home directory is a git repository whose tracked files are the session files, their index and head files and the blocks store; a lys-home subcommand commits the home's current state and pushes it as one ref to a remote named on the command line, refusing by name a home whose index is stale rather than shipping it, and reporting the commit and the ref it pushed. A second lys-home subcommand fetches that ref from the named remote into a new home directory that must not already hold a home, verifies every index against its file and every head against its index, and appends to each session a lys.harness_event recording the arrival: the source home's commit, the remote and ref it came from, and this home's own execution id, so the ancestry is on the record. Source files are never rewritten by either side, and no credential, token or secret value is ever tracked in the home. With the target home in place the launch template renders it and the printed launch line resumes it, which is the resume evidence stage 3 asks for, measured on this Mac on Claude Code 2.1.281 and written up as a proof document holding hashes, counts and paths only. Acceptance is that a fixture home with a synthetic session ships to a bare remote in a temporary directory and is fetched into a second directory whose session file, index and blocks hash-match the source; that the source home's files are byte-identical before and after; that the target session's last entry is an arrival event naming the source commit and a fresh execution id; that a fetch into a directory already holding a home is refused by name; that a home with a stale index is refused by name on ship and the report says so; that the launch template renders the target home and the launch line resumes it, recorded in the proof document; and that a search of the shipped ref for a fixture secret value finds nothing. Not in scope: the named second machine, which is stage 3's second block and waits on its two preconditions, read authority over the home from the directory step and encryption before bytes leave the machine from the secrets step, each a card on its own board, with this card's shipped ref as what that block fetches; harnesses other than Claude Code; encryption of the home; any transport other than a git ref to a named remote. Filed by Archie on Tom's roadmap stage 3 of 22 September 2026 and his 08:30 rule that a home moves as a pushed ref, on home DESIGN P1, P7 and P8 at lys main 0073b966, at 06:27 on 26 September 2026.
 
 ## What the survey found, and its angles
 
-The words ask that when a Claude Code file that holds a compaction is imported, the home writes a lys.loss custom entry straight after the compaction entry. That entry names the compaction, the first and last entry ids of the span it summarised, counts and bytes for that span, and the harness's tokensBefore, and it holds no content. A new lys-home subcommand lists each compaction with its loss entry and checks that every summarised entry and its blocks are still held. The Claude Code render stays as R4 has it and never writes the loss entry. There are also two proofs: a fixture proof and one real compacted session imported on this Mac. The tree conflicts with the words' premise. Claude Code 2.1.2xx does not write a `summary` record for a compaction. It writes a `system`/`compact_boundary` record with `compactMetadata.preservedSegment` and `preTokens`, then a `user` record marked `isCompactSummary`. The importer maps neither of these to a compaction entry today, and the renderer's `summary` line is not that shape.
+The card asks for the first, same-machine block of roadmap stage 3. A lys home (sessions/, their index and head files, and blocks/) becomes a git repository. A new lys-home subcommand commits the home and pushes it as one ref to a remote named on the command line, and it refuses a home whose index is stale. A second subcommand fetches that ref into a fresh directory, verifies each index and head, and appends an arrival lys.harness_event to each session carrying the source commit, the remote and ref, and a fresh execution id. The target home is then rendered through the existing Claude Code launch template and resumed, and the measurement is written up in a hashes-only proof document.
 
 ### What the tree holds
 
-- `crates/lys-home/src/harness/claude_code/import.rs` — Today it turns only a `type:"summary"` record into a Compaction entry (lines ~258-285). It sets `first_kept_entry_id` to the compaction's own fresh id and `tokens_before: 0`, which means nothing is kept and the harness's count is dropped. A `compact_boundary` record goes through `event_of` as a `lys.harness_event` system event: its null parentUuid falls back to the chain leaf. The `isCompactSummary` record imports as an ordinary user message. The loss entry would be appended here, and so would the unknown-first-kept refusal. The file is already 473 code lines against the 500 limit.
-- `crates/lys-home/src/harness/claude_code/events.rs` — `event_of` maps `system` records to KIND_SYSTEM and keeps only subtype, level and a few counts in detail. This is where compact_boundary lands today. If the boundary becomes a compaction entry, this mapping has to stop claiming it or has to sit beside the new one.
-- `crates/lys-home/src/harness/claude_code/render.rs` — A Compaction renders as `{"type":"summary","summary","leafUuid":prev}`. It does not advance `prev`, so the first kept record renders with parentUuid null. Custom entries are skipped (`_ => {}`), so a lys.loss entry is already never rendered. The words' rule that a render never writes the loss entry holds by construction here, but the words' claim that the harness then sees what it expects does not.
-- `crates/lys-home/src/record/mod.rs` — `context_path()` (lines 419-450) follows Pi's buildSessionContext: the last compaction on the path, then the path entries from `first_kept_entry_id` up to it, then everything after it. A lys.loss entry that is a child of the compaction and on the path comes back in `context_path()` as a custom entry. The acceptance test 'compaction followed by the kept entries and nothing from the span' must say how it treats that entry. `customs_everywhere` can find loss entries off the path.
-- `crates/lys-home/src/record/entries.rs` — Holds the lys custom-type constants (lys.harness_event, lys.call, lys.authored, lys.inherited). A new `lys.loss` constant goes here. The Compaction body already keeps unknown Pi fields (`details`, `fromHook`) in `rest`.
-- `crates/lys-home/src/record/blocks.rs` — A content-addressed store: put returns hash and new, get by hash. The listing's 'every block it references is still held' check reads from here. However, import's `store_part` throws away the returned hash, and message entries keep their content inline in Pi shape, so no entry names a block.
-- `crates/lys-home/src/cli.rs` — Holds the subcommands (import, render, canon, fewshot, ingest-call, resume-check) and the JSON-report-only output rule of R9. The compaction listing is added here. The file is at 398 code lines.
-- `docs/design/home/RECORD.md` — The written contract for lys custom entries and the context path. lys.loss has to be written down here, per the repo rule that a test needs a second party. The file's 'The loss account' section currently covers only R4's render loss.
-- `docs/design/home/briefs/HOME-001.json` — R3 and R4 are the specs the words build on. R3 says 'summary records become compaction entries pointing at the first kept entry' and refuses an unknown parentUuid by uuid. R4 says 'a compaction renders as Claude Code's summary record followed by the kept entries'. R3's acceptance requires every message entry's parent to equal the source parentUuid, which limits where the loss entry can sit.
-- `docs/design/home/design.json` — The cluster's Structure table, principles P1/P2/P7 and constraints CN3/CN4. A new brief (and its proof document) has to be listed here, and `scripts/design/gate.sh` checks coverage and that the rendered markdown matches.
-- `~/.claude/projects/**/*.jsonl (Claude Code 2.1.2xx transcripts)` — This is the real shape the importer must meet: a `system` record with `subtype:"compact_boundary"`, `parentUuid:null`, `logicalParentUuid` (the pre-compaction leaf) and `compactMetadata {trigger, preTokens, postTokens, cumulativeDroppedTokens, preservedSegment {headUuid, anchorUuid, tailUuid}}`. It is followed by a `user` record with `isCompactSummary:true` whose parentUuid is the boundary. Later records chain to that summary record (anchorUuid). headUuid..tailUuid are kept records that sit before the boundary in the file.
-- `/Users/tom/Developer/tools/harness/pi/packages/coding-agent/src/core/session-manager.ts @ 3d5cbe98` — CompactionEntry {summary, firstKeptEntryId, tokensBefore, details?, fromHook?} (lines 67-76). buildSessionContext (around line 372) emits the summary first, then the kept entries from firstKeptEntryId, then the entries after the compaction. Custom entries are not model context. This is the reading the words call 'Pi's reading as today'.
+- `crates/lys-home/src/record/mod.rs` — Home::open makes only sessions/ and blocks/, and the session layout is sessions/<id>.jsonl with <id>.index.jsonl, <id>.head and <id>.lock beside it. Ship needs an explicit tracked set that leaves out the .lock files and the templates/ store. Fetch has to decide what 'already holds a home' means before Home::open silently creates the directories.
+- `crates/lys-home/src/record/index.rs` — Index::load (line 83) rebuilds a stale or missing index and returns a rebuilt flag, and opening a session writes a missing head (RECORD.md). If ship and fetch reuse the normal open path, they would rewrite beside the source instead of refusing by name. They need a check-only path.
+- `crates/lys-home/src/record/beside.rs` — append_beside and append_under hang an entry as a side leaf without moving the head, as ADR-012 requires. This is where the arrival event goes if the head and the session head hash must not change.
+- `crates/lys-home/src/harness/claude_code/events.rs` — lys.harness_event has six closed kinds (hook, permission_mode, tool_completed, attachment, system, template_render) with harness 'claude-code', and MAX_DATA_BYTES is 512. An arrival is a seventh kind that is not a Claude Code record. Its detail (a 40-hex commit, a remote URL of any length, a ref and an execution id) has to fit under the cap.
+- `crates/lys-home/src/harness/claude_code/launch.rs` — render-launch takes --template as a file path and stores it into the home's templates/ at render. So the target home can render without templates/ being shipped. Render appends template_render and lys.given beside the head, which the proof runs on the target home.
+- `crates/lys-home/src/cli.rs` — The subcommand enum lives here, at 424 lines of code against the 500-line rule. given/given-check were already split into cli/given.rs, so ship and fetch belong in their own cli/ module.
+- `crates/lys-home/src/error.rs` — HomeError has 29 variants. The new refusals by name (stale index on ship, target already a home, index or head mismatch on fetch, git failure) are added here.
+- `crates/lys-home/Cargo.toml` — There is no git dependency today. The workspace rule says all dependencies are pure Rust, so the choice is between shelling out to the git binary and adding a pure-Rust git crate.
+- `crates/lys-home/tests/fixtures/launch/` — The synthetic session (5 lines, 1307 bytes) and the handle-only template (use_only LYS_FIXTURE_TOKEN -> handle-fixture-0001) are the fixture home that the acceptance ships, fetches, renders and searches for a secret value.
+- `docs/design/home/design.json / DESIGN.md` — Non-Goals lists 'Encryption at rest and moving a home between devices (stage 3 preconditions)'. That item has to be narrowed to the second machine, and Structure has to gain the new files and the HOME-004 brief.
+- `docs/design/home/RECORD.md` — This is where each lys custom entry and each harness_event kind is written down. The arrival kind, the tracked set and the execution id are recorded here.
+- `docs/design/identity/CONTEXT-ROADMAP-2026-09-22.md:61-75` — Stage 3 text: the same-machine proof comes first, three preconditions, a pushed ref fetched by the target, 'the remote is named in the brief', a distinct execution ID with ancestry, and credentials never copied into the home.
+- `docs/design/home/briefs/` — HOME-001..003 exist. This card is HOME-004, rendered by scripts/design/render-brief.py and checked by scripts/design/gate.sh.
 
 ### What was already decided
 
-- home DESIGN P1 — The original bytes are never rewritten; a compaction is a derived record stored beside its source and pointing at it. The loss entry and listing carry this out on the home side.
-- home DESIGN P2 / CN4 — The record is Pi's session tree. lys adds entry kinds only as custom entries and never adds a field to Pi's grammar. So lys.loss must be `custom`, and a block reference cannot be added as a field on a Pi message.
-- home DESIGN P7 / CN3 — Transcript contents never appear in output, logs, errors, test names or pages; only hashes, counts and offsets. This covers the loss entry, the listing report and the proof document.
-- home DESIGN P4 — A content block is stored once by its hash and entries reference blocks. The implementation stores the blocks but no entry records their hashes.
-- home DESIGN CN7 — Reading a path seeks through the index and never loads the whole file. A span walk over a large compacted session should respect this.
-- home DESIGN Goal 4 — A written loss account for every derived record. This card is the compaction's share of that goal. The Structure row docs/design/home/LOSS-ACCOUNT.md does not exist in the tree.
-- HOME-001 R1 — The context path is entries from the latest compaction's firstKeptEntryId onward plus the compaction summary, as Pi reads it. An entry id already on record is refused, and so is a parent that comes after its child.
-- HOME-001 R3 — 'summary records become compaction entries pointing at the first kept entry'. An unknown parentUuid is refused by uuid. The acceptance requires every message entry's parent uuid to equal the source record's parentUuid.
-- HOME-001 R4 — A compaction renders as Claude Code's summary record followed by the kept entries. Custom entries do not render. An existing target path is refused.
-- HOME-001 R8 — `system` records become lys.harness_event entries at their exact place on the chain under their own uuid. The compact_boundary record is imported this way today.
-- HOME-001 R9 — Every subcommand prints a JSON report of hashes, counts and paths, with no key named text, content or body, and exits 2 naming any missing argument.
-- HOME-001 R12 — The handover letter is excluded by the words.
-- home CHECKLIST C3 / C4 — C3 already claims that 'compaction summaries' import and C4 claims the render. Neither has a test: no test file in lys-home mentions summary or compaction on import.
-- PROOF-RESUME.md — The R5 proof used a 242-record Archie session with no compaction, so no compacted import has been measured yet.
-- CONTEXT-ROADMAP-2026-09-22 stage 4 — A compaction is stored beside its original, points at it and says what it could not keep, and the original is never replaced. This is the authority the words cite.
-- RM-005 — 'Give a session a home': this is the roadmap row (status briefed, HOME-001) that the home cluster's work hangs from.
+- home P1 — Original bytes are never rewritten. Ship and fetch must leave source session files untouched, and anything added is appended.
+- home P6 — A resume path is a per-harness, per-version measurement, and the one recorded is Claude Code 2.1.281 on 24 September.
+- home P7 — Transcript contents never appear in a post, log, error, test name or page, so the ship/fetch reports and the proof carry only hashes, counts and offsets.
+- home P8 — Credentials are supplied at launch on the target and never carried in the home.
+- home CN3 — Only hashes, counts, offsets and event ids appear in output, logs and errors.
+- home CN4 — Every home file must still parse with Pi's parseSessionEntries, so the arrival event must be a custom entry.
+- home CN7 — The head is persisted beside the file and never inferred. Fetch verifies the head against the index.
+- home CN8 — No secret value is written to any file, report, launch line, error or entry. A use-only secret appears only as its handle.
+- home Non-Goals — 'Encryption at rest and moving a home between devices (stage 3 preconditions)' is listed as a non-goal. This card moves a home on one machine, so the wording has to be narrowed.
+- ADR-012 — Render events hang beside the context path so the session head hash does not move. Advancing the head was rejected, which is the precedent for where the arrival event sits.
+- ADR-013 — lys.given is appended after each render and names the version the load order was measured on. The code pins it at 2.1.283 (given.rs MEASURED_VERSION).
+- ADR-007 — render-launch prints the launch line and never runs it. The resume is run by hand for the proof.
+- CONTEXT-ROADMAP stage 3 — The home moves as a pushed ref fetched by the target, never a hand copy. The remote is named in the brief. The target gets a distinct execution ID with ancestry. There are three preconditions, and the first block is the same-machine proof.
+- RECORD.md index/head — A stale index is refused by name and rebuilt on open, and every command that opens a session may write the index or head beside it.
 
 ### What was measured
 
-- Claude Code session files on this Mac across ~/.claude, ~/.claude-waffles, ~/.claude-de and ~/.claude-apollo holding a compaction marker: 135 files
-- compact_boundary system records in those files: 3,415 (3,283 trigger manual, 132 auto)
-- compact_boundary records carrying compactMetadata.preservedSegment {headUuid, anchorUuid, tailUuid}: 2,922 of 3,415; the 493 without it are all from versions before 2.1.281
-- compact_boundary records written by 2.1.281 or later: 161, every one with a preservedSegment
-- compact_boundary records whose parentUuid is null: 3,415 of 3,415
-- compact_boundary records whose preservedSegment.headUuid is not on record before the boundary: 5 (all pre-2.1.281)
-- `type:"summary"` records in the same 135 files: 1
-- files with compact_boundary under ~/.claude/projects (2,890 jsonl files): 35, each also holding isCompactSummary records
-- files with compactions written by 2.1.281 or later: 65
-- largest compacted session files: 3,504,675,296 bytes (926 boundaries), 2,368,051,315 bytes (469), 2,199,439,072 bytes (585)
-- one measured 2.1.282-era Norn session: records and compactions: 28,093 records, 30 compact_boundary records; headUuid sits 2 to 20 records before the boundary, and tailUuid equals logicalParentUuid in 29 of 30
-- installed Claude Code version: 2.1.282
-- code lines (non-blank, non-comment) in import.rs / cli.rs / render.rs / record/mod.rs: 473 / 398 / 263 / 417, against a 500 limit
-- lys-home source and test lines: 6,618 lines across 25 files
-- tests in lys-home that exercise summary or compaction import or render: 0 (record_tests.rs has one hand-built Compaction in the R1 fixture)
-- places where the importer records a block hash on an entry: 0: store_part keeps only put.new, message content stays inline in Pi shape; only lys.harness_event.record and lys.call carry hashes
-- tokens_before the importer writes on a compaction today: 0 (a constant)
-- docs/design/home/LOSS-ACCOUNT.md and PROOF-PROXY.md: both listed in Structure, neither exists
-- Pi checkout at /Users/tom/Developer/tools/harness/pi: HEAD 3d5cbe98, CompactionEntry at session-manager.ts:67-76
-- tree commit: 0073b96, matching the words' 'lys main 0073b966'
+- lys-home source and test lines (src/**/*.rs): 5672 lines across 21 .rs files under src/record, src/cli, and the crate root, plus 22 harness files
+- cli.rs code lines (excluding comments and blank lines): 424 of the 500 allowed (525 raw)
+- record/mod.rs code lines: 438 of 500 (584 raw)
+- HomeError variants: 29
+- lys.harness_event kinds today: 6 (hook, permission_mode, tool_completed, attachment, system, template_render)
+- harness_event data cap: 512 bytes (MAX_DATA_BYTES)
+- Claude Code installed on this Mac: 2.1.283
+- Claude Code version the words name for the proof: 2.1.281 (PROOF-RESUME measured 2.1.281, PROOF-GIVEN and given.rs MEASURED_VERSION use 2.1.283)
+- git on this Mac: 2.47.1 at /opt/homebrew/bin/git
+- git or remote code in lys-home today: 0 occurrences, and no git dependency in Cargo.toml
+- execution id concept in lys-home code: none, only in identity design docs (PROVISIONING row 7, CONTEXT-ROADMAP stage 3 and 5b, STATEMENT fork)
+- fixture session: 5 lines, 1307 bytes (tests/fixtures/launch/session.jsonl)
+- fixture template: 15 lines, 467 bytes, one use-only secret as handle 'handle-fixture-0001'
+- existing home briefs: 3 (HOME-001, HOME-002, HOME-003), next is HOME-004
+- integration tests in crates/lys-home/tests: 4 files (cached_index 103, claude_code_round_trip 341, launch_template 349, given_record 541 lines)
+- home checklist items: 23 (C1–C23), none for stage 3
+- roadmap rows for stage 3: 0 (RM-005, RM-006 and RM-007 are the home rows, and none carries a move)
+- commit 0073b966 the words cite: exists and is an ancestor of HEAD dfcca65
+- files beside each session: 3 (<id>.index.jsonl, <id>.head, <id>.lock), plus dot-prefixed .tmp files in blocks/ during a put
+- size of real homes' sources (DESIGN Problem): Archie's file 141,931,097 bytes; Waffles' file 3.37 GB
 
 ### What it means for the other projects
 
-- aion — The card runs through aion's chain (brief_card, sign-off, card_build_v3, src_pr, src_land) on inputs naming the lys repository, commit 0073b96, the card and the brief. aion's code does not change.
-- cambium — The card sits on the Cambium board under Tom's roadmap stage 4. Nothing in Cambium changes.
-- method — The new brief and any design.json Structure rows must validate against the method schemas vendored under scripts/design (validate.py, check-coverage.py, render-cluster.py). No change to method.
-- argus — Argus's warden requests the manual compactions that produce these files (3,283 of 3,415 boundaries are trigger manual). The listing gives a later Argus view hashes and counts it could read, but nothing in Argus changes on this card.
+- aion — The card runs through aion's chain (brief_card → sign-off → card_build_v3 → src_pr → src_land). The words take the pattern from how aion moves build trees ('the same route as a build tree'): aion pushes refs/staged-rounds/{run_id}/..., which is the precedent for the home's ref namespace. aion's code is not changed.
+- cambium — The card sits on a Cambium board. Stage 3's second block waits on two cards on other boards (directory read authority, secrets encryption), which fetch this card's shipped ref, so the ref name and report shape become what those cards depend on.
 
 ### The decisions it stands on
 
-- ADR-004 (honour) — lys-home stays standalone. The import, listing and proof need no manifold, aion or broker.
-- ADR-007 (honour) — The subcommand only lists and reports. Neither it nor the proof starts a harness on anyone's behalf.
-- ADR-003 (honour) — Who may read or resume a home is not changed. The loss entry and listing add no grant and bypass none.
--  (new) — lys.loss is a new lys custom entry type: its data fields, its place in the tree and the determinism rule. It needs recording in RECORD.md beside lys.call, lys.harness_event, lys.authored and lys.inherited, following P2.
--  (new) — If the lead chooses the real shape, Claude Code's compaction mapping becomes a recorded rule: compact_boundary plus isCompactSummary maps to the Pi compaction entry, with firstKeptEntryId set to preservedSegment.headUuid and tokensBefore set to preTokens. It replaces HOME-001 R3's 'summary records become compaction entries' and R4's 'summary record' render for 2.1.281.
+- ADR-012 (honour) — The arrival event, like template_render, should hang beside the context path so the head and the session head hash do not move and a render of the target matches a render of the source.
+- ADR-013 (honour) — Rendering the target home appends lys.given unchanged, and the recorded harness_version (2.1.283) has to match the version the proof measures.
+- ADR-007 (honour) — The launch line is printed and never run. The resume for the proof is run by hand and recorded.
+- ADR-001 (honour) — Only handles ever appear in a home or a render, and no credential is tracked or carried to the target (home P8, CN8).
+- ADR-004 (honour) — Ship and fetch must work with git alone, without manifold, aion or the broker.
+-  (new) — A home is a git repository with an allowlisted tracked set (sessions/*.jsonl, *.index.jsonl, *.head, blocks/), with lock and temporary files never tracked, and it moves only as one pushed ref to a named remote.
+-  (new) — An arrival is a seventh lys.harness_event kind, written by fetch and not imported, recording the source commit, the remote and ref, and the target home's execution id. It needs its own decision because it extends the closed kind set and adds execution identity to the home.
 
 ### What it requires
 
-- Importing a fixture Claude Code file with a compaction yields exactly one lys.loss custom entry per compaction entry, and its data names that compaction's entry id.
-- The loss entry's first and last span ids equal the fixture's first entry after the root or the previous compaction and the entry before the first kept one, and its counts of entries, messages, tool calls, tool results and blocks equal the fixture's counts.
-- The loss entry's tokensBefore equals the value the harness recorded in the fixture.
-- The loss entry's serialised data contains no message, thinking, tool input or tool result text (a test scans it against the fixture's content strings).
-- Two imports of the same fixture into two fresh homes give loss entries that are byte-identical once ids and timestamps are masked.
-- Every entry in a compaction's span is still readable by id after import, and the listing reports it as present.
-- The listing reports every block the span references as held, and reports a missing block by hash (tested by removing one block file).
-- context_path() on the imported fixture holds the compaction, then the kept entries, then later entries, and no entry from the span.
-- The Claude Code render of the imported fixture holds the compaction's records and the kept entries, and no line carrying lys.loss.
-- A fixture whose compaction names a first kept entry that is not on record is refused with that uuid in the error, and no session file is written.
-- The listing subcommand prints one JSON report with no key named text, content or body, and exits 2 naming a missing required argument.
-- One real compacted Claude Code session is imported on this Mac, and its listing is recorded in a proof document under docs/design/home with counts, ids and hashes only, the source file's SHA-256 equal before and after.
-- The new brief, its checklist item and its Structure rows pass scripts/design/gate.sh.
-- All gates pass: fmt, clippy in both feature shapes, tests with --all-features, doc in both shapes, and the design gate.
+- lys-home has a ship subcommand that commits the tracked set of a home and pushes it as one ref to the remote named on the command line, and its JSON report names the commit and the ref.
+- Ship refuses a home with any stale index by name, exits 1, writes nothing to the home or the remote, and the report says which session was stale.
+- Ship tracks only session files, their index and head files, and blocks/. No .lock file, .tmp file, render output or environment file is in the pushed tree.
+- lys-home has a fetch subcommand that fetches the named ref from the named remote into a new directory, and refuses by name a directory that already holds a home.
+- Fetch verifies every index against its session file and every head against its index without rebuilding either, and refuses by name on a mismatch.
+- After fetch, each target session's last physical entry is a lys.harness_event arrival naming the source commit, the remote, the ref and a fresh execution id, and the data is at most 512 bytes.
+- The fixture home's source files are byte-identical before and after ship, measured by SHA-256 of every file.
+- The fetched session file, index and blocks hash-match the source (measured as the lead settles relative to the arrival append).
+- A search of every object reachable from the shipped ref for the fixture secret value finds zero matches, and a positive control finds a planted value.
+- render-launch renders the target home, and the printed launch line resumes it on this Mac's Claude Code. A proof document in docs/design/home records the version, hashes, counts and paths only.
+- HOME-004 brief, design.json Structure and Non-Goals, RECORD.md, CHECKLIST and the crate README describe ship, fetch and the arrival kind, and the design gate passes.
+- All gates pass: fmt, clippy with and without --all-features, tests --all-features, doc in both shapes, and the design gate.
 
 ### What must not change
 
-- No file under ~/.claude/projects (or any config root) is rewritten, truncated or moved (CN1).
-- No field is added to Pi's header or to any Pi entry outside custom.data. lys.loss is a custom entry and the compaction entry keeps Pi's shape (P2, CN4).
-- The summarised entries and their blocks are never removed or rewritten, and a block is never overwritten (P1, R2).
-- No transcript content in the loss entry, the listing, errors, logs, test names or the proof document (P7, CN3).
-- The existing unknown-parentUuid refusal and R3's parent-equality for message entries stay as they are.
-- R4's thinking rule, the refuse-an-existing-path rule and the loss.json beside a rendered file stay as they are.
-- No Norn crate or type enters lys-home (CN6).
-- The home does not compact a session, translate one, or write a handover on this card.
-- No source file goes over 500 code lines, and there is no #[allow], #[ignore] or other lint bypass.
-- Heavy builds and full gates run on Dean's laptop. Only warm single-crate checks run on this Mac.
+- No existing session file, index, head or block in the source home is rewritten, truncated or rebuilt by ship or fetch (P1, CN1).
+- No credential, token, secret value or remote userinfo is written to any tracked file, entry, report or error (CN8, P8).
+- No transcript content in reports, errors, test names or the proof document (P7, CN3).
+- Pi's grammar stays unchanged: the arrival is a custom entry, and every home file still parses with parseSessionEntries at 3d5cbe98 (CN4).
+- render-launch, template_render and lys.given behaviour and wire shape are unchanged.
+- No transport other than git, no encryption, no second machine and no harness other than Claude Code.
+- No new non-pure-Rust dependency, no unsafe, no file over 500 lines of code, and no unwrap/expect/panic in library code.
 
 ### What we must put in place first
 
-- The lead answers whether this card maps Claude Code's compact_boundary/isCompactSummary pair, because no real 2.1.281 file carries the summary record the words describe.
-- The lead answers how 'every block it references' is measured, because entries record no block hashes today.
-- A fixture Claude Code file in the 2.1.281 compaction shape: a pre-compaction chain, compact_boundary with preservedSegment, the isCompactSummary record, and later records chained to it. It must be hand-built with no real content.
+- The lead's answers to the product decisions on the hash-match versus arrival append, the Claude Code version, remote locality, the secret guarantee and templates/.
+- A HOME-004 brief in docs/design/home/briefs and a roadmap row for stage 3 block one, going through the aion chain (brief_card, sign-off).
 
 ### The risks
 
-- The card lands against `type:"summary"` alone and passes its fixture, while every real compacted session on this Mac (3,415 boundaries) still imports with no compaction entry and no loss entry. The real-session proof then finds nothing to list.
-- A span walk over a multi-GB session (up to 3.5 GB, 926 compactions) may read far more than the path, against CN7, or run slowly on this Mac.
-- The block check agrees with itself when it re-derives hashes from the same code that stored them. A drift test must delete a real block and count that exactly that one was reported.
-- Placing the loss entry on the chain would re-parent the record after the compaction and break R3's parentUuid equality. Placing it as a side leaf means a path-only reader never sees it.
-- The meaning of the kept range changes once kept entries sit before the boundary in the file (headUuid..tailUuid). Counting them into the span would inflate the counts and wrongly show them as summarised.
-- Five older boundaries name a headUuid that is not before them. With a strict refusal, those files will not import at all.
-- The name lys.loss may be confused with R4's `.loss.json` render loss account, so RECORD.md must tell the two apart.
-- Claude Code 2.1.282 is now installed while the proofs name 2.1.281, so a version drift in the compaction shape could go unmeasured.
+- Calling the existing open path (Index::load, Session open) on ship would silently rebuild a stale index or persist a missing head in the source, which breaks both 'byte-identical' and 'refused by name'.
+- The user's global git config (hooks, commit signing, core.autocrlf, a missing user.name) could make commit fail or alter bytes. The git invocation must be isolated.
+- A remote URL with embedded credentials could be recorded in the arrival event, or appear in a git error echoed into a report.
+- Pushing a real home (up to GB-scale blocks) to a remote off the machine ships plaintext transcripts before stage 3's encryption precondition is met.
+- Secrets pasted into a conversation live in blocks/ and would be shipped. An allowlist of paths cannot catch them.
+- The arrival event changes the target's session file and index, so an acceptance measured naively after fetch cannot hash-match the source.
+- Where the arrival sits could move the head and change the session head hash, which diverges renders of source and target (ADR-012).
+- A long remote path or URL could push the arrival data past the 512-byte cap and fail on fetch.
+- The proof run on 2.1.283 against words naming 2.1.281 leaves the proof and lys.given disagreeing on version.
+- git objects are not written with the home's fsync discipline, so an interrupted fetch can leave a partial target that a retry must refuse or clean up by name.
+- cli.rs is at 424 code lines, and adding the subcommands inline would breach the 500-line rule.
 
 ### Still open
 
-- Claude Code 2.1.281 records a compaction as a compact_boundary system record plus an isCompactSummary user record, not as a summary record. Does this card teach the importer that pair, so that the first kept entry is preservedSegment.headUuid, tokensBefore is compactMetadata.preTokens, and the summary comes from the isCompactSummary message? Or does it attach the loss entry only to today's `type:"summary"` path, which occurs once on this Mac? The sentence of the words it stands on: "A compaction is the first derived record, because the harness itself produces it: Claude Code writes a summary record and keeps everything before it in its own file, and the importer already turns that record into Pi's compaction entry with its summary and first kept entry.". Why only the lead can settle it: crates/lys-home/src/harness/claude_code/import.rs maps only `type:"summary"` to a Compaction, with firstKeptEntryId set to its own id and tokensBefore 0. Across 135 real files there are 3,415 compact_boundary records and 1 summary record. Today a compact_boundary becomes a lys.harness_event and the summary becomes a plain user message. Without the new mapping, the real-session proof yields no compaction entry, and so no loss entry either.
-- For a compaction, should the Claude Code render write what 2.1.281 itself writes (a compact_boundary record, then an isCompactSummary user record, then the kept records), or keep R4's `{type: summary, leafUuid}` line? The sentence of the words it stands on: "A render for Claude Code writes the summary record and the kept entries as R4 does now, and never the loss entry, so the harness sees what it expects while the home keeps the whole.". Why only the lead can settle it: crates/lys-home/src/harness/claude_code/render.rs writes `{"type":"summary","summary","leafUuid"}` and does not advance the parent chain, so the first kept record has parentUuid null. That is not the compaction shape 2.1.281 writes, and it puts the summary text in no record the model is given. A resumed session would lose the summary rather than see what it expects.
-- No home entry records which blocks it came from. Should the card add a block reference for each entry, which under P2 can only be a lys custom entry and never a new field on a Pi message? Or is 'every block it references is still held' measured some other way, for example by re-hashing parts or by the harness_event record hashes only? The sentence of the words it stands on: "A lys-home subcommand lists a session's compactions: for each, the compaction entry, its loss entry, and a check that every entry in the summarised span is still readable by id and every block it references is still held, printed as a JSON report of ids, counts and hashes.". Why only the lead can settle it: import.rs store_part discards the hash that BlockStore::put returns, and message entries keep their parts inline in Pi's reshaped form (toolCall, toolResult, thinkingSignature). Re-hashing an entry's part therefore does not give the stored block's hash, and the block check has nothing to follow. The design (P4) says entries reference blocks, but the tree does not.
-- A compact_boundary with no preservedSegment (493 records, all older than 2.1.281, including the 3.5 GB Waffles file) names no first kept entry. Should it be refused, or imported as a compaction that keeps nothing, with the whole pre-boundary chain as its span? The sentence of the words it stands on: "Acceptance is that a fixture Claude Code file with a summary record imports to a session whose compaction entry is followed by a loss entry naming that compaction, the span's first and last ids and counts that match the fixture; that every entry before the first kept one is still on the tree with its blocks present, checked by the listing; that the context path is the compaction followed by the kept entries and nothing from the span; that the rendered file holds the summary record and the kept entries and no loss line; that importing the same fixture twice into two homes gives byte-identical loss entries apart from ids and timestamps; that a summary record whose first kept entry is not on record is refused by uuid as the importer refuses an unknown parent today; and that one real compacted Claude Code session is imported on this Mac and its listing recorded in a proof document as counts and hashes only.". Why only the lead can settle it: The words refuse only a first kept entry that is 'not on record'. They do not cover a compaction that names none. That choice decides whether older compacted sessions on this Mac import at all or are refused.
+- Should the byte-for-byte match between target and source be checked on the fetched commit before the arrival event is appended, or only as a prefix of the target's session file and index, given that the arrival event makes the target's session file and index differ from the source? The sentence of the words it stands on: "Acceptance is that a fixture home with a synthetic session ships to a bare remote in a temporary directory and is fetched into a second directory whose session file, index and blocks hash-match the source; that the source home's files are byte-identical before and after; that the target session's last entry is an arrival event naming the source commit and a fresh execution id; that a fetch into a directory already holding a home is refused by name; that a home with a stale index is refused by name on ship and the report says so; that the launch template renders the target home and the launch line resumes it, recorded in the proof document; and that a search of the shipped ref for a fixture secret value finds nothing.". Why only the lead can settle it: Fetch appends an arrival lys.harness_event to each target session (record/beside.rs), which adds a line to <id>.jsonl and a row to <id>.index.jsonl. After fetch the target's session file and index cannot hash-match the source, so the acceptance cannot pass as worded. The lead chooses what the match is measured on.
+- Should the proof be measured on the installed Claude Code 2.1.283, or must 2.1.281 be installed for it? The sentence of the words it stands on: "With the target home in place the launch template renders it and the printed launch line resumes it, which is the resume evidence stage 3 asks for, measured on this Mac on Claude Code 2.1.281 and written up as a proof document holding hashes, counts and paths only.". Why only the lead can settle it: `claude --version` on this Mac answers 2.1.283. PROOF-GIVEN.md and harness/claude_code/given.rs MEASURED_VERSION pin 2.1.283, and lys.given entries record 2.1.283. A proof on 2.1.281 needs a downgrade and would contradict the version the render records.
+- Should ship refuse a remote that is not on this machine (for example a local path or file:// only) until encryption exists? The sentence of the words it stands on: "The home directory is a git repository whose tracked files are the session files, their index and head files and the blocks store; a lys-home subcommand commits the home's current state and pushes it as one ref to a remote named on the command line, refusing by name a home whose index is stale rather than shipping it, and reporting the commit and the ref it pushed.". Why only the lead can settle it: CONTEXT-ROADMAP stage 3 requires encryption before any bytes leave the machine, and the words defer encryption. A remote named on the command line could be a hosted forge, and then plaintext transcripts and blocks would leave the Mac. Whether ship refuses such a remote changes what a person can do with it.
+- Is 'no secret value is ever tracked' met by the allowlisted path set (sessions and blocks only, no env or render files), or must ship also scan block and session content and refuse a match? The sentence of the words it stands on: "Source files are never rewritten by either side, and no credential, token or secret value is ever tracked in the home.". Why only the lead can settle it: blocks/ holds raw request and response bodies (lys.call raw_request/raw_response, record/call.rs), and a secret pasted into a conversation lives there. An allowlist cannot keep it out of the shipped ref. A scan needs a list of secret values, which lys-home does not have (secrets stay behind the broker, ADR-001). What a person can safely ship depends on the answer.
+- Should templates/ be left out of the shipped home, so the target has none of the source's template objects that its template_render events name by hash? The sentence of the words it stands on: "The home directory is a git repository whose tracked files are the session files, their index and head files and the blocks store; a lys-home subcommand commits the home's current state and pushes it as one ref to a remote named on the command line, refusing by name a home whose index is stale rather than shipping it, and reporting the commit and the ref it pushed.". Why only the lead can settle it: ADR-012 and record/templates.rs keep each rendered template in the home under templates/ by SHA-256. The words' tracked set leaves templates/ out, so a template_render event carried on a shipped session names a template that the target home cannot produce. render-launch still works because it takes --template as a file.
 
 ### The units beyond the first
 
-- Render a compaction for Claude Code in the harness's own compact_boundary shape — If the lead keeps R4's summary line on this card, making a resumed rendered session carry its compaction the way 2.1.281 writes it is a separate change to render.rs and needs its own resume measurement.
-- Block references on home entries — If the lead chooses a per-entry block manifest (a lys custom entry), it changes every import, not only compacted ones, and needs its own contract and round-trip gates.
-- Import older compaction shapes (no preservedSegment, head not before boundary) — 493 boundaries from versions before 2.1.281 name no kept range and 5 name one out of order. Handling them is a separate decision and set of fixtures if this card refuses them.
-- LOSS-ACCOUNT.md: the written loss account across render and compaction — The design lists it in Structure and it does not exist. It covers R4's render losses as well as compaction's, which is wider than this card.
+- Stage 3 block two: a home fetched and resumed on a named second machine — This block waits on two preconditions owned by other boards, read authority over the home (directory step) and encryption before bytes leave the machine (secrets step). It fetches the ref this card ships.
 
 ### The smallest complete shape
 
-One brief in the home cluster (for example HOME-002) with one landable change to lys-home. The change contains: the importer's compaction mapping, for whichever shape the lead chooses (and the compact_boundary pair if chosen); the lys.loss entry appended at each compaction with deterministic span ids, counts, bytes and tokensBefore; the refusal of an unknown first kept entry by uuid; the compaction listing subcommand with its span-readable and blocks-held check; the render left writing no loss line; RECORD.md naming lys.loss; the fixture tests for every acceptance line; and the proof document holding one real compacted 2.1.281 session's listing as counts and hashes.
+One landable unit, HOME-004, containing:
+- lys-home ship and fetch subcommands in their own cli module, with git invoked in isolation, the allowlisted tracked set, a stale-index refusal on ship, and an already-a-home refusal and index/head verification on fetch, none of which writes to the source.
+- The arrival event as a seventh lys.harness_event kind hung beside the head, carrying the source commit, the remote, the ref and a fresh per-home execution id.
+- An end-to-end test on the launch fixture home: ship to a bare remote in a tempdir, fetch into a second tempdir, hash matches, source byte-identity, the arrival as last entry, both refusals, and a secret search of the pushed objects with a positive control.
+- A proof document of the target home rendered through render-launch and resumed by the printed line on this Mac's Claude Code.
+- Design, RECORD, checklist and README updates.
 
 ## The roadmap row
 
-- **RM-006** — Say what a compaction could not keep, and prove the original is all still there (feature, idea)
-- Summary: When a compacted Claude Code session is imported into its home, each compaction entry is followed by a lys.loss entry naming the span it summarised as ids, counts and hashes, the hash of every stored part is kept beside the session, a lys-home subcommand lists each compaction and checks that every summarised entry and block is still held, and the compaction renders for Claude Code in the shape the measured version writes. Proved on a fixture and on one real compacted session.
-- Asked by: tom on 2026-09-26T06:36:44+10:00
-- Context: The card's words for roadmap stage 4 (a compaction is stored beside its original, points at it and says what it could not keep), on the home design's P1, P2 and P7 and HOME-001 R3 and R4, with the lead's answers to the card's survey (the compact_boundary pair, the render shape, the block rows, the keep-nothing compaction, the boundary whose summary never arrives, and the listing's exit status).
-- Quote: A compaction is the first derived record, because the harness itself produces it: Claude Code writes a summary record and keeps everything before it in its own file, and the importer already turns that record into Pi's compaction entry with its summary and first kept entry. What the home does not yet say is what the compaction could not keep, and nothing yet proves, on a compacted session, that the original is all still there. This card adds both. When a compaction entry enters a session, on import of a Claude Code file that carries a summary record, the importer appends directly after it a lys.loss custom entry that points at the compaction by entry id and names what fell outside the kept range: the first and last entry id of the span it summarises, from the root or the previous compaction to the entry before the first kept one, and the counts of entries, messages, tool calls, tool results and blocks in that span with their bytes, and the tokensBefore the harness reported; it names entry ids and hashes and never a word of content. The summarised entries are not touched: they stay on the tree, their blocks stay in the store, and the context path is Pi's reading as today, the compaction first, then the kept entries. A lys-home subcommand lists a session's compactions: for each, the compaction entry, its loss entry, and a check that every entry in the summarised span is still readable by id and every block it references is still held, printed as a JSON report of ids, counts and hashes. A render for Claude Code writes the summary record and the kept entries as R4 does now, and never the loss entry, so the harness sees what it expects while the home keeps the whole. Acceptance is that a fixture Claude Code file with a summary record imports to a session whose compaction entry is followed by a loss entry naming that compaction, the span's first and last ids and counts that match the fixture; that every entry before the first kept one is still on the tree with its blocks present, checked by the listing; that the context path is the compaction followed by the kept entries and nothing from the span; that the rendered file holds the summary record and the kept entries and no loss line; that importing the same fixture twice into two homes gives byte-identical loss entries apart from ids and timestamps; that a summary record whose first kept entry is not on record is refused by uuid as the importer refuses an unknown parent today; and that one real compacted Claude Code session is imported on this Mac and its listing recorded in a proof document as counts and hashes only. Not in scope: the home compacting a session itself; translation, which is stage 4b and its own card; changing what Claude Code writes; the handover letter, which is HOME-001 R12. Filed by Archie on Tom's roadmap stage 4 of 22 September 2026, a compaction is stored beside its original, points at it and says what it could not keep, the original never replaced, and on home DESIGN P1, P2 and P7 and HOME-001 R3 and R4 at lys main 0073b966, on 26 September 2026.
-- Cluster: home; briefs: HOME-002
-- Notes: Further units, not written: LOSS-ACCOUNT.md: the written loss account across render and compaction.
+- **RM-008** — Move a home as a pushed ref: ship, fetch and the same-machine resume proof (stage 3, first block) (feature, idea)
+- Summary: A home lives only on the machine that captured it. This item takes stage 3's first block: the home directory becomes a git repository with an allowlisted tracked set, `lys-home ship` commits it and pushes it as one ref to a remote named on the command line, refusing a stale index, a remote off this machine, a named secret value and a match of the five standard secret patterns, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding, and records an arrival event on each session naming the source commit, the remote, the ref and the new home's execution id. The fetched home is rendered through the Claude Code launch template and resumed by the printed line, measured on the installed Claude Code and written up as hashes, counts and paths.
+- Asked by: tom on 2026-09-26T06:27:00+10:00
+- Context: A Cambium card on the home cluster for roadmap stage 3's first block, the same-machine proof. The lead's answers settled that the hash match is taken at the fetched commit before the arrival and as byte prefixes after it, that the proof is measured on the installed Claude Code 2.1.283 rather than the 2.1.281 the words name, that ship refuses a remote off this machine until encryption at rest lands, that no secret is tracked by an allowlisted tracked set plus a scan for the named values file's values and five standard patterns, and that templates/ is shipped.
+- Quote: A home is a directory of session files, their indexes and heads, and the blocks store, and today it lives on the machine that captured it and nowhere else. Roadmap stage 3 says a home moves by the same route as a build tree, a pushed ref that the target fetches, never a hand copy, and that the target gets a distinct execution id with its ancestry recorded. This card takes the first block of stage 3, the same-machine proof: a home shipped as a ref to a named remote and fetched into an isolated second home on this Mac, then rendered and resumed there through the Claude Code launch template. The home directory is a git repository whose tracked files are the session files, their index and head files and the blocks store; a lys-home subcommand commits the home's current state and pushes it as one ref to a remote named on the command line, refusing by name a home whose index is stale rather than shipping it, and reporting the commit and the ref it pushed. A second lys-home subcommand fetches that ref from the named remote into a new home directory that must not already hold a home, verifies every index against its file and every head against its index, and appends to each session a lys.harness_event recording the arrival: the source home's commit, the remote and ref it came from, and this home's own execution id, so the ancestry is on the record. Source files are never rewritten by either side, and no credential, token or secret value is ever tracked in the home. With the target home in place the launch template renders it and the printed launch line resumes it, which is the resume evidence stage 3 asks for, measured on this Mac on Claude Code 2.1.281 and written up as a proof document holding hashes, counts and paths only. Acceptance is that a fixture home with a synthetic session ships to a bare remote in a temporary directory and is fetched into a second directory whose session file, index and blocks hash-match the source; that the source home's files are byte-identical before and after; that the target session's last entry is an arrival event naming the source commit and a fresh execution id; that a fetch into a directory already holding a home is refused by name; that a home with a stale index is refused by name on ship and the report says so; that the launch template renders the target home and the launch line resumes it, recorded in the proof document; and that a search of the shipped ref for a fixture secret value finds nothing. Not in scope: the named second machine, which is stage 3's second block and waits on its two preconditions, read authority over the home from the directory step and encryption before bytes leave the machine from the secrets step, each a card on its own board, with this card's shipped ref as what that block fetches; harnesses other than Claude Code; encryption of the home; any transport other than a git ref to a named remote. Filed by Archie on Tom's roadmap stage 3 of 22 September 2026 and his 08:30 rule that a home moves as a pushed ref, on home DESIGN P1, P7 and P8 at lys main 0073b966, at 06:27 on 26 September 2026.
+- Cluster: home; briefs: HOME-004
+- Notes: Further units, not written: Stage 3 block two: a home fetched and resumed on a named second machine.
 
 ## The design
 
@@ -177,7 +176,7 @@ Today a session exists only as its harness's file. Archie's Claude Code file mea
 
 ## Solution
 
-Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it.
+Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree, not Norn): one append-only JSONL per session, a header line, then entries each carrying id, parentId and timestamp, a leaf pointer for the current position, forks by moving the pointer, compaction and branch summaries as entries that keep their originals. lys adds nothing to that grammar: harness events (approvals, tool completion) and proxy call records ride Pi's custom entry type under lys customType names, so a home file stays readable by Pi's own parser. Two captures feed it: the model traffic through the door's proxy (the same process that swaps the credential, SECRETS-002 R1), and the harness's own events from its transcript. Content blocks are stored once by hash; entries reference them. A harness resume file is a rendered projection of the root-to-leaf path: for Claude Code, a JSONL written under a chosen uuid at the harness's own path, then resumed by that id with --fork-session. Provider-native reasoning stays on the message with its provider, api and model and is rendered whole only to the same three; another model gets readable thinking as text and opaque blocks dropped, each named in a loss account. lys grants say who may read and resume. Every resume path is measured on a named harness version before anything relies on it. A session is launched on a harness from a launch template kept in the home (ADR-012): one JSON object per harness, schema in docs/design/home/launch-template.schema.json, stored under templates/ by its SHA-256 beside sessions/ and blocks/, so a template's version is its hash. Its named slots map the home onto the harness: the transcript (the one slot no template maps generically, so the template names how the harness fills it; Claude Code fills it by resuming the rendered file by path with --fork-session, since a bare resume writes onto the rendered file's own name), the MCP configuration, the environment, the secrets (use-only ones written as their handle; readable ones refused until the secrets rows build the broker reader, ADR-001) and the appended instructions. lys-home render-launch reads a template and a session, writes the R4 render, its loss account, an MCP file, an environment file and an instructions file into one directory, and prints the launch line in its report without running it (ADR-007). Each render is recorded on the session as a lys.harness_event of the sixth kind, template_render, hung as a side leaf beside the context path so the head and the session head hash (SHA-256 of the head entry's line) do not move; the written paths ride in a manifest block the event names by hash, under the 512-byte cap. At render, the launch template also records the context record: a lys.given custom entry after the render event naming, by path, byte length and SHA-256 only, the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on a named Claude Code version, with the environment variable names the template set and the kinds of document resolved and left unlisted (@-imports and .claude/rules, which a second lys.given entry at the first request records), so a reader sees what was measured and can check a file on disk against it without anyone reading its contents. A home moves by the route a build tree takes (ADR-014): the home directory is a git repository whose tracked set is an allowlist (sessions/<id>.jsonl, its index and head files, blocks/ and templates/, never a lock, temporary, environment or render file), `lys-home ship` commits that set and pushes it as one ref, refs/lys-home/<commit>, to a remote named on the command line, and `lys-home fetch` fetches the ref into a new home, checks every index and head without rebuilding either, and records the arrival on each session as a seventh lys.harness_event kind beside the head (ADR-015), naming the source commit, the remote, the ref and the target home's own execution id. Until encryption at rest exists, ship refuses a remote off this machine and any tracked file holding a named secret value.
 
 ## Principles
 
@@ -197,8 +196,11 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
-- ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
-- ADR-013 — Claude Code's compaction is read and rendered in the shape the measured version writes — The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.
+- ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+- ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+- ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
+- ADR-014 — A home moves as one pushed git ref of an allowlisted tracked set, never a hand copy — A home is a git repository whose tracked set is an allowlist: sessions/<id>.jsonl, <id>.index.jsonl and <id>.head, the files under blocks/ and the files under templates/, never a lock, temporary, environment, render or execution-id file. `lys-home ship` commits exactly that set with git run apart from the person's configuration and pushes it without force as one ref, refs/lys-home/<commit>, to a remote named on the command line; `lys-home fetch` fetches that ref into a new home. Rejected: a hand copy or an archive of the directory, which names no commit and records no ancestry; tracking the whole directory, which ships whatever else is in it; and a pure-Rust git crate, which adds a dependency where the git binary suffices. Until encryption at rest exists, ship refuses a remote off this machine and any tracked file holding a value of the named secret values file or matching one of five standard secret patterns (private key header, sk- token, GitHub token, AWS access key id, JWT).
+- ADR-015 — An arrival is a seventh lys.harness_event kind, hung beside the head and written by fetch — Fetch appends to each session one lys.harness_event of kind `arrival`, with source_uuid and record null and a detail of exactly source_commit, remote, ref and execution_id, hung beside the head with append_beside so the head and the session head hash do not move; the execution id is one per target home, fresh at fetch, kept in the untracked file <home>/execution-id. The remote is recorded as a canonical path, a file:/// URL, or a URL without userinfo, and the data stays within the 512-byte cap. Rejected: appending the arrival on the context path, which moves the head (ADR-012); a new custom entry type, which adds a type where the harness event carries the same shape; and one execution id per session, where the words give the home one.
 
 ## Goals
 
@@ -208,14 +210,18 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - A written loss account for every derived record: what a render or translation preserved, transformed and could not carry.
 - The canon, one curated versioned series of short examples each showing a rule lived, seeds every new session, and its effect is measured on a card against a plain start.
 - A handover letter from an outgoing session seeds its successor as inherited memory, with the model's own thinking intact, and the effect is measured on a card against a plain start.
+- A session in the home renders, from a Claude Code launch template kept in the home by hash, into a directory of launch files whose hashes are identical on a second render, and the printed launch line resumes it on the installed Claude Code version, measured.
+- Every launch-template render records what the session was given: one lys.given entry after the render event naming each instruction document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the measured order, with the environment variable names the template set, and never a document's content; lys-home lists those records and checks a file on disk against one by hash.
+- A home ships as one pushed git ref to a named remote on this machine and is fetched into a second home whose tracked files match the source at the fetched commit, with an arrival on each session naming the source commit and a fresh execution id; the fetched home renders through the launch template and the printed launch line resumes it on the installed Claude Code version, measured.
 
 ## Non-Goals
 
 - Anchoring, signing or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for). — Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it.
-- Encryption at rest and moving a home between devices (stage 3 preconditions). — Stage 3's three preconditions (identity and read authority, encryption before bytes leave, the resume evidence) are their own brief.
+- Encryption at rest, and moving a home to a named second machine (stage 3's second block and its preconditions). — Stage 3's second block waits on read authority over the home and on encryption before bytes leave the machine, each a card on its own board; this cluster's move is the same-machine proof, whose shipped ref that block fetches.
 - Harnesses other than Claude Code, and Chat Completions or Responses translation beyond keeping the raw call bytes. — One harness proved first; each other harness is its own profile and its own measurement.
 - Lanterns and forks at a coordinate (stages 5 and 5b). — Lanterns and forks stand on a proved resume; this brief supplies that proof.
 - Adopting, wrapping or calling Norn's session code; Pi's code is read as the reference and not vendored. — Tom, Dot 13:28: not Norn. Pi's tree is the reference.
+- Reading a secret's value through the broker at launch. — The broker's own read belongs to the secrets rows (SECRETS-002); until its reader exists a readable secret is refused and only handles render.
 
 ## Structure
 
@@ -241,6 +247,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/lib.rs` | module wiring: record and harness | HOME-001 |
 | `crates/lys-home/src/harness/mod.rs` | harness profiles; Claude Code first | HOME-001 |
 | `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example | HOME-001 |
+| `crates/lys-home/Cargo.toml` | the crate manifest; gains regex for the five standard secret patterns | HOME-004 |
 | `crates/lys-home/README.md` | what the tool does and does not do | HOME-001 |
 | `crates/lys-home/src/record/index.rs` | the offset index and the persisted head: a path is read by seeking, never by loading the file | HOME-001 |
 | `crates/lys-home/src/proxy/mod.rs` | the proxy module: declarations only | HOME-001 |
@@ -266,21 +273,59 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 | `crates/lys-home/src/proxy/stream_tests.rs` | the three grammars, partial streams | HOME-001 |
 | `crates/lys-home/src/proxy/link_tests.rs` | linking by the measured key; unlinked; never inferred | HOME-001 |
 | `crates/lys-home/src/proxy/journal_tests.rs` | recovery after a kill: one lost record per open call | HOME-001 |
-| `docs/design/home/briefs/HOME-002.json` | the second brief: a compaction's loss entry, the block rows beside a session, the compaction listing, the compaction render, and the proof | HOME-002 |
+| `docs/design/home/briefs/HOME-002.json` | the second brief: the Claude Code launch template and render-launch | HOME-002 |
 | `docs/design/home/briefs/HOME-002.md` | its rendered markdown | HOME-002 |
-| `docs/design/home/PROOF-COMPACTION.md` | measured: one real compacted Claude Code session imported and listed as counts, ids and hashes, and the compaction render resumed on a named Claude Code version | HOME-002 |
-| `crates/lys-home/src/record/block_rows.rs` | the block rows beside a session, <id>.blocks.jsonl: one {entry, part, hash} row per content part stored at import | HOME-002 |
-| `crates/lys-home/src/record/block_rows_tests.rs` | gates on the block rows: one row per stored part, the hash put returned, no content | HOME-002 |
-| `crates/lys-home/src/record/loss.rs` | the lys.loss entry: a compaction's summarised span walked by seeking, counted, and written as ids, counts and hashes | HOME-002 |
-| `crates/lys-home/src/record/loss_tests.rs` | gates on the loss entry: span bounds, counts, bytes and digest against the fixture | HOME-002 |
-| `crates/lys-home/src/record/compactions.rs` | the compaction listing: each compaction, its loss entry, and the span's entries read by id and blocks checked as held | HOME-002 |
-| `crates/lys-home/src/record/compactions_tests.rs` | gates on the listing: every entry read, a removed block named by hash, an absent rows file reported unverified | HOME-002 |
-| `crates/lys-home/src/harness/claude_code/compaction.rs` | Claude Code's compaction records (the compact_boundary and isCompactSummary pair, and the summary record) into one Pi compaction entry | HOME-002 |
-| `crates/lys-home/src/harness/claude_code/compaction_tests.rs` | gates on the compaction mapping: first kept, tokensBefore, keep-nothing, the unknown first kept refused by uuid | HOME-002 |
-| `crates/lys-home/src/harness/claude_code/render_tests.rs` | gates on the render, including the compaction's compact_boundary shape | HOME-002 |
-| `crates/lys-home/src/error.rs` | the crate's errors, including an unknown first kept entry refused by uuid | HOME-002 |
-| `crates/lys-home/tests/claude_code_compaction.rs` | end to end on the compacted fixture: import, two homes, context path, listing, render | HOME-002 |
-| `crates/lys-home/tests/fixtures/claude_code_compacted.jsonl` | a hand-built Claude Code 2.1.281 file with two compactions and no real content | HOME-002 |
+| `docs/design/home/launch-template.schema.json` | the Claude Code launch template's JSON Schema: harness, flags and the five named slots | HOME-002 |
+| `docs/design/home/PROOF-LAUNCH.md` | the measured launch: installed version, template hash, written paths and hashes, the launch line, the resume outcome; no transcript | HOME-002 |
+| `crates/lys-home/src/harness/claude_code/template.rs` | the launch template parsed and checked: unknown or missing slot, readable secret, duplicate variable refused by name | HOME-002 |
+| `crates/lys-home/src/harness/claude_code/template_tests.rs` | gates on the template parser and its agreement with the schema file | HOME-002 |
+| `crates/lys-home/src/harness/claude_code/launch_env.rs` | the environment file: template variables and use-only secrets as handles | HOME-002 |
+| `crates/lys-home/src/harness/claude_code/launch.rs` | render-launch: its arguments, the five files, the launch line, the manifest and the event | HOME-002 |
+| `crates/lys-home/src/harness/claude_code/events_tests.rs` | gates on the template_render event and the 512-byte cap | HOME-002 |
+| `crates/lys-home/src/record/templates.rs` | the home's template store: templates/<hh>/<hash>, written once | HOME-002 |
+| `crates/lys-home/src/record/templates_tests.rs` | gates on the template store | HOME-002 |
+| `crates/lys-home/src/record/beside.rs` | append beside the context path without moving the head; the session head hash | HOME-002 |
+| `crates/lys-home/src/record/beside_tests.rs` | gates on the side-leaf append and the head hash | HOME-002 |
+| `crates/lys-home/tests/launch_template.rs` | render-launch end to end: recorded hashes, twice identical, handle only, refusals, exit 2 | HOME-002 |
+| `crates/lys-home/tests/fixtures/launch/template.json` | the fixture Claude Code launch template, handle-only secrets | HOME-002 |
+| `crates/lys-home/tests/fixtures/launch/session.jsonl` | the synthetic fixture session in Pi's grammar, no transcript content | HOME-002 |
+| `crates/lys-home/src/error.rs` | the home's errors; gains the template refusals |  |
+| `crates/lys-home/src/harness/claude_code/render_tests.rs` | gates on the R4 render |  |
+| `docs/design/identity/STATEMENT-2026-09-22.md` | the statement; its steps 4 and 5 entry carries the ruling the launch template stands on |  |
+| `docs/design/home/DESIGN.md` | the cluster design, rendered from design.json |  |
+| `docs/design/home/CHECKLIST.md` | the checklist, rendered from checklist.json |  |
+| `docs/design/home/USER-STORIES.md` | the stories, rendered from stories.json |  |
+| `docs/design/home/briefs/HOME-003.json` | the third brief: the context record (lys.given) made at render, listed and checked by hash | HOME-003 |
+| `docs/design/home/briefs/HOME-003.md` | its rendered markdown | HOME-003 |
+| `docs/design/home/PROOF-GIVEN.md` | the measured Claude Code 2.1.283 instruction load order and slug rule, and one real render recorded as paths, counts and hashes | HOME-003 |
+| `crates/lys-home/src/harness/claude_code/paths.rs` | the Claude Code project slug as measured: every character that is not an ASCII letter or digit becomes '-' | HOME-003 |
+| `crates/lys-home/src/harness/claude_code/paths_tests.rs` | the slug rule against dotted, underscored and hyphenated working directories | HOME-003 |
+| `crates/lys-home/src/harness/claude_code/given.rs` | resolving, in the measured order, the documents Claude Code will load for a working directory plus the files a render wrote | HOME-003 |
+| `crates/lys-home/src/harness/claude_code/given_tests.rs` | resolution order, absent documents omitted, lengths and hashes | HOME-003 |
+| `crates/lys-home/src/record/given.rs` | the lys.given entry data: harness, version, kinds, config directory and its source, documents, environment names; appended and read back | HOME-003 |
+| `crates/lys-home/src/record/given_tests.rs` | the lys.given shape: no content field, parented on the render event, read back equal | HOME-003 |
+| `crates/lys-home/src/cli/given.rs` | the given and given-check subcommands, split out of cli.rs | HOME-003 |
+| `crates/lys-home/tests/given_record.rs` | end to end on the fixture template: order, two renders equal, one byte changed, matches and differs, no content | HOME-003 |
+| `docs/design/home/briefs/HOME-004.json` | the fourth brief: ship and fetch a home as one git ref, the arrival event, the same-machine resume proof | HOME-004 |
+| `docs/design/home/briefs/HOME-004.md` | its rendered markdown | HOME-004 |
+| `docs/design/home/PROOF-MOVE.md` | the measured move: the fixture home shipped, fetched, rendered and resumed on the installed Claude Code, as hashes, counts and paths | HOME-004 |
+| `crates/lys-home/src/record/verify.rs` | an index and a head checked against their session file without rebuilding or writing anything | HOME-004 |
+| `crates/lys-home/src/record/verify_tests.rs` | gates on the check-only verification: stale, missing and unindexed refused, nothing written | HOME-004 |
+| `crates/lys-home/src/moves/mod.rs` | the move module: declarations only | HOME-004 |
+| `crates/lys-home/src/moves/git.rs` | the git binary run with the person's git configuration, hooks, signing and prompts shut out | HOME-004 |
+| `crates/lys-home/src/moves/git_tests.rs` | gates on the isolated git runner | HOME-004 |
+| `crates/lys-home/src/moves/remote.rs` | the remote named: ship stays on this machine, no remote carries userinfo, the form the arrival records | HOME-004 |
+| `crates/lys-home/src/moves/remote_tests.rs` | gates on the remote rules | HOME-004 |
+| `crates/lys-home/src/moves/tracked.rs` | the tracked set by allowlist, and the scan for the named secret values and the five standard patterns | HOME-004 |
+| `crates/lys-home/src/moves/tracked_tests.rs` | gates on the tracked set, the value scan and each pattern with its near miss | HOME-004 |
+| `crates/lys-home/src/moves/ship.rs` | ship: check, scan, commit the tracked set, push one ref; the table of the five standard secret patterns | HOME-004 |
+| `crates/lys-home/src/moves/fetch.rs` | fetch: into a staging directory, verify, record the arrival, rename into place | HOME-004 |
+| `crates/lys-home/src/cli/moves.rs` | the ship and fetch subcommands, split out of cli.rs | HOME-004 |
+| `crates/lys-home/tests/home_ship.rs` | ship through the built binary: the report, the pushed tree, each refusal with nothing written | HOME-004 |
+| `crates/lys-home/tests/home_fetch.rs` | fetch through the built binary: the arrival, the execution id, each refusal with nothing left behind | HOME-004 |
+| `crates/lys-home/tests/home_move.rs` | the move end to end on the fixture home: hash match at the fetched commit, prefixes after, source unchanged, secret search with its control | HOME-004 |
+| `Cargo.toml` | the workspace manifest; gains regex among the workspace dependencies | HOME-004 |
+| `Cargo.lock` | the lockfile; gains regex and what it resolves to | HOME-004 |
 
 ## Inventory
 
@@ -302,6 +347,7 @@ Adopt Pi's session tree as the home record (Tom, Dot 13:27 and 13:28: Pi's tree,
 - **CN5** — The pass-through proxy forwards every header and the streamed body unchanged and stores nothing but the measurement; it is an example binary, never a service.
 - **CN6** — No Norn crate is a dependency of lys-home and no Norn type is copied into it.
 - **CN7** — Reading the root-to-leaf path of a home file reads only the entries on that path plus the index, never the whole file (Pi loads the whole journal; Chippy 13:33); the head is persisted beside the file, never inferred from the last physical entry on reopen.
+- **CN8** — No secret value is written to any file, report, launch line, error or entry by lys-home; a use-only secret appears only as its handle.
 
 
 ---
@@ -322,7 +368,7 @@ title: Build the home record on Pi's session tree, with the Claude Code importer
 > **Checklist:**
 > - C1 — The home record is Pi's session tree: a home file parses with Pi's parser unchanged, and lys's harness events and call records are custom entries.
 > - C2 — Content blocks are stored once by SHA-256 and referenced; an identical block put twice occupies one entry.
-> - C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
+> - C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.
 > - C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
 > - C5 — Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events.
 > - C6 — One real session imported, rendered and resumed with --fork-session on Claude Code 2.1.281: it continues, no completed tool action repeats, the original's hash is unchanged.
@@ -420,7 +466,7 @@ WHEN given a Claude Code transcript file (records with parentUuid, uuid, type, m
 - modify: crates/lys-home/src/lib.rs
 
 **Checklist:**
-- C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
+- C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.
 
 **Stories:**
 - S1 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
@@ -563,7 +609,7 @@ Add subcommands to the lys-home binary: `import --home <dir> --claude-code <file
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
+- C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.
 - C4 — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
 - C10 — A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored.
 
@@ -702,262 +748,873 @@ A handover is one R11 lys.inherited entry, its data naming the outgoing session 
 type: brief
 id: HOME-002
 cluster: home
-title: Say what each compaction could not keep and prove the original is all still there: the loss entry, the block rows, the compaction listing and the compaction render
+title: Launch a Claude Code session from its home through a kept template
 ---
 
-# HOME-002: Say what each compaction could not keep and prove the original is all still there: the loss entry, the block rows, the compaction listing and the compaction render
+# HOME-002: Launch a Claude Code session from its home through a kept template
 
 > **Cluster:** home
 > **Depends on:** HOME-001
 > **Design anchor:**
-> - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
+> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
-> - ADR-013 — Claude Code's compaction is read and rendered in the shape the measured version writes — The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
 > **Checklist:**
-> - C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
-> - C14 — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
-> - C15 — A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.
-> - C16 — The hash of every content part stored at import is kept beside the session in <id>.blocks.jsonl, one row per part naming its entry, so the blocks an entry references can be checked as held; a session without the file is reported as unverified.
-> - C17 — A compaction renders for Claude Code as the target version writes it (a compact_boundary record, then the isCompactSummary record, then the kept records, the parent chain advancing through all three) and the lys.loss entry never renders.
-> - C18 — One real compacted Claude Code session is imported on the machine that holds it and its listing recorded in a proof document as counts, ids and hashes only; the compaction render is measured resuming on a named Claude Code version.
+> - C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
+> - C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
+> - C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
+> - C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+> - C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+> - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+> - C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
 > **Stories:**
-> - S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
-> - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
+> - S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+> - S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+> - S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
 
 ## Purpose
 
-A compaction is the first derived record because the harness itself produces it. HOME-001 imports sessions but says nothing of what a compaction could not keep, reads only a summary record that one measured file carries while every other compacted file holds compact_boundary and isCompactSummary records, keeps no hash of the blocks it stores, and renders a compaction as a summary line the model never reads. This brief makes a compacted session's home say, beside each compaction, what fell outside its kept range, lets anyone check that every summarised entry and block is still held, and renders the compaction in the shape the measured harness version writes (design principles P1, P2, P4, P6 and P7; ADR-012 and ADR-013).
+The home holds the record a new session is made from, but nothing turns it into a running session on a harness. This brief adds the first launch template, for Claude Code: a JSON object kept in the home by its SHA-256, with its schema in docs/design/home, and a lys-home subcommand, render-launch, that reads a template and a session and writes the files a Claude Code launch needs into one directory (the R4-rendered JSONL and its loss account, an MCP configuration file, an environment file, an appended-instructions file), prints one JSON report carrying the launch line, and records the render on the session as a template_render harness event hung beside the context path, so a stranger can tell which template a session was launched with (design solution, ADR-012).
 
 ## Task
 
-Extend lys-home in the order of the requirements: RECORD.md's contract first (R1), then the block rows (R2), the compaction mapping (R3), the loss entry (R4), the listing (R5), the render (R6), the end-to-end gates (R7) and the proof (R8). The fixture `crates/lys-home/tests/fixtures/claude_code_compacted.jsonl` is sixteen hand-built records of Claude Code 2.1.281's shape, every text a short made-up phrase and no real content, with uuids `00000000-0000-4000-8000-0000000000NN` for NN = 01 to 10 (hex), in this file order, and `…NN` abbreviates `00000000-0000-4000-8000-0000000000NN` wherever this brief writes it: 01 user text (parentUuid null); 02 assistant with a text part and a tool_use part (parent 01); 03 user holding only the tool_result for that tool_use (parent 02); 04 assistant text (parent 03); 05 user text (parent 04); 06 assistant text (parent 05); 07 system compact_boundary (parentUuid null, logicalParentUuid 06, compactMetadata {trigger "manual", preTokens 12345, preservedSegment {headUuid 05, anchorUuid 08, tailUuid 06}}); 08 user isCompactSummary true (parent 07, message content a string summary); 09 user text (parent 08); 0a assistant text (parent 09); 0b user text (parent 0a); 0c assistant text (parent 0b); 0d system compact_boundary (parentUuid null, logicalParentUuid 0c, compactMetadata {trigger "manual", preTokens 23456, preservedSegment {headUuid 0b, anchorUuid 0e, tailUuid 0c}}); 0e user isCompactSummary true (parent 0d, content the string `Fixture summary two. The code word is heliotrope.`); 0f user text (parent 0e); 10 assistant text (parent 0f). The word heliotrope appears in no other record. A file's content strings, wherever this brief scans for them, are every non-empty string value that is the `text` of a text part, the `thinking` of a thinking part, a string anywhere inside a tool_use part's `input`, a tool_result part's `content` when it is a string or the `text` of each text part in it, a `message.content` that is itself a string, and a `summary` field; type names, roles, ids, tool names, model names and every other structural value are not content strings. Split with HOME-001: C3 is HOME-001's row and this brief delivers its compaction half, its text amended to say that the compact_boundary pair is R3 corrected by measurement; HOME-001's R4 text is amended by R6 here. New files go where the design's structure names them; import.rs is at 473 of 500 code lines, so the compaction mapping, including the existing summary arm, moves to harness/claude_code/compaction.rs. Heavy builds and the full gate run where the project's standing rules send them; only warm single-crate checks run where the real session is held, and the real-session proof runs there. A compact_boundary whose isCompactSummary record never arrives imports as a compaction with an empty summary (R3); the listing prints its whole report first, then exits non-zero over an entry it could not read, a missing block, a session whose block rows are absent, or a compaction with no lys.loss entry, and exits 0 only when every compaction has its loss entry and every block in every span was read (R5). Out of scope: the home compacting a session itself; translation (stage 4b, its own card); changing what Claude Code writes; the handover letter (HOME-001 R12); LOSS-ACCOUNT.md.
+Build the Claude Code launch template and the render-launch subcommand, in dependency order: the template schema and parser (R1), a deterministic record uuid in the R4 render so a session renders byte-identically twice (R2), the home's template store (R3), a side-leaf append and the session head hash (R4), the template_render event kind (R5), the environment file with handles (R6), the subcommand (R7), the measured launch (R8), and the ruling's record plus the re-rendered cluster markdown (R9).
+
+What the words settle and how this brief reads them. The transcript slot is the one slot no template maps generically: the template names how this harness fills it (`resume-by-path`), and Claude Code fills it by resuming the rendered file by path. The launch line resumes by path WITH --fork-session: PROOF-FEWSHOT.md measured that a bare `claude --resume <path>` writes its continuation beside the passed file as <sessionId>.jsonl, which is the rendered file's own name under R4 (sessionId = the chosen uuid), so a bare resume would write onto the rendered file and break its recorded hash; PROOF-RESUME.md resumed with --fork-session. The rendered file is a launch artefact and is never written to after the render; the continuation lands under ~/.claude/projects for the run's working directory under the uuid Claude Code assigns at the fork, which is where the importer already reads, and that uuid is learned at capture, where the fork's parent link names the rendered session id. The launch line carries the rendered path and the flags only.
+
+Secrets. The words' sentence that the launch line reads the value through the broker at start is corrected here: a secret the template marks use-only is written as its handle and nothing else, and the launch line reads nothing for it, so its value never enters the process (ADR-001). A broker read at start happens only for a secret the template marks readable, and no broker reader exists until SECRETS-002 lands one, so a template naming any readable secret is refused naming secret_reader_unbuilt and SECRETS-002, and only handle-only secrets render. The schema carries the reader as a named command mapping in text (slots.secrets.reader), so SECRETS-002 fills it without a schema change; this brief never substitutes it into a launch line. The broker's own read is out of scope.
+
+The pieces. The subcommand launches the session it is given. The transcript slot may name a canon file, and then the render is taken with that canon exactly as R4's render --canon does (HOME-001 R11). The handover is not carried: HOME-001 R12 (record/handover.rs) is not on main, and a later card adds a handover slot once R12 lands. The first sentence of the words names the record, the canon and the handover as what the home holds, not as what this card launches.
+
+The recorded hashes. The CI acceptance renders a synthetic fixture session committed to the tree, holding no transcript content, and compares the written files against SHA-256 values recorded in the test. The recorded session from PROOF-RESUME is run once on the proof machine (R8): the proof records the template hash, the written paths, their hashes and the resume outcome, never the file or its content, and the private session is never committed (CN3, P7).
+
+The record. The render's lys.harness_event is a side leaf: its parentId is the head, the head does not move, the render walker never sees it, and a second render of the same session records the same session head hash in a second event. The record already has side leaves beside the context path (permission_mode and tool_completed events, RECORD.md), so no new entry kind is added; the new thing is the sixth event kind, template_render, which RECORD.md and the design name. The written paths ride in a manifest block the event names by hash, so the event stays under the 512-byte cap whatever the paths are.
+
+The ruling this stands on is recorded at docs/design/identity/STATEMENT-2026-09-22.md line 181 in a shorter relayed form; R9 adds the two items the relay omits to that entry, keeping its mark that it stands for correction.
+
+Out of scope: any harness other than Claude Code, launching on another machine, the broker's own read, running the launch line, the handover slot, capture of the launched session into the home.
 
 ## Requirements
 
-### R1: Write the compaction contract into RECORD.md before any code changes
+### R1: Define the Claude Code launch template: its schema and its parser, refusing an unknown slot by name
 
-RECORD.md is the second party the implementation is held to, so it is written first, in the commit before or the same commit as any change to crates/lys-home. It SHALL gain: (1) under 'What lys keeps beside the file', `<id>.blocks.jsonl`: one JSON row per content part stored at import, `{entry, part, hash}`, where entry is the id of the entry the part went into, part is the part's 0-based index in its source record's content (a string content is part 0), and hash is the SHA-256 hex BlockStore::put returned; appended only, never part of Pi's grammar, rebuildable from the original file by re-importing its parts through the store, and absent for a session imported before it existed, in which case a reader reports that session's blocks as unverified and never guesses. (2) under 'The lys custom entries', `lys.loss`: its data fields {compaction, first_kept, kept_none, span_first, span_last, entries, messages, tool_calls, tool_results, blocks, entry_bytes, block_bytes, blocks_sha256, tokens_before} with the meaning R4 gives each; its place (the line directly after its compaction entry in the file, with the compaction as its parent, a side leaf off the context path); the span rule of R4 (the context the compaction summarised as it stood, less what it keeps, including entries an earlier compaction kept and that earlier compaction entry, and for a completing compaction the span of the compaction it completes) and its counting rule; that it names ids, counts and hashes and never content; and that it is not the render's `<uuid>.loss.json`, which accounts for what a render dropped. (3) a section 'Claude Code compactions' stating the import mapping of R3 (the compact_boundary and isCompactSummary pair, the summary record, a boundary without preservedSegment keeping nothing, a boundary whose isCompactSummary record never arrives imported with an empty summary and `summary_missing` true, an isCompactSummary record read after that compaction was written importing as a second compaction entry that names the first in `details.completes` and leaves it unrewritten, every compaction entry becoming the file chain's last entry, a tailUuid that names no entry on record falling back to logicalParentUuid and then to the chain's last entry, the refusal of an unknown first kept entry by uuid) and the render shape of R6, each naming the Claude Code version it was measured on. The text SHALL NOT quote any transcript and SHALL NOT describe a field on a Pi entry outside custom data and the compaction's own Pi `details` field.
-
-**Acceptance:**
-- RECORD.md contains the strings `<id>.blocks.jsonl`, `lys.loss`, `compact_boundary`, `isCompactSummary`, `preservedSegment.headUuid` `summary_missing` and `completes`.
-- Each of the fourteen lys.loss field names (compaction, first_kept, kept_none, span_first, span_last, entries, messages, tool_calls, tool_results, blocks, entry_bytes, block_bytes, blocks_sha256, tokens_before) appears in RECORD.md's lys.loss paragraph, and that paragraph names `.loss.json` as a different record.
-- `git log --format=%H -- docs/design/home/RECORD.md` on the landed branch lists a commit that is an ancestor of, or equal to, the first commit on the branch that touches crates/lys-home.
-
-**Files:**
-- modify: docs/design/home/RECORD.md
-
-**Checklist:**
-- C14 — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
-- C15 — A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.
-- C16 — The hash of every content part stored at import is kept beside the session in <id>.blocks.jsonl, one row per part naming its entry, so the blocks an entry references can be checked as held; a session without the file is reported as unverified.
-
-**Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
-
-### R2: Keep every stored part's block hash beside the session
-
-WHEN the importer stores a content part through BlockStore::put, THE SYSTEM SHALL append one row {entry, part, hash} to `<id>.blocks.jsonl` beside the session file, where hash is the Hash put returned (today store_part discards it) and entry and part are as RECORD.md says; the path is given by a function beside Index::index_path and Index::head_path. The rows SHALL be durable before the import returns. THE SYSTEM SHALL NOT recompute a hash from the Pi-shaped part, SHALL NOT write any part content, text or length of text into a row, and SHALL NOT add a field to the header or to any Pi entry.
+Structure: docs/design/home/launch-template.schema.json is a JSON Schema (draft 2020-12) for one JSON object with exactly three members, all required: `harness` (the string `claude-code`), `flags` (an array of strings, the extra Claude Code arguments the launch line carries, in order) and `slots` (an object with exactly five members, all required, and additionalProperties false): `transcript` {`fill`: the string `resume-by-path`, `canon`: a canon file path string or null}, `mcp` (an object written verbatim as the MCP configuration file; it carries `mcpServers`), `env` (an object of environment variable name to string value), `secrets` {`use_only`: array of {`env`, `handle`}, `readable`: array of {`env`, `handle`}, `reader`: a string, the broker reader's command mapping in text, empty until the secrets rows fill it}, and `instructions` (a string, the text appended to the system prompt). A parser in crates/lys-home/src/harness/claude_code/template.rs reads that shape. IF a template's `slots` object holds a member not among the five, THEN THE SYSTEM SHALL refuse the template with HomeError::UnknownSlot naming that member AND SHALL NOT store the template, open a session or write any file. IF one of the five slots is missing, THEN THE SYSTEM SHALL refuse the template with HomeError::MissingSlot naming it. IF `harness` is not `claude-code` or `transcript.fill` is not `resume-by-path`, THEN THE SYSTEM SHALL refuse the template naming the field and the value given. IF `secrets.readable` holds any entry, THEN THE SYSTEM SHALL refuse the template with HomeError::SecretReaderUnbuilt, whose message names `secret_reader_unbuilt`, `SECRETS-002` and the entry's env name, AND SHALL NOT write, print or invoke the `reader` text. IF two entries across `env`, `secrets.use_only` and `secrets.readable` name the same environment variable, THEN THE SYSTEM SHALL refuse the template naming the variable. THE SYSTEM SHALL NOT interpret, expand or execute any string in the template, and SHALL NOT put a template's `instructions`, `env` values or `mcp` contents in an error message. The template hash is the SHA-256 of the template file's bytes exactly as read.
 
 **Acceptance:**
-- Importing the fixture writes `<session>.blocks.jsonl` holding exactly 15 rows, and the import report's `blocks` is 15.
-- The row with entry `00000000-0000-4000-8000-000000000002` and part 1 carries the SHA-256 hex of `serde_json::to_vec` of the tool_use part parsed from fixture line 2, computed by the test from the fixture file.
-- BlockStore::contains is true for the hash of every one of the 15 rows.
-- The rows file contains none of the fixture's content strings, and the test counts the content strings it scanned for and asserts the count is greater than 0.
-- No message entry in the imported session file carries a key named `hash` or `blocks`.
+- Parsing crates/lys-home/tests/fixtures/launch/template.json returns a template whose flags are ["--strict-mcp-config"], whose transcript fill is `resume-by-path` with canon null, and whose use_only secrets are exactly one entry {env: LYS_FIXTURE_TOKEN, handle: handle-fixture-0001}.
+- Parsing the fixture with slots.voice = {} added returns HomeError::UnknownSlot whose Display contains `voice`.
+- Parsing the fixture with slots.instructions removed returns HomeError::MissingSlot whose Display contains `instructions`.
+- Parsing the fixture with secrets.readable = [{"env": "LYS_FIXTURE_READ", "handle": "handle-fixture-0002"}] returns HomeError::SecretReaderUnbuilt whose Display contains `secret_reader_unbuilt`, `SECRETS-002` and `LYS_FIXTURE_READ`.
+- Parsing the fixture with harness set to `codex` returns an error whose Display contains `harness` and `codex`.
+- Parsing the fixture with env.LYS_FIXTURE_TOKEN = "x" added returns an error whose Display contains `LYS_FIXTURE_TOKEN`.
+- A test reads docs/design/home/launch-template.schema.json and asserts that the property names of its `slots` object are exactly {transcript, mcp, env, secrets, instructions}, the same set the parser accepts, and that `slots` has additionalProperties false.
+- The template hash of the fixture equals the SHA-256 of the fixture file's bytes computed by the sha2 crate in the test.
 
 **Files:**
-- create: crates/lys-home/src/record/block_rows.rs
-- create: crates/lys-home/src/record/block_rows_tests.rs
-- create: crates/lys-home/tests/fixtures/claude_code_compacted.jsonl
-- modify: crates/lys-home/src/record/mod.rs
-- modify: crates/lys-home/src/record/index.rs
-- modify: crates/lys-home/src/harness/claude_code/import.rs
-
-**Checklist:**
-- C16 — The hash of every content part stored at import is kept beside the session in <id>.blocks.jsonl, one row per part naming its entry, so the blocks an entry references can be checked as held; a session without the file is reported as unverified.
-
-**Stories:**
-- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
-
-### R3: Import Claude Code's compaction records as one Pi compaction entry
-
-WHEN a Claude Code transcript holds a `system` record with subtype `compact_boundary` and a `user` record with `isCompactSummary: true` whose parentUuid is that boundary's uuid, THE SYSTEM SHALL write one Pi compaction entry for the pair when the summary record is read: its id is the summary record's uuid, so a later record whose parentUuid names the summary attaches under the compaction and R3's parent equality holds; its parentId is the boundary's `compactMetadata.preservedSegment.tailUuid` when that names an entry on record, otherwise the boundary's `logicalParentUuid` when that names an entry on record, otherwise the last entry on the file's chain, so a tailUuid that names no entry on record is never refused; its summary is the summary record's message content string; its firstKeptEntryId is the first entry that the record named by `preservedSegment.headUuid` produced; its tokensBefore is `compactMetadata.preTokens`; its timestamp is the summary record's; and its Pi `details` field is `{"boundaryUuid": <boundary uuid>, "summaryUuid": <summary uuid>}` so both originals are traceable. The pair is matched by the summary's parentUuid, not by adjacency (records may sit between the two). The summary's content is stored as a block with a row under the compaction's id, part 0. THE SYSTEM SHALL count the two records in the import report as the compaction's source (`compactions` counts compaction entries, `compaction_sources` counts the records they came from) and SHALL NOT write either as a lys.harness_event entry or as a user message entry, nor count them in `events` or `counted_types`. IF a compact_boundary record's isCompactSummary record has not been read when a later record names the boundary's uuid as its parentUuid, or when the end of the file is reached, THEN THE SYSTEM SHALL write the compaction at that point with the boundary's uuid as its id, an empty summary, the same parentId, firstKeptEntryId and tokensBefore rules, the boundary's timestamp, and details `{"boundaryUuid": <boundary uuid>, "summary_missing": true}`, count it in `compactions` and the boundary in `compaction_sources`, and SHALL NOT write the boundary as a lys.harness_event entry nor refuse the file. WHEN an isCompactSummary record is read after its boundary's compaction was already written that way, THE SYSTEM SHALL write a second compaction entry for the same boundary: its id is the summary record's uuid, its parentId is the summary record's parentUuid (the earlier compaction's id), its summary is the summary record's message content string, its firstKeptEntryId and tokensBefore are the earlier compaction's, its timestamp is the summary record's, and its details are `{"boundaryUuid": <boundary uuid>, "summaryUuid": <summary uuid>, "completes": <earlier compaction's id>}`; the summary's content is stored as a block with a row under this entry's id, part 0; it is counted in `compactions` and the summary record in `compaction_sources`. THE SYSTEM SHALL NOT import that summary record as a user message entry, and SHALL NOT change, rewrite or remove the earlier compaction entry, whose details keep `summary_missing` true. WHEN the boundary carries no preservedSegment, THE SYSTEM SHALL write the compaction with firstKeptEntryId equal to its own id, so it keeps nothing, and SHALL NOT refuse the file. WHEN a `type:"summary"` record is read, THE SYSTEM SHALL write its compaction entry as today (a fresh id, the last main-path message as parent, firstKeptEntryId its own id, tokensBefore 0) and count it in `compactions` and `compaction_sources`; this arm moves out of import.rs into the new compaction module so import.rs stays under 500 code lines. WHEN THE SYSTEM writes a compaction entry by any of these paths (the pair when its summary is read, the fallback at a later child or at the end of the file, the completing entry, and the summary record), THE SYSTEM SHALL make that compaction entry the last entry on the file's chain, so that the next record without an on-record parent attaches under it and the head is set to it when no later record follows; the lys.loss entry after it SHALL NOT become the chain's last entry. IF `preservedSegment.headUuid` names a record not on record when the compaction is written, THEN THE SYSTEM SHALL refuse the import with an error naming that uuid, as an unknown parentUuid is refused, and SHALL NOT append the compaction entry or its loss entry; this is the only compaction refusal. THE SYSTEM SHALL NOT change what any other record imports to, SHALL NOT change the unknown-parentUuid refusal, and SHALL NOT write to the source file.
-
-**Acceptance:**
-- Importing the fixture yields a compaction entry with id `00000000-0000-4000-8000-000000000008`, parentId `…06`, firstKeptEntryId `…05`, tokensBefore 12345 and details `{"boundaryUuid": "…07", "summaryUuid": "…08"}`, and one with id `…0e`, parentId `…0c`, firstKeptEntryId `…0b` and tokensBefore 23456.
-- The fixture's import report has `compactions` 2, `compaction_sources` 4, `events` equal to `{"tool_completed": 1}` and no `system` key in `counted_types`, and the session holds no entry with id `…07` and none with id `…0d`.
-- In the fixture import, entry `…09` has parentId `…08` and entry `…0f` has parentId `…0e`, and every message entry's parent equals its source record's parentUuid (checked over all).
-- With both boundaries' preservedSegment removed from the fixture, the import succeeds and entry `…08` has firstKeptEntryId `…08` and parentId `…06` (the logicalParentUuid).
-- With the first boundary's preservedSegment.tailUuid replaced by `00000000-0000-4000-8000-0000000000fe`, the import succeeds and entry `…08` has parentId `…06` (the logicalParentUuid); with both that replacement and the boundary's logicalParentUuid replaced by `00000000-0000-4000-8000-0000000000fd`, the import succeeds and entry `…08` has parentId `…06` (the last entry on the file's chain when the summary is read).
-- With the fixture's line 7 moved to sit between lines 5 and 6, entry `…08` is written with the same parentId, firstKeptEntryId, tokensBefore and details as unmoved.
-- With the first boundary's headUuid replaced by `00000000-0000-4000-8000-0000000000ff`, the import returns an error whose Display contains `00000000-0000-4000-8000-0000000000ff`, and the session holds no entry `…08` and no lys.loss entry.
-- With fixture lines 14 to 16 removed, the import succeeds; the last two lines of the session file are a compaction entry with id `…0d`, summary `""`, parentId `…0c`, firstKeptEntryId `…0b`, tokensBefore 23456 and details `{"boundaryUuid": "…0d", "summary_missing": true}`, then a lys.loss entry whose data.compaction is `…0d`; the report has `compactions` 2 and `compaction_sources` 3, and entry `…08`'s details have no `summary_missing` key.
-- With fixture lines 14 to 16 removed, Session::head() after the import is `…0d`; on the unmodified fixture, Session::head() after the import is `…10`.
-- A three-line file (user `…01` with parentUuid null, assistant `…02` with parent `…01`, then `{"type":"summary","summary":"Fixture summary.","leafUuid":"…02"}`) imports to one compaction entry whose firstKeptEntryId equals its own id and whose tokensBefore is 0, with report `compactions` 1 and `compaction_sources` 1.
-- With a user record `00000000-0000-4000-8000-000000000011` whose parentUuid is `…07` inserted between fixture lines 7 and 8, the import succeeds; the session holds a compaction entry with id `…07`, summary `""`, parentId `…06`, firstKeptEntryId `…05`, tokensBefore 12345 and details `{"boundaryUuid": "…07", "summary_missing": true}`, followed on the next line by a lys.loss entry whose data.compaction is `…07`; entry `…11` is a user message with parentId `…07`; entry `…08` is a compaction entry with parentId `…07`, summary equal to fixture line 8's summary string, firstKeptEntryId `…05`, tokensBefore 12345 and details `{"boundaryUuid": "…07", "summaryUuid": "…08", "completes": "…07"}`, followed on the next line by a lys.loss entry whose data.compaction is `…08`; the session holds no user message entry with id `…08`; entry `…07`'s line is byte-identical to the line it had when `…11` was read; entry `…09` has parentId `…08`; and the report has `compactions` 3 and `compaction_sources` 4.
-
-**Files:**
-- create: crates/lys-home/src/harness/claude_code/compaction.rs
-- create: crates/lys-home/src/harness/claude_code/compaction_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/import.rs
+- create: docs/design/home/launch-template.schema.json
+- create: crates/lys-home/src/harness/claude_code/template.rs
+- create: crates/lys-home/src/harness/claude_code/template_tests.rs
+- create: crates/lys-home/tests/fixtures/launch/template.json
 - modify: crates/lys-home/src/harness/claude_code/mod.rs
 - modify: crates/lys-home/src/error.rs
 
 **Checklist:**
-- C3 — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
-- C14 — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
+- C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
 
 **Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
+- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
 
-### R4: Append a lys.loss entry directly after each compaction entry
+### R2: Make the render's record uuid a function of the entry id, so a session renders byte-identically twice
 
-WHEN the importer appends a compaction entry by any path of R3, THE SYSTEM SHALL append, as the very next line of the session file, a custom entry with customType `lys.loss` (a constant beside lys.harness_event in entries.rs), a fresh id, the compaction's timestamp and the compaction entry as its parent: a side leaf, so the path through the compaction, R3's parent equality and the context path are unchanged. Its data SHALL be: `compaction` the compaction's entry id; `first_kept` its firstKeptEntryId; `kept_none` true exactly when firstKeptEntryId is the compaction's own id; `span_first` and `span_last` the first and last entry ids of the span, both null when the span is empty; `entries` the number of span entries; `messages` the span's message entries (user, assistant and toolResult); `tool_calls` the toolCall parts in the span's assistant messages; `tool_results` the span's toolResult messages; `blocks` the number of block rows whose entry is in the span; `entry_bytes` the sum of the span entries' line lengths in the session file as the index holds them; `block_bytes` the sum of the byte lengths of the blocks those rows name, as held; `blocks_sha256` the SHA-256 hex of those rows' hashes in span order then part order, each followed by one newline; `tokens_before` the compaction's tokensBefore. The span is the context the compaction summarised as that context stood, every entry its summary now stands in for: the entries of the compaction's ancestry that Pi's context reading covered at the compaction's parent, less the entries the compaction keeps. On the ancestry, root first, it starts at the root when no compaction entry sits earlier on that ancestry; otherwise at the nearest earlier compaction's first kept entry when that entry is on the ancestry (so entries an earlier compaction kept, and that earlier compaction entry itself, are in the span), and at that earlier compaction entry when its first kept entry is itself or is not on the ancestry. It ends at the entry whose child on the ancestry is the first kept entry, or at the compaction's parent when the compaction keeps nothing. For a completing compaction of R3 (one whose details carry `completes`), the span is the span of the compaction it completes, and every data field but `compaction` and `tokens_before` equals that compaction's loss entry's. It is one unbroken run of the ancestry, named in ancestry order, so span_first, span_last and the parent ids between them name every id in it. Entries off that ancestry (side leaves such as tool_completed and permission-mode events, earlier loss entries, sidechains) are not in the span; custom entries on it (attachment and system events, lys.authored) are counted in `entries` only. THE SYSTEM SHALL compute the span by seeking its entries through the index and SHALL NOT read the whole session file. The data SHALL NOT carry any text, thinking, tool input, tool result or summary, nor any key named text, content or body, and THE SYSTEM SHALL NOT remove, rewrite or move any span entry or block.
-
-**Acceptance:**
-- Importing the fixture yields exactly two lys.loss entries (Session::customs_everywhere); the first has parentId `…08`, its index offset equals the offset plus length of entry `…08`, and its data.compaction is `…08`.
-- The first loss entry's data has span_first `…01`, span_last `…04`, entries 4, messages 4, tool_calls 1, tool_results 1, blocks 5, first_kept `…05`, kept_none false and tokens_before 12345.
-- The second loss entry's data has compaction `…0e`, first_kept `…0b`, kept_none false, span_first `…05`, span_last `…0a`, entries 5, messages 4, tool_calls 0, tool_results 0, blocks 5 and tokens_before 23456, and its entry_bytes equals the sum of the index lengths of entries `…05`, `…06`, `…08`, `…09` and `…0a`.
-- The first loss entry's block_bytes equals the sum of `serde_json::to_vec` lengths of the five content parts of fixture lines 1 to 4 (line 1's string content taken as `{"type":"text","text":…}`), and its blocks_sha256 equals the SHA-256 of those five parts' hashes each followed by a newline in file order, both computed by the test from the fixture file.
-- The first loss entry's entry_bytes equals the sum of the index lengths of entries `…01`, `…02`, `…03` and `…04`.
-- With both boundaries' preservedSegment removed, the first loss entry has kept_none true, span_first `…01`, span_last `…06`, entries 6, messages 6, tool_calls 1, tool_results 1 and blocks 7.
-- The three-line summary file of R3 yields one loss entry with kept_none true, span_first `…01`, span_last `…02`, entries 2, messages 2 and tokens_before 0.
-- Neither loss entry's serialised data contains any of the fixture's content strings, the test counts the content strings it scanned for and asserts the count is greater than 0, and neither loss entry has a key named text, content or body.
-- On the fixture with the user record `…11` of R3 inserted between lines 7 and 8, the lys.loss entry whose data.compaction is `…08` has span_first `…01`, span_last `…04`, entries 4, blocks 5, first_kept `…05` and kept_none false, and its blocks_sha256 equals that of the lys.loss entry whose data.compaction is `…07`.
-
-**Files:**
-- create: crates/lys-home/src/record/loss.rs
-- create: crates/lys-home/src/record/loss_tests.rs
-- modify: crates/lys-home/src/record/entries.rs
-- modify: crates/lys-home/src/record/mod.rs
-- modify: crates/lys-home/src/harness/claude_code/compaction.rs
-
-**Checklist:**
-- C14 — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
-
-**Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
-
-### R5: List a session's compactions with the span read by id and its blocks checked as held
-
-Add the subcommand `lys-home compactions --home <dir> --session <id>`. WHEN run, THE SYSTEM SHALL take the session's root-to-head ancestry from the index's rows (ids and parent ids, without reading the session file) and read each of those entries on its own by Session::entry, so an entry that cannot be read is named and the walk goes on, never aborting the listing; every id it could not read, on the path or as a loss entry, is listed in the report's top-level `unreadable`. For each compaction entry among the entries read, in path order, THE SYSTEM SHALL report `compaction`, `summary` (the word `missing` when the compaction's details carry `summary_missing` true and no compaction entry on the path names it in `details.completes`, otherwise the word `present`), `completes` (the id in its details' `completes`, or null), `completed_by` (the id of the compaction entry on the path whose details' `completes` names it, or null), `first_kept`, `kept_none`, `tokens_before`, `loss` (the id of the lys.loss entry whose data.compaction names it, found through the index's custom rows and read by Session::entry, or null when there is none), `span_first`, `span_last`, `entries_expected` (the loss entry's entries), `entries_read` (how many of the span's entries Session::entry read, the span's ids taken from the index by following parent ids from span_last back to span_first, each read on its own), `entries_missing` (every span id that could not be read, in ancestry order, the walk continuing past each), `blocks_expected` (the loss entry's blocks), `blocks_held`, `blocks_missing` (the hashes of the span's block rows the store does not hold) and `blocks_sha256` (recomputed from the rows as R4 computes it) and `reason` (null when the compaction has a loss entry, otherwise the string `unknown: no lys.loss entry, imported before HOME-002`). The report is one JSON object `{command: "compactions", session, blocks_verified, unreadable, compactions: [...]}`. WHILE `<id>.blocks.jsonl` is absent, THE SYSTEM SHALL report `blocks_verified` false with the session id and every block field null, and SHALL NOT infer blocks any other way. WHEN a compaction has no loss entry, its span, entries and block fields SHALL be null and its reason SHALL be `unknown: no lys.loss entry, imported before HOME-002`; its span SHALL NOT be guessed from the path. THE SYSTEM SHALL NOT print any transcript, block or summary content nor a key named text, content or body, SHALL NOT write to the session file, its index, head, block rows or the block store, and SHALL NOT start any process. WHEN the report is printed, IF `unreadable` is non-empty, or any compaction's entries_missing or blocks_missing is non-empty, or any compaction has no loss entry, or `blocks_verified` is false, THEN THE SYSTEM SHALL exit 1 after printing the whole report, with each failure named in it by entry id, block hash, compaction id or session id; WHEN `unreadable` is empty, every compaction has its loss entry, `blocks_verified` is true, and every compaction has entries_read equal to entries_expected and empty entries_missing and blocks_missing, THE SYSTEM SHALL exit 0, and in no other case. THE SYSTEM SHALL NOT exit before printing the report because an entry, block, rows file or loss entry is missing or cannot be read. IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it.
+WHEN render_claude_code maps an entry whose id is not uuid-shaped, THE SYSTEM SHALL derive the record uuid from the SHA-256 of the entry id's bytes, formatted as today's uuid shape (8-4-4-4-12 hex, version nibble 4, variant nibble 8), AND SHALL NOT draw a random value for it. WHILE an entry id is already uuid-shaped, THE SYSTEM SHALL keep it unchanged, as today. THE SYSTEM SHALL NOT change any other byte the render writes, the loss account's shape, or the render report's fields.
 
 **Acceptance:**
-- On the fixture import, stdout parses as one JSON object whose `unreadable` is [], whose `blocks_verified` is true and whose `compactions` array has 2 members; the first has compaction `…08`, summary `present`, loss equal to the first lys.loss entry's id, entries_expected 4, entries_read 4, entries_missing [], blocks_expected 5, blocks_held 5, blocks_missing [] and reason null; the second has compaction `…0e`, entries_expected 5, entries_read 5, entries_missing [], blocks_expected 5, blocks_held 5 and blocks_missing []; and the exit status is 0.
-- After the block file of the tool_use part of entry `…02` (hash H, from its block row) is removed, the listing's first compaction has blocks_held 4 and blocks_missing exactly [H], and the second compaction's blocks_missing is [], stdout parses as the whole report, and the exit status is 1.
-- After `<session>.blocks.jsonl` is removed, the listing reports blocks_verified false and the session id, every compaction's blocks_held, blocks_missing and blocks_sha256 are null, and the first compaction's entries_read is still 4, stdout parses as the whole report, and the exit status is 1.
-- After every byte of entry `…03`'s line in the session file except its trailing newline is overwritten in place with `x`, the listing's top-level `unreadable` is exactly [`…03`], its first compaction has entries_read 3 and entries_missing exactly [`…03`], its second compaction has entries_read 5 and entries_missing [], stdout parses as the whole report, and the exit status is 1.
-- On the import of the fixture with lines 14 to 16 removed, the listing's second compaction has compaction `…0d` and summary `missing`, and the first has summary `present`.
-- On the import of the fixture with the user record `…11` of R3 inserted between lines 7 and 8, the listing's `compactions` array has 3 members in path order: compaction `…07` with summary `present`, completes null and completed_by `…08`; compaction `…08` with summary `present`, completes `…07`, completed_by null, entries_expected 4 and entries_read 4; and compaction `…0e`; and the exit status is 0.
-- A session written through the record API holding user entry `…01`, assistant entry `…02` (parent `…01`) and a compaction entry (parent `…02`, firstKeptEntryId `…02`), with no lys.loss entry and no block rows file, lists one compaction whose loss, span_first, span_last, entries_expected, entries_read, entries_missing, blocks_expected, blocks_held, blocks_missing and blocks_sha256 are all null and whose reason is `unknown: no lys.loss entry, imported before HOME-002`; stdout parses as the whole report and the exit status is 1.
-- The listing's stdout has no key named text, content or body at any depth and contains none of the fixture's content strings, and the test counts the content strings it scanned for and asserts the count is greater than 0.
-- `lys-home compactions --home h` exits 2 and its stderr contains `--session`.
-- The SHA-256 of the session file, its index, its head and its block rows file are each the same before and after a listing.
-
-**Files:**
-- create: crates/lys-home/src/record/compactions.rs
-- create: crates/lys-home/src/record/compactions_tests.rs
-- modify: crates/lys-home/src/cli.rs
-- modify: crates/lys-home/src/record/mod.rs
-- modify: crates/lys-home/README.md
-
-**Checklist:**
-- C15 — A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.
-
-**Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
-- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
-
-### R6: Render a compaction for Claude Code in the shape the target version writes, never the loss entry
-
-WHEN rendering for Claude Code a context path whose first entry is a compaction, THE SYSTEM SHALL write, in place of the `{type: summary, leafUuid}` line: a `system` record with subtype `compact_boundary`, content `Conversation compacted`, level `info` and `compactMetadata` `{"preTokens": <tokensBefore>}`, whose parentUuid is null; then a `user` record with `isCompactSummary` true, `isVisibleInTranscriptOnly` true and message `{"role": "user", "content": <summary>}`, whose parentUuid is the boundary's uuid; then the kept and later entries, the first of them with the summary record's uuid as its parentUuid, the chain advancing through all three. Both records carry sessionId, cwd, version, userType, isSidechain and timestamp as the other rendered records do. THE SYSTEM SHALL NOT write a `type:"summary"` line, SHALL NOT write any custom entry (lys.loss included), and SHALL NOT write a preservedSegment. R4's thinking rule, the refusal of an existing path and the `.loss.json` beside the file are unchanged. HOME-001's R4 spec is amended to name this shape in place of 'Claude Code's summary record', stating that the summary line was written before the shape was measured and left the summary in no record the model reads, and HOME-001.md is re-rendered from it.
-
-**Acceptance:**
-- Rendering the fixture import writes 6 lines: line 1 has type `system`, subtype `compact_boundary`, parentUuid null and compactMetadata.preTokens 23456; line 2 has type `user`, isCompactSummary true, parentUuid equal to line 1's uuid and message.content equal to fixture line 14's summary string; line 3 has uuid `…0b` and parentUuid equal to line 2's uuid; lines 4 to 6 each have parentUuid equal to the previous line's uuid.
-- The rendered fixture file has 0 lines whose type is `summary`, 0 lines whose type is `custom` and 0 lines containing `lys.loss`.
-- Re-importing the rendered fixture file into a fresh home yields exactly one compaction entry, with tokensBefore 23456 and summary equal to fixture line 14's.
-- The render tests that predate this brief (same model keeps signed thinking, a different model gets a loss account) pass unchanged.
-- HOME-001.json's R4 spec contains `compact_boundary` and `isCompactSummary` and no longer contains `a compaction renders as Claude Code's summary record`, and HOME-001.md is byte-equal to what render-cluster.py writes from it.
+- Rendering a session of four message entries with ids e1, e2, e3 and e4 twice, to two different paths under the same target uuid, cwd, model and version, yields two files with equal bytes and two loss accounts with equal bytes.
+- In that render the four records carry four distinct uuids, and each record after the first has parentUuid equal to the previous record's uuid.
+- An entry with id 5f0c0b8e-2a1d-4c3b-9e7f-0123456789ab renders with uuid 5f0c0b8e-2a1d-4c3b-9e7f-0123456789ab.
+- The existing render and round-trip tests (render_tests.rs, tests/claude_code_round_trip.rs) pass unchanged.
 
 **Files:**
 - modify: crates/lys-home/src/harness/claude_code/render.rs
 - modify: crates/lys-home/src/harness/claude_code/render_tests.rs
-- modify: docs/design/home/briefs/HOME-001.json
-- modify: docs/design/home/briefs/HOME-001.md
 
 **Checklist:**
-- C17 — A compaction renders for Claude Code as the target version writes it (a compact_boundary record, then the isCompactSummary record, then the kept records, the parent chain advancing through all three) and the lys.loss entry never renders.
+- C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
 
 **Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
+- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
 
-### R7: Gate the whole on the compacted fixture, end to end
+### R3: Keep each template in the home as an object named by its SHA-256
 
-An integration test SHALL carry the words' acceptance on the fixture through the crate's public surface. WHEN the fixture is imported into two fresh homes, THE SYSTEM SHALL give lys.loss entry lines that are byte-identical once `id`, `parentId` and `timestamp` are removed. WHEN a compacted fixture home is read, every entry in each span SHALL be readable by id, the context path SHALL be the last compaction then its kept entries then the later entries with nothing from any span, and the render SHALL hold the boundary, summary and kept records and no loss line. The test SHALL NOT use any real transcript and its names SHALL NOT carry any of the fixture's content strings.
+Structure: a home keeps templates under `templates/` beside `sessions/` and `blocks/`, with the block store's layout and write discipline (`templates/<hh>/<hash>`, written to a temporary file, fsynced, renamed, directory fsynced). WHEN a template is stored, THE SYSTEM SHALL name it by the SHA-256 of its bytes, return that hash and whether it was new, AND SHALL NOT write it again when the same bytes are already held. THE SYSTEM SHALL NOT rewrite or delete a stored template. Home::open SHALL NOT change: the templates directory is created when the first template is stored.
 
 **Acceptance:**
-- The two homes' first lys.loss lines, and their second lys.loss lines, are byte-identical after removing `id`, `parentId` and `timestamp`, and the test counts 2 compared pairs.
-- Session::entry succeeds for each of `…01`, `…02`, `…03` and `…04` (the first compaction's span) and for each of `…05`, `…06`, `…08`, `…09` and `…0a` (the second compaction's span), the test counts 9 ids read, and the listing reports entries_missing [] and blocks_missing [] for both compactions.
-- The ids of Session::context_path are exactly [`…0e`, `…0b`, `…0c`, `…0f`, `…10`].
-- The rendered fixture file holds 1 compact_boundary record, 1 isCompactSummary record and 4 records with uuids `…0b`, `…0c`, `…0f`, `…10`, and 0 lines containing `lys.loss`.
-- The fixture file's SHA-256 is the same before and after the import, listing and render.
+- Storing the fixture template's bytes into a fresh home returns its SHA-256 with new = true, and the file templates/<first two hex>/<hash> holds bytes equal to the fixture's.
+- Storing the same bytes a second time returns the same hash with new = false and leaves the stored file's modification time unchanged.
+- Home::open on a fresh directory creates exactly `sessions` and `blocks`, as before.
 
 **Files:**
-- create: crates/lys-home/tests/claude_code_compaction.rs
+- create: crates/lys-home/src/record/templates.rs
+- create: crates/lys-home/src/record/templates_tests.rs
+- modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C14 — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
-- C15 — A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.
-- C17 — A compaction renders for Claude Code as the target version writes it (a compact_boundary record, then the isCompactSummary record, then the kept records, the parent chain advancing through all three) and the lys.loss entry never renders.
+- C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
 
 **Stories:**
-- S9 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
-- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
+- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
 
-### R8: Prove it on one real compacted session and measure the render's resume
+### R4: Append an entry beside the context path without moving the head, and name the session head by hash
 
-PROOF-COMPACTION.md SHALL record two measurements. First, one real compacted Claude Code session, chosen as the smallest by byte size (ties broken by the lesser path in byte order) of the main-session files (not a subagent's) holding a compact_boundary record under every Claude Code config root on the machine that holds it; the proof records each config root it searched and the exact search command, whose output lists the candidate files with their byte sizes, so that running the recorded command over the recorded roots picks the same file. It SHALL NOT be running: it is established as not running by `pgrep -f <session id>` finding no process, the rule HOME-001's proof applied, with that command and its empty result recorded, and by its SHA-256 being equal before and after. The proof records its byte size, SHA-256 before and after, its count of compact_boundary records and the Claude Code version on them, the exact import and listing commands, the import report, and the listing report, as ids, counts and hashes only. Second, the fixture home rendered with `--version` set to the installed Claude Code's version and resumed by path with `claude -p --resume <rendered file>` and a prompt asking for the code word from the summary, run from a directory that is neither the file's directory nor the config root: the output of `claude --version`, the exact command, its exit status, the one-word answer, the rendered file's SHA-256 before and after, and the continuation file's count of compact_boundary and isCompactSummary records. The proof is scanned for every content string of the real source, whatever its length, and the scan command, the number of content strings scanned and the number found are written in it. THE PROOF SHALL NOT contain any content string of the real session, and SHALL NOT be run against a session that is running.
+WHEN Session::append_beside is given an entry body, THE SYSTEM SHALL append it with a fresh id, parentId equal to the current head and the current time, durable in the same order as an append (entry line, then index row), AND SHALL NOT write or move the head. append_entry and append_beside SHALL share one durable write path, so a failure after the line is durable reconciles the same way. Structure: the session head hash is the SHA-256 of the head entry's line bytes in the session file, trailing newline included, exactly the bytes its index row's offset and length name; for a session with no head it is the SHA-256 of the header line, trailing newline included. THE SYSTEM SHALL read those bytes by seeking to the row and SHALL NOT read the whole file for it.
 
 **Acceptance:**
-- PROOF-COMPACTION.md names the real source by size and SHA-256, states its compact_boundary count and their Claude Code version, records `pgrep -f <session id>` with no process found, and its SHA-256 before and after are equal.
-- PROOF-COMPACTION.md lists the config roots it searched and the exact search command, and the source it names is the first file of that command's recorded output when ordered by byte size and then by path in byte order.
-- The recorded listing's `compactions` array length equals the recorded import report's `compactions`, and every member has entries_read equal to entries_expected, entries_missing [] and blocks_missing [], with blocks_verified true.
-- A scan of PROOF-COMPACTION.md for every content string of the real source, whatever its length, each matched where it is bounded on both sides by the start or end of the file or by a character that is neither a letter nor a digit, finds 0 matches, and the scan command, the number of content strings scanned (greater than 0) and the number found (0) are written in the proof.
-- The render measurement records `claude --version` reporting 2.1.282, exit status 0, the answer `heliotrope`, equal rendered-file SHA-256 before and after, and the continuation's compact_boundary and isCompactSummary counts.
+- On a session whose head is e4, append_beside of a custom entry returns an id whose entry has parentId e4; afterwards head() is e4, the <id>.head file's bytes are unchanged, and context_path() returns the same four entries as before.
+- After reopening that session with Session::open, head() is e4 and customs_everywhere of the appended custom type returns one entry.
+- For the fixture session crates/lys-home/tests/fixtures/launch/session.jsonl, the session head hash equals the SHA-256 of that file's last line plus a newline, computed by the test from the fixture bytes.
+- The session head hash is equal before and after an append_beside.
+- For a session holding only its header line, the session head hash equals the SHA-256 of the header line plus a newline.
 
 **Files:**
-- create: docs/design/home/PROOF-COMPACTION.md
+- create: crates/lys-home/src/record/beside.rs
+- create: crates/lys-home/src/record/beside_tests.rs
+- modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C18 — One real compacted Claude Code session is imported on the machine that holds it and its listing recorded in a proof document as counts, ids and hashes only; the compaction render is measured resuming on a named Claude Code version.
+- C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
 
 **Stories:**
-- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
+- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+### R5: Add template_render as the sixth lys.harness_event kind, carrying the written paths by a manifest block
+
+Structure: a sixth event kind, KIND_TEMPLATE_RENDER = `template_render`, whose data is {kind: `template_render`, harness: `claude-code`, source_uuid: null, record: the SHA-256 of a manifest block, detail: {template: the template hash, session_head: the session head hash, files: the count of files written}}. The manifest block is one JSON object stored in the home's block store: {template, session_head, head (the head entry id, or null), uuid (the rendered session id), files: [{path, sha256}] in write order}. WHEN a template_render event is built, THE SYSTEM SHALL apply the existing 512-byte check to its data AND SHALL NOT put a path, a flag, an environment value, a handle or the instructions text in its detail. THE SYSTEM SHALL NOT change the five existing kinds, their data, or MAX_DATA_BYTES. RECORD.md SHALL document the sixth kind, the manifest block and that the event hangs beside the context path as a side leaf.
+
+**Acceptance:**
+- A template_render event built from a 64-hex template hash, a 64-hex session head hash, a 64-hex manifest hash and files = 5 serialises to data of at most 512 bytes with kind `template_render` and source_uuid null.
+- The manifest block for five files whose paths are each 240 bytes long is stored, and the event built from its hash still serialises to at most 512 bytes.
+- KIND_HOOK, KIND_PERMISSION_MODE, KIND_TOOL_COMPLETED, KIND_ATTACHMENT and KIND_SYSTEM keep their values and MAX_DATA_BYTES is 512.
+- docs/design/home/RECORD.md lists `template_render` among the lys.harness_event kinds and names the manifest block's fields template, session_head, head, uuid and files.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/events_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/events.rs
+- modify: docs/design/home/RECORD.md
+
+**Checklist:**
+- C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+
+**Stories:**
+- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+### R6: Write the environment file: the template's variables and each use-only secret as its handle
+
+WHEN the environment file is written from a parsed template, THE SYSTEM SHALL write a Claude Code settings file whose only member is `env`, an object holding each `slots.env` name with its value and each `slots.secrets.use_only` env name with its handle, AND SHALL NOT read any secret's value, SHALL NOT read the process environment to fill any entry, and SHALL NOT write a `readable` secret (R1 refuses it before this point). The file is serialised with keys in sorted order, so the same template writes the same bytes.
+
+**Acceptance:**
+- From the fixture template the environment file parses as {"env": {"LYS_FIXTURE_MODE": "fixture", "LYS_FIXTURE_TOKEN": "handle-fixture-0001"}} and holds no other member.
+- Written while the process environment holds LYS_FIXTURE_TOKEN=fixture-secret-value-0001, the environment file holds 0 occurrences of the bytes fixture-secret-value-0001.
+- Writing the environment file twice from the fixture template gives equal bytes.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/launch_env.rs
+
+**Checklist:**
+- C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+
+**Stories:**
+- S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+### R7: Add `lys-home render-launch`: write the launch files, print the report and the launch line, record the render
+
+Add a subcommand `render-launch --home <dir> --session <id> --template <file> --uuid <uuid> --cwd <dir> --model <id> --version <claude code version> --out <dir>`; its arguments and logic live in crates/lys-home/src/harness/claude_code/launch.rs and cli.rs holds only the variant and its dispatch. WHEN run, THE SYSTEM SHALL, in this order: parse the template (R1); open the home and the session, taking its lock; refuse by path any of the five target files that already exists; store the template (R3); take the session head hash (R4); render the session with R4's render to <out>/<uuid>.jsonl with its loss account <out>/<uuid>.loss.json, taking the canon named by slots.transcript.canon when it is not null; write <out>/mcp.json (the mcp slot verbatim, keys sorted), <out>/env.json (R6) and <out>/instructions.md (the instructions slot's bytes); hash the five files; store the manifest block and append one template_render event with append_beside (R4, R5); and print one JSON report {command, template, session_head, uuid, files: [{path, sha256}], launch, event, manifest, render}. The launch member SHALL be one line: `claude --resume <out>/<uuid>.jsonl --fork-session --mcp-config <out>/mcp.json --settings <out>/env.json --append-system-prompt-file <out>/instructions.md` followed by the template's flags in order, arguments separated by one space, an argument holding a character outside letters, digits and `._/=:-` single-quoted for a POSIX shell. THE SYSTEM SHALL NOT run the launch line or any process (ADR-007), SHALL NOT print transcript, block, body, instructions, environment values or MCP contents, SHALL NOT write outside <out> and the home, and SHALL NOT write any file after a refusal. IF a required argument is missing, THEN THE SYSTEM SHALL exit 2 naming it (clap). IF the template is refused, THEN THE SYSTEM SHALL exit 1 with the refusal's message on stderr and write nothing. IF the event cannot be recorded, THEN THE SYSTEM SHALL exit 1 naming the failure and SHALL NOT print a report.
+
+**Acceptance:**
+- `lys-home render-launch` given every argument but --template exits 2 and its stderr contains `--template`.
+- Given a fresh home holding the fixture session (session.jsonl, id `fixture`), the fixture template, --uuid 00000000-0000-4000-8000-000000000001, --cwd /fixture, --model claude-fixture, --version 2.1.283 and an empty --out, the command exits 0 and <out> holds exactly five files: 00000000-0000-4000-8000-000000000001.jsonl, 00000000-0000-4000-8000-000000000001.loss.json, mcp.json, env.json and instructions.md.
+- The SHA-256 of each of those five files equals the value recorded for it as a constant in tests/launch_template.rs.
+- Running it a second time with a second empty --out gives five files whose SHA-256 values equal the first run's pairwise, and a report whose session_head equals the first report's.
+- The report's launch member equals `claude --resume <out>/00000000-0000-4000-8000-000000000001.jsonl --fork-session --mcp-config <out>/mcp.json --settings <out>/env.json --append-system-prompt-file <out>/instructions.md --strict-mcp-config` with <out> the given directory, and the test observes no child process (the command's only output is its stdout report).
+- With LYS_FIXTURE_TOKEN=fixture-secret-value-0001 in the command's environment, a byte search of the five written files and of stdout for fixture-secret-value-0001 finds 0 matches, and env.json's env.LYS_FIXTURE_TOKEN is handle-fixture-0001.
+- The report parses as JSON and contains no key named text, no key named content and no key named body, at any depth.
+- After the two runs, the session reopens with head `e4`, customs_everywhere("lys.harness_event") returns two entries whose parentId is e4 and whose data.kind is template_render, and each event's data.detail.template equals the SHA-256 of the fixture template file.
+- The template object templates/<hh>/<hash> in the home exists with the hash the report names as template.
+- Run with the fixture template plus slots.voice = {}, the command exits 1, stderr contains `voice`, <out> holds 0 files, the home holds no templates directory, and the session file's bytes are unchanged.
+- Run with the fixture template plus one readable secret, the command exits 1, stderr contains `secret_reader_unbuilt` and `SECRETS-002`, and <out> holds 0 files.
+- Run with --out naming a directory that already holds env.json, the command exits 1, stderr names that env.json path, and the directory holds only env.json with its bytes unchanged.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/launch.rs
+- create: crates/lys-home/tests/launch_template.rs
+- create: crates/lys-home/tests/fixtures/launch/session.jsonl
+- modify: crates/lys-home/src/cli.rs
+- modify: crates/lys-home/README.md
+
+**Checklist:**
+- C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
+- C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
+- C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+- C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+- C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+
+**Stories:**
+- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+- S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+### R8: Measure the launch on the installed Claude Code and write it down
+
+WHEN the launch is proved, THE SYSTEM's proof SHALL import the recorded session from PROOF-RESUME into a home, run render-launch on it with a proof template, and run the printed launch line once, from a working directory that is neither the out directory nor the session's cwd, on the Claude Code version `claude --version` reports on the proof machine; docs/design/home/PROOF-LAUNCH.md SHALL record that version, the proof template's hash, the written paths relative to the out directory with their SHA-256, the launch line with the out directory written as <out>, the rendered file's SHA-256 before and after the launch, where the continuation was written relative to ~/.claude/projects, whether the continuation's parent link names the rendered session id, the resume-check report, whether the appended instructions took effect under the proof template's --system-prompt-snapshot setting, whether a tool call in the launched session saw the environment file's handle, and whether --mcp-config was accepted. The proof SHALL NOT contain the session file, any transcript, block or body content, or a secret value, and the private session SHALL NOT be committed. The Claude Code profile's module doc in harness/claude_code/mod.rs SHALL state that a launch resumes with --fork-session because a bare resume writes onto <sessionId>.jsonl beside the passed file, with the version it was measured on.
+
+**Acceptance:**
+- docs/design/home/PROOF-LAUNCH.md names the Claude Code version string printed by `claude --version` on the proof run.
+- PROOF-LAUNCH.md records the rendered file's SHA-256 before and after the launch, and the two are equal.
+- PROOF-LAUNCH.md records the continuation's path relative to ~/.claude/projects, in the run directory's slug directory, and the path is not the rendered file's path.
+- PROOF-LAUNCH.md records the resume-check report with repeated_tool_use_ids equal to 0.
+- PROOF-LAUNCH.md records, for each of four questions, one answer from {yes, no} with the observation it rests on: the parent link naming the rendered session id, the appended instructions taking effect, the handle being visible to a tool call, and --mcp-config being accepted.
+- A search of PROOF-LAUNCH.md for the text of any message of the proof session finds nothing: it holds hashes, paths, counts, flags and answers from {yes, no} only.
+- git ls-files lists no .jsonl file outside crates/lys-home/tests/fixtures and canon/.
+
+**Files:**
+- create: docs/design/home/PROOF-LAUNCH.md
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+
+**Checklist:**
+- C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+- C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
+
+**Stories:**
+- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+### R9: Record the whole ruling in the tree and re-render the cluster's markdown
+
+Structure: the entry for steps 4 and 5 in the identity cluster's statement document named in this requirement's files (at line 181, the relayed rules for the home) gains the two items the relay omits, in the relayed register: the mapping also covers where the prior conversation goes, and it is delivered as files and runtime variables, with command mappings in text and never a transcript converter. The entry keeps its existing mark that it stands as relayed, for correction, and no other line of that document changes. docs/design/home/DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-002.md are re-rendered by the method's render-cluster.py from their JSON and are never edited by hand.
+
+**Acceptance:**
+- `git diff` of the identity statement document named in this requirement's files touches only the steps 4 and 5 entry, and that entry contains `where the prior conversation goes`, `runtime variables`, `in text` and `never a transcript converter` and the entry's first sentence, which marks it as relayed for correction, is byte-identical before and after.
+- `sh scripts/design/gate.sh` exits 0 from the repository root.
+
+**Files:**
+- create: docs/design/home/briefs/HOME-002.md
+- modify: docs/design/identity/STATEMENT-2026-09-22.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
+
+**Checklist:**
+- C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
+
+**Stories:**
+- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
 
 ## Boundaries
 
-- SHALL NOT rewrite, truncate or move any file under a Claude Code config root; the import reads the source and the render writes a new path only.
-- SHALL NOT add a field to Pi's header or to any Pi entry outside a custom entry's data and the compaction's own Pi `details` field.
-- SHALL NOT remove, rewrite or move a summarised entry or its blocks, and SHALL NOT overwrite a block.
-- SHALL NOT put transcript content in the loss entry, the block rows, the listing, an error, a log line, a test name or the proof; ids, counts and hashes only.
-- SHALL NOT change the unknown-parentUuid refusal or R3's parent equality for message entries.
-- SHALL NOT change R4's thinking rule, its refusal of an existing path or the `.loss.json` beside a rendered file.
-- SHALL NOT depend on or copy any Norn crate or type.
-- SHALL NOT compact, translate or hand over a session, and SHALL NOT change what Claude Code writes.
-- SHALL NOT let the listing or the proof start a harness on anyone's behalf, and SHALL NOT add or bypass any grant on who may read or resume a home.
-- SHALL NOT let any source file exceed 500 code lines, and SHALL NOT add #[allow], #[ignore], a `_`-prefixed unused binding or #[cfg(any())] beyond the test modules' standing opt-out.
-- SHALL NOT write LOSS-ACCOUNT.md or any path outside the design's structure array.
-- SHALL NOT run a proof against a session that is running.
+- SHALL NOT run the launch line, spawn Claude Code or any other process; the line is printed in the report (ADR-007).
+- SHALL NOT write a secret's value to any file, report, launch line, error or entry; a use-only secret appears only as its handle, and a readable secret is refused until SECRETS-002 builds the reader.
+- SHALL NOT build, call or name a broker reader command in a launch line; the broker's own read belongs to the secrets rows.
+- SHALL NOT add a harness other than Claude Code, a launch on another machine, a sandbox or VM target profile, or capture of the launched session into the home.
+- SHALL NOT add a handover slot; HOME-001 R12 is not on main.
+- SHALL NOT rewrite, truncate or write into any file under ~/.claude/projects, and SHALL NOT write to the rendered file after the render (CN1).
+- SHALL NOT move the session head when recording a render; the event is a side leaf.
+- SHALL NOT change the five existing lys.harness_event kinds, MAX_DATA_BYTES, Pi's grammar, or the reports of import, render, fewshot, ingest-call and resume-check.
+- SHALL NOT commit the PROOF-RESUME session or any real transcript; the CI fixture is synthetic (CN3, P7).
+- SHALL NOT add a dependency on manifold, the door, aion or any Norn crate (ADR-004, CN6).
 
 ## Verification
 
 - From docs/: python3 $DS2_METHOD/scripts/validate.py design/home exits 0.
 - From docs/: python3 $DS2_METHOD/scripts/check-coverage.py design/home exits 0.
-- From the repository root: cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0.
-- From the repository root: sh scripts/design/gate.sh exits 0 after python3 scripts/design/render-cluster.py docs/design/home has rewritten the cluster's markdown.
+- From the repository root: sh scripts/design/gate.sh exits 0.
+- From the repository root: cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
+- cargo test -p lys-home --test launch_template reports every test in the file run and passed, with a non-zero count.
+- grep -rn 'Command::new\|process::Command' crates/lys-home/src/harness/claude_code/launch.rs crates/lys-home/src/harness/claude_code/launch_env.rs crates/lys-home/src/harness/claude_code/template.rs finds nothing.
+- Every file under crates/lys-home/src is at most 500 lines of code excluding comments and blank lines, and cli.rs gains only the render-launch variant and its dispatch.
+
+
+---
+type: brief
+id: HOME-003
+cluster: home
+title: Record what a session was given: a lys.given entry at render, listed and checked by hash
+---
+
+# HOME-003: Record what a session was given: a lys.given entry at render, listed and checked by hash
+
+> **Cluster:** home
+> **Depends on:** HOME-001, HOME-002
+> **Blocked by:** The launch template card ct98Wv-2 (HOME-002: the render-launch subcommand, its template_render event, and the appended instructions file and MCP configuration it writes) is on card/home-002-launch-template (lys PR 14) and not yet on lys main; this brief is built on that branch, lands after it, and hooks into the render step that card places in crates/lys-home/src/harness/claude_code/launch.rs (render_launch), the file the design's structure names for it.
+> **Design anchor:**
+> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
+> **Checklist:**
+> - C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+> - C22 — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+> - C23 — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+> **Stories:**
+> - S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+> - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+## Purpose
+
+Today a render records the template hash, the session head hash and the written paths, and nothing records which instruction documents the rendered session was given, in what versions or order. This brief makes that record at render, the product's own act (ADR-007): one lys.given custom entry after the render event naming each document Claude Code will load, and each file the render wrote, by path, byte length and SHA-256 in the order measured on a named Claude Code version, with the config directory and how it was found, the environment variable names the template set, and the kinds it resolved and left unlisted, and never a document's content. It is the context record of step 4 in the home design, unsigned and unencrypted, shaped as hashes only so that signing (stage 6) and encryption at rest (stage 3) can be added later without changing what is recorded (ADR-012).
+
+## Task
+
+Build on lys main after ct98Wv-2 lands; start from its template subcommand and its render event. The load order below was measured, not assumed, on the Claude Code installed on the machine this brief was written on: `claude --version` answered 2.1.283. Three runs of `claude -p` were pointed at a local listener, with a fixture config directory (CLAUDE_CONFIG_DIR), fixture CLAUDE.md files, a memory index, `--append-system-prompt-file` and `--mcp-config`. Each file's first access time gave the order the harness reads the files, and the request it sent gave the order it places them in the context. Across kinds, the order was the same in all three runs: (1) the user CLAUDE.md at <config>/CLAUDE.md; (2) the appended instructions file; (3) the MCP configuration; (4) the CLAUDE.md chain, directory by directory from the outermost ancestor of the working directory down to the working directory itself, each directory contributing its CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md when present; (5) the memory index at <config>/projects/<slug>/memory/MEMORY.md. The project slug is the working directory with every character that is not an ASCII letter or digit replaced by '-': '/', '.' and '_' each became '-', '-' stayed, and a memory directory named under the old '/'-only rule was never read. Within one directory, the read order of CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md changed from run to run (the harness reads them concurrently), while the request always gave them as CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md. The entry records the order the request gave, because it holds what reached the model and not the order the harness happened to read the files in: within one directory, CLAUDE.md, then .claude/CLAUDE.md, then CLAUDE.local.md. The config directory is the CLAUDE_CONFIG_DIR the template sets for the session; when the template sets none, it is HOME/.claude with HOME taken from the rendering process's environment (the root home P6 measured), and the entry's config_dir member records the path and which of the two it came from (source template or home). The rendering process's own CLAUDE_CONFIG_DIR is never read, since that process's environment is not the session's; a launch from another shell or machine is the launch template's to settle, by setting the variable. When the config directory is HOME/.claude and the working directory is under HOME, the file HOME/.claude/CLAUDE.md is both the user CLAUDE.md and the .claude/CLAUDE.md position of HOME on the chain. This was measured on 2.1.283 with HOME set to a fixture directory H, no CLAUDE_CONFIG_DIR, H/.claude/CLAUDE.md and H/w/CLAUDE.md present and the working directory H/w: the request gave H/.claude/CLAUDE.md exactly once, first, as the user's global instructions, and then H/w/CLAUDE.md. The entry lists it the same way: once, as user_claude_md, first, and not again in the chain. When the template sets CLAUDE_CONFIG_DIR to another directory, HOME/.claude/CLAUDE.md is not the user file and is listed as claude_md_chain at HOME's place on the chain. A document position the harness would read but finds absent is omitted from the documents list; the kinds member still names every kind this render resolved, so a reader sees what was looked for. The record is limited to the six kinds the card names (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names), and the entry says so through its kinds member, which names those six as resolved and names claude_md_imports and claude_rules as unlisted, so a reader can tell those two are missing from this entry rather than absent from the session. Settings, hook output, plugin skills and agents, and output styles are later cards on this same entry shape. A document the render wrote (the appended instructions and the MCP configuration) is named by its kind and its path relative to the render's out directory. Every other document is named by its absolute path. Two renders of a template that writes no per-render bytes therefore give equal document lists. A template that writes a session id into a rendered file gives a differing hash for that one document, and the record shows it. cli.rs has 398 code lines against the 500-line limit, so the two new subcommands live in src/cli/given.rs, declared from cli.rs, and cli.rs keeps only the enum arms that call them. The render wiring goes into the template subcommand's render arm in cli.rs; if ct98Wv-2 places its render step in another file, the scout names that file and the design's structure gains it before the wiring is written. projects_slug moves out of harness/claude_code/mod.rs into paths.rs and is re-exported, so mod.rs holds declarations and re-exports only. render.rs keeps calling projects_slug and needs no edit. In scope: the slug fix, the resolution, the entry, the render wiring, the two subcommands, the fixture tests, RECORD.md and the crate README, and PROOF-GIVEN.md with one real render. Out of scope: signing or anchoring the record (stage 6); encryption at rest (stage 3); documents a session reads later with its own tools; files the harness puts in the request through an @-import or from .claude/rules. The entry made at render records what the render placed and what the harness reads by its documented rule, the three files per directory, and never parses a document to find an import. What actually reached the model, imports and rules included, is recorded by a second lys.given entry appended at the first request by the HOME-001 proxy's capture, from the request as the harness resolved it; that entry belongs to the capture's card, a later unit on this same entry shape, and not to this brief; harnesses other than Claude Code; any change to the render event ct98Wv-2 writes. given-check answers as diff does, so it can stand in a script: exit status 0 when the answer is matches, 1 when it is differs, and 2 on an error such as a missing argument or an unreadable record. Differs is an answer, not an error, and the status tells the two apart; the printed answer is the same either way. The fixture template the acceptance renders is ct98Wv-2's. If that card lands none, the integration test writes one in its own temporary directory, in that card's template format, that writes the appended instructions and MCP configuration with no per-render bytes. The fixture working directory is a fresh temporary directory whose ancestors hold no CLAUDE.md. If the machine running the test has one on the chain, the test's expected list is wrong for that machine, and the scout says so; the resolver is not bent to hide it.
+
+## Requirements
+
+### R1: Resolve the project slug as Claude Code 2.1.283 does
+
+Move projects_slug from harness/claude_code/mod.rs into harness/claude_code/paths.rs, re-exported from mod.rs so every caller keeps its path. WHEN given a working directory, THE SYSTEM SHALL return it with every character that is not an ASCII letter or ASCII digit replaced by '-', and SHALL keep ASCII letters, digits and '-' as they are. THE SYSTEM SHALL NOT keep '.' or '_' in a slug, SHALL NOT collapse consecutive '-', and SHALL NOT read or write any file to compute a slug. mod.rs SHALL hold only module declarations, re-exports, constants it already holds, and module docs.
+
+**Acceptance:**
+- projects_slug("/home/u/.aion/clones/w") returns "-home-u--aion-clones-w".
+- projects_slug("/tmp/x_y/p-q.r/w") returns "-tmp-x-y-p-q-r-w".
+- projects_slug("/srv/plain") returns "-srv-plain", unchanged from the rule before this brief.
+- harness/claude_code/mod.rs contains no `fn` item after the change.
+- The claude_code render tests that passed before the change pass unchanged.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/paths.rs
+- create: crates/lys-home/src/harness/claude_code/paths_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+
+**Checklist:**
+- C23 — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+
+**Stories:**
+- S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R2: Resolve the documents a Claude Code session will be given, in the measured order
+
+WHEN a render resolves the given documents for a working directory, a config directory and the files the render wrote, THE SYSTEM SHALL return one document per file that exists, in this order: the user CLAUDE.md at <config>/CLAUDE.md (kind user_claude_md); the appended instructions file the render wrote (kind appended_instructions); the MCP configuration the render wrote (kind mcp_config); for each directory from the outermost ancestor of the working directory down to the working directory, its CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md (kind claude_md_chain); then the memory index at <config>/projects/<projects_slug(cwd)>/memory/MEMORY.md (kind memory_index). Each document SHALL carry its kind, its path, its byte length and the lowercase hex SHA-256 of its bytes, all taken from one read of the file. A document the render wrote SHALL carry its path relative to the render's out directory; every other document SHALL carry its absolute path. IF a position's file does not exist, THEN THE SYSTEM SHALL omit it. IF a file exists and cannot be read, THEN THE SYSTEM SHALL fail by name with the path and the operation, and SHALL NOT omit it, since a document the harness would read is being dropped. THE SYSTEM SHALL NOT keep, return, log or put in an error any byte of a document's content. It SHALL NOT write any file under the config directory or the working directory. It SHALL NOT parse any document's content, and so SHALL NOT find an @-imported file or a .claude/rules file by reading a document. One directory's files SHALL be listed together, as CLAUDE.md, then .claude/CLAUDE.md, then CLAUDE.local.md, the order the harness's request gives them in; it SHALL NOT list them in the order the files happen to be read. The config directory SHALL be the CLAUDE_CONFIG_DIR the template sets for the session. IF the template sets none, THEN the config directory SHALL be HOME/.claude, with HOME taken from the rendering process's environment, and the resolution SHALL return the config directory's path with its source: template in the first case, home in the second. THE SYSTEM SHALL NOT read the rendering process's CLAUDE_CONFIG_DIR. IF <config>/CLAUDE.md is also a position on the chain (the config directory is D/.claude for a directory D from the outermost ancestor down to the working directory), THEN THE SYSTEM SHALL list that file once, as user_claude_md in the first position, as the harness's request gives it, and SHALL NOT list it again as claude_md_chain. IF the config directory is not D/.claude, THEN D/.claude/CLAUDE.md SHALL be listed as claude_md_chain at D's place on the chain. The measured harness version SHALL be a constant (2.1.283 as measured when this brief was written; R8 re-measures it), named beside the order in the module docs.
+
+**Acceptance:**
+- For a temporary working directory W holding CLAUDE.md, a config directory C holding projects/<projects_slug(W)>/memory/MEMORY.md and no CLAUDE.md, and an out directory O holding the render's appended instructions file and MCP configuration, the resolved kinds are, in order: appended_instructions, mcp_config, claude_md_chain, memory_index.
+- In that case the appended_instructions and mcp_config documents carry paths relative to O, and the claude_md_chain and memory_index documents carry absolute paths equal to W/CLAUDE.md and the MEMORY.md path under C.
+- Each resolved document's length equals the file's byte length, and its sha256 equals the SHA-256 of the file's bytes, as computed independently in the test with the sha2 crate.
+- Adding C/CLAUDE.md puts one user_claude_md document first, ahead of appended_instructions.
+- For W = A/w with A/CLAUDE.md and W/CLAUDE.md both present, A/CLAUDE.md is listed before W/CLAUDE.md.
+- For W holding CLAUDE.local.md, .claude/CLAUDE.md and CLAUDE.md, each created in that order, the resolved claude_md_chain documents are exactly W/CLAUDE.md, W/.claude/CLAUDE.md and W/CLAUDE.local.md, in that order.
+- With no MEMORY.md under C, the result holds no memory_index document and the call succeeds.
+- With the template setting CLAUDE_CONFIG_DIR to C, the memory index under C is listed and the config directory is returned as C with source template. With the template setting none, HOME set to H and the rendering process's CLAUDE_CONFIG_DIR set to C, the memory index under H/.claude is listed, none under C is listed, and the config directory is returned as H/.claude with source home.
+- With the template setting no CLAUDE_CONFIG_DIR, HOME set to H, W = H/w, and H/.claude/CLAUDE.md and W/CLAUDE.md both present, the resolved documents are exactly two, in order: H/.claude/CLAUDE.md with kind user_claude_md, then W/CLAUDE.md with kind claude_md_chain; no claude_md_chain document has the path H/.claude/CLAUDE.md.
+- With the template setting CLAUDE_CONFIG_DIR to C (holding no CLAUDE.md), HOME set to H, W = H/w, and H/.claude/CLAUDE.md and W/CLAUDE.md both present, the resolved documents are exactly two, in order: H/.claude/CLAUDE.md with kind claude_md_chain, then W/CLAUDE.md with kind claude_md_chain; no document has the kind user_claude_md.
+- A MEMORY.md placed under projects/<W with only '/' replaced by '-'>/memory/ for a W containing a '.' is not listed.
+- A W/CLAUDE.md with its read permission removed fails the resolution with an error naming W/CLAUDE.md, and the error text holds no line of the file.
+- The config directory's and the working directory's file listings (names, lengths and modification times) are identical before and after resolution.
+
+**Files:**
+- create: crates/lys-home/src/harness/claude_code/given.rs
+- create: crates/lys-home/src/harness/claude_code/given_tests.rs
+- modify: crates/lys-home/src/harness/claude_code/mod.rs
+
+**Checklist:**
+- C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R3: Define the lys.given entry and append and read it inside Pi's custom entry
+
+Add the custom type constant lys.given beside the four lys custom types. Its data SHALL be exactly: harness ("claude-code"), harness_version (the measured version), kinds (an object with two members: resolved, the list claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names, in that order; and unlisted, the list claude_md_imports, claude_rules, in that order), config_dir (an object with two members: path, the config directory R2 resolved, and source, template or home as R2 returned it), documents (the ordered list from R2, each {kind, path, length, sha256}) and environment (the names of the environment variables the template set for the session, sorted, since the template's env slot is parsed into a sorted map and the environment file writes it sorted). WHEN a given record is appended, THE SYSTEM SHALL write it with Session::append as a custom entry whose customType is lys.given, so its parentId is the head at that moment. It SHALL read given records back with customs_everywhere("lys.given") in file order. THE SYSTEM SHALL NOT add a field to Pi's header or to any entry outside custom.data. It SHALL NOT carry any document content or any environment variable value. It SHALL NOT sign or encrypt the entry. It SHALL NOT record a variable name the template did not set. It SHALL NOT list a document under claude_md_imports or claude_rules, and SHALL NOT drop either name from unlisted.
+
+**Acceptance:**
+- A given record appended to a session and read back with customs_everywhere("lys.given") deserialises equal to the value appended.
+- The serialised data object of a lys.given entry has exactly the keys config_dir, documents, environment, harness, harness_version and kinds, config_dir has exactly the keys path and source,, and each document object has exactly the keys kind, length, path and sha256.
+- A given record built from a resolution whose config directory came from the template has config_dir.source equal to template, and one built from a resolution that fell back to HOME has config_dir.source equal to home and config_dir.path equal to HOME/.claude.
+- kinds in every lys.given entry equals {"resolved": ["claude_md_chain", "user_claude_md", "memory_index", "appended_instructions", "mcp_config", "environment_names"], "unlisted": ["claude_md_imports", "claude_rules"]}, and no document in the entry has the kind claude_md_imports or claude_rules.
+- Given a template environment of FOO_A=secret-value-1 and BAR_B=secret-value-2, environment equals ["BAR_B", "FOO_A"], sorted, and the serialised entry contains neither secret-value-1 nor secret-value-2.
+- The entry's line in the session file has the top-level keys type, id, parentId, timestamp, customType and data, and no other.
+
+**Files:**
+- create: crates/lys-home/src/record/given.rs
+- create: crates/lys-home/src/record/given_tests.rs
+- modify: crates/lys-home/src/record/entries.rs
+- modify: crates/lys-home/src/record/mod.rs
+
+**Checklist:**
+- C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+### R4: Append the given record after the render event on every template render
+
+WHEN the template subcommand renders a Claude Code session and has appended its render event, THE SYSTEM SHALL resolve the given documents (R2) for the rendered session's working directory, config directory and out directory, and append exactly one lys.given entry (R3) as the child of that render event. THE SYSTEM SHALL NOT alter, reorder or re-serialise the render event. IF resolution fails, THEN THE SYSTEM SHALL fail the render by name, and SHALL NOT append a lys.given entry holding a partial documents list. THE SYSTEM SHALL NOT run the rendered command (ADR-007).
+
+**Acceptance:**
+- After one render of the fixture template, the session holds exactly one lys.given entry, and its parentId equals the id of the render event that render appended.
+- The tests ct98Wv-2 lands for its render event pass unchanged with this brief's code in the render path.
+- A render whose working directory holds an unreadable CLAUDE.md exits non-zero, names the path, and leaves the session with no lys.given entry for that render.
+
+**Files:**
+- modify: crates/lys-home/src/harness/claude_code/launch.rs
+
+**Checklist:**
+- C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+### R5: List a session's given records and check a listed document against a file by hash
+
+Add the subcommands given and given-check, implemented in src/cli/given.rs and dispatched from cli.rs. WHEN given is run on a session, THE SYSTEM SHALL report every lys.given entry in file order with its entry id, harness, harness_version, the config directory with its source, the kinds line naming the resolved kinds and the unlisted kinds, the environment names, and each document's kind, path, length and sha256. WHEN given-check is run with a session, a given entry id, a document path as listed, and a file on disk, THE SYSTEM SHALL hash the file and report the answer matches when its SHA-256 and length equal the listed document's, and differs otherwise. WHEN the answer is matches, THE SYSTEM SHALL exit with status 0; WHEN the answer is differs, THE SYSTEM SHALL exit with status 1. IF an argument is missing, the session or the file cannot be read, or the entry id or the listed path is not in the session, THEN THE SYSTEM SHALL fail by name with the id, the path or the argument concerned and exit with status 2. THE SYSTEM SHALL NOT exit 0 on differs, SHALL NOT exit 1 on an error, and SHALL NOT print a different answer for either status. THE SYSTEM SHALL NOT print, log or put in an error any byte of either file.
+
+**Acceptance:**
+- given on a session holding two lys.given entries reports two records in file order, each with its entry id and its full documents list.
+- given's report for a record carries a kinds line naming the six resolved kinds and naming claude_md_imports and claude_rules as unlisted, the config directory's path and source equal to the entry's config_dir, and environment equal to the entry's names.
+- given-check with the fixture CLAUDE.md as recorded reports the answer matches and exits with status 0.
+- given-check with that CLAUDE.md after one byte is changed reports the answer differs and exits with status 1.
+- given-check naming an entry id not in the session exits with status 2 and an error naming that id.
+- given-check naming a document path not listed in the entry exits with status 2 and an error naming that path.
+- given-check run with no file argument exits with status 2.
+- given-check naming a file on disk that does not exist exits with status 2 and an error naming that file's path.
+- cli.rs has at most 500 code lines, excluding comments and blank lines, after the change.
+
+**Files:**
+- create: crates/lys-home/src/cli/given.rs
+- modify: crates/lys-home/src/cli.rs
+
+**Checklist:**
+- C22 — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+### R6: Prove the acceptance end to end on the fixture template
+
+Add an integration test that renders the fixture template for a fixture working directory holding a CLAUDE.md with a fixed fixture sentence and a memory index under the fixture config directory, then checks every clause of the card's acceptance. The fixture template SHALL set CLAUDE_CONFIG_DIR to the fixture config directory C for the rendered session; if ct98Wv-2's fixture template sets none, the test writes its own as the task describes, setting it. The test SHALL run the render with HOME set to a fresh temporary directory holding no .claude directory and with CLAUDE_CONFIG_DIR removed from the rendering process's environment, so the resolved documents cannot depend on the configuration of the machine running the test. THE SYSTEM SHALL NOT use a fixture sentence as, or inside, a test name. Tests SHALL count what fired: each assertion over a documents list first asserts the list's length.
+
+**Acceptance:**
+- The first render's lys.given entry has 4 documents, whose kinds are appended_instructions, mcp_config, claude_md_chain and memory_index in that order, and whose lengths and sha256 values equal those of the four files on disk.
+- In the first render's entry, config_dir equals {path: C, source: template}, the memory_index document's path starts with C, environment contains CLAUDE_CONFIG_DIR, and no document has the kind user_claude_md.
+- A second render of the same fixture gives a second lys.given entry whose documents list is equal to the first's in every kind, path, length and sha256, with the render-written documents compared by their out-directory-relative paths.
+- After one byte of the fixture CLAUDE.md is changed (same length), a third render's entry differs from the second's in exactly one field: the claude_md_chain document's sha256. All other fields of all 4 documents are equal.
+- given-check reports matches for the fixture CLAUDE.md against the second entry before the change, and differs against the second entry after it.
+- A search for the fixture sentence finds 0 occurrences in the lys.given entries' lines of the session file, in the serialised given report, and in the serialised given-check reports.
+- The session file's lines each parse as JSON, with the header first and every entry carrying id, parentId and timestamp.
+
+**Files:**
+- create: crates/lys-home/tests/given_record.rs
+
+**Checklist:**
+- C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+- C22 — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+### R7: Write lys.given into RECORD.md and the crate README
+
+Add lys.given to the lys custom entries in RECORD.md: its data keys, the config_dir member and its two sources (template, home), the six resolved kinds and the two unlisted kinds (claude_md_imports and claude_rules, recorded by a later entry at the first request), the measured order, how a written document's path is relative to the out directory, that absent documents are omitted, and that the entry is unsigned and unencrypted and names hashes only. Add the lys.given row to the crate README's custom-type table, and add the given and given-check subcommands to it. Neither document SHALL quote any instruction document's content.
+
+**Acceptance:**
+- RECORD.md's 'The lys custom entries' section has a lys.given item naming the keys harness, harness_version, kinds, config_dir, documents and environment, the config_dir members path and source, the kinds members resolved and unlisted, the unlisted kinds claude_md_imports and claude_rules, and the document keys kind, path, length and sha256.
+- The README's custom-type table has a lys.given row, and the README names the given and given-check subcommands.
+
+**Files:**
+- modify: docs/design/home/RECORD.md
+- modify: crates/lys-home/README.md
+
+**Checklist:**
+- C21 — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+- C22 — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+
+**Stories:**
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+### R8: Record the measurement and one real render in PROOF-GIVEN.md
+
+Write PROOF-GIVEN.md with: the Claude Code version answered by `claude --version` on this Mac, the machine whose Claude Code version the task names; the method and result of measuring the load order and slug rule from the harness's own behaviour (the order in the task, re-measured on that version); and one real session render on this Mac recorded through the template subcommand as the lys.given entry's kinds, document count, environment-name count, and each document's kind, path, length and sha256. IF the version measured differs from 2.1.283, THEN the proof SHALL say so and give the order measured on it, and the constant in R2 SHALL be that version. The proof SHALL state how many documents were probed for content by the check below and how many were skipped for having no line long enough. THE SYSTEM SHALL NOT put any document content or any environment variable value in the proof.
+
+**Acceptance:**
+- PROOF-GIVEN.md names the Claude Code version, and the order of kinds it measured on that version.
+- PROOF-GIVEN.md holds one real render's lys.given entry id, its document count, its environment-name count, and one line per document with kind, path, length and a 64-hex-character sha256.
+- For each document the proof lists, the probe is its longest line after trimming leading and trailing whitespace, taken only when that line is at least 40 characters long; a document with no such line is skipped. A search of PROOF-GIVEN.md for each probe finds 0 occurrences, the number of documents probed plus the number skipped equals the document count the proof states, and the number probed is at least 1.
+
+**Files:**
+- create: docs/design/home/PROOF-GIVEN.md
+
+**Checklist:**
+- C23 — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+
+**Stories:**
+- S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+## Boundaries
+
+- No signing, anchoring or hashing into a lys log of the given record (stage 6), and no encryption at rest (stage 3).
+- No document content and no environment variable value in the entry, a report, a log line, an error, a test name or a proof document; paths, lengths, hashes, counts and variable names only.
+- No field added to Pi's grammar; lys.given rides inside a custom entry only.
+- The render event ct98Wv-2 writes is not altered, reordered or re-serialised.
+- No file under the config directory or the working directory is written; resolution only reads.
+- No harness other than Claude Code, and no recording of documents a session reads later with its own tools.
+- No settings file, hook output, plugin skill or agent listing, or output style is recorded; those are later cards on the same entry shape.
+- No document's content is parsed: no @-imported file or .claude/rules file is found by reading a document. Those files are named as unlisted kinds here, and recorded by the second lys.given entry the HOME-001 proxy's capture appends at the first request, which is a later unit.
+- No Norn crate is depended on and no Norn code is copied.
+- The design's structure array is the whole file list; a path outside it is not created.
+
+## Verification
+
+- python3 scripts/design/validate.py docs/design/home exits 0.
+- python3 scripts/design/check-coverage.py docs/design/home exits 0.
+- cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
+- sh scripts/design/gate.sh exits 0.
+- grep -n 'fn ' crates/lys-home/src/harness/claude_code/mod.rs returns nothing.
 - grep -rn 'norn' crates/lys-home/Cargo.toml returns nothing.
-- grep -rln 'heliotrope' crates/lys-home/src returns nothing (the fixture's code word lives only in the fixture file and the integration test's assertion).
-- For each of import.rs, cli.rs, render.rs and record/mod.rs, the count of lines that are neither blank nor comments is at most 500.
+- The fixture session file from the R6 test, written out in the proof step, parses with Pi's parseSessionEntries at 3d5cbe98 through node, and its entry count equals the count lys-home reports (the command is written in PROOF-GIVEN.md).
+
+
+---
+type: brief
+id: HOME-004
+cluster: home
+title: Move a home as one pushed git ref: ship, fetch with an arrival event, and the same-machine resume proof
+---
+
+# HOME-004: Move a home as one pushed git ref: ship, fetch with an arrival event, and the same-machine resume proof
+
+> **Cluster:** home
+> **Depends on:** HOME-001, HOME-002, HOME-003
+> **Design anchor:**
+> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
+> - ADR-014 — A home moves as one pushed git ref of an allowlisted tracked set, never a hand copy — A home is a git repository whose tracked set is an allowlist: sessions/<id>.jsonl, <id>.index.jsonl and <id>.head, the files under blocks/ and the files under templates/, never a lock, temporary, environment, render or execution-id file. `lys-home ship` commits exactly that set with git run apart from the person's configuration and pushes it without force as one ref, refs/lys-home/<commit>, to a remote named on the command line; `lys-home fetch` fetches that ref into a new home. Rejected: a hand copy or an archive of the directory, which names no commit and records no ancestry; tracking the whole directory, which ships whatever else is in it; and a pure-Rust git crate, which adds a dependency where the git binary suffices. Until encryption at rest exists, ship refuses a remote off this machine and any tracked file holding a value of the named secret values file or matching one of five standard secret patterns (private key header, sk- token, GitHub token, AWS access key id, JWT).
+> - ADR-015 — An arrival is a seventh lys.harness_event kind, hung beside the head and written by fetch — Fetch appends to each session one lys.harness_event of kind `arrival`, with source_uuid and record null and a detail of exactly source_commit, remote, ref and execution_id, hung beside the head with append_beside so the head and the session head hash do not move; the execution id is one per target home, fresh at fetch, kept in the untracked file <home>/execution-id. The remote is recorded as a canonical path, a file:/// URL, or a URL without userinfo, and the data stays within the 512-byte cap. Rejected: appending the arrival on the context path, which moves the head (ADR-012); a new custom entry type, which adds a type where the harness event carries the same shape; and one execution id per session, where the words give the home one.
+> **Checklist:**
+> - C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+> - C25 — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
+> - C26 — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
+> - C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+> - C28 — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
+> - C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+> - C30 — On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.
+> - C31 — PROOF-MOVE.md records the fetched home rendered by render-launch and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.
+> **Stories:**
+> - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+> - S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+> - S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+> - S17 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the moved home's resume measured on a named Claude Code version and written in a proof document, so that the move is shown to continue a session rather than assumed to.
+
+## Purpose
+
+A home lives only on the machine that captured it. Stage 3 of the context roadmap moves a home by the route a build tree takes, a pushed ref the target fetches, never a hand copy, and gives the target a distinct execution id with its ancestry on the record (ADR-014, ADR-015). This brief takes stage 3's first block, the same-machine proof: `lys-home ship` commits the home's tracked set and pushes it as one ref to a remote named on the command line, refusing a stale index, a remote off this machine and a named secret value; `lys-home fetch` fetches that ref into a new home, checks every index and head without rebuilding, and records an arrival on each session beside the head; and the fetched home is rendered through the Claude Code launch template and resumed by the printed line, measured and written up as hashes, counts and paths.
+
+## Task
+
+Build, in dependency order: a check-only index and head verification (R1), an isolated git runner (R2), the remote rules (R3), the tracked set and the secret-value scan (R4), the arrival event kind (R5), the ship subcommand (R6), the fetch subcommand (R7), the end-to-end test on the fixture home (R8), the measured proof (R9), and the record, README and re-rendered cluster markdown (R10).
+
+What the lead's answers settle and how this brief reads them. The hash match is taken on the fetched files before the arrival is appended: every tracked file at the fetched commit equals the source byte for byte; after the arrival, the source session file and index are a byte prefix of the target's and the blocks are unchanged (R8). The proof is measured on the installed Claude Code 2.1.283, the version MEASURED_VERSION pins and lys.given records; the 2.1.281 in the words is superseded, with no downgrade (R9). Until encryption at rest lands with stage 3's precondition card, ship refuses by name any remote that is not a path on this machine or a file:// URL, naming the remote's scheme and that card, and the acceptance ships to a bare local remote (R3, R6). No secret value is tracked by two mechanisms and no third: the tracked set is an allowlist of session files, their index and head files, blocks and templates, never an environment or render file (R4); and ship scans every tracked file's bytes, blocks included, for the values of the file named by --secret-values and for the five standard patterns, refusing on a hit by file and offset (R4, R6). templates/ is shipped, so the target resolves every template_render event's template by its hash. Fetch refuses only a directory that holds a home, by its markers: a sessions, blocks or templates directory, a .git entry, or an execution-id file, which is the first thing a home writes and so marks a home on its own; an empty directory, or one holding only other entries such as a lone note file, is accepted and the home is created beside them, the refusal names the entry that made the directory a home, except that a directory marked only by its execution-id file is refused naming the directory and not the file, and nothing is written under a refused target (R7). A refusal for a rule of the home is never HomeError::Io, which stays for the file system failing.
+
+The five standard patterns are named: private_key_header `-----BEGIN [A-Z ]*PRIVATE KEY-----`, sk_token `sk-[A-Za-z0-9_-]{20,}`, github_token `gh[pousr]_[A-Za-z0-9]{36,}`, aws_access_key_id `AKIA[0-9A-Z]{16}` and jwt `eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`, byte regexes run case-sensitive over every tracked file's bytes. They are a constant table in the ship module, one row per pattern with its name and regex, so a sixth is one row; a hit refuses by file path, byte offset and pattern name and never prints the matched bytes, and the named values file's values are matched as exact bytes alongside the five (R4, R6).
+
+What the words settle. Ship refuses a stale index by name and does not rebuild it, and its report says so: a stale refusal prints a report naming each stale session file under `stale_index` (R6); fetch refuses a directory that already holds a home by name; the execution id is one per target home, carried on each session's arrival; and the only transport is a git ref pushed to and fetched from a named remote. Out of scope: the named second machine (stage 3's second block, which waits on read authority over the home and on encryption before bytes leave the machine, and fetches this brief's ref), harnesses other than Claude Code, encryption of the home, and any other transport.
+
+The ordinary choices this brief makes. git is the git binary spawned with the person's configuration shut out, not a new crate. The five patterns are compiled with the pure-Rust regex crate's byte regexes, added as a workspace dependency, which is the one dependency this brief adds. When one tracked file holds more than one hit, the refusal names the smallest offset, and a value's hit is named `named_value` in place of a pattern name. The ref is refs/lys-home/<commit>, named by the commit it points at, so two homes never collide on one remote and no push needs force; the home's own branch refs/heads/lys-home chains its ships. A session whose head file is missing is refused by name on ship, since fetch verifies every head. The execution id is record::fresh_id (32 lowercase hex) kept in <home>/execution-id, which is not in the tracked set. The arrival hangs beside the head as template_render does (ADR-012), so the head and the session head hash do not move, and carries the remote as ship_remote or fetch_remote records it: a canonical path, a file:/// URL, and never userinfo. Fetch works in a staging directory beside the target and moves the staged entries into place only when every check has passed, so a refused fetch leaves nothing a retry must clean up.
+
+## Requirements
+
+### R1: Check a session's index and head without writing anything
+
+Add `verify_session(session_file: &Path) -> Result<VerifiedSession, HomeError>` in crates/lys-home/src/record/verify.rs, declared from record/mod.rs, where VerifiedSession carries the session id, the entry count and the head (`Option<String>`). WHEN called, THE SYSTEM SHALL read the session file's header line, the index file beside it and the head file beside it, and SHALL return Ok only when the index rows are this file's under the rules a cached index is already held to by Index::load (each row starts where the one before ended, has a nonzero length, an id not yet seen and a parent already indexed that is not itself, ends on a newline byte of the session file, and the last row ends where the file ends) and the head file names an id the index holds, or is empty for a session whose head is the header. IF the index file is missing, unreadable as rows, or disagrees with the file under those rules, THEN THE SYSTEM SHALL refuse with HomeError::StaleIndex naming the session file. IF the head file is missing, THEN THE SYSTEM SHALL refuse with a new HomeError::HeadMissing whose message contains `head_missing` and the session file. IF the head file names an id the index does not hold, THEN THE SYSTEM SHALL refuse with a new HomeError::HeadNotIndexed whose message contains `head_not_indexed`, the session file and that id. THE SYSTEM SHALL NOT rebuild an index, persist a head, create a lock file or write any file; SHALL NOT call Index::load, Session::open or Home::open; SHALL NOT read an entry line beyond the byte at each row's end; and SHALL NOT put any entry content in an error.
+
+**Acceptance:**
+- On a home holding the fixture session tests/fixtures/launch/session.jsonl as sessions/fixture.jsonl, opened once with Session::open so its index and head exist, verify_session(sessions/fixture.jsonl) returns entries 4 and head Some("e4").
+- After the 8 bytes `{"x":1}` plus a newline are appended to that session file, verify_session returns Err(HomeError::StaleIndex) whose path is that session file, and the SHA-256 of fixture.jsonl, fixture.index.jsonl and fixture.head and the sorted listing of sessions/ are the same before and after the call.
+- With fixture.index.jsonl deleted, verify_session returns Err(HomeError::StaleIndex) and sessions/ holds no fixture.index.jsonl after the call.
+- With fixture.head deleted, verify_session returns Err(HomeError::HeadMissing) and sessions/ holds no fixture.head after the call.
+- With fixture.head holding `e9` plus a newline, verify_session returns Err(HomeError::HeadNotIndexed) whose Display contains `head_not_indexed` and `e9`.
+- The verify tests run five cases and assert that exactly four of them are refused.
+
+**Files:**
+- create: crates/lys-home/src/record/verify.rs
+- create: crates/lys-home/src/record/verify_tests.rs
+- modify: crates/lys-home/src/record/mod.rs
+- modify: crates/lys-home/src/error.rs
+
+**Checklist:**
+- C25 — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
+- C28 — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
+
+**Stories:**
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+
+### R2: Run git isolated from the person's git configuration
+
+Add the module crates/lys-home/src/moves/ (mod.rs holding only module docs and `pub mod` lines, declared from lib.rs) and in moves/git.rs a `Git` runner for one directory that spawns the `git` binary found on PATH. EVERY git invocation SHALL carry the environment GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM=1 and GIT_TERMINAL_PROMPT=0, and SHALL begin its arguments with `-c core.hooksPath=/dev/null -c commit.gpgSign=false -c core.autocrlf=false -c user.name=lys-home -c user.email=lys-home@localhost`. IF git cannot be spawned, or exits with a status other than 0, THEN THE SYSTEM SHALL refuse with a new HomeError::Git whose message is one line containing `git_failed`, the step name the caller gave (for example `push`) and the exit status. THE SYSTEM SHALL NOT carry git's stdout or stderr into an error or a report, SHALL NOT read the person's global or system git configuration, SHALL NOT run a hook, SHALL NOT sign, SHALL NOT prompt, and SHALL NOT add a dependency for git to crates/lys-home/Cargo.toml.
+
+**Acceptance:**
+- The std::process::Command a Git runner builds for step `rev-parse` has get_envs() holding GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM=1 and GIT_TERMINAL_PROMPT=0, and its first ten get_args() are `-c core.hooksPath=/dev/null -c commit.gpgSign=false -c core.autocrlf=false -c user.name=lys-home -c user.email=lys-home@localhost`.
+- Running step `rev-parse` with arguments `--verify HEAD` in an empty temporary directory that is not a repository returns Err(HomeError::Git) whose Display contains `git_failed` and `rev-parse` and holds no newline.
+- `grep -n 'fn ' crates/lys-home/src/moves/mod.rs` prints nothing.
+- `grep -nE '^(git2|gix)' crates/lys-home/Cargo.toml` prints nothing, and `grep -nE '^name = "(git2|gix)"' Cargo.lock` prints nothing.
+
+**Files:**
+- create: crates/lys-home/src/moves/mod.rs
+- create: crates/lys-home/src/moves/git.rs
+- create: crates/lys-home/src/moves/git_tests.rs
+- modify: crates/lys-home/src/lib.rs
+- modify: crates/lys-home/src/error.rs
+
+**Checklist:**
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+
+**Stories:**
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+
+### R3: Name the remote: ship stays on this machine, and no remote carries userinfo
+
+In crates/lys-home/src/moves/remote.rs add `ship_remote(text) -> Result<Remote, HomeError>` and `fetch_remote(text) -> Result<Remote, HomeError>`, where Remote carries the argument handed to git and the form recorded in the arrival event. For ship: WHEN the text begins `file:///` (a file URL with an empty authority), THE SYSTEM SHALL accept it and record it as given; WHEN the text holds `://` with any other scheme, or begins `file://` with a nonempty authority, THE SYSTEM SHALL refuse with a new HomeError::RemoteOffMachine whose message contains `remote_off_machine`, the scheme (the text before `://`), and that ship accepts only a path on this machine or a file:// URL until encryption at rest lands with stage 3's encryption precondition card; WHEN the text holds no `://` and a `:` stands before its first `/`, THE SYSTEM SHALL refuse with RemoteOffMachine naming the scheme `ssh`, as git reads host:path as ssh; OTHERWISE the text is a path on this machine, and THE SYSTEM SHALL resolve it with std::fs::canonicalize, record the canonical absolute path, and refuse a path that does not resolve with HomeError::Io naming it. For fetch: WHEN a URL's authority holds `@`, or the text holds no `://` and an `@` stands before a `:` that stands before its first `/`, THE SYSTEM SHALL refuse with a new HomeError::RemoteUserinfo whose message contains `remote_userinfo` and the scheme; a path is resolved and recorded as for ship; every other remote is recorded as given. THE SYSTEM SHALL NOT put a remote's authority, userinfo, host or any part after the scheme into an error; SHALL NOT run git or contact a remote while naming one; and SHALL NOT accept an `https`, `http`, `ssh` or `git` remote for ship.
+
+**Acceptance:**
+- ship_remote on the path of an existing bare repository in a temporary directory returns a Remote whose recorded form equals std::fs::canonicalize of that path.
+- ship_remote("file:///tmp/lys-remote.git") returns a Remote whose recorded form is `file:///tmp/lys-remote.git`.
+- ship_remote("https://example.invalid/home.git") returns Err(HomeError::RemoteOffMachine) whose Display contains `remote_off_machine`, `https` and `encryption at rest`.
+- ship_remote("ssh://example.invalid/home.git") and ship_remote("example.invalid:home.git") each return Err(HomeError::RemoteOffMachine) whose Display contains `ssh`.
+- ship_remote("file://user:tok3n@example.invalid/home.git") returns Err(HomeError::RemoteOffMachine) whose Display contains `file` and contains neither `tok3n` nor `example.invalid`.
+- fetch_remote("https://user:tok3n@example.invalid/home.git") returns Err(HomeError::RemoteUserinfo) whose Display contains `remote_userinfo` and `https` and does not contain `tok3n`.
+- fetch_remote("git@example.invalid:home.git") returns Err(HomeError::RemoteUserinfo) whose Display contains `ssh` and does not contain `example.invalid`.
+- fetch_remote("https://example.invalid/home.git") returns a Remote whose recorded form is `https://example.invalid/home.git`.
+- ship_remote on a relative path that does not exist returns Err(HomeError::Io).
+- The remote tests assert that exactly seven of their ten cases are refused.
+
+**Files:**
+- create: crates/lys-home/src/moves/remote.rs
+- create: crates/lys-home/src/moves/remote_tests.rs
+- modify: crates/lys-home/src/moves/mod.rs
+- modify: crates/lys-home/src/error.rs
+
+**Checklist:**
+- C26 — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
+- C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+
+**Stories:**
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+
+### R4: Name the tracked set and scan it for the named values and the five standard patterns
+
+In crates/lys-home/src/moves/tracked.rs add `tracked_set(home_root) -> Result<Vec<PathBuf>, HomeError>` returning home-relative paths sorted bytewise: for every sessions/<id>.jsonl whose name does not end `.index.jsonl`, that file, sessions/<id>.index.jsonl and sessions/<id>.head; every file under blocks/<hh>/; and every file under templates/<hh>/; where no file name beginning `.` is taken. THE SYSTEM SHALL NOT include a session's lock file (the path Index::lock_path names), a `.tmp` file, a file at the home's root, the execution-id file, or any file under a directory other than sessions/, blocks/ and templates/ (render output, an environment file, an MCP file, the .git directory). In crates/lys-home/src/moves/ship.rs add the constant table STANDARD_PATTERNS, one row per pattern holding its name and its regex, with exactly these five rows in this order: private_key_header `-----BEGIN [A-Z ]*PRIVATE KEY-----`; sk_token `sk-[A-Za-z0-9_-]{20,}`; github_token `gh[pousr]_[A-Za-z0-9]{36,}`; aws_access_key_id `AKIA[0-9A-Z]{16}`; jwt `eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`. Each regex is compiled as a case-sensitive byte regex with the regex crate (regex::bytes), added to the workspace's dependencies and to crates/lys-home/Cargo.toml as `regex.workspace = true`; a row that does not compile is refused with a new HomeError::SecretPattern naming the row's name, never with a panic. In tracked.rs add `read_values(file) -> Result<Vec<Vec<u8>>, HomeError>` taking one value per line with the line ending removed and empty lines skipped, and `scan(home_root, set, values, patterns) -> Result<(), HomeError>`. WHEN any value's bytes occur in a tracked file, or any pattern's regex matches a tracked file's bytes, THE SYSTEM SHALL refuse with a new HomeError::SecretInHome whose message contains `secret_in_home`, the home-relative path of the first tracked file in set order holding a hit, the byte offset of the earliest hit in that file, and what hit there: the pattern's name for a pattern, `named_value` for a value (a value before a pattern, and patterns in table order, when two hits start at one offset). THE SYSTEM SHALL NOT put a value, the matched bytes, their length or the bytes around a hit into an error, a report or a log line; SHALL NOT scan for anything but the values and the table's patterns; and SHALL NOT write any file.
+
+**Acceptance:**
+- `git diff <base> -- crates/lys-home/Cargo.toml`, where <base> is the brief's base commit, adds exactly one line, `regex.workspace = true`, and removes none.
+- On the fixture home after one render-launch of tests/fixtures/launch/template.json, tracked_set returns exactly sessions/fixture.jsonl, sessions/fixture.index.jsonl and sessions/fixture.head, one path per file under blocks/ whose name does not begin `.`, and one path under templates/, in bytewise order.
+- After the test creates blocks/ab/.tmp-x, env.json at the home root, render/env.json and the path Index::lock_path names for sessions/fixture.jsonl, tracked_set returns the same list as before they were created.
+- read_values on a file holding `a`, a newline, a newline, `b` and a newline returns [b"a", b"b"].
+- STANDARD_PATTERNS holds exactly five rows, and their names in order are private_key_header, sk_token, github_token, aws_access_key_id and jwt, each with the regex this requirement gives it, character for character.
+- scan over that home's tracked set with the values [b"fixture-secret-value-0001"] and STANDARD_PATTERNS returns Ok(()).
+- After the test writes blocks/zz/plant holding `0123fixture-secret-value-0001` into a copy of that home, scan over the copy's tracked set returns Err(HomeError::SecretInHome) whose Display contains `blocks/zz/plant`, `offset 4` and `named_value` and does not contain `fixture-secret-value-0001`.
+- For each of the five plants `-----BEGIN OPENSSH PRIVATE KEY-----`, `sk-` followed by 20 × `A`, `ghp_` followed by 36 × `A`, `AKIA` followed by 16 × `A`, and `eyJ` + 10 × `a` + `.eyJ` + 10 × `a` + `.` + 10 × `a`, written as `0123` followed by the plant into blocks/zz/plant of a fresh copy of that home, scan with no values returns Err(HomeError::SecretInHome) whose Display contains `blocks/zz/plant`, `offset 4` and, respectively, private_key_header, sk_token, github_token, aws_access_key_id and jwt, and does not contain the plant.
+- For each of the five near misses `-----BEGIN PUBLIC KEY-----`, `sk-` followed by 19 × `A`, `ghp_` followed by 35 × `A`, `AKIA` followed by 15 × `A`, and `eyJ` + 10 × `a` + `.eyJ` + 10 × `a` + `.` + 9 × `a`, written the same way, scan with no values returns Ok(()).
+- The pattern tests run ten plant cases and assert that exactly five of them are refused, one naming each of the five patterns.
+
+**Files:**
+- create: crates/lys-home/src/moves/tracked.rs
+- create: crates/lys-home/src/moves/tracked_tests.rs
+- create: crates/lys-home/src/moves/ship.rs
+- modify: crates/lys-home/src/moves/mod.rs
+- modify: crates/lys-home/src/error.rs
+- modify: crates/lys-home/Cargo.toml
+- modify: Cargo.toml
+- modify: Cargo.lock
+
+**Checklist:**
+- C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+
+**Stories:**
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+
+### R5: Add the arrival kind of lys.harness_event
+
+In crates/lys-home/src/harness/claude_code/events.rs add the seventh kind KIND_ARRIVAL = `arrival` and `arrival(source_commit, remote, reference, execution_id) -> HarnessEvent` with source_uuid None, record None, and a detail holding exactly `source_commit`, `remote`, `ref` and `execution_id`. Its data is the shape every lys.harness_event already carries, `{kind, harness, source_uuid, record, detail}`, refused by the existing HomeError::EventTooLarge when it exceeds MAX_DATA_BYTES (512). The arrival is written by fetch only: THE SYSTEM SHALL NOT map any Claude Code record to the arrival kind in event_of, SHALL NOT change the six existing kinds, their constants or template_render's shape, and SHALL NOT put content, userinfo or a path other than the recorded remote into an arrival.
+
+**Acceptance:**
+- arrival(40 × `a`, `/r/remote.git`, `refs/lys-home/` + 40 × `a`, 32 × `b`).data() returns Ok of the JSON object {"kind":"arrival","harness":"claude-code","source_uuid":null,"record":null,"detail":{"source_commit":40 × `a`,"remote":"/r/remote.git","ref":"refs/lys-home/" + 40 × `a`,"execution_id":32 × `b`}}.
+- The same call with a remote of 400 characters returns Err(HomeError::EventTooLarge).
+- The events tests that passed before this brief pass unchanged.
+
+**Files:**
+- modify: crates/lys-home/src/harness/claude_code/events.rs
+- modify: crates/lys-home/src/harness/claude_code/events_tests.rs
+
+**Checklist:**
+- C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+
+**Stories:**
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+
+### R6: Add `lys-home ship`: commit the tracked set and push it as one ref
+
+Add the subcommand `ship --home <dir> --remote <remote> --secret-values <file>`; its arguments and dispatch live in crates/lys-home/src/cli/moves.rs and its logic in crates/lys-home/src/moves/ship.rs, and cli.rs holds only the variant, its dispatch and the module doc naming it. WHEN run, THE SYSTEM SHALL, in this order: name the remote with ship_remote (R3); check every sessions/*.jsonl whose name does not end `.index.jsonl` with verify_session (R1); take the tracked set (R4) and scan it for the values read from --secret-values and for STANDARD_PATTERNS (R4); and only then initialise the home as a git repository when it holds no .git, build a commit of exactly the tracked set through a temporary index file under .git (the previous ship commit, refs/heads/lys-home, as its parent when there is one), set refs/heads/lys-home to it, push `<commit>:refs/lys-home/<commit>` to the remote without force (R2), and print one JSON report {command: "ship", commit, ref}. IF any session's index is stale, THEN THE SYSTEM SHALL check every session before refusing, print one JSON report {command: "ship", refused: "stale_index", stale: [the home-relative path of each stale session file, sorted bytewise]}, exit 1 with HomeError::StaleIndex on stderr, and write nothing to the home and nothing to the remote. IF any other refusal fires, THEN THE SYSTEM SHALL exit 1 with the refusal on stderr, print no report, and write nothing to the home and nothing to the remote. THE SYSTEM SHALL NOT write any file of the home outside .git/, SHALL NOT check out, reset, clean or stash, SHALL NOT force a push or push any ref but the one, SHALL NOT open a session, take its lock, rebuild an index or persist a head, and SHALL NOT print a secret value, a matched byte or a transcript byte.
+
+**Acceptance:**
+- `lys-home ship --home <dir> --remote <remote>` exits 2 and its stderr contains `--secret-values`.
+- In tests/home_ship.rs, on the fixture home after one render-launch of the fixture template, with a bare remote made by `git init --bare` in a temporary directory and a values file holding `fixture-secret-value-0001`, ship exits 0 and prints a report whose keys are exactly command, commit and ref, whose commit is 40 lowercase hex characters, and whose ref equals `refs/lys-home/` followed by the commit.
+- `git --git-dir <remote> rev-parse <ref>` prints the reported commit, and `git --git-dir <remote> for-each-ref` prints exactly one line.
+- `git --git-dir <remote> ls-tree -r --name-only <commit>` prints exactly the paths tracked_set returns for the home, in the same order.
+- After the 8 bytes `{"x":1}` plus a newline are appended to sessions/fixture.jsonl of a second fixture home, ship exits 1, its stdout is one JSON object whose keys are exactly command, refused and stale, with command `ship`, refused `stale_index` and stale equal to ["sessions/fixture.jsonl"], its stderr contains `stale` and `fixture.jsonl`, that home holds no .git, and `git --git-dir <remote2> for-each-ref` on a fresh bare remote prints nothing.
+- Ship with --remote https://example.invalid/home.git exits 1, its stderr contains `remote_off_machine` and `https`, and the home holds no .git.
+- On a fixture home holding blocks/zz/plant with the bytes `0123fixture-secret-value-0001`, ship exits 1, its stderr contains `secret_in_home`, `blocks/zz/plant` and `offset 4` and does not contain `fixture-secret-value-0001`, and the fresh bare remote's for-each-ref prints nothing.
+- On a fixture home holding blocks/zz/plant with the bytes `0123ghp_` followed by 36 × `A`, ship exits 1, its stderr contains `secret_in_home`, `blocks/zz/plant`, `offset 4` and `github_token` and does not contain `ghp_`, and the fresh bare remote's for-each-ref prints nothing.
+- The ship tests assert that exactly four of their five ship runs over a valid argument set are refused.
+
+**Files:**
+- create: crates/lys-home/src/cli/moves.rs
+- create: crates/lys-home/tests/home_ship.rs
+- modify: crates/lys-home/src/cli.rs
+- modify: crates/lys-home/src/moves/mod.rs
+- modify: crates/lys-home/src/moves/ship.rs
+
+**Checklist:**
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- C25 — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
+- C26 — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
+- C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+
+**Stories:**
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+
+### R7: Add `lys-home fetch`: fetch the ref into a new home, verify it, and record the arrival
+
+Add the subcommand `fetch --remote <remote> --ref <ref> --home <dir>`; its arguments and dispatch live in crates/lys-home/src/cli/moves.rs and its logic in crates/lys-home/src/moves/fetch.rs. WHEN run, THE SYSTEM SHALL, in this order: refuse with a new HomeError::TargetHoldsHome when <dir> exists and holds a home, that is an entry named `sessions`, `blocks` or `templates` that is a directory, an entry named `.git` of any kind, or an entry named `execution-id` of any kind, before running git, before Home::open and before writing anything; when one of the first four is present its message contains `target_holds_home`, <dir> and the name of the first such entry in the order sessions, blocks, templates, .git; when only `execution-id` is present its message contains `target_holds_home` and <dir> and does not name the file; an empty <dir>, or one holding only other entries, is not a home and is accepted; name the remote with fetch_remote (R3); make a staging directory beside <dir> whose name contains `.lys-fetch-`; initialise it as a git repository, fetch <ref> from the remote into the same ref name, and check out its commit detached (R2); check every sessions/*.jsonl of the checkout whose name does not end `.index.jsonl` with verify_session (R1); build every session's arrival event (R5) and refuse on one that exceeds the cap before appending any; take a fresh execution id with record::fresh_id; append to each session, in session id order, one lys.harness_event custom entry holding the arrival's data with append_beside so the head does not move; then place the home in <dir>: create <dir> when it does not exist, write the execution id with a newline to <dir>/execution-id as a new file that never replaces one (when that file already exists, the write refuses with HomeError::TargetHoldsHome naming <dir>, not with HomeError::Io; any other failure of that write refuses with HomeError::Io naming it; either refusal comes before anything else is written under <dir>), rename the staged .git, sessions, blocks and templates into <dir>, and remove the staging directory; and print one JSON report {command: "fetch", home, commit, ref, execution_id, arrivals: [{session, event}]}. IF any refusal fires, THEN THE SYSTEM SHALL remove the staging directory, leave <dir> exactly as it was, or absent when it was absent, print no report and exit 1 with the refusal on stderr. THE SYSTEM SHALL NOT write into <dir> before the verification and the arrivals have passed in staging, SHALL NOT touch, move or remove an entry <dir> already held, SHALL NOT call a directory that holds no home marker a home, SHALL NOT refuse a home marker through HomeError::Io, SHALL NOT rebuild an index or persist a head before the verification passes, SHALL NOT append any entry but the one arrival per session, SHALL NOT move a head, and SHALL NOT write anything to the remote.
+
+**Acceptance:**
+- `lys-home fetch --remote <remote> --home <dir>` exits 2 and its stderr contains `--ref`.
+- In tests/home_fetch.rs, from a bare remote holding the ref a ship of the fixture home (after one render-launch) pushed, fetch into a path that does not exist exits 0 and prints a report whose commit and ref equal the ship report's and whose execution_id is 32 lowercase hex characters, and <dir>/execution-id holds that execution_id followed by a newline.
+- The last line of <dir>/sessions/fixture.jsonl is a custom entry with customType `lys.harness_event`, parentId `e4`, data.kind `arrival`, data.detail.source_commit equal to the commit, data.detail.ref equal to the ref, data.detail.remote equal to std::fs::canonicalize of the remote path, and data.detail.execution_id equal to the report's execution_id, and its serialised data is at most 512 bytes.
+- <dir>/sessions/fixture.head holds `e4` followed by a newline after the fetch.
+- Two fetches of the same ref into two new paths report two different execution_id values.
+- A second fetch into the same <dir> exits 1, its stderr contains `target_holds_home` and `sessions`, the SHA-256 of every file under <dir> is the same before and after, and <dir>'s parent holds no entry whose name contains `.lys-fetch-`.
+- A fetch into an existing directory holding one empty file named `note` exits 0, `note` is still there and still empty afterwards, and the directory then holds .git, sessions/fixture.jsonl and execution-id beside it.
+- A fetch into an existing directory holding only an empty directory named `templates` exits 1, its stderr contains `target_holds_home` and `templates`, and the directory holds only that empty `templates` afterwards.
+- A fetch into an existing directory holding only one empty file named `execution-id` exits 1, its stderr contains `target_holds_home` and the directory's path and does not contain the string `execution-id`, and the directory holds only that empty `execution-id` file afterwards.
+- From a ref whose commit the test builds with plain git from a copy of the fixture home whose sessions/fixture.jsonl had the 8 bytes `{"x":1}` plus a newline appended after its index was written, fetch exits 1, its stderr contains `stale` and `fixture.jsonl`, <dir> does not exist afterwards, and its parent holds no entry whose name contains `.lys-fetch-`.
+- From a ref whose commit the test builds with plain git from a copy of the fixture home whose sessions/fixture.head holds `e9` plus a newline, fetch exits 1, its stderr contains `head_not_indexed` and `e9`, and <dir> does not exist afterwards.
+- Fetch with --remote https://user:tok3n@example.invalid/home.git exits 1, its stderr contains `remote_userinfo` and does not contain `tok3n`, and <dir> does not exist afterwards.
+- The fetch tests assert that exactly six of their nine fetch runs over a valid argument set are refused.
+
+**Files:**
+- create: crates/lys-home/src/moves/fetch.rs
+- create: crates/lys-home/tests/home_fetch.rs
+- modify: crates/lys-home/src/cli/moves.rs
+- modify: crates/lys-home/src/moves/mod.rs
+- modify: crates/lys-home/src/error.rs
+
+**Checklist:**
+- C28 — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
+- C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+
+**Stories:**
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+
+### R8: Prove the move end to end on the fixture home
+
+Add crates/lys-home/tests/home_move.rs, which builds the source home from the fixture session and one render-launch of the fixture template with LYS_FIXTURE_TOKEN=fixture-secret-value-0001 in the command's environment, records the SHA-256 of every file under the source home, ships it with a values file holding `fixture-secret-value-0001` to a bare remote in a temporary directory, and fetches the pushed ref into a second temporary directory, all through the built binary. The match is taken where the arrival cannot touch it: THE SYSTEM SHALL show every tracked file at the fetched commit equal to the source file byte for byte, and after the arrival is appended SHALL show the source session file and index as byte prefixes of the target's and the blocks and templates unchanged. The search of the shipped ref SHALL read every object in the bare remote and count what it searched and what it found, with a positive control that the same search finds a planted value. The source home in this test SHALL also hold blocks/zz/crlf with the 6 bytes `a`, CR, LF, `b`, CR, LF. The ship in this test SHALL run with HOME and XDG_CONFIG_HOME set to a directory whose .gitconfig turns on commit.gpgSign, sets core.hooksPath to a directory holding an executable pre-push hook that exits 1, sets core.autocrlf true, and sets user.name and user.email so a plain commit fails on signing alone, and the test SHALL show each of the three settings firing on plain git under that same HOME, so the ship passing is the isolation and not a setting that never fired. THE SYSTEM SHALL NOT name a test after transcript content, SHALL NOT print a secret value, and SHALL NOT write any file outside the test's temporary directories.
+
+**Acceptance:**
+- For every path tracked_set returns for the source home, the SHA-256 of `git -C <target> show <commit>:<path>` equals the SHA-256 of the source file, and the test asserts the number of paths compared equals the tracked set's length, with at least one path under blocks/ and exactly one under templates/.
+- After the fetch, the source sessions/fixture.jsonl bytes are a strict prefix of the target's and the target has exactly one line more; the source sessions/fixture.index.jsonl bytes are a strict prefix of the target's and the target has exactly one row more.
+- The sorted lists of files under blocks/ and templates/ are equal between source and target, and each pair of files has equal SHA-256.
+- Every file present in the source home before ship has the same SHA-256 after ship and after fetch, and every path added to the source home by ship begins with `.git/`.
+- The target session's last line is an arrival event whose detail.source_commit equals the ship report's commit and whose detail.execution_id equals the contents of <target>/execution-id without its newline.
+- A byte search for `fixture-secret-value-0001` over the contents of every object `git --git-dir <remote> cat-file --batch-all-objects --batch` prints finds 0 matches, and the test asserts the number of objects searched is at least the tracked set's length.
+- The same search over a scratch bare repository into which the test wrote one blob holding `fixture-secret-value-0001` with `git hash-object -w` finds exactly 1 match.
+- The ship run under the hostile .gitconfig exits 0, `git --git-dir <remote> rev-parse <ref>` prints the reported commit (the pre-push hook did not run), `git --git-dir <remote> cat-file -p <commit>` prints no line beginning `gpgsig`, and `git --git-dir <remote> cat-file blob <commit>:blocks/zz/crlf` prints exactly the 6 bytes `a`, CR, LF, `b`, CR, LF.
+- Under the same HOME and XDG_CONFIG_HOME, with no GIT_CONFIG_GLOBAL set, plain `git push` of a commit from a scratch repository to a fresh bare repository exits nonzero and that bare repository's for-each-ref prints nothing; plain `git commit` in a scratch repository exits nonzero (the signing key does not exist); and plain `git add` of a file holding `a`, CR, LF, `b`, CR, LF followed by `git cat-file blob :<file>` prints the 4 bytes `a`, LF, `b`, LF.
+- The hostile-configuration tests assert that exactly three plain-git controls fired and that the one isolated ship passed.
+
+**Files:**
+- create: crates/lys-home/tests/home_move.rs
+
+**Checklist:**
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+- C30 — On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.
+
+**Stories:**
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+
+### R9: Render and resume the fetched home on the installed Claude Code and write it down
+
+WHEN the move is proved, THE SYSTEM's proof SHALL build the source home from the fixture session and one render-launch of the fixture template, ship it to a bare remote in a scratch directory, fetch the ref into a second scratch directory, run render-launch on the target home with the fixture template, and run the printed launch line once from a working directory that is neither the out directory nor the session's cwd, on Claude Code 2.1.283 as `claude --version` reports it. docs/design/home/PROOF-MOVE.md SHALL record: the version string; the ship report's commit and ref; the fetch report's execution_id; the SHA-256 of the source and target session file, index and head at the fetched commit; the counts of block and template files in source and target; the session_head of the source render's template_render event and of the target render's; the five written paths relative to <out> with their SHA-256; the launch line with the out directory written as <out>; the rendered file's SHA-256 before and after the launch; where the continuation was written relative to the Claude Code projects directory; whether the continuation's parent link names the rendered session id, answered yes or no with the observation it rests on; and the resume-check report. The proof SHALL NOT contain transcript content, a secret value, or a path that is not written relative to <scratch>, <out> or the projects directory.
+
+**Acceptance:**
+- docs/design/home/PROOF-MOVE.md contains the string `2.1.283 (Claude Code)` as the version `claude --version` printed on the proof run.
+- PROOF-MOVE.md records the ship commit and the ref, and the ref equals `refs/lys-home/` followed by the commit.
+- PROOF-MOVE.md records, for the session file, the index and the head, the source SHA-256 and the target SHA-256 at the fetched commit, and each pair is equal.
+- PROOF-MOVE.md records the session_head of the source render and of the target render, and the two are equal.
+- PROOF-MOVE.md records the rendered file's SHA-256 before and after the launch, and the two are equal.
+- PROOF-MOVE.md records the answer yes, with its observation, to whether the continuation's parent link names the rendered session id.
+- PROOF-MOVE.md records the resume-check report with repeated_tool_use_ids equal to 0.
+- A search of PROOF-MOVE.md for `fixture turn one` and for `fixture-secret-value-0001` finds 0 matches.
+
+**Files:**
+- create: docs/design/home/PROOF-MOVE.md
+
+**Checklist:**
+- C31 — PROOF-MOVE.md records the fetched home rendered by render-launch and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.
+
+**Stories:**
+- S17 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the moved home's resume measured on a named Claude Code version and written in a proof document, so that the move is shown to continue a session rather than assumed to.
+
+### R10: Write the move down and re-render the cluster
+
+RECORD.md SHALL write down the home as a git repository, the tracked set by path pattern, that a session's lock file, dot-prefixed files and the execution-id file are never tracked, the ref namespace refs/lys-home/<commit> and the branch refs/heads/lys-home, the arrival kind's data shape with its four detail keys, and that ship and fetch check an index and a head without rebuilding either. crates/lys-home/README.md SHALL document both subcommands with their arguments, their reports and their refusals by name. The cluster's markdown (DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/HOME-004.md) SHALL be re-rendered with scripts/design/render-cluster.py, never hand-edited. THE SYSTEM SHALL NOT change the written description of any existing entry kind, and SHALL NOT change the rendered markdown of HOME-001, HOME-002 or HOME-003.
+
+**Acceptance:**
+- docs/design/home/RECORD.md lists `arrival` among the lys.harness_event kinds with the detail keys source_commit, remote, ref and execution_id.
+- RECORD.md names sessions/<id>.jsonl, sessions/<id>.index.jsonl, sessions/<id>.head, blocks/<hh>/<hash> and templates/<hh>/<hash> as tracked, and names the session lock file and `execution-id` as never tracked.
+- crates/lys-home/README.md contains `ship --home <dir> --remote <remote> --secret-values <file>` and `fetch --remote <remote> --ref <ref> --home <dir>`.
+- `python3 scripts/design/render-cluster.py docs/design/home` followed by `git diff --exit-code docs/design/home` exits 0.
+- `sh scripts/design/gate.sh` exits 0.
+
+**Files:**
+- create: docs/design/home/briefs/HOME-004.md
+- modify: docs/design/home/RECORD.md
+- modify: crates/lys-home/README.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
+
+**Checklist:**
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+
+**Stories:**
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+
+## Boundaries
+
+- No second machine, no encryption, no harness other than Claude Code, and no transport other than a git ref pushed to and fetched from a named remote.
+- Ship accepts no remote off this machine: only a path on this machine or a file:/// URL.
+- No source session file, index, head, block or template is written, truncated, rebuilt or re-serialised by ship or fetch; ship writes into the home only under .git/.
+- No secret value, remote userinfo, transcript content, block content or git output in a report, an error, an entry, a test name or the proof document.
+- The scan is for the values of the --secret-values file and the five standard patterns of STANDARD_PATTERNS, and nothing else.
+- No field added to Pi's grammar; the arrival rides inside a lys.harness_event custom entry.
+- render-launch, the template_render event and lys.given keep their behaviour and wire shape.
+- No force push, no deletion of a remote ref, and no ref pushed outside refs/lys-home/.
+- No dependency added but the pure-Rust regex crate, no unsafe, no file over 500 lines of code, and no unwrap, expect or panic in library code.
+- The design's structure array is the whole file list; a path outside it is not created.
+
+## Verification
+
+- python3 scripts/design/validate.py docs/design/home exits 0.
+- python3 scripts/design/check-coverage.py docs/design/home exits 0.
+- cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
+- sh scripts/design/gate.sh exits 0.
+- grep -n 'fn ' crates/lys-home/src/moves/mod.rs returns nothing.
+- git diff of crates/lys-home/Cargo.toml against the brief's base commit adds exactly the one line `regex.workspace = true` and removes none.
+- The target session file from the R8 test, written out in the proof step, parses with Pi's parseSessionEntries at 3d5cbe98 through node, and its entry count equals the source's plus one (the command is written in PROOF-MOVE.md).
+- git ls-files lists no .jsonl file outside crates/lys-home/tests/fixtures and canon/.
 
