@@ -8,6 +8,7 @@ title: Stop the record replaying and re-reading: indexed call lookup, one open c
 # HOME-035: Stop the record replaying and re-reading: indexed call lookup, one open check, batched durable appends, streamed rendering
 
 > **Cluster:** home
+> **Blocked by:** HOME-020 landed on main: the build starts only when `git log --oneline origin/main --grep=HOME-020` names its R2, R4 and R6 commits.
 > **Design anchor:**
 > - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 > **Checklist:**

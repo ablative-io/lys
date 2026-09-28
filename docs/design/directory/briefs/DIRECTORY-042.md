@@ -8,6 +8,7 @@ title: Decide a grant once per request: one decision per check, a filtered relat
 # DIRECTORY-042: Decide a grant once per request: one decision per check, a filtered relationship read, indexes for holders and changes, a pooled SpiceDB client with a cached schema
 
 > **Cluster:** directory
+> **Blocked by:** DIRECTORY-025 landed on main: the build starts only when the roadmap row linking DIRECTORY-025 reads landed.
 > **Design anchor:**
 > - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 > **Checklist:**
