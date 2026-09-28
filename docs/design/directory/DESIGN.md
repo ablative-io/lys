@@ -794,6 +794,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/signed_head_settle.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
 | `crates/lys-identity/tests/support/mod.rs` | The receipts route answers a signed checkpoint | DIRECTORY-058 |
 | `crates/lys/src/identity/install/detached.rs` | a detached start through the holder | DIRECTORY-057 |
+| `docs/design/directory/HOLDER-KEY-OPTIONS.md` | options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment | DIRECTORY-050 |
 
 ## Inventory
 

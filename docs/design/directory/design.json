@@ -3506,6 +3506,11 @@
       "path": "crates/lys/src/identity/install/detached.rs",
       "note": "a detached start through the holder",
       "brief": "DIRECTORY-057"
+    },
+    {
+      "path": "docs/design/directory/HOLDER-KEY-OPTIONS.md",
+      "note": "options for agent session holder keys, for a ruling before DIRECTORY-049 R8 and a DIRECTORY-050 amendment",
+      "brief": "DIRECTORY-050"
     }
   ],
   "inventory": [
