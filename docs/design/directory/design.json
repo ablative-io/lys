@@ -1023,6 +1023,10 @@
     {
       "path": "CLAUDE.md",
       "note": "lines 78-80: a format is frozen once a signature is produced or a leaf is logged under it; a new version alongside, never a mutation. Governs the lys release that carries the verifier."
+    },
+    {
+      "path": "docs/design/decisions.json",
+      "note": "the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row"
     }
   ],
   "constraints": [
