@@ -11,6 +11,8 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+#[path = "log_tests/leftovers.rs"]
+mod leftovers;
 #[path = "log_tests/proofs.rs"]
 mod proofs;
 #[path = "log_tests/vectors.rs"]

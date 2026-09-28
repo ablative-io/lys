@@ -57,17 +57,23 @@
 use lys_log_store::FileLeafStore;
 use tempfile::TempDir;
 
-use crate::admission::{AcceptAll, SubmitterContext};
+use crate::AnchorConfig;
+use crate::admission::{AcceptAll, MaxSize, SubmitterContext};
 use crate::anchor::Anchor;
+use crate::error::AnchorError;
 use crate::keys::FileSigner;
 use crate::wire::Submission;
 
+use super::super::projection::parse_count;
 use super::super::report::Relation;
 use super::super::report::fixture::{
-    CHILD_ORIGIN, Child, OTHER_CHILD_ORIGIN, flip_root, witness_anchor,
+    CHILD_ORIGIN, Child, OTHER_CHILD_ORIGIN, WITNESS_GENESIS, WITNESS_ORIGIN, flip_root,
+    witness_anchor,
 };
 use super::*;
 
+#[path = "observe_tests/kept.rs"]
+mod kept;
 #[path = "observe_tests/receipt.rs"]
 mod receipt;
 #[path = "observe_tests/relations.rs"]
@@ -81,19 +87,36 @@ fn staged() -> (TempDir, Anchor<FileLeafStore, FileSigner, AcceptAll>) {
     (dir, anchor)
 }
 
-/// Observes `note` with no consistency proof, under no established identity.
+/// Observes `note` with no consistency proof, under no established identity,
+/// through a projection rebuilt over the whole log for this call.
 fn see(
     anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>,
     note: &[u8],
 ) -> super::super::report::Observation {
-    observe(anchor, note, None, SubmitterContext::Unidentified).unwrap()
+    let mut projection = WitnessProjection::rebuild(anchor);
+    observe(
+        anchor,
+        &mut projection,
+        note,
+        None,
+        SubmitterContext::Unidentified,
+    )
+    .unwrap()
 }
 
-/// Observes `note` with `proof`.
+/// Observes `note` with `proof`, through a projection rebuilt for this call.
 fn see_with(
     anchor: &mut Anchor<FileLeafStore, FileSigner, AcceptAll>,
     note: &[u8],
     proof: &[u8],
 ) -> super::super::report::Observation {
-    observe(anchor, note, Some(proof), SubmitterContext::Unidentified).unwrap()
+    let mut projection = WitnessProjection::rebuild(anchor);
+    observe(
+        anchor,
+        &mut projection,
+        note,
+        Some(proof),
+        SubmitterContext::Unidentified,
+    )
+    .unwrap()
 }

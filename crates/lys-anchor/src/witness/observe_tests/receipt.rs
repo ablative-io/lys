@@ -116,8 +116,15 @@ fn the_receipt_is_byte_identical_whatever_the_relation() {
     let mut compared = 0;
     let mut with_a_memory = 0;
     for (step, (bytes, proof, expect_previous)) in script.into_iter().enumerate() {
-        let witnessed =
-            observe(&mut witness, bytes, proof, SubmitterContext::Unidentified).unwrap();
+        let mut projection = WitnessProjection::rebuild(&witness);
+        let witnessed = observe(
+            &mut witness,
+            &mut projection,
+            bytes,
+            proof,
+            SubmitterContext::Unidentified,
+        )
+        .unwrap();
         let recorded = plain
             .submit(
                 Submission { statement: bytes },

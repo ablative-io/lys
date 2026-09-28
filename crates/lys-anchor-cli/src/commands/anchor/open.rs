@@ -24,6 +24,15 @@
 //! the success object — always present, `null` when the log opened clean, so a
 //! consumer can tell "no repair" from "an older binary that never reported one".
 //!
+//! # Leftover temporary leaf files go to stderr only
+//!
+//! `FileLeafStore::open` returns the names of the temporary leaf files an
+//! interrupted append left in `leaves/`, and this layer prints them in one
+//! stderr line, straight after the store opens. Unlike `recovered_to` they are
+//! **not** a `--json` field: the success object's keys are a contract with its
+//! consumers, and a leftover temporary file changes nothing about the anchor —
+//! it is not a leaf, not an error, and not removed.
+//!
 //! # The disclosure this module carries, and why it is a constant
 //!
 //! `BUILD-PLAN.md` §2.2 requires four places to state that a standalone anchor
@@ -105,7 +114,8 @@ pub fn create<P: AdmissionPolicy>(
         .map_err(|err| anchor_failure(dir, err))
 }
 
-/// Opens the anchor at `dir`, reporting an interrupted append that was repaired.
+/// Opens the anchor at `dir`, reporting the leftover temporary leaf files the
+/// store skipped and an interrupted append that was repaired.
 ///
 /// # Errors
 ///
@@ -115,6 +125,9 @@ pub fn create<P: AdmissionPolicy>(
 /// genesis leaf, and [`CliError::Io`] on filesystem failure.
 pub fn open<P: AdmissionPolicy>(dir: &Path, key: &Path, policy: P) -> CliResult<FileAnchor<P>> {
     let store = FileLeafStore::open(dir)?;
+    if let Some(line) = leftover_temporaries_line(&store.leftover_temporaries()?) {
+        eprintln!("{line}");
+    }
     let signer = FileSigner::load(key)?;
     let anchor = Anchor::open(store, signer, policy, AnchorConfig::unconfigured())
         .map_err(|err| anchor_failure(dir, err))?;
@@ -122,6 +135,21 @@ pub fn open<P: AdmissionPolicy>(dir: &Path, key: &Path, policy: P) -> CliResult<
         eprintln!("recovered interrupted append: state advanced to {tree_size}");
     }
     Ok(anchor)
+}
+
+/// The stderr line naming the leftover temporary leaf files a store skipped at
+/// open, in the order given, or `None` when there were none.
+///
+/// The same line `lys log` prints, so an operator running both tools over the
+/// same kind of directory reads one sentence.
+fn leftover_temporaries_line(names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "ignored leftover temporary leaf files: {}",
+        names.join(", ")
+    ))
 }
 
 /// The signed-note verifier key string a third party needs to check anything

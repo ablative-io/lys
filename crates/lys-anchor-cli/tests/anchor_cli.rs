@@ -450,3 +450,149 @@ fn a_refused_submission_leaves_the_log_untouched() {
     ]);
     assert_eq!(grown["tree_size"], Value::from(2u64));
 }
+
+/// An anchor made by `init` with origin `example.com/anchor`, a key made by
+/// `Ed25519Identity::load_or_generate`, a genesis file holding `genesis`, and
+/// `--admit accept-all`.
+fn example_anchor() -> Fixture {
+    let fixture = Fixture::new();
+    std::fs::write(&fixture.genesis, b"genesis").unwrap();
+    ok_json(&[
+        "init",
+        "--dir",
+        fixture.dir.to_str().unwrap(),
+        "--origin",
+        "example.com/anchor",
+        "--key",
+        fixture.key.to_str().unwrap(),
+        "--genesis",
+        fixture.genesis.to_str().unwrap(),
+        "--admit",
+        "accept-all",
+    ]);
+    fixture
+}
+
+/// `status --dir D --key K --admit accept-all`, with `--json` first when asked.
+fn status(fixture: &Fixture, json: bool) -> Output {
+    let mut args = Vec::new();
+    if json {
+        args.push("--json");
+    }
+    args.extend([
+        "status",
+        "--dir",
+        fixture.dir.to_str().unwrap(),
+        "--key",
+        fixture.key.to_str().unwrap(),
+        "--admit",
+        "accept-all",
+    ]);
+    run(&args)
+}
+
+/// The stderr lines of `output` that start with `prefix`.
+fn stderr_lines_starting(output: &Output, prefix: &str) -> Vec<String> {
+    String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .filter(|line| line.starts_with(prefix))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The sorted keys of the one JSON object on `output`'s stdout, whose `ok` is
+/// true.
+fn ok_keys(output: &Output) -> Vec<String> {
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["ok"], Value::Bool(true), "{value}");
+    let mut keys: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+    keys.sort();
+    keys
+}
+
+#[test]
+fn status_names_a_leftover_temporary_leaf_file_on_stderr_only() {
+    let fixture = example_anchor();
+    let clean_keys = ok_keys(&status(&fixture, true));
+    let clean = status(&fixture, false);
+    assert_eq!(clean.status.code(), Some(0));
+    assert!(
+        stderr_lines_starting(&clean, "ignored leftover temporary leaf files").is_empty(),
+        "{}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+
+    std::fs::write(
+        fixture
+            .dir
+            .join("leaves")
+            .join(".4242-00000000000000000001-0.tmp"),
+        b"partial",
+    )
+    .unwrap();
+    let planted = status(&fixture, false);
+    assert_eq!(
+        planted.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&planted.stderr)
+    );
+    assert_eq!(
+        stderr_lines_starting(&planted, "ignored leftover temporary leaf files"),
+        ["ignored leftover temporary leaf files: .4242-00000000000000000001-0.tmp"]
+    );
+    assert!(
+        !String::from_utf8_lossy(&planted.stdout).contains("ignored leftover"),
+        "the notice goes to stderr only"
+    );
+
+    let planted_json = status(&fixture, true);
+    assert_eq!(
+        ok_keys(&planted_json),
+        clean_keys,
+        "a leftover temporary file adds no --json field"
+    );
+}
+
+#[test]
+fn status_refuses_a_torn_genesis_leaf_inside_the_pinned_prefix() {
+    let fixture = example_anchor();
+    std::fs::write(
+        fixture.dir.join("leaves").join(format!("{:020}", 0)),
+        b"gen",
+    )
+    .unwrap();
+    let state_before = std::fs::read(fixture.dir.join("state.json")).unwrap();
+    let refused = status(&fixture, false);
+    let state_after = std::fs::read(fixture.dir.join("state.json")).unwrap();
+    assert_eq!(
+        refused.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    let errors = stderr_lines_starting(&refused, "error: ");
+    assert_eq!(
+        errors.len(),
+        1,
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    let expected_start = format!(
+        "error: anchor directory invalid: {}: stored leaves rebuild to tree size 1 with root ",
+        fixture.dir.display()
+    );
+    assert!(errors[0].starts_with(&expected_start), "{}", errors[0]);
+    assert!(
+        errors[0].contains(", but the pinned state is tree size 1 with root "),
+        "{}",
+        errors[0]
+    );
+    assert_eq!(state_before, state_after, "a refused open writes no pin");
+}

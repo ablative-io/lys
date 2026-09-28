@@ -223,6 +223,105 @@ fn crash_recovery_does_not_mask_a_tampered_prefix() {
     assert!(matches!(err, StoreError::PinMismatch { .. }), "{err}");
 }
 
+/// Appends `leaf-0`, `leaf-1` and `leaf-2` to a fresh store with origin
+/// `example.com/log`, returning the root after the third append.
+fn three_leaf_store(dir: &Path) -> [u8; 32] {
+    FileLeafStore::create(dir, "example.com/log").unwrap();
+    let mut log = Log::open(FileLeafStore::open(dir).unwrap()).unwrap();
+    for leaf in [b"leaf-0".as_slice(), b"leaf-1", b"leaf-2"] {
+        log.append(leaf).unwrap();
+    }
+    let (root, size) = log.tree().root().to_parts();
+    assert_eq!(size, 3);
+    root
+}
+
+/// The root the file store's refusal must state for the given leaves,
+/// computed from the bytes the test planted rather than from what open read.
+fn rebuilt_root_b64(leaves: &[&[u8]]) -> String {
+    let owned: Vec<Vec<u8>> = leaves.iter().copied().map(<[u8]>::to_vec).collect();
+    let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&owned);
+    STANDARD.encode(tree.root().to_parts().0)
+}
+
+/// Replaces leaf 1 of a three-leaf store with `planted`, opens it, and returns
+/// the refusal's Display text and roots, holding `state.json` unchanged.
+fn refusal_over_planted_leaf_1(planted: &[u8]) -> (String, String, String) {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let pinned_root = STANDARD.encode(three_leaf_store(&dir));
+    std::fs::write(leaf_path(&dir, 1), planted).unwrap();
+    let state_before = std::fs::read(dir.join("state.json")).unwrap();
+    let err = reopen(&dir).unwrap_err();
+    let state_after = std::fs::read(dir.join("state.json")).unwrap();
+    assert_eq!(
+        state_before, state_after,
+        "a refused open must not write the pin"
+    );
+    let display = err.to_string();
+    let (pinned_size, got_pinned_root, rebuilt_size, rebuilt_root) = match err {
+        StoreError::PinMismatch {
+            pinned_size,
+            pinned_root,
+            rebuilt_size,
+            rebuilt_root,
+        } => (pinned_size, pinned_root, rebuilt_size, rebuilt_root),
+        other => panic!("expected PinMismatch, got {other}"),
+    };
+    assert_eq!(pinned_size, 3);
+    assert_eq!(rebuilt_size, 3);
+    assert_eq!(got_pinned_root, pinned_root);
+    assert_eq!(
+        rebuilt_root,
+        rebuilt_root_b64(&[b"leaf-0", planted, b"leaf-2"])
+    );
+    assert_ne!(rebuilt_root, pinned_root);
+    (display, rebuilt_root, pinned_root)
+}
+
+#[test]
+fn a_torn_leaf_inside_the_pinned_prefix_is_refused_with_the_pin_and_the_rebuilt_root() {
+    let (display, rebuilt_root, pinned_root) = refusal_over_planted_leaf_1(b"lea");
+    assert_eq!(
+        display,
+        format!(
+            "stored leaves rebuild to tree size 3 with root {rebuilt_root}, but the pinned \
+             state is tree size 3 with root {pinned_root}"
+        )
+    );
+}
+
+#[test]
+fn a_one_byte_change_inside_the_pinned_prefix_is_refused_with_the_pin_and_the_rebuilt_root() {
+    let (display, rebuilt_root, pinned_root) = refusal_over_planted_leaf_1(b"leaf-X");
+    assert_eq!(
+        display,
+        format!(
+            "stored leaves rebuild to tree size 3 with root {rebuilt_root}, but the pinned \
+             state is tree size 3 with root {pinned_root}"
+        )
+    );
+}
+
+#[test]
+fn a_torn_leaf_just_past_the_pin_is_adopted_pinned_and_reported() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    FileLeafStore::create(&dir, "example.com/log").unwrap();
+    let mut log = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
+    log.append(b"leaf-0").unwrap();
+    log.append(b"leaf-1").unwrap();
+    // A final leaf name holding a short write, as a store written before the
+    // temporary-name write could hold after a crash.
+    std::fs::write(leaf_path(&dir, 2), b"lea").unwrap();
+    let recovered = reopen(&dir).unwrap();
+    assert_eq!(recovered.recovered_to(), Some(3));
+    assert_eq!(recovered.tree().len(), 3);
+    let reread = reopen(&dir).unwrap();
+    assert_eq!(reread.recovered_to(), None);
+    assert_eq!(reread.tree().len(), 3);
+}
+
 #[test]
 fn recovery_refuses_a_pin_that_is_ahead_of_the_leaves() {
     // The mirror image of an interrupted append, and deliberately NOT
