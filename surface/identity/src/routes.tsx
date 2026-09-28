@@ -5,7 +5,6 @@ import { Connections } from './features/connections/Connections';
 import { SecretsPage } from './features/secrets/SecretsPage';
 import { Sessions } from './features/sessions/Sessions';
 import { Reviews } from './features/reviews/Reviews';
-import { Teams } from './features/teams/Teams';
 import { Requests } from './features/requests/Requests';
 import { Route, Routes } from 'react-router';
 import { Access } from './features/access/Access';
@@ -38,7 +37,6 @@ export function AppRoutes() {
       <Route path="/sessions" element={<Sessions />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
-      <Route path="/teams" element={<Teams />} />
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />

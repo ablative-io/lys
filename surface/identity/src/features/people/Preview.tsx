@@ -1,6 +1,5 @@
 import { RoleSummary } from '../roles/AssignedRoles';
 import type { RolesLoad } from '../roles/AssignedRoles';
-import { NowSummary } from './NowSummary';
 import type { Entry } from './directory';
 import type { Load } from '../../api';
 import { Reach } from './reach';
@@ -36,7 +35,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
         <>
           <div className="section-h">Now</div>
           <div className="note">
-            <NowSummary id={x.id} />
+            <a href={'#/file/' + x.id + '/sessions'}>Read runtime reports</a>. A report is required to confirm running or stopped.
           </div>
         </>
       ) : null}
@@ -44,9 +43,7 @@ export function Preview({ x, reach, roles }: { x: Entry; roles: RolesLoad; reach
         <a className="btn" href={'#/file/' + x.id}>Open file</a>
         <a className="btn" href={'#/graph/' + x.id}>Show in graph</a>
         {agent && x.state === 'active' ? (
-          <a className="btn" data-act="start" href={'#/file/' + x.id + '/provisioning'} title="Prepare a start from the reviewed profile">
-            Start…
-          </a>
+          <a className="btn" data-act="start" href={'#/file/' + x.id + '/provisioning'}>Prepare start…</a>
         ) : null}
       </div>
     </div>

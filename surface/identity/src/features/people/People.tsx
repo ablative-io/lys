@@ -1,9 +1,9 @@
-import { RuntimeSessions } from '../runtime/RuntimeSessions';
+import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
+import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { api, request, useLoad } from '../../api';
-import type { RuntimeSession } from '../runtime/RuntimeSessions';
+import { api, useLoad } from '../../api';
 import type { Scope } from '../../generated';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -17,24 +17,6 @@ import type { Load } from '../../api';
 import { Preview } from './Preview';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 import type { RolesLoad } from '../roles/AssignedRoles';
-
-/** What the runtimes report across the directory, counted for the administrator; anyone else sees why not. */
-function RuntimeStats({ scope }: { scope: Scope }) {
-  const load = useLoad(async () => {
-    if (scope !== 'directory') return null;
-    const found = await request<{ sessions: RuntimeSession[] }>('/runtime/found');
-    const running = await request<{ sessions: RuntimeSession[] }>('/runtime/sessions');
-    return { found: found.sessions.filter((session) => session.shown !== 'stopped').length, running: running.sessions.filter((session) => session.shown === 'running').length };
-  }, 'people-runtime:' + scope);
-  const why = load.status === 'loading' ? '…' : load.status === 'refused' ? load.refused.refusal.refusal : load.data === null ? 'administrator only' : undefined;
-  const counts = load.status === 'ok' ? load.data : null;
-  return (
-    <>
-      <Stat n={counts?.found ?? null} l="found, not registered" why={why} />
-      <Stat n={counts?.running ?? null} l="sessions running" why={why} />
-    </>
-  );
-}
 
 function PeopleHead() {
   const shell = useShell();
@@ -63,15 +45,14 @@ function PeopleHead() {
   );
 }
 
-function Stat({ n, l, warn, why }: { n: number | null; l: string; warn?: boolean; why?: string }) {
+function Stat({ n, l, warn }: { n: number; l: string; warn?: boolean }) {
   return (
     <div className="stat">
       <div className="n" style={warn && n ? { color: 'var(--warn)' } : undefined}>
-        {n === null ? <span className="dim">—</span> : n}
+        {n}
       </div>
       <div className="l">
         {l}
-        {n === null ? <> · <span className="open-q">{why ?? 'not visible'}</span></> : null}
       </div>
     </div>
   );
@@ -98,7 +79,7 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
         <Stat n={active('person')} l="people active" />
         <Stat n={active('agent')} l="agents active" />
         <Stat n={all.filter(needsNewPerson).length} l="with no one answering" warn />
-        <RuntimeStats scope={scope} />
+        <RuntimeCounts />
       </div>
       <div className="split">
         <div>
@@ -159,12 +140,11 @@ function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad;
 export function People() {
   const shell = useShell();
   const load = useLoad(api.people, 'people');
-  if (shell.filterKind === 'teams') return <Teams head={<PeopleHead />} />;
-  if (shell.filterKind === 'found') {
+  if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
       <div className="page">
         <PeopleHead />
-        <RuntimeSessions found />
+        {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Teams />}
       </div>
     );
   }
