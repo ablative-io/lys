@@ -2945,6 +2945,46 @@
       "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
       "note": "R5: Proof on a fresh macOS account",
       "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/render.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/render_tests.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config.rs",
+      "note": "R5: The configuration and compose files move with the binaries",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/adopt.rs",
+      "note": "R6: The first move of an install made before this card",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/adopt_tests.rs",
+      "note": "R6: The first move of an install made before this card",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/intent.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/intent_tests.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/swap.rs",
+      "note": "R7: An upgrade stopped part-way is finished or put back",
+      "brief": "DIRECTORY-045"
     }
   ],
   "inventory": [

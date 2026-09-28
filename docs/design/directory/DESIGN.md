@@ -681,6 +681,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-app/src/login_item_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
 | `surface/identity/src/features/account/Uninstall.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R5: Proof on a fresh macOS account | DIRECTORY-054 |
+| `crates/lys/src/identity/upgrade/render.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/render_tests.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/install/server_config.rs` | R5: The configuration and compose files move with the binaries | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/adopt.rs` | R6: The first move of an install made before this card | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/adopt_tests.rs` | R6: The first move of an install made before this card | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 
 ## Inventory
 

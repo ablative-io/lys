@@ -261,7 +261,7 @@
 ## A running install names its build and upgrades in place
 
 - [ ] **C344** — Every Lys binary answers --version with its build commit (DIRECTORY-045 R1).
-- [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2).
+- [ ] **C345** — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
 - [ ] **C346** — The install and the server say which build is running (DIRECTORY-045 R3).
 - [ ] **C347** — Prove it on the live install (DIRECTORY-045 R4).
 
