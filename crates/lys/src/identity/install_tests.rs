@@ -84,7 +84,7 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
     );
     assert_eq!(
         rendered["issuer"],
-        format!("http://localhost:{}/auth/v1", layout::RAUTHY_PORT)
+        format!("http://localhost:{}/auth/v1/", layout::RAUTHY_PORT)
     );
     assert_eq!(
         rendered["surface_dir"],
