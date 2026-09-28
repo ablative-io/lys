@@ -387,7 +387,7 @@ pub struct UnknownCannotGiveReason {
     pub reason: String,
 }
 
-/// Why an item cannot be given, spelled as one of the six snake_case names.
+/// Why an item cannot be given, spelled as one of the six `snake_case` names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CannotGiveReasonView(pub CannotGiveReason);
 

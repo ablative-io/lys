@@ -93,12 +93,11 @@ fn mask(text: &str) -> String {
 /// order of first appearance; any other run is kept as it stands.
 fn flush(run: &mut String, ids: &mut Vec<String>, out: &mut String) {
     if run.len() == 32 && !run.bytes().any(|b| b.is_ascii_uppercase()) {
-        let n = match ids.iter().position(|id| *id == *run) {
-            Some(n) => n,
-            None => {
-                ids.push(run.clone());
-                ids.len() - 1
-            }
+        let n = if let Some(n) = ids.iter().position(|id| *id == *run) {
+            n
+        } else {
+            ids.push(run.clone());
+            ids.len() - 1
         };
         out.push('#');
         out.push_str(&n.to_string());
@@ -116,7 +115,7 @@ fn the_imported_fixture_masked_hashes_to_the_value_pinned_at_the_parent_commit()
 
 #[test]
 fn the_mask_numbers_each_fresh_id_by_its_first_appearance() {
-    let line = r##"{"id":"0123456789abcdef0123456789abcdef","parentId":"0123456789abcdef0123456789abcdef","x":"fedcba9876543210fedcba9876543210"}"##;
+    let line = r#"{"id":"0123456789abcdef0123456789abcdef","parentId":"0123456789abcdef0123456789abcdef","x":"fedcba9876543210fedcba9876543210"}"#;
     assert_eq!(mask(line), r##"{"id":"#0","parentId":"#0","x":"#1"}"##);
 }
 
