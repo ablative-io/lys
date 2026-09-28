@@ -3110,6 +3110,71 @@
       "path": "rules/ast-grep/no-poll.yml",
       "note": "R1: Usage measured from the transcript, per turn",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/setup.rs",
+      "note": "R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/setup/Setup.tsx",
+      "note": "R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in.rs",
+      "note": "R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/sign-in/SignIn.tsx",
+      "note": "R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provider.rs",
+      "note": "R3: Lys is the OpenID provider every product is registered with",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/oidc.rs",
+      "note": "R3: Lys is the OpenID provider every product is registered with",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_providers.rs",
+      "note": "R4: Providers are set up inside Lys with every step shown",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/connections/SignInProviders.tsx",
+      "note": "R4: Providers are set up inside Lys with every step shown",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src/features/people/Account.tsx",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/accounts.rs",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys/src/identity/install/prepare.rs",
+      "note": "R5: A person's own account, and administration of accounts, are Lys screens",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "R6: Nothing a person reads names the issuer",
+      "brief": "DIRECTORY-047"
+    },
+    {
+      "path": "surface/identity/src",
+      "note": "R6: Nothing a person reads names the issuer",
+      "brief": "DIRECTORY-047"
     }
   ],
   "inventory": [

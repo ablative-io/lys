@@ -714,6 +714,19 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
 | `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
 | `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
+| `crates/lys-identity-server/src/setup.rs` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `surface/identity/src/features/setup/Setup.tsx` | R1: First run is a Lys setup page that asks for the administrator; install fills nothing from the machine | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in.rs` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `surface/identity/src/features/sign-in/SignIn.tsx` | R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages | DIRECTORY-047 |
+| `crates/lys-identity-server/src/provider.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/oidc.rs` | R3: Lys is the OpenID provider every product is registered with | DIRECTORY-047 |
+| `crates/lys-identity-server/src/sign_in_providers.rs` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/connections/SignInProviders.tsx` | R4: Providers are set up inside Lys with every step shown | DIRECTORY-047 |
+| `surface/identity/src/features/people/Account.tsx` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/accounts.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys/src/identity/install/prepare.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
+| `crates/lys-identity-server/src/error.rs` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `surface/identity/src` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
 
 ## Inventory
 
