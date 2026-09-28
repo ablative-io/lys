@@ -246,6 +246,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Status { .. } => "status",
         Answer::Judged { .. } => "judged",
         Answer::Collected { .. } => "collected",
+        Answer::Operation { .. } => "operation",
         Answer::Refused { .. } => "refused",
     }
 }

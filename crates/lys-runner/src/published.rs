@@ -12,18 +12,19 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 8] = [
-    "start", "input", "keys", "read", "wait", "resize", "end", "status",
+pub const ACTS: [&str; 10] = [
+    "start", "input", "keys", "read", "wait", "resize", "end", "status", "operate", "outcome",
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 7] = [
+pub const ANSWERS: [&str; 8] = [
     "started",
     "delivered",
     "output",
     "matched",
     "ended",
     "status",
+    "operation",
     "refused",
 ];
 
@@ -75,12 +76,14 @@ pub fn section() -> Value {
                 "resize": {"session": "string", "columns": "u16", "rows": "u16"},
                 "end": {"session": "string"},
                 "status": {"session": "optional string"},
+                "operate": {"operation": {"operation": "string: the server's stable id, never a connection's challenge", "session": "string", "request": "tagged by request: compact {text}, notice {text}, reminder {text} or stop; text is typed at the next turn boundary"}},
+                "outcome": {"operation": "string"},
             },
             "act_tag": "act",
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
             "request_refusals": REQUEST_REFUSALS,
-            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left"],
+            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown"],
             "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null"},
             "dial": {
                 "description": "A runner on another machine is reached through a bridge that dials the server; the server never dials it. The bridge carries its runner connection's greeting to next, and the request it is answered is signed over it. TLS for https://; cleartext http:// only to the machine's own loopback address.",

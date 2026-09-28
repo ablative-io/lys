@@ -221,6 +221,17 @@ pub enum Act {
         #[serde(default)]
         session: Option<String>,
     },
+    /// Accept an operation under the server's stable id, answering how it
+    /// stands; asked again under that id it is answered, never done twice.
+    Operate {
+        /// The operation.
+        operation: crate::operations::Operation,
+    },
+    /// How an operation stands, as the runner's record keeps it.
+    Outcome {
+        /// The operation's id.
+        operation: String,
+    },
 }
 
 /// How a session ended.
@@ -360,6 +371,11 @@ pub enum Answer {
     Collected {
         /// What was recorded, in words.
         words: String,
+    },
+    /// How an operation stands.
+    Operation {
+        /// Its outcome.
+        outcome: crate::operations::OperationOutcome,
     },
     /// The act was refused, by name.
     Refused {

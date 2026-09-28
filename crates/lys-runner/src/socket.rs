@@ -310,6 +310,12 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
         Act::Status { session } => Ok(Answer::Status {
             status: sessions.status(session.as_deref())?,
         }),
+        Act::Operate { operation } => sessions
+            .operate(operation)
+            .map(|outcome| Answer::Operation { outcome }),
+        Act::Outcome { operation } => sessions
+            .outcome(&operation)
+            .map(|outcome| Answer::Operation { outcome }),
     }
 }
 
