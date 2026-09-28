@@ -147,12 +147,19 @@ impl GrantEvent {
     }
 }
 
-/// The change kind's wire code: `1` issue, `2` revoke.
+/// The change kind code of an issue.
+pub(crate) const ISSUE: u64 = 1;
+/// The change kind code of a revocation.
+pub(crate) const REVOKE: u64 = 2;
+/// The change kind code of a use.
+pub(crate) const USE: u64 = 3;
+
+/// The change kind's wire code: `1` issue, `2` revoke, `3` use.
 pub fn change_kind(change: &GrantChange) -> u64 {
     match change {
-        GrantChange::Issue(_) => 1,
-        GrantChange::Revoke { .. } => 2,
-        GrantChange::Use { .. } => 3,
+        GrantChange::Issue(_) => ISSUE,
+        GrantChange::Revoke { .. } => REVOKE,
+        GrantChange::Use { .. } => USE,
     }
 }
 
@@ -191,11 +198,22 @@ pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
     out
 }
 
-fn route_code(route: Route) -> u64 {
+/// A route's wire code.
+pub(crate) fn route_code(route: Route) -> u64 {
     match route {
         Route::Browser => 1,
         Route::Api => 2,
         Route::Tool => 3,
+    }
+}
+
+/// The route a wire code names.
+pub(crate) fn route_from(code: u64) -> Option<Route> {
+    match code {
+        1 => Some(Route::Browser),
+        2 => Some(Route::Api),
+        3 => Some(Route::Tool),
+        _ => None,
     }
 }
 
@@ -223,24 +241,20 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
     }
     let [_, operation, caller, recorded_at, kind, change] = fields::<6>(value, SHAPE)?;
     let change = match as_uint(&kind, "a change kind is a code")? {
-        1 => GrantChange::Issue(Box::new(read_grant(change)?)),
-        2 => {
+        ISSUE => GrantChange::Issue(Box::new(read_grant(change)?)),
+        REVOKE => {
             let [grant, reason] = fields::<2>(change, "a revocation is a map of keys 1 and 2")?;
             GrantChange::Revoke {
                 grant: GrantId::from_bytes(as_id(grant, "a grant id is 16 bytes")?),
                 reason: as_text(reason, "a reason is text")?,
             }
         }
-        3 => {
+        USE => {
             let [grant, route] = fields::<2>(change, "a use is a map of keys 1 and 2")?;
             GrantChange::Use {
                 grant: GrantId::from_bytes(as_id(grant, "a grant id is 16 bytes")?),
-                route: match as_uint(&route, "a route is a code")? {
-                    1 => Route::Browser,
-                    2 => Route::Api,
-                    3 => Route::Tool,
-                    _ => return Err(malformed("a route code is 1 to 3")),
-                },
+                route: route_from(as_uint(&route, "a route is a code")?)
+                    .ok_or_else(|| malformed("a route code is 1 to 3"))?,
             }
         }
         _ => return Err(malformed("a grant change kind is 1 to 3")),

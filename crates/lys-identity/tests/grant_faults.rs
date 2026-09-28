@@ -440,7 +440,7 @@ fn grant_idempotence_a_lost_acknowledgement_retries_to_one_grant() -> TestResult
     assert_eq!(world.events(), 2, "one root and one grant");
     let issued = world
         .grants
-        .events()
+        .events()?
         .iter()
         .filter(|(signed, _)| signed.event().operation() == request.operation)
         .count();

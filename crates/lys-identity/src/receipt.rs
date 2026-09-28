@@ -7,6 +7,7 @@
 //! service's public key, a checkpoint of the log and an inclusion proof can
 //! check it: a changed actor, payload, position or signature fails.
 
+use ciborium::Value;
 use lys_core::merkle::{InclusionProof, RootHash, raw_leaf_hash, verify_inclusion_raw};
 
 use crate::error::IdentityError;
@@ -14,8 +15,12 @@ use crate::event::{EVENT_VERSION, IdentityEvent, wire};
 use crate::id::IdentityId;
 use crate::log::Coordinate;
 use crate::operation::OperationId;
-use crate::provenance::Actor;
+use crate::provenance::{Actor, Provenance};
 use crate::signer::{SignedEvent, verify_event};
+use crate::state_value::{
+    Unreadable, array, binding, bytes, coordinate, identity, operation, read_binding,
+    read_coordinate, read_fixed, read_identity, read_operation, read_uint, tuple, uint,
+};
 
 /// What the directory answers for a recorded change.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +90,49 @@ impl Receipt {
             && self.identity == event.identity()
             && self.change_kind == wire::change(event.change())
     }
+}
+
+/// The receipt as a snapshot state holds it.
+pub(crate) fn encode_receipt(receipt: &Receipt) -> Value {
+    let provenance = receipt.actor.provenance();
+    array(vec![
+        uint(receipt.version),
+        operation(receipt.operation),
+        array(vec![
+            binding(receipt.actor.binding()),
+            uint(wire::method(provenance.method())),
+            uint(provenance.authenticated_at()),
+        ]),
+        identity(receipt.identity),
+        uint(receipt.change_kind),
+        bytes(&receipt.payload_commitment),
+        coordinate(receipt.coordinate),
+    ])
+}
+
+/// The receipt a snapshot state holds.
+pub(crate) fn decode_receipt(value: Value) -> Result<Receipt, Unreadable> {
+    let [version, op, actor, identity, change_kind, commitment, at] =
+        tuple::<7>(value, "a receipt")?;
+    let [bound, method, authenticated_at] = tuple::<3>(actor, "a receipt's actor")?;
+    let method = read_uint(&method, "an authentication method")?;
+    let method = wire::method_from(method)
+        .ok_or_else(|| format!("authentication method {method} is not a method"))?;
+    Ok(Receipt {
+        version: read_uint(&version, "a receipt's version")?,
+        operation: read_operation(op)?,
+        actor: Actor::new(
+            read_binding(bound)?,
+            Provenance::new(
+                method,
+                read_uint(&authenticated_at, "an authentication time")?,
+            ),
+        ),
+        identity: read_identity(identity)?,
+        change_kind: read_uint(&change_kind, "a receipt's change kind")?,
+        payload_commitment: read_fixed::<32>(commitment, "a payload commitment")?,
+        coordinate: read_coordinate(at)?,
+    })
 }
 
 /// Check `receipt` against the signed `message`, the service's public key, a

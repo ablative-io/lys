@@ -18,8 +18,8 @@ use lys_core::merkle::InclusionProof;
 use lys_log_store::{LeafStore, Start, StoreError};
 
 use crate::error::IdentityError;
-use crate::restart::{Leaves, Ledger, SNAPSHOT_EVERY};
-use crate::signer::{SignedEvent, read_attested_event, verify_event};
+use crate::restart::{Leaves, Ledger, Opening};
+use crate::signer::{SignedEvent, verify_event};
 
 /// Where an event's leaf stands in the log, as its receipt returns it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,10 +77,6 @@ impl Leaves for IdentityLeaves {
         verify_event(bytes, key)
     }
 
-    fn attested(bytes: &[u8], key: &[u8; 32]) -> Result<SignedEvent, IdentityError> {
-        read_attested_event(bytes, key)
-    }
-
     fn unavailable(reason: String) -> IdentityError {
         IdentityError::LogUnavailable { reason }
     }
@@ -105,23 +101,15 @@ fn unavailable(error: &StoreError) -> IdentityError {
 }
 
 impl<S: LeafStore> EventLog<S> {
-    /// Open the log over the store `reopen` gives from its snapshot, reading
-    /// only the leaves after it, and return every event in log order with its
-    /// coordinate. A snapshot is written every [`SNAPSHOT_EVERY`] entries.
+    /// Open the log over the store `reopen` gives from its owner's snapshot,
+    /// reading only the leaves after it, and hand back the snapshot's state
+    /// with every event after it. A snapshot is owed every `every` entries.
     pub fn open(
         reopen: Reopen<S>,
         key: &Ed25519Identity,
-    ) -> Result<(Self, Vec<(SignedEvent, Coordinate)>), IdentityError> {
-        Self::open_with(reopen, key, SNAPSHOT_EVERY)
-    }
-
-    /// As [`EventLog::open`], writing a snapshot every `every` entries.
-    pub fn open_with(
-        reopen: Reopen<S>,
-        key: &Ed25519Identity,
         every: NonZeroU64,
-    ) -> Result<(Self, Vec<(SignedEvent, Coordinate)>), IdentityError> {
-        let (ledger, events) = Ledger::open(&reopen, key, every)?;
+    ) -> Result<(Self, Opening<SignedEvent>), IdentityError> {
+        let (ledger, opening) = Ledger::open(&reopen, key, every)?;
         Ok((
             Self {
                 ledger,
@@ -129,8 +117,30 @@ impl<S: LeafStore> EventLog<S> {
                 service_key: key.public_key_bytes(),
                 pending: None,
             },
-            events,
+            opening,
         ))
+    }
+
+    /// Refuse the snapshot's state, which the owner could not read, by
+    /// `reason`, and reopen the log from every leaf, answering every event.
+    pub fn refuse_state(
+        &mut self,
+        reason: String,
+        key: &Ed25519Identity,
+    ) -> Result<Vec<(SignedEvent, Coordinate)>, IdentityError> {
+        self.ledger.refuse_state(&self.reopen, reason, key)
+    }
+
+    /// Write a snapshot of the state `encode` gives, when one is owed. The
+    /// caller calls this only when that state is the fold of every leaf.
+    pub fn snapshot_if_due(
+        &mut self,
+        key: &Ed25519Identity,
+        encode: impl FnOnce() -> Result<Vec<u8>, String>,
+    ) {
+        if self.pending.is_none() {
+            self.ledger.snapshot_if_due(key, encode);
+        }
     }
 
     /// How the log was started: from its snapshot, or from every leaf and
@@ -173,10 +183,16 @@ impl<S: LeafStore> EventLog<S> {
         Ok(self.certain()?.head())
     }
 
-    /// The leaf bytes at `index`, if the log holds one there, refused while
-    /// an append is uncertain.
-    pub fn leaf(&self, index: u64) -> Result<Option<&[u8]>, IdentityError> {
-        Ok(self.certain()?.leaf(index))
+    /// The leaf bytes at `index`, if the log holds one there, read from the
+    /// store, refused while an append is uncertain.
+    pub fn leaf(&self, index: u64) -> Result<Option<Vec<u8>>, IdentityError> {
+        self.certain()?.leaf(index)
+    }
+
+    /// The event at `index`, if the log holds one there, read from the store
+    /// and verified, refused while an append is uncertain.
+    pub fn event(&self, index: u64) -> Result<Option<SignedEvent>, IdentityError> {
+        self.certain()?.event(index, &self.service_key)
     }
 
     /// An inclusion proof of the leaf at `index` in the log's current tree,
@@ -185,19 +201,14 @@ impl<S: LeafStore> EventLog<S> {
         self.certain()?.inclusion_proof(index)
     }
 
-    /// Append `event` as one leaf, writing a snapshot with `key` when the log
-    /// crosses a multiple of its cadence.
+    /// Append `event` as one leaf.
     ///
     /// A failed append may still have stored its leaf, so it is held
     /// uncertain and answered `LogUnavailable` with the store's reason; the
     /// caller resolves it with [`EventLog::reconcile`].
-    pub fn append(
-        &mut self,
-        event: &SignedEvent,
-        key: &Ed25519Identity,
-    ) -> Result<Coordinate, IdentityError> {
+    pub fn append(&mut self, event: &SignedEvent) -> Result<Coordinate, IdentityError> {
         let index = self.certain()?.len();
-        self.ledger.append(event.bytes(), key).map_err(|failure| {
+        self.ledger.append(event.bytes()).map_err(|failure| {
             self.pending = Some(Pending {
                 index,
                 bytes: event.bytes().to_vec(),

@@ -17,6 +17,9 @@ use super::types::{Grant, GrantId, Resource, Source};
 use crate::id::IdentityId;
 use crate::operation::OperationId;
 
+/// The rule a use event observed for anyone but the grant's holder breaks.
+pub(crate) const USE_BY_HOLDER: &str = "a use is observed for the grant's own holder";
+
 /// Where and why a grant was revoked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Revocation {
@@ -205,7 +208,7 @@ impl GrantBook {
                     Ok(())
                 } else {
                     Err(GrantError::EventMismatch {
-                        reason: "a use is observed for the grant's own holder",
+                        reason: USE_BY_HOLDER,
                     })
                 }
             }
@@ -264,3 +267,6 @@ impl GrantBook {
         self.refused.insert(index, (event.operation(), refusal));
     }
 }
+
+#[path = "book_state.rs"]
+pub(crate) mod state;

@@ -15,11 +15,16 @@ use lys_core::Ed25519Identity;
 use lys_identity::log::Reopen;
 use lys_identity::projection::Projection;
 use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
-use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, SnapshotRefusal, Start, StoreResult};
+use lys_log_store::{
+    FileLeafStore, Frontier, LeafStore, PinnedRoot, SnapshotRefusal, Start, StoreResult, seal,
+};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 const ORIGIN: &str = "example.test/lys/directory";
+
+/// The snapshot domain the directory seals its state under.
+const DOMAIN: &str = "lys/identity-directory/v1";
 
 /// A file store that counts every leaf read through it.
 struct Counting {
@@ -256,6 +261,49 @@ fn a_missing_snapshot_is_refused_by_name_and_rewritten() -> TestResult {
         }
     );
     assert_eq!(reads, 6);
+    drop(rebuilt);
+
+    let (_again, reads) = place.open()?;
+    assert_eq!(reads, 0, "the rebuild wrote a snapshot at the whole log");
+    Ok(())
+}
+
+#[test]
+fn a_signed_snapshot_whose_state_does_not_read_is_refused_and_rewritten() -> TestResult {
+    let place = Place::new()?;
+    let (mut first, _) = place.open()?;
+    register(&mut first, 1, 8)?;
+    let before = projection_of(&mut first)?;
+    drop(first);
+
+    let store = FileLeafStore::open(&place.log())?;
+    let leaves = (0..store.extent())
+        .map(|index| store.leaf(index)?.ok_or("a leaf is missing".into()))
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let key = Ed25519Identity::load(&place.dir.path().join("service.key"))?;
+    let sealed = seal(
+        DOMAIN,
+        ORIGIN,
+        &Frontier::from_leaves(&leaves),
+        b"not a directory state",
+        &key,
+    );
+    std::fs::write(place.snapshot(), sealed)?;
+
+    let (mut rebuilt, reads) = place.open()?;
+    let start = start_of(&mut rebuilt)?;
+    assert!(
+        matches!(
+            start,
+            Start::Rebuilt {
+                refusal: SnapshotRefusal::StateUnreadable { .. },
+                replayed: 8
+            }
+        ),
+        "{start}"
+    );
+    assert_eq!(reads, 8, "a refused state rebuilds from every leaf");
+    assert_eq!(projection_of(&mut rebuilt)?, before);
     drop(rebuilt);
 
     let (_again, reads) = place.open()?;

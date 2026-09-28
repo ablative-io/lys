@@ -268,3 +268,6 @@ fn fresh(
         events: vec![index],
     }
 }
+
+#[path = "projection_state.rs"]
+pub(crate) mod state;
