@@ -75,7 +75,8 @@
     "ADR-046",
     "ADR-058",
     "ADR-055",
-    "ADR-047"
+    "ADR-047",
+    "ADR-093"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -100,7 +101,8 @@
     "A Claude Code file holding a compact_boundary pair and a legacy summary record imports to a session where each compaction is followed by a lys.loss entry whose ids, counts and hashes match the file, the listing proves every summarised entry and block still held, and the render of the compaction resumes on Claude Code 2.1.283 answering from the summary.",
     "Whether a launch template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves the session's config directory is measured on a named Claude Code version, and the context record names the directory the session reads from.",
     "crates/lys-home/src/record/mod.rs holds no fn, struct, enum, impl, const or type item, every public path under lys_home::record resolves as it did before the move, and every test that passed before the move passes unchanged.",
-    "Two ingested calls and one harness event give three leaves in the home's log that lys-home verify accepts under the agent identity's public key; one byte changed in one of those entry lines makes it refuse naming that entry; ingesting the same call id again adds no leaf; a sealed record opened through lys-home open adds one lys.open entry and one leaf; and a byte scan of the log directory for a fixture message's text finds nothing."
+    "Two ingested calls and one harness event give three leaves in the home's log that lys-home verify accepts under the agent identity's public key; one byte changed in one of those entry lines makes it refuse naming that entry; ingesting the same call id again adds no leaf; a sealed record opened through lys-home open adds one lys.open entry and one leaf; and a byte scan of the log directory for a fixture message's text finds nothing.",
+    "An ingest on a session kept open, an import and a session's open each read and sync what they need rather than work that grows with the session's length, proved by counters, and a session imported before and after the change is the same bytes once its fresh ids and header timestamp are masked."
   ],
   "non_goals": [
     {
@@ -262,6 +264,18 @@
     {
       "text": "Anchoring or receipts into a lys log (CONTEXT-ROADMAP stage 6; when asked for), and signing any record other than what a session was given, which HOME-008 signs as the given statement.",
       "reason": "Signing comes when asked for (Tom, 22 September 16:27); every stage here works without it. It is lifted for the given statement alone because CONFORMANCE row 6.5, marked test, is part of the conformance test Tom set as the definition of done, and he asked for all of it to be done (HOME-008). Anchoring and receipts into a lys log are still not asked for."
+    },
+    {
+      "text": "Finding a recorded call by id without reading entries on a fresh open: a call id in the index, or a call-id lookup persisted beside the file.",
+      "reason": "The index layout is out of scope of the repeated-work card; its call-id map is built once per open, so an owner that opens a session per call, as the CLI's ingest-call does, still reads every lys.call entry once per open."
+    },
+    {
+      "text": "Batching the block store's syncs during an import.",
+      "reason": "Each new block syncs its file and its directory under the block store's own contract (RECORD.md, Blocks); the repeated-work card counts those syncs beside the session's and leaves them as they are."
+    },
+    {
+      "text": "Recovering a session whose last line a crash tore, by extending reconcile or trimming an unsynced tail.",
+      "reason": "The original bytes are never rewritten (P1); a staged import (ADR-093) never leaves such a tail under a session's name, and recovering one is its own decision."
     }
   ],
   "structure": [
@@ -1944,6 +1958,51 @@
       "path": "docs/design/home/briefs/HOME-008.json",
       "note": "the given-statement brief: the given hash, the signed given statement at render, checked offline with lys verify",
       "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-020.json",
+      "note": "the repeated-work brief: a call-id map per open, a staged import published once, a bounded open that returns a real I/O error, one pass over resume ids, the canon's kept id set, clones gone and one uuid formatter",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-020.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/io_counts.rs",
+      "note": "the entries a session read and the syncs its own writes made, counted for tests",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/staged.rs",
+      "note": "a new session built under a staging name with no per-entry sync and published once by rename; the remainder of a part-way import removed by name",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/staged_tests.rs",
+      "note": "gates on the staged import: five syncs for 6 and for 300 records, a part-way import leaving no session, the re-import and the removal",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/record_tests.rs",
+      "note": "gates on the session record: the counters, and the bounded open over an injected reader",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_tests.rs",
+      "note": "gates on call ingest: idempotency on all three paths and the entries read per ingest",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/tests/cached_index.rs",
+      "note": "the cached index is a cache: stale rows rebuild from the file",
+      "brief": "HOME-020"
+    },
+    {
+      "path": "crates/lys-home/tests/import_bytes.rs",
+      "note": "an import's line bytes, fresh ids and header timestamp masked, hashed and pinned at the parent commit",
+      "brief": "HOME-020"
     }
   ],
   "inventory": [
