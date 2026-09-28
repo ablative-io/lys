@@ -12,7 +12,8 @@ const connections = {
     { id: 'secrets', name: 'Secrets broker', purpose: 'Provides secret access.', state: 'unconfigured', endpoint: null },
   ], health_checked: false,
 };
-const none: ProvidersView = { providers: [], offered: ['google', 'microsoft', 'github'] };
+const REDIRECT = 'http://localhost:8490/auth/v1/providers/callback';
+const none: ProvidersView = { providers: [], offered: ['google', 'microsoft', 'github'], redirect_address: REDIRECT };
 const google: ProvidersView['providers'][number] = { id: 'provider-1', provider: 'google', name: 'Google', enabled: true, client_id: '123.apps.googleusercontent.com' };
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
 
@@ -40,7 +41,9 @@ describe('Sign-in providers', () => {
       },
     });
     expect(text()).toContain('No sign-in provider is set yet');
-    expect(text()).toContain('http://localhost:18080/auth/v1/providers/callback');
+    expect(($('#sign-in-redirect') as HTMLInputElement | null)?.value).toBe(REDIRECT);
+    expect($('a[href="https://console.cloud.google.com/auth/clients/create"]')?.textContent).toContain('Create a client');
+    expect(text()).toContain('A provider already registered with the old address needs the new one added.');
     expect($$('form[aria-label="Set a sign-in provider"] input[type="password"]')).toHaveLength(1);
     await input('form[aria-label="Set a sign-in provider"] input:not([type="password"])', '123.apps.googleusercontent.com');
     await input('form[aria-label="Set a sign-in provider"] input[type="password"]', 'GOCSPX-secret');
@@ -61,6 +64,7 @@ describe('Sign-in providers', () => {
       'POST /sign-in-providers': refused(502, 'SignInProvidersRefused', 'the issuer answered 400: name is invalid'),
     });
     await click($('[role="radiogroup"] [data-provider="microsoft"]'));
+    expect($('a[href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade"]')?.textContent).toContain('New registration');
     expect($$('form[aria-label="Set a sign-in provider"] input')).toHaveLength(3);
     await input('form[aria-label="Set a sign-in provider"] input:not([type="password"])', 'app-id');
     await input('form[aria-label="Set a sign-in provider"] input[type="password"]', 'secret');

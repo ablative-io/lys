@@ -1,10 +1,17 @@
 //! The directory service's configuration, written from the layout and the
 //! deployment configuration. Every path is under the data root; every
 //! credential is a file the service reads, never a value written here.
+//!
+//! The one choice it carries that neither of those holds, the Rauthy user
+//! who signs in as the administrator, is read back from the configuration
+//! already written, so an upgrade renders the new build's configuration
+//! without asking Rauthy.
 
 use serde_json::{Value, json};
 
 use super::super::config::DeploymentConfig;
+use super::super::error::{ErrorKind, IdentityError, IdentityResult};
+use super::super::private_files;
 use super::layout::{BROKER_PORT, Layout, SERVICE_PORT};
 
 /// The origin the directory service names its own log by.
@@ -23,6 +30,10 @@ pub const LINK_AUDIT_SUBJECT: &str = "lys-link-audit";
 /// The file the sign-in providers API key is written to, under state.
 pub const PROVIDERS_KEY_FILE: &str = "sign-in-providers-api-key";
 
+/// The file under state holding the seed Lys signs products' ID tokens with,
+/// written owner-only by the install.
+pub const PROVIDER_KEY_FILE: &str = "provider-signing.key";
+
 /// How long a sign-in lasts, in seconds: one working day.
 pub const SESSION_SECONDS: u64 = 28_800;
 
@@ -35,13 +46,28 @@ pub fn issuer(config: &DeploymentConfig) -> String {
     )
 }
 
-/// The configuration as the service reads it, with `administrator` the
-/// Rauthy user id that signs in as the administrator and the screens served
-/// when `surface` is present.
+/// What an earlier run's service configuration named that a run again keeps:
+/// the administrator, and the products registered as clients of Lys.
+#[derive(Debug, Default)]
+pub struct Carried {
+    /// The administrator an earlier configuration named.
+    pub administrator: Option<Value>,
+    /// The products an earlier configuration registered as clients of Lys.
+    pub products: Option<Value>,
+}
+
+/// The configuration as the service reads it, with the screens served when
+/// `surface` is present.
+///
+/// No administrator is written for a new install: the person makes the
+/// administrator on the setup page, which the `setup` settings configure.
+/// What `carried` names, an earlier configuration's administrator and
+/// registered products, is written again, so an install run again never
+/// loses either.
 pub fn render(
     layout: &Layout,
     config: &DeploymentConfig,
-    administrator: &str,
+    carried: &Carried,
     surface: bool,
 ) -> Value {
     let issuer = issuer(config);
@@ -60,7 +86,12 @@ pub fn render(
             .display()
             .to_string(),
         "redirect_url": format!("{}/api/callback", Layout::service_url()),
-        "administrator": {"issuer": issuer, "subject": administrator},
+        "sign_in_api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
+        "setup": {
+            "code_file": state.join(super::setup_code::CODE_FILE).display().to_string(),
+            "administrator_file": layout.administrator_file().display().to_string(),
+            "email": config.deployment.admin_email,
+        },
         "link_audit_source": {"issuer": issuer, "subject": LINK_AUDIT_SUBJECT},
         "session_seconds": SESSION_SECONDS,
         "secure_cookie": false,
@@ -80,6 +111,10 @@ pub fn render(
             "api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
             "api_key_file": state.join(PROVIDERS_KEY_FILE).display().to_string(),
         },
+        "provider": {
+            "key_file": state.join(PROVIDER_KEY_FILE).display().to_string(),
+            "clients": carried.products.clone().unwrap_or_else(|| json!([])),
+        },
         "requests_dir": dir("requests"),
         "certificates_dir": dir("certificates"),
         "network_file": dir("network.json"),
@@ -93,8 +128,34 @@ pub fn render(
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });
+    if let Some(administrator) = &carried.administrator {
+        rendered["administrator"] = administrator.clone();
+    }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
     rendered
+}
+
+/// What the configuration written under `layout` names that a run again
+/// keeps, or `None` when no configuration has been written.
+pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
+    let path = layout.service_config();
+    let Some(bytes) = private_files::read(&path)? else {
+        return Ok(None);
+    };
+    let earlier: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::ConfigInvalid,
+            "read",
+            "identity.json",
+            error.to_string(),
+        )
+        .at(&path)
+    })?;
+    let named = |value: Option<&Value>| value.filter(|value| !value.is_null()).cloned();
+    Ok(Some(Carried {
+        administrator: named(earlier.get("administrator")),
+        products: named(earlier.pointer("/provider/clients")),
+    }))
 }

@@ -87,16 +87,22 @@ impl ServerError {
 
     pub(crate) fn status(&self) -> StatusCode {
         match self {
-            Self::NotSignedIn | Self::AgentSignatureRefused { .. } | Self::DialRefused { .. } => {
-                StatusCode::UNAUTHORIZED
-            }
+            Self::NotSignedIn
+            | Self::AgentSignatureRefused { .. }
+            | Self::SignInRefused
+            | Self::SetupCodeRefused
+            | Self::ClientUnknown
+            | Self::DialRefused { .. }
+            | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
+            Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }
             | Self::MachineNotForAgent
-            | Self::ReviewerOnly
-            | Self::NotPermitted { .. } => StatusCode::FORBIDDEN,
+            | Self::SecondFactorUnsupported
+            | Self::NotPermitted { .. }
+            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
@@ -145,9 +151,18 @@ impl ServerError {
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
             | Self::RunnerAbsent { .. }
-            | Self::ReviewReused { .. }
-            | Self::DialStale { .. } => StatusCode::CONFLICT,
-            Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
+            | Self::DialStale { .. }
+            | Self::SetupClosed
+            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
+            Self::SignInStateUnknown
+            | Self::RequestMalformed { .. }
+            | Self::AccountRefused { .. }
+            | Self::ProviderRefused { .. }
+            | Self::RedirectUnregistered
+            | Self::CodeUnknown
+            | Self::CodeUsed
+            | Self::CodeExpired
+            | Self::VerifierWrong => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
@@ -164,6 +179,8 @@ impl ServerError {
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
+            | Self::SetupUnavailable { .. }
+            | Self::ProviderUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Runner { refusal, .. } => runner_status(refusal),

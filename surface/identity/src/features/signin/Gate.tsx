@@ -26,7 +26,7 @@ export function SignIn() {
         <summary>Advanced: how access is managed</summary>
         <p>People sign in. Agents are registered by a person responsible for them.</p>
         {authority.status === 'loading' ? <p>Reading access details…</p>
-          : authority.status === 'ok' ? <p>{authority.data}</p>
+          : authority.status === 'ok' ? <><p>{authority.data.authority}</p><p className="dim">Build <code>{authority.data.build}</code></p></>
           : <p role="status">Access details are unavailable: {authority.refused.refusal.refusal} — {authority.refused.refusal.reason}</p>}
       </details>
     </div>

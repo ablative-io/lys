@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "decisions": [
     {
       "id": "ADR-001",
@@ -1899,6 +1899,63 @@
         "A check that asks /health or /healthz at the root still gets the page and must ask /api/health.",
         "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports.",
         "A probe that asks /health, /healthz or /status at the root gets 200 with the page and never reaches the API, so a status-only monitor would report healthy wrongly. Every probe of this service asks /api/health."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-130",
+      "title": "Managed harness channels carry automatic context and reminder acts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom, direction relayed by Waffles; transport contract authored by Gypsy for non-writer review",
+      "context": "051 owns the tracking and budget/goal models, but its generic runner delivery does not prove a harness boundary and still discusses typing. Tom requires behind-the-scenes acts, with nothing typed into a terminal.",
+      "decision": "064 adds one runner-owned typed control/event channel per managed Claude or Codex session. It reuses 051 operation and usage owners, serialises all inputs at proved boundaries, requires actual harness evidence and retains uncertain outcomes without automatic resend. Legacy PTY sessions remain manual and cannot claim this capability. 065 extends the same Codex event reader for refusal coverage.",
+      "quote": "nothing is typed into a terminal",
+      "consequences": [
+        "051 stores and Usage page are extended, not duplicated.",
+        "An accepted control request is not a completed compaction.",
+        "No source checkout alone establishes installed-harness capability.",
+        "An uncertain pipe write cannot be made exactly-once by a local operation ID."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-132",
+      "title": "Runner placement and process identity are separate upgrade facts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Gypsy, integration owner, with Waffles acceptance contract",
+      "context": "The 050 integration e7ec3905 preserves runner startup, but start_runner executes services::sibling(\"lys\") while 045 places only the broker and service. The runner is therefore missing from the installed build set and cannot be upgraded honestly. Archie identified this at 07:41; Waffles supplied the independent acceptance contract at 07:44 (post b162bb51). Gypsy chooses tracked runner placement with separate live/placed evidence and session-preserving upgrades. Card c8HKiQoa.",
+      "decision": "Place lys as the runner binary without putting the runner in the broker/service restart set. Record the running process build separately from placed bytes. Show pending restart and require explicit session-aware confirmation before ending live sessions. Preserve the runner through ordinary upgrade and rollback.",
+      "quote": "the runner joins 045's placed builds",
+      "consequences": [
+        "An upgrade can correctly leave the old runner running.",
+        "The installed record must name both builds.",
+        "A local status read cannot substitute for an authenticated live runner answer."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-131",
+      "title": "Codex policy comes from Lys and refusal provenance follows the real harness contract",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at07:32 Melbourne. Recorded by Chippy.",
+      "context": "The inspected installed package manifest namesbd3798fa. Its relevant config/hooks/rollout/protocol/tool-event source is unchanged at7cbba483. Legacy notify is only after-turn. Modern PreToolUse exists separately. Declined may mean operational rejection and Failed may contain a sandbox error. These types cannot identify policy cause alone. Source paths and proof are pinned byDIRECTORY-065R1.",
+      "decision": "Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.",
+      "quote": "Lys renders a Codex agent's config with its own sandbox and approval settings from the same Lys policy, and collects Codex's own denials as refusal records",
+      "consequences": [
+        "No notify event or free-text command failure establishes a refusal.",
+        "Unattended approval never rejects escalation while sandboxing remains enabled.",
+        "051's unconditional Codex unsupported display is superseded only where065 proves the required capability.",
+        "The real installed binary and source contract are recorded independently.",
+        "062 and064 remain the owners of native containment and harness transport."
       ],
       "supersedes": [],
       "superseded_by": ""

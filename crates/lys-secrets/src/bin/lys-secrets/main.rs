@@ -26,7 +26,7 @@ mod watched;
 use std::io::{Read, Write};
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 use lys_core::Ed25519Identity;
 use lys_secrets::{
     Broker, EntryClass, HandleId, Holder, Presentation, Recipients, RecordedLine, Relation, Scope,
@@ -454,8 +454,18 @@ fn run(command: Command) -> Result<(), SecretsError> {
     Ok(())
 }
 
+/// What `--version` prints after the name: the crate version and the commit
+/// the binary was built from, stamped by `build.rs`.
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("LYS_BUILD"), ")");
+
+/// The arguments, with `--version` answering [`VERSION`].
+fn parse() -> Cli {
+    let matches = Cli::command().version(VERSION).get_matches();
+    Cli::from_arg_matches(&matches).unwrap_or_else(|error| error.exit())
+}
+
 fn main() -> ExitCode {
-    match run(Cli::parse().command) {
+    match run(parse().command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");

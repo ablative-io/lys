@@ -15,6 +15,8 @@ use base64::Engine;
 mod attest;
 #[path = "cli_tests/ca.rs"]
 mod ca;
+#[path = "cli_tests/identity_setup.rs"]
+mod identity_setup;
 #[path = "cli_tests/inspect.rs"]
 mod inspect;
 #[path = "cli_tests/key.rs"]

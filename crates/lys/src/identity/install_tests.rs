@@ -1,16 +1,19 @@
 #![cfg(test)]
 
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
 use super::layout::{self, Layout, SERVICE_PORT, data_root, render_deployment};
+use super::log_wait;
 use super::server_config;
 use super::services;
 use super::surface;
 use crate::identity::config::DeploymentConfig;
 use crate::identity::error::ErrorKind;
+use crate::identity::private_files;
 
 #[test]
 fn the_data_root_follows_the_platform_or_the_named_home() -> Result<(), Box<dyn Error>> {
@@ -41,9 +44,13 @@ fn the_data_root_follows_the_platform_or_the_named_home() -> Result<(), Box<dyn 
 #[test]
 fn the_written_deployment_is_valid_and_keeps_state_beside_it() -> Result<(), Box<dyn Error>> {
     let root = PathBuf::from("/srv/lys");
-    let config = DeploymentConfig::parse(&render_deployment("owner@example.test"), root.clone())?;
+    let config =
+        DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root.clone())?;
     assert_eq!(config.state_dir(), root.join("state"));
-    assert_eq!(config.deployment.admin_email, "owner@example.test");
+    assert_eq!(
+        config.deployment.admin_email.as_deref(),
+        Some("owner@example.test")
+    );
     assert_eq!(config.issuer.listen_port, layout::RAUTHY_PORT);
     assert_eq!(
         config.clients.platform.redirect_uris,
@@ -56,8 +63,10 @@ fn the_written_deployment_is_valid_and_keeps_state_beside_it() -> Result<(), Box
 fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box<dyn Error>> {
     let root = PathBuf::from("/srv/lys");
     let layout = Layout::at(root.clone());
-    let config = DeploymentConfig::parse(&render_deployment("owner@example.test"), root.clone())?;
-    let rendered = server_config::render(&layout, &config, "user-1", true);
+    let config =
+        DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root.clone())?;
+    let rendered =
+        server_config::render(&layout, &config, &server_config::Carried::default(), true);
     let object = rendered.as_object().ok_or("not an object")?;
     for (key, value) in object {
         if let Some(text) = value.as_str()
@@ -70,7 +79,23 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
         rendered["redirect_url"],
         format!("http://localhost:{SERVICE_PORT}/api/callback")
     );
-    assert_eq!(rendered["administrator"]["subject"], "user-1");
+    assert!(
+        rendered.get("administrator").is_none(),
+        "a new install names no administrator"
+    );
+    assert_eq!(rendered["provider"]["clients"], serde_json::json!([]));
+    assert_eq!(
+        rendered["provider"]["key_file"],
+        root.join("state")
+            .join(server_config::PROVIDER_KEY_FILE)
+            .display()
+            .to_string()
+    );
+    assert_eq!(rendered["setup"]["email"], "owner@example.test");
+    assert_eq!(
+        rendered["setup"]["code_file"],
+        root.join("state").join("setup-code").display().to_string()
+    );
     assert_eq!(rendered["spicedb"]["endpoint"], "127.0.0.1:58443");
     assert_eq!(
         rendered["sign_in_providers"]["api"],
@@ -85,14 +110,62 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
     );
     assert_eq!(
         rendered["issuer"],
-        format!("http://localhost:{}/auth/v1/", layout::RAUTHY_PORT)
+        format!("http://localhost:{SERVICE_PORT}/auth/v1/"),
+        "the sign-in service's public address is Lys's own origin"
+    );
+    assert_eq!(
+        rendered["sign_in_api"],
+        format!("http://127.0.0.1:{}/auth/v1", layout::RAUTHY_PORT),
+        "Lys reaches the sign-in service over loopback"
+    );
+    assert_eq!(
+        config.pub_url(),
+        format!("localhost:{SERVICE_PORT}"),
+        "a provider sends people back to Lys's origin"
     );
     assert_eq!(
         rendered["surface_dir"],
         root.join("surface").display().to_string()
     );
-    let without = server_config::render(&layout, &config, "user-1", false);
+    let without =
+        server_config::render(&layout, &config, &server_config::Carried::default(), false);
     assert!(without.get("surface_dir").is_none());
+    Ok(())
+}
+
+#[test]
+fn an_install_run_again_keeps_the_administrator_and_the_registered_products()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+    let layout = Layout::at(dir.path().to_path_buf());
+    let config = DeploymentConfig::parse(&render_deployment(None), dir.path().to_path_buf())?;
+    let first = server_config::render(
+        &layout,
+        &config,
+        &server_config::carried(&layout)?.unwrap_or_default(),
+        true,
+    );
+    assert_eq!(first["provider"]["clients"], serde_json::json!([]));
+    assert!(first.get("administrator").is_none());
+    let product = serde_json::json!([{
+        "client_id": "fixture-product",
+        "secret_sha256": "00",
+        "redirect_uris": ["http://product.example.test/auth/callback"],
+    }]);
+    let administrator = serde_json::json!({"login": "ada"});
+    let mut registered = first;
+    registered["provider"]["clients"] = product.clone();
+    registered["administrator"] = administrator.clone();
+    private_files::write(&layout.service_config(), &serde_json::to_vec(&registered)?)?;
+    let again = server_config::render(
+        &layout,
+        &config,
+        &server_config::carried(&layout)?.unwrap_or_default(),
+        true,
+    );
+    assert_eq!(again["provider"]["clients"], product);
+    assert_eq!(again["administrator"], administrator);
     Ok(())
 }
 
@@ -240,7 +313,7 @@ fn the_install_names_the_fix_when_docker_is_missing_or_not_running() {
 fn the_written_deployment_publishes_no_port_another_service_defaults_to()
 -> Result<(), Box<dyn Error>> {
     let config = DeploymentConfig::parse(
-        &render_deployment("owner@example.test"),
+        &render_deployment(Some("owner@example.test")),
         PathBuf::from("/srv/lys"),
     )?;
     assert_eq!(config.spicedb.grpc_port, 58051);
@@ -282,7 +355,7 @@ fn a_service_is_ready_within_the_log_event_that_says_so() -> Result<(), Box<dyn 
     let (tell, pid, log) = told_service(dir.path(), script)?;
     let mut checks = 0;
     let mut told = None;
-    services::wait_until("scratch", &log, &pid, &mut || {
+    log_wait::wait_until("scratch", &log, &pid, &mut || {
         checks += 1;
         if told.is_none() {
             told = Some(std::fs::write(&tell, b"go\n"));
@@ -306,7 +379,7 @@ fn a_service_that_exits_unready_is_refused_naming_its_log() -> Result<(), Box<dy
     let script = r#"read told < "$1"; echo giving up; exit 3"#;
     let (tell, pid, log) = told_service(dir.path(), script)?;
     let mut told = None;
-    let outcome = services::wait_until("scratch", &log, &pid, &mut || {
+    let outcome = log_wait::wait_until("scratch", &log, &pid, &mut || {
         if told.is_none() {
             told = Some(std::fs::write(&tell, b"go\n"));
         }
@@ -353,5 +426,18 @@ fn the_compose_wait_checks_once_per_output_and_names_each_ready() -> Result<(), 
         "{refused}"
     );
     assert_eq!(said.len(), 2, "nothing was said ready that was not");
+    Ok(())
+}
+
+#[test]
+fn a_new_install_registers_no_product_and_names_no_administrator() -> Result<(), Box<dyn Error>> {
+    let config = DeploymentConfig::parse(&render_deployment(None), PathBuf::from("/srv/lys"))?;
+    assert!(
+        config.clients.app.is_none(),
+        "no product is registered by install"
+    );
+    assert_eq!(config.managed_clients().len(), 1);
+    assert_eq!(config.clients.platform.id, "lys-platform");
+    assert_eq!(config.deployment.admin_email, None);
     Ok(())
 }

@@ -35,6 +35,16 @@ pub struct SecretSpec {
 /// The bootstrap API key's name, which configure presents with its secret.
 pub const API_KEY_NAME: &str = "lys_configure";
 
+/// The issuer's own bootstrap account, which it makes on its first start
+/// whatever it is told: a machine account at a fixed address that names no
+/// person, whose generated password nobody reads. People are made on Lys's
+/// setup page, never here.
+pub const BOOTSTRAP_ACCOUNT_EMAIL: &str = "bootstrap@machine.lys.test";
+
+/// The header the directory service names a person's own address in when it
+/// signs them in; the sign-in service takes it from its trusted proxies alone.
+pub const FORWARDED_FOR: &str = "X-Forwarded-For";
+
 /// The rendered compose environment's file name.
 pub const COMPOSE_ENV: &str = "compose.env";
 
@@ -143,9 +153,10 @@ fn materialise(
 }
 
 /// The base64 JSON Rauthy reads as its one bootstrap API key: read, create
-/// and update on clients and sign-in providers, read on secrets and users,
-/// nothing else. Users are read to find the administrator's id; providers
-/// are what the sign-in providers route manages.
+/// and update on clients, users and sign-in providers, read on secrets,
+/// nothing else. Users are made and changed by the directory service, on
+/// the setup page and the account screens; providers are what the sign-in
+/// providers route manages.
 pub fn bootstrap_api_key() -> String {
     let request = serde_json::json!({
         "name": API_KEY_NAME,
@@ -153,7 +164,7 @@ pub fn bootstrap_api_key() -> String {
         "access": [
             {"group": "Clients", "access_rights": ["read", "create", "update"]},
             {"group": "Secrets", "access_rights": ["read"]},
-            {"group": "Users", "access_rights": ["read"]},
+            {"group": "Users", "access_rights": ["read", "create", "update"]},
             {"group": "AuthProviders", "access_rights": ["read", "create", "update"]},
         ],
     });
@@ -171,7 +182,7 @@ pub fn render_env(
         .publish_port
         .map_or(String::new(), |p| p.to_string());
     let profiles = if database.bundled { "bundled-db" } else { "" };
-    let lines: [(&str, String); 20] = [
+    let lines: [(&str, String); 23] = [
         ("COMPOSE_PROJECT_NAME", config.deployment.project.clone()),
         ("COMPOSE_PROFILES", profiles.to_string()),
         ("IDENTITY_NODE", config.deployment.node.clone()),
@@ -180,6 +191,8 @@ pub fn render_env(
         ("IDENTITY_DB_NAME", database.name.clone()),
         ("IDENTITY_DB_TLS", database.tls.clone()),
         ("IDENTITY_DB_PUBLISH_PORT", publish_port),
+        ("IDENTITY_NETWORK", config.deployment.network.clone()),
+        ("IDENTITY_GATEWAY", config.gateway()?.to_string()),
         ("RAUTHY_LISTEN_PORT", config.issuer.listen_port.to_string()),
         ("RAUTHY_PUB_URL", config.pub_url().to_string()),
         ("RAUTHY_RP_ID", config.rp_id().to_string()),
@@ -191,8 +204,26 @@ pub fn render_env(
                 .trim_end_matches('/')
                 .to_string(),
         ),
+        // The sign-in service names itself on the public origin's scheme: it
+        // calls itself https only in proxy mode, so proxy mode follows an
+        // https origin and nothing else.
         ("RAUTHY_PROXY_MODE", config.public_tls().to_string()),
         ("RAUTHY_COOKIE_MODE", config.cookie_mode().to_string()),
+        // Every password sign-in reaches the issuer from the directory
+        // service, which names the person's own address in
+        // X-Forwarded-For; the issuer takes that header from the trusted
+        // proxies alone (the network's gateway), so one person's failures
+        // bar only that person. A configuration that trusts no proxy leaves
+        // the header name empty, which names no header, rather than
+        // trusting every sender.
+        (
+            "RAUTHY_PEER_IP_HEADER_NAME",
+            if config.issuer.trusted_proxies.is_empty() {
+                String::new()
+            } else {
+                FORWARDED_FOR.to_string()
+            },
+        ),
         (
             "RAUTHY_TRUSTED_PROXIES",
             format!("\"{}\"", config.issuer.trusted_proxies.join("\\n")),
@@ -200,7 +231,7 @@ pub fn render_env(
         ("RAUTHY_ENC_KEY_ACTIVE", ENCRYPTION_KEY_ID.to_string()),
         (
             "RAUTHY_BOOTSTRAP_ADMIN_EMAIL",
-            config.deployment.admin_email.clone(),
+            BOOTSTRAP_ACCOUNT_EMAIL.to_string(),
         ),
         ("RAUTHY_BOOTSTRAP_API_KEY", bootstrap_api_key()),
         ("SPICEDB_GRPC_PORT", config.spicedb.grpc_port.to_string()),
@@ -237,26 +268,39 @@ pub fn render_env(
     Ok(env)
 }
 
+/// Materialises every declared credential and the compose environment for
+/// `config`, answering each private file with its outcome, in order.
+pub fn materialise_all(config: &DeploymentConfig) -> IdentityResult<Vec<(&'static str, Outcome)>> {
+    let state_dir = config.state_dir();
+    private_files::ensure_dir(&state_dir)?;
+    let mut credentials = Vec::with_capacity(SECRETS.len());
+    let mut outcomes = Vec::with_capacity(SECRETS.len() + 1);
+    for spec in SECRETS {
+        let (credential, outcome) = materialise(&state_dir, spec, config.credentials.source)?;
+        outcomes.push((spec.file, outcome));
+        credentials.push((spec, credential));
+    }
+    let env = render_env(config, &credentials)?;
+    let env_outcome = private_files::write(&state_dir.join(COMPOSE_ENV), env.as_bytes())?;
+    outcomes.push((COMPOSE_ENV, env_outcome));
+    Ok(outcomes)
+}
+
 /// Runs `lys identity prepare` against the configuration at `config_path`.
 pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     let config = DeploymentConfig::load(config_path)?;
-    let state_dir = config.state_dir();
-    private_files::ensure_dir(&state_dir)?;
     let mut emitter = Emitter::new(json);
     emitter.field("node", "node", config.deployment.node.clone());
-    emitter.field("state", "state_dir", state_dir.display().to_string());
-    let mut credentials = Vec::with_capacity(SECRETS.len());
+    emitter.field(
+        "state",
+        "state_dir",
+        config.state_dir().display().to_string(),
+    );
     let mut outcomes = serde_json::Map::new();
-    for spec in SECRETS {
-        let (credential, outcome) = materialise(&state_dir, spec, config.credentials.source)?;
-        emitter.note(&format!("{} {} (mode 600)", spec.file, outcome.word()));
-        outcomes.insert(spec.file.to_string(), outcome.word().into());
-        credentials.push((spec, credential));
+    for (file, outcome) in materialise_all(&config)? {
+        emitter.note(&format!("{file} {} (mode 600)", outcome.word()));
+        outcomes.insert(file.to_string(), outcome.word().into());
     }
-    let env = render_env(&config, &credentials)?;
-    let env_outcome = private_files::write(&state_dir.join(COMPOSE_ENV), env.as_bytes())?;
-    emitter.note(&format!("{COMPOSE_ENV} {} (mode 600)", env_outcome.word()));
-    outcomes.insert(COMPOSE_ENV.to_string(), env_outcome.word().into());
     emitter.field(
         "private files",
         "private_files",

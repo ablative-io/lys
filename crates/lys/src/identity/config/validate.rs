@@ -1,6 +1,8 @@
 //! What a deployment's addresses and clients must be: origins, the admin
 //! address and each client checked, each refusal named.
 
+use std::net::Ipv4Addr;
+
 use super::{Client, ClientRole, LOOPBACK_HOSTS, TOKEN_ALGORITHMS, refuse};
 use crate::identity::error::{ErrorKind, IdentityResult};
 
@@ -44,6 +46,48 @@ fn split_uri(uri: &str) -> Result<(&str, &str, &str), &'static str> {
         return Err("plain http is accepted only for a loopback host; use https");
     }
     Ok((scheme, authority, tail))
+}
+
+/// The gateway of `network`, a private IPv4 range written from its first
+/// address. The range leaves room for the gateway and the four services at
+/// the least, so its prefix is at most /29.
+pub(super) fn network_gateway(network: &str) -> IdentityResult<Ipv4Addr> {
+    let invalid = |detail: &str| {
+        refuse(
+            ErrorKind::ConfigInvalid,
+            "deployment.network",
+            format!(
+                "expected a private IPv4 range written from its first address, at most /29, as 172.29.47.0/24 ({detail})"
+            ),
+        )
+    };
+    let (address, prefix) = network
+        .split_once('/')
+        .ok_or_else(|| invalid("no /prefix"))?;
+    let address: Ipv4Addr = address
+        .parse()
+        .map_err(|error: std::net::AddrParseError| invalid(&error.to_string()))?;
+    let prefix: u32 = prefix
+        .parse()
+        .map_err(|error: std::num::ParseIntError| invalid(&error.to_string()))?;
+    if !address.is_private() {
+        return Err(invalid("not a private range"));
+    }
+    if prefix > 29 {
+        return Err(invalid(
+            "too few addresses for the gateway and the services",
+        ));
+    }
+    let first = u32::from(address);
+    if first & (u32::MAX >> prefix) != 0 {
+        return Err(invalid("not the range's first address"));
+    }
+    // A range that starts private can still run past its private block, as
+    // 10.0.0.0/7 runs into 11.0.0.0/8: its last address must be private too.
+    if !Ipv4Addr::from(first | (u32::MAX >> prefix)).is_private() {
+        return Err(invalid("the range runs past its private block"));
+    }
+    Ok(Ipv4Addr::from(first | 1))
 }
 
 pub(super) fn validate_origin(origin: &str) -> IdentityResult<()> {

@@ -38,6 +38,12 @@ fn every_kind_has_a_distinct_snake_case_name() {
         ErrorKind::ReadBackMismatch,
         ErrorKind::ThemeInvalid,
         ErrorKind::Unready,
+        ErrorKind::NotInstalled,
+        ErrorKind::BinaryMissing,
+        ErrorKind::VersionUnreadable,
+        ErrorKind::UpgradeFailed,
+        ErrorKind::InstallBuildDiffers,
+        ErrorKind::UpgradeBuildDiffers,
     ];
     let mut names: Vec<&str> = kinds.iter().map(|kind| kind.name()).collect();
     assert!(
@@ -48,6 +54,65 @@ fn every_kind_has_a_distinct_snake_case_name() {
     names.sort_unstable();
     names.dedup();
     assert_eq!(names.len(), kinds.len());
+}
+
+/// The kinds whose stable name says the issuer's product, and the name a
+/// person reads instead, written apart from `lys_name`.
+const SAID_IN_LYS_WORDS: [(ErrorKind, &str); 7] = [
+    (ErrorKind::RauthyUnreachable, "sign_in_service_unreachable"),
+    (
+        ErrorKind::RauthyUncertain,
+        "sign_in_service_outcome_uncertain",
+    ),
+    (
+        ErrorKind::RauthyUnauthorized,
+        "sign_in_service_unauthorized",
+    ),
+    (ErrorKind::RauthyForbidden, "sign_in_service_forbidden"),
+    (ErrorKind::RauthyBadRequest, "sign_in_service_bad_request"),
+    (ErrorKind::RauthyServerError, "sign_in_service_server_error"),
+    (
+        ErrorKind::RauthyUnexpected,
+        "sign_in_service_unexpected_response",
+    ),
+];
+
+#[test]
+fn a_failure_said_in_lys_words_never_names_the_issuers_product() {
+    let mut said = 0;
+    for (kind, lys_name) in SAID_IN_LYS_WORDS {
+        let error = IdentityError::new(
+            kind,
+            "call Rauthy",
+            "rauthy",
+            "Rauthy at RAUTHY_LISTEN_PORT answered; spicedb and postgres are up",
+        )
+        .at(Path::new("/state/rauthy-db-password"));
+        let plain = error.to_string();
+        assert!(plain.starts_with(kind.name()), "{plain}");
+        let text = error.said_in_lys_words().to_string();
+        assert!(text.starts_with(&format!("{lys_name}: ")), "{text}");
+        let outside_path = text.replace("/state/rauthy-db-password", "");
+        assert!(
+            !outside_path.to_ascii_lowercase().contains("rauthy"),
+            "{text}"
+        );
+        assert!(
+            !outside_path.to_ascii_lowercase().contains("spicedb"),
+            "{text}"
+        );
+        assert!(!outside_path.contains("postgres"), "{text}");
+        assert!(
+            text.contains("(/state/rauthy-db-password)"),
+            "the path is kept exactly"
+        );
+        said += 1;
+    }
+    assert_eq!(said, 7);
+    let unchanged = IdentityError::new(ErrorKind::Unready, "wait", "services", "")
+        .said_in_lys_words()
+        .to_string();
+    assert_eq!(unchanged, "unready: wait services");
 }
 
 #[test]

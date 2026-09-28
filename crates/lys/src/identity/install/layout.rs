@@ -42,6 +42,10 @@ pub const BROKER_PORT: u16 = 8472;
 /// The loopback port Rauthy is published on.
 pub const RAUTHY_PORT: u16 = 18080;
 
+/// The binaries the install runs from its own `bin/`, in the order they
+/// start: the secrets broker, then the directory service.
+pub const BINARIES: [&str; 2] = ["lys-secrets", "lys-identity-server"];
+
 /// Every path the install writes, all under one root.
 #[derive(Debug, Clone)]
 pub struct Layout {
@@ -98,6 +102,47 @@ impl Layout {
         self.root.join("surface")
     }
 
+    /// The screens an upgrade replaced, kept to return to.
+    pub fn surface_previous_dir(&self) -> PathBuf {
+        self.root.join("surface.previous")
+    }
+
+    /// The binaries the broker and the service run from.
+    pub fn bin_dir(&self) -> PathBuf {
+        self.root.join("bin")
+    }
+
+    /// The binaries an upgrade replaced, kept to return to.
+    pub fn bin_previous_dir(&self) -> PathBuf {
+        self.root.join("bin.previous")
+    }
+
+    /// The installed binary `name`.
+    pub fn binary(&self, name: &str) -> PathBuf {
+        self.bin_dir().join(name)
+    }
+
+    /// What the install knows about itself.
+    pub fn install_dir(&self) -> PathBuf {
+        self.root.join("install")
+    }
+
+    /// The build running: each binary's commit and the screens' digest.
+    pub fn build_record(&self) -> PathBuf {
+        self.install_dir().join("build.json")
+    }
+
+    /// An upgrade under way: its builds and each step as it completes.
+    pub fn upgrade_intent(&self) -> PathBuf {
+        self.install_dir().join("upgrade.json")
+    }
+
+    /// The configuration and compose files an upgrade replaced, kept to
+    /// return to.
+    pub fn config_previous_dir(&self) -> PathBuf {
+        self.root.join("config.previous")
+    }
+
     /// The directory service's configuration.
     pub fn service_config(&self) -> PathBuf {
         self.root.join("identity.json")
@@ -132,6 +177,22 @@ impl Layout {
     pub fn service_url() -> String {
         format!("http://localhost:{SERVICE_PORT}")
     }
+
+    /// The setup page's address, without its code.
+    pub fn setup_url() -> String {
+        format!("{}/setup", Self::service_url())
+    }
+
+    /// The file the administrator first-run setup made is recorded in.
+    pub fn administrator_file(&self) -> PathBuf {
+        self.data_dir().join("administrator.json")
+    }
+
+    /// The file a headless install writes the setup code to, owner-only, in
+    /// the install root, because no browser was there to hand it to.
+    pub fn headless_setup_code(&self) -> PathBuf {
+        self.root.join("setup-code")
+    }
 }
 
 /// The data root for `os`, given the variables that may name it.
@@ -159,11 +220,13 @@ pub fn data_root(
     Ok(base.join("lys").join("identity"))
 }
 
-/// The deployment configuration text for `admin_email`, with the state
-/// directory beside it.
-pub fn render_deployment(admin_email: &str) -> String {
+/// The deployment configuration text, naming `admin_email` when an
+/// unattended install was given one and no administrator otherwise, with
+/// the state directory beside it.
+pub fn render_deployment(admin_email: Option<&str>) -> String {
+    let line = admin_email.map_or_else(String::new, |email| format!("admin_email = \"{email}\"\n"));
     DEPLOYMENT_TEMPLATE
-        .replace("{{admin_email}}", admin_email)
+        .replace("{{admin_email_line}}", &line)
         .replace("{{rauthy_port}}", &RAUTHY_PORT.to_string())
         .replace("{{service_port}}", &SERVICE_PORT.to_string())
 }

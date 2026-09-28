@@ -3,11 +3,25 @@
 //! The install makes its own data root under the user's application data
 //! path and never writes outside it. Inside, it writes the deployment
 //! configuration, materialises credentials, starts the compose services,
-//! waits until they answer, registers both clients, generates the service
-//! key and the secrets broker, writes the directory service's configuration
-//! and starts the broker, the runner and the service. Running it again
-//! changes only what is missing; nothing is rotated or restarted, and the
-//! runner least of all, since a restart of it ends every session it holds.
+//! waits until they answer, registers its own client, generates the service
+//! key and the secrets broker, writes the directory service's configuration,
+//! places the broker's and the service's binaries in its own `bin/` and
+//! starts them from there, and records the build running in
+//! `install/build.json`. Running it again changes only what is missing;
+//! nothing is rotated, and a placed binary is never replaced: that is
+//! `lys identity upgrade`'s.
+//!
+//! Invariants: install first ends an upgrade stopped part-way. It refuses,
+//! before stopping anything, to run from a build other than the one placed.
+//! A process is restarted when its configuration changed or its binary was
+//! just placed, so `install/build.json` always names what runs.
+//!
+//! The install makes no administrator and fills nothing about a person from
+//! the machine. While no administrator exists it writes a one-time setup
+//! code and hands it to the browser in the setup page's address
+//! (`setup_code`), where the person makes the administrator. Everything it
+//! says names Lys and its parts by what they do, never the issuer.
+//! The runner starts beside the service and is not restarted by reinstall.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,28 +30,31 @@ use base64::Engine;
 use lys_core::Ed25519Identity;
 
 use super::config::DeploymentConfig;
-use super::error::{ErrorKind, IdentityError, IdentityResult};
+use super::error::{ErrorKind, IdentityError, IdentityResult, in_lys_words};
 use super::prepare::{API_KEY_NAME, API_KEY_SECRET, read_secret};
 use super::private_files::Outcome;
-use super::rauthy::RauthyApi;
+use super::upgrade::{self, Compose, adopt, swap};
 use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
 
 pub mod exit_wait;
 pub mod layout;
+pub mod log_wait;
 pub mod server_config;
 pub mod services;
+pub mod setup_code;
 pub mod surface;
 
-use layout::{BROKER_PORT, Layout, SERVICE_PORT};
+use layout::{BINARIES, Layout};
 
 /// What the operator chose.
 #[derive(Debug)]
 pub struct Options {
     /// The data root; the platform's application data path when absent.
     pub root: Option<PathBuf>,
-    /// The administrator's email, the identity Rauthy bootstraps.
-    pub admin_email: String,
+    /// For an unattended install, the administrator's email: the only one
+    /// the setup page then takes. Never read from the machine.
+    pub admin_email: Option<String>,
     /// A compiled screens package to verify and place.
     pub surface: Option<PathBuf>,
 }
@@ -60,6 +77,21 @@ fn write_absent(path: &Path, text: &str) -> IdentityResult<bool> {
     }
     write_plain(path, text)?;
     Ok(true)
+}
+
+/// The key Lys signs products' ID tokens with, kept in the state folder.
+fn provider_key(config: &DeploymentConfig) -> IdentityResult<()> {
+    let path = config.state_dir().join(server_config::PROVIDER_KEY_FILE);
+    Ed25519Identity::load_or_generate(&path).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::PrivateFileIo,
+            "generate provider key",
+            "provider key",
+            error.to_string(),
+        )
+        .at(&path)
+    })?;
+    Ok(())
 }
 
 fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
@@ -91,56 +123,6 @@ fn write_providers_key(config: &DeploymentConfig) -> IdentityResult<()> {
     Ok(())
 }
 
-fn administrator_subject(config: &DeploymentConfig) -> IdentityResult<String> {
-    let credential = read_secret(&config.state_dir(), API_KEY_SECRET)?;
-    let api = RauthyApi::new(&config.issuer.admin_url, Some(credential))?;
-    api.user_id(&config.deployment.admin_email)?.ok_or_else(|| {
-        IdentityError::new(
-            ErrorKind::Unready,
-            "find administrator",
-            "rauthy",
-            format!(
-                "Rauthy holds no user for {}; it bootstraps one on its first start only",
-                config.deployment.admin_email
-            ),
-        )
-    })
-}
-
-/// How a start is reported: a process that was replaced was restarted.
-fn started_word(started: bool, replace: bool) -> &'static str {
-    match (started, replace) {
-        (true, true) => "restarted with its new configuration",
-        (true, false) => "started",
-        (false, _) => "already running",
-    }
-}
-
-fn start_broker(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
-    let program = services::sibling("lys-secrets")?;
-    let log = layout.logs_dir().join("secrets.log");
-    let pid = layout.run_dir().join("secrets.pid");
-    let args = [
-        "serve",
-        "--root",
-        &layout.broker_root().display().to_string(),
-        "--keys",
-        &layout.broker_keys().display().to_string(),
-        "--listen",
-        &format!("127.0.0.1:{BROKER_PORT}"),
-        "--directory-config",
-        &layout.service_config().display().to_string(),
-    ]
-    .map(str::to_string);
-    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
-    services::wait_answering(BROKER_PORT, "/", &pid, &log)?;
-    emitter.note(&format!(
-        "secrets broker {} on 127.0.0.1:{BROKER_PORT}",
-        started_word(started, replace)
-    ));
-    Ok(())
-}
-
 /// Start the runner beside the service, as the service is started: it holds
 /// each agent the service starts in its own pseudo-terminal, on a Unix socket
 /// in the run folder, acting only on the service key's requests. It is never
@@ -169,41 +151,40 @@ fn start_runner(
     .map(str::to_string);
     let started = services::start_detached(&program, &args, &log, &pid, false)?;
     let client = lys_runner::Client::new(socket.clone(), Arc::clone(key));
-    services::wait_until("runner", &log, &pid, &mut || {
+    log_wait::wait_until("runner", &log, &pid, &mut || {
         client
             .ask(&lys_runner::Act::Status { session: None })
             .is_ok()
     })?;
     emitter.note(&format!(
         "runner {} on {}",
-        started_word(started, false),
+        if started {
+            "started"
+        } else {
+            "already running"
+        },
         socket.display()
     ));
     Ok(())
 }
 
-fn start_service(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
-    let program = services::sibling("lys-identity-server")?;
-    let log = layout.logs_dir().join("identity.log");
-    let pid = layout.run_dir().join("identity.pid");
-    let args = [layout.service_config().display().to_string()];
-    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
-    services::wait_answering(SERVICE_PORT, "/api/authority", &pid, &log)?;
-    emitter.note(&format!(
-        "identity service {} on {}",
-        started_word(started, replace),
-        Layout::service_url()
-    ));
-    Ok(())
+/// Runs `lys identity install`. A failure is said in Lys's words, because
+/// the person installing reads it.
+pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
+    install(options, json).map_err(IdentityError::said_in_lys_words)
 }
 
-/// Runs `lys identity install`.
-pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
+fn install(options: &Options, json: bool) -> IdentityResult<()> {
     let layout = match &options.root {
         Some(root) => Layout::at(root.clone()),
         None => Layout::discover()?,
     };
     let mut emitter = Emitter::new(json);
+    let units = upgrade::units(&layout);
+    swap::recover(&layout, &units, &mut Compose, &mut |line| {
+        emitter.note(line);
+    })?;
+    adopt::check_placed_build(&layout, &BINARIES, &services::sibling)?;
     services::require_docker(Path::new("docker"))?;
     private_files::ensure_dir(&layout.root)?;
     for dir in [
@@ -226,17 +207,24 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let config_path = layout.deployment_config();
     if write_absent(
         &config_path,
-        &layout::render_deployment(&options.admin_email),
+        &layout::render_deployment(options.admin_email.as_deref()),
     )? {
         emitter.note("deployment.toml written");
     }
     let config = DeploymentConfig::load(&config_path)?;
-    prepare::run(&config_path, json)?;
+    let materialised = prepare::materialise_all(&config)?;
+    emitter.note(&format!(
+        "{} private files ready (only you can read them)",
+        materialised.len()
+    ));
     services::compose_up(&layout, &config)?;
-    emitter.note("compose services up");
-    services::wait_ready(&layout, &config, &mut |line| println!("{line}"))?;
-    emitter.note("postgres, rauthy and spicedb ready");
-    configure::run(&config_path, json)?;
+    emitter.note("database, sign-in and permission services up");
+    services::wait_ready(&layout, &config, &mut |line| {
+        println!("{}", in_lys_words(line));
+    })?;
+    emitter.note("database, sign-in and permission services ready");
+    configure::reconcile(&config)?;
+    emitter.note("sign-in clients registered");
     let key = Arc::new(service_key(&layout)?);
     let public = base64::engine::general_purpose::STANDARD.encode(key.public_key_bytes());
     emitter.note(&format!("service key public {public}"));
@@ -250,8 +238,9 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let surface_present = layout.surface_dir().join("index.html").is_file();
     write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
     write_providers_key(&config)?;
-    let subject = administrator_subject(&config)?;
-    let rendered = server_config::render(&layout, &config, &subject, surface_present);
+    provider_key(&config)?;
+    let carried = server_config::carried(&layout)?.unwrap_or_default();
+    let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {
         IdentityError::new(
             ErrorKind::RenderFailed,
@@ -262,24 +251,40 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     })?;
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
     let changed = configuration != Outcome::Unchanged;
-    start_broker(&layout, &mut emitter, changed)?;
+    let code = if setup_code::has_administrator(&layout)? {
+        None
+    } else {
+        let code = setup_code::generate();
+        let first_run = setup_code::Purpose::FirstRun;
+        setup_code::write_pending(&config.state_dir(), first_run, code.expose())?;
+        Some(code)
+    };
+    let build = adopt::settle(&layout, &units, &services::sibling, changed, &mut |line| {
+        emitter.note(line);
+    })?;
+    let build = serde_json::to_value(&build).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::RenderFailed,
+            "render",
+            "build.json",
+            error.to_string(),
+        )
+    })?;
+    if emitter.is_json() {
+        emitter.field("build", "build", build);
+    }
     start_runner(&layout, &key, &mut emitter)?;
-    start_service(&layout, &mut emitter, changed)?;
     emitter.field("open", "url", Layout::service_url());
-    emitter.field(
-        "administrator",
-        "administrator",
-        config.deployment.admin_email.clone(),
-    );
-    emitter.field(
-        "administrator password file",
-        "administrator_password_file",
-        config
-            .state_dir()
-            .join("rauthy-admin-password")
-            .display()
-            .to_string(),
-    );
+    emitter.field("sign-in for products", "issuer", Layout::service_url());
+    if let Some(code) = code {
+        emitter.field("setup", "setup", Layout::setup_url());
+        setup_code::hand_over(
+            &layout,
+            code.expose(),
+            &setup_code::open_in_browser,
+            &mut emitter,
+        )?;
+    }
     if !surface_present {
         emitter.note("no screens placed: pass --surface with a compiled screens package");
     }

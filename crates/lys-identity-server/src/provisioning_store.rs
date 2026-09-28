@@ -52,7 +52,7 @@ pub struct Settings {
 }
 
 /// How an agent's sessions are driven through a runner.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SessionSettings {
     /// The harness's compaction command, typed as one line; none when the

@@ -10,10 +10,11 @@ use std::sync::{Mutex, PoisonError};
 
 use lys_identity::{Actor, AuthMethod, LoginBinding, Provenance};
 use openidconnect::core::{
-    CoreAuthenticationFlow, CoreClient, CoreJwsSigningAlgorithm, CoreProviderMetadata,
+    CoreAuthenticationFlow, CoreClient, CoreJsonWebKeySet, CoreJwsSigningAlgorithm,
+    CoreProviderMetadata,
 };
 use openidconnect::{
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, PkceCodeChallenge,
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, PkceCodeChallenge,
     PkceCodeVerifier, RedirectUrl, TokenResponse, reqwest,
 };
 
@@ -29,6 +30,12 @@ fn failed(reason: &dyn std::fmt::Display) -> ServerError {
     }
 }
 
+/// The origin of `url`: its scheme, host and port, as an address prefix.
+fn origin_of(url: &str) -> Result<String, ServerError> {
+    let parsed = reqwest::Url::parse(url).map_err(|error| failed(&error))?;
+    Ok(parsed.origin().ascii_serialization())
+}
+
 /// The service's OIDC relying party.
 pub struct Oidc {
     metadata: CoreProviderMetadata,
@@ -40,16 +47,59 @@ pub struct Oidc {
 }
 
 impl Oidc {
-    /// Discover the configured issuer.
+    /// Discover the configured issuer over the address the service reaches
+    /// it at.
+    ///
+    /// The issuer's public address is Lys's own origin, which a browser
+    /// uses and the service does not: the issuer's discovery document is
+    /// read from `sign_in_api`, its name must be the configured issuer
+    /// exactly, and every endpoint it names on its public origin is reached
+    /// on the `sign_in_api` origin instead. The document is otherwise taken
+    /// as the issuer wrote it, and every token is still checked against the
+    /// issuer's name and keys.
     pub async fn discover(config: &Config) -> Result<Self, ServerError> {
         let http = reqwest::ClientBuilder::new()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| failed(&error))?;
-        let issuer = IssuerUrl::new(config.issuer.clone()).map_err(|error| failed(&error))?;
-        let metadata = CoreProviderMetadata::discover_async(issuer, &http)
+        let api = config.sign_in_api();
+        let text = http
+            .get(format!("{api}/.well-known/openid-configuration"))
+            .header(reqwest::header::ACCEPT, "application/json")
+            .send()
+            .await
+            .map_err(|error| failed(&error))?
+            .text()
             .await
             .map_err(|error| failed(&error))?;
+        let mut document: serde_json::Value =
+            serde_json::from_str(&text).map_err(|error| failed(&error))?;
+        let named = document.get("issuer").and_then(serde_json::Value::as_str);
+        if named != Some(config.issuer.as_str()) {
+            return Err(failed(&format!(
+                "the issuer names itself {}, not the configured {}",
+                named.unwrap_or("nothing"),
+                config.issuer
+            )));
+        }
+        let public = origin_of(&config.issuer)?;
+        let reached = origin_of(&api)?;
+        if let Some(fields) = document.as_object_mut() {
+            for (key, value) in fields.iter_mut() {
+                if key == "issuer" {
+                    continue;
+                }
+                if let Some(rest) = value.as_str().and_then(|url| url.strip_prefix(&public)) {
+                    *value = serde_json::Value::String(format!("{reached}{rest}"));
+                }
+            }
+        }
+        let metadata: CoreProviderMetadata =
+            serde_json::from_value(document).map_err(|error| failed(&error))?;
+        let keys = CoreJsonWebKeySet::fetch_async(metadata.jwks_uri(), &http)
+            .await
+            .map_err(|error| failed(&error))?;
+        let metadata = metadata.set_jwks(keys);
         Ok(Self {
             metadata,
             client_id: ClientId::new(config.client_id.clone()),
@@ -94,6 +144,14 @@ impl Oidc {
         Ok(url.to_string())
     }
 
+    /// Forget the sign-in in flight under `state`, which will not be finished.
+    pub fn abandon(&self, state: &str) {
+        self.in_flight
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(state);
+    }
+
     /// Finish a sign-in from the issuer's answer, validating its ID token.
     pub async fn finish(&self, code: String, state: &str) -> Result<Actor, ServerError> {
         let (verifier, nonce) = self
@@ -114,7 +172,14 @@ impl Oidc {
             .set_pkce_verifier(verifier)
             .request_async(&self.http)
             .await
-            .map_err(|error| failed(&error))?;
+            .map_err(|error| match error {
+                // The issuer's own refusal is said; a transport failure is
+                // said without the issuer's address, which a browser reads.
+                openidconnect::RequestTokenError::ServerResponse(answer) => {
+                    failed(&format!("the sign-in service refused the code: {answer}"))
+                }
+                _ => failed(&"the sign-in service did not answer the code exchange"),
+            })?;
         let token = answer
             .id_token()
             .ok_or_else(|| failed(&"the issuer answered no ID token"))?;

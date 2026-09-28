@@ -76,7 +76,7 @@ pub struct WindowView {
 }
 
 /// Permitted exercises whose use events could not be recorded.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct UnreportedView {
     /// How many.
     pub count: u64,
@@ -147,7 +147,7 @@ impl From<&Usage> for LastUseView {
 }
 
 /// Why a grant does not stand, as the caller may read it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct RefusedView {
     /// The refusal's name, the same for a refusal withheld from the caller.
     pub refusal: String,
@@ -160,7 +160,7 @@ pub struct RefusedView {
 
 /// Whether a grant stands at the service's clock, judged over its whole
 /// chain exactly as a check judges it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct StandingView {
     /// Whether it stands.
     pub stands: bool,

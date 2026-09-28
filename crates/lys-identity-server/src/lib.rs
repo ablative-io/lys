@@ -1,10 +1,13 @@
 //! The lys directory service.
 //!
-//! People sign in through the configured OIDC issuer. Every mutation is
+//! People sign in on Lys's own pages; the service carries the sign-in to the
+//! configured OIDC issuer server-side, and a browser never reaches the
+//! issuer. Every mutation is
 //! admitted only for the configured administrator, and every other caller is
 //! refused by name (P9). The directory itself is crates/lys-identity: this
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
 
+pub mod accounts;
 pub mod admission;
 mod agent_sight;
 pub mod agent_signature;
@@ -44,6 +47,7 @@ mod openapi_refusals;
 mod openapi_table;
 mod openapi_typed;
 mod openapi_types;
+pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;
 pub mod read_api;
@@ -79,6 +83,7 @@ pub mod service_accounts_store;
 pub mod session;
 pub mod sessions_api;
 pub mod setup;
+pub mod sign_in;
 pub mod sign_in_providers;
 pub mod spicedb;
 mod spicedb_apps;

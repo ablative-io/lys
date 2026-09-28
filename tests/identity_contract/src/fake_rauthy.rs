@@ -6,6 +6,12 @@
 //! key it was started with. It keeps every provider and every user it was
 //! given, so a test reads back what the service sent, secret included, and
 //! counts every request that reached it, answered or not.
+//!
+//! It reads an account by id or by email and replaces one whole, as the
+//! issuer's own update does. When it is linked to a fake issuer, every
+//! change is handed to that issuer, so the account then signs in there with
+//! its email and password as changed, or not at all once disabled; the
+//! password is never kept here.
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
@@ -21,6 +27,8 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{Value, json};
 
+use crate::fake_issuer::FakeIssuer;
+
 /// The API key the fake admits, `name$secret` as the issuer writes it.
 pub const API_KEY: &str = "lys$contract-test-api-key";
 
@@ -29,6 +37,7 @@ struct Inner {
     providers: Mutex<Vec<Value>>,
     users: Mutex<Vec<Value>>,
     requests: AtomicUsize,
+    issuer: Mutex<Option<FakeIssuer>>,
     /// Holds the API key file, as the installation writes it, for the
     /// stand-in's life.
     keys: tempfile::TempDir,
@@ -56,6 +65,7 @@ impl FakeRauthy {
             providers: Mutex::new(Vec::new()),
             users: Mutex::new(Vec::new()),
             requests: AtomicUsize::new(0),
+            issuer: Mutex::new(None),
             keys,
         });
         let router = Router::new()
@@ -64,6 +74,8 @@ impl FakeRauthy {
             .route("/auth/v1/providers/create", post(create))
             .route("/auth/v1/providers/{id}", axum::routing::put(replace))
             .route("/auth/v1/users", get(users).post(create_user))
+            .route("/auth/v1/users/{id}", get(read_user).put(update_user))
+            .route("/auth/v1/users/email/{email}", get(user_by_email))
             .layer(from_fn_with_state(Arc::clone(&inner), counted))
             .with_state(Arc::clone(&inner));
         tokio::spawn(async move { axum::serve(listener, router).await });
@@ -97,6 +109,24 @@ impl FakeRauthy {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .len()
+    }
+
+    /// Hand every password set on an account from now on to `issuer`.
+    pub fn link(&self, issuer: FakeIssuer) {
+        *self
+            .inner
+            .issuer
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(issuer);
+    }
+
+    /// Every account held, as the service last wrote it, never with a password.
+    pub fn users(&self) -> Vec<Value> {
+        self.inner
+            .users
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// How many requests reached the stand-in, on any route, answered or refused.
@@ -246,5 +276,105 @@ async fn create_user(
         fields.insert("id".to_owned(), Value::String(id));
     }
     held.push(body.clone());
+    Json(body).into_response()
+}
+
+fn no_user() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "message": "no user has that id" })),
+    )
+        .into_response()
+}
+
+fn held_user(inner: &Inner, found: impl Fn(&Value) -> bool) -> Option<Value> {
+    inner
+        .users
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .find(|user| found(user))
+        .cloned()
+}
+
+async fn read_user(
+    State(inner): State<Shared>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    if let Some(refusal) = refused(&headers) {
+        return refusal;
+    }
+    held_user(&inner, |user| user["id"] == id.as_str())
+        .map_or_else(no_user, |user| Json(user).into_response())
+}
+
+async fn user_by_email(
+    State(inner): State<Shared>,
+    headers: HeaderMap,
+    Path(email): Path<String>,
+) -> Response {
+    if let Some(refusal) = refused(&headers) {
+        return refusal;
+    }
+    held_user(&inner, |user| user["email"] == email.as_str())
+        .map_or_else(no_user, |user| Json(user).into_response())
+}
+
+async fn update_user(
+    State(inner): State<Shared>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(mut body): Json<Value>,
+) -> Response {
+    if let Some(refusal) = refused(&headers) {
+        return refusal;
+    }
+    let password = match &mut body {
+        Value::Object(fields) => {
+            fields.insert("id".to_owned(), Value::String(id.clone()));
+            fields.remove("password")
+        }
+        _ => None,
+    };
+    let email = body["email"].as_str().unwrap_or_default().to_owned();
+    let linked = inner
+        .issuer
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    // The issuer refuses a password set again while it is one of the last
+    // used (Rauthy v0.36.2's password policy, not_recently_used).
+    let reused = linked.as_ref().is_some_and(|issuer| {
+        issuer.account(&email).is_some_and(|account| {
+            account.login.subject == id
+                && password.as_ref().and_then(Value::as_str) == Some(account.password.as_str())
+        })
+    });
+    if reused {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "BadRequest",
+                "message": "The new password must not be one of the last 3 used passwords",
+            })),
+        )
+            .into_response();
+    }
+    {
+        let mut held = inner.users.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(slot) = held.iter_mut().find(|user| user["id"] == id.as_str()) else {
+            return no_user();
+        };
+        *slot = body.clone();
+    }
+    let password = match password {
+        Some(Value::String(password)) => Some(password),
+        _ => None,
+    };
+    let enabled = body["enabled"].as_bool().unwrap_or(true);
+    if let Some(issuer) = linked {
+        issuer.follow(&id, &email, password, enabled);
+    }
     Json(body).into_response()
 }

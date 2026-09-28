@@ -45,10 +45,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::admission::effective;
-use lys_identity::grants::{
-    ExerciseRequest, GrantError, GrantRecord, Grants, MemoryRelationships, Model,
-};
+use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
 use lys_identity::{IdentityError, IdentityId, PersonId};
@@ -58,9 +55,10 @@ use crate::apps_store::AppStore;
 use crate::error::ServerError;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
-    ModelView, PAGE_MAX, PermitView, RecordedView, RefusedView, RevokeBody, RootBody, StandingView,
-    WhoBody, WhoPage, grant_id,
+    ModelView, PAGE_MAX, PermitView, RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
+    grant_id,
 };
+pub(crate) use crate::grant_sight::grant_view;
 use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -162,8 +160,15 @@ pub(crate) fn with_grants<T>(
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = directory.projection()?;
+        let administrator =
+            state
+                .admission
+                .administrator_login()
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "no administrator is set up yet, so there is no root authority to judge a grant under",
+                })?;
         let root = projection
-            .person_for(state.admission.administrator_login())
+            .person_for(&administrator)
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;
@@ -208,63 +213,6 @@ pub(crate) fn engine_permits(
     Err(GrantError::PermissionAbsent {
         grant: permit.grant.to_string(),
     })
-}
-
-/// The grant a refusal names on the chain it was judged over, if any.
-fn named_grant(error: &GrantError) -> Option<String> {
-    match error {
-        GrantError::Revoked { grant }
-        | GrantError::Expired { grant, .. }
-        | GrantError::NotStarted { grant, .. }
-        | GrantError::OperationUnresolved { grant, .. } => Some(grant.clone()),
-        _ => None,
-    }
-}
-
-/// `record` as `caller` reads it at `at`: whether it stands, judged by
-/// admission over its whole chain, and the earliest end on that chain.
-pub(crate) fn grant_view(
-    judged: &Judged<'_>,
-    caller: IdentityId,
-    record: &GrantRecord,
-    at: u64,
-) -> GrantView {
-    let id = record.grant().id();
-    let book = judged.grants.book();
-    let effective_ends_at = book
-        .lineage(id)
-        .ok()
-        .and_then(|lineage| lineage.ends)
-        .map(|(ends, _)| ends);
-    let standing = match effective(book, judged.directory, id, at) {
-        Ok(_) => StandingView {
-            stands: true,
-            refused: None,
-        },
-        Err(error) => {
-            let named = named_grant(&error);
-            let seen = as_seen_by(judged, caller, error);
-            let grant = if matches!(seen, ServerError::Withheld { .. }) {
-                None
-            } else {
-                named
-            };
-            StandingView {
-                stands: false,
-                refused: Some(RefusedView {
-                    refusal: seen.name(),
-                    grant,
-                    reason: seen.to_string(),
-                }),
-            }
-        }
-    };
-    GrantView::new(
-        record,
-        judged.grants.unreported(id),
-        standing,
-        effective_ends_at,
-    )
 }
 
 /// Whether a decision is an exercise, recorded as a use, or a question.

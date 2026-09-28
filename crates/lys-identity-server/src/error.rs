@@ -50,6 +50,41 @@ pub enum ServerError {
     /// A sign-in answer names a state this service did not issue, or one already used.
     #[error("SignInStateUnknown: the sign-in answer does not match a sign-in this service began")]
     SignInStateUnknown,
+    /// The email or the password is not right. Which one is never said.
+    #[error("SignInRefused: the email or password is not right")]
+    SignInRefused,
+    /// Too many sign-ins failed from the person's address for now.
+    #[error(
+        "SignInThrottled: too many sign-ins failed from this address; wait a little, then try again"
+    )]
+    SignInThrottled,
+    /// The account asks for a second factor, which Lys's sign-in does not take.
+    #[error(
+        "SecondFactorUnsupported: this account asks for a second factor, such as a passkey, which Lys's sign-in does not take yet (act: ask your administrator to reset the account to a password)"
+    )]
+    SecondFactorUnsupported,
+    /// First-run setup is over: an administrator exists.
+    #[error(
+        "SetupClosed: Lys already has an administrator, so first-run setup is closed (act: sign in, or run lys identity setup-code to set a new password)"
+    )]
+    SetupClosed,
+    /// The setup code is not the one written for this machine, or was used.
+    #[error(
+        "SetupCodeRefused: this setup link is not valid or was already used (act: run lys identity setup-code for a fresh one)"
+    )]
+    SetupCodeRefused,
+    /// First-run setup is not configured, or its files could not be read or written.
+    #[error("SetupUnavailable: {reason}")]
+    SetupUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The account could not be made or changed as asked.
+    #[error("AccountRefused: {reason}")]
+    AccountRefused {
+        /// What was refused, in Lys's words.
+        reason: String,
+    },
     /// The issuer could not be reached or its answer did not validate.
     #[error("SignInFailed: {reason}")]
     SignInFailed {
@@ -446,6 +481,43 @@ pub enum ServerError {
     #[error("SignInProvidersUnavailable: {reason}")]
     SignInProvidersUnavailable {
         /// What failed.
+        reason: String,
+    },
+    /// Lys's `OpenID` provider is not configured, or cannot answer now.
+    #[error("ProviderUnavailable: {reason}")]
+    ProviderUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No product is registered with that client id, or its secret is wrong.
+    #[error("ClientUnknown: no product is registered with that client id and secret")]
+    ClientUnknown,
+    /// The redirect address is not one registered for the product.
+    #[error("RedirectUnregistered: that redirect address is not registered for this product")]
+    RedirectUnregistered,
+    /// The code is not one Lys answered this product with.
+    #[error("CodeUnknown: that code is not one Lys gave this product")]
+    CodeUnknown,
+    /// The code was already exchanged.
+    #[error("CodeUsed: that code was already used")]
+    CodeUsed,
+    /// The code is past its instant.
+    #[error("CodeExpired: that code is past the instant it was good until")]
+    CodeExpired,
+    /// The PKCE verifier does not match the code's challenge.
+    #[error("VerifierWrong: the PKCE verifier does not match the code's challenge")]
+    VerifierWrong,
+    /// The access token is not one Lys issued, or is past its instant.
+    #[error("TokenUnknown: that access token is not one Lys issued, or it has ended")]
+    TokenUnknown,
+    /// A sign-in provider refused the client id it was proved with.
+    #[error("ProviderRefused: {provider} did not accept this client id ({status}): {reason}")]
+    ProviderRefused {
+        /// The provider.
+        provider: &'static str,
+        /// The status the provider answered, zero when it was never asked.
+        status: u16,
+        /// The provider's own words.
         reason: String,
     },
     /// The issuer's administration API refused the act.
