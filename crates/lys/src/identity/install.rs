@@ -151,7 +151,7 @@ fn start_runner(
     .map(str::to_string);
     let started = services::start_detached(&program, &args, &log, &pid, false)?;
     let client = lys_runner::Client::new(socket.clone(), Arc::clone(key));
-    services::wait_until("runner", &log, &pid, &mut || {
+    log_wait::wait_until("runner", &log, &pid, &mut || {
         client
             .ask(&lys_runner::Act::Status { session: None })
             .is_ok()

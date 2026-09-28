@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::RunnerError;
 
 /// What says a usage limit.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "signal", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Limit {
     /// The harness exits with this status at its usage limit: its own signal.
@@ -46,7 +46,7 @@ impl Limit {
 }
 
 /// How a session moves between accounts at a usage limit.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Rotation {
     /// The account handles, in order; the first is the session's first account.
