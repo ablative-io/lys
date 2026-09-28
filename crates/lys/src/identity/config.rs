@@ -129,17 +129,18 @@ pub enum CredentialSource {
     Provided,
 }
 
-/// The `[clients]` table: the platform's client, and Cambium's where a
-/// configuration still names it. An install names only the platform's: a
-/// product registers itself as a client of Lys, never of the issuer.
+/// The `[clients]` table: the platform's client, and one app's client where a
+/// configuration names it. An install names only the platform's: every app
+/// registers itself through the directory's Apps API, never with the issuer.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Clients {
     /// The platform's own confidential client, themed identity orange.
     pub platform: Client,
-    /// Cambium's client, themed Cambium green, when a configuration names it.
+    /// The one app client installed beside the platform's, themed with the
+    /// app accent the theme mapping declares, when a configuration names it.
     #[serde(default)]
-    pub cambium: Option<Client>,
+    pub app: Option<Client>,
 }
 
 /// One managed OIDC client.
@@ -208,8 +209,8 @@ impl DeploymentConfig {
     /// The managed clients, platform first.
     pub fn managed_clients(&self) -> Vec<(ClientRole, &Client)> {
         let mut clients = vec![(ClientRole::Platform, &self.clients.platform)];
-        if let Some(cambium) = &self.clients.cambium {
-            clients.push((ClientRole::Cambium, cambium));
+        if let Some(app) = &self.clients.app {
+            clients.push((ClientRole::App, app));
         }
         clients
     }
@@ -283,14 +284,14 @@ impl DeploymentConfig {
         self.validate_database()?;
         if self
             .clients
-            .cambium
+            .app
             .as_ref()
-            .is_some_and(|cambium| cambium.id == self.clients.platform.id)
+            .is_some_and(|app| app.id == self.clients.platform.id)
         {
             return Err(refuse(
                 ErrorKind::ClientInvalid,
                 "clients",
-                "the platform and Cambium clients need distinct ids",
+                "the platform and app clients need distinct ids",
             ));
         }
         for (role, client) in self.managed_clients() {
@@ -406,8 +407,9 @@ impl DeploymentConfig {
 pub enum ClientRole {
     /// The platform's own client.
     Platform,
-    /// Cambium's client.
-    Cambium,
+    /// The one installed app's client. Every further app registers itself
+    /// through the directory's Apps API.
+    App,
 }
 
 impl ClientRole {
@@ -415,7 +417,7 @@ impl ClientRole {
     pub fn key(self) -> &'static str {
         match self {
             Self::Platform => "platform",
-            Self::Cambium => "cambium",
+            Self::App => "app",
         }
     }
 }

@@ -1126,7 +1126,7 @@
       "items": [
         {
           "id": "C361",
-          "text": "An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).",
+          "text": "Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).",
           "done": false
         },
         {
@@ -1151,7 +1151,7 @@
         },
         {
           "id": "C366",
-          "text": "Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).",
+          "text": "Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).",
           "done": false
         },
         {
@@ -1246,7 +1246,7 @@
       "items": [
         {
           "id": "C381",
-          "text": "Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).",
+          "text": "Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).",
           "done": false
         },
         {
@@ -1266,7 +1266,12 @@
         },
         {
           "id": "C385",
-          "text": "A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).",
+          "text": "Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).",
+          "done": false
+        },
+        {
+          "id": "C421",
+          "text": "Lys creates an editable tool-boundary policy and records runner/grant denials on the agent page; Codex pre-tool coverage is explicitly unavailable (DIRECTORY-051 R6).",
           "done": false
         }
       ]
@@ -1467,6 +1472,76 @@
         {
           "id": "C420",
           "text": "The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "A SpiceDB call ends on its answer or its caller (DIRECTORY-061)",
+      "items": [
+        {
+          "id": "C422",
+          "text": "No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).",
+          "done": false
+        },
+        {
+          "id": "C423",
+          "text": "Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).",
+          "done": false
+        },
+        {
+          "id": "C424",
+          "text": "A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Native process containment (DIRECTORY-062)",
+      "items": [
+        {
+          "id": "C425",
+          "text": "One Lys policy becomes a bound containment plan (DIRECTORY-062 R1).",
+          "done": false
+        },
+        {
+          "id": "C426",
+          "text": "macOS applies Seatbelt before the harness can run (DIRECTORY-062 R2).",
+          "done": false
+        },
+        {
+          "id": "C427",
+          "text": "Linux applies Landlock and a network namespace before exec (DIRECTORY-062 R3).",
+          "done": false
+        },
+        {
+          "id": "C428",
+          "text": "Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).",
+          "done": false
+        },
+        {
+          "id": "C429",
+          "text": "The agent page states the sandbox and the evidence (DIRECTORY-062 R5).",
+          "done": false
+        },
+        {
+          "id": "C430",
+          "text": "A person watches real native denials and an allowed control (DIRECTORY-062 R6).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Unknown API paths and the health route (DIRECTORY-063)",
+      "items": [
+        {
+          "id": "C431",
+          "text": "Every unknown path under /api answers 404 with a named JSON refusal, never the page (DIRECTORY-063 R1).",
+          "done": false
+        },
+        {
+          "id": "C432",
+          "text": "GET /api/health answers that the service is serving, with its name and build, asking no other service (DIRECTORY-063 R2).",
           "done": false
         }
       ]

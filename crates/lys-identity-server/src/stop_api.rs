@@ -46,15 +46,15 @@ use crate::stops_store::StopStore;
 const REASON_MAX: usize = 500;
 
 /// A stop to make.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct StopBody {
+pub(crate) struct StopBody {
     operation: String,
     reason: String,
 }
 
 /// The answer of the stop route: what was done, and what was only asked.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct StopView {
     /// The agent stopped.
     pub agent: String,
@@ -110,7 +110,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// The answer of `GET /agents/{id}/stops`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct StopsView {
     /// Every stop kept on the agent, in the order kept.
     pub stops: Vec<StopView>,

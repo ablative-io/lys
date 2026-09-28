@@ -7,7 +7,7 @@ use crate::read_views::PersonSummary;
 use crate::requests_store::Decided;
 
 /// The decision on a request.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct DecisionView {
     /// The person who decided.
     pub by: String,
@@ -31,7 +31,7 @@ impl From<&Decided> for DecisionView {
 }
 
 /// One access request.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct RequestView {
     /// The request's id, which is the operation id it was asked with.
     pub id: String,
@@ -73,7 +73,7 @@ pub struct RequestView {
 }
 
 /// The answer of `GET /requests`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct RequestList {
     /// Every request the caller may see, in the order asked.
     pub requests: Vec<RequestView>,

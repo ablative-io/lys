@@ -43,16 +43,17 @@ const NOTE_MAX: usize = 500;
 /// The most characters each of a version's texts carries.
 const TEXT_MAX: usize = 4000;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ResourceBody {
+#[schema(as = RoleResourceBody)]
+pub(crate) struct ResourceBody {
     kind: String,
     id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct TemplateBody {
+pub(crate) struct TemplateBody {
     resource: ResourceBody,
     relation: String,
     days: Option<u32>,
@@ -60,9 +61,9 @@ struct TemplateBody {
 
 /// What a version says. Every member is required; `profile` may be empty
 /// and `grant_templates` may be an empty list.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct VersionBody {
+pub(crate) struct VersionBody {
     operation: String,
     responsibilities: String,
     goals: String,
@@ -73,9 +74,9 @@ struct VersionBody {
 }
 
 /// A role to make: its name, and what its first version says.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct MakeBody {
+pub(crate) struct MakeBody {
     operation: String,
     name: String,
     responsibilities: String,
@@ -87,25 +88,25 @@ struct MakeBody {
 }
 
 /// A holder to assign. `ends_at` may be null.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct AssignBody {
+pub(crate) struct AssignBody {
     operation: String,
     holder: String,
     ends_at: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct MoveBody {
+pub(crate) struct MoveBody {
     assignment: String,
     from_version: u32,
     to_version: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct EndBody {
+pub(crate) struct EndBody {
     assignment: String,
 }
 
@@ -209,7 +210,7 @@ fn said(state: &AppState, body: &VersionBody) -> Result<Words, ServerError> {
     for template in &body.grant_templates {
         let resource = Resource::new(&template.resource.kind, &template.resource.id)?;
         let relation = Relation::new(&template.relation)?;
-        state.grant_setup.model.actions(&relation)?;
+        state.grant_setup.model().actions(&relation)?;
         if template.days == Some(0) {
             return Err(malformed(
                 "a template's days is 1 or more, or null for no end of its own",

@@ -80,7 +80,7 @@ pub struct SignInProviders {
 const SECRET_MAX: usize = 256;
 
 /// The sign-in providers this installation offers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Provider {
     /// Google accounts.
@@ -111,7 +111,7 @@ impl Provider {
 }
 
 /// A provider as the issuer holds it, without its secret.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ProviderView {
     /// The issuer's id for it.
     pub id: String,
@@ -126,20 +126,22 @@ pub struct ProviderView {
 }
 
 /// The answer of `GET /sign-in-providers`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ProvidersView {
     /// Every provider the issuer holds.
     pub providers: Vec<ProviderView>,
     /// The providers this installation offers to set.
+    #[schema(value_type = Vec<Provider>)]
     pub offered: [Provider; 3],
     /// The redirect address to register with each provider: Lys's own.
     pub redirect_address: String,
 }
 
 /// What the administrator sends to set a provider. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct SetBody {
+#[schema(as = SignInProviderSetBody)]
+pub(crate) struct SetBody {
     provider: Provider,
     client_id: String,
     client_secret: String,

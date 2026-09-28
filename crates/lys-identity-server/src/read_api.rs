@@ -33,11 +33,12 @@ use lys_identity::projection::{Projection, Record};
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
 
 use crate::admission::AUTHORITY;
+use crate::directory_views::receipt_json;
 use crate::error::ServerError;
 use crate::read_views::{
     AgentSummary, AgentView, Login, MeView, PeopleView, PersonSummary, PersonView, Provenance,
 };
-use crate::routes::{AppState, receipt_json, signed_in, with_directory};
+use crate::routes::{AppState, signed_in, with_directory};
 
 /// The commit this service was built from, as `build.rs` stamped it.
 pub const BUILD: &str = env!("LYS_BUILD");
@@ -247,7 +248,11 @@ fn agent_json(
     let mut view = agent_view(projection, agent, scope)?;
     let first = view.provenance.events.first().copied();
     view.provenance.registration = match first {
-        Some(index) => directory.receipt_at(index)?.as_ref().map(receipt_json),
+        Some(index) => directory
+            .receipt_at(index)?
+            .as_ref()
+            .map(receipt_json)
+            .transpose()?,
         None => None,
     };
     Ok(Json(view))

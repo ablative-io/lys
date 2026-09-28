@@ -286,12 +286,12 @@
 
 ## Every app registers with Lys through a published API (DIRECTORY-048)
 
-- [ ] **C361** — An app is registered through the API with its id, name, sign-in client and permission schema, and has no effect until an administrator approves it on a Lys screen (DIRECTORY-048 R1).
+- [ ] **C361** — Only a person holding an explicit register_app grant registers an app; approval creates its distinct application-connector identity and binding, and every app permission follows an explicit grant chain back to the super administrator (ADR-126, DIRECTORY-048 R1).
 - [ ] **C362** — An app's schema declares kinds under its own prefix, their actions, relations carrying actions and parent kinds; an invalid schema is refused naming the line of the fault (DIRECTORY-048 R2).
 - [ ] **C363** — An app cannot define, change or grant on another app's kinds; the refusal names the owning prefix (DIRECTORY-048 R2).
 - [ ] **C364** — A schema change that would strand standing grants is refused naming the relation and the count; a dry run answers the same without writing (DIRECTORY-048 R3).
 - [ ] **C365** — Lys's own model is the schema of the app 'lys'; existing grants and checks answer the same after the move (DIRECTORY-048 R4).
-- [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
+- [ ] **C366** — Apps check many permissions and list permitted resources as their own application connector, under explicit grants and their own-kind boundary; neither binding nor prefix ownership grants authority (ADR-126, DIRECTORY-048 R5).
 - [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 - [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
 - [ ] **C386** — A person builds an app's whole permission template on the Apps screen from templates, tests it on example people and resources against the real check, and saves it; built and uploaded schemas are the same record (DIRECTORY-048 R8).
@@ -316,11 +316,12 @@
 
 ## Lys tracks tokens, context, time, budgets and goals (DIRECTORY-051)
 
-- [ ] **C381** — Each session's tokens per turn, context in use against its window, time running and paying account are measured from its transcript (DIRECTORY-051 R1).
+- [ ] **C381** — Lys installs its own session hooks/status line and incrementally follows the runner-local stream; usage is durable, authenticated and exported for optional Argus analytics (DIRECTORY-051 R1).
 - [ ] **C382** — Budgets for context, tokens and time are set on an agent, a team or a person, and inherited downward (DIRECTORY-051 R2).
 - [ ] **C383** — A reached budget compacts, stops or tells, as the budget says, once, with a receipt (DIRECTORY-051 R3).
 - [ ] **C384** — Goals on an agent carry a deadline and reminders delivered into its session (DIRECTORY-051 R4).
-- [ ] **C385** — A Usage screen shows every agent's usage against its budgets, and goals with their state (DIRECTORY-051 R5).
+- [ ] **C385** — Plain controls set and read budgets and goals and show reached or uncertain state; analytics stays in Argus (DIRECTORY-051 R5).
+- [ ] **C421** — Lys creates an editable tool-boundary policy and records runner/grant denials on the agent page; Codex pre-tool coverage is explicitly unavailable (DIRECTORY-051 R6).
 
 ## Provision a working team in one act (DIRECTORY-052)
 
@@ -377,3 +378,23 @@
 - [ ] **C418** — A runner session's handles are issued to a key the runner made for it in memory, before anything is spawned (DIRECTORY-060 R1).
 - [ ] **C419** — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).
 - [ ] **C420** — The harness and lys mcp get every presentation from the runner and hold no key (DIRECTORY-060 R3).
+
+## A SpiceDB call ends on its answer or its caller (DIRECTORY-061)
+
+- [ ] **C422** — No SpiceDB connect, write or read in Lys waits on a clock, and a cancelled call returns at once (DIRECTORY-061 R1).
+- [ ] **C423** — Every grants section runs off the async workers, and a request that leaves ends its SpiceDB wait and lets the grants lock go (DIRECTORY-061 R2).
+- [ ] **C424** — A section that takes the grants lock after its request left calls no SpiceDB (DIRECTORY-061 R2).
+
+## Native process containment (DIRECTORY-062)
+
+- [ ] **C425** — One Lys policy becomes a bound containment plan (DIRECTORY-062 R1).
+- [ ] **C426** — macOS applies Seatbelt before the harness can run (DIRECTORY-062 R2).
+- [ ] **C427** — Linux applies Landlock and a network namespace before exec (DIRECTORY-062 R3).
+- [ ] **C428** — Kernel evidence feeds the existing refusal stream (DIRECTORY-062 R4).
+- [ ] **C429** — The agent page states the sandbox and the evidence (DIRECTORY-062 R5).
+- [ ] **C430** — A person watches real native denials and an allowed control (DIRECTORY-062 R6).
+
+## Unknown API paths and the health route (DIRECTORY-063)
+
+- [ ] **C431** — Every unknown path under /api answers 404 with a named JSON refusal, never the page (DIRECTORY-063 R1).
+- [ ] **C432** — GET /api/health answers that the service is serving, with its name and build, asking no other service (DIRECTORY-063 R2).

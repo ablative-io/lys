@@ -433,7 +433,7 @@ fn the_compose_wait_checks_once_per_output_and_names_each_ready() -> Result<(), 
 fn a_new_install_registers_no_product_and_names_no_administrator() -> Result<(), Box<dyn Error>> {
     let config = DeploymentConfig::parse(&render_deployment(None), PathBuf::from("/srv/lys"))?;
     assert!(
-        config.clients.cambium.is_none(),
+        config.clients.app.is_none(),
         "no product is registered by install"
     );
     assert_eq!(config.managed_clients().len(), 1);

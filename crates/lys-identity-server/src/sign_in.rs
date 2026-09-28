@@ -43,9 +43,11 @@ use sha2::{Digest, Sha256};
 
 use crate::admission::AUTHORITY;
 use crate::config::Config;
+use crate::directory_views::SignedInView;
 use crate::error::ServerError;
 use crate::oidc::Oidc;
 use crate::routes::AppState;
+use crate::sessions_api::SessionLogin;
 
 #[path = "sign_in_upstream.rs"]
 mod upstream;
@@ -443,10 +445,13 @@ async fn login() -> Response {
 /// Sign the person in with `actor` and answer the signed-in body with the
 /// session cookie.
 pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response, ServerError> {
-    let body = json!({
-        "signed_in": { "issuer": actor.binding().issuer(), "subject": actor.binding().subject() },
-        "authority": AUTHORITY,
-    });
+    let body = SignedInView {
+        signed_in: SessionLogin {
+            issuer: actor.binding().issuer().to_owned(),
+            subject: actor.binding().subject().to_owned(),
+        },
+        authority: AUTHORITY.to_owned(),
+    };
     let cookie = state.sessions.begin(actor.clone())?;
     Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
 }

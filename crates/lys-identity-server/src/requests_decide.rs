@@ -37,7 +37,7 @@ use crate::session::now;
 
 /// An approval. `source` is the grant the access is lent from, or null for
 /// the root authority to issue it to a person.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApproveBody {
     operation: String,
@@ -46,7 +46,7 @@ pub(crate) struct ApproveBody {
     note: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DeclineBody {
     note: String,

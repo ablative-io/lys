@@ -1,7 +1,7 @@
 # The standalone identity product's three dependency processes for development:
 # the maintained Rauthy (ADR-009), SpiceDB, and one PostgreSQL service with one
-# durable database (ADR-005). Cambium, Manifold, Argus and Aion are not here and
-# are not needed.
+# durable database (ADR-005). No app the directory serves is here, and none is
+# needed: apps register themselves through the directory's API.
 #
 # Every value comes from the environment `lys identity prepare` renders into the
 # state directory; nothing here is a credential. A missing value is refused by

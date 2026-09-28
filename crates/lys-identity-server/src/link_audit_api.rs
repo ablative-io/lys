@@ -45,11 +45,11 @@ use axum::{Json, Router};
 use lys_identity::{Actor, LinkChange, LinkObservation, LoginBinding, PersonId, Provenance};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
 
 use crate::agent_signature::signed_agent;
+use crate::directory_views::{LinkAuditPerson, ReceiptAnswer, receipt_view};
 use crate::error::ServerError;
-use crate::routes::{AppState, receipt_json, signed_in, with_directory};
+use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 
 /// The link-audit routes.
@@ -120,9 +120,10 @@ fn read<T: DeserializeOwned>(headers: &HeaderMap, body: &[u8]) -> Result<T, Serv
     Ok(members)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Asked {
+#[schema(as = LinkAuditAsked)]
+pub(crate) struct Asked {
     issuer: String,
     subject: String,
 }
@@ -132,7 +133,7 @@ async fn holder(
     headers: HeaderMap,
     uri: Uri,
     bytes: Bytes,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<LinkAuditPerson>, ServerError> {
     admitted(&state, &headers, uri.path(), &bytes)?;
     let asked: Asked = read(&headers, &bytes)?;
     let login = LoginBinding::new(&asked.issuer, &asked.subject)
@@ -142,13 +143,16 @@ async fn holder(
             .projection()?
             .person_for(&login)
             .ok_or(ServerError::LoginUnbound)?;
-        Ok(Json(json!({ "person": person.to_string() })))
+        Ok(Json(LinkAuditPerson {
+            person: person.to_string(),
+        }))
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Delivery {
+#[schema(as = LinkAuditDelivery)]
+pub(crate) struct Delivery {
     person: String,
     source_operation_id: String,
     change: String,
@@ -163,7 +167,7 @@ async fn deliver(
     headers: HeaderMap,
     uri: Uri,
     bytes: Bytes,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ReceiptAnswer>, ServerError> {
     let source = admitted(&state, &headers, uri.path(), &bytes)?;
     let body: Delivery = read(&headers, &bytes)?;
     let change = match body.change.as_str() {
@@ -183,6 +187,8 @@ async fn deliver(
     )?;
     with_directory(&state, |directory| {
         let receipt = directory.accept_link_audit(source, person, observation, now())?;
-        Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
+        Ok(Json(ReceiptAnswer {
+            receipt: receipt_view(&receipt),
+        }))
     })
 }

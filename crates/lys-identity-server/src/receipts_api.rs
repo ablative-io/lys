@@ -10,10 +10,10 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
-use serde_json::{Value, json};
 
+use crate::directory_views::{CheckpointView, ReceiptPage, ServiceKeyView, receipt_view};
 use crate::error::ServerError;
-use crate::routes::{AppState, hex, receipt_json, with_directory};
+use crate::routes::{AppState, hex, with_directory};
 
 /// The receipt routes.
 pub fn routes() -> Router<Arc<AppState>> {
@@ -22,16 +22,20 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/service-key", get(service_key))
 }
 
-async fn service_key(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
+async fn service_key(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ServiceKeyView>, ServerError> {
     with_directory(&state, |directory| {
-        Ok(Json(json!({ "ed25519": hex(&directory.service_key()) })))
+        Ok(Json(ServiceKeyView {
+            ed25519: hex(&directory.service_key()),
+        }))
     })
 }
 
 async fn receipt(
     State(state): State<Arc<AppState>>,
     Path(index): Path<u64>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ReceiptPage>, ServerError> {
     with_directory(&state, |directory| {
         let log = directory.log()?;
         let message =
@@ -49,11 +53,14 @@ async fn receipt(
                 .ok_or_else(|| ServerError::RequestMalformed {
                     reason: format!("the directory holds no receipt for leaf {index}"),
                 })?;
-        Ok(Json(json!({
-            "receipt": receipt_json(&receipt),
-            "message": message,
-            "checkpoint": { "tree_size": tree_size, "root": hex(&root) },
-            "inclusion_proof": hex(proof.as_bytes()),
-        })))
+        Ok(Json(ReceiptPage {
+            receipt: receipt_view(&receipt),
+            message,
+            checkpoint: CheckpointView {
+                tree_size,
+                root: hex(&root),
+            },
+            inclusion_proof: hex(proof.as_bytes()),
+        }))
     })
 }

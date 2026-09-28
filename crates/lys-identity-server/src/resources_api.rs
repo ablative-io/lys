@@ -19,7 +19,7 @@ use crate::routes::AppState;
 use crate::session::now;
 
 /// One resource, and the grants on it the caller may see.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ResourceSummary {
     /// The resource's kind.
     pub kind: String,
@@ -34,7 +34,7 @@ pub struct ResourceSummary {
 }
 
 /// The answer of `GET /resources`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ResourceList {
     /// The kinds the listed resources are of, in the order of their names.
     pub kinds: Vec<String>,

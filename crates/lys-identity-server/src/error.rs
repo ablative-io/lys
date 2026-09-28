@@ -14,6 +14,9 @@ pub enum ServerError {
     /// A grant refusal, from the grants' one authority owner.
     #[error(transparent)]
     Grant(#[from] GrantError),
+    /// An apps refusal: a registration, a schema, a kind or an app's credential.
+    #[error(transparent)]
+    App(#[from] crate::apps_error::AppError),
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,

@@ -129,6 +129,29 @@ pub fn relationships_of(grant: &Grant) -> Vec<Relationship> {
     ]
 }
 
+/// The relation a resource of an app kind is placed in its parent by: the
+/// schema's `parent_` and the parent kind's name within its app, so each
+/// parent kind of a kind has a relation of its own.
+pub fn parent_relation(parent_kind: &str) -> String {
+    let local = parent_kind
+        .split_once('.')
+        .map_or(parent_kind, |(_, local)| local);
+    format!("{}{local}", super::schema::PARENT_RELATION)
+}
+
+/// The relationship placing `child` in `parent`, through which the relations
+/// held on the parent flow down to the child. It carries no grant and no end:
+/// it says where a resource is, never who may act on it.
+pub fn placement(child: &Resource, parent: &Resource) -> Relationship {
+    Relationship {
+        resource: ObjectRef::resource(child),
+        relation: parent_relation(parent.kind()),
+        subject: ObjectRef::resource(parent),
+        subject_relation: None,
+        ends_at: None,
+    }
+}
+
 /// A permission engine holding relationships at a revision.
 pub trait RelationshipStore {
     /// The number of grant events the relationships reflect.

@@ -1,0 +1,26 @@
+id: no-app-names-rust
+snapshots:
+  // the Cambium client:
+    labels:
+    - source: // the Cambium client
+      style: primary
+      start: 0
+      end: 21
+  'const BLUE: &str = "#6B96D1"; // Aion blue':
+    labels:
+    - source: // Aion blue
+      style: primary
+      start: 30
+      end: 42
+  'const NAME: &str = "manifold";':
+    labels:
+    - source: manifold
+      style: primary
+      start: 20
+      end: 28
+  fn argus_seat() {}:
+    labels:
+    - source: argus_seat
+      style: primary
+      start: 3
+      end: 13

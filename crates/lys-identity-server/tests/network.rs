@@ -126,6 +126,7 @@ async fn a_machine_the_route_does_not_take_is_refused_by_name_and_kept_nowhere()
         .post("/network/machines", Some(&ada), &stranger)
         .await?;
     assert_ne!(answer.0, 200, "a person is not an agent: {}", answer.1);
+    assert_eq!(answer.1["refusal"], "IdentifierMalformed", "{}", answer.1);
     let (_, seen) = service.get("/network", Some(&ada)).await?;
     assert_eq!(seen["machines"], json!([]));
     Ok(())

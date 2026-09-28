@@ -151,7 +151,7 @@ fn id001_deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResu
         assert!(!leaks(&first_text, &secret) && !leaks(&second_text, &secret));
     }
 
-    let expected: BTreeSet<String> = ["rauthy", "lys-platform", "cambium"]
+    let expected: BTreeSet<String> = ["rauthy", "lys-platform", "app"]
         .into_iter()
         .map(str::to_string)
         .collect();
@@ -168,11 +168,11 @@ fn id001_deploy_fresh_install_is_ready_and_configure_is_idempotent() -> TestResu
         platform["redirect_uris"],
         serde_json::json!(["http://localhost:8490/auth/callback"])
     );
-    let cambium = rauthy_json(&deployment, "GET", "/auth/v1/clients/cambium")?;
-    assert_eq!(cambium["access_token_alg"], "RS256");
-    assert_eq!(cambium["id_token_alg"], "RS256");
+    let app = rauthy_json(&deployment, "GET", "/auth/v1/clients/app")?;
+    assert_eq!(app["access_token_alg"], "RS256");
+    assert_eq!(app["id_token_alg"], "RS256");
     assert_eq!(
-        cambium["redirect_uris"],
+        app["redirect_uris"],
         serde_json::json!(["http://localhost:8400/auth/oidc/callback"])
     );
     Ok(())
