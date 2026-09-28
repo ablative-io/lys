@@ -782,6 +782,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
 | `crates/lys-identity-server/tests/apps_connect.rs` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
 | `surface/identity/src/features/apps/ConnectRequest.tsx` | An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code | DIRECTORY-059 |
+| `crates/lys-identity-server/src/session.rs` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
+| `surface/identity/src/features/sessions/Sessions.tsx` | Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app | DIRECTORY-059 |
 
 ## Inventory
 

@@ -1441,7 +1441,7 @@
         },
         {
           "id": "C414",
-          "text": "Signing out of Lys ends the person's sessions at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).",
+          "text": "Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app (DIRECTORY-059 R4).",
           "done": false
         },
         {

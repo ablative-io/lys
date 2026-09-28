@@ -3446,6 +3446,16 @@
       "path": "surface/identity/src/features/apps/ConnectRequest.tsx",
       "note": "An app asks for its registration, an administrator approves it on one screen, and the app receives its secret by a one-time code",
       "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity-server/src/session.rs",
+      "note": "Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "surface/identity/src/features/sessions/Sessions.tsx",
+      "note": "Signing out of Lys signs the person out at the issuer, and the issuer tells every registered app",
+      "brief": "DIRECTORY-059"
     }
   ],
   "inventory": [
