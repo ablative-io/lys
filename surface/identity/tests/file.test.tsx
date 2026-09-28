@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable } from './harness';
-import { unmountAll } from './harness';
 import { ADA, REVIEWER, SCRIBE, SERVICE, refused } from './fixtures';
 
 describe("An agent's file", () => {
