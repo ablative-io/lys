@@ -65,7 +65,38 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/error.rs",
+            "change": "modified",
+            "note": "Gains ReadOnly { path, operation } and RepairPending { pinned_tree_size, leaves } with the brief's messages and docs; LeafDurabilityUncertain was already present and is unchanged; no line removed."
+          },
+          {
+            "path": "crates/lys-log-store/src/store.rs",
+            "change": "modified",
+            "note": "LeafStore::put_leaf's # Errors gains a line and link definition naming StoreError::LeafDurabilityUncertain; doc comments only."
+          }
+        ],
+        "how": "Row 1 and row 2 (test `the_uncertain_error_names_its_index_its_cause_and_the_reopen`): not added under that name. The same assertions already exist in crates/lys-log-store/src/file_tests/after_link.rs:256 `leaf_durability_uncertain_names_its_index_and_its_source`, landed with 770f234/a426b9a before this round, and error.rs:52-67 already holds the variant with the exact message. Row 3: met, store.rs put_leaf # Errors now links StoreError::LeafDurabilityUncertain. Row 4: met, the store.rs diff touches doc lines only. Row 5: not met as written. The error.rs diff removes no line but adds two variants (ReadOnly, RepairPending), not three, because LeafDurabilityUncertain already existed on this branch. Blocked because the brief was written against a tree without the variant, and rows 1, 2 and 5 cannot be met literally without duplicating an existing test or re-adding an existing variant.",
+        "deviation": "LeafDurabilityUncertain pre-existed on the branch (with a sibling ReopenRequired variant the brief does not know about). I did not re-add it or duplicate its test under the brief's name.",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "StoreError::ReadOnly { path: PathBuf, operation: &'static str } is documented in error.rs."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "Unchanged Log::open behaviour still refuses a pin mismatch with PinMismatch carrying both trees; this brief does not alter it."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -92,7 +123,38 @@
       "stories": [
         "S1",
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "put_leaf_with refuses a read-only handle before any other check; the temp-file write path (file/leaves.rs) is unchanged."
+          }
+        ],
+        "how": "The behaviour is already on the branch in crates/lys-log-store/src/file/leaves.rs. leaf_temp_name at :34 builds `.pid-<20-digit index>-seq.tmp`. create_leaf_temp at :78 uses create_new and retries the next sequence on AlreadyExists. write_leaf_temp at :47 writes, sync_alls and discards its own temp on failure. put_leaf_with at file.rs takes next_sequence, and put_leaf passes next_process_sequence over one atomic. Differences from the brief: create_leaf_temp bounds retries at LEAF_TEMP_ATTEMPTS and then returns LeafTempNamesTaken. The tests carry other names: `leaf_temp_name_differs_by_sequence_and_by_pid`, `a_taken_temporary_name_is_skipped_and_never_replaced`, `two_handles_writing_in_turn_leave_no_temporary_names`, `a_write_failing_before_the_link_leaves_no_leaf` (file_tests.rs, uses a failing write_contents closure rather than a flush fault) and `a_refused_link_leaves_no_temporary_file`. `a_failed_temporary_write_leaves_no_temporary_file` does not exist by that name; the assertion lives inside `a_write_failing_before_the_link_leaves_no_leaf`. The leaf_path row is met: in put_leaf_with, leaf_path's value goes only to link_leaf, which calls std::fs::hard_link. Blocked: the named test rows cannot all be met without renaming or duplicating existing tests, which the brief forbids.",
+        "deviation": "Kept the branch's existing implementation, including the LEAF_TEMP_ATTEMPTS bound and LeafTempNamesTaken, which the brief does not describe. I did not rename existing tests to the brief's names.",
+        "checklist": [
+          {
+            "id": "C2",
+            "done": true,
+            "note": "StoreError::RepairPending { pinned_tree_size, leaves } is documented in error.rs."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "A handle from FileLeafStore::open_read_only refuses put_leaf, pin and put_snapshot with ReadOnly (file.rs refuse_if_read_only)."
+          },
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "Log::open_at_pin reports pending_repair and refuses appends with RepairPending; Anchor::open_read_only surfaces it through AnchorStatus."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -116,7 +178,33 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "No change to the link itself; see R2 and R5."
+          }
+        ],
+        "how": "Already on the branch: link_leaf in crates/lys-log-store/src/file/leaves.rs:117 uses std::fs::hard_link. AlreadyExists gives LeafAlreadyWritten after discarding its own temp; any other failure gives Io naming both paths. Row 1: the test exists as `no_replace_link_alone_refuses_a_leaf_this_store_never_saw` (file_tests.rs), not the brief's `the_link_alone_refuses_a_leaf_this_store_never_saw`, with the same assertions. Row 2: `a_refused_link_leaves_no_temporary_file` exists in file_tests/after_link.rs:268. Row 3: `a_reused_index_is_refused_by_the_ordinary_route_too` is unchanged. Row 4: `grep -n 'fs::rename' file.rs` prints one line, in write_state. Blocked only on the row-1 name, which the branch already renamed differently in a426b9a.",
+        "deviation": "Did not rename no_replace_link_alone_refuses_a_leaf_this_store_never_saw again; it already names the link rather than create_new.",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": "FileLeafStore::open_read_only runs open's checks through open_as with Access::ReadOnly, skipping only the leaves/ flush, and writes nothing."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": false,
+            "note": "Witness observation cost is not touched by this brief."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -144,7 +232,43 @@
       "stories": [
         "S1",
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "No change to the after-link steps; the read-only refusal now precedes them."
+          }
+        ],
+        "how": "Already on the branch: in put_leaf_with the extent advances at the link. A failed temp removal is recorded in left_behind and still returns Ok. A failed leaves/ flush returns LeafDurabilityUncertain with the flush's own error and sets durability_uncertain. Tests exist under other names in file_tests/after_link.rs: `a_temporary_name_that_cannot_be_removed_still_commits_the_leaf`, `a_failed_directory_flush_is_named_and_halts_the_handle_until_reopen` and `a_failed_directory_flush_carries_the_flush_error_as_its_source` (TimedOut, 'injected leaves directory flush failure'). The refusal row is NOT met as written. After an uncertain flush the handle refuses further put_leaf with StoreError::ReopenRequired { index }, an existing documented variant asserted by an existing test (after_link.rs:216), not with LeafDurabilityUncertain. Changing it would change an existing variant's documented meaning and an existing test's assertion, both of which the brief forbids. Blocked on that conflict.",
+        "deviation": "Kept ReopenRequired as the refusal after an uncertain flush, rather than LeafDurabilityUncertain as R4 specifies, because the brief also forbids changing any existing variant's documentation or any existing test's assertions.",
+        "checklist": [
+          {
+            "id": "C4",
+            "done": false,
+            "note": "This checklist line says open_read_only returns RepairPending; R11 and R12 specify that open_read_only opens and Log::open_at_pin reports the pending repair, which is what was built. No store byte changes in either case."
+          },
+          {
+            "id": "C5",
+            "done": true,
+            "note": "a_read_only_handle_refuses_put_leaf_by_name asserts ReadOnly and an identical (path, bytes) set before and after."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "See R2."
+          },
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "See R1."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -179,7 +303,83 @@
         "S5",
         "S6",
         "S7"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/error.rs",
+            "change": "modified",
+            "note": "StoreError::ReadOnly with message `refusing to {operation} in the log store at {path}: it was opened read-only`."
+          },
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "Private Access enum and access field. open and the new open_read_only both go through a private open_as(dir, access, flush_leaves); a writable open flushes leaves/ before probed_extent and fails with Io naming the leaves directory and the flush. refuse_if_read_only guards put_leaf_with ('write a leaf'), pin ('pin a root') and put_snapshot ('write a snapshot')."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests/read_only.rs",
+            "change": "created",
+            "note": "a_read_only_open_never_flushes_the_leaves_directory, a_writable_open_whose_leaves_flush_fails_is_refused_and_writes_nothing, a_read_only_handle_refuses_put_leaf_by_name, a_read_only_handle_refuses_pin_by_name, a_read_only_handle_refuses_a_snapshot_write_by_name."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Declares the read_only test module and adds a drift table for the two opens."
+          }
+        ],
+        "how": "Row 1: in open_as (file.rs), the writable branch calls flush_leaves (sync_dir, which fsync_dir wraps) on leaves/ before probed_extent. probed_extent superseded contiguous_extent at open in 33d9068. Row 2: `a_leftover_temporary_file_is_ignored_at_open` already exists in file_tests.rs and asserts the same things. It writes b\"leaf-1-never-linked\" rather than b\"torn\"; a sibling test, `open_leaves_a_leftover_temporary_file_byte_identical`, checks the leftover is unchanged. Rows 3 to 6: met by the four same-named tests in file_tests/read_only.rs. Each uses FileLeafStore::open_as with a TimedOut 'injected leaves directory flush failure' flush, or open_read_only, and compares a (relative path, bytes) set, or raw_leaf_hash of state.json, before and after. Row 7: the existing test is `an_unexpected_leaves_entry_is_found_by_the_audit_but_dotfiles_are_ignored` (renamed on the branch by 33d9068) and is unchanged. Neither open deletes, renames or writes a file.",
+        "deviation": "put_snapshot is also refused on a read-only handle (operation 'write a snapshot', with its own test), because a snapshot write is a write and S1 asks that every write be refused. The open-time fault is injected through a private open_as function-pointer parameter, matching the branch's existing AfterLink seam, rather than a cfg(test)-only field.",
+        "checklist": [
+          {
+            "id": "C6",
+            "done": true,
+            "note": "a_read_only_handle_refuses_pin_by_name: ReadOnly 'pin a root', pinned stays 1, and state.json's hash is unchanged."
+          },
+          {
+            "id": "C7",
+            "done": true,
+            "note": "Log test and a_writable_open_repairs_the_log_a_reader_found_one_leaf_ahead: FileLeafStore::open + Log::open gives recovered_to Some(2)."
+          },
+          {
+            "id": "C12",
+            "done": false,
+            "note": "The new module-doc section does not state that FileLeafStore::leaf serves unchecked bytes; not asked by R5/R6's rows."
+          },
+          {
+            "id": "C14",
+            "done": true,
+            "note": "open_read_only is a documented inherent constructor sharing open's checks via open_as; the LeafStore trait is unchanged."
+          },
+          {
+            "id": "C16",
+            "done": true,
+            "note": "pin calls refuse_if_read_only before its monotonic and root checks."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "See R2."
+          },
+          {
+            "id": "S5",
+            "satisfied": true,
+            "note": "The read-only handle refuses put_leaf, pin and put_snapshot, and tests assert no byte changes."
+          },
+          {
+            "id": "S6",
+            "satisfied": true,
+            "note": "The read-only anchor reports pending_repair and a notice in words, and changes nothing."
+          },
+          {
+            "id": "S7",
+            "satisfied": true,
+            "note": "file.rs module doc section '# A named leaf is whole' states open never deletes a leftover temporary file."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -200,7 +400,27 @@
       "checklist": [
         "C8"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "Module docs gain '# A named leaf is whole', appended after Durability."
+          }
+        ],
+        "how": "Row 1: file.rs module docs contain `//! # A named leaf is whole`. Row 2: the section names LeafDurabilityUncertain, open_read_only and 'commit point', and states '**Open never deletes a leftover temporary file**'. It also covers the writable open's flush and Io failure, the read-only count without a flush, the handle refusing appends until reopened, own-temp removal, and that stranded-temp clearing is out of scope. It scopes directory flushes to unix. Row 3: the section is appended after the Durability section, and no existing module-doc line is changed or removed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C8",
+            "done": true,
+            "note": "Unchanged Log::open still refuses a torn leaf inside the pinned prefix with PinMismatch (log_tests a_tampered_leaf_byte_is_detected_at_open)."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R7",
@@ -222,7 +442,27 @@
       "checklist": [
         "C9"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file.rs",
+            "change": "modified",
+            "note": "The open-time flush is a function-pointer parameter of the private open_as."
+          }
+        ],
+        "how": "The branch already carried a fault seam of a different shape: the AfterLink struct of function pointers (remove_temp, flush_dir) with AFTER_LINK as the production value, plus put_leaf_with's write_contents closure. I extended the same shape to open: private open_as takes flush_leaves, and tests pass a failing function. Rows met: the injected flush error is std::io::Error::new(TimedOut, \"injected leaves directory flush failure\") (file_tests/read_only.rs refuse_flush, after_link.rs refuse_flush); the seam items are private with no pub/pub(crate)/pub(super); no #[allow] was added. Row not met: the seam is not compiled only under cfg(test), since AfterLink and open_as are used by production with the real steps. Blocked on that row, because the existing seam predates this brief and replacing it would rewrite existing tests.",
+        "deviation": "Used the branch's existing function-pointer seam pattern (not cfg(test)-only) instead of a cfg(test) fault field and enum.",
+        "checklist": [
+          {
+            "id": "C9",
+            "done": true,
+            "note": "Unchanged Log::open repairs a one-leaf-ahead store and reports recovered_to (log_tests crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it)."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R8",
@@ -247,7 +487,37 @@
         "C10",
         "C11"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/file_tests.rs",
+            "change": "modified",
+            "note": "Adds the read_only module and a drift table for the open-time flush and read-only refusals."
+          },
+          {
+            "path": "crates/lys-log-store/src/file_tests/read_only.rs",
+            "change": "created",
+            "note": "The five read-only/open-flush tests."
+          }
+        ],
+        "how": "Added the five tests R5 needs, plus a module-doc drift table in file_tests.rs, one row per injection, each naming one case. The cases are injections 14, 15, 17 and 18, plus a put_snapshot refusal row. The other named tests of R1 to R4 exist under the branch's names (see R1 to R4), and the absent-check table already names the no-replace link and `no_replace_link_alone_refuses_a_leaf_this_store_never_saw`. `grep -c create_new file_tests.rs` is 0. No existing assert line was removed. file.rs has 341 non-blank, non-comment lines. Not met: file::tests now runs 45 tests, not 40, since the branch already had 40. The drift table does not hold seventeen rows for injections 1-12 and 14-18. I ran no drift injection, because this session's instructions forbid running tests.",
+        "deviation": "Drift injections were reasoned per case, not applied and run: this session was told to run no test command. The table covers the checks this round added, not the seventeen the brief lists against test names this branch does not use.",
+        "checklist": [
+          {
+            "id": "C10",
+            "done": false,
+            "note": "FileLeafStore::leftover_temporaries is not in this brief's requirements and was not built."
+          },
+          {
+            "id": "C11",
+            "done": true,
+            "note": "file.rs '# A named leaf is whole' states what open and open_read_only do and never do."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R9",
@@ -272,7 +542,38 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-003.json",
+            "change": "modified",
+            "note": "depends_on is now [\"DIRECTORY-002\", \"LYSLOGSTORE-001\"]; no other field changed."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-003.md",
+            "change": "modified",
+            "note": "Re-rendered by scripts/design/render-cluster.py; only the Depends on line changes."
+          }
+        ],
+        "how": "Row 1: depends_on is ['DIRECTORY-002', 'LYSLOGSTORE-001']. Row 2: the JSON diff is one added list element, so the objects without depends_on are equal. Row 3: git status lists only those two files under docs/design/directory. Rendering the whole directory cluster changed no other file. Row 4: DIRECTORY-003.md is render-cluster.py's output. check-coverage only warns on a cross-cluster dependency.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C13",
+            "done": true,
+            "note": "ReadOnly and RepairPending carry no leaf index; no existing variant changed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "See R2."
+          }
+        ]
+      }
     },
     {
       "id": "R10",
@@ -298,7 +599,43 @@
       ],
       "stories": [
         "S6"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/anchor/read_only.rs",
+            "change": "modified",
+            "note": "Both doc examples open the store with FileLeafStore::open_read_only."
+          },
+          {
+            "path": "crates/lys-anchor/src/anchor/read_only_tests.rs",
+            "change": "modified",
+            "note": "The read_only helper and the genesis-refusal test open with FileLeafStore::open_read_only."
+          },
+          {
+            "path": "crates/lys-anchor/tests/standalone_is_complete.rs",
+            "change": "modified",
+            "note": "The one store opened for Anchor::open_read_only uses FileLeafStore::open_read_only."
+          }
+        ],
+        "how": "Row 1: grep -c 'FileLeafStore::open_read_only' gives read_only.rs 2, read_only_tests.rs 2 and standalone_is_complete.rs 1. Row 2: grep -A1 'Anchor::open_read_only(' over the three files shows no 'FileLeafStore::open('. Row 3: git diff --name-only -- crates/lys-anchor lists exactly read_only.rs, read_only_tests.rs, status.rs and tests/standalone_is_complete.rs, and the standalone diff is the one line containing FileLeafStore::open_read_only. Row 4: not run by me. The post-edit hook's clippy run over lys-anchor reported nothing, and the compile_fail doctest still differs from its positive control only by the publish_checkpoint line.",
+        "deviation": "The two doc examples' `let reader =` statements were re-wrapped over four lines so the longer constructor fits.",
+        "checklist": [
+          {
+            "id": "C15",
+            "done": true,
+            "note": "a_read_only_handle_refuses_put_leaf_by_name: ReadOnly, and no byte changes."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S6",
+            "satisfied": true,
+            "note": "See R5."
+          }
+        ]
+      }
     },
     {
       "id": "R11",
@@ -323,7 +660,43 @@
       ],
       "stories": [
         "S7"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-log-store/src/error.rs",
+            "change": "modified",
+            "note": "StoreError::RepairPending with the brief's message and documentation."
+          },
+          {
+            "path": "crates/lys-log-store/src/log.rs",
+            "change": "modified",
+            "note": "Log gains a pending_repair field (set only by open_at_pin; None in Log::open's literal), Log::open_at_pin, Log::pending_repair, a Debug field, and Log::append's leading RepairPending check with its # Errors line."
+          },
+          {
+            "path": "crates/lys-log-store/src/log_tests.rs",
+            "change": "modified",
+            "note": "Adds a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_is_pending."
+          }
+        ],
+        "how": "open_at_pin reads every leaf, rebuilds the tree and compares it with the pin without calling store.pin. When they are equal it returns as Log::open would. When there is exactly one extra leaf and the prefix root matches, it truncates to the pinned prefix, keeps the prefix tree and sets pending_repair = Some(extent). Anything else is PinMismatch. append checks pending_repair first and returns RepairPending { pinned_tree_size: tree.len(), leaves }, never Poisoned and without calling put_leaf. Rows 1 and 2 are the log_tests test: tree len 1, pending Some(2), recovered None, pinned 1, and a RepairPending refusal with the exact message that is not Poisoned. leaves/ then holds exactly two names and state.json is byte-identical. Then Log::open repairs to 2 (pending None), and append returns index 2, tree 3 and pin 3. Row 3: the log.rs diff removes no line from Log::open, reconcile_with_pin or Log::append. Log::open gains only the `pending_repair: None,` initializer the new field requires, and Log::append gains only the RepairPending check.",
+        "deviation": "Log::open's struct literal gains one initializer line, `pending_repair: None`, because Log gained a field; its behaviour is unchanged.",
+        "checklist": [
+          {
+            "id": "C17",
+            "done": false,
+            "note": "As with C4, this line has open_read_only return RepairPending; the requirements place the refusal on Log::append after Log::open_at_pin, which is what was built."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S7",
+            "satisfied": true,
+            "note": "See R5."
+          }
+        ]
+      }
     },
     {
       "id": "R12",
@@ -350,7 +723,43 @@
       ],
       "stories": [
         "S7"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-anchor/src/anchor/read_only.rs",
+            "change": "modified",
+            "note": "Opens its log with Log::open_at_pin; module docs gain '# A reader never repairs', and the function docs say it opens at the pinned head, reports pending_repair, and that only a writable open repairs."
+          },
+          {
+            "path": "crates/lys-anchor/src/anchor/status.rs",
+            "change": "modified",
+            "note": "AnchorStatus gains pending_repair: Option<u64>, read from the log in status(), and pending_repair_notice()."
+          },
+          {
+            "path": "crates/lys-anchor/src/anchor/read_only_tests.rs",
+            "change": "modified",
+            "note": "Adds a_reader_opens_a_log_one_leaf_ahead_at_its_pin_and_reports_the_pending_repair, a_writable_open_repairs_the_log_a_reader_found_one_leaf_ahead and a_reader_over_a_clean_log_reports_no_pending_repair."
+          }
+        ],
+        "how": "Rows 1 to 3 are the three tests. First: tree_size 1, recovered_to None, pending_repair Some(2), the exact notice, and state.json unchanged. Second: Log::open repairs to 2, then a reader reports tree_size 2 with no pending repair or notice. Third: a clean log reports none of the three. Row 4: read_only.rs has Log::open_at_pin and no 'Log::open('. Row 5: the module docs contain 'never repairs' and 'pending_repair'. The old sentence saying an interrupted append is repaired is removed. The genesis refusal and Anchor::open are unchanged, and no existing AnchorStatus field changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C18",
+            "done": true,
+            "note": "a_writable_open_repairs_the_log_a_reader_found_one_leaf_ahead: FileLeafStore::open + Log::open gives recovered_to Some(2)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S7",
+            "satisfied": true,
+            "note": "See R5."
+          }
+        ]
+      }
     },
     {
       "id": "R13",
@@ -374,7 +783,21 @@
       "checklist": [
         "C19"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [],
+        "how": "I ran scripts/design/render-cluster.py over docs/design/lys-log-store. It reproduced DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSLOGSTORE-001.md byte for byte, so none needed a change. Row 1: all four files exist. Row 2: the render matches the committed files, so the gate prints no 'rendered markdown differs' for this cluster. Row 3: BACKENDS.md is unchanged.",
+        "deviation": "No file changed: the committed markdown already equalled what the renderer produces from the current JSON.",
+        "checklist": [
+          {
+            "id": "C19",
+            "done": true,
+            "note": "file.rs '# A named leaf is whole' states open never deletes a leftover temporary file."
+          }
+        ],
+        "stories": []
+      }
     }
   ],
   "boundaries": [

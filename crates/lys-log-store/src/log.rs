@@ -61,6 +61,10 @@ pub struct Log<S: LeafStore> {
     tree: AppendOnlyTree<RawLeaf>,
     recovered_to: Option<u64>,
     poisoned: bool,
+    /// The tree size a writable open would repair to, when this log was opened
+    /// at its pin with one leaf standing ahead of it. Only
+    /// [`Log::open_at_pin`] sets it.
+    pending_repair: Option<u64>,
 }
 
 impl<S: LeafStore> std::fmt::Debug for Log<S> {
@@ -72,6 +76,7 @@ impl<S: LeafStore> std::fmt::Debug for Log<S> {
             .field("num_leaves", &self.leaves.len())
             .field("recovered_to", &self.recovered_to)
             .field("poisoned", &self.poisoned)
+            .field("pending_repair", &self.pending_repair)
             .finish_non_exhaustive()
     }
 }
@@ -112,9 +117,69 @@ impl<S: LeafStore> Log<S> {
             tree,
             recovered_to: None,
             poisoned: false,
+            pending_repair: None,
         };
         log.reconcile_with_pin()?;
         Ok(log)
+    }
+
+    /// Opens a log over `store` at its pin, never pinning: loads every leaf,
+    /// rebuilds the tree, and compares it with the pinned root as
+    /// [`Log::open`] does, but repairs nothing.
+    ///
+    /// For a reader, whose open must not change the store. When the rebuilt
+    /// tree equals the pin, the log is the one [`Log::open`] returns. When the
+    /// store holds exactly one leaf more than the pin and the pinned-size
+    /// prefix rebuilds to the pinned root — the append interrupted between
+    /// storing its leaf and advancing the pin that [`Log::open`] repairs — the
+    /// log holds the pinned prefix only, reports the tree size a writable open
+    /// repairs to through [`pending_repair`](Self::pending_repair), and refuses
+    /// every append with [`StoreError::RepairPending`]. The store's
+    /// [`pin`](LeafStore::pin) is never called.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::PinMismatch`] for any other divergence,
+    /// [`StoreError::LeafMissingWithinExtent`] if the store breaks its own
+    /// contiguity promise, and whatever the store returns while reading leaves.
+    pub fn open_at_pin(store: S) -> StoreResult<Self> {
+        let extent = store.extent();
+        let mut leaves = Vec::with_capacity(usize::try_from(extent).unwrap_or(0));
+        for index in 0..extent {
+            let leaf = store
+                .leaf(index)?
+                .ok_or(StoreError::LeafMissingWithinExtent { index, extent })?;
+            leaves.push(leaf);
+        }
+        let tree = AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves(&leaves);
+        let (rebuilt_root, rebuilt_size) = tree.root().to_parts();
+        let pinned = store.pinned();
+        let mut log = Self {
+            store,
+            leaves,
+            tree,
+            recovered_to: None,
+            poisoned: false,
+            pending_repair: None,
+        };
+        if rebuilt_size == pinned.tree_size && rebuilt_root == pinned.root {
+            return Ok(log);
+        }
+        if rebuilt_size == pinned.tree_size + 1 {
+            let prefix = log.prefix_tree(pinned.tree_size)?;
+            if prefix.root().to_parts().0 == pinned.root {
+                log.leaves.truncate(log.leaves.len().saturating_sub(1));
+                log.tree = prefix;
+                log.pending_repair = Some(rebuilt_size);
+                return Ok(log);
+            }
+        }
+        Err(StoreError::PinMismatch {
+            pinned_size: pinned.tree_size,
+            pinned_root: STANDARD.encode(pinned.root),
+            rebuilt_size,
+            rebuilt_root: STANDARD.encode(rebuilt_root),
+        })
     }
 
     /// Compares the rebuilt tree against the pin, applying the single
@@ -155,6 +220,14 @@ impl<S: LeafStore> Log<S> {
         self.recovered_to
     }
 
+    /// The tree size a writable open would repair this log to, when it was
+    /// opened by [`Log::open_at_pin`] with one leaf standing ahead of its pin.
+    /// `None` when no repair is pending, and always `None` for a log from
+    /// [`Log::open`], which performs the repair itself.
+    pub fn pending_repair(&self) -> Option<u64> {
+        self.pending_repair
+    }
+
     /// Appends raw leaf bytes: stores the leaf durably, extends the tree, then
     /// advances the pin. Returns the new leaf's index and its RFC 6962 leaf
     /// hash.
@@ -165,7 +238,15 @@ impl<S: LeafStore> Log<S> {
     /// [`StoreError::LeafAlreadyWritten`] if another writer took this index.
     /// [`StoreError::Poisoned`] if an earlier append on this handle failed
     /// after storing its leaf (see the module docs on append order).
+    /// [`StoreError::RepairPending`] if the log was opened at its pin with one
+    /// leaf standing ahead of it; see [`Log::open_at_pin`].
     pub fn append(&mut self, leaf_bytes: &[u8]) -> StoreResult<(u64, [u8; 32])> {
+        if let Some(leaves) = self.pending_repair {
+            return Err(StoreError::RepairPending {
+                pinned_tree_size: self.tree.len(),
+                leaves,
+            });
+        }
         if self.poisoned {
             return Err(StoreError::Poisoned);
         }

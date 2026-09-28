@@ -3,7 +3,8 @@
   "cluster": "directory",
   "title": "Build the directory contract and signed authoritative identity changes",
   "depends_on": [
-    "DIRECTORY-002"
+    "DIRECTORY-002",
+    "LYSLOGSTORE-001"
   ],
   "blocked_by": [
     "Waffles' review of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until Waffles has reviewed it)",

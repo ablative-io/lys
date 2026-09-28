@@ -246,6 +246,44 @@ pub enum StoreError {
         expected: u32,
     },
 
+    /// A write was refused because the store was opened read-only.
+    ///
+    /// A handle from
+    /// [`FileLeafStore::open_read_only`](crate::FileLeafStore::open_read_only)
+    /// reads and never writes: a leaf, a pin and a snapshot are each a write,
+    /// and reading the log must never change the evidence it reads. Only a
+    /// handle from [`FileLeafStore::open`](crate::FileLeafStore::open) writes.
+    #[error(
+        "refusing to {operation} in the log store at {}: it was opened read-only",
+        path.display()
+    )]
+    ReadOnly {
+        /// The store's directory.
+        path: PathBuf,
+        /// The act that was refused, such as `write a leaf` or `pin a root`.
+        operation: &'static str,
+    },
+
+    /// An append was refused because the log was opened at its pin with one
+    /// leaf standing ahead of the pin.
+    ///
+    /// The log was opened by [`Log::open_at_pin`](crate::Log::open_at_pin),
+    /// which never pins, so the leaf an interrupted append stored is still
+    /// ahead of the pin. Appending would meet that leaf at the next index, and
+    /// the store never reports its own leaf as another writer's. A writable
+    /// open ([`Log::open`](crate::Log::open) over a handle from
+    /// [`FileLeafStore::open`](crate::FileLeafStore::open)) must repair it
+    /// before any append.
+    #[error(
+        "refusing to append: the log has a pending repair, its store holds {leaves} leaves but its pin is at tree size {pinned_tree_size}; a writable open must repair it before any append"
+    )]
+    RepairPending {
+        /// The pin's tree size the log was opened at.
+        pinned_tree_size: u64,
+        /// The count of leaves the store held.
+        leaves: u64,
+    },
+
     /// The log refused further use because an earlier append failed partway.
     ///
     /// An append writes the leaf durably and *then* advances the pin. If the

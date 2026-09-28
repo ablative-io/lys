@@ -152,8 +152,8 @@ impl fmt::Display for WitnessPosture {
     }
 }
 
-/// What an anchor reports about itself: identity, extent, root, posture, and
-/// whether opening it repaired anything.
+/// What an anchor reports about itself: identity, extent, root, posture,
+/// whether opening it repaired anything, and whether a repair is pending.
 ///
 /// **Nothing here is signed**, and the type offers no way to make it look as
 /// though it were. It is the answer to "what does this anchor hold", read off
@@ -182,6 +182,15 @@ pub struct AnchorStatus {
     /// second call. A repair the operator never hears about is
     /// indistinguishable from one that never happened.
     pub recovered_to: Option<u64>,
+    /// The tree size a writable open would repair the log to, when this anchor
+    /// was opened read-only over a store standing one leaf ahead of its pin,
+    /// or `None` when no repair is pending.
+    ///
+    /// A reader never repairs, because a pin is a write; it opens at the pinned
+    /// head and says so here, and [`pending_repair_notice`](Self::pending_repair_notice)
+    /// says it in words. Only a writable open performs the repair, which it
+    /// then reports through [`recovered_to`](Self::recovered_to).
+    pub pending_repair: Option<u64>,
 }
 
 impl AnchorStatus {
@@ -191,6 +200,17 @@ impl AnchorStatus {
     /// [module docs](self) for why one fact gets one field.
     pub fn tree_size(&self) -> u64 {
         self.root.num_leaves()
+    }
+
+    /// The pending repair in words, when there is one: that one leaf stands
+    /// ahead of the pin at this status's tree size, and the tree size a
+    /// writable open repairs it to. `None` when no repair is pending.
+    pub fn pending_repair_notice(&self) -> Option<String> {
+        let repaired = self.pending_repair?;
+        Some(format!(
+            "one leaf stands ahead of the pin at tree size {}; a writable open repairs it to tree size {repaired}",
+            self.tree_size()
+        ))
     }
 }
 
@@ -217,6 +237,7 @@ impl<S: LeafStore, K, P> Anchor<S, K, P> {
             // and is not yet established by that.
             posture: WitnessPosture::Unwitnessed,
             recovered_to: self.recovered_to(),
+            pending_repair: self.log.pending_repair(),
         }
     }
 }

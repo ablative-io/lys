@@ -360,3 +360,58 @@ fn validate_origin_matches_what_a_checkpoint_would_accept() {
     }
     assert_eq!(bad_origins.len(), 3, "an empty list would pass vacuously");
 }
+
+#[test]
+fn a_log_opened_at_its_pin_leaves_the_pin_and_refuses_to_append_while_a_repair_is_pending() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    FileLeafStore::create(&dir, ORIGIN).unwrap();
+    {
+        let mut log = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
+        log.append(b"leaf-0").unwrap();
+    }
+    // An append interrupted after storing its leaf and before its pin.
+    std::fs::write(leaf_path(&dir, 1), b"an append interrupted before its pin").unwrap();
+    let state_before = std::fs::read(dir.join("state.json")).unwrap();
+
+    {
+        let mut log = Log::open_at_pin(FileLeafStore::open(&dir).unwrap()).unwrap();
+        assert_eq!(log.tree().len(), 1);
+        assert_eq!(log.pending_repair(), Some(2));
+        assert_eq!(log.recovered_to(), None);
+        assert_eq!(log.store().pinned().tree_size, 1);
+        let err = log.append(b"leaf-2").unwrap_err();
+        assert!(
+            matches!(
+                err,
+                StoreError::RepairPending {
+                    pinned_tree_size: 1,
+                    leaves: 2
+                }
+            ),
+            "{err}"
+        );
+        assert!(!matches!(err, StoreError::Poisoned), "{err}");
+        assert_eq!(
+            err.to_string(),
+            "refusing to append: the log has a pending repair, its store holds 2 leaves but its \
+             pin is at tree size 1; a writable open must repair it before any append"
+        );
+    }
+    let mut names: Vec<String> = std::fs::read_dir(dir.join("leaves"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(names, vec![format!("{:020}", 0), format!("{:020}", 1)]);
+    assert_eq!(std::fs::read(dir.join("state.json")).unwrap(), state_before);
+
+    // Only a writable open repairs it, as it always has.
+    let mut repaired = Log::open(FileLeafStore::open(&dir).unwrap()).unwrap();
+    assert_eq!(repaired.recovered_to(), Some(2));
+    assert_eq!(repaired.pending_repair(), None);
+    assert_eq!(repaired.store().pinned().tree_size, 2);
+    assert_eq!(repaired.append(b"leaf-2").unwrap().0, 2);
+    assert_eq!(repaired.tree().len(), 3);
+    assert_eq!(repaired.store().pinned().tree_size, 3);
+}
