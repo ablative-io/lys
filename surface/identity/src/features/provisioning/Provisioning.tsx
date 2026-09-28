@@ -1,3 +1,4 @@
+import { StartAgent } from '../runtime/StartAgent';
 import { ReviewProfile } from './ReviewProfile';
 /** An agent's recorded provisioning is versioned explicitly; a saved profile is not a runtime application receipt. */
 import { useState } from 'react';
@@ -35,6 +36,7 @@ export function Provisioning({ id }: { id: string }) {
       </section> : <p>No provisioning profile has been recorded.</p>}
       {authority.status === 'ok' && answer.profile ? <ReviewProfile key={id + ':' + revision} agent={id} person={authority.data.me.person.id} profile={answer.profile} changed={(message) => { setNotice(message); setRevision((value) => value + 1); }} /> : null}
       {authority.status === 'ok' && authority.data.people.scope === 'directory' ? <ProfileEditor key={id + ':' + revision} id={id} person={authority.data.me.person.id} profile={answer.profile} changed={() => { setNotice('Provisioning profile recorded.'); setRevision((value) => value + 1); }} /> : null}
+      {answer.profile?.reviewed_by ? <StartAgent agent={id} /> : <p>Review the current profile before preparing a start.</p>}
       {answer.versions.length ? <details className="card"><summary>Profile history ({answer.versions.length})</summary>{answer.versions.map((version) => <p key={version.version}>Version {version.version} · {clock(version.set_at)} · {version.note}</p>)}</details> : null}
     </>} />
     {authority.status === 'refused' ? <p className="why-not">{authority.refused.refusal.refusal}: {authority.refused.refusal.reason}</p> : null}

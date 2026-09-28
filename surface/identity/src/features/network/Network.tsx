@@ -38,6 +38,7 @@ export function Network() {
         <h2>{machine.name} <span className="note">{machine.kind} · {machine.state === 'retired' ? 'Retired' : 'Registered'}</span></h2>
         <p>Runtime: {machine.runtime ?? 'none recorded'} · Agent slots: {machine.slots}</p>
         <h3>Permitted agents</h3>{machine.may_run.length ? <ul>{machine.may_run.map((agent) => <li key={agent.id}><a href={'#/file/' + agent.id}>{agent.display_name}</a> · {agent.state}</li>)}</ul> : <p>None recorded.</p>}
+        <h3>Permitted roles</h3>{machine.may_run_roles?.length ? <ul>{machine.may_run_roles.map((id) => <li key={id}><a href={'#/roles/' + encodeURIComponent(id)}>{id}</a></li>)}</ul> : <p>None recorded.</p>}
         <h3>Permitted hosts</h3><p>{machine.may_reach.join(', ') || 'None recorded.'}</p>
         <p className="note">Last runtime report: {machine.last_report_at === null ? 'none received' : clock(machine.last_report_at)}.</p>
         <details><summary>Record details</summary><p>{machine.id} · Recorded {clock(machine.named_at)} by {machine.named_by}.</p></details>
