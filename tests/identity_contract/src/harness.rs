@@ -1,6 +1,12 @@
 //! A directory on a temporary log, a service key over a fixed seed, a store
 //! that can be told to fail an append at a chosen step, and the directory
 //! service started on a local port behind the fake issuer.
+//!
+//! The issuer is set up as the install sets it up: it names itself on the
+//! service's own origin, under `/auth/v1`, and answers only on a loopback
+//! port of its own, which the service reaches through `sign_in_api`. So a
+//! test that finds the issuer's loopback address or port in anything a
+//! browser is given finds what production would give.
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
@@ -11,7 +17,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::Directory;
 use lys_identity_server::config::ConfiguredLogin;
 use lys_identity_server::secrets_api::SecretsSettings;
-use lys_identity_server::sign_in_providers::SignInProvidersSettings;
+use lys_identity_server::sign_in_providers::{ProviderOrigins, SignInProvidersSettings};
 use lys_identity_server::spicedb::SpiceDbSettings;
 use lys_identity_server::{Config, service};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
@@ -203,12 +209,23 @@ fn secret_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
-    Ok(answer
+/// The password the harness types for a login the issuer was told to sign.
+pub const HARNESS_PASSWORD: &str = "Harness-Password-2026";
+
+/// The session cookie an answer began, or its refusal as an error.
+pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<dyn Error>> {
+    let cookie = signed_in
         .headers()
-        .get(reqwest::header::LOCATION)
-        .ok_or_else(|| format!("{} answered no redirect", answer.url()))?
-        .to_str()?
+        .get(reqwest::header::SET_COOKIE)
+        .map(|value| value.to_str().map(str::to_owned));
+    let (status, body) = answer(signed_in).await?;
+    let Some(cookie) = cookie else {
+        return Err(format!("sign-in answered {status} without a session: {body}").into());
+    };
+    Ok(cookie?
+        .split(';')
+        .next()
+        .ok_or("the session cookie is empty")?
         .to_owned())
 }
 
@@ -288,10 +305,11 @@ impl Service {
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
         secret_file(&dir.path().join("client.secret"), CLIENT_SECRET.as_bytes())?;
-        let issuer = FakeIssuer::start(&dir.path().join("issuer.key")).await?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let listen = listener.local_addr()?;
         let base = format!("http://{listen}");
+        let issuer = FakeIssuer::start_behind(&base, &dir.path().join("issuer.key")).await?;
+        issuer.set_public_callback(&format!("{base}/auth/v1/providers/callback"));
         let configured = |subject: &str| ConfiguredLogin {
             issuer: issuer.issuer().to_owned(),
             subject: subject.to_owned(),
@@ -305,7 +323,8 @@ impl Service {
             client_id: CLIENT_ID.to_owned(),
             client_secret_file: dir.path().join("client.secret"),
             redirect_url: format!("{base}/callback"),
-            administrator: configured(ADMINISTRATOR),
+            sign_in_api: Some(issuer.api().to_owned()),
+            administrator: Some(configured(ADMINISTRATOR)),
             link_audit_source: configured(LINK_AUDIT_SOURCE),
             session_seconds: 600,
             secure_cookie: false,
@@ -326,6 +345,13 @@ impl Service {
             stops_dir: Some(dir.path().join("stops")),
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
+            provider_origins: Some(ProviderOrigins {
+                google: issuer.provider_base().to_owned(),
+                microsoft: issuer.provider_base().to_owned(),
+                github: issuer.provider_base().to_owned(),
+            }),
+            provider: None,
+            setup: None,
             surface_dir: None,
         };
         adjust(&mut config);
@@ -333,7 +359,13 @@ impl Service {
         config.validate()?;
         let prepared = prepare(&config)?;
         let app = service(&config).await?;
-        tokio::spawn(async move { axum::serve(listener, app).await });
+        tokio::spawn(async move {
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await
+        });
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
@@ -348,45 +380,30 @@ impl Service {
         ))
     }
 
-    /// Begin a sign-in and let the issuer answer it as `login`, answering the
-    /// service path the issuer sends the browser back to.
-    pub async fn issuer_answer(&self, login: Login) -> Result<String, Box<dyn Error>> {
+    /// Sign in on Lys's own sign-in route as `login`, which the issuer
+    /// signs whatever password is typed, answering the session cookie.
+    pub async fn sign_in(&self, login: Login) -> Result<String, Box<dyn Error>> {
+        let email = login.email.clone();
         self.issuer.sign_in_as(login);
-        let to_issuer = self
-            .client
-            .get(format!("{}/login", self.base))
-            .send()
-            .await?;
-        let authorize = location(&to_issuer)?;
-        let back = self.client.get(authorize).send().await?;
-        let url = location(&back)?;
-        Ok(url
-            .strip_prefix(&self.base)
-            .ok_or_else(|| format!("the issuer sent the browser to {url}"))?
-            .to_owned())
+        self.sign_in_with(&email, HARNESS_PASSWORD).await
     }
 
-    /// Sign in at the issuer as `login`, answering the session cookie.
-    pub async fn sign_in(&self, login: Login) -> Result<String, Box<dyn Error>> {
-        let back = self.issuer_answer(login).await?;
+    /// Sign in on Lys's own sign-in route with `email` and `password`,
+    /// answering the session cookie, or the refusal as an error.
+    pub async fn sign_in_with(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<String, Box<dyn Error>> {
+        let body = serde_json::json!({ "email": email, "password": password });
         let signed_in = self
             .client
-            .get(format!("{}{back}", self.base))
+            .post(format!("{}/sign-in", self.base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body.to_string())
             .send()
             .await?;
-        let cookie = signed_in
-            .headers()
-            .get(reqwest::header::SET_COOKIE)
-            .map(|value| value.to_str().map(str::to_owned));
-        let (status, body) = answer(signed_in).await?;
-        let Some(cookie) = cookie else {
-            return Err(format!("sign-in answered {status} without a session: {body}").into());
-        };
-        Ok(cookie?
-            .split(';')
-            .next()
-            .ok_or("the session cookie is empty")?
-            .to_owned())
+        session_cookie(signed_in).await
     }
 
     /// GET `path`, with the session `cookie` when one is given.

@@ -70,5 +70,10 @@ name = "identity_theme"
 path = "tests/identity_theme.rs"
 test = false
 
+[[test]]
+name = "identity_install"
+path = "tests/identity_install.rs"
+test = false
+
 [lints]
 workspace = true

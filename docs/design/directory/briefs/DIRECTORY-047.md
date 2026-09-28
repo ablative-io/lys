@@ -58,6 +58,39 @@ Behavioural. Today first-run setup (crates/lys-identity-server/src/setup.rs, sur
 **Stories:**
 - S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The acceptance row now holds on a real install: identity_install.rs runs a first install with no --admin-email, and the setup route answers the setup screen. The install makes no administrator. The setup code arrives in a 0600 file because the run is headless, and setup makes the administrator and signs them in. That became possible once the issuer scheme was fixed (see R2). The real run exposed a retry defect: a setup attempted again after its account was made hit the issuer's recently-used-password refusal. Setup now tries the typed password first on an account that already existed. A drift check proves the fix: with it switched off, exactly the new test fails.
+- Deviation: R1 asks for the issuer's own password policy to be read through sign_in_api. Rauthy v0.36.2 exposes GET /auth/v1/password_policy only to a signed-in session: generic.rs:290-295 calls validate_session_auth and accepts no API key. The only other place the policy appears is a password-reset link (users.rs:1143). No read path exists for the service before a person exists, which is the case on the setup page. accounts.rs therefore still checks Rauthy's shipped default (14 to 128 characters, lower case, upper case and a digit), and the issuer checks it again on every set. Its refusal is said in Lys's words. Reading the live policy needs a ruling. One option is a non-admin machine account the service signs in as to read the policy. Another is for Lys to own the policy and write it to the issuer with Secrets:update, a right the bootstrap key does not have today. Neither was invented here.
+- Files changed:
+  - modified: `crates/lys-identity-server/src/setup.rs` — First-run setup against the one-time code. If an earlier attempt already made the account, setup now signs in with the typed password before setting it again, because the issuer refuses a password set again as recently used.
+  - created: `crates/lys-identity-server/src/accounts.rs` — make() now says whether it made the account or found it already there.
+  - created: `crates/lys-identity-server/tests/setup_page.rs` — New test: a_setup_retried_after_its_account_was_made_signs_in_with_the_password_it_set.
+  - modified: `tests/identity_contract/src/fake_rauthy.rs` — Refuses a password set again while it is the account's current one, as Rauthy's not_recently_used rule does.
+  - created: `crates/lys/src/identity/install/setup_code.rs` — Hands over the setup code; failures are said in Lys's words.
+  - modified: `surface/identity/src/features/setup/Setup.tsx` — The first-run setup screen.
+- Checklist delivery:
+  - [x] C355 — First run asks the person for the administrator's name, email and password on a Lys setup page; install fills nothing from the machine and has no default administrator (DIRECTORY-047 R1). — On a real install (identity_install.rs, passing): no administrator is made, the setup code goes to a 0600 file, the setup page answers, and setup makes the administrator and signs them in. The live password policy read is open; see the deviation.
+- Story delivery:
+  - [x] S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys. — A person sets up the first administrator on a Lys page, measured on a real install.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A first install with no --admin-email creates no administrator, prints the setup address, and the setup route answers the setup screen. — The route passes in the harness (tests/setup_page.rs the_setup_route_answers_the_setup_screen_for_the_pending_code_only: ok, my run). On a real first install the directory service never starts: deployment.template.toml:13 public_origin http plus :19 non-empty trusted_proxies gives RAUTHY_PROXY_MODE=true (prepare.rs:207-209). Rauthy v0.36.2 rauthy_config.rs:113-120 then names the issuer https, and oidc.rs discover refuses the http issuer that server_config.rs:35-38 configures. So no setup screen answers on a first install.
+  - [x] The setup route refuses by name once an administrator exists, and with a wrong or used code. — setup.rs refuses with SetupClosed/SetupCodeRefused, and admission.rs set_administrator refuses a second login. tests/setup_page.rs a_wrong_code_makes_nothing_and_a_weak_password_is_refused_before_anything_is_sent and completing_setup_makes_one_administrator_and_signs_them_in: ok.
+  - [x] Completing setup creates exactly one administrator with the entered email and leaves the person signed in to Lys. — tests/setup_page.rs completing_setup_makes_one_administrator_and_signs_them_in: ok (my run).
+  - [x] A test sets git user.email and every EMAIL-like environment variable to a marker and proves the marker appears nowhere in state, deployment.toml or the issuer. — crates/lys/tests/cli_tests/identity_setup.rs:92 nothing_about_a_person_is_taken_from_the_machine. The measured tests leg passed (exit 0).
+  - [x] The bootstrap account names no person, and a people count after setup is one. — prepare.rs BOOTSTRAP_ACCOUNT_EMAIL is a fixed machine address (asserted in identity_setup.rs). setup_page.rs completing_setup... asserts one person: ok.
+  - [x] No output line or log holds the setup code; `lys identity setup-code` lets a sole administrator set a new password. — identity_setup.rs:142 the_setup_code_is_never_printed_and_is_kept_only_as_its_digest passes (tests leg). setup_page.rs a_password_code_sets_the_administrator_a_new_password: ok. The setup files hold only the sha256 digest (setup.rs PendingCode).
+- Issues:
+  - Make a real first install start the directory service, so the setup route answers. Today the issuer scheme mismatch caused by PROXY_MODE stops it at start. This needs the brief revision named under R2.
+  - Show and check the issuer's own password policy, as the spec says, by reading the issuer's /auth/v1/password_policy through sign_in_api. Today accounts.rs:41-58 hard-codes PASSWORD_MIN=14, PASSWORD_MAX=128 and the character classes, a copy of Rauthy's default that goes wrong as soon as the issuer's policy is changed.
+
 ### R2: Password sign-in is a Lys page; the browser never reaches the issuer's pages
 
 Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today redirects to the issuer's authorize page. It serves Lys's sign-in screen instead: email, password and one button per enabled provider. The password form posts to the service, which runs the issuer's authorization server-side for the lys-platform client (including its proof of work and PKCE), completes the code exchange as /callback does today, and sets the session. A refusal is worded by Lys: wrong email or password is one message that does not say which. Provider buttons start the provider flow through the service and return through /callback; a person passes through the provider's own consent page only. The sign-in, first-run setup and account screens are Lys screens in every visible respect: built in surface/identity from the same design tokens, forms.css inputs, selects and buttons, typography, spacing and layout shell as the other screens, with Lys's name and mark; no issuer template, stylesheet, font, colour or default browser control appears on any page a person sees. Because every password sign-in reaches the issuer from the service's address, the service passes the person's address in the forwarded header and the issuer trusts that header from the service's address only (proxy mode on, trusted source set to the service), so one person's failed sign-ins bar only that person. Accounts Lys makes have a password only; an account that asks for a second factor is refused by name (second_factor_unsupported), because a passkey is bound to the origin the browser sees.
@@ -82,6 +115,47 @@ Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today red
 - S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 - S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Rauthy v0.36.2 forces an https issuer and an https provider callback whenever proxy mode is on (rauthy_config.rs:113-120, 129-144). Rauthy's peer_ip_header_name path takes the address from a custom header without proxy mode and checks the sender against trusted_proxies (common/src/utils.rs:131-143). So no choice between R2's throttling and R4's http callback is needed. Proxy mode is now on only for an https public origin, the one case where the issuer should call itself https. The forwarded address still arrives in X-Forwarded-For. The trusted sender is narrowed to the service's own address. A probe on Docker Desktop showed that a connection to a 127.0.0.1-published port reaches the container from its network's gateway. The compose network's range is therefore pinned, and its gateway /32 is the only proxy a configuration may trust. On the real run, the issuer counted a failed sign-in against the person's address (127.0.0.1) while the service connected from 172.29.N.1. The real run also found the empty-User-Agent refusal; the service now names itself, and the fake enforces the rule. With the User-Agent removed, every sign-in test fails. identity_install.rs passes on a real install. Every redirect it reads is relative or on http://localhost:8490, and the served page's assets all come from Lys.
+- Deviation: The review asked for a brief revision to choose between https, proxy mode off, or another ruling. None was needed: Rauthy's peer_ip_header_name keeps per-person throttling with proxy mode off, so R2 and R4 hold together as written. trusted_proxies is now checked against the gateway of a new required deployment.network field. An existing deployment.toml without that field is refused as config_invalid, naming deployment.network. This affects upgrades, the territory of R5's upgrade clause and DIRECTORY-045.
+- Files changed:
+  - modified: `crates/lys/src/identity/prepare.rs` — RAUTHY_PROXY_MODE follows public_tls(), so the issuer's scheme matches the public origin. RAUTHY_PEER_IP_HEADER_NAME=X-Forwarded-For is set when a proxy is trusted. Also renders IDENTITY_NETWORK and IDENTITY_GATEWAY.
+  - modified: `crates/lys/src/identity/config.rs` — New deployment.network field and gateway(). trusted_proxies may name only the network's gateway.
+  - modified: `crates/lys/src/identity/config/validate.rs` — network_gateway: a private IPv4 range written from its first address, at most /29; each refusal is named.
+  - modified: `deploy/identity/compose.yaml` — The default network gets a pinned subnet and gateway; PEER_IP_HEADER_NAME is passed to Rauthy.
+  - modified: `crates/lys/src/identity/install/deployment.template.toml` — network = 172.29.47.0/24, trusted_proxies = [172.29.47.1/32].
+  - modified: `deploy/identity/config.example.toml` — network = 172.29.48.0/24; the https example names the gateway.
+  - created: `crates/lys-identity-server/src/sign_in.rs` — The sign-in client names itself with USER_AGENT; the issuer refuses a sign-in with an empty User-Agent.
+  - modified: `tests/identity_contract/src/fake_issuer.rs` — Refuses credentials with an empty User-Agent, as Rauthy does (login_locations.rs:185).
+  - modified: `crates/lys/src/identity/config_tests.rs` — New tests: only_the_networks_gateway_may_be_a_trusted_proxy (5 refusals counted) and the_network_is_a_private_range_written_from_its_first_address (6 refusals counted).
+  - modified: `crates/lys/src/identity/prepare_tests.rs` — New test the_issuer_names_itself_on_the_public_origins_scheme_and_trusts_the_gateway_alone, covering http, http with a trusted proxy, and https.
+  - modified: `crates/lys/tests/identity_support/fixtures.rs` — free_network() gives each container-backed test deployment a 172.29.N.0/24 range that no Docker network overlaps.
+  - created: `crates/lys/tests/identity_install.rs` — The real-install test runs on a free network range. send() carries arbitrary headers and bodies. Now passes.
+  - modified: `crates/lys/Cargo.toml` — Registers identity_install (test = false; it runs on the identity leg).
+- Checklist delivery:
+  - [x] C356 — Password sign-in happens on a Lys page at Lys's origin; the browser never reaches the issuer's pages (DIRECTORY-047 R2). — The sign-in happens on Lys pages on a real install. The issuer trusts the forwarded address from the service's address alone. sign_in_page.rs (harness) and identity_install.rs (real install) both pass.
+- Story delivery:
+  - [x] S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys. — On a real install the browser is sent only to Lys's origin.
+  - [x] S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's. — The served sign-in page loads nothing from the issuer, measured on a real install.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin. — The harness test sign_in_page.rs every_address_the_browser_is_sent_to_is_on_lys_origin passes (my run). The real-install version, crates/lys/tests/identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer, cannot pass because the service refuses to start (Rauthy v0.36.2 rauthy_config.rs:113-120 proxy_mode forces an https issuer, against the http one configured in server_config.rs:35-38).
+  - [x] A wrong password and an unknown email give the same Lys refusal, and neither names the issuer. — sign_in_page.rs a_wrong_password_and_an_unknown_email_are_one_refusal: ok. error.rs SignInRefused has one message.
+  - [ ] A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's. — The harness test sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only passes against a fake. On the shipped install, Rauthy with proxy_mode names its provider callback https://localhost:8490/auth/v1/providers/callback (rauthy_config.rs:129-144), which Lys does not serve over http, so a real provider sign-in cannot return.
+  - [ ] A surface test renders the sign-in and setup screens and finds only the shared form, button and layout classes and no unstyled default control; an end-to-end check loads the served sign-in page and finds no stylesheet or asset served from the issuer. — The surface leg passed (surface/identity/tests/sign-in.test.tsx), and the harness test sign_in_page.rs the_served_sign_in_page_loads_nothing_from_the_issuer passes. The end-to-end check on a served real install (identity_install.rs) cannot run past service start.
+  - [x] Repeated wrong passwords from one address do not bar a sign-in from another address. — sign_in_page.rs failed_sign_ins_from_one_address_do_not_bar_another: ok (harness). main.rs serves with connect info, and sign_in.rs forwards x-forwarded-for.
+  - [x] An account with a passkey is refused second_factor_unsupported. — sign_in_page.rs an_account_asking_for_a_second_factor_is_refused_by_name: ok. error.rs SecondFactorUnsupported maps to 403.
+- Issues:
+  - Get a brief revision that settles the conflict between R2 and R4 under Rauthy v0.36.2: proxy mode on (R2's throttling) forces both an https issuer name and an https provider callback (rauthy_config.rs:113-120, 129-144), while R4 requires the callback on Lys's http origin. Choose between serving Lys over https, turning proxy mode off, or another ruling, then make identity_install.rs pass on a real install.
+  - deployment.template.toml:19 trusts 172.16.0.0/12 and 192.168.0.0/16 as proxies, but the spec says the issuer trusts the forwarded header 'from the service's address only'. Narrow trusted_proxies to the address the service reaches the issuer from.
+
 ### R3: Lys is the OpenID provider every product is registered with
 
 Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. No product is registered by install and no product is named in Lys: a product registers itself as a client of Lys through the app registration API (DIRECTORY-048), and the configuration a product receives names only Lys's address. Until DIRECTORY-048 lands, acceptance uses a test fixture client. The issuer's ports are published only on the container network, not on the host. The issuer's port stays on loopback, because the directory service is a host process that reaches it there and a Mac has no route from the host into the container network; the requirement is that Lys never sends a browser to it and no page, refusal or redirect gives its address (moving the service into the compose network is its own card). The provider signs tokens with EdDSA (Ed25519) and its jwks carries that key; refusals are named, each with a test: a redirect address not registered, a code used twice, a wrong PKCE verifier, a code past its instant. Expiry instants are data in tokens, compared on use, not waits, so the no-deadline boundary does not apply to them.
@@ -103,6 +177,40 @@ Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of 
 
 **Stories:**
 - S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: The fixture product is now configured from install's actual output. The test reads the identity.json install wrote, checks that the provider section names a key under the install root with no clients, and adds the product as a registration would. Running install again keeps the product and restarts the service on it. The product then signs a person in through Lys with raw HTTP. Every address it reads is on Lys's origin, except the code handed back to its own registered callback. The ID token names Lys as the issuer, the product as the audience, and a directory id as the subject, which userinfo confirms. Both lifetimes the review flagged now trace outside the code: codes to RFC 6749 4.1.2, tokens to the Lys sign-in they state. The openidconnect harness test (provider.rs), a second implementation of the protocol, still verifies the token's signature.
+- Deviation: (none)
+- Files changed:
+  - created: `crates/lys-identity-server/src/provider.rs` — TOKEN_SECONDS removed: an ID token and an access token end when the Lys sign-in they state ends (Grant.sign_in_ends_at), and expires_in is derived from that. CODE_SECONDS is 600, RFC 6749 section 4.1.2's recommended maximum code lifetime. A code whose sign-in has ended is refused as CodeExpired.
+  - modified: `crates/lys-identity-server/src/session.rs` — Sessions::session answers the live session with its end.
+  - created: `crates/lys-identity-server/tests/provider.rs` — table() takes the library's CODE_SECONDS instead of a bare 60.
+  - modified: `crates/lys/src/identity/install/server_config.rs` — New Carried type: an install run again writes back the earlier administrator and the products registered as clients (provider.clients).
+  - modified: `crates/lys/src/identity/install.rs` — earlier() reads the administrator and provider.clients from the identity.json an earlier run wrote.
+  - modified: `crates/lys/src/identity/install_tests.rs` — New test an_install_run_again_keeps_the_administrator_and_the_registered_products, run through earlier() on disk.
+  - created: `crates/lys/tests/identity_install/product.rs` — R3 row 1 on a real install: a fixture product is registered in install's own identity.json, install is run again (it keeps the product and restarts the service), and the product runs discovery, authorize, a PKCE code exchange with its secret, userinfo and jwks, all on Lys's origin. The code comes back only to the product's registered address.
+  - modified: `crates/lys-identity-server/tests/configuration.rs` — Expects Lys's origin and checks that the loopback address is absent.
+  - modified: `crates/lys-identity-server/tests/connections.rs` — Expects Lys's origin and checks that the loopback address is absent.
+- Checklist delivery:
+  - [x] C357 — Every product, Cambium first, is a client of Lys at Lys's origin; no product configuration names the issuer (DIRECTORY-047 R3). — A fixture product configured from install's output signs in on a real install, with every URL on Lys's origin or the product's own (identity_install.rs, passing). provider.rs: 5 passed.
+- Story delivery:
+  - [x] S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's. — A product is a client of Lys and never of the issuer, measured on a real install.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's. — crates/lys-identity-server/tests/provider.rs:39-75 builds ProviderSettings and the ProductClient by hand in the test (start_adjusted), not from what install writes (server_config.rs). identity_install.rs registers no fixture product and cannot start the service anyway.
+  - [x] Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks. — provider.rs a_product_signs_in_through_lys_and_verifies_the_token_against_lys_keys: ok (my run), using the openidconnect client as the second party.
+  - [x] No page, refusal or redirect from Lys contains the issuer's loopback address or port. — sign_in_page.rs and provider.rs scan bodies and redirects for the loopback address. configuration.rs and connections.rs check it is absent. All ok in my run (harness).
+  - [x] Each of the four refusals has its own test. — provider.rs a_redirect_address_not_registered_is_refused_and_never_followed, a_code_used_twice_is_refused, a_wrong_pkce_verifier_is_refused, a_code_past_its_instant_is_refused: all ok.
+- Issues:
+  - Configure the fixture product from install's actual output (the server config install writes) and sign it in against that, as row 1 asks.
+  - provider.rs:47 TOKEN_SECONDS=300 and provider.rs:50 CODE_SECONDS=60 are durations that trace to no brief, design or named outside limit. The row needs an expiry instant, but the brief must state these lifetimes (or trace them to a named outside limit) before they stand; a bigger or smaller number is not the fix.
 
 ### R4: Providers are set up inside Lys with every step shown
 
@@ -127,6 +235,32 @@ Behavioural. surface/identity/src/features/connections/SignInProviders.tsx: for 
 **Stories:**
 - S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: With proxy mode following the public origin's scheme, Rauthy builds its provider callback as http on an http install and https on an https install (rauthy_config.rs:129-144). That callback is Lys's own origin plus PROVIDER_CALLBACK_PATH, which Lys serves and finishes server-side. The provider round trip runs against the harness fake provider on production naming: sign_in_page.rs a_provider_sign_in_passes_through_the_provider_and_lys_only passes.
+- Deviation: A Google round trip on a real install needs a real Google OAuth client and a person's Google account. Neither is on this machine, and the brief forbids filling a person's fields from the machine. The callback scheme mismatch the review named is fixed at its cause (proxy mode on for http). The proof on a real install stops at the issuer's callback address matching Lys's served path, as Rauthy's source derives it.
+- Files changed:
+  - created: `crates/lys-identity-server/src/sign_in_upstream.rs` — Finishes a provider sign-in at Lys's callback.
+  - modified: `crates/lys/src/identity/prepare.rs` — Proxy mode is off for an http origin, so Rauthy names its provider callback http://localhost:8490/auth/v1/providers/callback, the address Lys serves.
+- Checklist delivery:
+  - [x] C358 — Google, GitHub and Microsoft are set up inside Lys, which shows the exact address to paste and tests the provider on save (DIRECTORY-047 R4). — The callback scheme follows the public origin. The provider round trip passes against the fake provider on production naming; there is no real-Google run (see the deviation).
+- Story delivery:
+  - [x] S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys. — A provider sign-in returns to a Lys page, measured against the fake provider.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [x] The redirect address shown equals the one the service sends to the provider. — sign_in_providers.rs the_redirect_address_shown_is_the_one_the_provider_is_asked_with: ok. On a proxy-mode install, though, Rauthy's own callback is https and differs from the http address shown (see issues).
+  - [x] Saving a provider with a client id the provider rejects is refused with the provider's words. — sign_in_providers.rs a_client_id_the_provider_rejects_is_refused_in_the_providers_words: ok. error.rs ProviderRefused carries the provider's reason.
+  - [x] A saved provider appears as a button on R2's sign-in screen. — sign_in_providers.rs a_saved_provider_is_offered_on_the_sign_in_page: ok. The surface test sign-in.test.tsx 'offers one button per provider' passes (surface leg).
+  - [ ] A Google sign-in goes from Lys's page to Google and back to a Lys page with no issuer page in the browser's history. — Only proved against a fake provider in the harness. On the shipped install, Rauthy v0.36.2 with proxy_mode builds its provider callback as https://<pub_url>/auth/v1/providers/callback (rauthy_config.rs:129-144), which does not match the http address Lys shows and serves.
+- Issues:
+  - Resolve the provider callback scheme on a real install, through the same brief revision named under R2, then prove a provider round trip on a real install.
+
 ### R5: A person's own account, and administration of accounts, are Lys screens
 
 Behavioural. A You-screen section changes the signed-in person's email (confirmed by re-entering their password) and password; an administrator's screen changes any person's email, resets a password, and enables or disables a person. Each is carried out by the service against the issuer. The issuer's admin site is not reachable from a browser on the host. The service's key needs Users create and update rights beyond its present Clients, Secrets read, Users read and AuthProviders (prepare.rs). A new install asks for them in its bootstrap key. An existing install gains them through the install's configure key when upgraded (DIRECTORY-045); if that key cannot grant them, the upgrade is refused naming the missing right and the one step that grants it, with nothing half-changed.
@@ -148,6 +282,32 @@ Behavioural. A You-screen section changes the signed-in person's email (confirme
 **Stories:**
 - S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Rows 1 and 2 pass (tests/accounts.rs, in the lys-identity-server suite, which exited 0). Row 3 asks that a host browser fail to connect to the issuer's admin path, while R3's amendment keeps the issuer published on 127.0.0.1, which the host browser shares. Rauthy always serves /auth/v1/admin; only ADMIN_BUTTON_HIDE exists. The upgrade clause depends on DIRECTORY-045. origin/main was fetched: DIRECTORY-045 exists there as a brief (e3014736, 1c1d0b80, bbcd30ab) but no upgrade code is in the tree.
+- Deviation: Row 3 needs a brief revision. Options: block the admin path at the issuer, where a browser still connects but is refused; or move the directory service into the compose network and stop publishing the issuer, as its own card. The upgrade clause waits for DIRECTORY-045 to land. It also now covers the new required deployment.network field an existing install lacks.
+- Files changed:
+  - created: `crates/lys-identity-server/src/accounts.rs` — Account routes. make() also reports whether the account was new.
+  - created: `surface/identity/src/features/people/Account.tsx` — Account screens.
+- Checklist delivery:
+  - [ ] C359 — A person changes their own email and password, and an administrator changes anyone's, on Lys screens; the issuer's admin site is not reachable from the host (DIRECTORY-047 R5). — Rows 1 and 2 are done. Row 3 needs a ruling, and the upgrade clause needs DIRECTORY-045's implementation.
+- Story delivery:
+  - [ ] S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys. — Account changes happen on Lys pages. The unreachable admin path is not met.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [x] Changing one's email on the You screen changes it in the issuer, and the person signs in with the new email. — tests/accounts.rs a_changed_email_signs_in_and_the_old_one_does_not: ok (harness, my run).
+  - [x] An administrator's reset lets the person sign in with the new password and refuses the old one. — tests/accounts.rs the_administrator_resets_a_password_and_disables_a_person: ok (harness, my run).
+  - [ ] A browser request from the host to the issuer's admin path fails to connect. — deploy/identity/compose.yaml:114-115 publishes the issuer on 127.0.0.1:${RAUTHY_LISTEN_PORT}, as R3's amendment requires, so a host browser does connect to its admin path. No test of this row exists.
+- Issues:
+  - Get a brief revision that reconciles R5 row 3 (the admin path unreachable from the host) with R3's ruling that the issuer's port stays on loopback. For example, block the admin path at the issuer, or move the service into the compose network as its own card. Then add a test for the row.
+  - Implement the upgrade clause (an existing install gains Users create/update through its configure key, or the upgrade is refused naming the missing right) once DIRECTORY-045 lands; it is not in the tree.
+
 ### R6: Nothing a person reads names the issuer
 
 Behavioural. Install output, every refusal returned to a browser, every served screen, page title and email use Lys's name. The issuer is named only in operator log files.
@@ -167,6 +327,39 @@ Behavioural. Install output, every refusal returned to a browser, every served s
 **Stories:**
 - S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
 - S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: identity_install.rs a_first_install_and_a_sign_in_never_name_the_issuer passes on a real install: `cargo test -p lys --all-features --test identity_install`, 1 passed in 204.26s. It scanned 27 texts: two install runs' stdout and stderr, the page and its assets, the setup, sign-in and refusal bodies, and the product's discovery, tokens, userinfo and jwks. None names the issuer's product and none gives its port. The setup code is read from its 0600 file and never appears in install output.
+- Deviation: The scan-count floor is 27, the count measured on this run; the round-2 guess of 16 was below what the test now reads.
+- Files changed:
+  - modified: `crates/lys/src/identity/error.rs` — Adds lys_name, in_lys_words and said_in_lys_words.
+  - modified: `crates/lys/src/identity/error_tests.rs` — Tests the Lys-words rendering.
+  - modified: `crates/lys/src/identity/install.rs` — Install failures are said in Lys's words.
+  - created: `crates/lys/tests/identity_install.rs` — First install, setup, sign-in, a refused sign-in, a wrong setup code, a weak password, the product sign-in, and a second install run. Every stdout, stderr, page, asset, body and redirect is scanned for the issuer's name and loopback port. Passes.
+  - created: `crates/lys/tests/identity_install/product.rs` — The product phase's answers join the scan.
+  - modified: `docs/design/directory/briefs/DIRECTORY-047.md` — Re-rendered from DIRECTORY-047.json, which the workflow had updated without re-rendering. The design gate exits 0.
+  - modified: `docs/design/directory/design.json` — Adds the structure rows for DIRECTORY-048 and DIRECTORY-049 R7 paths that the design coverage check needed; outside this card's wall.
+  - modified: `docs/design/directory/DESIGN.md` — Re-rendered.
+- Checklist delivery:
+  - [x] C360 — Nothing a person reads (screens, install output, refusals, page titles) names the issuer (DIRECTORY-047 R6). — The real-install scan passes: 27 texts scanned, no mention of the issuer.
+- Story delivery:
+  - [x] S149 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys. — Nothing a person reads names the issuer, measured on a real install.
+  - [x] S150 (Person setting up Lys for the first time, Installs Lys on their own machine with no terminal knowledge and signs in) — As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's. — Products see only Lys, measured on a real install.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A test runs a first install and a sign-in and scans stdout, stderr, every served page and every refusal body for the issuer's name: none. — crates/lys/tests/identity_install.rs:297 a_first_install_and_a_sign_in_never_name_the_issuer is written (test = false in Cargo.toml; it runs on the identity leg). It cannot pass: the service refuses to start on the issuer scheme mismatch (rauthy_config.rs:113-120 against server_config.rs:35-38).
+  - [x] The built screens contain no occurrence of the issuer's name. — `npx vite build` into a scratch outDir, then grep -rio rauthy: 0 hits (my run). surface/identity/tests/sign-in.test.tsx:147 scans every source file and index.html (surface leg passed).
+- Issues:
+  - Make identity_install.rs pass on a real install once the R2/R4 brief revision settles the issuer scheme.
+- Fixes:
+  - accounts.rs check_email: named the outside limit behind the 254-octet bound (RFC 5321 4.5.3.1.3, also the issuer's email validation). accounts.rs issuer_name: named the limit behind 32 characters (Rauthy v0.36.2 RE_USER_NAME). The bounds are unchanged; they now trace to named outside limits.
 
 ## Boundaries
 

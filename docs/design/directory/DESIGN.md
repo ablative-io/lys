@@ -669,6 +669,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/install/prepare.rs` | R5: A person's own account, and administration of accounts, are Lys screens | DIRECTORY-047 |
 | `crates/lys-identity-server/src/error.rs` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
 | `surface/identity/src` | R6: Nothing a person reads names the issuer | DIRECTORY-047 |
+| `rules/no-app-names.yml` | DIRECTORY-048 R7: the ast-grep rule that refuses an app named in Lys code | DIRECTORY-048 |
+| `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
+| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools that cover the whole published API | DIRECTORY-049 |
+| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the calling agent's signature | DIRECTORY-049 |
 
 ## Inventory
 

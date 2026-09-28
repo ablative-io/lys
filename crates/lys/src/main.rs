@@ -49,6 +49,9 @@ fn main() -> ExitCode {
                 identity::configure::run(&config, json)
             }
             identity::IdentityCommand::Health { config } => identity::health::run(&config, json),
+            identity::IdentityCommand::SetupCode { root } => {
+                identity::install::setup_code::run(root, json)
+            }
             identity::IdentityCommand::Install {
                 root,
                 admin_email,

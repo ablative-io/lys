@@ -20,7 +20,10 @@ async fn configuration_is_the_effective_startup_view_without_secrets() -> TestRe
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["source"], "startup_configuration");
     assert_eq!(body["mutable_in_browser"], false);
-    assert_eq!(body["sign_in"]["provider_origin"], service.issuer.issuer());
+    // The sign-in service is named on Lys's own origin, as installed; its
+    // loopback address is never shown.
+    assert_eq!(body["sign_in"]["provider_origin"], service.base.as_str());
+    assert!(!body.to_string().contains(service.issuer.loopback()));
     assert!(body["sign_in"]["session_seconds"].as_u64().is_some());
     assert!(body["sign_in"]["secure_cookie"].as_bool().is_some());
     assert_eq!(body["permissions"]["projection"], "local");
