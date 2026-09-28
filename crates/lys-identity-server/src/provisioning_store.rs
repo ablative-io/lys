@@ -62,6 +62,21 @@ pub struct Version {
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
     pub set_at: u64,
+    /// Its review, null until someone answering for the agent reviewed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewed: Option<Review>,
+}
+
+/// A profile version's review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Review {
+    /// The operation id it was recorded with.
+    pub operation: String,
+    /// The person who reviewed it.
+    pub by: String,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
 }
 
 /// An agent's profile: every version, in order.
@@ -217,5 +232,43 @@ impl ProvisioningStore {
         }
         self.write(Kept { profiles })?;
         Ok(number)
+    }
+
+    /// Keep `review` of version `number` of `agent`'s profile. Sent again in
+    /// the same words it is kept once; the operation naming any other act is
+    /// refused, and a version reviewed already answers its review unchanged.
+    pub fn review(&mut self, agent: &str, number: u32, review: Review) -> Result<(), ServerError> {
+        self.settle()?;
+        let reused = self.kept.profiles.iter().any(|profile| {
+            profile.versions.iter().any(|version| {
+                let reviewed_here = profile.agent == agent && version.number == number;
+                version.operation == review.operation
+                    || version.reviewed.as_ref().is_some_and(|kept| {
+                        kept.operation == review.operation
+                            && !(reviewed_here && kept.by == review.by)
+                    })
+            })
+        });
+        if reused {
+            return Err(ServerError::ProvisioningReused {
+                operation: review.operation,
+            });
+        }
+        let mut profiles = self.kept.profiles.clone();
+        let version = profiles
+            .iter_mut()
+            .find(|profile| profile.agent == agent)
+            .and_then(|profile| {
+                profile
+                    .versions
+                    .iter_mut()
+                    .find(|version| version.number == number)
+            })
+            .ok_or(ServerError::LaunchRecordMissing)?;
+        if version.reviewed.is_some() {
+            return Ok(());
+        }
+        version.reviewed = Some(review);
+        self.write(Kept { profiles })
     }
 }
