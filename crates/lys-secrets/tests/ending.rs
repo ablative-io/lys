@@ -1,5 +1,6 @@
 //! A person ending a handle held for them: only the person the holder acts
-//! for may end it, a handle lent on from it ends with it and the audit log
+//! for may end it, anyone else but its holder is answered as for a handle
+//! never issued, a handle lent on from it ends with it and the audit log
 //! names the line, the ending is made once per operation id, a restart from
 //! the snapshot keeps it ended, and the provider's part of the revocation
 //! stays apart and is never taken as confirmed.
@@ -10,7 +11,7 @@ use std::path::Path;
 use lys_core::Ed25519Identity;
 use lys_log_store::{seal, unseal};
 use lys_secrets::{
-    AuditKind, Broker, BrokerPaths, Ended, HandleEnded, Holder, IssuedHandle, LocalGrants,
+    AuditKind, Broker, BrokerPaths, EndAct, Ended, HandleEnded, Holder, IssuedHandle, LocalGrants,
     Presentation, Relation, STATE_DOMAIN, Secret, SecretRelation, SecretsError, Start,
     UpstreamRevocation, new_operation_id,
 };
@@ -133,6 +134,8 @@ fn ended_by_dana(root: &IssuedHandle) -> Ended {
         by: DANA.to_owned(),
         operation: ENDING.to_owned(),
         root: root.id.as_str().to_owned(),
+        act: EndAct::Revoke,
+        at_ms: NOW_MS,
     }
 }
 
@@ -219,8 +222,8 @@ fn anyone_but_the_person_acted_for_is_refused_and_nothing_is_written() -> TestRe
                 .broker
                 .end_handle(TOM, &seeded.bot.id, None, Some(ENDING))
         ),
-        "LendingNotPermitted",
-        "a person who may use the secret but is not acted for"
+        "HandleUnknown",
+        "a person who may use the secret but is not acted for learns nothing of the handle"
     );
     assert_eq!(
         refusal(
@@ -237,8 +240,17 @@ fn anyone_but_the_person_acted_for_is_refused_and_nothing_is_written() -> TestRe
                 .broker
                 .end_handle(DANA, &seeded.tom.id, None, Some(ENDING))
         ),
+        "HandleUnknown",
+        "owning the secret confers nothing over a handle not held for her, not even its existence"
+    );
+    assert_eq!(
+        refusal(
+            seeded
+                .broker
+                .end_handle(BOT, &seeded.bot.id, None, Some(ENDING))
+        ),
         "LendingNotPermitted",
-        "owning the secret confers nothing over a handle not held for her"
+        "its holder, an agent acting for Dana, does not end it as the person acted for"
     );
     assert_eq!(seeded.broker.audit().len(), before);
     Ok(())
@@ -328,7 +340,7 @@ fn a_restart_from_the_snapshot_keeps_the_handle_ended() -> TestResult {
     let key = Ed25519Identity::load(&world.paths.audit_key)?;
     let written = std::fs::read(&snapshot)?;
     let honest = unseal(&written, STATE_DOMAIN, ORIGIN, &key.public_key_bytes())?;
-    let older = replaced(honest.state(), b"broker-folded/v3", b"broker-folded/v2")
+    let older = replaced(honest.state(), b"broker-folded/v4", b"broker-folded/v3")
         .ok_or("the state does not name its format")?;
     std::fs::write(
         &snapshot,
