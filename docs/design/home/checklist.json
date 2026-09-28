@@ -1510,6 +1510,61 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Repeated work removed",
+      "items": [
+        {
+          "id": "C45",
+          "text": "A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.",
+          "done": false
+        },
+        {
+          "id": "C46",
+          "text": "A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.",
+          "done": false
+        },
+        {
+          "id": "C47",
+          "text": "The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.",
+          "done": false
+        },
+        {
+          "id": "C48",
+          "text": "RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-107 records it.",
+          "done": false
+        },
+        {
+          "id": "C49",
+          "text": "resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.",
+          "done": false
+        },
+        {
+          "id": "C50",
+          "text": "The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.",
+          "done": false
+        },
+        {
+          "id": "C51",
+          "text": "Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt; a later read that meets a row that is not the file's drops the cached index, rebuilds it from the session file and retries once, refuses as Malformed when the rebuilt index fails the same read, and returns a real I/O error at once, never retried.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.",
+          "done": false
+        },
+        {
+          "id": "C53",
+          "text": "One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C54",
+          "text": "The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit.",
+          "done": false
+        }
+      ]
     }
   ]
 }

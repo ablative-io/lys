@@ -76,7 +76,8 @@
     "ADR-058",
     "ADR-055",
     "ADR-047",
-    "ADR-093"
+    "ADR-093",
+    "ADR-107"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -276,6 +277,10 @@
     {
       "text": "Recovering a session whose last line a crash tore, by extending reconcile or trimming an unsynced tail.",
       "reason": "The original bytes are never rewritten (P1); a staged import (ADR-093) never leaves such a tail under a session's name, and recovering one is its own decision."
+    },
+    {
+      "text": "Recovering a session whose last line a crash tore, by extending reconcile or trimming an unsynced tail.",
+      "reason": "The original bytes are never rewritten (P1); a staged import (ADR-107) never leaves such a tail under a session's name, and recovering one is its own decision."
     }
   ],
   "structure": [

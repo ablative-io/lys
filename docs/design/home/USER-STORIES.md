@@ -20,9 +20,7 @@
 
 **S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
 
-**S71.** As an agent, I want my home to move into a second home by a pushed ref the target fetches, holding my record byte for byte, so that I can continue from a home that is not the one that captured me.
-
-**S72.** As an agent, I want each of my arrived sessions to carry an arrival naming where it came from and a fresh execution id of its own, with its head unchanged, so that my continuation is a distinct execution whose ancestry is on the record.
+**S24.** As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
 
 ## Tom — Owns the platform and reads what a session was given
 
@@ -40,6 +38,8 @@
 
 **S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
 
+**S25.** As the owner of the platform, I want an import that stops part way to leave no half-written session under its name, so that running the import again is all the repair it needs.
+
 ## Reviewer — Checks the proofs before anything relies on them
 
 **S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
@@ -56,8 +56,6 @@
 
 **S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
 
-**S73.** As the reviewer, I want ship to refuse by name, pushing nothing, any home it cannot ship whole and any remote that is not a path on this machine, so that nothing half-written or unencrypted leaves.
+**S26.** As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
-**S74.** As the reviewer, I want a fetch that fails verification to name the bad index or block by hash and leave behind nothing it wrote, so that a corrupted home never arrives half-written.
-
-**S75.** As the reviewer, I want the fetched home rendered and resumed through the launch template on the installed Claude Code and recorded as hashes, counts and paths, with no fixture secret in the shipped ref, so that the resume evidence stage 3 asks for is measured.
+**S27.** As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing.
