@@ -69,7 +69,8 @@ already holds revoked, a verbatim replay of its own issuance leaf included, is a
 leaf. It is refused by name (`certificate_reinstatement_refused`), and the certificate stays
 revoked. The way back is a new certificate.
 
-The last-wins hazard documented at `crates/lys-core/src/delegation/artifact.rs:370-373`, where
+The last-wins hazard documented at `crates/lys-core/src/delegation/artifact.rs:222-241` (DIRECTORY-013
+cites the block as artifact.rs:370-373, its position before the file was reorganised), where
 a verbatim copy of an earlier leaf made a revoked key current again under last-wins by log
 position, is named here and refused: the fold never lets a later issuance leaf undo an
 earlier revocation.
@@ -97,7 +98,9 @@ on the typed-claim card (hhAN8h77), and not by the fold.
 
 A certificate whose subject common name equals the issuing authority's lowercase hex public
 key fails `verify_certificate_chain_at`'s self-signed screen. That is a known false positive,
-recorded at `crates/lys-core/src/ca/authority.rs:335-341`, so its issuance leaf records
+recorded by DIRECTORY-013 at `crates/lys-core/src/ca/authority.rs:335-341` and living, since
+lys-core's files were split, in `crates/lys-core/src/ca/authority/verify.rs` (the screen at lines
+78-84, its rustdoc naming the false positive), so its issuance leaf records
 `certificate_chain_invalid`. The typed-claim card's issuance refuses such a subject by name,
 and the false positive is answered by its own lys-core card, not by this contract.
 
