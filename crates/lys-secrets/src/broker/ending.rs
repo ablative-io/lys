@@ -145,12 +145,7 @@ impl<P: PermissionCheck> Broker<P> {
         if !self.discovers(person, &record.secret) {
             return Err(SecretsError::HandleUnknown);
         }
-        if !self.acts_for(person, &record.identity) {
-            return Err(SecretsError::from(LendingRefusal::NotActedFor {
-                person: person.to_owned(),
-                handle: id.as_str().to_owned(),
-            }));
-        }
+        let acted_for = self.acts_for(person, &record.identity);
         let operation = checked(&format!("handle {id}"), operation)?;
         if let Some(root) = self.ended_under(person, operation) {
             if root == id.as_str() {
@@ -165,6 +160,12 @@ impl<P: PermissionCheck> Broker<P> {
         }
         if self.line_dropped(id.as_str()) {
             return Ok(HandleEnded::AlreadyEnded);
+        }
+        if !acted_for {
+            return Err(SecretsError::from(LendingRefusal::NotActedFor {
+                person: person.to_owned(),
+                handle: id.as_str().to_owned(),
+            }));
         }
         spoken("the person ending a handle", person)?;
         if let Some(service) = via {
