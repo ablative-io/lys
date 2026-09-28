@@ -58,6 +58,7 @@ pub mod service_accounts_store;
 pub mod session;
 pub mod sessions_api;
 pub mod setup;
+pub mod sign_in_providers;
 pub mod spicedb;
 mod spicedb_http;
 pub mod stop_api;

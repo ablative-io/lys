@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
+import { SignInProviders } from './SignInProviders';
 
 interface Connection {
   id: string;
@@ -30,6 +31,7 @@ export function Connections() {
         {connection.endpoint ? <details><summary>Connection details</summary><p className="mono">{connection.endpoint}</p></details> : null}
       </section>)}</div>
       {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : null}
+      <SignInProviders issuer={data.connections.find((connection) => connection.id === 'sign_in')?.endpoint ?? null} />
       <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
       <a className="btn" href="#/service-accounts">Manage service accounts</a>{' '}
       <a className="btn" href="#/me">Your sign-in accounts</a>

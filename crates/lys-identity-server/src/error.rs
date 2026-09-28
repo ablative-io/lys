@@ -433,4 +433,19 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
+    /// The issuer's administration API is not configured, could not be
+    /// reached, or answered what could not be read.
+    #[error("SignInProvidersUnavailable: {reason}")]
+    SignInProvidersUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The issuer's administration API refused the act.
+    #[error("SignInProvidersRefused: the issuer answered {status}: {reason}")]
+    SignInProvidersRefused {
+        /// The status the issuer answered.
+        status: u16,
+        /// The issuer's message.
+        reason: String,
+    },
 }

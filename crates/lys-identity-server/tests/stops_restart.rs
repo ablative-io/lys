@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity_server::error::ServerError;
+use lys_identity_server::stop_api::StopView;
 use lys_identity_server::stops_state::Stop;
 use lys_identity_server::stops_store::StopStore;
 use lys_log_store::Start;
@@ -54,9 +55,14 @@ fn a_stop_asked_binds_its_words_before_it_is_done() -> TestResult {
     drop(store);
 
     let mut store = StopStore::open(&path, key(dir.path())?)?;
-    assert!(store.recorded("op-1").is_some_and(|asked| !asked.done));
+    let asked = store.recorded("op-1").cloned().ok_or("op-1 not held")?;
+    assert!(!asked.done);
+    let shown = StopView::from(asked);
+    assert_eq!(shown.state, "asked");
+    assert!(!shown.done);
     let done = store.keep(stop("op-1", "leaked its key", 8))?;
     assert!(done.done);
+    assert_eq!(StopView::from(done.clone()).state, "suspended");
     assert_eq!(
         store.ask(stop("op-1", "leaked its key", 9))?,
         Some(done.clone())

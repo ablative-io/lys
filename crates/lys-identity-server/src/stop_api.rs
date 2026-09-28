@@ -60,8 +60,12 @@ pub struct StopView {
     pub agent: String,
     /// The operation id the stop was made under.
     pub operation: String,
-    /// The agent's lifecycle state after the stop: `suspended`.
+    /// `suspended` once every part of the stop is done; `asked` while the
+    /// stop is kept as asked and its parts are not all done.
     pub state: String,
+    /// Whether every part is done. A stop that is only asked claims
+    /// nothing about certificates, sessions or credentials yet.
+    pub done: bool,
     /// The person who stopped it.
     pub by: String,
     /// When, in seconds since the Unix epoch.
@@ -85,7 +89,8 @@ impl From<Stop> for StopView {
         Self {
             agent: stop.agent,
             operation: stop.operation,
-            state: "suspended".to_owned(),
+            state: if stop.done { "suspended" } else { "asked" }.to_owned(),
+            done: stop.done,
             by: stop.by,
             at: stop.at,
             certificates_withdrawn: stop.certificates_withdrawn,
