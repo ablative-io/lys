@@ -62,6 +62,12 @@ pub struct RequestView {
     /// Whether the caller could approve it with no source, by issuing the access directly: the
     /// caller is the root authority and a person asks.
     pub can_issue_root: bool,
+    /// Whether the caller may approve or decline it: a person who could give the access, or
+    /// the root authority.
+    pub can_decide: bool,
+    /// The person whose approval is being settled, null when none is. While it is not null
+    /// only that person's same approval is taken.
+    pub held_by: Option<String>,
     /// The decision, null while it waits.
     pub decision: Option<DecisionView>,
 }

@@ -386,3 +386,52 @@ async fn only_the_root_authority_is_shown_that_it_could_issue_directly() -> Test
     assert_eq!(seen["requests"][0]["sources"], json!([]));
     Ok(())
 }
+
+#[tokio::test]
+async fn an_approval_the_grants_refuse_holds_nothing_and_gives_nothing() -> TestResult {
+    let table = Table::set().await?;
+    let source = table.lendable("1").await?;
+    let wider = table.ask(&table.ada, "1", "alpha").await?;
+    assert_eq!(wider["can_decide"], true, "Ada is the root authority");
+    let (_, seen) = table.service.get("/requests", Some(&table.bea)).await?;
+    assert_eq!(seen["requests"], json!([]), "Bea cannot give alpha: {seen}");
+
+    let reading = table.ask(&table.ada, "1", "beta").await?;
+    let (_, seen) = table.service.get("/requests", Some(&table.bea)).await?;
+    assert_eq!(seen["requests"][0]["can_decide"], true);
+    let mut unknown = source.clone();
+    unknown.replace_range(unknown.len() - 4.., "0000");
+    let first = approval(Some(&unknown))?;
+    let turned = table
+        .decide(&table.bea, &reading, "approve", &first)
+        .await?;
+    assert_ne!(turned.0, 200, "{}", turned.1);
+    let (_, seen) = table.service.get("/requests", Some(&table.bea)).await?;
+    assert_eq!(seen["requests"][0]["state"], "waiting");
+    assert_eq!(
+        seen["requests"][0]["held_by"],
+        Value::Null,
+        "the grants hold nothing for the operation, so nothing is held"
+    );
+
+    let (status, declined) = table
+        .decide(
+            &table.ada,
+            &reading,
+            "decline",
+            &json!({ "note": "not now" }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{declined}");
+    let again = table
+        .decide(&table.bea, &reading, "approve", &first)
+        .await?;
+    refused(&again, 409, "RequestDecided");
+    let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
+    assert_eq!(
+        held["grants"].as_array().map(Vec::len),
+        Some(1),
+        "only the grant Bea lends from exists: {held}"
+    );
+    Ok(())
+}

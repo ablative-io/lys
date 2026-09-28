@@ -10,6 +10,13 @@
 //! is a grant, signed and receipted by the grants like every other. So these
 //! leaves are not signed, and carry no receipt.
 //!
+//! An approval is two writes: the grant, in the grants' log, and the decision
+//! here. So the approval is kept here as an intent before the grant is
+//! issued. While an intent stands only that approval, by that person, with
+//! that operation, source and note, is taken: nobody else approves and nobody
+//! declines. The intent is withdrawn only when the grants hold nothing for
+//! its operation.
+//!
 //! A request is named by the operation id it was asked with, so asking again
 //! with the same operation and the same words answers the request already
 //! kept, and the same operation with other words is refused.
@@ -64,10 +71,40 @@ pub struct Decided {
     pub decided_at: u64,
 }
 
+/// An approval about to be made: kept before the grant is issued.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Intended {
+    /// The request approved.
+    pub id: String,
+    /// The person approving.
+    pub by: String,
+    /// The operation id the grant is issued under.
+    pub operation: String,
+    /// The grant the access is lent from, null for the root authority's own issue.
+    pub source: Option<String>,
+    /// The approver's words.
+    pub note: String,
+    /// When it was intended, in seconds since the Unix epoch.
+    pub intended_at: u64,
+}
+
+/// An intent given up, because the grants hold nothing for its operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Withdrawn {
+    /// The request.
+    pub id: String,
+    /// The operation id of the intent withdrawn.
+    pub operation: String,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "line", rename_all = "snake_case")]
 enum Line {
     Asked(Asked),
+    Intended(Intended),
+    Withdrawn(Withdrawn),
     Decided(Decided),
 }
 
@@ -87,6 +124,7 @@ pub struct RequestStore<S: LeafStore = FileLeafStore> {
     folded: u64,
     uncertain: bool,
     asked: Vec<Asked>,
+    intended: BTreeMap<String, Intended>,
     decided: BTreeMap<String, Decided>,
 }
 
@@ -117,6 +155,7 @@ impl<S: LeafStore> RequestStore<S> {
             folded: 0,
             uncertain: false,
             asked: Vec::new(),
+            intended: BTreeMap::new(),
             decided: BTreeMap::new(),
         };
         store.fold()?;
@@ -158,7 +197,20 @@ impl<S: LeafStore> RequestStore<S> {
     fn hold(&mut self, line: Line) {
         match line {
             Line::Asked(asked) => self.asked.push(asked),
+            Line::Intended(intended) => {
+                self.intended.insert(intended.id.clone(), intended);
+            }
+            Line::Withdrawn(withdrawn) => {
+                if self
+                    .intended
+                    .get(&withdrawn.id)
+                    .is_some_and(|kept| kept.operation == withdrawn.operation)
+                {
+                    self.intended.remove(&withdrawn.id);
+                }
+            }
             Line::Decided(decided) => {
+                self.intended.remove(&decided.id);
                 self.decided.insert(decided.id.clone(), decided);
             }
         }
@@ -209,10 +261,51 @@ impl<S: LeafStore> RequestStore<S> {
         }
     }
 
+    /// The approval of the request `id` being settled, if one is.
+    pub fn intent(&self, id: &str) -> Option<&Intended> {
+        self.intended.get(id)
+    }
+
+    /// Keep the intent to approve a request that waits. Intended again in the
+    /// same words it is kept once; while one stands any other is refused.
+    pub fn intend(&mut self, intended: Intended) -> Result<(), ServerError> {
+        self.settle()?;
+        match self.request(&intended.id) {
+            None => Err(ServerError::RequestUnknown),
+            Some((_, Some(_))) => Err(ServerError::RequestDecided {
+                request: intended.id,
+            }),
+            Some((_, None)) => match self.intended.get(&intended.id) {
+                None => self.append(Line::Intended(intended)),
+                Some(kept) if same_intent(kept, &intended) => Ok(()),
+                Some(kept) => Err(held(kept)),
+            },
+        }
+    }
+
+    /// Give up the intent on the request `id` made under `operation`, when
+    /// one stands.
+    pub fn withdraw(&mut self, id: &str, operation: &str) -> Result<(), ServerError> {
+        self.settle()?;
+        match self.intended.get(id) {
+            Some(kept) if kept.operation == operation => self.append(Line::Withdrawn(Withdrawn {
+                id: id.to_owned(),
+                operation: operation.to_owned(),
+            })),
+            _ => Ok(()),
+        }
+    }
+
     /// Keep the decision on a request that waits. Decided again the same way
-    /// it is kept once; a request decided another way is refused.
+    /// it is kept once; a request decided another way is refused, and so is
+    /// any decision but the one an intent that stands was made for.
     pub fn decide(&mut self, decided: Decided) -> Result<(), ServerError> {
         self.settle()?;
+        if let Some(kept) = self.intended.get(&decided.id)
+            && !(decided.approved && decided.by == kept.by)
+        {
+            return Err(held(kept));
+        }
         match self.request(&decided.id) {
             None => Err(ServerError::RequestUnknown),
             Some((_, None)) => self.append(Line::Decided(decided)),
@@ -228,6 +321,22 @@ impl<S: LeafStore> RequestStore<S> {
             }),
         }
     }
+}
+
+fn held(kept: &Intended) -> ServerError {
+    ServerError::RequestHeld {
+        request: kept.id.clone(),
+        by: kept.by.clone(),
+    }
+}
+
+/// Whether two intents are the same approval, whenever each was made.
+fn same_intent(kept: &Intended, intended: &Intended) -> bool {
+    let timeless = Intended {
+        intended_at: kept.intended_at,
+        ..intended.clone()
+    };
+    *kept == timeless
 }
 
 /// Whether two askings are the same request, whenever each was asked.

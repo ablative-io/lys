@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use identity_contract::harness::{Fault, FaultStore, Harness};
-use lys_identity_server::requests_store::{Asked, Decided, Reopen, RequestStore};
+use lys_identity_server::error::ServerError;
+use lys_identity_server::requests_store::{Asked, Decided, Intended, Reopen, RequestStore};
 use lys_log_store::StoreError;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -137,6 +138,104 @@ fn a_store_that_cannot_be_read_back_answers_nothing_until_it_can() -> TestResult
         ids,
         ["op-1", "op-2"],
         "the stored leaf is read back once, not written twice"
+    );
+    Ok(())
+}
+
+fn intended(id: &str, by: &str, operation: &str) -> Intended {
+    Intended {
+        id: id.to_owned(),
+        by: by.to_owned(),
+        operation: operation.to_owned(),
+        source: None,
+        note: "for the quarter".to_owned(),
+        intended_at: 7,
+    }
+}
+
+fn approved(id: &str, by: &str) -> Decided {
+    Decided {
+        id: id.to_owned(),
+        by: by.to_owned(),
+        approved: true,
+        note: "for the quarter".to_owned(),
+        grant: Some("grant-1".to_owned()),
+        decided_at: 8,
+    }
+}
+
+#[test]
+fn while_an_approval_is_being_settled_only_that_approval_is_taken() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("requests");
+    let mut store = RequestStore::open(&path)?;
+    store.ask(asked("op-1"))?;
+    store.intend(intended("op-1", "person-b", "approve-1"))?;
+    drop(store);
+
+    let mut store = RequestStore::open(&path)?;
+    assert_eq!(
+        store.intent("op-1").map(|intent| intent.by.as_str()),
+        Some("person-b"),
+        "the intent is read back from the leaves"
+    );
+    let later = Intended {
+        intended_at: 90,
+        ..intended("op-1", "person-b", "approve-1")
+    };
+    store.intend(later)?;
+    for refused in [
+        store.intend(intended("op-1", "person-c", "approve-2")),
+        store.intend(intended("op-1", "person-b", "approve-2")),
+        store.decide(declined("op-1")),
+        store.decide(approved("op-1", "person-c")),
+    ] {
+        assert!(
+            matches!(&refused, Err(ServerError::RequestHeld { by, .. }) if by == "person-b"),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(
+        store.request("op-1").map(|(_, decided)| decided),
+        Some(None)
+    );
+
+    let decision = approved("op-1", "person-b");
+    store.decide(decision.clone())?;
+    assert!(store.intent("op-1").is_none());
+    drop(store);
+    let store = RequestStore::open(&path)?;
+    assert!(store.intent("op-1").is_none());
+    assert_eq!(
+        store.request("op-1").map(|(_, decided)| decided),
+        Some(Some(&decision))
+    );
+    Ok(())
+}
+
+#[test]
+fn an_intent_withdrawn_frees_the_request_for_any_decision() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("requests");
+    let mut store = RequestStore::open(&path)?;
+    store.ask(asked("op-1"))?;
+    store.intend(intended("op-1", "person-b", "approve-1"))?;
+    store.withdraw("op-1", "approve-other")?;
+    assert!(
+        store.intent("op-1").is_some(),
+        "an intent is withdrawn by its own operation only"
+    );
+    store.withdraw("op-1", "approve-1")?;
+    assert!(store.intent("op-1").is_none());
+    drop(store);
+
+    let mut store = RequestStore::open(&path)?;
+    assert!(store.intent("op-1").is_none());
+    store.decide(declined("op-1"))?;
+    let refused = store.intend(intended("op-1", "person-b", "approve-1"));
+    assert!(
+        matches!(refused, Err(ServerError::RequestDecided { .. })),
+        "{refused:?}"
     );
     Ok(())
 }

@@ -18,6 +18,7 @@ pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
 pub mod requests_api;
+pub mod requests_decide;
 pub mod requests_store;
 pub mod requests_views;
 pub mod reviews_api;

@@ -97,6 +97,16 @@ pub enum ServerError {
         /// The request.
         request: String,
     },
+    /// An approval of the request is being settled, and this is not that approval.
+    #[error(
+        "RequestHeld: an approval of access request `{request}` by {by} is being settled, and until it is only that approval is taken"
+    )]
+    RequestHeld {
+        /// The request.
+        request: String,
+        /// The person whose approval is being settled.
+        by: String,
+    },
     /// The operation id already names a request asked in other words.
     #[error(
         "RequestReused: operation `{request}` already names an access request asked in other words"
@@ -131,7 +141,9 @@ impl ServerError {
             | Self::GrantNotVisible
             | Self::SessionUnknown
             | Self::RequestUnknown => StatusCode::NOT_FOUND,
-            Self::RequestDecided { .. } | Self::RequestReused { .. } => StatusCode::CONFLICT,
+            Self::RequestDecided { .. } | Self::RequestHeld { .. } | Self::RequestReused { .. } => {
+                StatusCode::CONFLICT
+            }
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
