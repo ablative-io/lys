@@ -227,7 +227,7 @@ impl SpiceDb {
         let text = value
             .get("schemaText")
             .and_then(Value::as_str)
-            .unwrap_or("");
+            .ok_or_else(|| unavailable("the schema answer carries no schemaText"))?;
         Ok(text
             .lines()
             .filter_map(|line| line.strip_prefix("definition "))
@@ -318,11 +318,18 @@ impl RelationshipStore for SpiceDb {
             "resourceType": "lys_mirror",
             "optionalResourceId": self.mirror,
         }))?;
-        held.iter()
-            .map(|relationship| relationship.subject.id.parse::<u64>())
-            .max_by_key(|revision| revision.clone().unwrap_or(0))
-            .unwrap_or(Ok(0))
-            .map_err(|error| unavailable(format!("the mirror's revision is not a number: {error}")))
+        let revisions = held
+            .iter()
+            .map(|relationship| {
+                relationship.subject.id.parse::<u64>().map_err(|error| {
+                    unavailable(format!(
+                        "the mirror's revision `{}` is not a number: {error}",
+                        relationship.subject.id
+                    ))
+                })
+            })
+            .collect::<Result<Vec<u64>, GrantError>>()?;
+        Ok(revisions.into_iter().max().unwrap_or(0))
     }
 
     fn write(
