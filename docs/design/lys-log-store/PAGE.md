@@ -2,460 +2,484 @@
 
 ## The words, as they were typed
 
-A sweep of crates/lys-log-store and crates/lys-anchor found one correctness defect and one cost defect. In crates/lys-log-store/src/file.rs, put_leaf (line 245 as main stands) creates the leaf file with create_new and then writes and syncs it; if write_all or sync_all fails, or the process dies between them, the half-written leaf stays on disk, and Log::open in log.rs lines 128 to 137 then counts it as one more leaf, finds the prefix matching the pin, and pins it as a completed append, so a truncated leaf is committed to the tree with no error. In crates/lys-anchor/src/witness/observe.rs line 91, every observe calls WitnessProjection::rebuild_prefix, which parses every leaf in the log (projection.rs line 141) to find one origin's latest checkpoint, so the witness's cost grows with the square of the log's length.
+Conformance row 4.3 says the flight recorder's log refuses a leaf it cannot prove whole, and its witness reads only what is new. This card carries the leaf-store half of that row.
 
-This card makes the leaf store refuse a leaf it cannot prove whole and makes the witness read only what it needs. A leaf is written to a temporary name beside its final one, synced, and renamed into place, with the directory synced after, so a leaf either exists whole or not at all; on open, a leaf whose bytes do not hash to the leaf the tree expects is refused by name, and the log opens read-only rather than pinning it. The witness finds an origin's latest checkpoint by scanning from the newest leaf back and stopping at the first match, or from a per-origin position it keeps, and never re-parses the whole log per observe.
+lys main at a426b9a5 already names a leaf only after its bytes are flushed, links it under a name that is never replaced, takes temporary leaf sequences from a parameter, and isolates the no-replace link under a rename injection; those four commits are the first half of the earlier words, and this card does not redo them. The survey reads the tree as it stands and names each earlier requirement that main already meets, so the brief carries only what remains.
 
-Acceptance: a test that kills the write after part of a leaf proves the next open refuses that leaf by name and does not pin it; a test that leaves a stray temporary file proves open ignores it and says so; a leaf changed by one byte is refused by name on open; a test over a log of a stated length proves observe parses a bounded number of leaves, measured by a counter on the parse path and not by time; every existing test in both crates still passes, and scripts/verify_inclusion.py still verifies an artifact from a store written after the change. Not in scope: the leaf format, the checkpoint format and the artifact format, which do not change.
+What remains is this. A leaf store opened read only never writes and never repairs: open_read_only refuses put_leaf and pin by name with ReadOnly, and opening an interrupted append read only refuses by name with RepairPending instead of repairing it. A leaf changed by one byte after it was named is refused by name on open, checked against the tree the store already keeps, so a corrupted leaf is never served as whole. The module doc of the leaf store says what open does and never does, and says that open never deletes a leftover temporary file. The witness half of the row, reading only what is new, is carried by LYSLOGSTORE-002 on its own card and is not this card's.
 
-Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main fa3dd5311e98d1a751c770319e1cfe2570718c76.
+Acceptance: put_leaf and pin through a read-only handle each refuse with ReadOnly and change no byte of the store; a store with an interrupted append opened read only refuses with RepairPending and the store's bytes are unchanged; the same store opened for writing repairs as today; a leaf whose bytes are changed by one byte after naming is refused by name on open; and every test named in the brief runs by a command a stranger can run against lys main, with its expected output stated. The brief names row 4.3 as the row it passes in part, and names LYSLOGSTORE-002 as the other part.
+
+Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), and commit the cluster's rendered markdown with the brief so the gate exits 0 on the branch. The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing; the path docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json is held by two open drafts, a1163a79 and e8440f97, on other subjects, so this brief takes the next free number and does not reuse LYSLOGSTORE-001. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 28 September 2026, against lys main a426b9a5.
 
 ## What the survey found, and its angles
 
-The card asks for two fixes. First, the file leaf store must never let a torn leaf become part of the tree: each leaf is written under a temporary name, synced, and put in place only when whole, and on open a leaf whose bytes do not match what the tree expects is refused by name instead of being pinned. Second, the federation witness must stop re-parsing the whole log on every observe (the cost is quadratic today) and find an origin's latest checkpoint by reading only what it needs. The card was filed against fa3dd53, but main now stands at a426b9a, where four lys-log-store commits have already landed the temporary-name write, using a no-replace hard link rather than a rename. What the store still lacks is the per-leaf check at open, the report of a stray temporary file, and a read-only open. The witness half is untouched.
+The card asks for the leaf-store half of a log-integrity row. First, a FileLeafStore opened read-only never writes and never repairs: put_leaf and pin refuse with a named ReadOnly error, and a read-only open of a store left one leaf ahead of its pin refuses with a named RepairPending error instead of repairing it. Second, a leaf changed after it was named is refused on open. Third, the leaf store's module doc says what open does and never does, including that it never deletes a leftover temporary file. The four landed commits (flush-then-name, no-replace link, sequence parameter, rename-injection isolation) are not to be redone. The witness half belongs to LYSLOGSTORE-002. On main the cluster has no design.json, so the brief also brings the cluster's method documents and their rendered markdown.
 
 ### What the tree holds
 
-- `crates/lys-log-store/src/file.rs` — At fa3dd53, put_leaf (lines 230-272) opens the final leaf name with create_new and then writes and syncs it, which is the defect as described. At a426b9a (main, 658 lines) put_leaf_with writes a hidden temporary file `.<pid>-<index>-<seq>.tmp`, syncs it, hard-links it to the final name so an existing leaf is never replaced, removes the temporary file and syncs leaves/. Open syncs leaves/ before counting. contiguous_extent still skips every entry that starts with '.', silently.
-- `crates/lys-log-store/src/log.rs` — reconcile_with_pin (lines 122-146) adopts exactly one extra leaf when the pinned-size prefix rebuilds to the pinned root, and pins it through store.pin. Nothing in it checks a single leaf's hash, because the only expectation it holds is the (tree_size, root) pin. Log has no read-only mode: open always repairs and pins. The refusal by name and the read-only open land here.
-- `crates/lys-log-store/src/store.rs` — The LeafStore trait contract (durable on return, write-once, contiguous, monotonic pin, immutable origin) and PinnedRoot, which holds only (tree_size, root). Any per-leaf expected hash is a new fact the contract does not carry today, and BACKENDS.md holds a second backend to this contract.
-- `crates/lys-log-store/src/error.rs` — On main it gained LeafDurabilityUncertain, ReopenRequired and LeafTempNamesTaken. A refusal that names a leaf, and a reported stray temporary file, need their own variant or return value here.
-- `crates/lys-log-store/src/file_tests.rs` — On main (783 lines) it already has a_leftover_temporary_file_is_ignored_at_open, open_leaves_a_leftover_temporary_file_byte_identical, a_refused_link_leaves_no_temporary_file and others. The acceptance tests for this card sit beside them, and some of them overlap.
-- `crates/lys-anchor/src/witness/observe.rs` — Line 91 calls WitnessProjection::rebuild_prefix(anchor, recorded.leaf_index) on every observe, which is the quadratic cost.
-- `crates/lys-anchor/src/witness/projection.rs` — rebuild_prefix (lines 136-160) runs checkpoint_in_leaf over indices 0..leaves, and a later index overwrites an earlier one ('last recorded wins'). Its module invariant says 'Derived, rebuildable, and never authoritative. Nothing here is stored.' checkpoint_in_leaf (line 99) is the parse path where the acceptance counter would go.
-- `crates/lys-anchor/src/anchor/open.rs` — Anchor holds pub(super) log: Log<S>, signer, config and policy. A per-origin position kept across observes would live here or in a witness-side wrapper. The witness is behind the off-by-default `federation` feature, and no item outside it may name anything inside it.
-- `crates/lys-anchor/src/anchor/read_only.rs` — Anchor::open_read_only calls Log::open, so a read-only anchor today still repairs and pins an extra leaf. A log that 'opens read-only rather than pinning it' has to reach this path too.
-- `crates/lys-anchor-cli/src/commands/anchor/open.rs and crates/lys/src/commands/log/store.rs` — The two CLI callers of FileLeafStore::open and Log::open. The anchor CLI prints 'recovered interrupted append' to stderr. Whatever a refused leaf or a stray temporary file produces is what an operator sees here.
-- `scripts/verify_inclusion.py` — Takes <artifact.json> <leaf-file> and hashes the leaf file's raw bytes as the RFC 6962 preimage. Any per-leaf hash record must therefore sit outside the leaf file, or this acceptance check breaks.
-- `docs/design/lys-log-store/BACKENDS.md` — The only document in the cluster: the five adoption criteria for a second backend, and haematite as the blocked candidate. It has no design.json, so scripts/design/gate.sh skips the cluster entirely.
+- `crates/lys-log-store/src/file.rs` — FileLeafStore. open (lines ~180-215) fsyncs leaves/ and then counts names without reading leaf bytes. put_leaf_with and pin are where a read-only refusal goes. There is no open_read_only and no read-only flag. The module doc (lines 1-54) describes the temporary name and the no-replace link, but it does not say that open never deletes a leftover. It has 430 non-blank, non-// lines against the 500-line limit.
+- `crates/lys-log-store/src/error.rs` — StoreError is #[non_exhaustive] with 16 variants. ReadOnly and RepairPending do not exist, so adding them is not a semver break for the published lys-log-store 0.2.0.
+- `crates/lys-log-store/src/log.rs` — Log::open → reconcile_with_pin is the only place a repair happens: storage exactly one leaf ahead, prefix matching the pin, then store.pin. A leaf changed inside the pinned prefix is already refused here as PinMismatch, without naming the leaf. The one-ahead leaf is adopted whatever its bytes. A read-only store under Log::open would reach store.pin and fail, unless RepairPending is raised first.
+- `crates/lys-log-store/src/store.rs` — The LeafStore trait contract, items 1-5. Whether read-only is an inherent FileLeafStore constructor or a trait matter decides whether BACKENDS.md and the trait change.
+- `crates/lys-log-store/src/file_tests.rs` — 34 tests. It already holds a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical (the leftover-untouched behaviour exists). It has no read-only test.
+- `crates/lys-log-store/src/log_tests.rs` — 13 tests. It already holds a_tampered_leaf_byte_is_detected_at_open (leaf-0→leaf-X, one byte, PinMismatch), crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it (the 'repairs as today' case) and crash_recovery_does_not_mask_a_tampered_prefix.
+- `crates/lys-anchor/src/anchor/read_only.rs` — Anchor::open_read_only calls Log::open (line 171) over FileLeafStore::open, so the existing 'read-only' anchor repairs and pins. That is outside this card's leaf-store scope, but it is the obvious consumer.
+- `crates/lys/src/commands/log/store.rs` — The lys log commands open with Log::open(FileLeafStore::open(dir)) and print the repair. They are a second read path that still repairs.
+- `docs/design/lys-log-store/` — On main it holds only BACKENDS.md: no design.json, stories.json, checklist.json or briefs/. gate.sh measures only clusters with a design.json, so this brief must bring the cluster's JSON and rendered markdown. Two open branches (0e2bb567 and 6826e0cf) each create their own design.json here.
+- `scripts/design/gate.sh` — Validates decisions.json and project.json. For every cluster with a design.json it runs validate.py and check-coverage.py, then compares the render-cluster.py output byte for byte with the committed .md files.
+- `docs/design/identity/CONFORMANCE.md` — The only numbered conformance table in the tree. Its row 4.3 is about moving a role holder to a newer version, not the flight recorder.
 
 ### What was already decided
 
-- docs/design/lys-log-store/BACKENDS.md — Criteria 1-5: durable on return, write-once enforced by the backend, contiguity established at open, every stored leaf readable back, no fork/merge/delete/truncate. Adding a per-leaf check at open adds a criterion that haematite would also have to meet.
-- crates/lys-log-store/src/store.rs module docs — LeafAlreadyWritten is a conflict, not a resume signal; catching up happens at open by repairing exactly the one-leaf-ahead state. This card narrows that repair.
-- crates/lys-log-store/src/log.rs module docs — Append order is load-bearing: the leaf is stored before the pin advances, so one leaf ahead of the pin is the only divergence a crash can produce and the only one open repairs.
-- crates/lys-anchor/src/witness/projection.rs invariants — The projection is derived, rebuildable and never authoritative, and nothing in it is stored; last recorded wins, not largest size. A kept per-origin position has to answer to this.
-- docs/design/lys-anchor/DECISIONS.md DP18 — A witness records; it does not audit. observe's check is a report, and nothing from it reaches a signature.
-- docs/design/lys-anchor/DECISIONS.md DP19 — Standalone operation is a hard requirement, so the witness speed-up must stay behind the `federation` feature and leave the default build untouched.
-- CLAUDE.md 'Wire formats are forever' — The leaf encoding is a versioned wire contract. The on-disk layout is local state (file.rs module docs), but the leaf file must stay the raw RFC 6962 preimage.
-- CLAUDE.md coding standards — No file over 500 lines of code excluding tests, comments and whitespace; tests go in sibling *_tests.rs files; no unwrap/expect/panic in library code.
+- docs/design/lys-log-store/BACKENDS.md — Five criteria a second backend must meet: durable on return, write-once, contiguity at open, read-back, and no fork/merge/delete. Read-only opening is not among them.
+- LYSLOGSTORE-001 (brief/lys-log-store/0e2bb567, unlanded) — The earlier words. R1-R4 and most of R5/R7/R8 are now on main. R5's open_read_only/ReadOnly, R6's module-doc section, R9 (DIRECTORY-003 depends_on), R10-R12 (Anchor opens at the pinned head and reports the repair as pending, rather than refusing) and R13 (cluster render) are not.
+- LYSLOGSTORE-002 (brief/lys-log-store/6826e0cf, unlanded) — It carries more than the witness: pinned-prefix PinMismatch tests (R1), leftover-temporary reporting (R2-R4) and the witness projection. It also says 'SHALL NOT add a read-only mode to Log or to Anchor' and 'any read-only open' is out of scope.
+- ADR-101 (on branch 6826e0cf only, not in main's ledger) — The pin is the store's only expectation of its leaves. A damaged pinned prefix is refused as PinMismatch without naming a leaf. A per-leaf hash record, bisection and a read-only open of a refused log are all rejected.
+- ADR-100 (on branch 6826e0cf only) — The witness folds only new leaves through an in-memory projection. That is the witness half the words hand to LYSLOGSTORE-002.
+- crates/lys-log-store/src/log.rs module doc — Append stores the leaf before the pin, so 'one leaf ahead' is the only divergence a crash produces and the only one Log::open repairs.
+- CLAUDE.md coding standards — No file over 500 code lines, tests in sibling *_tests.rs, every public item documented, and gates in both feature shapes, including cargo doc.
+- docs/design/identity/CONFORMANCE.md row 4.3 — 'Moving a holder to a newer version is a deliberate act…' (roles). It does not match the row 4.3 the words cite.
 
 ### What was measured
 
-- Commits on main past the card's stated base fa3dd53: 4 (9e0d1fb, 770f234, 1298836, a426b9a), all in lys-log-store: 662 insertions and 56 deletions across error.rs, file.rs and file_tests.rs
-- main head per git ls-remote: a426b9a5bfa47abc935497b2caddee800b5d72f0 (the card names fa3dd5311e98d1a751c770319e1cfe2570718c76)
-- crates/lys-log-store/src/file.rs on main: 658 lines, 430 of them neither comment nor blank, against a limit of 500 code lines (70 lines of headroom)
-- crates/lys-log-store/src/file.rs at fa3dd53: 462 lines; put_leaf at lines 230-272, create_new at 245
-- crates/lys-log-store/src/log.rs: 234 lines; the adopt-one-extra-leaf branch is at lines 128-138
-- crates/lys-log-store/src/file_tests.rs on main: 783 lines
-- #[test] count on main: lys-log-store 47, lys-anchor 141
-- crates/lys-anchor/src/witness: observe.rs 155 lines, projection.rs 188, observe_tests.rs 535, projection_tests.rs 246
-- Leaves parsed by one observe today: recorded.leaf_index, i.e. every leaf before the new one; across n observes about n²/2 parses
-- Callers of rebuild_prefix outside tests: 1 (observe.rs:91); WitnessProjection::rebuild has 0 non-test callers
-- Per-leaf hash records the store keeps today: 0; state.json holds tree_size and root_hash only
-- Read-only mode on Log: none; Anchor::open_read_only calls Log::open, which repairs and pins
-- Design documents in docs/design/lys-log-store: 1 (BACKENDS.md); no design.json, stories.json or briefs/, so gate.sh does not measure the cluster
-- Remote branch tips (excluding refs/pull and card-gate) whose objects exist locally: 71 of 221; 150 cannot be read without a fetch
-- Highest ids seen in the 71 readable tips: RM-045 and ADR-074; main itself holds RM-016 and ADR-018
+- Code lines in crates/lys-log-store/src/file.rs (non-blank, not starting //): 430 of a 500 limit (658 physical lines)
+- Physical lines per lys-log-store source file: file.rs 658, file_tests.rs 783, error.rs 265, log.rs 234, log_tests.rs 345, store.rs 191, lib.rs 60
+- Tests in file_tests.rs / log_tests.rs: 34 / 13 #[test] functions
+- StoreError variants on main: 16, #[non_exhaustive]; ReadOnly and RepairPending: 0 occurrences in crates/
+- open_read_only on FileLeafStore: absent (the only open_read_only is Anchor::open_read_only in lys-anchor)
+- Non-test Log::open call sites: 6 (lys-anchor open.rs ×2, genesis.rs ×2, read_only.rs ×1; lys commands/log/store.rs ×1)
+- Non-test FileLeafStore::open call sites: 2 (lys commands/log/store.rs:46, lys-anchor-cli commands/anchor/open.rs:117) plus 2 doc examples in read_only.rs
+- Files in docs/design/lys-log-store on main: 1 (BACKENDS.md); design.json absent
+- Branches holding docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json: 5 refs across 4 cards: brief+draft 0e2bb567 (leaf naming, the earlier words), draft 9aee27d1 (leaf naming), draft a1163a79 (Log memory), draft e8440f97 (Log memory)
+- Branches holding LYSLOGSTORE-002.json: 2 refs (brief+draft 6826e0cf)
+- Highest ids across all 336 remote refs at survey time: RM-063, ADR-103, LYSLOGSTORE-002; next free: RM-064, ADR-104, LYSLOGSTORE-003
+- Ids on main's ledgers: 11 roadmap rows (last RM-016), 18 decisions (last ADR-018)
+- Earlier LYSLOGSTORE-001 requirements already met on main a426b9a: R1 (LeafDurabilityUncertain), R2 (temp write+flush, leaf_temp_name, create_new), R3 (no-replace hard_link), R4 (link is commit point, ReopenRequired), R5 writable-open part (fsync_dir before contiguous_extent; leftovers untouched), R7 (fault seam as AfterLink + next_sequence parameter); not met: R5 read-only part, R6 module-doc section, R9, R10-R12, R13
+- Existing one-byte-change test: 1: log_tests.rs a_tampered_leaf_byte_is_detected_at_open asserts PinMismatch, names no leaf
 
 ### What it means for the other projects
 
-- haematite — It is the intended second LeafStore backend (BACKENDS.md). If the per-leaf check becomes part of the trait contract or of Log::open, haematite gains a sixth adoption criterion on top of its three existing blockers, #11 recovery fails open, #58 append not fsynced and #57 no committed lockfile, and BACKENDS.md should say so.
-- aion — The card runs through the aion chain (brief_card → sign-off → card_build_v3 → src_pr → src_land), and its inputs must name the repository, a426b9a (not fa3dd53), the card and the brief.
-- method — The lys-log-store cluster is not measured by the method's gate today because it has no design.json. Writing the brief there means creating the cluster in the method's form.
+- haematite — BACKENDS.md names haematite as the blocked second backend. If read-only opening becomes part of what a backend must support (a trait change rather than a FileLeafStore constructor), BACKENDS.md's criteria and haematite's adoption check both grow a row. If it stays inherent to FileLeafStore, haematite is untouched.
+- aion — The card runs through aion's chain (brief_card → sign-off → card_build_v3 → src_pr → src_land). The id collision on LYSLOGSTORE-001 across five refs, and two open branches each creating docs/design/lys-log-store/design.json, are merge conflicts the chain's landing step will hit.
+- method — The design-system scripts are copied at commit 3c3bac7 (scripts/design/SOURCE.md). The brief must validate against those copied schemas. Nothing in the method changes.
+- cambium — The card lives on the Lys board on Cambium. If the lead cuts LYSLOGSTORE-002 back or closes 0e2bb567, those cards' rows change there.
 
 ### The decisions it stands on
 
-- ADR-004 (honour) — lys-log-store and lys-anchor stand alone. The fix must not make the store depend on haematite or the witness depend on another anchor, and the witness stays behind `federation` (DP19).
--  (new) — Record where the expected per-leaf hash comes from (a new local-state record beside the leaf files, or the pin alone), and that a leaf failing it is refused by name while the log opens read-only instead of pinning. This changes the LeafStore/Log recovery contract that BACKENDS.md holds backends to.
--  (new) — Record that the witness keeps a derived, in-memory, rebuildable per-origin index, or scans backward with a stated bound, reconciling this with projection.rs's 'nothing here is stored' invariant and DP18.
+- ADR-004 (honour) — lys-log-store stands alone. A read-only open adds nothing that needs another project, and the trait stays free of any engine.
+-  (new) — A FileLeafStore opened read-only refuses to write (ReadOnly) and refuses a one-leaf-ahead store (RepairPending) instead of repairing it. This departs from the earlier unlanded brief's choice to open at the pinned head, and from ADR-101 on branch 6826e0cf (not in main's ledger), which rejects any read-only open. It takes the next free ADR id (ADR-104 at survey time).
+-  (new) — If the lead chooses to name a changed leaf by index, a per-leaf expectation record becomes a new local-state layout decision. It would contradict ADR-101 on 6826e0cf and would change BACKENDS.md. If the lead chooses PinMismatch as the refusal, no decision is needed.
 
 ### What it requires
 
-- The card's base is main as it stands at writing (a426b9a or later), not fa3dd53.
-- No crash or failed write at any point in put_leaf leaves a file under a 20-digit leaf name whose bytes are not the whole leaf.
-- A leaf never replaces an existing leaf at its index (write-once holds; the no-replace test stays green).
-- Opening a store whose leaf at a final name has been truncated returns a refusal that names that leaf's index, and state.json's pin is unchanged afterwards.
-- Opening a store with one byte of a leaf changed returns a refusal that names that leaf's index.
-- Opening a store with a stray hidden temporary file in leaves/ succeeds, does not count it, leaves it byte-identical, and reports that it is there.
-- A test over a log of a stated length N proves observe calls the parse path at most a stated bound of times, asserted on a counter and not on time.
-- observe's Relation and previous results are unchanged for every existing observe_tests and projection_tests case, including rollback ('last recorded wins').
-- All 47 lys-log-store tests and 141 lys-anchor tests existing on main still pass under cargo test --workspace --all-features.
-- scripts/verify_inclusion.py exits 0 on an artifact and leaf file from a store written after the change.
-- fmt, both clippy runs, tests, both doc runs and scripts/design/gate.sh are clean; no source file goes over 500 code lines.
+- FileLeafStore has a public, documented open_read_only(dir) that performs open's checks (log.json, state.json, contiguity) and returns a handle.
+- put_leaf on a read-only handle returns StoreError::ReadOnly and every file under the store directory is byte-identical before and after.
+- pin on a read-only handle returns StoreError::ReadOnly and state.json is byte-identical before and after.
+- open_read_only (or Log::open over it) on a store with extent == pinned.tree_size + 1 returns StoreError::RepairPending, and every file under the store directory is byte-identical before and after.
+- FileLeafStore::open followed by Log::open on that same store repairs it, reports recovered_to() == Some(n), and a second open reports None (the existing crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it still passes unchanged).
+- A store whose named leaf has one byte changed after naming is refused on open with a named StoreError variant, as the lead settles it (PinMismatch, or a new variant naming the leaf).
+- The leaf store's module doc states what open does (checks, counting, the leaves/ flush on a writable open) and never does (repair on a read-only open, count a dot-prefixed temporary name, delete or change a leftover temporary file).
+- StoreError gains exactly the new variants the brief names (ReadOnly, RepairPending), each documented, with messages naming the directory and the refused act.
+- Every test the brief names is listed with a command such as `cargo test -p lys-log-store --all-features <test> -- --exact` and its expected output.
+- crates/lys-log-store/src/file.rs stays at or under 500 code lines.
+- docs/design/lys-log-store gains design.json, stories.json, checklist.json, briefs/LYSLOGSTORE-<next>.json and their rendered .md files, and `sh scripts/design/gate.sh` exits 0 on the branch.
+- The brief names row 4.3 as passed in part and LYSLOGSTORE-002 as the other part.
+- The brief lists which earlier LYSLOGSTORE-001 requirements main a426b9a already meets (R1-R4, R5's writable open, R7) and carries only what remains.
+- All six gate legs pass in both feature shapes (fmt, clippy ×2, tests --all-features, doc ×2), run on Dean's laptop.
 
 ### What must not change
 
-- The leaf file stays the raw RFC 6962 preimage: no header, framing or hash inside it.
-- The checkpoint note format, the inclusion artifact format and every receipt or bundle format do not change.
-- The LeafStore trait keeps no fork, merge, delete, truncate or rewrite.
-- The receipt that observe returns stays byte-identical to Anchor::submit's.
-- No witness item reaches a signature or an admission decision, and nothing outside `federation` names a witness item.
-- The append order (leaf durable before the pin advances) is not reversed.
-- Existing store directories written by the lys-log-store 0.2.0 layout (log.json, state.json, leaves/) still open.
+- Do not change the four landed commits' behaviour: the temporary write and flush, the no-replace hard_link, the next_sequence parameter, and the AfterLink injection seams.
+- Do not change the one-leaf repair on a writable Log::open.
+- Do not change the leaf file layout, the leaf name width, log.json, state.json's shape, or the rule that a leaf file is the RFC 6962 preimage, unless the lead chooses a per-leaf record.
+- Do not add fork, merge, delete, truncate or leaf rewrite to LeafStore.
+- Do not delete, rename or modify a leftover temporary file on any open.
+- Do not touch the witness (lys-anchor witness module), which is LYSLOGSTORE-002's.
+- Do not reuse LYSLOGSTORE-001, or any id already on main or on an open brief, draft or hand branch.
+- Add no #[allow], #[ignore] or _-prefixed bypass. Library code has no unwrap, expect or panic.
 
 ### What we must put in place first
 
-- Fetch or ls-remote the 150 remote tips not held locally and read their roadmap.json and decisions.json, so the next free RM, ADR and brief ids are known. Readable tips show RM-045 and ADR-074.
-- Give docs/design/lys-log-store the method's cluster files (design.json and what validate.py and check-coverage.py require) so gate.sh measures the brief.
-- Rebase the card's base from fa3dd53 to current main a426b9a.
+- The lead's answers on row 4.3's source, on the meaning of 'refused by name' for a changed leaf, and on LYSLOGSTORE-002's overlap, before the brief's requirements can be written without contradicting the tree.
+- Re-run git ls-remote immediately before writing to confirm LYSLOGSTORE-003, RM-064 and ADR-104 are still free (at survey time the highest ids were LYSLOGSTORE-002, RM-063 and ADR-103).
+- Dean's laptop available for the full gate runs (standing rule 3/7).
 
 ### The risks
 
-- Using rename as the words say would silently re-open the second-writer overwrite that main's hard link closes.
-- A per-leaf hash record written separately from the leaf introduces a new crash window (record written, leaf not, or the reverse) that recovery must handle, or open refuses a healthy log.
-- Refusing the one-leaf-ahead state more strictly could turn today's routine crash recovery into a refusal, so logs that open now would stop opening.
-- A backward scan still parses the whole log for a new origin; if the bound is measured only on repeat origins, the acceptance passes while the quadratic case remains.
-- A kept per-origin index that falls out of step with the leaves becomes a second copy of the truth, the defect projection.rs warns about.
-- file.rs has 70 code lines of headroom, so the check and the scan may push it past the 500-line gate unless it is split.
-- Ids chosen from the 71 readable tips alone may collide with ids on the 150 unread ones.
+- file.rs has 70 code lines of headroom. open_read_only, a mode flag, two guards, a RepairPending check and a doc section could push it past 500 and force a split.
+- If RepairPending is checked only in Log::open, a read-only store reaching reconcile_with_pin fails at pin with ReadOnly instead, and the acceptance names the wrong error.
+- Two open branches (0e2bb567, 6826e0cf) each create docs/design/lys-log-store/design.json, stories.json and checklist.json. Whichever lands second conflicts, and the gate's render comparison fails until it is regenerated.
+- ADR-101 on 6826e0cf rejects a read-only open. If both land, the ledger holds contradictory decisions.
+- Anchor::open_read_only and `lys log status` still repair after this card, so a person could believe 'read-only' is now honoured end to end when it is not.
+- The existing one-byte test already passes. A new test that asserts only PinMismatch agrees with main as it stands and proves nothing new. The drift injection must fail exactly that test.
+- A read-only open that still fsyncs leaves/ may fail on a read-only mount, depending on the platform.
 
 ### Still open
 
-- Main (a426b9a) has already landed the temporary-name write. Does this card rebase onto main and drop that half, so that it carries only the open-time check, the stray-temporary report and the witness? The sentence of the words it stands on: "In crates/lys-log-store/src/file.rs, put_leaf (line 245 as main stands) creates the leaf file with create_new and then writes and syncs it; if write_all or sync_all fails, or the process dies between them, the half-written leaf stays on disk, and Log::open in log.rs lines 128 to 137 then counts it as one more leaf, finds the prefix matching the pin, and pins it as a completed append, so a truncated leaf is committed to the tree with no error.". Why only the lead can settle it: The tree contradicts it. At a426b9a, put_leaf_with in crates/lys-log-store/src/file.rs writes .<pid>-<index>-<seq>.tmp, syncs it and hard-links it into place, and open syncs leaves/ first. The defect as described no longer exists on main, and the card was filed against fa3dd53.
-- Should the leaf be put in place by a rename, as the words say, or by main's no-replace hard link, given that a rename silently replaces a leaf another writer already put at that index? The sentence of the words it stands on: "A leaf is written to a temporary name beside its final one, synced, and renamed into place, with the directory synced after, so a leaf either exists whole or not at all; on open, a leaf whose bytes do not hash to the leaf the tree expects is refused by name, and the log opens read-only rather than pinning it.". Why only the lead can settle it: The tree contradicts it. std::fs::rename overwrites an existing destination, which breaks write-once (store.rs contract 2). Main uses std::fs::hard_link in link_leaf precisely because it refuses an existing name, and commit a426b9a proves that swapping in rename makes no_replace_link_alone_refuses_a_leaf_this_store_never_saw fail.
-- Where does 'the leaf the tree expects' come from? Should the store start keeping a per-leaf hash record (a new local-state file beside the leaves), or should the refusal cover only leaves inside the pinned prefix, found by bisecting against the pin? The sentence of the words it stands on: "A leaf is written to a temporary name beside its final one, synced, and renamed into place, with the directory synced after, so a leaf either exists whole or not at all; on open, a leaf whose bytes do not hash to the leaf the tree expects is refused by name, and the log opens read-only rather than pinning it.". Why only the lead can settle it: Nothing in the tree records an expected hash per leaf. state.json (crates/lys-log-store/src/file.rs LogState) holds only (tree_size, root), so a changed leaf inside the pin surfaces as PinMismatch with no leaf named. For the one leaf past the pin (log.rs:128) there is no expectation at all. The answer changes the store's layout, what the operator is told, and what BACKENDS.md requires of haematite.
-- When a leaf is refused, does opening fail with an error that names it, as PinMismatch does today, or does it succeed and hand back a handle that can read but not append, and if so, what may that handle serve? The sentence of the words it stands on: "A leaf is written to a temporary name beside its final one, synced, and renamed into place, with the directory synced after, so a leaf either exists whole or not at all; on open, a leaf whose bytes do not hash to the leaf the tree expects is refused by name, and the log opens read-only rather than pinning it.". Why only the lead can settle it: Log has no read-only mode (crates/lys-log-store/src/log.rs). Anchor::open_read_only (crates/lys-anchor/src/anchor/read_only.rs) still repairs and pins. Whether `lys log` and `lys-anchor` status keep answering on a damaged log is behaviour an operator sees.
-- On main, a write killed partway leaves only a hidden temporary file and no leaf name, so there is nothing for open to refuse. Should the acceptance test instead plant a torn file at a final leaf name, as a store written before the change could hold, and prove open refuses it? The sentence of the words it stands on: "Acceptance: a test that kills the write after part of a leaf proves the next open refuses that leaf by name and does not pin it; a test that leaves a stray temporary file proves open ignores it and says so; a leaf changed by one byte is refused by name on open; a test over a log of a stated length proves observe parses a bounded number of leaves, measured by a counter on the parse path and not by time; every existing test in both crates still passes, and scripts/verify_inclusion.py still verifies an artifact from a store written after the change.". Why only the lead can settle it: The tree contradicts the test as written. With write_leaf_temp and link_leaf on main, a killed write never produces a leaf name, and a_leftover_temporary_file_is_ignored_at_open already covers what remains. The test can only show a refusal by planting a torn leaf by hand.
-- Must observe be bounded even for an origin it has never seen? If so, the witness needs a per-origin index built once (at open, or kept as leaves append), because a backward scan still parses the whole log for a first sighting. The sentence of the words it stands on: "The witness finds an origin's latest checkpoint by scanning from the newest leaf back and stopping at the first match, or from a per-origin position it keeps, and never re-parses the whole log per observe.". Why only the lead can settle it: The two mechanisms the words offer do not meet the acceptance equally. For a new origin, a backward scan parses every leaf before the note, so 'observe parses a bounded number of leaves' fails under it; only a kept index passes. projection.rs also says 'Nothing here is stored', which a kept index would have to square with, by staying in memory and derived.
-- How does open 'say so' about a stray temporary file: a value returned to the caller only, like recovered_to, or also a line the lys and lys-anchor CLIs print on stderr? The sentence of the words it stands on: "Acceptance: a test that kills the write after part of a leaf proves the next open refuses that leaf by name and does not pin it; a test that leaves a stray temporary file proves open ignores it and says so; a leaf changed by one byte is refused by name on open; a test over a log of a stated length proves observe parses a bounded number of leaves, measured by a counter on the parse path and not by time; every existing test in both crates still passes, and scripts/verify_inclusion.py still verifies an artifact from a store written after the change.". Why only the lead can settle it: Today contiguous_extent skips every '.' entry silently (crates/lys-log-store/src/file.rs), and the anchor CLI prints recovery on stderr (crates/lys-anchor-cli/src/commands/anchor/open.rs:121). Whether operators see a new line is an output change.
+- Where is 'conformance row 4.3' for the flight recorder written, given that the tree's only numbered conformance table puts a roles row at 4.3, and which document should the brief cite for it? The sentence of the words it stands on: "Conformance row 4.3 says the flight recorder's log refuses a leaf it cannot prove whole, and its witness reads only what is new.". Why only the lead can settle it: docs/design/identity/CONFORMANCE.md:47 row 4.3 is 'Moving a holder to a newer version is a deliberate act…'. No document in the tree numbers a flight-recorder row 4.3, so the brief would cite a row that says something else.
+- Should a changed leaf be refused as today's PinMismatch from Log::open, which names no leaf because the store keeps only one tree size and one root? Or should the store start keeping a per-leaf hash record so the refusal can name the leaf and FileLeafStore::open itself can check bytes? The sentence of the words it stands on: "A leaf changed by one byte after it was named is refused by name on open, checked against the tree the store already keeps, so a corrupted leaf is never served as whole.". Why only the lead can settle it: FileLeafStore keeps only state.json's (tree_size, root_hash) (file.rs LogState). FileLeafStore::open never reads leaf bytes (file.rs open doc). A one-byte change inside the pinned prefix is already refused as PinMismatch (log_tests.rs a_tampered_leaf_byte_is_detected_at_open), but it names no leaf. The one leaf just past the pin cannot be checked against anything. Also, FileLeafStore::leaf serves bytes unchecked to any caller that skips Log::open. Naming the leaf needs a new layout record, which BACKENDS.md and ADR-101 on 6826e0cf reject.
+- Does 'refused by name on open' in the acceptance mean returning a named error variant (PinMismatch already does this), or naming the index of the changed leaf? The sentence of the words it stands on: "Acceptance: put_leaf and pin through a read-only handle each refuse with ReadOnly and change no byte of the store; a store with an interrupted append opened read only refuses with RepairPending and the store's bytes are unchanged; the same store opened for writing repairs as today; a leaf whose bytes are changed by one byte after naming is refused by name on open; and every test named in the brief runs by a command a stranger can run against lys main, with its expected output stated.". Why only the lead can settle it: Under the first reading the one-byte case is already met on main by an existing test. Under the second it needs a per-leaf record, which changes what an operator is told and the store layout.
+- LYSLOGSTORE-002 on brief/lys-log-store/6826e0cf also carries the pinned-prefix refusal tests, leftover-temporary reporting and 'SHALL NOT add a read-only mode to Log or to Anchor', and its ADR-101 rejects a read-only open. Is 002 to be cut back to the witness only, or does this card supersede those lines? The sentence of the words it stands on: "The witness half of the row, reading only what is new, is carried by LYSLOGSTORE-002 on its own card and is not this card's.". Why only the lead can settle it: docs/design/lys-log-store/briefs/LYSLOGSTORE-002.json on 6826e0cf covers more than the witness and forbids the read-only open this card adds. Landing both as written puts two contradictory briefs and two design.json files in one cluster.
+- The earlier brief's unlanded items are R9 (DIRECTORY-003 waits on it), R10-R12 (Anchor::open_read_only and a log opened at its pin, reporting the repair as pending) and R13. Are these dropped, carried by this card, or named as further roadmap units? And is brief/lys-log-store/0e2bb567 (which also holds LYSLOGSTORE-001) closed? The sentence of the words it stands on: "The survey reads the tree as it stands and names each earlier requirement that main already meets, so the brief carries only what remains.". Why only the lead can settle it: The words scope this card to the leaf store. But Anchor::open_read_only (lys-anchor read_only.rs:171) and `lys log` (commands/log/store.rs:46) would still repair on a read path, so a person running `status` still gets a write. The earlier brief also opened at the pinned head where these words refuse.
+- Is LYSLOGSTORE-001.json held only by the two drafts named, or also by brief/draft 0e2bb567 and draft 9aee27d1 on this same subject, which the words call the earlier words? The sentence of the words it stands on: "The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing; the path docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json is held by two open drafts, a1163a79 and e8440f97, on other subjects, so this brief takes the next free number and does not reuse LYSLOGSTORE-001.". Why only the lead can settle it: git ls-remote shows LYSLOGSTORE-001.json on five refs across four cards: 0e2bb567 (brief and draft) and 9aee27d1 (draft) on the leaf-naming subject, plus a1163a79 and e8440f97 on Log memory. The 'other subjects' count is incomplete, and that decides which cards the lead closes.
 
 ### The units beyond the first
 
-- Update BACKENDS.md and haematite's adoption criteria for the per-leaf check at open — It changes what a second backend must satisfy, which is a separate document change with its own estate reader (haematite) and is not needed for the file store fix to land.
-- Surface refused leaves and stray temporary files in the lys and lys-anchor CLIs' status output — Only if the lead decides the report goes beyond a library return value; that is operator-facing output with its own tests.
+- Open Anchor::open_read_only and `lys log status` over FileLeafStore::open_read_only — The earlier brief's R10-R12. The consumers' read paths still repair after the leaf store learns to refuse. It touches lys-anchor, lys-anchor-cli and lys, which the words keep off this card.
+- Record that DIRECTORY-003 waits on the leaf-store brief — The earlier brief's R9. It is a change to the directory cluster, a separate document set with its own gate, and is not part of the leaf store.
+- Name the changed leaf through a per-leaf expectation record — Only if the lead wants the leaf index named. It is a layout change that needs a decision, a BACKENDS.md criterion, crash-window analysis and an adversarial review, which is too large and too different to ride with the read-only refusal.
+- Witness reads only what is new (LYSLOGSTORE-002) — The other half of row 4.3, assigned by the words to its own card.
 
 ### The smallest complete shape
 
-One card on current main, in two parts. In lys-log-store, open refuses by name any leaf whose bytes fail the expected hash and does not pin it, and it reports stray temporary files; the temporary-name write already on main is kept as it stands, with its no-replace link. In lys-anchor, observe finds an origin's latest checkpoint without folding the whole log. The card also carries the acceptance tests the words list and the lys-log-store cluster's method files and brief. Neither part is useful to an operator without the other's tests green, and they share one gate run.
+One PR on lys main. In crates/lys-log-store: add StoreError::ReadOnly and StoreError::RepairPending (error.rs). Add FileLeafStore::open_read_only with a read-only mode, in which put_leaf and pin refuse with ReadOnly, and the open refuses a store exactly one leaf ahead of its pin with RepairPending (file.rs). Add a module-doc section on what open does and never does, including never deleting a leftover. Add tests in file_tests.rs/log_tests.rs for each acceptance line (ReadOnly ×2 with byte-identical store, RepairPending with byte-identical store, writable repair unchanged, one-byte change refused as the lead settles it), each with its stranger-runnable command and expected output. In the same PR, add the lys-log-store cluster's design.json, stories.json, checklist.json and brief LYSLOGSTORE-003, their rendered markdown, one roadmap row (RM-064) and, if recorded, ADR-104, so scripts/design/gate.sh exits 0.
 
 ## The roadmap row
 
-- **RM-062** — Refuse a damaged pinned prefix at open, report leftover temporary leaf files, and bound the witness's observe (fix, idea)
-- Summary: The file log store could let a torn leaf into the tree. On main the torn write is already closed by the temporary-name write and its no-replace hard link, which are kept. LYSLOGSTORE-002 holds the rest under tests: a torn or changed leaf inside the pinned prefix is refused with StoreError::PinMismatch, which states the pin and the recomputed root and names no leaf (ADR-101), and the one-leaf repair just past the pin stays as it is. Open also returns the leftover temporary names, and the lys and lys-anchor tools print them on one stderr line. The federation witness's observe parses only the leaves recorded since its previous call, through an in-memory per-origin projection built once (ADR-100).
-- Asked by: tom on 2026-09-27T22:43:00+10:00
-- Context: A card for the identity line on the Lys board, filed against lys main fa3dd53 and briefed against main a426b9a. The lead's answers to the card's survey rebased it onto main and dropped the write half. They replaced the rename with main's no-replace hard link and withdrew the read-only open. They planted the torn leaf at a final name instead of killing a write, and chose an in-memory per-origin index for the witness. They had open report leftover temporary files both to the caller and on the two tools' stderr. Answering the author, the lead ruled that a refusal is PinMismatch stating the pin and the recomputed root and never a leaf index. The torn leaf is planted inside the pin, and the one-leaf repair just past it is kept and asserted.
-- Quote: A sweep of crates/lys-log-store and crates/lys-anchor found one correctness defect and one cost defect. In crates/lys-log-store/src/file.rs, put_leaf (line 245 as main stands) creates the leaf file with create_new and then writes and syncs it; if write_all or sync_all fails, or the process dies between them, the half-written leaf stays on disk, and Log::open in log.rs lines 128 to 137 then counts it as one more leaf, finds the prefix matching the pin, and pins it as a completed append, so a truncated leaf is committed to the tree with no error. In crates/lys-anchor/src/witness/observe.rs line 91, every observe calls WitnessProjection::rebuild_prefix, which parses every leaf in the log (projection.rs line 141) to find one origin's latest checkpoint, so the witness's cost grows with the square of the log's length.
+- **RM-066** — Open a leaf store read-only that never writes and never repairs (feature, idea)
+- Summary: The leaf-store half of the flight recorder's log-integrity row: FileLeafStore::open_read_only refuses put_leaf and pin with StoreError::ReadOnly and refuses a store one leaf past its pin with StoreError::RepairPending, changing no byte; a writable open still repairs as today; FileLeafStore::leftover_temporaries names the temporary files an open skipped; Log::open's PinMismatch refusal of a torn pinned prefix is held under tests; and file.rs's module doc says what open does and never does, including that it never deletes a leftover temporary file and that a leaf is proven whole only through Log::open. The one-byte case is already met on main. The witness half is LYSLOGSTORE-002's.
+- Asked by: tom on 2026-09-27T16:42:00+10:00
+- Context: The leaf-store card on the Lys board, filed by the identity line's lead against lys main a426b9a5 and surveyed against that tree; the lead's answers to the survey's six questions are written into LYSLOGSTORE-003 and ADR-106.
+- Quote: Conformance row 4.3 says the flight recorder's log refuses a leaf it cannot prove whole, and its witness reads only what is new. This card carries the leaf-store half of that row.
 
-This card makes the leaf store refuse a leaf it cannot prove whole and makes the witness read only what it needs. A leaf is written to a temporary name beside its final one, synced, and renamed into place, with the directory synced after, so a leaf either exists whole or not at all; on open, a leaf whose bytes do not hash to the leaf the tree expects is refused by name, and the log opens read-only rather than pinning it. The witness finds an origin's latest checkpoint by scanning from the newest leaf back and stopping at the first match, or from a per-origin position it keeps, and never re-parses the whole log per observe.
+lys main at a426b9a5 already names a leaf only after its bytes are flushed, links it under a name that is never replaced, takes temporary leaf sequences from a parameter, and isolates the no-replace link under a rename injection; those four commits are the first half of the earlier words, and this card does not redo them. The survey reads the tree as it stands and names each earlier requirement that main already meets, so the brief carries only what remains.
 
-Acceptance: a test that kills the write after part of a leaf proves the next open refuses that leaf by name and does not pin it; a test that leaves a stray temporary file proves open ignores it and says so; a leaf changed by one byte is refused by name on open; a test over a log of a stated length proves observe parses a bounded number of leaves, measured by a counter on the parse path and not by time; every existing test in both crates still passes, and scripts/verify_inclusion.py still verifies an artifact from a store written after the change. Not in scope: the leaf format, the checkpoint format and the artifact format, which do not change.
+What remains is this. A leaf store opened read only never writes and never repairs: open_read_only refuses put_leaf and pin by name with ReadOnly, and opening an interrupted append read only refuses by name with RepairPending instead of repairing it. A leaf changed by one byte after it was named is refused by name on open, checked against the tree the store already keeps, so a corrupted leaf is never served as whole. The module doc of the leaf store says what open does and never does, and says that open never deletes a leftover temporary file. The witness half of the row, reading only what is new, is carried by LYSLOGSTORE-002 on its own card and is not this card's.
 
-Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main fa3dd5311e98d1a751c770319e1cfe2570718c76.
-- Cluster: lys-log-store; briefs: LYSLOGSTORE-002
-- Notes: Ids are the next free past main a426b9a and every open brief, draft and hand branch. The draft's commits sit on main a426b9a. git ls-remote was read immediately before each of rounds 1 and 2, and each time every one of the 239 branch tips it listed, outside refs/pull and card-gate, was fetched and read, none unreadable. The highest ids held on any other tip were, both times, RM-061 and ADR-099 (draft/directory/844a587d, which held RM-058 and ADR-097 when the lead read it, now holds RM-059 and ADR-098), and LYSLOGSTORE-001 was the highest other brief under the prefix. The words give no first-writer priority, so this row, first written as RM-058 with ADR-097 and ADR-098, is renumbered to RM-062 with ADR-100 and ADR-101, and it keeps LYSLOGSTORE-002. Further units, not written: Update BACKENDS.md and haematite's adoption criteria for the per-leaf check at open (under ADR-101 no per-leaf check is added, so nothing in it is owed yet); Surface refused leaves and stray temporary files in the lys and lys-anchor CLIs' status output (the lead's answers brought the stderr line and the refusal's exit into LYSLOGSTORE-002; anything beyond them stays here).
+Acceptance: put_leaf and pin through a read-only handle each refuse with ReadOnly and change no byte of the store; a store with an interrupted append opened read only refuses with RepairPending and the store's bytes are unchanged; the same store opened for writing repairs as today; a leaf whose bytes are changed by one byte after naming is refused by name on open; and every test named in the brief runs by a command a stranger can run against lys main, with its expected output stated. The brief names row 4.3 as the row it passes in part, and names LYSLOGSTORE-002 as the other part.
+
+Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh), and commit the cluster's rendered markdown with the brief so the gate exits 0 on the branch. The brief id, roadmap row and any decision take the next free id past main and every open brief, draft and hand branch, checked with git ls-remote immediately before writing; the path docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json is held by two open drafts, a1163a79 and e8440f97, on other subjects, so this brief takes the next free number and does not reuse LYSLOGSTORE-001. If a sentence here is open or contradicted by the repository as it stands, the survey quotes it whole as a question for the lead. Filed by Archie, lead for the identity line, on 28 September 2026, against lys main a426b9a5.
+- Cluster: lys-log-store; briefs: LYSLOGSTORE-003
+- Notes: Further units, by title, not written here: (1) Move Anchor::open_read_only and the lys log commands onto FileLeafStore::open_read_only, opening a log at its pin and reporting the repair as pending (the earlier LYSLOGSTORE-001 R10 to R12, with its R13 cluster render). Until it lands, crates/lys-anchor/src/anchor/read_only.rs and crates/lys/src/commands/log/store.rs still repair on a read path, so a person running status still gets a write, and the integrity row is not passed in full. (2) Record that DIRECTORY-003 waits on the leaf-store brief (the earlier LYSLOGSTORE-001 R9; DIRECTORY-003 is the brief that waits, on LYSLOGSTORE-003). (3) Print leftover temporary leaf files from the lys log and lys-anchor commands, and hold their refusal of a damaged log (LYSLOGSTORE-002's former R3 and R4, which leave that brief when it is cut back to the witness). (4) Witness reads only what is new (LYSLOGSTORE-002). Finding: docs/design/identity/CONFORMANCE.md carries no flight-recorder row (its row 4.3 is a roles row); the lead adds one, and LYSLOGSTORE-003 stands on the lys-log-store design's goal meanwhile. Superseded by LYSLOGSTORE-003 and closed at sign-off: brief/lys-log-store/0e2bb567 and draft/lys-log-store/9aee27d1. LYSLOGSTORE-001 is held on five refs across four cards (0e2bb567 brief and draft, 9aee27d1, and a1163a79 and e8440f97 on Log memory, which stay open). Ids read with git ls-remote over all refs immediately before writing, and read again each time a draft branch took the next number between reads (draft/directory/3e63b2d8 took RM-064 and ADR-104, then draft/directory/09884e04 took RM-065 and ADR-105): over 339 refs the highest are RM-065, ADR-105 and LYSLOGSTORE-002, so this row is RM-066, the decision ADR-106 and the brief LYSLOGSTORE-003.
 
 ## The design
 
 ---
 type: design
 cluster: lys-log-store
-title: lys-log-store: a store that refuses what its pin cannot vouch for and says what it skipped, and a witness that reads only what is new
+title: lys-log-store: a leaf store that never serves a leaf as whole unless it is proven whole
 ---
 
-# lys-log-store: a store that refuses what its pin cannot vouch for and says what it skipped, and a witness that reads only what is new
+# lys-log-store: a leaf store that never serves a leaf as whole unless it is proven whole
 
 > **Cluster:** lys-log-store
 
 ## Intention
 
-A log store is trusted because a stranger can rebuild its tree from the leaf files and get the pinned root. When the leaves inside the pin no longer rebuild to it, the store refuses to open. It states exactly what it knows, the pin and the root the leaves now give, and claims nothing it cannot prove. Anything the store sees in its own directory and decides not to count is part of that story too, so it is reported to the operator instead of skipped in silence.
+A flight recorder is only evidence if reading it cannot change it and nothing it serves as whole is anything less. The leaf store is where that starts: it holds the leaves of a lys log on disk, and every other part of the log trusts what it says it holds.
 
-A witness is a durable memory of other logs' checkpoints. Its cost per observation should follow what it has not yet read, not the whole length of its own log, so that a witness can keep running for as long as the logs it watches keep growing.
+When this cluster's first brief is done, a reader can open a leaf store and be certain that the open wrote nothing, repaired nothing and deleted nothing, and a store that a crash left mid-append tells that reader so by name instead of being quietly repaired under them. A leaf is proven whole in exactly one place, a Log opened against the pinned root, and the module doc says so where the next implementor will read it.
 
 ## Problem
 
-Two defects were found in a sweep of crates/lys-log-store and crates/lys-anchor. First, the file leaf store could let a torn leaf become part of the tree. The torn-write half of that is already closed on main: a leaf is written under a temporary name, synced and put in place by a no-replace hard link, which is kept as it stands. What remains is that nothing asserts that a torn or changed leaf inside the pinned prefix is refused at open, and that the leftover temporary file an interrupted append leaves in leaves/ is skipped without a word. Second, every observe in crates/lys-anchor/src/witness/observe.rs folds the witness's entire log through WitnessProjection::rebuild_prefix to find one origin's latest checkpoint. One observe parses every leaf recorded before it, so n observes cost about n squared over two parses and the witness slows as its log grows.
+FileLeafStore has one way to open, and it is the writer's. A caller that only wants to read a log gets a handle that will write a leaf or move the pin if asked, and a store left one leaf ahead of its pin by a crash is repaired by the first Log::open over it, whoever that caller is. So a read path, such as a status command or Anchor::open_read_only, performs a write. Nothing in the store names that state to a reader, and nothing tells a reader which leftover temporary files the open skipped.
+
+The store's module doc says how a leaf is written but not what open does and never does: that open never deletes a leftover temporary file, and that FileLeafStore::leaf returns bytes it has not checked, so a leaf is proven whole only through Log::open against the pinned root. A reader who calls leaf() directly can be served a changed leaf without knowing it.
+
+The refusal of a damaged pinned prefix exists on main as StoreError::PinMismatch from Log::open, but only a one-byte change is held under a test; a torn leaf inside the prefix, and a torn leaf just past the pin, are not.
 
 ## Solution
 
-The pin is the store's only expectation of its leaves: one tree size and one root (ADR-101). No per-leaf hash record is added. When the leaves inside the pinned prefix, one of them torn or changed, rebuild to a root other than the pinned one, Log::open refuses with StoreError::PinMismatch as it does today. The refusal states the pin's tree size and root and the tree size and root recomputed from the leaves. A single root cannot tell which leaf changed, so the refusal does not name one and nothing claims to. Nothing is pinned and state.json is left as it was. The one-leaf repair for a leaf just past the pin is kept exactly as it is, since it is what makes crash recovery routine: such a leaf, torn or whole, is adopted, pinned and reported through recovered_to. The lys log commands and the lys-anchor commands already turn the refusal into a stderr diagnostic and a non-zero exit, and tests now hold them to it. No read-only open is added.
+The store gains a second constructor for readers, FileLeafStore::open_read_only, beside the writer's FileLeafStore::open. It is an inherent constructor on FileLeafStore: the LeafStore trait, BACKENDS.md and Log are unchanged, and Log and Anchor gain no read-only mode (ADR-106). The read-only open performs the same checks as the writable open (log.json, state.json, the 20-digit leaf names and their contiguity) and differs in three ways: it does not flush leaves/, it refuses by name with StoreError::RepairPending a store whose extent is exactly one past its pinned tree size, and the handle it returns refuses put_leaf and pin with StoreError::ReadOnly before any other check. RepairPending is decided from the extent and the pin alone, without reading leaf bytes, so it fires before any Log could reach the repair; whether the pending leaf is a clean interrupted append or a damaged prefix is decided by a writable open, which repairs or refuses with PinMismatch exactly as it does today. A read-only handle over a store that is two or more leaves past its pin, or behind it, opens, and Log::open over it refuses with PinMismatch without writing.
 
-The file store's open already walks leaves/ to find the contiguous extent. That walk now also recognises names in the store's own temporary-leaf form (a dot, a process id, a dash, the twenty-digit index, a dash, a sequence number and .tmp). It keeps them out of the extent as today, leaves them untouched, and hands their names back to the caller through the opened store. The two command-line tools that open a file store, lys (log commands) and lys-anchor, read those names straight after the store opens and print one stderr line naming them, the same way both already print an interrupted-append recovery. Nothing changes in the LeafStore trait, in Log, in state.json or in the leaf files, so BACKENDS.md and the second-backend criteria are unchanged.
+The walk of leaves/ that counts the extent also collects the store's own temporary-leaf names, which it already skips, and returns them in lexical order from FileLeafStore::leftover_temporaries, so a caller can name what the open ignored. The walk never removes, renames or changes one.
 
-The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessProjection, which is already the per-origin map, also records how many of the anchor's leaves it has folded. One pass over the whole log builds it once, when the caller opens the anchor. After that, observe takes the kept projection, folds only the leaves recorded since its position, compares the new note against it, and then adds the new note to it. The note is not parsed twice. The projection stays derived and rebuildable: discarding it and folding again from the leaves gives the same answer, and a test holds the kept projection to a fresh fold after every step. Parses are counted by a test-only counter on the parse path, so the bound is asserted on the number of parses and never on elapsed time. The witness stays behind the federation feature, because standalone operation is a hard requirement (docs/design/lys-anchor/DECISIONS.md DP19).
+The refusal of a changed leaf stays where it is: Log::open rebuilds the tree from every stored leaf and compares it with the one tree size and one root state.json keeps, and a leaf changed inside the pinned prefix is refused as StoreError::PinMismatch, which carries both trees and never a leaf index. The store keeps no per-leaf record, so which leaf changed is not known and is not claimed. New tests hold that refusal for a torn leaf and hold the one-leaf repair for a torn leaf just past the pin.
+
+file.rs's module doc gains a section saying what open and open_read_only do and never do, including that neither ever deletes a leftover temporary file, and that leaf() serves bytes it has not checked: every reader that wants a proven leaf goes through Log::open.
+
+The witness half of the same integrity row, a witness that reads only what is new, is LYSLOGSTORE-002's and is not designed here. The consumers' read paths (Anchor::open_read_only and the lys log commands) still open with the writable open after this cluster's first brief; moving them onto the read-only open is a further unit.
 
 ## Principles
 
-- **P1** — A leaf the pin cannot vouch for is refused, and the refusal states what the store knows (the pin and the recomputed root) and claims nothing more.
-- **P2** — What open decides not to count is named to the operator; a skipped file is never silent.
-- **P3** — The leaves are the record. The witness's per-origin memory is a view of them, held in memory, never stored, and it agrees with a fresh fold at every point.
-- **P4** — A bound on work is measured by counting the work, not by timing it.
+- **P1** — A read-only open writes no byte: no leaf, no pin, no flush, no removal of a leftover.
+- **P2** — A refusal is a named StoreError variant, never a repaired or partial answer.
+- **P3** — A leaf is proven whole only by Log::open against the pinned root; the store serves bytes, it does not vouch for them.
+- **P4** — The store claims only what it knows: it keeps one tree size and one root, so no refusal names a leaf index.
+- **P5** — The LeafStore trait stays what BACKENDS.md says a backend must satisfy; reading without writing is FileLeafStore's own.
 
 ## Decisions
 
-- ADR-100 — The witness keeps a derived per-origin projection in memory and folds only new leaves — The witness's per-origin projection is built by one pass when the anchor is opened. It records how many leaves it has folded, and each observe folds only the leaves recorded since then before comparing, then adds the note it just recorded. The projection lives in memory only and is derived from the leaves, so discarding it and folding again gives the same answer, and it is never authoritative. Observe is bounded for a known origin and a first sighting alike. Rejected: the backward scan, which leaves a first sighting unbounded. Also rejected: any stored index, which would be a second copy of the truth beside the leaves.
-- ADR-101 — A file log store's only expectation of its leaves is the pin; a damaged pinned prefix is refused without naming a leaf — The pin is the store's only expectation of its leaves. When the leaves inside the pinned prefix rebuild to another root, Log::open refuses with StoreError::PinMismatch as it does today. That refusal states the pin's tree size and root and the tree size and root recomputed from the leaves, and it never names a leaf index, because which leaf changed is not known. The one-leaf repair for a leaf just past the pin is kept exactly as it is. Rejected: a per-leaf hash record beside the leaves, which changes the layout and BACKENDS.md and adds a crash window. Also rejected: naming a leaf by bisecting the pin's root, which cannot be done. Also rejected: a read-only open of a refused log, and refusing a torn leaf just past the pin, which would turn routine crash recovery into a refusal.
+- ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+- ADR-106 — A FileLeafStore opened read-only refuses to write and to repair; Log and Anchor gain no read-only mode — FileLeafStore gains an inherent open_read_only whose handle refuses put_leaf and pin with StoreError::ReadOnly and which refuses a store exactly one leaf past its pin with StoreError::RepairPending, decided from the count and the pin without reading leaf bytes and without flushing. Log and Anchor gain no read-only mode: Log::open over a read-only handle either finds the tree matching the pin, or refuses with PinMismatch, and never reaches a pin, so the Log needs no mode for the store to hold. Both hold because the refusal of a repair lives at the one place that can know a repair would be needed before any Log sees the store. Rejected: opening a read-only log at its pinned head and reporting the repair as pending (a Log mode, and a served state the store has not reconciled); a read-only mode on Log or Anchor; making read-only opening a LeafStore trait method, which would add a criterion to BACKENDS.md; and a per-leaf hash record so a refusal could name the changed leaf.
 
 ## Goals
 
-- Opening a file store whose pinned prefix holds a torn or changed leaf fails with StoreError::PinMismatch stating the pin and the recomputed root, pins nothing, and the lys and lys-anchor status commands exit non-zero with that refusal on stderr.
-- A torn leaf just past the pin is repaired, pinned and reported exactly as before this change.
-- Opening a file store whose leaves/ holds a leftover temporary leaf file returns that file's name to the caller, and the lys and lys-anchor tools print it on one stderr line.
-- After the witness's projection is built once, an observe on a 256-leaf log parses one leaf when no other leaf was recorded since the previous observe.
-- Every test that exists in lys-log-store and lys-anchor on main passes, with its assertions unchanged.
-- scripts/verify_inclusion.py exits 0 on an inclusion artifact and a leaf file from a store written after this change.
+- No leaf is served as whole unless it is proven whole against the pinned root through Log::open, and file.rs's module doc says so.
+- FileLeafStore::open_read_only refuses put_leaf and pin with StoreError::ReadOnly, and every file under the store directory holds the same bytes before and after.
+- FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending, every file under the store directory holds the same bytes before and after, and a writable open of the same store repairs it as main does.
+- A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch and state.json is unchanged, under a named test.
+- FileLeafStore::leftover_temporaries names the temporary-leaf files an open skipped, and no open removes or changes one.
 
 ## Non-Goals
 
-- Writing a leaf through a temporary name and putting it in place — Main already writes the temporary file, syncs it and hard-links it into place without replacing an existing leaf; a rename would replace another writer's leaf and break write-once.
-- A read-only mode for Log or for the anchor — A refused log fails to open; no read-only handle is added.
-- Naming which leaf changed when open refuses a log — The pin is one tree size and one root, which cannot identify a single leaf, and no per-leaf hash record is kept (ADR-101). Which leaf changed is not known and is not claimed.
-- Refusing a torn leaf just past the pin — The one-leaf repair is kept exactly as it is, since it is what makes crash recovery routine.
-- Changing the leaf format, the checkpoint format or the inclusion artifact format — Out of scope; the leaf file stays the raw RFC 6962 preimage.
-- Updating BACKENDS.md or the second backend's adoption criteria — Nothing in the LeafStore contract changes, and no per-leaf check is added.
+- A per-leaf hash record, or a refusal that names the index of a changed leaf. — The store keeps one tree size and one root (BACKENDS.md); naming the leaf needs a new layout record, which this cluster does not add.
+- A read-only mode on Log or on Anchor. — ADR-106: the read-only open is FileLeafStore's alone.
+- Moving Anchor::open_read_only and the lys log commands onto FileLeafStore::open_read_only, or printing leftover temporary files from the lys log and lys-anchor commands. — Those are the consumers' read paths, in lys-anchor, lys-anchor-cli and lys, and are a further unit.
+- The witness reading only what is new. — LYSLOGSTORE-002 carries the witness half of the integrity row.
+- Redoing flush-before-name, the no-replace link, the temporary-sequence parameter or the rename-injection isolation. — All four are on main already.
+- Deleting or tidying leftover temporary files. — Open only skips and names them; clearing them is not the store's act.
 
 ## Structure
 
 | Path | Note | Brief |
 |------|------|-------|
-| `docs/design/lys-log-store/design.json` | this design |  |
-| `docs/design/lys-log-store/checklist.json` | the rows this cluster's brief delivers |  |
-| `docs/design/lys-log-store/stories.json` | the stories this cluster's brief serves |  |
-| `docs/design/lys-log-store/briefs/LYSLOGSTORE-002.json` | the refusal at open, the leftover-temporary report and the bounded witness |  |
-| `docs/design/lys-log-store/BACKENDS.md` | second-backend adoption criteria; unchanged |  |
-| `crates/lys-log-store/src/log_tests.rs` | Log tests, including the torn and changed leaf inside the pin and the torn leaf just past it |  |
-| `crates/lys-log-store/src/file.rs` | FileLeafStore; open recognises and reports leftover temporary leaf files |  |
-| `crates/lys-log-store/src/file_tests.rs` | FileLeafStore tests, including the leftover-temporary report |  |
-| `crates/lys/src/commands/log/store.rs` | the lys log commands' store open; prints the leftover-temporary line |  |
-| `crates/lys/tests/log_tests.rs` | lys log binary tests, including the stderr line and the Python verifier run |  |
-| `crates/lys-anchor-cli/src/commands/anchor/open.rs` | lys-anchor's anchor open; prints the leftover-temporary line |  |
-| `crates/lys-anchor-cli/tests/anchor_cli.rs` | lys-anchor binary tests, including the stderr line |  |
-| `crates/lys-anchor/src/witness/projection.rs` | WitnessProjection with its fold position, forward fold and the test-only parse counter |  |
-| `crates/lys-anchor/src/witness/projection_tests.rs` | projection tests, including forward fold against a fresh rebuild |  |
-| `crates/lys-anchor/src/witness/observe.rs` | observe over a kept projection |  |
-| `crates/lys-anchor/src/witness/observe_tests.rs` | observe tests, including the bounded-parse count |  |
+| `crates/lys-log-store/src/error.rs` | StoreError; gains ReadOnly and RepairPending |  |
+| `crates/lys-log-store/src/file.rs` | FileLeafStore; gains open_read_only, the read-only refusals, leftover_temporaries and the 'What open does and never does' module-doc section |  |
+| `crates/lys-log-store/src/file_tests.rs` | FileLeafStore tests; gains the read-only and leftover-temporary tests |  |
+| `crates/lys-log-store/src/log.rs` | Log over any LeafStore; its open and one-leaf repair are unchanged |  |
+| `crates/lys-log-store/src/log_tests.rs` | Log tests; gains the pinned-prefix refusal and repair tests |  |
+| `crates/lys-log-store/src/store.rs` | The LeafStore trait contract; unchanged |  |
+| `crates/lys-log-store/src/lib.rs` | Crate root and re-exports; unchanged |  |
+| `docs/design/lys-log-store/BACKENDS.md` | Criteria a second LeafStore backend must meet; unchanged |  |
+| `docs/design/lys-log-store/design.json` | This design | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/checklist.json` | The cluster checklist | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/stories.json` | The cluster stories | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/briefs/LYSLOGSTORE-003.json` | The read-only leaf store brief | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/DESIGN.md` | Rendered from design.json | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/CHECKLIST.md` | Rendered from checklist.json | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/USER-STORIES.md` | Rendered from stories.json | LYSLOGSTORE-003 |
+| `docs/design/lys-log-store/briefs/LYSLOGSTORE-003.md` | Rendered from LYSLOGSTORE-003.json | LYSLOGSTORE-003 |
 
 ## Inventory
 
-- `crates/lys-log-store/src/file.rs` — On main: put_leaf_with writes leaves/.<pid>-<index>-<seq>.tmp, syncs it, hard-links it to the 20-digit name, removes the temporary file and syncs leaves/. open syncs leaves/ before counting. contiguous_extent skips every dot-prefixed name without reporting it. 430 code lines.
-- `crates/lys-log-store/src/file_tests.rs` — On main: includes a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical.
-- `crates/lys-log-store/src/log.rs` — Log::open rebuilds the tree, reconciles it with the (tree_size, root) pin, repairs exactly one leaf past the pin and reports it through recovered_to, and otherwise returns StoreError::PinMismatch with pinned_size, pinned_root, rebuilt_size and rebuilt_root. Code unchanged by this cluster.
-- `crates/lys-log-store/src/log_tests.rs` — On main: a_tampered_leaf_byte_is_detected_at_open, crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it and crash_recovery_does_not_mask_a_tampered_prefix assert the variant only.
-- `crates/lys-log-store/src/error.rs` — StoreError::PinMismatch's message: 'stored leaves rebuild to tree size {rebuilt_size} with root {rebuilt_root}, but the pinned state is tree size {pinned_size} with root {pinned_root}'. Unchanged by this cluster.
-- `crates/lys-log-store/src/store.rs` — The LeafStore contract and PinnedRoot (tree_size, root). Unchanged by this cluster.
-- `crates/lys/src/commands/log/store.rs` — open() opens FileLeafStore then Log and prints 'recovered interrupted append: state advanced to N' on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1.
-- `crates/lys-anchor-cli/src/commands/anchor/open.rs` — open() opens FileLeafStore then Anchor and prints the same recovery line on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1.
-- `crates/lys-anchor/src/witness/observe.rs` — observe(anchor, note, proof, context) calls WitnessProjection::rebuild_prefix on every call (line 91).
-- `crates/lys-anchor/src/witness/projection.rs` — WitnessProjection: a BTreeMap of origin to OriginState folded from leaves; rebuild and rebuild_prefix fold from index 0; checkpoint_in_leaf is the parse path. Module invariant: derived, rebuildable, nothing stored; last recorded wins.
-- `scripts/verify_inclusion.py` — Standalone RFC 6962 verifier: verify_inclusion.py <artifact.json> <leaf-file>, exit 0 when the leaf verifies.
-- `docs/design/lys-log-store/BACKENDS.md` — The five adoption criteria for a second LeafStore backend.
+- `crates/lys-log-store/src/file.rs` — FileLeafStore with create, open (flushes leaves/, then counts 20-digit names, skipping dot-prefixed ones), leaf, put_leaf (temporary write, flush, no-replace hard link) and pin. No read-only open. 430 code lines of the 500 allowed.
+- `crates/lys-log-store/src/error.rs` — StoreError, #[non_exhaustive], 16 variants including PinMismatch; no ReadOnly or RepairPending.
+- `crates/lys-log-store/src/log.rs` — Log::open rebuilds from every leaf and reconciles with the pin; repairs exactly one leaf past the pin when the prefix matches, otherwise PinMismatch.
+- `crates/lys-log-store/src/store.rs` — The LeafStore trait and PinnedRoot; no fork, merge, delete, truncate or rewrite.
+- `crates/lys-log-store/src/file_tests.rs` — 34 tests, including a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical; no read-only test.
+- `crates/lys-log-store/src/log_tests.rs` — 13 tests, including a_tampered_leaf_byte_is_detected_at_open (one byte changed in the pinned prefix, PinMismatch), crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it and crash_recovery_does_not_mask_a_tampered_prefix.
+- `crates/lys-anchor/src/anchor/read_only.rs` — Anchor::open_read_only opens its log with Log::open over the writable FileLeafStore::open, so it repairs and pins on a read path.
+- `crates/lys/src/commands/log/store.rs` — The lys log commands open with Log::open(FileLeafStore::open(dir)), so status repairs on a read path.
+- `docs/design/lys-log-store/BACKENDS.md` — Five criteria a second backend must meet; reading without writing is not among them.
+- `docs/design/identity/CONFORMANCE.md` — The only numbered conformance table; it carries no flight-recorder row, and its row 4.3 is a roles row.
+- `scripts/design/gate.sh` — Validates every cluster with a design.json, checks its coverage and compares its rendered markdown byte for byte.
 
 ## Constraints
 
-- **CN1** — The leaf file stays the raw RFC 6962 preimage: no header, framing or hash is added to it.
-- **CN2** — The checkpoint note format, the inclusion artifact format and every receipt and bundle format do not change.
-- **CN3** — The LeafStore trait gains no method, and keeps no fork, merge, delete, truncate or rewrite.
-- **CN4** — A leaf is put in place only by the existing no-replace hard link; nothing renames over a leaf name.
-- **CN5** — The receipt observe returns stays byte-identical to Anchor::submit's for the same note at the same tree state.
-- **CN6** — Every witness item stays behind the federation feature, and no item outside it names one.
-- **CN7** — No source file goes over 500 lines of code, excluding tests, comments and blank lines.
-- **CN8** — Store directories in the lys/log-dir/v1 layout (log.json, state.json, leaves/) written before this change still open.
+- **CN1** — The leaf write on main is unchanged: the temporary write and flush, the no-replace hard link, the next_sequence parameter and the AfterLink seams.
+- **CN2** — A writable open followed by Log::open repairs a store exactly one leaf past its pin as main does, and reports it through recovered_to.
+- **CN3** — The leaves/ layout, the 20-digit leaf name, log.json, state.json's shape and the rule that a leaf file is the RFC 6962 preimage are unchanged.
+- **CN4** — The LeafStore trait gains no method, and gains no fork, merge, delete, truncate or leaf rewrite; BACKENDS.md is unchanged.
+- **CN5** — No open deletes, renames or modifies a leftover temporary file.
+- **CN6** — crates/lys-log-store/src/file.rs holds no more than 500 lines that are neither blank nor comment lines, not counting tests.
+- **CN7** — Library code has no unwrap, expect, panic, todo, unimplemented or unreachable, and no #[allow], #[ignore] or _-prefixed bypass is added.
 
 
 ---
 type: brief
-id: LYSLOGSTORE-002
+id: LYSLOGSTORE-003
 cluster: lys-log-store
-title: Refuse a damaged pinned prefix at open, report leftover temporary leaf files, and bound the witness's observe to the leaves recorded since the last one
+title: Open a leaf store read-only that never writes and never repairs, name its leftovers, and say what open does and never does
 ---
 
-# LYSLOGSTORE-002: Refuse a damaged pinned prefix at open, report leftover temporary leaf files, and bound the witness's observe to the leaves recorded since the last one
+# LYSLOGSTORE-003: Open a leaf store read-only that never writes and never repairs, name its leftovers, and say what open does and never does
 
 > **Cluster:** lys-log-store
 > **Design anchor:**
-> - ADR-100 — The witness keeps a derived per-origin projection in memory and folds only new leaves — The witness's per-origin projection is built by one pass when the anchor is opened. It records how many leaves it has folded, and each observe folds only the leaves recorded since then before comparing, then adds the note it just recorded. The projection lives in memory only and is derived from the leaves, so discarding it and folding again gives the same answer, and it is never authoritative. Observe is bounded for a known origin and a first sighting alike. Rejected: the backward scan, which leaves a first sighting unbounded. Also rejected: any stored index, which would be a second copy of the truth beside the leaves.
-> - ADR-101 — A file log store's only expectation of its leaves is the pin; a damaged pinned prefix is refused without naming a leaf — The pin is the store's only expectation of its leaves. When the leaves inside the pinned prefix rebuild to another root, Log::open refuses with StoreError::PinMismatch as it does today. That refusal states the pin's tree size and root and the tree size and root recomputed from the leaves, and it never names a leaf index, because which leaf changed is not known. The one-leaf repair for a leaf just past the pin is kept exactly as it is. Rejected: a per-leaf hash record beside the leaves, which changes the layout and BACKENDS.md and adds a crash window. Also rejected: naming a leaf by bisecting the pin's root, which cannot be done. Also rejected: a read-only open of a refused log, and refusing a torn leaf just past the pin, which would turn routine crash recovery into a refusal.
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-106 — A FileLeafStore opened read-only refuses to write and to repair; Log and Anchor gain no read-only mode — FileLeafStore gains an inherent open_read_only whose handle refuses put_leaf and pin with StoreError::ReadOnly and which refuses a store exactly one leaf past its pin with StoreError::RepairPending, decided from the count and the pin without reading leaf bytes and without flushing. Log and Anchor gain no read-only mode: Log::open over a read-only handle either finds the tree matching the pin, or refuses with PinMismatch, and never reaches a pin, so the Log needs no mode for the store to hold. Both hold because the refusal of a repair lives at the one place that can know a repair would be needed before any Log sees the store. Rejected: opening a read-only log at its pinned head and reporting the repair as pending (a Log mode, and a served state the store has not reconciled); a read-only mode on Log or Anchor; making read-only opening a LeafStore trait method, which would add a criterion to BACKENDS.md; and a per-leaf hash record so a refusal could name the changed leaf.
 > **Checklist:**
-> - C8 — Log::open over a store whose leaf inside the pinned prefix is torn returns StoreError::PinMismatch stating the pin's tree size and root and the recomputed tree size and root, names no leaf, and leaves state.json unchanged.
-> - C9 — Log::open over a store whose leaf inside the pinned prefix has one byte changed returns the same refusal, naming no leaf and leaving state.json unchanged.
-> - C10 — Log::open over a store with a torn leaf at the index just past the pin repairs and pins it and reports the repair through recovered_to, exactly as before this change.
-> - C1 — FileLeafStore::open returns, sorted, the name of every entry in leaves/ that has the store's temporary-leaf form, does not count any of them as a leaf, and leaves each byte-identical.
-> - C11 — lys log status on a log whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.
-> - C2 — Every lys log command that opens a store prints one stderr line naming the leftover temporary leaf files the store reported.
-> - C4 — scripts/verify_inclusion.py exits 0 on an inclusion artifact and a leaf file from a store written after this change.
-> - C3 — Every lys-anchor command that opens an anchor prints one stderr line naming the leftover temporary leaf files the store reported.
-> - C12 — lys-anchor status on an anchor whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.
-> - C5 — WitnessProjection records how many leaves it has folded and folds forward from that position only.
-> - C6 — observe parses at most one leaf more than the number of leaves recorded since the previous observe through the same projection, counted on the parse path.
-> - C7 — After every observe, the kept projection reports the same latest state for every origin as WitnessProjection::rebuild over the same anchor, including after a rollback.
+> - C1 — StoreError has a documented ReadOnly variant carrying the store's directory and the refused act.
+> - C2 — StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent.
+> - C3 — FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file.
+> - C4 — FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after.
+> - C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+> - C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+> - C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
+> - C8 — A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.
+> - C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
+> - C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.
+> - C11 — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
+> - C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
 > **Stories:**
-> - S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
-> - S1 (Log operator, Opens a log store, including after a crash) — As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
-> - S2 (Third-party verifier, Checks a leaf without lys) — As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code.
-> - S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
+> - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+> - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
+> - S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+> - S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+> - S5 (Verifier, Trusting a leaf the log serves) — As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole.
+> - S6 (Developer, Building a reader on the leaf store) — As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole.
 
 ## Purpose
 
-A file log store must never commit a leaf the pin cannot vouch for, and must never skip a file in silence. Opening a store whose pinned prefix holds a torn or changed leaf already fails with StoreError::PinMismatch, but no test holds the refusal's content, the untouched pin, or the two command-line tools' exit status to that. Opening a store also skips the leftover temporary file an interrupted append leaves in leaves/ without a word. The witness's observe re-parses its whole log on every call, so its cost grows with the square of the log's length. This brief pins the refusal and the one-leaf repair beside it under tests (ADR-101). It makes open name the temporary files it skipped, to the caller and on the two tools' stderr. It also makes observe parse only the leaves recorded since its previous call, through a per-origin projection built once and kept in memory (ADR-100).
+This brief delivers the leaf-store half of the integrity row the words call conformance row 4.3: the flight recorder's log refuses a leaf it cannot prove whole, and its witness reads only what is new. docs/design/identity/CONFORMANCE.md carries no flight-recorder row (its row 4.3 is a roles row), which is a finding for the lead to add one; until then this brief passes in part the lys-log-store design's goal that no leaf is served as whole unless it is proven whole against the pinned root, and LYSLOGSTORE-002 carries the other part, the witness that reads only what is new. A reader gets an open that never writes and never repairs, refusals that are named errors, the leftovers the open skipped by name, and a module doc that says where a leaf is proven whole.
 
 ## Task
 
-Work on main as it stands, where the temporary-name write and its no-replace hard link have already landed. Keep that write exactly as it is (CN4). In lys-log-store, add tests that plant a torn leaf and a one-byte change inside the pinned prefix and assert Log::open's existing StoreError::PinMismatch refusal, with its full content and an untouched state.json. Add a test that plants a torn leaf just past the pin and asserts the existing one-leaf repair and its report. The refusal is named PinMismatch and states the pin's tree size and root and the tree size and root recomputed from the leaves. It never names a leaf index: the pin is one tree size and one root, so which leaf changed is not known and is not claimed. The walk of leaves/ in FileLeafStore::open recognises the store's own temporary-leaf names, keeps them out of the extent as today, and returns them to the caller. The lys log commands and the lys-anchor commands print one stderr line naming them. Tests hold both tools' status commands to a non-zero exit with the refusal on stderr for a damaged log. In lys-anchor's witness module, which stays behind the federation feature so standalone operation is untouched (docs/design/lys-anchor/DECISIONS.md DP19), WitnessProjection records its fold position and folds forward, and observe takes a kept projection instead of rebuilding one per call. Out of scope: any per-leaf hash record, any read-only open, any narrowing of the one-leaf repair, any change to Log's code, StoreError::PinMismatch, the LeafStore trait, state.json or BACKENDS.md, and the leaf, checkpoint and artifact formats.
+Work in crates/lys-log-store on main as it stands. Main already names a leaf only after its bytes are flushed, links it under a name that is never replaced, takes temporary leaf sequences from a parameter, and isolates the no-replace link under a rename injection; do not redo or change any of that (CN1). Of the earlier LYSLOGSTORE-001 on brief/lys-log-store/0e2bb567, main already meets R1 to R4, R5's writable open, R7, and R8's tests for those parts. This brief carries what remains of the leaf store's part: R5's read-only open and R6's module-doc section, reshaped by these words so that a read-only open refuses a store one leaf past its pin with RepairPending instead of opening it at the pinned head. It also carries the leaf store's part of LYSLOGSTORE-002 on brief/lys-log-store/6826e0cf as that brief stands: its pinned-prefix refusal tests (R6 here) and its leftover-temporary accessor (R5 here). LYSLOGSTORE-002 is cut back to the witness only.
+
+In: StoreError::ReadOnly and StoreError::RepairPending (R1); FileLeafStore::open_read_only, an inherent constructor that leaves the LeafStore trait and BACKENDS.md unchanged (R2); ReadOnly refusals of put_leaf and pin (R3); a test that a store one leaf past its pin, the state a read-only open refuses, is repaired by a writable open as today (R4); FileLeafStore::leftover_temporaries (R5); tests of Log::open's refusal of a torn pinned prefix and its repair of a torn leaf past the pin (R6); and the module-doc section (R7). Build R1 first; R2 depends on it, R3 on R2, R4 on R2, R5 extends the walk R2 shares, and R7 describes all of them.
+
+A leaf changed by one byte after it was named is refused by name on open, meaning the caller receives the named error StoreError::PinMismatch from Log::open and never a repaired or partial answer; the store keeps one tree size and one root and cannot name the leaf's index. That case is already met on main by log::tests::a_tampered_leaf_byte_is_detected_at_open, and this brief carries no new requirement for it.
+
+Out: any per-leaf hash record or refusal naming a leaf index; any read-only mode on Log or on Anchor (ADR-106); any change to Log's code, the LeafStore trait, state.json, log.json, the leaves/ layout or BACKENDS.md; the witness, which is LYSLOGSTORE-002's; and the consumers' read paths. The finding stands plainly: after this brief, Anchor::open_read_only (crates/lys-anchor/src/anchor/read_only.rs) and the lys log commands (crates/lys/src/commands/log/store.rs) still open with the writable FileLeafStore::open and Log::open, so a person running status still gets a write, and the integrity row is not passed in full until the further unit that moves them onto open_read_only lands.
+
+This brief supersedes brief/lys-log-store/0e2bb567 and draft/lys-log-store/9aee27d1, this subject's earlier words, which are closed at sign-off. Its id is LYSLOGSTORE-003 because LYSLOGSTORE-001 is held on five refs across four cards and LYSLOGSTORE-002 on two.
 
 ## Requirements
 
-### R1: Hold Log::open's refusal of a damaged pinned prefix, and its one-leaf repair, under tests
+### R1: Name the two read-only refusals in StoreError
 
-IF a leaf at an index below the pinned tree size holds bytes other than those appended there, torn short or changed, THEN THE SYSTEM SHALL return StoreError::PinMismatch from Log::open. The error SHALL carry the pin's tree size and base64 root and the tree size and base64 root the stored leaves rebuild to. THE SYSTEM SHALL NOT name a leaf index in that error, SHALL NOT pin, and SHALL NOT write state.json. WHEN the stored leaves are exactly one more than the pinned tree size and the pinned-size prefix rebuilds to the pinned root, THE SYSTEM SHALL adopt the extra leaf whatever its bytes, pin it and report it through recovered_to, exactly as main does. THE SYSTEM SHALL NOT change Log::open, reconcile_with_pin, StoreError::PinMismatch's fields or its message, and SHALL NOT add a per-leaf hash record. This requirement adds tests to crates/lys-log-store/src/log_tests.rs and changes no library code.
+StoreError gains two variants, each with a /// doc and each field documented. ReadOnly has the fields path: PathBuf, the store's directory, and operation: &'static str, the act refused, and the message `refusing to {operation} in the log store at {path}: it was opened read-only`. RepairPending has the fields path: PathBuf, the store's directory, pinned_size: u64, the pinned tree size, and extent: u64, the number of leaves counted, and the message `refusing to open the log store at {path} read-only: it holds {extent} leaves but its pin is at tree size {pinned_size}, an interrupted append that only a writable open repairs`. StoreError SHALL stay #[non_exhaustive]. No existing variant's fields, message or documentation SHALL change, and neither new variant SHALL carry or print a leaf index.
 
 **Acceptance:**
-- A store created at a fresh directory with origin example.com/log, with leaves `leaf-0`, `leaf-1` and `leaf-2` appended through Log::append, then leaves/00000000000000000001 rewritten to hold `lea`: Log::open(FileLeafStore::open(dir)) returns StoreError::PinMismatch with pinned_size 3, pinned_root the standard base64 of the log's root after the third append, rebuilt_size 3, and rebuilt_root the standard base64 of the root AppendOnlyTree::reconstruct_from_raw_leaves gives for [`leaf-0`, `lea`, `leaf-2`].
-- That error's Display text equals `stored leaves rebuild to tree size 3 with root X, but the pinned state is tree size 3 with root Y`, with X the rebuilt_root and Y the pinned_root above.
-- state.json in that store holds the same bytes before and after that failed open.
-- The same three-leaf store with leaves/00000000000000000001 rewritten to hold `leaf-X` returns StoreError::PinMismatch from Log::open with pinned_size 3 and rebuilt_size 3. Its rebuilt_root is the standard base64 of the root reconstruct_from_raw_leaves gives for [`leaf-0`, `leaf-X`, `leaf-2`], and it differs from pinned_root. state.json holds the same bytes before and after.
-- A store with leaves `leaf-0` and `leaf-1` appended through Log::append, then a file leaves/00000000000000000002 holding `lea` written by hand, opens with Log::open: recovered_to() is Some(3) and tree().len() is 3. A second open of the same store returns a log whose recovered_to() is None and whose tree().len() is 3.
+- `StoreError::ReadOnly { path: PathBuf::from("store"), operation: "write a leaf" }.to_string()` equals `refusing to write a leaf in the log store at store: it was opened read-only`.
+- `StoreError::RepairPending { path: PathBuf::from("store"), pinned_size: 1, extent: 2 }.to_string()` equals `refusing to open the log store at store read-only: it holds 2 leaves but its pin is at tree size 1, an interrupted append that only a writable open repairs`.
+- Both assertions above are made by the test file::tests::the_read_only_refusals_name_the_store_and_the_refused_act, and `cargo test -p lys-log-store --all-features --lib file::tests::the_read_only_refusals_name_the_store_and_the_refused_act -- --exact` prints `test file::tests::the_read_only_refusals_name_the_store_and_the_refused_act ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- `git diff` of crates/lys-log-store/src/error.rs against the base commit adds exactly the two variants ReadOnly and RepairPending and removes or changes no existing line.
 
 **Files:**
+- modify: crates/lys-log-store/src/error.rs
+- modify: crates/lys-log-store/src/file_tests.rs
+
+**Checklist:**
+- C1 — StoreError has a documented ReadOnly variant carrying the store's directory and the refused act.
+- C2 — StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent.
+
+**Stories:**
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+- S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
+
+### R2: Open a store for reading, and refuse one that is one leaf past its pin
+
+FileLeafStore gains a public, documented inherent constructor open_read_only(dir: &Path) -> StoreResult<FileLeafStore>, the open for a reader, whose # Errors section names StoreError::RepairPending. WHEN open_read_only is called, THE SYSTEM SHALL perform every check FileLeafStore::open performs, in the same order and with the same errors (NotInitialized, Corrupt, Io), and SHALL count the named leaves as FileLeafStore::open does. It SHALL NOT flush leaves/ or any other directory, and SHALL NOT create, write, rename, link or remove any file. IF the counted extent equals the pinned tree size plus one, THEN THE SYSTEM SHALL return StoreError::RepairPending with path the store's directory, pinned_size the pinned tree size and extent the counted extent, and SHALL NOT return a handle. It SHALL decide this from the count and state.json alone and SHALL NOT read leaf bytes: RepairPending says a leaf stands one past the pin, and whether that is a clean interrupted append or a damaged prefix is decided by a writable open, which repairs or refuses with PinMismatch as it does on main. WHEN the counted extent is any other value, THE SYSTEM SHALL return the handle, over which Log::open accepts a tree that matches the pin and refuses any other with PinMismatch without calling pin. The LeafStore trait SHALL NOT gain a method, and FileLeafStore::open's behaviour SHALL NOT change.
+
+**Acceptance:**
+- A store made by FileLeafStore::create at a fresh directory D, then put_leaf(0, b"leaf-0") on that handle with no pin (extent 1, pinned tree size 0): FileLeafStore::open_read_only(D) returns Err(StoreError::RepairPending { path: D, pinned_size: 0, extent: 1 }), and every file under the store directory, dot-prefixed names included, holds the same bytes before and after, and no file is added or removed. The test is file::tests::open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte, and `cargo test -p lys-log-store --all-features --lib file::tests::open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte -- --exact` prints `test file::tests::open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- FileLeafStore::open_read_only on a fresh directory holding no log.json returns Err(StoreError::NotInitialized { path }) with path equal to that directory. The test is file::tests::open_read_only_on_an_uninitialized_dir_is_not_initialized, and `cargo test -p lys-log-store --all-features --lib file::tests::open_read_only_on_an_uninitialized_dir_is_not_initialized -- --exact` prints `test file::tests::open_read_only_on_an_uninitialized_dir_is_not_initialized ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- A log made at a fresh directory D with `leaf-0` and `leaf-1` appended through Log::append: Log::open(FileLeafStore::open_read_only(D)?) returns a log whose tree().len() is 2 and whose recovered_to() is None, and every file under the store directory, dot-prefixed names included, holds the same bytes before and after, and no file is added or removed. The test is log::tests::a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte, and `cargo test -p lys-log-store --all-features --lib log::tests::a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte -- --exact` prints `test log::tests::a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- A log made at a fresh directory D whose state.json bytes are saved right after creation, then `leaf-0` and `leaf-1` appended through Log::append, then state.json rewritten with the saved bytes (extent 2, pinned tree size 0): FileLeafStore::open_read_only(D) returns a handle with extent() 2, Log::open over that handle returns StoreError::PinMismatch with pinned_size 0 and rebuilt_size 2, and every file under the store directory, dot-prefixed names included, holds the same bytes before and after, and no file is added or removed. The test is log::tests::a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write, and `cargo test -p lys-log-store --all-features --lib log::tests::a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write -- --exact` prints `test log::tests::a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- The body of FileLeafStore::open_read_only in crates/lys-log-store/src/file.rs, and every private function it calls, calls neither fsync_dir, sync_dir, write_state nor write_durably.
+
+**Files:**
+- modify: crates/lys-log-store/src/file.rs
+- modify: crates/lys-log-store/src/file_tests.rs
 - modify: crates/lys-log-store/src/log_tests.rs
 
 **Checklist:**
-- C8 — Log::open over a store whose leaf inside the pinned prefix is torn returns StoreError::PinMismatch stating the pin's tree size and root and the recomputed tree size and root, names no leaf, and leaves state.json unchanged.
-- C9 — Log::open over a store whose leaf inside the pinned prefix has one byte changed returns the same refusal, naming no leaf and leaving state.json unchanged.
-- C10 — Log::open over a store with a torn leaf at the index just past the pin repairs and pins it and reports the repair through recovered_to, exactly as before this change.
+- C3 — FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file.
+- C4 — FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after.
 
 **Stories:**
-- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+- S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 
-### R2: Return the store's leftover temporary leaf files from FileLeafStore::open
+### R3: Refuse a leaf write and a pin on a read-only handle
 
-WHEN FileLeafStore::open reads the leaves/ directory, THE SYSTEM SHALL collect the name of every entry of the store's temporary-leaf form: a dot, one or more decimal digits, a dash, twenty decimal digits, a dash, one or more decimal digits, and the suffix .tmp. THE SYSTEM SHALL return these names in lexical order from a FileLeafStore accessor named leftover_temporaries, and the accessor SHALL return an empty slice when there are none. THE SYSTEM SHALL NOT count such an entry toward the extent, and SHALL NOT remove, rename, open for writing or otherwise modify it. THE SYSTEM SHALL NOT report a dot-prefixed name outside that form; such a name keeps today's handling. THE SYSTEM SHALL NOT add a method to the LeafStore trait, and SHALL NOT change Log, state.json, log.json or any leaf file.
+WHEN put_leaf is called on a handle returned by FileLeafStore::open_read_only, THE SYSTEM SHALL return StoreError::ReadOnly with path the store's directory and operation `write a leaf` before any other check, SHALL NOT create, write, link, remove or flush any file, and SHALL NOT advance the extent. WHEN pin is called on such a handle, THE SYSTEM SHALL return StoreError::ReadOnly with path the store's directory and operation `pin` before PinWentBackwards and PinRootChanged are checked, SHALL NOT write state.json or state.json.tmp, and SHALL NOT change pinned(). A handle returned by FileLeafStore::open or FileLeafStore::create SHALL keep main's put_leaf and pin behaviour, and the leaf write SHALL NOT otherwise change.
 
 **Acceptance:**
-- A store created at a fresh directory with origin example.com/log, with one leaf of bytes `a` appended through Log::append and a file leaves/.4242-00000000000000000001-0.tmp holding the bytes `partial` written afterwards, opens with FileLeafStore::open: extent() is 1 and leftover_temporaries() equals [".4242-00000000000000000001-0.tmp"].
-- After that open, leaves/.4242-00000000000000000001-0.tmp holds exactly the bytes `partial`.
-- The same store with no planted file opens with leftover_temporaries() empty and extent() 1.
-- A store holding leaves/.4242-00000000000000000001-1.tmp and leaves/.17-00000000000000000001-0.tmp opens with leftover_temporaries() equal to [".17-00000000000000000001-0.tmp", ".4242-00000000000000000001-1.tmp"].
-- A store holding one leaf and a file leaves/.DS_Store opens with leftover_temporaries() empty and extent() 1.
-- crates/lys-log-store/src/file.rs holds no more than 500 lines that are neither blank nor comment lines, not counting tests.
+- A store made by FileLeafStore::create at a fresh directory D, put_leaf(0, b"leaf-0"), and pin to tree size 1 with the root AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves gives for [`leaf-0`], then reopened with FileLeafStore::open_read_only(D): put_leaf(1, b"leaf-1") returns Err(StoreError::ReadOnly { path: D, operation: "write a leaf" }), put_leaf(0, b"leaf-X") returns the same error and not LeafAlreadyWritten, extent() is still 1, and every file under the store directory, dot-prefixed names included, holds the same bytes before and after, and no file is added or removed. The test is file::tests::a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte, and `cargo test -p lys-log-store --all-features --lib file::tests::a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte -- --exact` prints `test file::tests::a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- The same read-only handle: pin(PinnedRoot { tree_size: 2, root: [0; 32] }) returns Err(StoreError::ReadOnly { path: D, operation: "pin" }), pin with tree_size 0 returns the same error and not PinWentBackwards, pinned() equals the pin held before both calls, D holds no state.json.tmp, and every file under the store directory, dot-prefixed names included, holds the same bytes before and after, and no file is added or removed. The test is file::tests::a_read_only_handle_refuses_a_pin_and_changes_no_byte, and `cargo test -p lys-log-store --all-features --lib file::tests::a_read_only_handle_refuses_a_pin_and_changes_no_byte -- --exact` prints `test file::tests::a_read_only_handle_refuses_a_pin_and_changes_no_byte ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- Every test in crates/lys-log-store/src/file_tests.rs that exists on the base commit passes with its assertions unchanged.
 
 **Files:**
 - modify: crates/lys-log-store/src/file.rs
 - modify: crates/lys-log-store/src/file_tests.rs
 
 **Checklist:**
-- C1 — FileLeafStore::open returns, sorted, the name of every entry in leaves/ that has the store's temporary-leaf form, does not count any of them as a leaf, and leaves each byte-identical.
+- C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+- C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
 
 **Stories:**
-- S1 (Log operator, Opens a log store, including after a crash) — As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 
-### R3: Print the leftover temporary files from the lys log commands, and hold their refusal of a damaged log
+### R4: Hold the writable repair of a store one leaf past its pin
 
-WHEN a lys log command opens a store whose leftover_temporaries() is not empty, THE SYSTEM SHALL print one line to stderr, straight after the store opens and before the log is opened: the text `ignored leftover temporary leaf files: ` followed by the names in the order returned, separated by a comma and a space. THE SYSTEM SHALL NOT print that line when the list is empty. The line SHALL NOT go to stdout. It SHALL NOT change the command's exit status or its --json output, and SHALL NOT be printed more than once per open. IF opening the log returns StoreError::PinMismatch, THEN THE SYSTEM SHALL exit with status 1 and print one stderr line `error: log directory invalid: <dir>: ` followed by the store's PinMismatch message, as main does. THE SYSTEM SHALL NOT print a leaf index in that line and SHALL NOT write state.json.
+WHEN a store one leaf past its pin, the state FileLeafStore::open_read_only refuses with RepairPending under R2, is opened with FileLeafStore::open and Log::open, THE SYSTEM SHALL repair it exactly as main does: adopt the one leaf past the pin, pin it, and report it through recovered_to. This requirement adds a test to crates/lys-log-store/src/log_tests.rs. It SHALL NOT change Log::open, reconcile_with_pin or the one-leaf repair. The test SHALL establish the interrupted append through a FileLeafStore::open handle and SHALL NOT call open_read_only before the repair, so that R2's test alone holds the RepairPending refusal and R2's byte-for-byte check alone holds that the refusal leaves the store unchanged.
 
 **Acceptance:**
-- `lys log init --dir D --origin example.com/log` on a fresh directory D, then a file D/leaves/.4242-00000000000000000000-0.tmp holding `partial`: `lys log status --dir D` exits 0, and its stderr has exactly one line starting `ignored leftover temporary leaf files`, which equals `ignored leftover temporary leaf files: .4242-00000000000000000000-0.tmp`.
-- `lys log status --dir D` on a directory D made by `lys log init` with no planted file exits 0, and its stderr has no line starting `ignored leftover temporary leaf files`.
-- A key made by `lys key generate --out K`, a log D made by `lys log init --dir D --origin example.com/log`, a leaf file L holding `hello` appended by `lys log append --dir D --leaf L`, and an artifact A written by `lys log prove inclusion --dir D --key K --leaf-index 0 --out A`: `python3 scripts/verify_inclusion.py A D/leaves/00000000000000000000` exits 0.
-- `lys log init --dir D --origin example.com/log`, then `lys log append --dir D --leaf L` three times with L holding `leaf-0`, `leaf-1` and `leaf-2` in turn, then D/leaves/00000000000000000001 rewritten to hold `lea`: `lys log status --dir D` exits 1. Its stderr has exactly one line starting `error: `, which starts `error: log directory invalid: D: stored leaves rebuild to tree size 3 with root ` and contains `, but the pinned state is tree size 3 with root `. D/state.json holds the same bytes before and after.
+- A log made at a fresh directory D with `leaf-0` appended through Log::append, its state.json bytes saved, `leaf-1` appended, and state.json rewritten with the saved bytes: a handle from FileLeafStore::open(D) has extent() 2 and pinned().tree_size 1, and is dropped before Log::open is called. Log::open(FileLeafStore::open(D)?) then returns a log whose tree().len() is 2 and whose recovered_to() is Some(2). FileLeafStore::open_read_only(D) after that returns a handle whose extent() is 2 and whose pinned().tree_size is 2. The test is log::tests::a_writable_open_repairs_a_store_one_leaf_past_its_pin, and `cargo test -p lys-log-store --all-features --lib log::tests::a_writable_open_repairs_a_store_one_leaf_past_its_pin -- --exact` prints `test log::tests::a_writable_open_repairs_a_store_one_leaf_past_its_pin ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- log::tests::crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it passes with its assertions unchanged, and `cargo test -p lys-log-store --all-features --lib log::tests::crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it -- --exact` prints `test log::tests::crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
 
 **Files:**
-- modify: crates/lys/src/commands/log/store.rs
-- modify: crates/lys/tests/log_tests.rs
+- modify: crates/lys-log-store/src/log_tests.rs
 
 **Checklist:**
-- C2 — Every lys log command that opens a store prints one stderr line naming the leftover temporary leaf files the store reported.
-- C4 — scripts/verify_inclusion.py exits 0 on an inclusion artifact and a leaf file from a store written after this change.
-- C11 — lys log status on a log whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.
+- C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
 
 **Stories:**
-- S1 (Log operator, Opens a log store, including after a crash) — As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
-- S2 (Third-party verifier, Checks a leaf without lys) — As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code.
-- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+- S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 
-### R4: Print the leftover temporary files from the lys-anchor commands, and hold their refusal of a damaged anchor
+### R5: Name the leftover temporary leaf files an open skipped
 
-WHEN a lys-anchor command opens an anchor directory whose store reports a non-empty leftover_temporaries(), THE SYSTEM SHALL print the same single stderr line R3 defines, straight after the store opens and before the anchor is opened. THE SYSTEM SHALL NOT print it when the list is empty, SHALL NOT print it on stdout, SHALL NOT change the exit status, and SHALL NOT add a field to the --json output. IF opening the anchor returns StoreError::PinMismatch, THEN THE SYSTEM SHALL exit with status 1 and print one stderr line `error: anchor directory invalid: <dir>: ` followed by the store's PinMismatch message, as main does. THE SYSTEM SHALL NOT print a leaf index in that line and SHALL NOT write state.json.
+WHEN FileLeafStore::open or FileLeafStore::open_read_only reads leaves/, THE SYSTEM SHALL collect the name of every entry of the store's temporary-leaf form: a dot, one or more decimal digits, a dash, twenty decimal digits, a dash, one or more decimal digits, and the suffix .tmp. THE SYSTEM SHALL return these names in lexical order from a public, documented FileLeafStore accessor leftover_temporaries(&self) -> &[String], which SHALL return an empty slice when there are none; a handle from FileLeafStore::create SHALL return an empty slice. THE SYSTEM SHALL NOT count such an entry toward the extent, and SHALL NOT remove, rename, open for writing or otherwise modify it. A dot-prefixed name outside that form SHALL NOT be reported and keeps main's handling. THE SYSTEM SHALL NOT add a method to the LeafStore trait and SHALL NOT change Log, state.json, log.json or any leaf file.
 
 **Acceptance:**
-- With a key file K made by Ed25519Identity::load_or_generate and a genesis file G holding `genesis`, an anchor made by `lys-anchor init --dir D --origin example.com/anchor --key K --genesis G --admit accept-all`, then a file D/leaves/.4242-00000000000000000001-0.tmp holding `partial`: `lys-anchor status --dir D --key K --admit accept-all` exits 0, and its stderr has exactly one line starting `ignored leftover temporary leaf files`, which equals `ignored leftover temporary leaf files: .4242-00000000000000000001-0.tmp`.
-- The same status command on the same anchor with no planted file exits 0, and its stderr has no line starting `ignored leftover temporary leaf files`.
-- With the planted file, `lys-anchor --json status --dir D --key K --admit accept-all` exits 0, its stdout parses as one JSON object whose ok is true, and its keys are the same as those of the same command run without the planted file.
-- With a key file K made by Ed25519Identity::load_or_generate and a genesis file G holding `genesis`, an anchor made by `lys-anchor init --dir D --origin example.com/anchor --key K --genesis G --admit accept-all`, then D/leaves/00000000000000000000 rewritten to hold `gen`: `lys-anchor status --dir D --key K --admit accept-all` exits 1. Its stderr has exactly one line starting `error: `, which starts `error: anchor directory invalid: D: stored leaves rebuild to tree size 1 with root ` and contains `, but the pinned state is tree size 1 with root `. D/state.json holds the same bytes before and after.
+- A store made by FileLeafStore::create at a fresh directory D with put_leaf(0, b"a") and a pin to tree size 1 with the root AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves gives for [`a`], then a file D/leaves/.4242-00000000000000000001-0.tmp holding `partial` written by hand: FileLeafStore::open(D) gives extent() 1 and leftover_temporaries() equal to [".4242-00000000000000000001-0.tmp"], FileLeafStore::open_read_only(D) gives the same two values, and after both opens the file holds exactly `partial`. The test is file::tests::leftover_temporaries_names_the_stores_own_temporary_files, and `cargo test -p lys-log-store --all-features --lib file::tests::leftover_temporaries_names_the_stores_own_temporary_files -- --exact` prints `test file::tests::leftover_temporaries_names_the_stores_own_temporary_files ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- A store holding one leaf and the hand-written files D/leaves/.4242-00000000000000000001-1.tmp and D/leaves/.17-00000000000000000001-0.tmp opens with FileLeafStore::open giving leftover_temporaries() equal to [".17-00000000000000000001-0.tmp", ".4242-00000000000000000001-1.tmp"]. The test is file::tests::leftover_temporaries_are_in_lexical_order, and `cargo test -p lys-log-store --all-features --lib file::tests::leftover_temporaries_are_in_lexical_order -- --exact` prints `test file::tests::leftover_temporaries_are_in_lexical_order ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- A store holding one leaf and no hand-written file opens with FileLeafStore::open giving leftover_temporaries() empty and extent() 1; the same store with a file D/leaves/.DS_Store added opens giving leftover_temporaries() empty and extent() 1. The test is file::tests::leftover_temporaries_is_empty_without_one_of_the_stores_form, and `cargo test -p lys-log-store --all-features --lib file::tests::leftover_temporaries_is_empty_without_one_of_the_stores_form -- --exact` prints `test file::tests::leftover_temporaries_is_empty_without_one_of_the_stores_form ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- file::tests::open_leaves_a_leftover_temporary_file_byte_identical and file::tests::a_leftover_temporary_file_is_ignored_at_open pass with their assertions unchanged.
 
 **Files:**
-- modify: crates/lys-anchor-cli/src/commands/anchor/open.rs
-- modify: crates/lys-anchor-cli/tests/anchor_cli.rs
+- modify: crates/lys-log-store/src/file.rs
+- modify: crates/lys-log-store/src/file_tests.rs
 
 **Checklist:**
-- C3 — Every lys-anchor command that opens an anchor prints one stderr line naming the leftover temporary leaf files the store reported.
-- C12 — lys-anchor status on an anchor whose pinned prefix holds a torn leaf exits 1 and prints the refusal on stderr.
+- C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.
 
 **Stories:**
-- S1 (Log operator, Opens a log store, including after a crash) — As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
-- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
 
-### R5: Give WitnessProjection a fold position and a forward fold
+### R6: Hold Log::open's refusal of a torn pinned prefix, and its repair of a torn leaf past the pin, under tests
 
-WitnessProjection SHALL record the number of the anchor's leaves it has folded, returned by an accessor named folded. rebuild and rebuild_prefix SHALL set it to the number of leaves they folded. WHEN fold_to(anchor, leaves) is called, THE SYSTEM SHALL fold the indices from folded up to the smaller of leaves and the anchor's tree size, in ascending order and under the same rule as rebuild_prefix, so the last recorded state wins. It SHALL then set folded to that bound. IF folded is already greater than that bound, THEN THE SYSTEM SHALL discard the projection's contents and fold from index 0. THE SYSTEM SHALL NOT parse any leaf below folded otherwise, SHALL NOT write anything to storage, and SHALL NOT take a mutable reference to the anchor. Under the test configuration only, every call of checkpoint_in_leaf SHALL add one to a per-thread parse counter the tests read. No counter SHALL exist outside the test configuration.
+IF a leaf at an index below the pinned tree size is torn short after it was named, THEN THE SYSTEM SHALL return StoreError::PinMismatch from Log::open, carrying the pin's tree size and base64 root and the tree size and base64 root the stored leaves rebuild to. THE SYSTEM SHALL NOT name a leaf index in that error, SHALL NOT pin, and SHALL NOT write state.json. WHEN the stored leaves are exactly one more than the pinned tree size and the pinned-size prefix rebuilds to the pinned root, THE SYSTEM SHALL adopt the extra leaf whatever its bytes, pin it and report it through recovered_to, as main does. This requirement adds tests to crates/lys-log-store/src/log_tests.rs and changes no library code; it SHALL NOT change Log::open, reconcile_with_pin, or StoreError::PinMismatch's fields or message, and SHALL NOT add a per-leaf hash record.
 
 **Acceptance:**
-- On a witness anchor holding the genesis leaf, three ordinary statements, a checkpoint note from CHILD_ORIGIN at size 3 and two more ordinary statements (seven leaves), rebuild_prefix(&anchor, 4) gives folded() 4. fold_to(&anchor, 7) then gives folded() 7, and the parse counter rises by exactly 3 during that fold_to.
-- After that fold_to, latest(CHILD_ORIGIN) equals WitnessProjection::rebuild(&anchor).latest(CHILD_ORIGIN), with tree_size 3.
-- rebuild(&anchor) over those seven leaves raises the parse counter by exactly 7.
-- rebuild(&anchor) over those seven leaves followed by fold_to(&anchor, 2) gives folded() 2 and an empty projection, equal to rebuild_prefix(&anchor, 2).
-- Child checkpoints at size 5 and then at size 3, recorded in that order and folded by two successive fold_to calls, leave latest(CHILD_ORIGIN) with tree_size 3.
-- Every existing projection_tests case passes with its assertions unchanged.
+- A log made at a fresh directory D with `leaf-0`, `leaf-1` and `leaf-2` appended through Log::append, then D/leaves/00000000000000000001 rewritten to hold `lea`: Log::open(FileLeafStore::open(D)?) returns StoreError::PinMismatch with pinned_size 3, pinned_root the standard base64 of the log's root after the third append, rebuilt_size 3, and rebuilt_root the standard base64 of the root AppendOnlyTree::<RawLeaf>::reconstruct_from_raw_leaves gives for [`leaf-0`, `lea`, `leaf-2`]; its Display text equals `stored leaves rebuild to tree size 3 with root X, but the pinned state is tree size 3 with root Y` with X that rebuilt_root and Y that pinned_root; and D/state.json holds the same bytes before and after. The test is log::tests::a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees, and `cargo test -p lys-log-store --all-features --lib log::tests::a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees -- --exact` prints `test log::tests::a_torn_leaf_inside_the_pinned_prefix_is_refused_with_both_trees ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- A log made at a fresh directory D with `leaf-0` and `leaf-1` appended through Log::append, then a file D/leaves/00000000000000000002 holding `lea` written by hand: Log::open(FileLeafStore::open(D)?) returns a log whose recovered_to() is Some(3) and whose tree().len() is 3, and a second such open returns a log whose recovered_to() is None and whose tree().len() is 3. The test is log::tests::a_torn_leaf_just_past_the_pin_is_repaired_and_reported, and `cargo test -p lys-log-store --all-features --lib log::tests::a_torn_leaf_just_past_the_pin_is_repaired_and_reported -- --exact` prints `test log::tests::a_torn_leaf_just_past_the_pin_is_repaired_and_reported ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- `git diff` of crates/lys-log-store/src/log.rs against the base commit is empty.
 
 **Files:**
-- modify: crates/lys-anchor/src/witness/projection.rs
-- modify: crates/lys-anchor/src/witness/projection_tests.rs
+- modify: crates/lys-log-store/src/log_tests.rs
 
 **Checklist:**
-- C5 — WitnessProjection records how many leaves it has folded and folds forward from that position only.
+- C8 — A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.
+- C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
 
 **Stories:**
-- S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
+- S5 (Verifier, Trusting a leaf the log serves) — As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole.
+- S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 
-### R6: Make observe fold only what is new, through a kept projection
+### R7: Say in file.rs's module doc what open does and never does
 
-observe SHALL take the caller's kept WitnessProjection as a mutable argument after the anchor. WHEN observe has recorded a note at index i through Anchor::submit, THE SYSTEM SHALL call fold_to(anchor, i) on the kept projection and compare the note against it under the existing relation rules. IF checkpoint_in_leaf reads the note as a checkpoint, THEN THE SYSTEM SHALL add that already-parsed body at index i, without parsing the note a second time. IF checkpoint_in_leaf does not read the note as a checkpoint, THEN THE SYSTEM SHALL add nothing. In both cases folded SHALL become i + 1, so the next observe does not parse leaf i again. IF Anchor::submit returns an error, THEN THE SYSTEM SHALL return that error and leave the projection unchanged. THE SYSTEM SHALL NOT call rebuild or rebuild_prefix from observe, and SHALL NOT change the receipt, the relation rules or the errors observe returns. The existing observe_tests helpers and the receipt case's loop SHALL build a projection with WitnessProjection::rebuild before each call, and no assertion in an existing observe_tests case SHALL change.
+file.rs's module doc gains a section headed `# What open does and never does`. It SHALL state: FileLeafStore::open reads log.json and state.json, flushes leaves/, counts the 20-digit leaf names and requires them to be contiguous from 0, and returns a writable handle; FileLeafStore::open_read_only performs the same checks without the flush, refuses a store one leaf past its pin with StoreError::RepairPending, and returns a handle whose put_leaf and pin refuse with StoreError::ReadOnly; neither open reads leaf bytes, repairs a store or advances the pin, since the one-leaf repair is Log::open's over a writable handle; neither open counts a dot-prefixed name; neither open ever deletes, renames or changes a leftover temporary file, and both name the store's own through leftover_temporaries; FileLeafStore::leaf serves bytes it has not checked, a leaf is proven whole only through Log::open against the pinned root, and every reader that wants a proven leaf goes through Log::open. The existing Layout and Durability sections SHALL NOT be weakened or removed, and the section SHALL NOT claim that the leaves/ flush holds on targets where fsync_dir does nothing.
 
 **Acceptance:**
-- A witness anchor holds the genesis leaf, a CHILD_ORIGIN checkpoint note at size 2 as leaf 1, and 254 ordinary statements, 256 leaves in all. Building p with WitnessProjection::rebuild raises the parse counter by 256. observe with p of the child's note at size 3 then raises the counter by exactly 1 and reports previous with tree_size 2.
-- Next, observe with p of an OTHER_CHILD_ORIGIN note raises the parse counter by exactly 1 and reports previous as None.
-- Next, after three ordinary statements are submitted through Anchor::submit, observe with p of the child's note at size 4 raises the parse counter by exactly 4.
-- After each of those three observes, p.folded() equals anchor.tree_size(), and p.latest(CHILD_ORIGIN) and p.latest(OTHER_CHILD_ORIGIN) equal WitnessProjection::rebuild(&anchor)'s for the same origins.
-- Through one kept projection, observing the child's notes stating size 5 and then size 3 reports the second as Relation::Rollback, and leaves p.latest(CHILD_ORIGIN) with tree_size 3.
-- Through a kept projection, observe of bytes that checkpoint_in_leaf does not read as a checkpoint raises the parse counter by exactly 1, reports previous as None, and leaves p.folded() equal to anchor.tree_size().
-- On an anchor whose admission policy is MaxSize with a limit shorter than the note, observe returns AnchorError::NotAdmitted and p.folded() is the same before and after the call.
-- Every existing observe_tests case passes with its assertions unchanged, including the_receipt_is_byte_identical_whatever_the_relation.
+- crates/lys-log-store/src/file.rs's //! module doc holds a line `//! # What open does and never does`, and the section under it contains the words `never deletes` applied to a leftover temporary file, names FileLeafStore::open_read_only, StoreError::RepairPending, StoreError::ReadOnly and leftover_temporaries, and states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open.
+- The `//! # Layout` and `//! # Durability` sections of file.rs hold the same lines as on the base commit.
+- `cargo doc --no-deps -p lys-log-store` and `cargo doc --no-deps --all-features -p lys-log-store` each finish with no line starting `warning` or `error`.
+- `grep -v '^[[:space:]]*$' crates/lys-log-store/src/file.rs | grep -v '^[[:space:]]*//' | wc -l` prints a number no greater than 500.
 
 **Files:**
-- modify: crates/lys-anchor/src/witness/observe.rs
-- modify: crates/lys-anchor/src/witness/observe_tests.rs
+- modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C6 — observe parses at most one leaf more than the number of leaves recorded since the previous observe through the same projection, counted on the parse path.
-- C7 — After every observe, the kept projection reports the same latest state for every origin as WitnessProjection::rebuild over the same anchor, including after a rollback.
+- C11 — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
+- C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
 
 **Stories:**
-- S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
+- S6 (Developer, Building a reader on the leaf store) — As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole.
 
 ## Boundaries
 
-- SHALL NOT change put_leaf_with, write_leaf_temp, link_leaf or any other part of the leaf write, and SHALL NOT put a leaf in place by rename.
-- SHALL NOT add a read-only mode to Log or to Anchor.
-- SHALL NOT add a per-leaf hash record, and SHALL NOT change state.json, log.json, the leaves/ layout or the leaf file bytes.
-- SHALL NOT change Log::open, its reconciliation, its one-leaf repair, or StoreError::PinMismatch's fields or message.
-- SHALL NOT name, guess or bisect for a leaf index in any refusal: which leaf changed is not known and is not claimed.
-- SHALL NOT add a method to the LeafStore trait or change BACKENDS.md.
-- SHALL NOT change the checkpoint note format, the inclusion artifact format, or any receipt or bundle format.
-- SHALL NOT store the witness projection anywhere but in memory, and SHALL NOT name a witness item outside the federation feature, which keeps standalone operation untouched (docs/design/lys-anchor/DECISIONS.md DP19).
-- SHALL NOT make a leftover temporary file an error, and SHALL NOT delete one.
+- SHALL NOT change put_leaf_with, write_leaf_temp, create_leaf_temp, link_leaf, the next_sequence parameter or the AfterLink seams, except to add the read-only refusal ahead of put_leaf's existing checks.
+- SHALL NOT change Log's code, its one-leaf repair, or StoreError::PinMismatch's fields or message.
+- SHALL NOT add a read-only mode to Log or to Anchor, and SHALL NOT change lys-anchor, lys-anchor-cli or lys.
+- SHALL NOT add a method to the LeafStore trait, and SHALL NOT change store.rs or BACKENDS.md.
+- SHALL NOT add a per-leaf hash record, and SHALL NOT change state.json, log.json, the leaves/ layout, the leaf name width or the leaf file bytes.
+- SHALL NOT name, guess or bisect for a leaf index in any refusal.
+- SHALL NOT delete, rename or modify a leftover temporary file on any open, and SHALL NOT make one an error.
+- SHALL NOT touch the lys-anchor witness module, which is LYSLOGSTORE-002's.
+- SHALL NOT add #[allow], #[ignore], a _-prefixed bypass, or unwrap, expect, panic, todo, unimplemented or unreachable in library code.
 
 ## Verification
 
-- cargo fmt --all -- --check
-- cargo clippy --all-targets --all-features -- -D warnings
-- cargo clippy --all-targets -- -D warnings
-- cargo test --workspace --all-features
-- cargo doc --no-deps --all-features
-- cargo doc --no-deps
-- sh scripts/design/gate.sh
-- Count the lines of crates/lys-log-store/src/file.rs, crates/lys-anchor/src/witness/projection.rs and crates/lys-anchor/src/witness/observe.rs that are neither blank nor comment lines, not counting tests: each is at most 500.
-- git grep -n 'rebuild_prefix\|WitnessProjection::rebuild' -- crates/lys-anchor/src/witness/observe.rs prints nothing.
-- git diff main -- crates/lys-log-store/src/log.rs crates/lys-log-store/src/error.rs crates/lys-log-store/src/store.rs prints nothing.
-- In a temporary directory, run the command sequence in R3's third acceptance line with the lys binary this branch builds: python3 scripts/verify_inclusion.py exits 0.
-- Count the #[test] functions in crates/lys-log-store and crates/lys-anchor on this branch and on main: every test name on main is present on this branch and passes.
+- From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, each exiting 0.
+- From the repository root: `sh scripts/design/gate.sh` exits 0.
+- Each test named in R1 to R6 runs alone with `cargo test -p lys-log-store --all-features --lib <module>::tests::<name> -- --exact` and prints `test <module>::tests::<name> ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- The one-byte case already met on main: `cargo test -p lys-log-store --all-features --lib log::tests::a_tampered_leaf_byte_is_detected_at_open -- --exact` prints `test log::tests::a_tampered_leaf_byte_is_detected_at_open ... ok` and a line starting `test result: ok. 1 passed; 0 failed`.
+- `git diff --stat` against the base commit lists only crates/lys-log-store/src/error.rs, file.rs, file_tests.rs and log_tests.rs outside docs/design.
+- Drift injection, one at a time and reverted after each: removing the RepairPending check from open_read_only fails file::tests::open_read_only_refuses_a_store_one_leaf_past_its_pin_and_changes_no_byte and no other test; removing the read-only check from put_leaf fails file::tests::a_read_only_handle_refuses_a_leaf_write_and_changes_no_byte and no other test; removing it from pin fails file::tests::a_read_only_handle_refuses_a_pin_and_changes_no_byte and no other test.
 

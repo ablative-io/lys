@@ -1,15 +1,21 @@
 # Lys-Log-Store — User Stories
 
-## Log operator — Opens a log store, including after a crash
+## Auditor — Reading a flight recorder's log without changing it
 
-**S4.** As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
+**S1.** As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 
-**S1.** As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence.
+**S2.** As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 
-## Third-party verifier — Checks a leaf without lys
+## Operator — Recovering a log after a crash
 
-**S2.** As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code.
+**S3.** As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 
-## Witness operator — Runs a witness anchor that observes other logs' checkpoints
+**S4.** As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
 
-**S3.** As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
+## Verifier — Trusting a leaf the log serves
+
+**S5.** As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole.
+
+## Developer — Building a reader on the leaf store
+
+**S6.** As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole.

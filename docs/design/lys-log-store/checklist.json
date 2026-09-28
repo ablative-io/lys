@@ -205,6 +205,86 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Read-only open",
+      "items": [
+        {
+          "id": "C1",
+          "text": "StoreError has a documented ReadOnly variant carrying the store's directory and the refused act.",
+          "done": false
+        },
+        {
+          "id": "C2",
+          "text": "StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent.",
+          "done": false
+        },
+        {
+          "id": "C3",
+          "text": "FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file.",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after.",
+          "done": false
+        },
+        {
+          "id": "C5",
+          "text": "put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Pinned prefix",
+      "items": [
+        {
+          "id": "C8",
+          "text": "A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.",
+          "done": false
+        },
+        {
+          "id": "C9",
+          "text": "A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Leftover temporary files",
+      "items": [
+        {
+          "id": "C10",
+          "text": "FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Module documentation",
+      "items": [
+        {
+          "id": "C11",
+          "text": "file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.",
+          "done": false
+        }
+      ]
     }
   ]
 }

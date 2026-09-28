@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "decisions": [
     {
       "id": "ADR-001",
@@ -1370,6 +1370,26 @@
         "StoreError::PinMismatch keeps its fields and message, and no refusal claims to know which leaf changed.",
         "A leaf just past the pin, torn or whole, is adopted, pinned and reported through recovered_to as before.",
         "Tests hold the refusal's content, the untouched state.json and the one-leaf repair, and the lys and lys-anchor status commands exit 1 with the refusal on stderr."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-106",
+      "title": "A FileLeafStore opened read-only refuses to write and to repair; Log and Anchor gain no read-only mode",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-28",
+      "decided_by": "The lead's answers to the lys-log-store survey; recorded with LYSLOGSTORE-003",
+      "context": "A reader of a lys log has only the writer's open: FileLeafStore::open returns a handle that writes a leaf or moves the pin if asked, and Log::open over it repairs a store left one leaf past its pin by a crash, whoever the caller is. The earlier unlanded LYSLOGSTORE-001 answered this by opening a log at its pinned head through a new Log constructor and reporting the repair as pending. LYSLOGSTORE-002's ADR-101, unlanded on its own branch, keeps the pin as the store's only expectation of its leaves and rejects a read-only mode on Log. The card for LYSLOGSTORE-003 asks for a leaf store that, opened read-only, never writes and never repairs, and refuses an interrupted append by name.",
+      "decision": "FileLeafStore gains an inherent open_read_only whose handle refuses put_leaf and pin with StoreError::ReadOnly and which refuses a store exactly one leaf past its pin with StoreError::RepairPending, decided from the count and the pin without reading leaf bytes and without flushing. Log and Anchor gain no read-only mode: Log::open over a read-only handle either finds the tree matching the pin, or refuses with PinMismatch, and never reaches a pin, so the Log needs no mode for the store to hold. Both hold because the refusal of a repair lives at the one place that can know a repair would be needed before any Log sees the store. Rejected: opening a read-only log at its pinned head and reporting the repair as pending (a Log mode, and a served state the store has not reconciled); a read-only mode on Log or Anchor; making read-only opening a LeafStore trait method, which would add a criterion to BACKENDS.md; and a per-leaf hash record so a refusal could name the changed leaf.",
+      "quote": "",
+      "consequences": [
+        "StoreError gains ReadOnly and RepairPending; no existing variant changes.",
+        "The LeafStore trait and BACKENDS.md are unchanged, so a second backend owes no read-only open.",
+        "A changed leaf is refused as PinMismatch from Log::open, naming no leaf index; FileLeafStore::leaf serves unchecked bytes and a leaf is proven whole only through Log::open.",
+        "Readers that must not write (Anchor::open_read_only, the lys log commands) are moved onto open_read_only by a further unit; until then they still repair on a read path.",
+        "LYSLOGSTORE-002 is cut back to the witness, and its line that Log and Anchor gain no read-only mode stands."
       ],
       "supersedes": [],
       "superseded_by": ""
