@@ -121,6 +121,18 @@
       "by": "Archie",
       "subject": "The ruling as built, pull request 96 in lys",
       "ruling": "The login that names the actor is the configured link-audit source login, which the signing agent's responsible person must hold in the directory's bindings; an agent whose responsible person does not hold it is refused NotAdmitted and nothing is recorded. The agent's id is key 5 of the actor map, 16 bytes, present when the method is 2 and never otherwise, and an OIDC actor encodes byte for byte as before. POST /link-audit and POST /link-audit/person both admit the signature, over the method, the route's path without the product's /api prefix, and the exact bytes of the body. A request carrying both a session and a signature is judged by the signature alone. A malformed body on the two routes is refused 400 RequestMalformed, and the caller is admitted before the body is read. Not built: the responsible person's lifecycle state is not checked on either path, the receipt does not show the method or the agent, and the install does not yet provision the link-audit agent with its person, login and certificate."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Waffles",
+      "subject": "A suspended or ended person vouches for no agent",
+      "ruling": "A responsible person who is suspended or ended must not be able to vouch for an agent. Lifecycle state is checked on both paths, the cookie path included, red test first, in pull request 96 itself. The method and the agent in the receipt, and the install provisioning the link-audit agent with its person, login and certificate, go into a later brief and do not hold pull request 96."
+    },
+    {
+      "date": "2026-09-28",
+      "by": "Archie",
+      "subject": "The lifecycle check as built, correcting the amendment before",
+      "ruling": "The earlier amendment 'The ruling as built' says the responsible person's lifecycle state is not checked on either path. That is no longer so. In pull request 96 the person who holds the configured link-audit source login is refused NotAdmitted, status 403, while suspended and once retired, on POST /link-audit and POST /link-audit/person, by the agent's signature and by the person's own session, naming the state and the act to take and recording nothing. A registered or active person is admitted, a reinstated person is admitted again, and a login no person holds has no holder to refuse."
     }
   ]
 }
