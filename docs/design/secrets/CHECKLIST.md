@@ -75,5 +75,5 @@
 
 ## A service issues a handle to a named key (SECRETS-008)
 
-- [ ] **C416** — lys-identity-server issues a handle bound to a public key it names, on behalf of the person the grant is rooted in, and only then (SECRETS-008 R1).
+- [ ] **C416** — The service lys-identity-server issues a handle bound to a public key it names, on behalf of the person the grant is rooted in, and only then (SECRETS-008 R1).
 - [ ] **C417** — Every issue through the route is on the audit record, and its handle token is in no log or audit line (SECRETS-008 R2).
