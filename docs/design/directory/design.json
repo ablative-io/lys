@@ -5070,7 +5070,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. DIRECTORY-054, under ADR-120, is implementation work within the exact requirement file walls of its reviewed brief; the documents-only boundary does not apply to those files. CN9 still requires a reviewed revision before any additional file is edited."
+      "text": "The documents-only boundary applies to the original directory planning task, not to published implementation briefs. A published DIRECTORY implementation brief authorises only its exact requirement file walls, including named source, tests, configuration and documentation files. No implementation author may widen those walls silently. The historical IDENTITY-001 record is not rewritten. Tom’s 29 September 07:51 direction, relayed by Waffles, removes lead brief sign-off as a prerequisite to dispatch; the design gate and automatic card review and full delivery gates remain required."
     },
     {
       "id": "CN2",
@@ -5098,11 +5098,11 @@
     },
     {
       "id": "CN8",
-      "text": "One implementer, one row in implementation and one gate invocation at a time in this lane; release builds, checks and tests run through the gate workflow at the venue, and a development exception never bypasses it (docs/design/identity/briefs/IDENTITY-001.json:25-27, docs/design/identity/briefs/IDENTITY-001.json:135)."
+      "text": "There is no one-build-per-lead rule: Tom withdrew that restriction on 29 September at 07:32, relayed by Waffles. Independent card builds may run concurrently. Heavy builds and full gates run at the declared venue. Concurrent dispatch does not supply missing prerequisite code: dependent changes need the actual prerequisite implementation in the integration tree, and the integrated commit passes the full delivery chain before landing."
     },
     {
       "id": "CN9",
-      "text": "A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28)."
+      "text": "A row that needs a file outside its wall stops and names it. The lead amends the handwritten brief on main and passes the design gate before that additional file is edited; a new module needs an exact file manifest within its named responsibility. Under Tom’s 29 September 07:51 direction, relayed by Waffles, no separate lead review or sign-off is required before dispatch. Automatic card review and full delivery gates remain required. An active run keeps its captured contract; changed words must be reconciled with its result before publication or landing."
     },
     {
       "id": "CN10",
