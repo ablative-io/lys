@@ -36,3 +36,21 @@ fn missing_manifest_names_the_path() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+#[test]
+fn a_copied_trusted_manifest_does_not_authenticate_changed_executable_bytes()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    std::fs::create_dir(dir.path().join("bin"))?;
+    std::fs::write(dir.path().join("bin/codex"), "codex-cli 0.0.0")?;
+    std::fs::write(
+        dir.path().join("codex-package.json"),
+        include_str!("fixtures/codex-package.json"),
+    )?;
+    let refusal = verify_package(dir.path())
+        .err()
+        .ok_or("changed binary accepted")?;
+    assert!(refusal.to_string().contains("bin/codex"));
+    assert!(refusal.to_string().contains("executable differs"));
+    Ok(())
+}
