@@ -1,6 +1,8 @@
 //! Arguments several commands share: where permission comes from, which
-//! relation a grant names, and a sealed record's class.
+//! relation a grant names, a sealed record's class, and a page of the audit
+//! log.
 
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -69,4 +71,18 @@ impl From<RelationArg> for Relation {
 pub enum RecordClass {
     Memory,
     Key,
+}
+
+/// A page of the audit log: the last `--most` lines, ending at the tail or
+/// before `--before`. Only those lines are read.
+#[derive(clap::Args)]
+pub struct Page {
+    /// How many lines to print (required; there is no default). The page
+    /// ends at the log's last line, or before `--before`.
+    #[arg(long)]
+    pub most: NonZeroU64,
+    /// The index to end before, as the previous page printed it; without
+    /// it the page ends at the log's last line.
+    #[arg(long)]
+    pub before: Option<u64>,
 }

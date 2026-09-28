@@ -1,7 +1,7 @@
 //! A walkthrough of the secrets broker: a person grants an agent the use of
 //! a credential, the agent uses it through a handle without ever seeing it,
-//! the lease runs out, the handle is dropped, and the signed audit log is
-//! replayed and verified.
+//! the lease runs out, the handle is dropped, and the signed audit log's
+//! lines since the key rotation are read from its tail and verified.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -148,6 +148,8 @@ fn run(root: &Path) -> Result<(), SecretsError> {
     step(
         "10. The store key is rotated; the old key file is gone and every entry opens under the new one",
     );
+    // Step 11 prints the lines written from here on, and reads no other.
+    let from_rotation = broker.audit().len();
     let (old_id, new_id) = broker.rotate_store_key(&keys.join("store-2.key"))?;
     println!("  old key {old_id}\n  new key {new_id}");
     broker.permissions().grant(SecretRelation {
@@ -170,12 +172,13 @@ fn run(root: &Path) -> Result<(), SecretsError> {
     }
 
     step(
-        "11. The broker restarts from disk; the audit log, every line signature-checked, holds no credential and no handle",
+        "11. The broker restarts from disk; the audit log's lines since the rotation, each signature-checked, hold no credential and no handle",
     );
     paths.store_key = keys.join("store-2.key");
     drop(broker);
     let reopened = Broker::open(&paths, LocalGrants::new(), Box::new(now_ms))?;
-    for recorded in reopened.audit().replay()? {
+    let since_rotation = reopened.audit().len().saturating_sub(from_rotation);
+    for recorded in reopened.audit().window(None, since_rotation)? {
         let line = recorded.line;
         println!(
             "  {:>2} {:<6} handle {:<32} {:<12} {:<12} {}",
