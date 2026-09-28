@@ -54,3 +54,7 @@ impl fmt::Display for Secret {
         f.write_str(REDACTED)
     }
 }
+
+#[cfg(test)]
+#[path = "secret_tests.rs"]
+mod tests;

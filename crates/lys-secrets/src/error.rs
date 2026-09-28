@@ -3,12 +3,14 @@
 
 use std::path::PathBuf;
 
+mod lease;
 mod lending;
 mod name;
 mod owner;
 mod revocation;
 mod service;
 
+pub use lease::{LeaseRefusal, ListRefusal};
 pub use lending::LendingRefusal;
 pub use owner::OwnerChangeRefusal;
 pub use revocation::RevocationRefusal;
