@@ -47,7 +47,32 @@
       ],
       "stories": [
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. None of the acceptance rows can be met. The spec requires the bytes of the method's scripts/render-brief.py at the main commit where the blocker check first prints '6 True True True True True 1'. No such commit exists. Running the blocker check from the repository root prints '0 True False False False False 1'. On the method's main, scripts/render-brief.py was last changed at f77ef422613a3f577facfa869f8f6c356716ad27 and has neither is_bare_id nor render_list_field. The method's render-lists card is only a brief, on branch brief/render-lists/99b64201-00c2-4fd8-ba9a-35e884a14fe7 (commit a252f20), with no build and no PR. Row by row: the gh api | cmp row has no <L> to name. The '--no-resolve | grep -c' row would print 0 on the current copy. The blocker check on the lys copy would print '0 True False False False False 1'. The 'from __future__ import annotations' row already prints 1 on the current copy, since f77ef42 carried that line, but the requirement also needs the rule. The SOURCE.md row has no <L7> to record. The diff row stays unmet because nothing was changed. Writing is_bare_id or render_list_field into scripts/design/render-brief.py in lys is forbidden by the boundary 'SHALL NOT write the prose-list rule into scripts/design/render-brief.py by hand'. Changing the method's repository is also forbidden. It unblocks when the method's card lands the rule on design-system main; then the build copies the file at that commit and records its first seven hex characters in scripts/design/SOURCE.md.",
+        "deviation": "No files were changed. The brief was dispatched while its blocked_by check still failed, and the brief's own words say 'the brief is not dispatched until this check ... prints 6 True True True True True 1'.",
+        "checklist": [
+          {
+            "id": "C31",
+            "done": false,
+            "note": "There is no method commit carrying the rule to copy from."
+          },
+          {
+            "id": "C33",
+            "done": false,
+            "note": "The rule and its docstring must come from the method's file, which does not carry them yet."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "Blocked on the method's card landing first."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -76,7 +101,37 @@
       ],
       "stories": [
         "S13"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. scripts/design/tests/test_render_brief.py was not created. Its three cases test render() on lys's copied renderer, and the current copy joins every list with ', '. The prose case and the mixed case would fail, so 'Ran 3 tests ... OK' cannot be met. The three mutation rows edit is_bare_id and render_list_field in scripts/design/render-brief.py, and neither function exists in the current copy. Adding the test now would also turn the design leg red once R3 wires it in. It unblocks with R1.",
+        "deviation": "The test file was not created because it depends on R1's copied bytes, and nothing it would test exists yet.",
+        "checklist": [
+          {
+            "id": "C32",
+            "done": false,
+            "note": "The renderer does not yet render prose lists one entry per line; it waits on R1."
+          },
+          {
+            "id": "C33",
+            "done": false,
+            "note": "Waits on R1."
+          },
+          {
+            "id": "C35",
+            "done": false,
+            "note": "The test was not written; it would fail against the pre-rule renderer."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked on the method's card."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -100,7 +155,27 @@
       ],
       "stories": [
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. scripts/design/gate.sh was not changed. Making it run a test that does not exist would make the gate exit 1, and running R2's test against the pre-rule renderer would also fail it. Either way the design leg would turn red before the rule exists. Both mutation rows and both diff rows depend on R1 and R2. It unblocks with R1 and R2.",
+        "deviation": "gate.sh was not changed, to keep the design leg green while the rule is missing upstream.",
+        "checklist": [
+          {
+            "id": "C35",
+            "done": false,
+            "note": "Waits on R2."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "Blocked on the method's card."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -136,7 +211,32 @@
       "stories": [
         "S13",
         "S14"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked. With the current renderer, re-rendering every cluster produces the old joined blocked_by lines, which are byte-identical to the committed files. DIRECTORY-006.md therefore still has '> **Blocked by:** ' followed by six joined entries, and the row expecting '6 True False' cannot be met. The all-briefs row would fail at lines.index('> **Blocked by:**'). The row expecting 'Ran 3 tests' needs R2 and R3. The rendered brief .md files were left untouched, because hand-editing them would make gate.sh's render cmp fail. It unblocks with R1 to R3.",
+        "deviation": "No brief .md files were re-rendered because the renderer they depend on has not landed upstream.",
+        "checklist": [
+          {
+            "id": "C34",
+            "done": false,
+            "note": "Nothing to re-render until R1 lands."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S13",
+            "satisfied": false,
+            "note": "Blocked on the method's card."
+          },
+          {
+            "id": "S14",
+            "satisfied": false,
+            "note": "Blocked on the method's card."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
