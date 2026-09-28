@@ -255,6 +255,18 @@ a later ship from the target carries the arrivals onward.
 - `lys.fork` (HOME-006 R3): `{child}`, the child's session id. Appended at
   the parent's head, which advances to it, once per fork; the parent gains
   this one line and no earlier byte of it changes.
+- `lys.translation` (HOME-009 R6): `{harness, codex_version, thread, head,
+  head_hash, rollout, rollout_sha256, account_sha256}`. One entry appended
+  by `translate-codex` beside the context path through `append_beside`, as a
+  child of the head, once the rollout and its loss account are written and
+  synced; the head does not move and no earlier byte of the session changes.
+  `harness` is `codex`, `codex_version` the version the rollout shape was
+  recorded against, `thread` the Codex thread id (the head's record uuid),
+  `head` the head entry's id, `head_hash` the session head hash before the
+  append, `rollout` the rollout's path relative to `--out`, and the two
+  hashes the SHA-256 of the rollout's and the account's bytes. With the
+  account, it is the durable link from the Codex fork back to the session.
+  Off the path, a later translation lists it lost.
 
 ## The rendered uuid
 
