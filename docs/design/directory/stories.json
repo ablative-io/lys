@@ -506,6 +506,10 @@
         {
           "id": "S150",
           "text": "As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's."
+        },
+        {
+          "id": "S160",
+          "text": "As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself."
         }
       ]
     },

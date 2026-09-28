@@ -1711,6 +1711,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-120",
+      "title": "Lys is installed by opening an app: a person downloads Lys, opens it, and finishes in the browser, never in a terminal",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 about 19:10 Melbourne (Lys is the only sign-in, an average person sets it up); recorded by Waffles with DIRECTORY-054",
+      "context": "`lys identity install` does the whole install, but it is a command typed in a terminal, it needs a container engine already running, and nothing packages Lys as a thing a person downloads. DIRECTORY-047 begins after the install, and DIRECTORY-029 gives start commands to paste into a shell. So no path exists by which an ordinary person installs Lys.",
+      "decision": "Lys ships for macOS as a signed, notarised Lys.app in a disk image. Opening it runs the same install service as `lys identity install`, in the process, showing each step on a Lys page in the browser, and hands over to the first-run setup page (DIRECTORY-047). Lys then starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045 with its way back, and uninstalling is a Lys screen. Nothing on the path asks for a terminal, a file edit, a port or a password file. Whether the container engine is removed (running the issuer, the permission service and the database as native processes shipped in the app) is put to Tom separately; until he decides, a missing or stopped engine is a Lys page that says what to do in plain words and continues by itself when the engine appears.",
+      "quote": "how is an average person supposed to do it?",
+      "consequences": [
+        "An ordinary person installs Lys without a terminal.",
+        "The signing identity for the app is Tom's Apple developer identity, held as a secret by handle; building the app without it is refused by name.",
+        "The container engine is still required until Tom decides otherwise; the app guides the person through it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

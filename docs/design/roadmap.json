@@ -2237,6 +2237,33 @@
       },
       "depends_on": [],
       "notes": "Written by hand. Follows DIRECTORY-045."
+    },
+    {
+      "id": "RM-091",
+      "title": "Install Lys by downloading and opening an app, with no terminal",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Lys.app for macOS: open it, watch the install on a Lys page, finish first-run setup, and Lys runs at login; update and uninstall from Lys.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:10:00+10:00",
+        "quote": "how is an average person supposed to do it?",
+        "context": "Tom's standing rule of that evening: Lys is the only sign-in for everything and an average person sets it up with no terminal. Found missing by Waffles at 20:22 while reviewing an installer draft."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-120"
+        ],
+        "briefs": [
+          "DIRECTORY-054"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-084"
+      ],
+      "notes": "Written by hand."
     }
   ]
 }

@@ -666,6 +666,21 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-secrets/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
 | `crates/lys-home/Cargo.toml` | R2: One build stamp | DIRECTORY-053 |
 | `crates/lys/tests/version.rs` | R2: One build stamp | DIRECTORY-053 |
+| `crates/lys/src/package.rs` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys/src/package_tests.rs` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Info.plist` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `packaging/macos/Lys.icns` | R1: `lys package app` builds the app and disk image | DIRECTORY-054 |
+| `crates/lys-app/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/main.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/progress_tests.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `surface/identity/src/features/install/InstallProgress.tsx` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-app/src/engine.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/engine_tests.rs` | R3: The container engine, guided in plain words | DIRECTORY-054 |
+| `crates/lys-app/src/login_item.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `crates/lys-app/src/login_item_tests.rs` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `surface/identity/src/features/account/Uninstall.tsx` | R4: Start at login, reopen, upgrade and uninstall | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R5: Proof on a fresh macOS account | DIRECTORY-054 |
 
 ## Inventory
 

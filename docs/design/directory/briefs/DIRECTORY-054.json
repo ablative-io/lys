@@ -1,0 +1,168 @@
+{
+  "id": "DIRECTORY-054",
+  "cluster": "directory",
+  "title": "Install Lys by downloading and opening an app, with no terminal",
+  "depends_on": [
+    "DIRECTORY-045",
+    "DIRECTORY-047"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C395",
+    "C396",
+    "C397",
+    "C398",
+    "C399"
+  ],
+  "stories": [
+    "S160"
+  ],
+  "design_anchor": [
+    "ADR-120"
+  ],
+  "purpose": "Tom, 28 September 2026 about 19:10: Lys is the only sign-in for everything, and \"how is an average person supposed to do it?\" Today the install is a terminal command that needs a container engine already running, and nothing packages Lys as something a person downloads.",
+  "task": "Add Lys.app for macOS: a packaging command that builds a signed, notarised app and disk image; an app that runs the install in its own process with progress on a Lys page and hands over to first-run setup; guidance for the container engine; start at login, reopen, upgrade and uninstall; and a proof on a fresh macOS account that no terminal is ever needed.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "`lys package app` builds the app and disk image",
+      "spec": "Behavioural. `lys package app --out DIR` builds Lys.app (bundle id, Info.plist, icon) holding lys, lys-identity-server, lys-secrets and lys-home built for the host architecture, the screens package, and lys-app as the bundle's executable, and a Lys.dmg with the app and an Applications link. Each binary's --version must name the same commit, or the packaging is refused naming the one that differs. It signs with the Developer ID named by a secret handle (DIRECTORY-052 R6, SECRETS), with the hardened runtime, and submits for notarisation, stapling the ticket; with no signing identity or a refused notarisation it fails naming which, and never produces an unsigned app under the release name.",
+      "acceptance": [
+        "The built app passes codesign --verify --deep --strict and spctl --assess.",
+        "Binaries built from two commits are refused naming the binary.",
+        "With no signing identity it is refused signing_identity_missing and no Lys.dmg is written."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/package.rs",
+          "crates/lys/src/package_tests.rs",
+          "packaging/macos/Info.plist",
+          "packaging/macos/Lys.icns"
+        ],
+        "modify": [
+          "crates/lys/src/main.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C395"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Opening the app installs and shows every step on a Lys page",
+      "spec": "Behavioural. lys-app, when no install exists under the platform data root, serves a Lys-styled progress page on a loopback port it chooses, opens the default browser to it, and runs the install service as a library call (the same code as `lys identity install`, never a spawned shell or terminal). Each step appears as it happens in plain words (\"Preparing your directory\", \"Starting sign-in\"), with a failure shown in the same words and the one next thing to do. When the install is ready it hands the browser to the first-run setup page of DIRECTORY-047. Opening the app while an install is running shows that install's page, never a second install.",
+      "acceptance": [
+        "Opening the app on a machine without an install reaches the first-run setup page with no terminal started.",
+        "A failure at any step shows its words and next action on the page and leaves the install resumable.",
+        "Opening the app twice during an install shows one install."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/Cargo.toml",
+          "crates/lys-app/src/main.rs",
+          "crates/lys-app/src/progress.rs",
+          "crates/lys-app/src/progress_tests.rs",
+          "surface/identity/src/features/install/InstallProgress.tsx"
+        ],
+        "modify": [
+          "Cargo.toml",
+          "crates/lys/src/identity/install.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C396"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The container engine, guided in plain words",
+      "spec": "Behavioural. Before the install starts its services, a container engine that is missing or not running is shown on the progress page in plain words: what it is for, the official download for this Mac, and that the install continues by itself. The app waits on the engine's socket appearing and answering (a filesystem event on its known socket paths), never on a clock or a poll, and continues the install when it does. No page names the issuer.",
+      "acceptance": [
+        "With the engine stopped, the page shows the guidance, and starting the engine continues the install with no action in Lys.",
+        "No wait in lys-app reads a clock or loops on a sleep."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/src/engine.rs",
+          "crates/lys-app/src/engine_tests.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C397"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Start at login, reopen, upgrade and uninstall",
+      "spec": "Behavioural. After a successful install the app registers Lys to start at login for this user (a LaunchAgent under the user's Library, removed on uninstall). Opening the app when Lys is installed and running opens Lys's screens; when installed and stopped it starts it and then opens them. An app whose bundled build is newer than the install's runs the upgrade of DIRECTORY-045 with its progress on the page and its way back (DIRECTORY-053). An Uninstall control on the account screen of an administrator stops Lys, removes the login registration and the binaries, and keeps the data folder unless the person ticks to remove it after a confirmation that names what is lost.",
+      "acceptance": [
+        "After a restart of the Mac, Lys is answering without the person doing anything.",
+        "Opening a newer app upgrades the install and the Build line shows the new commit.",
+        "Uninstall without the tick leaves the data folder, and a reinstall signs the same people in."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-app/src/login_item.rs",
+          "crates/lys-app/src/login_item_tests.rs",
+          "surface/identity/src/features/account/Uninstall.tsx"
+        ],
+        "modify": [
+          "crates/lys-app/src/main.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C398"
+      ],
+      "stories": [
+        "S160"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Proof on a fresh macOS account",
+      "spec": "Behavioural. On a fresh macOS user account on a machine that has never held Lys, a person downloads Lys.dmg, drags Lys to Applications, opens it, completes first-run setup and signs in. The run is recorded (screen recording and the process tree), and the record shows no Terminal or shell process started by the person or by Lys on their behalf and no page naming the issuer.",
+      "acceptance": [
+        "The recorded run reaches signed in from the disk image.",
+        "The process record holds no terminal started for the person, and a text scan of every page shown finds no issuer name."
+      ],
+      "files": {
+        "create": [
+          "docs/design/directory/reports/DIRECTORY-054-fresh-account.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C399"
+      ],
+      "stories": [
+        "S160"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT start a terminal or ask the person to type a command, edit a file, choose a port or read a password file at any step.",
+    "SHALL NOT produce an unsigned app under the release name.",
+    "SHALL NOT name the issuer on any page.",
+    "SHALL NOT add a timeout, sleep, poll, #[allow], #[ignore] or any bypass.",
+    "SHALL NOT add a silent fallback: every failure is a named refusal shown in plain words."
+  ],
+  "verification": [
+    "The full Lys gate, ast-grep scan and surface checks exit 0 at the card's head, measured by the card round.",
+    "R5's recorded run on a fresh macOS account."
+  ]
+}

@@ -224,6 +224,8 @@
 
 **S150.** As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
 
+**S160.** As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself.
+
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 
 **S151.** As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.

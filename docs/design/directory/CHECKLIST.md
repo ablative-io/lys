@@ -335,3 +335,11 @@
 
 - [ ] **C393** — `lys identity upgrade --back` returns a running install to the build kept in bin.previous (and surface.previous), stopped, swapped, started and waited on for ready exactly as an upgrade is, and records the build now running (DIRECTORY-053 R1).
 - [ ] **C394** — Every Lys binary takes its build stamp from one shared build-support crate; no build.rs is copied (DIRECTORY-053 R2).
+
+## Install Lys by opening an app (DIRECTORY-054)
+
+- [ ] **C395** — `lys package app` builds a signed, notarised Lys.app and disk image holding every Lys binary and the screens package, each stamped with its build; with no signing identity it is refused by name (DIRECTORY-054 R1).
+- [ ] **C396** — Opening Lys.app runs the install service in the process, shows each step on a Lys page in the browser in plain words, and hands over to first-run setup (DIRECTORY-054 R2).
+- [ ] **C397** — A missing or stopped container engine is a Lys page with what to do, and the install continues by itself when the engine appears, on its socket's event (DIRECTORY-054 R3).
+- [ ] **C398** — Lys starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045, and uninstalling is a Lys screen that keeps data unless the person chooses otherwise (DIRECTORY-054 R4).
+- [ ] **C399** — On a fresh macOS account, a person goes from the downloaded disk image to signed in with no terminal process started and nothing naming the issuer (DIRECTORY-054 R5).

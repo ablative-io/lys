@@ -2870,6 +2870,81 @@
       "path": "crates/lys/tests/version.rs",
       "note": "R2: One build stamp",
       "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/package.rs",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys/src/package_tests.rs",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Info.plist",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "packaging/macos/Lys.icns",
+      "note": "R1: `lys package app` builds the app and disk image",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/Cargo.toml",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/main.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/progress_tests.rs",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/install/InstallProgress.tsx",
+      "note": "R2: Opening the app installs and shows every step on a Lys page",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/engine_tests.rs",
+      "note": "R3: The container engine, guided in plain words",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-app/src/login_item_tests.rs",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "surface/identity/src/features/account/Uninstall.tsx",
+      "note": "R4: Start at login, reopen, upgrade and uninstall",
+      "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
+      "note": "R5: Proof on a fresh macOS account",
+      "brief": "DIRECTORY-054"
     }
   ],
   "inventory": [
