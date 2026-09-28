@@ -76,7 +76,21 @@
       "checklist": [
         "C186"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met; nothing was built. (1) R1 creates crates/lys-identity-server/src/spicedb/mod.rs, but crates/lys-identity-server/src/spicedb.rs already exists and crates/lys-identity-server/src/lib.rs:62 declares `pub mod spicedb;`. Rust will not compile with both files (error E0761). Keeping mod.rs to declarations and re-exports only (as R1 requires) means moving or deleting spicedb.rs and spicedb_http.rs (lib.rs:63). It also means rewriting the code that imports them: config.rs:17 and :66 (SpiceDbSettings), grants.rs:40, :56, :70-71, :148, :152, and tests/identity_spicedb.rs:19. None of these files is in R1's list, and CN9 requires a reviewed brief revision before they are edited. (2) The configuration DIRECTORY-002 declares gives the service `[spicedb] endpoint` as the HTTP gateway's host and port (spicedb.rs:33-43). The deploy file gives gRPC and HTTP ports separately (deploy/identity/config.example.toml:53-56). A gRPC address for the service is a change to config.rs, also outside the list. (3) R1's dependencies protox and rustls-rustcrypto are not in the local cargo cache, and the authzed protocol files have to be fetched for SOURCE.md's pinned tag. That is feasible, but the dev instructions forbid any build, so the client and the Cargo.lock resolution cannot be checked before the gate. Checks R1 shares with the other rows: git diff of crates/lys/src/identity/ is empty and nothing was added there.",
+        "deviation": "Stopped under CN9/CN12 instead of editing files outside the list; no files changed.",
+        "checklist": [
+          {
+            "id": "C186",
+            "done": false,
+            "note": "Blocked: src/spicedb.rs (landed by DIRECTORY-006) collides with the required src/spicedb/mod.rs, and its importers are outside R1's file list."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R2",
@@ -122,7 +136,21 @@
       "checklist": [
         "C187"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. The schema R2 describes (following ADR-078) is a grant object connected to the resource under its action, plus a root relationship to one root-authority object per directory. That contradicts the schema DIRECTORY-006 landed in crates/lys-identity/src/grants/permission.rs:22-35. There, resources carry one relation per model relation with subject type grant#holder, and a root grant stands on `source: grant | person`, the responsible person, not a root-authority object. That SCHEMA is exported (grants/mod.rs:35) and the landed engine uses it (spicedb.rs:184-205). permission.rs is in R3's file list, not R2's. The landed projection keeps its revision as a lys_mirror relationship written under preconditions (spicedb.rs:1-8, :320-367), while R2's projector records SpiceDB revision tokens (ZedTokens). Reconciling the two means rewriting grants/permission.rs, grants/authority.rs:25/:100/:133 (RelationshipStore generic), spicedb.rs and grants.rs, which are not all in R2's list. Also, the refusal R2 names, delegation_outlives_source, already exists in landed code as GrantError::ExpiryBeyondSource (crates/lys-identity/src/grants/error.rs:167-175, 'refused, never clamped'). Renaming or duplicating a landed refusal needs a ruling.",
+        "deviation": "Stopped under CN9 instead of rewriting DIRECTORY-006's landed schema and projection outside R2's file list.",
+        "checklist": [
+          {
+            "id": "C187",
+            "done": false,
+            "note": "Blocked on the schema and projection conflict with landed permission.rs:22-35 and spicedb.rs."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R3",
@@ -153,7 +181,21 @@
       "checklist": [
         "C188"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. The decision DIRECTORY-006 landed is answered inside lys-identity from the relationships held in the store: Grants::check is at authority.rs:366 and imports `confirm` from permission.rs at authority.rs:25. The SpiceDB check exists only as a second path in the server (grants.rs:148-152, spicedb.rs:275-302), reading fullyConsistent over HTTP. That means a second evaluator exists today. Making check.rs the only one means changing authority.rs, grants.rs and spicedb.rs, and removing the Relationships::Memory engine (grants.rs:70-71, spicedb.rs:405-434). Of those, only permission.rs is in R3's file list. R3 also follows R2, which is blocked. The README sentence was not written, because it states a behaviour that does not exist until the rest of R3 lands.",
+        "deviation": "Stopped under CN9; the README sentence was not written ahead of the behaviour it describes.",
+        "checklist": [
+          {
+            "id": "C188",
+            "done": false,
+            "note": "Blocked: the landed decision evaluates relationships locally (authority.rs:366, permission.rs confirm); rewiring it is outside R3's file list, and R2 is blocked."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R4",
@@ -181,7 +223,27 @@
       ],
       "stories": [
         "S79"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. R4 follows R3 and its freshness check sits behind the SpiceDB checks R3 has not built. The landed StaleDecision (crates/lys-identity/src/grants/error.rs:364-373, raised at authority.rs:396) carries u64 required and projected revisions. Adding the grant identifier is within R4's list, but that change without R3's evaluator meets none of R4's acceptance rows.",
+        "deviation": "Stopped because R3 is blocked.",
+        "checklist": [
+          {
+            "id": "C189",
+            "done": false,
+            "note": "Blocked behind R3."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S79",
+            "satisfied": false,
+            "note": "Blocked behind R3."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -204,7 +266,27 @@
       ],
       "stories": [
         "S77"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. The brief's own blocker holds: after git fetch origin main, git cat-file -e origin/main:crates/lys-identity/src/capability/claim.rs exits 128 ('path ... does not exist in origin/main'). Card hhAN8h77's typed capability claim has not landed. R5 also follows R4, which is blocked.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C190",
+            "done": false,
+            "note": "Blocked on card hhAN8h77 (claim.rs absent on origin/main) and on R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S77",
+            "satisfied": false,
+            "note": "Blocked on card hhAN8h77 and on R4."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -234,7 +316,21 @@
       "checklist": [
         "C191"
       ],
-      "stories": []
+      "stories": [],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. R6's answer must come from one call to check.rs's traced variant and from lookup.rs at the same revision, and neither exists because R1 and R3 are blocked. The landed explain seam, Grants::explain at authority.rs:381 served through grants.rs, answers from local lineage, and changing it to the traced SpiceDB answer depends on R3's evaluator.",
+        "deviation": "Stopped because R1 and R3 are blocked.",
+        "checklist": [
+          {
+            "id": "C191",
+            "done": false,
+            "note": "Blocked behind R1 and R3."
+          }
+        ],
+        "stories": []
+      }
     },
     {
       "id": "R7",
@@ -264,7 +360,27 @@
       ],
       "stories": [
         "S78"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "No acceptance row is met. R7 follows R6. Its browser acceptance test expects R6's answer shape (path to the responsible person, the SHA-256 of schema.zed and a revision token), and the server does not yet produce it. The view was not built against a shape the server does not have.",
+        "deviation": "Stopped because R6 is blocked.",
+        "checklist": [
+          {
+            "id": "C192",
+            "done": false,
+            "note": "Blocked behind R6."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S78",
+            "satisfied": false,
+            "note": "Blocked behind R6."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
