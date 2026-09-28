@@ -28,13 +28,19 @@
     {
       "id": "R1",
       "title": "Lys's own runner: each agent in its own background pseudo-terminal",
-      "spec": "Behavioural. New crate lys-runner and the command 'lys runner' (started by install as a login item beside the server, as the server is). It holds each session in its own pseudo-terminal with a scrollback of a configured size in bytes, keeps running when every screen is closed, and records each session's exit status and instant. Sessions survive a restart of lys-identity-server; a restart of the runner reports every session it held as ended, never as running. It listens only on a Unix socket in the install's run folder at mode 0600, and accepts only the server's signed requests. The runner may run on any machine: it dials the server (never the reverse) over the machine's authenticated connection, signing each request with the machine's own key as DIRECTORY-029's machine records name it, so an agent can run on another laptop. Its local control socket stays a Unix socket, mode 0600. The runner is one of the install's units (DIRECTORY-045): a restart of the runner ends every session it holds, and an upgrade says so, naming the running sessions, before its first stop. After a runner crash, sessions it held are reported ended_by_runner_restart with the instant the restart found them gone and no exit status; none is invented.",
+      "spec": "Behavioural. New crate lys-runner and the command 'lys runner' (started by install as a login item beside the server, as the server is). It holds each session in its own pseudo-terminal with a scrollback of a configured size in bytes, keeps running when every screen is closed, and records each session's exit status and instant. Sessions survive a restart of lys-identity-server; a restart of the runner reports every session it held as ended, never as running. It listens only on a Unix socket in the install's run folder at mode 0600, and accepts only the server's signed requests. The runner may run on any machine: it dials the server (never the reverse) over the machine's authenticated connection, signing each request with the machine's own key as DIRECTORY-029's machine records name it, so an agent can run on another laptop. Its local control socket stays a Unix socket, mode 0600. The runner is one of the install's units (DIRECTORY-045): a restart of the runner ends every session it holds, and an upgrade says so, naming the running sessions, before its first stop. After a runner crash, sessions it held are reported ended_by_runner_restart with the instant the restart found them gone and no exit status; none is invented. The runner SHALL record with each session the identity of its process group leader. That identity is the leader's process id together with the instant that process started, as the operating system reports it. WHEN a restart finds a recorded session without an end, THE SYSTEM SHALL end its process group only when the process at the recorded id started at the recorded instant, compared exactly. A process at the recorded id with any other start instant is a stranger, and the runner SHALL NOT signal it or its group. A group whose leader is gone cannot be proved the runner's, and the runner SHALL NOT signal it. A recorded session that holds no start instant SHALL NOT be signalled. In each of those three cases the session is reported ended_by_runner_restart, and the runner's log names the process id and says it was not signalled. THE SYSTEM SHALL NOT signal a process group on its recorded number alone.",
       "acceptance": [
         "A started session keeps running after the server restarts, and its output is still readable.",
         "A runner restart reports its old sessions ended with their instants.",
         "A request not signed by the server is refused runner_request_unsigned.",
         "A runner on a second machine, dialling the server with that machine's key, starts an agent the server asked for.",
-        "A runner killed and restarted reports its sessions ended_by_runner_restart with no exit status."
+        "A runner killed and restarted reports its sessions ended_by_runner_restart with no exit status.",
+        "A recorded session whose leader lives at the recorded start instant with a child that ignored the hang-up has its group ended, and the child is gone afterwards.",
+        "A recorded session whose process id now belongs to a process with another start instant is reported ended_by_runner_restart.",
+        "That other process is still running after the restart.",
+        "The runner's log for that restart names that process id and says it was not signalled.",
+        "A recorded session whose leader is gone while its group still holds a process is reported ended_by_runner_restart, and that process is still running afterwards.",
+        "A recorded session that holds no start instant is reported ended_by_runner_restart, and no signal is sent."
       ],
       "files": {
         "create": [
@@ -224,10 +230,13 @@
     "SHALL NOT let the runner listen on any network address; it listens on its Unix socket only.",
     "SHALL NOT pass an account, key or token value through a route, a log, a receipt or a command line.",
     "SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass; waits end on a signal or when the caller leaves.",
-    "SHALL NOT add a silent fallback: every failure is a named refusal."
+    "SHALL NOT add a silent fallback: every failure is a named refusal.",
+    "SHALL NOT add a code line to crates/lys-identity-server/src/grants.rs, which already holds 498 of the 500 code lines the file-length leg allows (ADR-111). Code this card needs beside the grants goes in a new module, and code may move out of grants.rs."
   ],
   "verification": [
     "The full Lys gate, ast-grep scan and the surface checks exit 0 at the card's head, measured by the card round.",
-    "On a scratch install: start a shell agent from the screen, type to it, read it, wait on a pattern, stop it."
+    "On a scratch install: start a shell agent from the screen, type to it, read it, wait on a pattern, stop it.",
+    "sh scripts/file-length.sh exits 0 at the card's head.",
+    "check_file_length.py counts no more than 498 code lines in crates/lys-identity-server/src/grants.rs at the card's head."
   ]
 }

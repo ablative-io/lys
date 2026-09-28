@@ -100,8 +100,16 @@ Behavioural. `lys identity install` and `lys identity upgrade` write install/bui
 Evidence, in two parts. In the round: the upgrade tests drive `upgrade` end to end against a scratch install each test makes in its own temporary directory (build A's binaries running with the configuration and compose files A renders, then build B's), through the engine that brings the compose services to their definition, so neither a container runtime nor the live install is needed. The build machine has neither, and the round never reaches the live install or its state directory. After landing: the lead who lands the card upgrades the live install with the landed build's `lys identity upgrade --from`, and commits docs/design/directory/PROOF-UPGRADE.md to main naming the installed commit before, the landed commit after, the upgrade's printed lines, the `build` member of http://localhost:8490/api/authority, and the cookie setting in the install's compose environment. Secrets and passwords never appear in it. The live install was made before this card (R6), so that upgrade starts with its first move. The round does not write PROOF-UPGRADE.md.
 
 **Acceptance:**
-- A test starts build A on a scratch install in a temporary directory, upgrades it to build B, and asserts that the recorded build and every binary's --version name B, that the configuration key and compose environment value only B renders are in place, and that config.previous/ holds A's files.
-- A test in which build B exits before it is ready asserts that A is running again, A is the recorded build, and A's configuration and compose files are back in place.
+- One test starts build A on a scratch install in a temporary directory and upgrades it to build B.
+- That test asserts the recorded build names B for every binary.
+- That test asserts every binary's --version names B.
+- That test asserts the configuration key only B renders is in the configuration the service started with.
+- That test asserts the compose environment value only B renders is in the compose environment.
+- That test asserts config.previous/ holds each of A's configuration and compose files, byte for byte.
+- One test upgrades A to a build B that exits before it is ready.
+- That test asserts A is running again.
+- That test asserts the recorded build names A for every binary.
+- That test asserts A's configuration and compose files are back in place, byte for byte.
 - No test or leg of the round needs a container runtime.
 - No test or leg of the round needs a listener on port 8490.
 - No test or leg of the round needs the live install's state directory.

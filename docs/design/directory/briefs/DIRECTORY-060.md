@@ -8,7 +8,7 @@ title: The runner holds one holder key per session and signs presentations for t
 # DIRECTORY-060: The runner holds one holder key per session and signs presentations for that session only
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-050, SECRETS-008
+> **Depends on:** DIRECTORY-050, DIRECTORY-051, SECRETS-008
 > **Design anchor:**
 > - ADR-125 — An agent session's holder key is held by the runner, and a session proves itself by peer credentials and ancestry — The runner makes one holder key per session in memory. A start becomes key, then issue, then spawn. The harness and lys mcp ask the runner for single presentations over its socket. The session is proved by peer credentials plus the process ancestry reaching the session's own root pid, checked on every connection, on macOS and Linux both, through a named maintained dependency and with no unsafe in Lys code.
 > **Checklist:**
@@ -63,7 +63,7 @@ Behavioural. When the runner is asked to start a session (DIRECTORY-050 R3), it 
 
 ### R2: The presentation act, for a peer proved to be the session
 
-Behavioural. The runner's socket (crates/lys-runner/src/socket.rs, mode 0600) gains one act, present, beside the acts of 050 R2. It takes a handle id, an operation id, a signing instant and the request digest of lys_secrets::request_digest (crates/lys-secrets/src/handle.rs line 28). It answers every header a handle route reads (crates/lys-secrets/src/bin/lys-secrets/serve.rs lines 203 to 210). These are the handle's token in hex as lys-handle, from the session's record, and one presentation made by Presentation::sign (handle.rs line 184) with the session's key, as the four wire words of to_wire (handle.rs line 129). It refuses present_not_session when the peer is not proved to be a session's, and present_not_this_handle when the handle id is not one issued to that session. The peer is proved on every connection by its credentials and its ancestry. The peer's pid comes from the socket, through nix 0.31.3 with the option LocalPeerPid on macOS and PeerCredentials on Linux. The peer's user must equal the runner's. Its parent chain is walked to a session's own root pid, the pid the runner spawned. On macOS the parent pid comes from libproc 0.14.11. On Linux it comes from reading /proc/<pid>/stat. A chain that reaches no session root, or breaks, is refused present_not_session. The connection stays open while the proof and the answer are made, so the peer's pid cannot be reused meanwhile. The server-signed acts of 050 R1 are unchanged, and present is the only act a session peer may ask. No unsafe block is added to Lys code.
+Behavioural. The runner's socket (crates/lys-runner/src/socket.rs, mode 0600) gains one act, present, beside the acts of 050 R2. It takes a handle id, an operation id, a signing instant and the request digest of lys_secrets::request_digest (crates/lys-secrets/src/handle.rs line 28). It answers every header a handle route reads (crates/lys-secrets/src/bin/lys-secrets/serve.rs lines 203 to 210). These are the handle's token in hex as lys-handle, from the session's record, and one presentation made by Presentation::sign (handle.rs line 184) with the session's key, as the four wire words of to_wire (handle.rs line 129). It refuses present_not_session when the peer is not proved to be a session's, and present_not_this_handle when the handle id is not one issued to that session. The peer is proved on every connection by its credentials and its ancestry. The peer's pid comes from the socket, through nix 0.31.3 with the option LocalPeerPid on macOS and PeerCredentials on Linux. The peer's user must equal the runner's. Its parent chain is walked to a session's own root pid, the pid the runner spawned. On macOS the parent pid comes from libproc 0.14.11. On Linux it comes from reading /proc/<pid>/stat. A chain that reaches no session root, or breaks, is refused present_not_session. The connection stays open while the proof and the answer are made, so the peer's pid cannot be reused meanwhile. The server-signed acts of 050 R1 are unchanged, and present joins the judge and collector acts of DIRECTORY-051 R6 as the only acts a session peer may ask. No unsafe block is added to Lys code. The peer proof already exists: DIRECTORY-051 R6 creates crates/lys-runner/src/peer.rs to exactly this proof, with the session leader's start identity compared before and after the walk. present calls that module and adds no second proof.
 
 **Acceptance:**
 - A child of a session's process asking present for one of its handles gets a presentation the broker admits.
@@ -76,11 +76,11 @@ Behavioural. The runner's socket (crates/lys-runner/src/socket.rs, mode 0600) ga
 - The manifest crates/lys-runner/Cargo.toml names nix at 0.31.3 and libproc at 0.14.11.
 
 **Files:**
-- create: crates/lys-runner/src/peer.rs
 - create: crates/lys-runner/tests/present.rs
 - modify: crates/lys-runner/Cargo.toml
 - modify: crates/lys-runner/src/socket.rs
 - modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/peer.rs
 
 **Checklist:**
 - C419 — The runner signs a presentation only for a peer proved by credentials and ancestry to be the session the handle was issued to, on macOS and Linux (DIRECTORY-060 R2).

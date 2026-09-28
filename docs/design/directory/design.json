@@ -82,7 +82,11 @@
     "ADR-113",
     "ADR-114",
     "ADR-115",
-    "ADR-122"
+    "ADR-122",
+    "ADR-126",
+    "ADR-127",
+    "ADR-128",
+    "ADR-129"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -102,7 +106,9 @@
     "Road step 2's certificate half (defined in docs/design/identity/STATEMENT-2026-09-22.md, The road; brought into this cluster by ADR-093): an enduring agent's certificate states what it was granted at issuance in a typed, versioned claim, lys/agent-capability/v1, a new format under its own proposed OID 1.3.6.1.4.1.66364.2.1 alongside the unchanged shipped .1 extension transport, and a named verifier, verify_agent_capability, checks the chain against a set of trusted issuer keys, reads the claim and refuses what it does not cover (DIRECTORY-031).",
     "DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).",
     "DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.",
-    "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits."
+    "DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.",
+    "DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go.",
+    "DIRECTORY-063 refuses unknown API paths by name and adds GET /api/health, so the live install never answers a missing API with its page."
   ],
   "non_goals": [
     {
@@ -2723,11 +2729,6 @@
       "brief": "DIRECTORY-051"
     },
     {
-      "path": "crates/lys-home/src/harness/claude_code/usage.rs",
-      "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
-      "brief": "DIRECTORY-051"
-    },
-    {
       "path": "crates/lys-identity-server/tests/usage.rs",
       "note": "DIRECTORY-051 R1: Usage measured from the transcript, per turn",
       "brief": "DIRECTORY-051"
@@ -3444,8 +3445,8 @@
     },
     {
       "path": "crates/lys-runner/src/peer.rs",
-      "note": "the runner's session holder key",
-      "brief": "DIRECTORY-060"
+      "note": "R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof",
+      "brief": "DIRECTORY-051"
     },
     {
       "path": "crates/lys-runner/tests/present.rs",
@@ -4208,14 +4209,524 @@
       "brief": "DIRECTORY-054"
     },
     {
-      "path": "crates/lys/src/cli/mcp.rs",
-      "note": "DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key",
-      "brief": "DIRECTORY-049"
+      "path": "crates/lys-home/src/record/lantern.rs",
+      "note": "DIRECTORY-052 R3: a member's starting memories are written as lantern notes",
+      "brief": "DIRECTORY-052"
     },
     {
-      "path": "crates/lys/tests/mcp_stdio.rs",
-      "note": "DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key",
-      "brief": "DIRECTORY-049"
+      "path": "crates/lys-home/src/cli/fewshot.rs",
+      "note": "DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/tests/fewshot_write.rs",
+      "note": "DIRECTORY-052 R3: fewshot turns written through lys-home's public library function",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/src/lib.rs",
+      "note": "DIRECTORY-052 R3: lys-home's library exposes the fewshot writer",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/src/cli.rs",
+      "note": "DIRECTORY-052 R3: the fewshot command calls the library writer",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_connector.rs",
+      "note": "Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111.",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_api.rs",
+      "note": "R1: Authenticated parsed tracking from Argus, durably resumed by cursor",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_store.rs",
+      "note": "R2: Budgets on agents, teams and people",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/operations.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/operations.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/state.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_acts.rs",
+      "note": "R3: A reached budget acts once",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/goals_store.rs",
+      "note": "R4: Goals, expectations and deliverables, with deadlines and reminders",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/usage.test.tsx",
+      "note": "R5: Plain budget and goal controls",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/shell/Shell.tsx",
+      "note": "R5: Plain budget and goal controls",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/refusals_api.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/refusals_store.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/refusals.rs",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentRefusals.tsx",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/agent-refusals.test.tsx",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/tabs.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/tracking_store.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/tracking.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/tracking_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/tracking_export.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/session/lifecycle.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/launch_env.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/mod.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/refusals.spec.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/vite.config.ts",
+      "note": "R6: Every refused act is visible on the agent page, from authoritative records",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_refusals.rs",
+      "note": "R6: refusal capture without growing grants.rs",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_cancel.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_cancel_tests.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/spicedb_cancel.rs",
+      "note": "a SpiceDB wait ends when its request leaves",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-061.json",
+      "note": "the SpiceDB cancel brief",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-061.md",
+      "note": "the SpiceDB cancel brief",
+      "brief": "DIRECTORY-061"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/src/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/containment_policy.rs",
+      "note": "One Lys policy becomes a bound containment plan; DIRECTORY-062 R1.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_macos.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_egress.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_macos.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_egress.rs",
+      "note": "macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_helper.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys/src/cli/containment.rs",
+      "note": "Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit_macos.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_audit_linux.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_audit.rs",
+      "note": "Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/src/containment_api.rs",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/containment.rs",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentContainment.tsx",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/tests/agent-containment.test.tsx",
+      "note": "The agent page states the sandbox and the evidence; DIRECTORY-062 R5.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-macos.sh",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-linux.sh",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_probe.rs",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/containment.spec.ts",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "docs/design/directory/PROOF-CONTAINMENT.md",
+      "note": "A person watches real native denials and an allowed control; DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/settings.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/settings_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/config.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/config_tests.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_hook.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_statusline.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_notify.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/template.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_store.rs",
+      "note": "R1: Lys-owned hooks, status line and incremental session-stream tracking",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/src/refusal_log.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys/src/commands/runner_judge.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_policy_api.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_policy_store.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_policy.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentPolicy.tsx",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/tests/agent-policy.test.tsx",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-runner/tests/judge_peer.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_sessions.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_sight.rs",
+      "note": "R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals",
+      "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "crates/lys-identity-server/src/health_api.rs",
+      "note": "the service's own health answer",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "crates/lys-identity-server/src/health_api_tests.rs",
+      "note": "the service's own health answer",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-063.json",
+      "note": "the unknown API path and health brief",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-063.md",
+      "note": "the unknown API path and health brief",
+      "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_forwarder.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare_macos.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_prepare.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_forwarder.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "docs/CONTAINMENT-PREPARATION.md",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-capabilities.sh",
+      "note": "A person watches real native denials and an allowed control. DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
     }
   ],
   "inventory": [
