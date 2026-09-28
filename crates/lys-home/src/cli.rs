@@ -15,6 +15,7 @@ mod fewshot;
 pub mod given;
 mod resume;
 
+pub use fewshot::write_fewshot;
 pub use resume::{ResumeReport, resume_check};
 
 use std::path::PathBuf;
@@ -336,7 +337,8 @@ fn report(command: Command) -> Result<Value, HomeError> {
             }
         },
         Command::Fewshot { out, turns, cwd } => {
-            let written = fewshot::fewshot(&out, &turns, &cwd)?;
+            let turns = crate::record::canon::parse_turns(&turns)?;
+            let written = crate::write_fewshot(&out, &turns, &cwd)?;
             // The person's own command, carried in the one JSON report; never run here.
             let resume = format!("claude --resume {}", out.display());
             Ok(

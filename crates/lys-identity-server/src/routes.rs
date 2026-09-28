@@ -134,7 +134,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts.start(),
         acts.len()
     ));
-    let apps = crate::apps_api::opened(config, key, &*say)?;
+    let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),

@@ -34,10 +34,11 @@ pub mod home_move;
 pub mod proxy;
 pub mod record;
 
+pub use cli::write_fewshot;
 pub use error::HomeError;
 pub use record::blocks::{BlockStore, Hash, Put};
 pub use record::call::{Api, CallMeta, CallRecord, CallStatus, IngestReport, OutcomeMeta};
-pub use record::canon::{AddReport, Canon, Inherited};
+pub use record::canon::{AddReport, Canon, Inherited, Role};
 pub use record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 pub use record::epilogue::{Added, add_epilogue};
 pub use record::fork::{ForkedFrom, fork};

@@ -52,7 +52,7 @@ pub struct Settings {
 }
 
 /// How an agent's sessions are driven through a runner.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SessionSettings {
     /// The harness's compaction command, typed as one line; none when the
@@ -71,6 +71,7 @@ pub struct SessionSettings {
     /// the variable the handle in use is set in, and what says a limit.
     /// Handles only: the broker swaps each for its account on the way out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
     pub accounts: Option<lys_runner::Rotation>,
 }
 

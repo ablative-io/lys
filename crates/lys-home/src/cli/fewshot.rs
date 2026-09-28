@@ -1,5 +1,7 @@
-//! The `fewshot` command: an authored transcript written in Claude Code's
-//! shape from a file of turns.
+//! The `fewshot` writer: an authored transcript written in Claude Code's
+//! shape from a list of turns. It is the one writer of authored turns: the
+//! `fewshot` command reads its turns file and calls it, and a caller in
+//! another crate reaches the same code as [`crate::write_fewshot`].
 
 use std::io::Write;
 use std::path::Path;
@@ -13,14 +15,16 @@ use crate::harness::claude_code::render::uuid_string;
 use crate::record::canon::Role;
 use crate::record::now;
 
-/// Write the authored file: user records as plain strings, assistant records
-/// with model `authored`, the parent chain intact, a fresh session id.
-pub(crate) fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeError> {
-    let turns = crate::record::canon::parse_turns(turns)?;
+/// Write `turns` to the authored file `out`: user records as plain strings,
+/// assistant records with model `authored`, the parent chain intact, a fresh
+/// session id, each record naming `cwd`. The file is created exclusively and
+/// never written over; it is synced with its directory before the count of
+/// records written is answered.
+pub fn write_fewshot(out: &Path, turns: &[(Role, String)], cwd: &str) -> Result<u64, HomeError> {
     let session_id = random_uuid();
     let mut prev: Option<String> = None;
     let mut lines = Vec::new();
-    for (n, (role, body)) in turns.into_iter().enumerate() {
+    for (n, (role, body)) in turns.iter().enumerate() {
         let uuid = random_uuid();
         let (kind, message) = match role {
             Role::User => ("user", json!({"role": "user", "content": body})),
