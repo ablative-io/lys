@@ -2165,7 +2165,7 @@
       "title": "Lys tracks every agent's tokens, context, time, budgets and goals, and acts on them",
       "status": "briefed",
       "kind": "feature",
-      "summary": "Usage measured from the transcript per turn; budgets on agents, teams and people that compact, stop or tell; goals with deadlines and reminders delivered into the session; screens and API. Replaces Argus for our sessions.",
+      "summary": "Lys installs session hooks/status line and follows runner-local streams, holds and enforces budgets/goals/reminders, and shows plain controls and authoritative refusals. Argus reads Lys data for analytics and visualisation.",
       "provenance": {
         "requested_by": "tom",
         "date": "2026-09-28T19:51:07+10:00",
@@ -2185,7 +2185,7 @@
       "depends_on": [
         "RM-087"
       ],
-      "notes": "Written by hand."
+      "notes": "Written by hand. Current scope follows Tom's 29 September 07:02 to 07:04 clarification relayed by Waffles; ADR-118 preserves the earlier directions and reversals."
     },
     {
       "id": "RM-089",
@@ -2509,6 +2509,83 @@
       "depends_on": [
         "RM-100"
       ],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-102",
+      "title": "A SpiceDB call ends on its answer or when its caller leaves, never on a clock",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "WAIT and the three socket timeouts leave spicedb_http.rs, and grants sections run off the async workers inside a cancel scope the request owns.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T03:01:00+10:00",
+        "quote": "No timeouts, deadlines or watchdogs anywhere",
+        "context": "Archie's clock census of Lys main found spicedb_http.rs WAIT as the only production clock, carded YIaL3p3F."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-127"
+        ],
+        "briefs": [
+          "DIRECTORY-061"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
+    },
+    {
+      "id": "RM-103",
+      "title": "Every runner-owned agent is contained by the operating system and its denials are visible",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Seatbelt and Landlock/network-namespace containment derived from Lys policy, with native denial provenance and a visible real-browser proof on both platforms.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T07:14:00+10:00",
+        "quote": "",
+        "context": "Waffles relayed Tom's visible sandboxing request for Archie's card11VnzLRp. The 07:16 correction requires a writable outside-root control instead of treating /etc/x as proof."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-128"
+        ],
+        "briefs": [
+          "DIRECTORY-062"
+        ],
+        "commits": []
+      },
+      "depends_on": [
+        "RM-088"
+      ],
+      "notes": "Handwritten on main. Stacks after DIRECTORY-051. Author Chippy; independent reviewer Archie."
+    },
+    {
+      "id": "RM-104",
+      "title": "An unknown API path is refused and the service answers one honest health route",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "The API under /api gets its own 404 fallback, and GET /api/health names the service and its build.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:23:00+10:00",
+        "quote": "on the live install, /api/health, /health and /healthz answer 200 with the web page instead of a health answer or a 404",
+        "context": "Waffles's handover to Archie, carded 8YKXu3wv."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-129"
+        ],
+        "briefs": [
+          "DIRECTORY-063"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
       "notes": "Written by hand."
     }
   ]

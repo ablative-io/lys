@@ -74,6 +74,10 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-114 — An installed identity product names its build and upgrades itself in place, keeping the previous build to return to — Every Lys binary answers --version with the commit and dirty state it was built from, stamped at build time; a build with no commit to read says so in those words, never a made-up value. `lys identity upgrade` takes a folder of newly built binaries (and optionally a screens package), checks each one's --version, stops the service and the broker by their exit events, swaps the binaries by rename keeping the previous set beside them, starts the new ones and waits for them ready; if any new binary fails to start or become ready, it puts the previous set back, starts it, and fails naming what broke. Data, credentials, configuration and the compose services are never touched by an upgrade. Rejected: making install restart what differs, which would mix a first install's promises with an upgrade's risks; asking people to copy binaries by hand.
 - ADR-115 — Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown — Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.
 - ADR-122 — Install provisions the audit agent and separate authenticated transport — Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.
+- ADR-126 — Applications have connector identities; people register them with explicit permission — An application connector is its own third identity and grant-holder kind. Apps do not act as agents and do not use service accounts, which are accounts people use to service things. Only a signed-in person with an explicit ordinary register_app grant registers an app. The super administrator may grant that permission to a person; an agent, connector or service account cannot register, even if presented with such a grant. Approval creates a connector identity and binds the app to it. No app authority is implicit in approval, binding or ownership of a kind prefix: every permission is an explicit grant with a chain tracing to the super administrator. Own-kind checks, schema acts, batch and which use that connector identity and the ordinary grant engine. Extend IdentityId, grant admission and the permission-store holder, plus event and snapshot representation with compatibility tests. Preserve historical person/agent bytes and signatures; version a representation when necessary, never rewrite history or coerce identities. This supersedes DIRECTORY-048 wording allowing a service account or connector holding register_app to register, and forbids a separate registrar credential as substitute authority.
+- ADR-127 — A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers — Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.
+- ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
+- ADR-129 — Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's — The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.
 
 ## Goals
 
@@ -95,6 +99,8 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - DIRECTORY-034 draws the access graph (conformance 8.3) with grant edges and every reachability from Access's answers, and responsible people and resource parents as recorded, holding no permission rule of its own (ADR-098).
 - DIRECTORY-037 passes conformance rows 9.1 to 9.3: the surface's test command runs in .land/gates.sh and proves the rail, the dock side by all three of its controls, the route table, the palette and go-to keys, the help overlay and a counted Tab walk, and index.v6.html carries the same two fixes as the built shell.
 - DIRECTORY-038 states and tests conformance row 1.2: linking a person's provider account to an agent, and delegating from a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.
+- DIRECTORY-061 takes the last production clock out of Lys. A SpiceDB call ends on its answer, on SpiceDB closing, or on its request leaving, and a request that leaves lets the grants lock go.
+- DIRECTORY-063 refuses unknown API paths by name and adds GET /api/health, so the live install never answers a missing API with its page.
 
 ## Non-Goals
 
@@ -637,7 +643,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/usage_api.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/usage_state.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/usage_store.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
-| `crates/lys-home/src/harness/claude_code/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/tests/usage.rs` | DIRECTORY-051 R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_api.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
 | `crates/lys-identity-server/src/budgets_state.rs` | DIRECTORY-051 R2: Budgets on agents, teams and people | DIRECTORY-051 |
@@ -781,7 +786,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/tests/session_key.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-core/src/keys/identity.rs` | the runner's session holder key | DIRECTORY-060 |
-| `crates/lys-runner/src/peer.rs` | the runner's session holder key | DIRECTORY-060 |
+| `crates/lys-runner/src/peer.rs` | R6: socket peer credentials, ancestry and leader start identity; DIRECTORY-060 reuses this proof | DIRECTORY-051 |
 | `crates/lys-runner/tests/present.rs` | the runner's session holder key | DIRECTORY-060 |
 | `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
 | `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |
@@ -934,8 +939,110 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
 | `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
-| `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: 'lys mcp', the stdio face agents reach the MCP server by, signing with their own key | DIRECTORY-049 |
-| `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: 'lys mcp' over stdio, each call signed with the agent's own key | DIRECTORY-049 |
+| `crates/lys-home/src/record/lantern.rs` | DIRECTORY-052 R3: a member's starting memories are written as lantern notes | DIRECTORY-052 |
+| `crates/lys-home/src/cli/fewshot.rs` | DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns | DIRECTORY-052 |
+| `crates/lys-home/tests/fewshot_write.rs` | DIRECTORY-052 R3: fewshot turns written through lys-home's public library function | DIRECTORY-052 |
+| `crates/lys-home/src/lib.rs` | DIRECTORY-052 R3: lys-home's library exposes the fewshot writer | DIRECTORY-052 |
+| `crates/lys-home/src/cli.rs` | DIRECTORY-052 R3: the fewshot command calls the library writer | DIRECTORY-052 |
+| `crates/lys-identity-server/src/grants_connector.rs` | Application-connector holder conversion and authorization helpers, keeping grants.rs within ADR-111. | DIRECTORY-048 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | R1: Authenticated parsed tracking from Argus, durably resumed by cursor | DIRECTORY-051 |
+| `crates/lys-identity-server/src/budgets_store.rs` | R2: Budgets on agents, teams and people | DIRECTORY-051 |
+| `crates/lys-runner/src/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/tests/operations.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-runner/src/state.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_acts.rs` | R3: A reached budget acts once | DIRECTORY-051 |
+| `crates/lys-identity-server/src/goals_store.rs` | R4: Goals, expectations and deliverables, with deadlines and reminders | DIRECTORY-051 |
+| `surface/identity/tests/usage.test.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `surface/identity/src/shell/Shell.tsx` | R5: Plain budget and goal controls | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_api.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/refusals_store.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/tests/refusals.rs` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentRefusals.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/tests/agent-refusals.test.tsx` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/src/features/file/tabs.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/tracking_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/tests/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/tracking_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/tracking_export.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/session/lifecycle.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/launch_env.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/mod.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `surface/identity/tests/acceptance/refusals.spec.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `surface/identity/vite.config.ts` | R6: Every refused act is visible on the agent page, from authoritative records | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grants_refusals.rs` | R6: refusal capture without growing grants.rs | DIRECTORY-051 |
+| `crates/lys-identity-server/src/spicedb_cancel.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `crates/lys-identity-server/src/spicedb_cancel_tests.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `crates/lys-identity-server/tests/spicedb_cancel.rs` | a SpiceDB wait ends when its request leaves | DIRECTORY-061 |
+| `docs/design/directory/briefs/DIRECTORY-061.json` | the SpiceDB cancel brief | DIRECTORY-061 |
+| `docs/design/directory/briefs/DIRECTORY-061.md` | the SpiceDB cancel brief | DIRECTORY-061 |
+| `crates/lys-runner/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment_policy.rs` | One Lys policy becomes a bound containment plan; DIRECTORY-062 R1. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_macos.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_egress.rs` | macOS applies Seatbelt before the harness can run; DIRECTORY-062 R2. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_helper.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_linux.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys/src/cli/containment.rs` | Linux applies Landlock and a network namespace before exec; DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_macos.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_audit_linux.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_audit.rs` | Kernel evidence feeds the existing refusal stream; DIRECTORY-062 R4. | DIRECTORY-062 |
+| `crates/lys-identity-server/src/containment_api.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `crates/lys-identity-server/tests/containment.rs` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/src/features/file/AgentContainment.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `surface/identity/tests/agent-containment.test.tsx` | The agent page states the sandbox and the evidence; DIRECTORY-062 R5. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-macos.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-linux.sh` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_probe.rs` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `surface/identity/tests/acceptance/containment.spec.ts` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `docs/design/directory/PROOF-CONTAINMENT.md` | A person watches real native denials and an allowed control; DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-home/src/harness/claude_code/settings.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/settings_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/codex/config_tests.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_hook.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_statusline.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_notify.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/render_write.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-home/src/harness/claude_code/template.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | R1: Lys-owned hooks, status line and incremental session-stream tracking | DIRECTORY-051 |
+| `crates/lys-runner/src/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/src/refusal_log.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys/src/commands/runner_judge.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_api.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/agent_policy_store.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/tests/agent_policy.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/src/features/file/AgentPolicy.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `surface/identity/tests/agent-policy.test.tsx` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-runner/tests/judge_peer.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/runner_sessions.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/grant_sight.rs` | R6: Lys creates tool-boundary policy enforcement and shows authoritative refusals | DIRECTORY-051 |
+| `crates/lys-identity-server/src/health_api.rs` | the service's own health answer | DIRECTORY-063 |
+| `crates/lys-identity-server/src/health_api_tests.rs` | the service's own health answer | DIRECTORY-063 |
+| `docs/design/directory/briefs/DIRECTORY-063.json` | the unknown API path and health brief | DIRECTORY-063 |
+| `docs/design/directory/briefs/DIRECTORY-063.md` | the unknown API path and health brief | DIRECTORY-063 |
+| `crates/lys-runner/src/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare_macos.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/src/containment_prepare_linux.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_prepare.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `crates/lys-runner/tests/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `docs/CONTAINMENT-PREPARATION.md` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
+| `scripts/identity-gates/containment-capabilities.sh` | A person watches real native denials and an allowed control. DIRECTORY-062 R6. | DIRECTORY-062 |
 
 ## Inventory
 

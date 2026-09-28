@@ -590,6 +590,34 @@
         {
           "id": "S164",
           "text": "As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable."
+        },
+        {
+          "id": "S172",
+          "text": "As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer."
+        }
+      ]
+    },
+    {
+      "name": "Person waiting on a permission check",
+      "role": "Uses a Lys screen or route that checks a grant",
+      "stories": [
+        {
+          "id": "S169",
+          "text": "As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine."
+        }
+      ]
+    },
+    {
+      "name": "Person running an agent under a policy",
+      "role": "Operates and inspects a runner-owned session",
+      "stories": [
+        {
+          "id": "S170",
+          "text": "As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits."
+        },
+        {
+          "id": "S171",
+          "text": "As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage."
         }
       ]
     }

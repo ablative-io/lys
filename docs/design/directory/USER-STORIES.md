@@ -261,3 +261,15 @@
 **S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
 
 **S164.** As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.
+
+**S172.** As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer.
+
+## Person waiting on a permission check — Uses a Lys screen or route that checks a grant
+
+**S169.** As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine.
+
+## Person running an agent under a policy — Operates and inspects a runner-owned session
+
+**S170.** As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
+
+**S171.** As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
