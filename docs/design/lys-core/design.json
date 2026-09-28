@@ -181,11 +181,11 @@
     },
     {
       "text": "Carrying no-std-mutex-in-async",
-      "reason": "lys has no async fn, no tokio and no std Mutex, so it cannot fire (ADR-055); the card that lands lys's first async code carries it."
+      "reason": "lys has no async fn, no tokio and no std Mutex, so it could not fire (ADR-064). The card that lands the first async code carries it and names ADR-064."
     },
     {
       "text": "Carrying no-timer-in-door-handlers and no-timer-import-in-door-handlers",
-      "reason": "lys has no door handlers, so they cannot fire (ADR-055)."
+      "reason": "Their files are Cambium door-handler paths that lys does not have, so they could not fire (ADR-064)."
     },
     {
       "text": "Tightening #![cfg_attr(not(test), forbid(unsafe_code))] so tests forbid unsafe code too",
@@ -193,7 +193,7 @@
     },
     {
       "text": "Splitting crates/lys-home/src/record/mod.rs",
-      "reason": "Its 47 hits are HOME-013's, which this work waits on."
+      "reason": "HOME-013 owns that split; this card is built on it and lands after it."
     },
     {
       "text": "Correcting CHECKLIST-PRE-METHOD.md's C4",
@@ -212,20 +212,8 @@
       "reason": "Neither project is edited to match the other; lys takes the opposite clippy.toml setting on tests from Cambium's."
     },
     {
-      "text": "Carrying no-std-mutex-in-async",
-      "reason": "lys has no async fn, no tokio and no std Mutex, so it could not fire (ADR-064). The card that lands the first async code carries it and names ADR-064."
-    },
-    {
-      "text": "Carrying no-timer-in-door-handlers and no-timer-import-in-door-handlers",
-      "reason": "Their files are Cambium door-handler paths that lys does not have, so they could not fire (ADR-064)."
-    },
-    {
       "text": "A _name-rename rule and the existing _-prefixed bindings",
       "reason": "Cambium carries no such rule. A card of its own writes the rule and handles each binding by its act."
-    },
-    {
-      "text": "Splitting crates/lys-home/src/record/mod.rs",
-      "reason": "HOME-013 owns that split; this card is built on it and lands after it."
     },
     {
       "text": "Tightening lys-core's unsafe_code attribute so test builds forbid unsafe code too",
@@ -239,42 +227,42 @@
   "structure": [
     {
       "path": "docs/design/lys-core/design.json",
-      "note": "this brief's cluster record; R7 restates the carried design's self-signed sentence and appends this record's principles, constraints, goals, non-goals and inventory under the next free numbers",
-      "brief": "LYSCORE-001"
+      "note": "this design",
+      "brief": "LYSCORE-003"
     },
     {
       "path": "docs/design/lys-core/checklist.json",
-      "note": "the checklist rows LYSCORE-001 delivers; R7 adds them to the carried checklist",
-      "brief": "LYSCORE-001"
+      "note": "the rows LYSCORE-003 delivers",
+      "brief": "LYSCORE-003"
     },
     {
       "path": "docs/design/lys-core/stories.json",
-      "note": "the stories LYSCORE-001 serves",
-      "brief": "LYSCORE-001"
+      "note": "the stories LYSCORE-003 serves",
+      "brief": "LYSCORE-003"
     },
     {
       "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
-      "note": "the brief: self-signed by keys, the verifier's caveat, and their consumers",
+      "note": "The ast-grep leg brief",
       "brief": "LYSCORE-001"
     },
     {
       "path": "docs/design/lys-core/DESIGN.md",
-      "note": "rendered from design.json; R7 commits the render",
-      "brief": "LYSCORE-001"
+      "note": "rendered from design.json once the hand-written file is renamed away",
+      "brief": ""
     },
     {
       "path": "docs/design/lys-core/CHECKLIST.md",
-      "note": "rendered from checklist.json; R7 commits the render",
-      "brief": "LYSCORE-001"
+      "note": "rendered from checklist.json once the hand-written file is renamed away",
+      "brief": ""
     },
     {
       "path": "docs/design/lys-core/USER-STORIES.md",
-      "note": "rendered from stories.json; R7 commits the render",
-      "brief": "LYSCORE-001"
+      "note": "rendered from stories.json once the hand-written file is renamed away",
+      "brief": ""
     },
     {
       "path": "crates/lys-core/src/ca/authority.rs",
-      "note": "issuance and chain verification; the self-signed judgement and the verifier rustdoc",
+      "note": "CertificateAuthority: issue, verify chain, _at variant (D3)",
       "brief": ""
     },
     {
@@ -309,7 +297,7 @@
     },
     {
       "path": "crates/lys-core/Cargo.toml",
-      "note": "",
+      "note": "lys-core's manifest; its dev-dependencies lose serial_test",
       "brief": ""
     },
     {
@@ -339,7 +327,7 @@
     },
     {
       "path": "crates/lys-core/src/lib.rs",
-      "note": "pub mod + re-exports, hex_lower helper (D1)",
+      "note": "crate root; hex_lower, and the comment above the unsafe_code attribute",
       "brief": ""
     },
     {
@@ -359,12 +347,12 @@
     },
     {
       "path": "crates/lys-core/src/keys/identity.rs",
-      "note": "Ed25519Identity: load_or_generate, from_env, sign, verify_strict, X25519 derivation, redaction (D2)",
+      "note": "Ed25519Identity, including from_env",
       "brief": ""
     },
     {
       "path": "crates/lys-core/src/keys/identity_tests.rs",
-      "note": "",
+      "note": "The env-backed tests call the seam; no set_var, remove_var, unsafe or #[serial]",
       "brief": ""
     },
     {
@@ -375,11 +363,6 @@
     {
       "path": "crates/lys-core/src/ca/mod.rs",
       "note": "pub mod / pub use only",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src/ca/authority.rs",
-      "note": "CertificateAuthority: issue, verify chain, _at variant (D3)",
       "brief": ""
     },
     {
@@ -629,7 +612,7 @@
     },
     {
       "path": "crates/lys/src/commands/hex.rs",
-      "note": "hex parsing/formatting helpers (D8)",
+      "note": "the CLI's hex helper",
       "brief": ""
     },
     {
@@ -678,434 +661,14 @@
       "brief": ""
     },
     {
-      "path": "docs/design/lys-core/design.json",
-      "note": "the lys-core design, carried from main's DESIGN.md",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN.md",
-      "note": "rendered markdown",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/checklist.json",
-      "note": "the lys-core checklist, carried from main's CHECKLIST.md",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST.md",
-      "note": "rendered markdown",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/stories.json",
-      "note": "the lys-core user stories, carried from main's USER-STORIES.md",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES.md",
-      "note": "rendered markdown",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
-      "note": "the brief that carries the hand-written lys-core design into the three JSON documents",
-      "brief": "LYSCORE-001"
-    },
-    {
       "path": "docs/design/lys-core/briefs/LYSCORE-001.md",
-      "note": "rendered markdown",
+      "note": "Its rendered markdown",
       "brief": "LYSCORE-001"
     },
     {
       "path": "rules/ast-grep/no-underscore-binding.yml",
       "note": "lys's rule refusing an underscore-prefixed binding, severity error, vendor/** ignored",
       "brief": "LYSCORE-002"
-    },
-    {
-      "path": "sgconfig.yml",
-      "note": "ast-grep root config naming rules/ast-grep; landed by LYSCORE-001 (brief 6747ce61), unchanged here",
-      "brief": ""
-    },
-    {
-      "path": "rules/ast-grep",
-      "note": "lys's ast-grep rule directory; landed by LYSCORE-001 (brief 6747ce61)",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/design.json",
-      "note": "this design",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/checklist.json",
-      "note": "the rows LYSCORE-002 delivers",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/stories.json",
-      "note": "the stories LYSCORE-002 serves",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-002.json",
-      "note": "the brief",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN.md",
-      "note": "rendered from design.json",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST.md",
-      "note": "rendered from checklist.json",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES.md",
-      "note": "rendered from stories.json",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-002.md",
-      "note": "rendered from the brief",
-      "brief": "LYSCORE-002"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
-      "note": "the hand-written pre-method design, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
-      "note": "the hand-written pre-method checklist, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
-      "note": "the hand-written pre-method stories, renamed by LYSCORE-001 (brief 6747ce61, ADR-045), content unchanged",
-      "brief": ""
-    },
-    {
-      "path": "Cargo.toml",
-      "note": "workspace lint table; map_err_ignore and used_underscore_binding at warn, unchanged",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src",
-      "note": "lys-core library and sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/tests",
-      "note": "lys-core integration and conformance tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/src",
-      "note": "lys-anchor library and sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/tests",
-      "note": "lys-anchor integration and conformance tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/src",
-      "note": "the anchor CLI and its sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/tests",
-      "note": "the anchor CLI's integration tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/src",
-      "note": "lys-home library and sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/tests",
-      "note": "lys-home integration tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src",
-      "note": "lys-log-store library, its published LeafStore trait and sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys/src",
-      "note": "the lys CLI",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys/tests",
-      "note": "the lys CLI's integration tests",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/design.json",
-      "note": "This design",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/checklist.json",
-      "note": "The rows LYSCORE-001 delivers",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/stories.json",
-      "note": "The stories LYSCORE-001 serves",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-001.json",
-      "note": "The ast-grep leg brief",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-001.md",
-      "note": "Its rendered markdown",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN.md",
-      "note": "The rendering of design.json, committed with the brief; R1 checks it",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST.md",
-      "note": "The rendering of checklist.json, committed with the brief; R1 checks it",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES.md",
-      "note": "The rendering of stories.json, committed with the brief; R1 checks it",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
-      "note": "The hand-written lys-core design, renamed in the brief's own commit and kept byte for byte as it stood at 7b53625",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
-      "note": "The hand-written lys-core checklist (C1 to C65 of the extraction), renamed in the brief's own commit and kept byte for byte; its C4 sentence is not borne out by the code after R5",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
-      "note": "The hand-written lys-core user stories, renamed in the brief's own commit and kept byte for byte",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "sgconfig.yml",
-      "note": "ast-grep project config naming rules/ast-grep as its one rule directory",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "rules/ast-grep/mod-rs-declarations-only.yml",
-      "note": "Carried from Cambium: mod.rs holds no function, struct, enum, trait, impl, const or static",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "rules/ast-grep/no-let-underscore-on-results.yml",
-      "note": "Carried from Cambium: no `let _ =` discard",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "rules/ast-grep/no-lint-bypass-attributes.yml",
-      "note": "Carried from Cambium: no #[allow], #![allow], #[expect] or #[ignore]",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "rules/ast-grep/no-unwrap-expect-panic-outside-tests.yml",
-      "note": "New: unwrap, expect and panic reported everywhere except test code recognised by structure",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "clippy.toml",
-      "note": "allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests set to true",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "crates/lys-core/tests/harness/go.rs",
-      "note": "The Go-toolchain logic moved out of lys-core's tests/harness/mod.rs",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "crates/lys-anchor/tests/harness/go.rs",
-      "note": "The Go-toolchain logic moved out of lys-anchor's tests/harness/mod.rs",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "crates/lys-anchor/tests/harness/scaffold.rs",
-      "note": "GO_ENV, GoScaffold, ALL_SCAFFOLDS and the path to lys-core's harness, moved out of lys-anchor's tests/harness/mod.rs",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "crates/lys-anchor/tests/harness/scaffold_tests.rs",
-      "note": "The two contract tests moved out of lys-anchor's tests/harness/mod.rs",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "crates/lys-home/src/harness/claude_code/names.rs",
-      "note": "HARNESS, PROVIDER, API and AUTHORED, moved out of claude_code/mod.rs",
-      "brief": "LYSCORE-001"
-    },
-    {
-      "path": "docs/design/project.json",
-      "note": "The tree's gate legs; gains the ast-grep leg",
-      "brief": ""
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "The whole gate the landing runs; gains `leg ast-grep scan --config sgconfig.yml`",
-      "brief": ""
-    },
-    {
-      "path": ".github/workflows/ci.yml",
-      "note": "CI; gains a pinned ast-grep install and the same scan",
-      "brief": ""
-    },
-    {
-      "path": "CLAUDE.md",
-      "note": "The test opt-out sentence and the gates block, corrected",
-      "brief": ""
-    },
-    {
-      "path": "Cargo.toml",
-      "note": "The workspace lint comment, corrected to name clippy.toml; the serial_test workspace dev-dependency, removed",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/Cargo.toml",
-      "note": "The serial_test dev-dependency, removed with the last #[serial_test::serial]",
-      "brief": ""
-    },
-    {
-      "path": "Cargo.lock",
-      "note": "Regenerated by cargo without serial_test and serial_test_derive",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src/lib.rs",
-      "note": "The comment above #![cfg_attr(not(test), forbid(unsafe_code))], rewritten; the attribute stays byte-identical; hex_lower's line 59 takes a form that returns no Result and line 54's import goes",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity.rs",
-      "note": "Ed25519Identity::from_env reads the variable and hands the result to a private seam the tests feed",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity_tests.rs",
-      "note": "The env-backed tests call the seam; no set_var, remove_var, unsafe or #[serial]",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys/src/commands/hex.rs",
-      "note": "hex_lower writes without a Result",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/src/commands/hex.rs",
-      "note": "hex_lower writes without a Result",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
-      "note": "Declarations and re-exports only after R6",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/tests/harness/mod.rs",
-      "note": "Declarations and re-exports only after R6, first line #![cfg(test)]",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/tests/harness/mod.rs",
-      "note": "Declarations and re-exports only after R6, first line #![cfg(test)]",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/src/upward/fixture.rs",
-      "note": "Test fixture; first line becomes #![cfg(test)]",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/src/witness/fixture.rs",
-      "note": "Test fixture; first line becomes #![cfg(test)]",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys/src",
-      "note": "lys sources; its 10 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys/tests",
-      "note": "lys integration tests; its 4 roots gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/src",
-      "note": "lys-anchor sources; its 17 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor/tests",
-      "note": "lys-anchor integration tests; its 5 roots gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/src",
-      "note": "lys-anchor-cli sources; its 6 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/tests",
-      "note": "lys-anchor-cli integration tests; its 1 roots gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src",
-      "note": "lys-core sources; its 33 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/tests",
-      "note": "lys-core integration tests; its 11 roots gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/src",
-      "note": "lys-home sources; its 20 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/tests",
-      "note": "lys-home integration tests; its 7 roots gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src",
-      "note": "lys-log-store sources; its 2 sibling *_tests.rs files gain #![cfg(test)] as their first line",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/roadmap.json",
-      "note": "RM-035 carries this work",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/decisions.json",
-      "note": "ADR-054 and ADR-055",
-      "brief": ""
     },
     {
       "path": "sgconfig.yml",
@@ -1116,6 +679,91 @@
       "path": "rules/ast-grep",
       "note": "lys's ast-grep rule directory, one <rule id>.yml per carried rule",
       "brief": "LYSCORE-003"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-002.json",
+      "note": "the brief",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/briefs/LYSCORE-002.md",
+      "note": "rendered from the brief",
+      "brief": "LYSCORE-002"
+    },
+    {
+      "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
+      "note": "the hand-written pre-method design, renamed with its bytes unchanged",
+      "brief": "LYSCORE-003"
+    },
+    {
+      "path": "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
+      "note": "the hand-written pre-method checklist C85 to C65, renamed with its bytes unchanged",
+      "brief": "LYSCORE-003"
+    },
+    {
+      "path": "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
+      "note": "the hand-written pre-method stories S30 to S23, renamed with its bytes unchanged",
+      "brief": "LYSCORE-003"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "workspace lint table, whose unwrap/expect/panic comment names clippy.toml, and workspace dependencies, which lose serial_test",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src",
+      "note": "lys-core; sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/tests",
+      "note": "lys-core's integration tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/src",
+      "note": "lys-anchor; sibling *_tests.rs files and the two fixture.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor/tests",
+      "note": "lys-anchor's integration tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor-cli/src",
+      "note": "the anchor CLI crate; sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-anchor-cli/tests",
+      "note": "the anchor CLI's integration tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-home/src",
+      "note": "lys-home; sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-home/tests",
+      "note": "lys-home's integration tests",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-log-store/src",
+      "note": "lys-log-store; sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src",
+      "note": "the CLI crate; sibling *_tests.rs files",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests",
+      "note": "the CLI's integration tests",
+      "brief": ""
     },
     {
       "path": "rules/ast-grep/mod-rs-declarations-only.yml",
@@ -1153,64 +801,19 @@
       "brief": "LYSCORE-003"
     },
     {
+      "path": "crates/lys-anchor/tests/harness/scaffold.rs",
+      "note": "GO_ENV, GoScaffold, ALL_SCAFFOLDS and the path to lys-core's harness, moved out of lys-anchor's tests/harness/mod.rs",
+      "brief": "LYSCORE-001"
+    },
+    {
+      "path": "crates/lys-anchor/tests/harness/scaffold_tests.rs",
+      "note": "The two contract tests moved out of lys-anchor's tests/harness/mod.rs",
+      "brief": "LYSCORE-001"
+    },
+    {
       "path": "crates/lys-home/src/harness/claude_code/names.rs",
       "note": "the HARNESS, PROVIDER, API and AUTHORED constants, moved out of claude_code/mod.rs",
       "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
-      "note": "the hand-written pre-method design, renamed with its bytes unchanged",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST-PRE-METHOD.md",
-      "note": "the hand-written pre-method checklist C85 to C65, renamed with its bytes unchanged",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES-PRE-METHOD.md",
-      "note": "the hand-written pre-method stories S30 to S23, renamed with its bytes unchanged",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/design.json",
-      "note": "this design",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/checklist.json",
-      "note": "the rows LYSCORE-003 delivers",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/stories.json",
-      "note": "the stories LYSCORE-003 serves",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-003.json",
-      "note": "the brief",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/briefs/LYSCORE-003.md",
-      "note": "the brief, rendered",
-      "brief": "LYSCORE-003"
-    },
-    {
-      "path": "docs/design/lys-core/DESIGN.md",
-      "note": "rendered from design.json once the hand-written file is renamed away",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/CHECKLIST.md",
-      "note": "rendered from checklist.json once the hand-written file is renamed away",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-core/USER-STORIES.md",
-      "note": "rendered from stories.json once the hand-written file is renamed away",
-      "brief": ""
     },
     {
       "path": "docs/design/project.json",
@@ -1233,33 +836,18 @@
       "brief": ""
     },
     {
-      "path": "Cargo.toml",
-      "note": "workspace lint table, whose unwrap/expect/panic comment names clippy.toml, and workspace dependencies, which lose serial_test",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/Cargo.toml",
-      "note": "lys-core's manifest; its dev-dependencies lose serial_test",
-      "brief": ""
-    },
-    {
       "path": "Cargo.lock",
       "note": "the resolved dependency graph, without serial_test and the packages only it pulled in",
       "brief": ""
     },
     {
-      "path": "docs/PEN-REGISTRATION.md",
-      "note": "cites the pre-method lys-core design and checklist by path",
+      "path": "crates/lys-anchor-cli/src/commands/hex.rs",
+      "note": "the anchor CLI's hex helper",
       "brief": ""
     },
     {
-      "path": "crates/lys-core/src/lib.rs",
-      "note": "crate root; hex_lower, and the comment above the unsafe_code attribute",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity.rs",
-      "note": "Ed25519Identity, including from_env",
+      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
+      "note": "the Claude Code profile module; four constants in a mod.rs today",
       "brief": ""
     },
     {
@@ -1273,68 +861,38 @@
       "brief": ""
     },
     {
-      "path": "crates/lys-home/src/harness/claude_code/mod.rs",
-      "note": "the Claude Code profile module; four constants in a mod.rs today",
+      "path": "crates/lys-anchor/src/upward/fixture.rs",
+      "note": "Test fixture; first line becomes #![cfg(test)]",
       "brief": ""
     },
     {
-      "path": "crates/lys/src/commands/hex.rs",
-      "note": "the CLI's hex helper",
+      "path": "crates/lys-anchor/src/witness/fixture.rs",
+      "note": "Test fixture; first line becomes #![cfg(test)]",
       "brief": ""
     },
     {
-      "path": "crates/lys-anchor-cli/src/commands/hex.rs",
-      "note": "the anchor CLI's hex helper",
+      "path": "docs/design/roadmap.json",
+      "note": "RM-035 carries this work",
       "brief": ""
     },
     {
-      "path": "crates/lys/src",
-      "note": "the CLI crate; sibling *_tests.rs files",
+      "path": "docs/design/decisions.json",
+      "note": "ADR-054 and ADR-055",
       "brief": ""
     },
     {
-      "path": "crates/lys/tests",
-      "note": "the CLI's integration tests",
-      "brief": ""
+      "path": "docs/design/lys-core/briefs/LYSCORE-003.json",
+      "note": "the brief",
+      "brief": "LYSCORE-003"
     },
     {
-      "path": "crates/lys-anchor/src",
-      "note": "lys-anchor; sibling *_tests.rs files and the two fixture.rs files",
-      "brief": ""
+      "path": "docs/design/lys-core/briefs/LYSCORE-003.md",
+      "note": "the brief, rendered",
+      "brief": "LYSCORE-003"
     },
     {
-      "path": "crates/lys-anchor/tests",
-      "note": "lys-anchor's integration tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-anchor-cli/src",
-      "note": "the anchor CLI crate; sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/src",
-      "note": "lys-core; sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-core/tests",
-      "note": "lys-core's integration tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/src",
-      "note": "lys-home; sibling *_tests.rs files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-home/tests",
-      "note": "lys-home's integration tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src",
-      "note": "lys-log-store; sibling *_tests.rs files",
+      "path": "docs/PEN-REGISTRATION.md",
+      "note": "cites the pre-method lys-core design and checklist by path",
       "brief": ""
     },
     {
@@ -1403,11 +961,11 @@
     },
     {
       "path": "crates",
-      "note": "At 7b53625 this card's rule reports 303 underscore-prefixed bindings in 70 files: 59 guards whose directory or state is still used, in 11 files (55 TempDir holders and four EnvCleanup guards in lys-core keys/identity_tests.rs), 68 discarded errors in 28 files (64 map_err closures, one or_else closure, three match arms), 164 unused values in 34 files (105 of them TempDirs returned beside an identity or authority already loaded into memory, 57 from golden_identity), 10 ignored trait parameters in 5 files and 2 cfg(not(unix)) stub parameters. Every underscore-prefixed identifier in the tree that is not a struct field is one of the 303; nine underscore-prefixed struct fields are not, the eight fixture TempDir fields and PhantomData's _marker."
+      "note": "333 Rust files under crates/ and tests/ in eight workspace members; no async fn, no tokio and no std Mutex or RwLock. At 4dd1c33 the lys rules report 113 lint-bypass hits (106 test opt-outs and seven #[allow(unsafe_code)] in lys-core keys/identity_tests.rs, none outside test code), 19 let-underscore hits in 18 files, 20 mod-rs hits in three files and 224 unwrap/expect/panic hits in 49 files (22 in the two fixture.rs files, 202 in helper fns of 47 *_tests.rs files, none in library code)."
     },
     {
       "path": "Cargo.toml",
-      "note": "[workspace.lints.clippy]: pedantic at warn, map_err_ignore = \"warn\" (line 87), used_underscore_binding = \"warn\" (line 108), all failing under -D warnings."
+      "note": "Workspace lints: unwrap_used, expect_used and panic at warn, under a comment saying tests opt out per module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]."
     },
     {
       "path": "crates/lys-core/src/tlog/verify.rs",
@@ -1447,11 +1005,11 @@
     },
     {
       "path": "crates/lys-core/src/keys/identity.rs",
-      "note": "Line 431: #[cfg(not(unix))] fn warn_if_loose_permissions(_path: &Path) {}; no gate host compiles it. Also seven discarded-error sites."
+      "note": "from_env (line 241) reads LYS_IDENTITY_KEY with std::env::var and decodes it in place"
     },
     {
       "path": "crates/lys-core/src/keys/identity_tests.rs",
-      "note": "Four `let _guard = EnvCleanup;` guards over the from_env tests; LYSCORE-001 plans to remove the environment mutation they guard."
+      "note": "Five from_env tests mutate LYS_IDENTITY_KEY with std::env::set_var/remove_var under seven #[allow(unsafe_code)] lines, #[serial_test::serial] and an EnvCleanup guard."
     },
     {
       "path": "crates (test fixture structs)",
@@ -1463,27 +1021,27 @@
     },
     {
       "path": "sgconfig.yml",
-      "note": "Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates it."
+      "note": "Absent."
     },
     {
       "path": "rules",
-      "note": "Absent at 7b53625; LYSCORE-001 (brief 6747ce61) creates rules/ast-grep."
+      "note": "Absent."
     },
     {
       "path": "docs/design/project.json",
-      "note": "Seven legs; no ast-grep leg at 7b53625. LYSCORE-001 adds `ast-grep scan --config sgconfig.yml` here, in .land/gates.sh and in CI."
+      "note": "One tree '.' with seven legs (fmt, clippy-all-features, clippy, tests, doc-all-features, doc, design); no ast-grep leg."
     },
     {
       "path": "CLAUDE.md",
-      "note": "Coding standards: silencing a lint with #[allow], an #[ignore]d test, a _-prefixed unused variable or #[cfg(any())] is a bypass, not a fix."
+      "note": "Coding standards: tests opt out per module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]; the same file calls #[allow], #[ignore], _-prefixed variables and #[cfg(any())] a bypass."
     },
     {
       "path": "docs/design/lys-core",
-      "note": "Hand-written pre-method DESIGN.md, CHECKLIST.md (C1 to C65) and USER-STORIES.md (S1 to S23), renamed *-PRE-METHOD.md with their content unchanged as LYSCORE-001 (ADR-045) does, so this cluster's rendered DESIGN.md, CHECKLIST.md and USER-STORIES.md take the plain names."
+      "note": "Pre-method cluster: DESIGN.md (255 lines), CHECKLIST.md (C85 to C65), USER-STORIES.md (S30 to S23); no design.json before this design."
     },
     {
       "path": "$cambium/rules/ast-grep",
-      "note": "Six rules, none refusing underscore-prefixed bindings. Read only."
+      "note": "Six error-severity rules at 1be80d8ec, unchanged since df4dca5: mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers. No unwrap/expect/panic rule and no _name rule. Read only."
     },
     {
       "path": "docs/design/lys-core/DESIGN-PRE-METHOD.md",
@@ -1498,24 +1056,16 @@
       "note": "Renamed byte for byte from USER-STORIES.md in the brief's own commit. Hand-written stories S1 to S23 (55 lines)"
     },
     {
-      "path": "docs/design/project.json",
-      "note": "Seven gate legs (fmt, clippy-all-features, clippy, tests, doc-all-features, doc, design); no ast-grep leg"
-    },
-    {
       "path": ".land/gates.sh",
-      "note": "Seven `leg` lines, run by the landing as the whole gate; no ast-grep"
+      "note": "The gate repo_land runs as the whole gate: gate.sh, cargo fmt --check, both clippies, the tests and both cargo doc runs. No ast-grep line."
     },
     {
       "path": ".github/workflows/ci.yml",
-      "note": "fmt, clippy and test steps on ubuntu-latest; ast-grep not installed"
+      "note": "Job test runs fmt, clippy and tests; job audit runs cargo-deny. No ast-grep install and no scan."
     },
     {
       "path": "scripts/design/gate.sh",
-      "note": "Validates, checks coverage of, and byte-compares the rendering of every cluster with a design.json; lys-core has none yet"
-    },
-    {
-      "path": "sgconfig.yml",
-      "note": "Absent"
+      "note": "Validates decisions.json and project.json and, for every cluster with a design.json, validates it, checks its coverage and compares its rendered markdown byte for byte. It runs no leg's command."
     },
     {
       "path": "rules/ast-grep",
@@ -1523,35 +1073,19 @@
     },
     {
       "path": "clippy.toml",
-      "note": "Absent"
-    },
-    {
-      "path": "Cargo.toml",
-      "note": "Lines 69-70 say tests opt out per-module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]; unsafe_code = \"deny\"; unwrap_used, expect_used and panic warn"
-    },
-    {
-      "path": "CLAUDE.md",
-      "note": "Line 35 says tests opt out per-module with #![allow]; the gates block lists six commands under 'All five clean' and no ast-grep"
+      "note": "Absent."
     },
     {
       "path": "crates/lys-core/src/lib.rs",
-      "note": "Lines 27-30 explain the relaxed forbid through the set_var tests' #[allow(unsafe_code)]; line 31 is the attribute; line 59 is `let _ = s.write_fmt(...)` in hex_lower, and line 54 is the `use std::fmt::Write;` that write needs"
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity.rs",
-      "note": "from_env (line 241) reads LYS_IDENTITY_KEY with std::env::var and decodes it in place"
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity_tests.rs",
-      "note": "Five #[serial] env tests and the EnvCleanup guard carry the 7 #[allow(unsafe_code)] around set_var and remove_var (lines 847-1068)"
+      "note": "Lines 27-30 say test builds relax forbid because the env-backed tests call set_var under #[allow(unsafe_code)]; line 59 discards the Result of a String write."
     },
     {
       "path": "crates/lys-anchor/src/upward/fixture.rs",
-      "note": "First line #![allow(clippy::unwrap_used, ...)]; declared only as #[cfg(test)] mod from pin.rs; 7 unwrap/expect/panic calls"
+      "note": "Line 1 is the opt-out; 7 unwrap/expect/panic calls; declared from pin.rs as a #[cfg(test)] #[path] mod."
     },
     {
       "path": "crates/lys-anchor/src/witness/fixture.rs",
-      "note": "First line #![allow(clippy::unwrap_used, ...)]; declared only as #[cfg(test)] mod from report.rs; 15 unwrap/expect/panic calls"
+      "note": "Line 1 is the opt-out; 15 unwrap/expect/panic calls; declared from report.rs as a #[cfg(test)] #[path] mod."
     },
     {
       "path": "crates/*/src/**/*_tests.rs",
@@ -1567,7 +1101,7 @@
     },
     {
       "path": "crates/lys-anchor/tests/harness/mod.rs",
-      "note": "252 lines, #![allow] at line 45, 12 mod-rs-declarations-only hits including two #[test] fns"
+      "note": "Reads ../lys-core/tests/harness/mod.rs as text in a contract test that checks lys-core's Go environment clauses."
     },
     {
       "path": "crates/lys-home/src/harness/claude_code/mod.rs",
@@ -1575,7 +1109,7 @@
     },
     {
       "path": "crates/lys-home/src/record/mod.rs",
-      "note": "630 lines, 47 mod-rs-declarations-only hits covering 521 lines on origin/main at 7b53625; split by HOME-013, not here"
+      "note": "47 mod-rs hits on main at 7b53625; 0 at 4dd1c33, where HOME-013 moved its logic into home.rs, session.rs and helpers.rs."
     },
     {
       "path": "crates/lys/src/commands/hex.rs",
@@ -1587,7 +1121,7 @@
     },
     {
       "path": "vendor/rauthy",
-      "note": "Pinned Rauthy submodule (ADR-009), not initialised in a fresh clone"
+      "note": "A git submodule, empty until initialised; once initialised its Rust sources sit under the scan root, and ast-grep walks into it."
     },
     {
       "path": "$cambium/rules/ast-grep/mod-rs-declarations-only.yml",
@@ -1614,76 +1148,12 @@
       "note": "Not carried: lys has no door handlers"
     },
     {
-      "path": "docs/design/project.json",
-      "note": "One tree '.' with seven legs (fmt, clippy-all-features, clippy, tests, doc-all-features, doc, design); no ast-grep leg."
-    },
-    {
-      "path": "scripts/design/gate.sh",
-      "note": "Validates decisions.json and project.json and, for every cluster with a design.json, validates it, checks its coverage and compares its rendered markdown byte for byte. It runs no leg's command."
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "The gate repo_land runs as the whole gate: gate.sh, cargo fmt --check, both clippies, the tests and both cargo doc runs. No ast-grep line."
-    },
-    {
-      "path": ".github/workflows/ci.yml",
-      "note": "Job test runs fmt, clippy and tests; job audit runs cargo-deny. No ast-grep install and no scan."
-    },
-    {
-      "path": "sgconfig.yml",
-      "note": "Absent."
-    },
-    {
-      "path": "rules",
-      "note": "Absent."
-    },
-    {
-      "path": "clippy.toml",
-      "note": "Absent."
-    },
-    {
-      "path": "Cargo.toml",
-      "note": "Workspace lints: unwrap_used, expect_used and panic at warn, under a comment saying tests opt out per module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]."
-    },
-    {
-      "path": "CLAUDE.md",
-      "note": "Coding standards: tests opt out per module with #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]; the same file calls #[allow], #[ignore], _-prefixed variables and #[cfg(any())] a bypass."
-    },
-    {
-      "path": "crates",
-      "note": "333 Rust files under crates/ and tests/ in eight workspace members; no async fn, no tokio and no std Mutex or RwLock. At 4dd1c33 the lys rules report 113 lint-bypass hits (106 test opt-outs and seven #[allow(unsafe_code)] in lys-core keys/identity_tests.rs, none outside test code), 19 let-underscore hits in 18 files, 20 mod-rs hits in three files and 224 unwrap/expect/panic hits in 49 files (22 in the two fixture.rs files, 202 in helper fns of 47 *_tests.rs files, none in library code)."
-    },
-    {
       "path": "crates/**/*_tests.rs",
       "note": "104 files: sibling test files under src/ included by a #[cfg(test)] mod in their parent, and four integration test roots under crates/lys/tests. None begins with #![cfg(test)]; 82 carry the unwrap/expect/panic opt-out."
     },
     {
-      "path": "crates/lys-anchor/src/witness/fixture.rs",
-      "note": "Line 1 is the opt-out; 15 unwrap/expect/panic calls; declared from report.rs as a #[cfg(test)] #[path] mod."
-    },
-    {
-      "path": "crates/lys-anchor/src/upward/fixture.rs",
-      "note": "Line 1 is the opt-out; 7 unwrap/expect/panic calls; declared from pin.rs as a #[cfg(test)] #[path] mod."
-    },
-    {
       "path": "crates/*/tests and tests/*/tests (31 roots and two harness modules not named *_tests.rs)",
       "note": "Integration test roots and the two tests/harness/mod.rs files. 22 of them carry the opt-out, and their helper fns are not test code to clippy unless the file is marked."
-    },
-    {
-      "path": "crates/lys-home/src/record/mod.rs",
-      "note": "47 mod-rs hits on main at 7b53625; 0 at 4dd1c33, where HOME-013 moved its logic into home.rs, session.rs and helpers.rs."
-    },
-    {
-      "path": "crates/lys-anchor/tests/harness/mod.rs",
-      "note": "Reads ../lys-core/tests/harness/mod.rs as text in a contract test that checks lys-core's Go environment clauses."
-    },
-    {
-      "path": "crates/lys-core/src/keys/identity_tests.rs",
-      "note": "Five from_env tests mutate LYS_IDENTITY_KEY with std::env::set_var/remove_var under seven #[allow(unsafe_code)] lines, #[serial_test::serial] and an EnvCleanup guard."
-    },
-    {
-      "path": "docs/design/lys-core",
-      "note": "Pre-method cluster: DESIGN.md (255 lines), CHECKLIST.md (C85 to C65), USER-STORIES.md (S30 to S23); no design.json before this design."
     },
     {
       "path": "crates/lys-core/tests/seal_derivation.rs",
@@ -1694,20 +1164,8 @@
       "note": "Line 50 cites docs/design/lys-core/DESIGN.md and docs/design/lys-core/CHECKLIST.md."
     },
     {
-      "path": "crates/lys-core/src/lib.rs",
-      "note": "Lines 27-30 say test builds relax forbid because the env-backed tests call set_var under #[allow(unsafe_code)]; line 59 discards the Result of a String write."
-    },
-    {
-      "path": "vendor/rauthy",
-      "note": "A git submodule, empty until initialised; once initialised its Rust sources sit under the scan root, and ast-grep walks into it."
-    },
-    {
       "path": "$cambium/sgconfig.yml",
       "note": "ruleDirs: rules/ast-grep. Read only."
-    },
-    {
-      "path": "$cambium/rules/ast-grep",
-      "note": "Six error-severity rules at 1be80d8ec, unchanged since df4dca5: mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers. No unwrap/expect/panic rule and no _name rule. Read only."
     }
   ],
   "constraints": [
@@ -1821,75 +1279,6 @@
     }
   ],
   "gate": [
-    {
-      "tree": ".",
-      "shorthand": {
-        "rust-build": [
-          "toolchain:rust",
-          "lockfile:Cargo.lock"
-        ]
-      },
-      "legs": [
-        {
-          "name": "fmt",
-          "command": "cargo fmt --all",
-          "requires": [
-            "tool:cargo",
-            "tool:rustfmt"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "clippy-all-features",
-          "command": "cargo clippy --all-targets --all-features -- -D warnings",
-          "requires": [
-            "rust-build"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "clippy",
-          "command": "cargo clippy --all-targets -- -D warnings",
-          "requires": [
-            "rust-build"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "tests",
-          "command": "cargo test --workspace --all-features",
-          "requires": [
-            "rust-build"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "doc-all-features",
-          "command": "cargo doc --no-deps --all-features",
-          "requires": [
-            "rust-build"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "doc",
-          "command": "cargo doc --no-deps",
-          "requires": [
-            "rust-build"
-          ],
-          "cadence": "round"
-        },
-        {
-          "name": "design",
-          "command": "sh scripts/design/gate.sh",
-          "requires": [
-            "tool:sh",
-            "tool:python3"
-          ],
-          "cadence": "round"
-        }
-      ]
-    },
     {
       "tree": ".",
       "shorthand": {

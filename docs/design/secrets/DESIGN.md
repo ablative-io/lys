@@ -55,10 +55,8 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - OpenBao or another external secrets engine — Tom's model is built in Rust inside the door; an external engine is only reconsidered if credentials minted on demand are needed.
 - The seat login through a proxy handle and base URL — Not tested with a subscription login; the statement keeps it open to prove later and nothing depends on it.
 - The delegation schema — The statement says it is not settled.
-- OpenBao or another external secrets engine — Tom's model is a broker built in Rust (ADR-001); ADR-019, proposed and waiting on his word, amends where it is built, from inside the door to lys as crates/lys-secrets. An external engine is only reconsidered if credentials minted on demand are needed.
 - A signed lease format, a new version beside lys/delegation/v1 — ADR-020: the lease is a broker record read only by the broker; a lease a stranger verifies offline is a new brief with its own adversarial review.
 - A release and demonstration row for the broker — SECRETS-003's words list its rows, and a release row is not among them; it would come from a later roadmap decision.
-- OpenBao or another external secrets engine — Tom's model is a broker built in Rust (ADR-001); ADR-019, decided, amends where it is built, from inside the door to lys as crates/lys-secrets. An external engine is only reconsidered if credentials minted on demand are needed.
 
 ## Structure
 
@@ -81,17 +79,17 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `docs/design/secrets/CONTRACT.md` | SECRETS-003 R2: the invariant, the key custody, the handle, the lease, the cancellation rule, the SpiceDB relations, the sealed-record binding and the audit line | SECRETS-003 |
 | `docs/design/secrets/reports/SECRETS-003-adversarial-review.md` | SECRETS-003 R2: every attack tried against the contract and the clause defeating each | SECRETS-003 |
 | `Cargo.toml` | the workspace manifest; gains crates/lys-secrets as a member (SECRETS-003 R3) | SECRETS-003 |
-| `Cargo.lock` | the workspace lockfile (SECRETS-003 R3, R4 and R5) | SECRETS-003 |
-| `crates/lys-secrets/Cargo.toml` | the broker crate's manifest (SECRETS-003 R3, R4 and R5) | SECRETS-003 |
-| `crates/lys-secrets/src/lib.rs` | module declarations and the crate's invariant docs | SECRETS-003 |
+| `Cargo.lock` | the workspace lockfile; gains the HTTP routing dependencies of crates/lys-secrets (SECRETS-004 R4) and the lys-secrets dependency of crates/lys-identity-server (SECRETS-004 R7) | SECRETS-004 |
+| `crates/lys-secrets/Cargo.toml` | the broker crate's manifest, created by SECRETS-003; gains the HTTP routing dependencies (SECRETS-004 R4) | SECRETS-003 |
+| `crates/lys-secrets/src/lib.rs` | the broker crate's module declarations, created by SECRETS-003; declares the SECRETS-004 modules (SECRETS-004 R3 to R7) and re-exports the lease record as lys_secrets::Lease (SECRETS-004 R5) | SECRETS-003 |
 | `crates/lys-secrets/src/error.rs` | the broker's error type; no credential byte in any variant | SECRETS-003 |
-| `crates/lys-secrets/src/secret.rs` | the one redacting type that holds every credential byte and every raw handle byte | SECRETS-003 |
-| `crates/lys-secrets/src/store.rs` | the encrypted store of real credentials | SECRETS-003 |
+| `crates/lys-secrets/src/secret.rs` | the redacting type for credential bytes, created by SECRETS-003; its fields unchanged, it gains only the declaration of its test module (SECRETS-004 R3) | SECRETS-003 |
+| `crates/lys-secrets/src/store.rs` | the encrypted store, created by SECRETS-003; each secret record, the entry that carries its owning identity, gains its scope and its team (SECRETS-004 R3) | SECRETS-003 |
 | `crates/lys-secrets/src/key_rotation.rs` | store-key rotation: every entry resealed to the new key, the old key refused by name, one audit line naming both key ids | SECRETS-003 |
 | `crates/lys-secrets/src/handle.rs` | handles bound to one identity, issued, resolved and dropped | SECRETS-003 |
-| `crates/lys-secrets/src/lease.rs` | the lease record: uses, time window, spend, the atomic use step and the retry outcome | SECRETS-003 |
+| `crates/lys-secrets/src/lease.rs` | the lease record Lease, created by SECRETS-003; each lease carries its holder, its person acted for, its source secret and its end (SECRETS-004 R3), and its upstream field, holding SECRETS-003 R4's revocation state and not public outside the crate (SECRETS-004 R5) | SECRETS-003 |
 | `crates/lys-secrets/src/audit.rs` | audit lines appended through lys-log-store | SECRETS-003 |
-| `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations for handle use and sealed-record reads | SECRETS-003 |
+| `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations, created by SECRETS-003; gains the relations the seam asks (SECRETS-004 R7) | SECRETS-003 |
 | `crates/lys-secrets/src/proxy.rs` | the check, swap, forward and audit line | SECRETS-003 |
 | `crates/lys-secrets/src/rotation.rs` | the next real account in turn under one handle | SECRETS-003 |
 | `crates/lys-secrets/src/in_flight.rs` | the register of admitted calls and the cancellation rule applied at a drop | SECRETS-003 |
@@ -106,18 +104,10 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/tests/spawn_login.rs` | R6's counted legs | SECRETS-003 |
 | `crates/lys-secrets/tests/sealed.rs` | R7's counted legs | SECRETS-003 |
 | `crates/lys-secrets/tests/next_account.rs` | R8's counted legs | SECRETS-003 |
-| `crates/lys-secrets/tests/support/mod.rs` | shared test doubles (the upstream, the provider, SpiceDB, the canary and the kill points) and the tracing subscriber that captures every log line | SECRETS-003 |
+| `crates/lys-secrets/tests/support/mod.rs` | shared test doubles, created by SECRETS-003; gains the two-people, two-teams fixture and the injected group claims (SECRETS-004 R4 to R7) | SECRETS-003 |
 | `docs/design/secrets/briefs/SECRETS-004.json` | the brief amending SECRETS-002 for CONFORMANCE rows 7.6 and 7.8: who may revoke a lease, the relinquish, and the scoped secrets list | SECRETS-004 |
 | `docs/design/secrets/briefs/SECRETS-004.md` | its rendered markdown | SECRETS-004 |
 | `docs/design/decisions.json` | the project decision ledger; gains proposed ADR-095, ownership alone confers no revoke (SECRETS-004 R1) | SECRETS-004 |
-| `Cargo.lock` | the workspace lockfile; gains the HTTP routing dependencies of crates/lys-secrets (SECRETS-004 R4) and the lys-secrets dependency of crates/lys-identity-server (SECRETS-004 R7) | SECRETS-004 |
-| `crates/lys-secrets/Cargo.toml` | the broker crate's manifest, created by SECRETS-003; gains the HTTP routing dependencies (SECRETS-004 R4) | SECRETS-003 |
-| `crates/lys-secrets/src/lib.rs` | the broker crate's module declarations, created by SECRETS-003; declares the SECRETS-004 modules (SECRETS-004 R3 to R7) and re-exports the lease record as lys_secrets::Lease (SECRETS-004 R5) | SECRETS-003 |
-| `crates/lys-secrets/src/store.rs` | the encrypted store, created by SECRETS-003; each secret record, the entry that carries its owning identity, gains its scope and its team (SECRETS-004 R3) | SECRETS-003 |
-| `crates/lys-secrets/src/lease.rs` | the lease record Lease, created by SECRETS-003; each lease carries its holder, its person acted for, its source secret and its end (SECRETS-004 R3), and its upstream field, holding SECRETS-003 R4's revocation state and not public outside the crate (SECRETS-004 R5) | SECRETS-003 |
-| `crates/lys-secrets/src/secret.rs` | the redacting type for credential bytes, created by SECRETS-003; its fields unchanged, it gains only the declaration of its test module (SECRETS-004 R3) | SECRETS-003 |
-| `crates/lys-secrets/schema/secrets.zed` | the SpiceDB relations, created by SECRETS-003; gains the relations the seam asks (SECRETS-004 R7) | SECRETS-003 |
-| `crates/lys-secrets/tests/support/mod.rs` | shared test doubles, created by SECRETS-003; gains the two-people, two-teams fixture and the injected group claims (SECRETS-004 R4 to R7) | SECRETS-003 |
 | `crates/lys-secrets/src/teams.rs` | team_ids: the signed-in person's team ids from the group claims on their token, the one place they are read (SECRETS-004 R2) | SECRETS-004 |
 | `crates/lys-secrets/src/teams_tests.rs` | team_ids tests with injected claims (SECRETS-004 R2) | SECRETS-004 |
 | `crates/lys-secrets/src/access.rs` | the one seam every secret visibility, lease discovery and lease revoke check calls; answers from the record's fields, then through the PermissionCheck it is given (SECRETS-004 R3, R7) | SECRETS-004 |

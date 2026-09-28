@@ -122,12 +122,11 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Building a Rauthy image from the vendor/rauthy pin — The leg accepts only an image whose own build set its revision label to the pin, and the upstream v0.36.2 image carries no such label. Building that image is heavy venue work, and the readiness leg's card does not do it.
 - A way for the method to request a demand leg and record its outcome — It lives in the design-system repository and changes the ledger for every project; design-system card 9jJgCzeG carries it, together with the acceptance line that a round records rauthy-ready as Unmeasured on a venue declaring no tool:docker.
 - Adding the readiness leg to .land/gates.sh — The land gate script is not changed; a demand leg never enters landing.
-- The broker's refusal to issue an agent any credential derived from a person's sign-in session — Issuance is the broker's (ADR-001); DIRECTORY-009 records it as a finding against SECRETS-002, carried by the broker's card.
-- The cannot-give list on the delegation screen — The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-009 supplies only the server's reason 'sign-in identity'.
+- The broker's refusal to issue an agent any credential derived from a person's sign-in session — Issuance is the broker's (ADR-001); DIRECTORY-038 records it as a finding against SECRETS-002, carried by the broker's card.
+- The cannot-give list on the delegation screen — The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-038 supplies only the server's reason 'sign-in identity'.
 - Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production
 Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-026's session record and session credential. — Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working.
 - The grant representation: how one grant records who may exercise it, whether it may be passed on (person, agent or nobody), what it derives from, and whether it can be bounded. OPEN for Tom. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader. — The statement leaves the exact delegation schema unsettled (docs/design/identity/STATEMENT-2026-09-22.md:21; ADR-003); AGENT-PARITY-2026-09-23's questions (docs/design/identity/AGENT-PARITY-2026-09-23.md:17-23) are inputs to it, not answers. Ruling (ADR-078): the grant representation is a technical decision of the owning lead with a second reader, and is decided for the SpiceDB schema: every grant, root or delegated, is its own grant object in SpiceDB, keyed by its grant identifier, and is exactly 3 relationships: the resource's relationship to the grant object under the grant's action; the grant's holder relationship to the identity that holds it, carrying an expiry caveat that ends no later than its source's; and the grant's standing relationship, which for a delegated grant is its source relationship to its source grant, the source relation the permission walks, and for a root grant, which has no source, is its root relationship, the grant object's relationship to the directory's root authority, one object per directory and the same object the issue_root permission is checked against when a person issues a root grant through POST /grants/roots; a permission holds through a grant only while the grant's standing holds, a root grant's through its root relationship and a delegated grant's through its source grant's standing, so derivation is a walk of the source relation that ends at the directory's root authority in a bounded number of steps, a grant that stands on neither a source relationship nor a root relationship is malformed and refused, and deleting a grant's standing relationship refuses its holder and every grant derived from it at once; two live grants giving the same holder the same action on the same resource are two grant objects, each with its own relationships, and revoking one leaves the other standing; withdrawing a grant deletes its relationships and those of every grant derived from it through the source relation on the same committed revoke event, the withdrawn grant's standing relationship alone in the first write and the rest in further writes within SpiceDB's configured max_updates_per_write.
-- Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production — Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working. Permission enforcement through SpiceDB on the standalone identity server is not covered by this non-goal; ADR-078 and CN11 carve it out.
 - Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production
 Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-029's Start on the agent file, which checks, gives a command and keeps its launch record, and never launches, runs or stops a session. — Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working.
 - CONFORMANCE row 5.7: a terminal view, sandbox, VM or container runner — Proposed as separate products; lys does not run agents (ADR-007).
@@ -141,8 +140,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 - The assistant's composer in the dock (conformance 9.4) — Row 9.4 is proposed with no brief and its runtime is open; the dock holds a not-yet note in its place.
 - A digit key for the identity file's eighth tab — The mock-up's digit keys stop at 7 while v5 has eight tabs; changing that departs from the mock-up and needs its own decision.
 - Pointing the Brief cells of CONFORMANCE.md rows 9.1 to 9.3 at DIRECTORY-037 — The words change only line 3 of that file in this card; the Brief cells follow once the brief id is fixed on main.
-- The broker's refusal to issue an agent any credential derived from a person's sign-in session — Issuance is the broker's (ADR-001); DIRECTORY-038 records it as a finding against SECRETS-002, carried by the broker's card.
-- The cannot-give list on the delegation screen — The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-038 supplies only the server's reason 'sign-in identity'.
 
 ## Structure
 
@@ -256,35 +253,33 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/commands/log/mod.rs` | the log command family's module list; pre-existing, gains the receipt module line (DIRECTORY-007) |  |
 | `crates/lys/tests/receipt_tests.rs` | rcli_accept, rcli_tamper, rcli_precrypto, rcli_test, rcli_readonly, driving the binary | DIRECTORY-007 |
 | `crates/lys-identity-server/src/sign_in_receipt.rs` | the sign-in and sign-in-refusal receipts the directory service emits, through lys-identity's commit path (DIRECTORY-007, after DIRECTORY-003 lands) | DIRECTORY-007 |
-| `crates/lys-identity-server/tests/sign_in_receipts.rs` | signin_ok, signin_refused, signin_first, signin_state | DIRECTORY-007 |
+| `crates/lys-identity-server/tests/sign_in_receipts.rs` | signin_ok, signin_refused, signin_first, signin_refused_reason | DIRECTORY-007 |
 | `docs/design/identity/reports/DIRECTORY-007-receipts.md` | the development-install proof: commands, exit codes, leaf indices, operation IDs, key fingerprints and counts; never a private key | DIRECTORY-007 |
-| `crates/lys/Cargo.toml` | the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets | DIRECTORY-002 |
 | `.land/gates.sh` | the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets | DIRECTORY-002 |
-| `CLAUDE.md` | gates before any commit; gains one line naming both acts of the identity leg | DIRECTORY-002 |
+| `CLAUDE.md` | the repository's standing instructions; its gate list gains one line naming the identity-release demand leg | DIRECTORY-030 |
 | `crates/lys/src/identity/config_tests.rs` | unit tests of config.rs | DIRECTORY-002 |
 | `crates/lys/src/identity/credentials_tests.rs` | unit tests of credentials.rs, the Debug and Display redaction included | DIRECTORY-002 |
 | `crates/lys/src/identity/error_tests.rs` | unit tests of error.rs, the Debug and Display redaction included | DIRECTORY-002 |
 | `crates/lys/src/identity/prepare_tests.rs` | unit tests of prepare.rs, the private files' modes included | DIRECTORY-002 |
 | `crates/lys/src/identity/themes_tests.rs` | unit tests of themes.rs | DIRECTORY-002 |
-| `docs/design/directory/briefs/DIRECTORY-009.json` | the lifecycle brief: the contract document, who may cause each transition, the fold, the access-check gate, the next-check rule at the session resolution point, and the typed read the screen consumes | DIRECTORY-009 |
+| `docs/design/directory/briefs/DIRECTORY-009.json` | conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent | DIRECTORY-009 |
 | `docs/design/directory/briefs/DIRECTORY-009.md` | rendered markdown | DIRECTORY-009 |
-| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract as it stands: states, transitions and their causers, the record, fold, check, next-check and retired rules, what the screen shows, the refusal table, and what IDENTITY-EVENTS.md must carry | DIRECTORY-009 |
-| `crates/lys-identity/src/lifecycle/mod.rs` | declarations and re-exports of the lifecycle module (DIRECTORY-009, after DIRECTORY-003 lands; reconciled with the landed manifest under CN9) | DIRECTORY-009 |
-| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition: the administrator, or the agent's responsible person from its registration record; lifecycle_actor_not_permitted otherwise | DIRECTORY-009 |
-| `crates/lys-identity/src/lifecycle/error.rs` | the six named lifecycle refusals, each carrying the act that answers it; never leaf or signature bytes | DIRECTORY-009 |
+| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2 | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/mod.rs` | the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check | DIRECTORY-019 |
+| `crates/lys-identity/src/lifecycle/error.rs` | the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person | DIRECTORY-019 |
 | `crates/lys-identity/src/lifecycle/state.rs` | the state type of exactly four values: registered, active, suspended, retired; provisioned is not among them | DIRECTORY-009 |
 | `crates/lys-identity/src/lifecycle/fold.rs` | the fold of an identity's transition records in log order through LeafStore; refuses lifecycle_fold_invalid at the coordinate of a record the table refuses; never opens the log for writing | DIRECTORY-009 |
 | `crates/lys-identity/src/lifecycle/gate.rs` | the access check as the conjunction, state first, then DIRECTORY-006 R4's grant existence and freshness through an injected answerer and clock; appends nothing | DIRECTORY-009 |
-| `crates/lys-identity/tests/lifecycle_support/mod.rs` | fixture log builder, attested test actors, counting grant answerer and injected clock; never compiled into the library | DIRECTORY-009 |
+| `crates/lys-identity/tests/lifecycle_support/mod.rs` | the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures | DIRECTORY-019 |
 | `crates/lys-identity/tests/lifecycle_causes.rs` | d009_r2_ac1 to d009_r2_ac4 | DIRECTORY-009 |
 | `crates/lys-identity/tests/lifecycle_fold.rs` | d009_r3_ac1 to d009_r3_ac5 | DIRECTORY-009 |
 | `crates/lys-identity/tests/lifecycle_gate.rs` | d009_r4_ac1 to d009_r4_ac5 | DIRECTORY-009 |
-| `crates/lys-identity-server/src/lib.rs` | the directory service's module list, declared by DIRECTORY-003's reviewed manifest; gains the lifecycle_gate and lifecycle_read module lines (DIRECTORY-009) | DIRECTORY-003 |
+| `crates/lys-identity-server/src/lib.rs` | the directory service's crate root; declares the issuer key, key enrolment, key replacement and issuance route modules | DIRECTORY-031 |
 | `crates/lys-identity-server/src/lifecycle_gate.rs` | the state refusal at sign-in and at refresh, called by one line at DIRECTORY-003's session resolution point; calls Rauthy to revoke nothing | DIRECTORY-009 |
-| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed read per identity (state, the record that put it there, actions, history, provisioned as a view) and the list filterable by state and kind; deletes and hides nothing | DIRECTORY-009 |
+| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field | DIRECTORY-019 |
 | `crates/lys-identity-server/tests/lifecycle_session.rs` | d009_r5_ac1 to d009_r5_ac5, against a test issuer stub that records every request | DIRECTORY-009 |
 | `crates/lys-identity-server/tests/lifecycle_read.rs` | d009_r6_ac1 to d009_r6_ac5 | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/sign_in_receipts.rs` | signin_ok, signin_refused, signin_first, signin_refused_reason | DIRECTORY-007 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-013.json` | certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039) | DIRECTORY-013 |
@@ -307,44 +302,35 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/agent_without_session.rs` | the proof that an agent registered with no session is listed under its responsible person and read with no session credential (R2) | DIRECTORY-011 |
 | `docs/design/directory/briefs/DIRECTORY-011.json` | the enduring agent kept apart from each session's credential: road adjustment 3 written into the directory contract, and the no-session agent proved (R1, R2) | DIRECTORY-011 |
 | `docs/design/directory/briefs/DIRECTORY-011.md` | rendered markdown | DIRECTORY-011 |
-| `docs/design/identity/LIFECYCLE-CONTRACT.md` | the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2 | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/mod.rs` | the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/error.rs` | the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person | DIRECTORY-019 |
-| `crates/lys-identity/src/lifecycle/causes.rs` | who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check | DIRECTORY-019 |
-| `crates/lys-identity/tests/lifecycle_support/mod.rs` | the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures | DIRECTORY-019 |
-| `crates/lys-identity-server/src/lifecycle_read.rs` | the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field | DIRECTORY-019 |
 | `crates/lys-identity/src/lifecycle/responsible.rs` | the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3) | DIRECTORY-019 |
 | `crates/lys-identity/tests/lifecycle_no_person.rs` | CONFORMANCE 3.1: an agent recorded with no person is refused by name (DIRECTORY-019 R2) | DIRECTORY-019 |
 | `crates/lys-identity/tests/lifecycle_needs_new_person.rs` | CONFORMANCE 3.1: retiring a person flags every one of their agents as needing a new person, and suspending one flags none (DIRECTORY-019 R3) | DIRECTORY-019 |
 | `crates/lys-identity/tests/lifecycle_walk.rs` | CONFORMANCE 3.2: the walk of all 20 changes of state (DIRECTORY-019 R4) | DIRECTORY-019 |
 | `crates/lys-identity-server/tests/lifecycle_authority.rs` | CONFORMANCE 3.2: the state is authority only and the read says nothing about running (DIRECTORY-019 R5) | DIRECTORY-019 |
-| `docs/design/directory/briefs/DIRECTORY-009.json` | the Rauthy readiness leg brief | DIRECTORY-009 |
-| `docs/design/project.json` | the lys design project file; gains the rauthy-ready demand leg | DIRECTORY-009 |
+| `docs/design/project.json` | the project's gate trees; gains the demand-cadence identity-release leg | DIRECTORY-030 |
 | `scripts/identity-gates/rauthy_ready.py` | the rauthy-ready leg's command: start the pinned Rauthy against a scratch PostgreSQL, pass on its ready answer, remove what it made | DIRECTORY-009 |
 | `crates/lys/tests/rauthy_ready_leg.rs` | runs the rauthy-ready script against a stub runtime; counts refusals, cleanup and searched secrets | DIRECTORY-009 |
-| `docs/design/directory/briefs/DIRECTORY-009.json` | conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent | DIRECTORY-009 |
-| `crates/lys-identity/src/sign_in_identity.rs` | classifies an issuer-subject pair as a current or former sign-in identity, an agent's service account, or unbound, from the signed history | DIRECTORY-009 |
-| `crates/lys-identity/src/sign_in_refusal.rs` | the sign-in identity refusal and its owner-and-administrator and redacted views | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through unlink and reopen | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the redacted view's absence of provider and subject | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_agent_binding.rs` | a sign-in identity refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-009 |
-| `crates/lys-identity-server/src/sign_in_link_check.rs` | the check the link path asks by issuer-subject pair before a person links a provider account | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/sign_in_link_check.rs` | a person's link of an agent's service account refused by name | DIRECTORY-009 |
-| `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-009 |
+| `crates/lys-identity/src/sign_in_identity.rs` | classifies an issuer-subject pair as a sign-in identity, an agent's own account, unbound or unreconciled, from the signed history | DIRECTORY-038 |
+| `crates/lys-identity/src/sign_in_refusal.rs` | the sign-in identity refusal and its owner-and-administrator view and its view for anyone else | DIRECTORY-038 |
+| `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through reopen | DIRECTORY-038 |
+| `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the absence of provider and subject from the view for anyone else | DIRECTORY-038 |
+| `crates/lys-identity/tests/sign_in_agent_binding.rs` | a person's provider account refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-038 |
+| `crates/lys-identity-server/src/sign_in_link_check.rs` | the directory's side of the link path: a person's link of an account bound to an agent refused by name and recorded in the history, the agent withheld from the person linking | DIRECTORY-038 |
+| `crates/lys-identity-server/tests/sign_in_link_check.rs` | the reverse-order refusal, its history entry naming the agent to the responsible person and the administrator and never to the person linking, the unbound answer and the two refused callers | DIRECTORY-038 |
+| `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating from a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-038 |
+| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-038 |
 | `crates/lys-identity-server/tests/sign_in_store.rs` | every refusal writes nothing; no agent record carries a sign-in identity, counted over the store | DIRECTORY-009 |
 | `docs/design/directory/briefs/DIRECTORY-024.json` | the cannot-give list: everything a person cannot give on the delegation form, with its one reason (conformance row 2.4) | DIRECTORY-024 |
 | `docs/design/directory/briefs/DIRECTORY-024.md` | rendered markdown | DIRECTORY-024 |
 | `crates/lys-identity/src/grants/cannot_give.rs` | the closed reason set, its precedence, and the per-recipient cannot-give list computed from the authority and lineage decisions | DIRECTORY-024 |
 | `crates/lys-identity/tests/grant_cannot_give.rs` | the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases | DIRECTORY-024 |
-| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the cannot-give operation across routes, its wire values and its refusals | DIRECTORY-024 |
 | `crates/lys-identity-server/src/grant_contract/requests.rs` | the cannot-give request: the source grant and the chosen recipient | DIRECTORY-024 |
-| `crates/lys-identity-server/src/grant_contract/views.rs` | the cannot-give answer: its items, the closed reason set on the wire and the source mark | DIRECTORY-024 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end | DIRECTORY-035 |
 | `surface/identity/src/features/grants/CannotGiveList.tsx` | renders the server's cannot-give answer and nothing else | DIRECTORY-024 |
 | `surface/identity/src/features/grants/cannotGiveAnswer.ts` | decodes the cannot-give answer and refuses an unknown reason by name | DIRECTORY-024 |
 | `surface/identity/tests/cannot_give.test.tsx` | the cannot-give list on the delegation form against fixture answers | DIRECTORY-024 |
-| `docs/design/identity/CONFORMANCE.md` | the conformance rows; DIRECTORY-024 changes only row 2.4's Brief column | DIRECTORY-024 |
-| `docs/design/WIRE-FORMATS.md` | the wire-format register; gains the proposed, unratified decision-log row for lys/session-start/v1 (R3) | DIRECTORY-026 |
+| `docs/design/identity/CONFORMANCE.md` | the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html, with its sha256, as the reference and v5 as the prior | DIRECTORY-037 |
+| `docs/design/WIRE-FORMATS.md` | the wire-format register; gains one line pointing at the capability-claim proposal and its PROPOSED decision-log row, which reads RATIFIED once the ratification is recorded on the card (R3), and both of its ratification sentences name the owning lead with a second reader; D1 to D6 and every other existing line unchanged | DIRECTORY-031 |
 | `docs/design/identity/SESSION-CREDENTIAL-REVIEW.md` | the adversarial review of the session credential, the challenge and the lys/session-start/v1 report-back proof, recorded before any session code (R4) | DIRECTORY-026 |
 | `crates/lys-identity/src/agent_session/mod.rs` | declarations and re-exports only; named agent_session so it is never confused with the server's operator sign-in session | DIRECTORY-026 |
 | `crates/lys-identity/src/agent_session/record.rs` | the session record: its id, agent directory id, launch record id, credential hash and open or ended state, rebuilt from its events | DIRECTORY-026 |
@@ -370,8 +356,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/src/event.rs` | gains change kinds 7 session_started, 8 session_ended and 9 agent_reported, appended (DIRECTORY-026 R5) | DIRECTORY-026 |
 | `crates/lys-identity/src/encoding.rs` | encodes and decodes the three session change kinds without changing an existing kind's bytes (DIRECTORY-026 R5) | DIRECTORY-026 |
 | `crates/lys-identity/src/provenance.rs` | gains actor method codes 2 (agent, enrolled key) and 3 (agent, session credential), appended (DIRECTORY-026 R5) | DIRECTORY-026 |
-| `crates/lys-identity/Cargo.toml` | the session module's dependencies (DIRECTORY-026 R5) | DIRECTORY-026 |
-| `crates/lys-identity-server/src/lib.rs` | declares the session routes module (DIRECTORY-026 R8) | DIRECTORY-026 |
+| `crates/lys-identity/Cargo.toml` | the directory crate's manifest; gains the capability claim's encoding dependency from the workspace lockfile | DIRECTORY-031 |
 | `crates/lys-identity-server/src/config.rs` | reads, validates and documents directory_id beside the service's other configured values (DIRECTORY-026 R8) | DIRECTORY-026 |
 | `tests/identity_contract/src/harness.rs` | starts the in-process service with a configured directory_id for the session route tests (DIRECTORY-026 R8) | DIRECTORY-026 |
 | `docs/design/directory/briefs/DIRECTORY-021.json` | the roles and their versions brief, conformance 4.2 to 4.5 (roles half) | DIRECTORY-021 |
@@ -412,7 +397,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/directory/briefs/DIRECTORY-025.json` | road step 2: every permission check the identity server makes asks SpiceDB, and the screen answers why | DIRECTORY-025 |
 | `docs/design/directory/briefs/DIRECTORY-025.md` | rendered markdown | DIRECTORY-025 |
 | `crates/lys-identity-server/Cargo.toml` | the server crate's manifest inside DIRECTORY-003's wall; DIRECTORY-025 adds the SpiceDB client dependencies (tonic, prost, protox) | DIRECTORY-003 |
-| `crates/lys-identity-server/src/lib.rs` | the server crate's root inside DIRECTORY-003's wall; DIRECTORY-025 declares the spicedb module | DIRECTORY-003 |
 | `crates/lys-identity-server/build.rs` | compiles the vendored authzed v1 protocol files with protox; no protoc | DIRECTORY-025 |
 | `crates/lys-identity-server/proto/SOURCE.md` | the authzed API release the protocol files are copied from | DIRECTORY-025 |
 | `crates/lys-identity-server/proto/authzed/` | the vendored authzed v1 protocol files | DIRECTORY-025 |
@@ -480,18 +464,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/tests/acceptance/start.spec.ts` | R13 test: build the Start drawer and the unconfirmed notice on the agent file | DIRECTORY-029 |
 | `docs/design/directory/briefs/DIRECTORY-030.json` | row 07 of IDENTITY-001: gate, install and demonstrate the exact release, up to a staged, test-keyed install | DIRECTORY-030 |
 | `docs/design/directory/briefs/DIRECTORY-030.md` | rendered markdown | DIRECTORY-030 |
-| `docs/design/project.json` | the project's gate trees; gains the demand-cadence identity-release leg | DIRECTORY-030 |
-| `CLAUDE.md` | the repository's standing instructions; its gate list gains one line naming the identity-release demand leg | DIRECTORY-030 |
 | `scripts/identity-gates/release.sh` | the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg | DIRECTORY-030 |
 | `docs/design/identity/reports/IDENTITY-001-release.md` | row 07's release report: refs, venue legs, review, install, receipts, standalone acceptance, not met, reserved acts, status | DIRECTORY-030 |
 | `docs/design/identity/reports/IDENTITY-001-commands.jsonl` | row 07's command record: one JSON line per command run for the release | DIRECTORY-030 |
-| `docs/design/directory/briefs/DIRECTORY-031.json` | the typed capability claim in an agent's certificate and its verifier: road step 2's certificate half | DIRECTORY-031 |
+| `docs/design/directory/briefs/DIRECTORY-031.json` | row 6.4: issuance entered in the lys-log-store log, the issuer certificate command and the stranger's proof | DIRECTORY-031 |
 | `docs/design/directory/briefs/DIRECTORY-031.md` | rendered markdown | DIRECTORY-031 |
 | `docs/design/identity/CAPABILITY-CLAIM.md` | the design round's proposal for lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1: transport, assertion, encoding, issuer key identifier, scope, verifier check, rendering consumer, revocation, issuer and anchor, status | DIRECTORY-031 |
 | `docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` | the adversarial review of the capability-claim draft, by a party other than its author, before the owning lead's ratification with a second reader | DIRECTORY-031 |
-| `docs/design/WIRE-FORMATS.md` | the wire-format register; gains one line pointing at the capability-claim proposal and its PROPOSED decision-log row, which reads RATIFIED once the ratification is recorded on the card (R3), and both of its ratification sentences name the owning lead with a second reader; D1 to D6 and every other existing line unchanged | DIRECTORY-031 |
 | `docs/PEN-REGISTRATION.md` | the sub-arc register under 1.3.6.1.4.1.66364; its .2 row keeps .2 a family arc for agent-certificate extensions, names .2.1 for the typed capability claim lys/agent-capability/v1 and keeps the rest of its stated purpose; its status cell stays Reserved until the ratification is recorded and then reads In use (.2.1) (R3); the .1 and .3+ rows unchanged | DIRECTORY-031 |
-| `crates/lys-identity/Cargo.toml` | the directory crate's manifest; gains the capability claim's encoding dependency from the workspace lockfile | DIRECTORY-031 |
 | `crates/lys-identity/src/capability/mod.rs` | declarations and re-exports only | DIRECTORY-031 |
 | `crates/lys-identity/src/capability/claim.rs` | the typed lys/agent-capability/v1 claim: holder id and every grant held at issuance, each with its grant id and its window as it stood then | DIRECTORY-031 |
 | `crates/lys-identity/src/capability/encoding.rs` | canonical encode and strict decode of the claim: claim_malformed, claim_version_unknown | DIRECTORY-031 |
@@ -503,7 +483,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/capability_issue.rs` | issuance, reissue after expiry and its counted refusals | DIRECTORY-031 |
 | `crates/lys-identity/src/agent_key.rs` | an agent's one enrolled Ed25519 public key, keyed by its directory id beside the agent record, enrolled once by the operator | DIRECTORY-031 |
 | `crates/lys-identity/tests/agent_key.rs` | enrolment and its counted refusals | DIRECTORY-031 |
-| `crates/lys-identity-server/src/lib.rs` | the directory service's crate root; declares the issuer key, key enrolment, key replacement and issuance route modules | DIRECTORY-031 |
 | `crates/lys-identity-server/src/issuer_key.rs` | custody of the directory's issuer key: restricted private file, Zeroizing seed, redacted Debug | DIRECTORY-031 |
 | `crates/lys-identity-server/tests/issuer_key.rs` | issuer key loading, counted refusals and redaction | DIRECTORY-031 |
 | `crates/lys-identity-server/src/agent_key_route.rs` | the operator's enrol route POST /identity/agents/{agent_id}/key and its named refusals | DIRECTORY-031 |
@@ -514,7 +493,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/tests/agent_key_replacement.rs` | replacement, reissue under the new key and the counted refusals | DIRECTORY-031 |
 | `crates/lys-identity-server/src/agent_key_replacement_route.rs` | the operator's replacement route POST /identity/agents/{agent_id}/key/replacement and its named refusals | DIRECTORY-031 |
 | `crates/lys-identity-server/tests/agent_key_replacement_route.rs` | the replacement route's acceptance and counted refusals | DIRECTORY-031 |
-| `docs/design/directory/briefs/DIRECTORY-031.json` | row 6.4: issuance entered in the lys-log-store log, the issuer certificate command and the stranger's proof | DIRECTORY-031 |
 | `docs/design/directory/PROOF-ISSUANCE.md` | the recorded stranger's check of an issued certificate and its log entry: commands, exit codes and output, hashes, counts and paths only | DIRECTORY-031 |
 | `crates/lys/src/commands/ca.rs` | `lys ca request`, `issue` and `verify`; gains `issuer_cert` and the issuer certificate stored beside the CA key, and `issue` always carries a log entry (DIRECTORY-031) |  |
 | `crates/lys/src/commands/ca_tests.rs` | unit tests of ca.rs |  |
@@ -546,24 +524,19 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `.gitignore` | DIRECTORY-034 adds two entries, crates/lys-identity-server/tests/grant_resources.ids.json and surface/identity/tests/fixtures/graph-directory.ids.json: the access graph tests' label-to-id maps, uncommitted run outputs each test also removes before it exits | DIRECTORY-034 |
 | `docs/design/directory/briefs/DIRECTORY-034.json` | the access graph brief (conformance 8.3) | DIRECTORY-034 |
 | `docs/design/directory/briefs/DIRECTORY-034.md` | rendered markdown | DIRECTORY-034 |
-| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end |  |
-| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 |  |
-| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields |  |
-| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk |  |
-| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) |  |
-| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound |  |
-| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 |  |
-| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use |  |
-| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand |  |
-| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers |  |
-| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test |  |
-| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test |  |
-| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg |  |
-| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 |  |
+| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 | DIRECTORY-035 |
+| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields | DIRECTORY-035 |
+| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk | DIRECTORY-035 |
+| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) | DIRECTORY-035 |
+| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound | DIRECTORY-035 |
+| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 | DIRECTORY-035 |
+| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use | DIRECTORY-035 |
+| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand | DIRECTORY-035 |
+| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers | DIRECTORY-035 |
+| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test | DIRECTORY-035 |
+| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test | DIRECTORY-035 |
 | `docs/design/directory/briefs/DIRECTORY-037.json` | the identity surface shell brief: the route table, the two keyboard gaps closed in the shell and the mock-up, and the gate leg | DIRECTORY-037 |
 | `docs/design/directory/briefs/DIRECTORY-037.md` | rendered markdown | DIRECTORY-037 |
-| `.land/gates.sh` | the repository gate; DIRECTORY-037 adds the surface's test leg |  |
-| `docs/design/project.json` | the project setup the design's gate array copies; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test |  |
 | `surface/identity/package.json` | the surface package, arriving with pull request 35 (DIRECTORY-005); DIRECTORY-037 adds @testing-library/user-event 14.6.7 and its peer @testing-library/dom 10.4.2 as development dependencies | DIRECTORY-005 |
 | `surface/identity/package-lock.json` | the surface lock file, arriving with pull request 35 (DIRECTORY-005); follows package.json | DIRECTORY-005 |
 | `surface/identity/src/shell/keyable.ts` | makes a non-button click action focusable and answer Enter and Space; arrives with pull request 35, DIRECTORY-037 keeps keyable(activate) and makes Enter and Space dispatch the click that runs it | DIRECTORY-005 |
@@ -579,40 +552,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/tests/walk.test.tsx` | the counted Tab walk over every built route | DIRECTORY-037 |
 | `surface/identity/tests/mockup.test.tsx` | index.v6.html's two fixes, proved on v6 and shown failing on v5 | DIRECTORY-037 |
 | `docs/design/identity/mockup/index.v6.html` | the mock-up with the focus fix and the keyboard fix, beside v5 (ADR-104) | DIRECTORY-037 |
-| `docs/design/identity/CONFORMANCE.md` | the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html |  |
 | `docs/design/directory/briefs/DIRECTORY-038.json` | conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent | DIRECTORY-038 |
 | `docs/design/directory/briefs/DIRECTORY-038.md` | rendered markdown | DIRECTORY-038 |
-| `crates/lys-identity/src/sign_in_identity.rs` | classifies an issuer-subject pair as a sign-in identity, an agent's own account, unbound or unreconciled, from the signed history | DIRECTORY-038 |
-| `crates/lys-identity/src/sign_in_refusal.rs` | the sign-in identity refusal and its owner-and-administrator view and its view for anyone else | DIRECTORY-038 |
-| `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through reopen | DIRECTORY-038 |
-| `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the absence of provider and subject from the view for anyone else | DIRECTORY-038 |
-| `crates/lys-identity/tests/sign_in_agent_binding.rs` | a person's provider account refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-038 |
 | `crates/lys-identity/src/bindings.rs` | DIRECTORY-003 R1's binding module, reconciled against its reviewed manifest before dispatch: gains the refusal of a person's provider account as an agent's binding | DIRECTORY-038 |
-| `crates/lys-identity-server/src/sign_in_link_check.rs` | the directory's side of the link path: a person's link of an account bound to an agent refused by name and recorded in the history, the agent withheld from the person linking | DIRECTORY-038 |
-| `crates/lys-identity-server/tests/sign_in_link_check.rs` | the reverse-order refusal, its history entry naming the agent to the responsible person and the administrator and never to the person linking, the unbound answer and the two refused callers | DIRECTORY-038 |
-| `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating from a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-038 |
-| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-038 |
 | `crates/lys-identity/tests/sign_in_store.rs` | after the two directory refusals, no agent record carries a sign-in identity, counted over the store | DIRECTORY-038 |
 | `docs/design/directory/briefs/DIRECTORY-035.json` | the grant conformance rows of the directory, each named to the test that passes it | DIRECTORY-035 |
 | `docs/design/directory/briefs/DIRECTORY-035.md` | rendered markdown | DIRECTORY-035 |
-| `crates/lys-identity-server/src/grant_contract/views.rs` | the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end | DIRECTORY-035 |
-| `crates/lys-identity/tests/grant_last_used.rs` | the last-used tests of conformance 8.4, named by their row under DIRECTORY-035 | DIRECTORY-035 |
-| `surface/identity/src/generated/grants.ts` | the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields | DIRECTORY-035 |
-| `surface/identity/src/features/grants/model.ts` | the grant screens' reading of the service's answers; loses the client standing walk | DIRECTORY-035 |
-| `surface/identity/src/features/grants/GrantCard.tsx` | one grant with its chain, window, last use and standing (conformance 8.4) | DIRECTORY-035 |
-| `surface/identity/src/features/grants/Delegate.tsx` | the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound | DIRECTORY-035 |
-| `surface/identity/src/features/me/You.tsx` | the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5 | DIRECTORY-035 |
-| `surface/identity/src/features/access/Access.tsx` | the access screens that list grants with their standing and last use | DIRECTORY-035 |
-| `surface/identity/src/features/file/sections.tsx` | an identity file's sections that read which grants stand | DIRECTORY-035 |
-| `surface/identity/tests/fixtures.ts` | the vitests' fixture service answers | DIRECTORY-035 |
-| `surface/identity/tests/me.test.tsx` | the You vitests, carrying row 1.5's test | DIRECTORY-035 |
-| `surface/identity/tests/revoke.test.tsx` | the Revoke vitests, carrying row 2.5's screen test | DIRECTORY-035 |
-| `docs/design/project.json` | the project's trees and legs; DIRECTORY-035 registers the surface leg | DIRECTORY-035 |
-| `docs/design/identity/CONFORMANCE.md` | the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 | DIRECTORY-035 |
-| `.land/gates.sh` | the repository gate; DIRECTORY-037 adds the surface's test leg | DIRECTORY-037 |
-| `docs/design/project.json` | the project setup; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test | DIRECTORY-037 |
-| `docs/design/identity/CONFORMANCE.md` | the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html, with its sha256, as the reference and v5 as the prior | DIRECTORY-037 |
-| `.land/gates.sh` | the repository gate; DIRECTORY-037 adds the surface's test leg, surface_leg | DIRECTORY-037 |
 | `docs/design/directory/briefs/DIRECTORY-039.json` | rendered brief list fields: the sync of the method's render-brief.py, its test, and the re-render of every rendered brief | DIRECTORY-039 |
 | `docs/design/directory/briefs/DIRECTORY-039.md` | rendered markdown | DIRECTORY-039 |
 | `scripts/design/render-brief.py` | the brief renderer, a copy of the design-system method's scripts/render-brief.py; re-copied at the method commit that holds the prose-list rule (DIRECTORY-039) | DIRECTORY-039 |
@@ -643,24 +588,19 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
-- `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
-ADR-039 was added to the ledger by DIRECTORY-013, a brief recording a decision through the ledger and not a document row.
 - `docs/design/project.json` — the lys design project file at main 7b53625: one tree, the rust-build shorthand, seven legs all cadence round, and the roots map
 - `scripts/design/schemas/project.schema.json` — the project schema: a leg is name, command, requires (at least one) and cadence (round or demand), the command run with no shell
-- `scripts/design/gate.sh` — the design leg: validates docs/design/project.json and every cluster, checks coverage and the rendered markdown
-- `.land/gates.sh` — the land gate script: the design leg and the six cargo gates; not changed by DIRECTORY-009
-- `docs/design/secrets/briefs/SECRETS-002.json` — the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-009 records a finding against it and changes nothing in it
+- `scripts/design/gate.sh` — the design leg: validates the ledgers, checks coverage, and cmp-checks every cluster's rendered markdown against a fresh render; runs no Python tests
+- `.land/gates.sh` — the repository gate: the design gate, fmt, both clippy shapes, feature-full tests and both rustdoc shapes; no leg for the surface
+- `docs/design/secrets/briefs/SECRETS-002.json` — the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-038 records a finding against it and changes nothing in it
 - `crates/lys-core/src/ca/extensions.rs` — the shipped extension transport: LYS_OID_ARC, encode_extension and decode_extension carry opaque bytes; DIRECTORY-031 uses it unchanged; read, never changed
 - `crates/lys-core/src/ca/authority.rs` — issue_certificate_for_request and verify_certificate_chain_at, which DIRECTORY-031 issues and verifies through; read, never changed
 - `crates/lys/src/commands/ca_log.rs` — on main at fa3dd5311e98d1a751c770319e1cfe2570718c76: `lys ca issue --log`, which today takes --log, --log-key, --leaf-out and --artifact-out together or not at all, stages every output before the append, and reports log_dir, leaf_index, tree_size, root_hash, root_base64, leaf_path and artifact_path; a failure after the append is LoggedButUnwritten with the recovering `lys log prove inclusion` command. DIRECTORY-031 changes it (structure row)
 - `crates/lys/tests/ca_log_tests.rs` — on main at fa3dd5311e98d1a751c770319e1cfe2570718c76: the `lys ca issue --log` integration tests and their modules under crates/lys/tests/ca_log/ (support.rs, outputs.rs, tamper.rs), which resolve openssl and python3 as hard requirements, never skips. DIRECTORY-031 adds two modules beside them (structure rows)
 - `scripts/verify_inclusion.py` — the stranger's inclusion checker for lys/log-inclusion-proof/v1: Python standard library only, exit 0 verified, 1 usage or I/O, 2 verification failed, an optional expected-root-base64 third argument; it does not check the checkpoint's signature and says so. Read, never changed
 - `docs/design/identity/mockup/index.v5.html` — the accepted mock-up, 1680 lines, sha256 e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f; the shell's definition; kept as the prior, never changed
-- `.land/gates.sh` — the repository gate: the design gate, fmt, both clippy shapes, feature-full tests and both rustdoc shapes; no leg for the surface
-- `docs/design/secrets/briefs/SECRETS-002.json` — the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-038 records a finding against it and changes nothing in it
 - `scripts/design/render-brief.py` — the brief renderer copied from the design-system method at 3c3bac7; joins every list field of a brief onto one line with ', ', blocked_by and depends_on included
 - `scripts/design/SOURCE.md` — states that the design scripts, render-brief.py among them, are copies of the design-system method at 3c3bac7
-- `scripts/design/gate.sh` — the design leg: validates the ledgers, checks coverage, and cmp-checks every cluster's rendered markdown against a fresh render; runs no Python tests
 
 ## Constraints
 

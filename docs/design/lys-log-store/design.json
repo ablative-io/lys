@@ -85,7 +85,7 @@
     },
     {
       "text": "A read-only mode for Log or for the anchor",
-      "reason": "A refused log fails to open; no read-only handle is added."
+      "reason": "A refused log fails to open; no read-only handle is added, for Log and the anchor; FileLeafStore::open_read_only is added by LYSLOGSTORE-004 under ADR-108."
     },
     {
       "text": "Naming which leaf changed when open refuses a log",
@@ -126,42 +126,38 @@
     {
       "text": "Deleting or tidying leftover temporary files.",
       "reason": "Open only skips and names them; clearing them is not the store's act."
-    },
-    {
-      "text": "A read-only mode for Log or for the anchor",
-      "reason": "A refused log fails to open; no read-only handle is added, for Log and the anchor; FileLeafStore::open_read_only is added by LYSLOGSTORE-004 under ADR-108."
     }
   ],
   "structure": [
     {
       "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError; gains LeafDurabilityUncertain { index, source }, ReadOnly { path, operation } and RepairPending { pinned_tree_size, leaves }",
-      "brief": "LYSLOGSTORE-001"
+      "note": "StoreError, including the ReadOnly and RepairPending refusals",
+      "brief": ""
     },
     {
       "path": "crates/lys-log-store/src/store.rs",
-      "note": "the LeafStore contract; put_leaf's errors name LeafDurabilityUncertain",
-      "brief": "LYSLOGSTORE-001"
+      "note": "The LeafStore trait contract; unchanged",
+      "brief": ""
     },
     {
       "path": "crates/lys-log-store/src/file.rs",
-      "note": "FileLeafStore: leaf_temp_name, create_leaf_temp, write_leaf_temp and put_leaf_with taking a caller-supplied sequence, temporary file created with create_new, flush, no-replace link, own-temporary cleanup on failure, commit point, open-time flush at a writable open, open_read_only and its handle's ReadOnly refusal of put_leaf and pin, module-doc invariant, cfg(test) fault seam",
-      "brief": "LYSLOGSTORE-001"
+      "note": "FileLeafStore; open recognises and reports leftover temporary leaf files",
+      "brief": ""
     },
     {
       "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "the file store's gates; gains the eighteen new tests of LYSLOGSTORE-001 R8, the drift-injection table, and module docs that name the no-replace link instead of create_new",
-      "brief": "LYSLOGSTORE-001"
+      "note": "FileLeafStore tests, including the leftover-temporary report",
+      "brief": ""
     },
     {
       "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log; gains open_at_pin and pending_repair, and Log::append refuses with RepairPending while a repair is pending; Log::open and its repair unchanged",
-      "brief": "LYSLOGSTORE-001"
+      "note": "Log over any LeafStore; its open and one-leaf repair are unchanged",
+      "brief": ""
     },
     {
       "path": "crates/lys-log-store/src/log_tests.rs",
-      "note": "Log's gates; gains the open_at_pin test",
-      "brief": "LYSLOGSTORE-001"
+      "note": "Log tests, including the torn and changed leaf inside the pin and the torn leaf just past it",
+      "brief": ""
     },
     {
       "path": "crates/lys-anchor/src/anchor/read_only.rs",
@@ -185,38 +181,38 @@
     },
     {
       "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "criteria a second LeafStore backend must satisfy; unchanged",
+      "note": "second-backend adoption criteria; unchanged",
       "brief": ""
     },
     {
       "path": "docs/design/lys-log-store/design.json",
       "note": "this design",
-      "brief": "LYSLOGSTORE-001"
+      "brief": ""
     },
     {
       "path": "docs/design/lys-log-store/DESIGN.md",
-      "note": "rendered from design.json by render-cluster.py",
-      "brief": "LYSLOGSTORE-001"
+      "note": "Rendered from design.json",
+      "brief": "LYSLOGSTORE-003"
     },
     {
       "path": "docs/design/lys-log-store/checklist.json",
-      "note": "the checklist",
-      "brief": "LYSLOGSTORE-001"
+      "note": "the rows this cluster's brief delivers",
+      "brief": ""
     },
     {
       "path": "docs/design/lys-log-store/CHECKLIST.md",
-      "note": "rendered checklist",
-      "brief": "LYSLOGSTORE-001"
+      "note": "Rendered from checklist.json",
+      "brief": "LYSLOGSTORE-003"
     },
     {
       "path": "docs/design/lys-log-store/stories.json",
-      "note": "the user stories",
-      "brief": "LYSLOGSTORE-001"
+      "note": "the stories this cluster's brief serves",
+      "brief": ""
     },
     {
       "path": "docs/design/lys-log-store/USER-STORIES.md",
-      "note": "rendered stories",
-      "brief": "LYSLOGSTORE-001"
+      "note": "Rendered from stories.json",
+      "brief": "LYSLOGSTORE-003"
     },
     {
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-001.json",
@@ -239,43 +235,8 @@
       "brief": ""
     },
     {
-      "path": "docs/design/lys-log-store/design.json",
-      "note": "this design",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-log-store/checklist.json",
-      "note": "the rows this cluster's brief delivers",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-log-store/stories.json",
-      "note": "the stories this cluster's brief serves",
-      "brief": ""
-    },
-    {
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-002.json",
       "note": "the refusal at open, the leftover-temporary report and the bounded witness",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "second-backend adoption criteria; unchanged",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/log_tests.rs",
-      "note": "Log tests, including the torn and changed leaf inside the pin and the torn leaf just past it",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/file.rs",
-      "note": "FileLeafStore; open recognises and reports leftover temporary leaf files",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "FileLeafStore tests, including the leftover-temporary report",
       "brief": ""
     },
     {
@@ -319,78 +280,13 @@
       "brief": ""
     },
     {
-      "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError; gains ReadOnly and RepairPending",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/file.rs",
-      "note": "FileLeafStore; gains open_read_only, the read-only refusals, leftover_temporaries and the 'What open does and never does' module-doc section",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "FileLeafStore tests; gains the read-only and leftover-temporary tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log over any LeafStore; its open and one-leaf repair are unchanged",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/log_tests.rs",
-      "note": "Log tests; gains the pinned-prefix refusal and repair tests",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/store.rs",
-      "note": "The LeafStore trait contract; unchanged",
-      "brief": ""
-    },
-    {
       "path": "crates/lys-log-store/src/lib.rs",
       "note": "Crate root and re-exports; unchanged",
       "brief": ""
     },
     {
-      "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "Criteria a second LeafStore backend must meet; unchanged",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/lys-log-store/design.json",
-      "note": "This design",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
-      "path": "docs/design/lys-log-store/checklist.json",
-      "note": "The cluster checklist",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
-      "path": "docs/design/lys-log-store/stories.json",
-      "note": "The cluster stories",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-003.json",
       "note": "The read-only leaf store brief",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
-      "path": "docs/design/lys-log-store/DESIGN.md",
-      "note": "Rendered from design.json",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
-      "path": "docs/design/lys-log-store/CHECKLIST.md",
-      "note": "Rendered from checklist.json",
-      "brief": "LYSLOGSTORE-003"
-    },
-    {
-      "path": "docs/design/lys-log-store/USER-STORIES.md",
-      "note": "Rendered from stories.json",
       "brief": "LYSLOGSTORE-003"
     },
     {
@@ -402,37 +298,32 @@
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-004.json",
       "note": "the read-only open, its two refusals, the repair rule and the file store's module doc",
       "brief": ""
-    },
-    {
-      "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError, including the ReadOnly and RepairPending refusals",
-      "brief": ""
     }
   ],
   "inventory": [
     {
       "path": "crates/lys-log-store/src/file.rs",
-      "note": "462 lines, 315 code lines. put_leaf opens the final leaf path with create_new, then write_all, sync_all and fsync_dir; a failure after create_new leaves a named leaf the next open counts. contiguous_extent already skips names starting with '.'. write_state uses a fixed, non-hidden state.json.tmp and rename. fsync_dir is a no-op on non-unix. No fault-injection seam."
+      "note": "On main: put_leaf_with writes leaves/.<pid>-<index>-<seq>.tmp, syncs it, hard-links it to the 20-digit name, removes the temporary file and syncs leaves/. open syncs leaves/ before counting. contiguous_extent skips every dot-prefixed name without reporting it. 430 code lines."
     },
     {
       "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "22 tests. create_new_alone_refuses_a_leaf_this_store_never_saw isolates the filesystem absent-check; an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored covers .DS_Store only. The module docs carry the drift-injection tables."
+      "note": "On main: includes a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical."
     },
     {
       "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError, #[non_exhaustive], 13 variants; LeafAlreadyWritten documented as two writers claiming one position; Poisoned belongs to Log's pin-failure case. No read-only variant."
+      "note": "StoreError::PinMismatch's message: 'stored leaves rebuild to tree size {rebuilt_size} with root {rebuilt_root}, but the pinned state is tree size {pinned_size} with root {pinned_root}'. Unchanged by this cluster."
     },
     {
       "path": "crates/lys-log-store/src/store.rs",
-      "note": "The LeafStore contract: durable on return, write-once, contiguous at open; LeafAlreadyWritten is a conflict meaning another writer, not a resume signal."
+      "note": "The LeafStore contract and PinnedRoot (tree_size, root). Unchanged by this cluster."
     },
     {
       "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log::open rebuilds from leaves and repairs exactly one leaf ahead of the pin through the store's pin; Log::append poisons only after put_leaf returns Ok. No open that leaves a store one leaf ahead as it found it."
+      "note": "Log::open rebuilds the tree, reconciles it with the (tree_size, root) pin, repairs exactly one leaf past the pin and reports it through recovered_to, and otherwise returns StoreError::PinMismatch with pinned_size, pinned_root, rebuilt_size and rebuilt_root. Code unchanged by this cluster."
     },
     {
       "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "The cluster's only document before this design: the criteria a backend satisfies."
+      "note": "The five adoption criteria for a second LeafStore backend."
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-003.json",
@@ -440,15 +331,15 @@
     },
     {
       "path": "crates/lys/src/commands/log/store.rs",
-      "note": "A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code."
+      "note": "open() opens FileLeafStore then Log and prints 'recovered interrupted append: state advanced to N' on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
     },
     {
       "path": "crates/lys-anchor-cli/src/commands/anchor/open.rs",
-      "note": "A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code."
+      "note": "open() opens FileLeafStore then Anchor and prints the same recovery line on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
     },
     {
       "path": "crates/lys-anchor/src/anchor/read_only.rs",
-      "note": "Anchor::open_read_only takes a store its caller opened and opens its log with Log::open, so it repairs a store one leaf ahead through the store's pin; it has no production caller. Its two doc examples (one of them compile_fail) open the store with FileLeafStore::open."
+      "note": "Anchor::open_read_only opens its log with Log::open over the writable FileLeafStore::open, so it repairs and pins on a read path."
     },
     {
       "path": "crates/lys-anchor/src/anchor/read_only_tests.rs",
@@ -463,36 +354,8 @@
       "note": "AnchorStatus, #[non_exhaustive]: origin, root, posture and recovered_to; nothing reports a repair that is pending rather than done."
     },
     {
-      "path": "crates/lys-log-store/src/file.rs",
-      "note": "On main: put_leaf_with writes leaves/.<pid>-<index>-<seq>.tmp, syncs it, hard-links it to the 20-digit name, removes the temporary file and syncs leaves/. open syncs leaves/ before counting. contiguous_extent skips every dot-prefixed name without reporting it. 430 code lines."
-    },
-    {
-      "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "On main: includes a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical."
-    },
-    {
-      "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log::open rebuilds the tree, reconciles it with the (tree_size, root) pin, repairs exactly one leaf past the pin and reports it through recovered_to, and otherwise returns StoreError::PinMismatch with pinned_size, pinned_root, rebuilt_size and rebuilt_root. Code unchanged by this cluster."
-    },
-    {
       "path": "crates/lys-log-store/src/log_tests.rs",
       "note": "On main: a_tampered_leaf_byte_is_detected_at_open, crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it and crash_recovery_does_not_mask_a_tampered_prefix assert the variant only."
-    },
-    {
-      "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError::PinMismatch's message: 'stored leaves rebuild to tree size {rebuilt_size} with root {rebuilt_root}, but the pinned state is tree size {pinned_size} with root {pinned_root}'. Unchanged by this cluster."
-    },
-    {
-      "path": "crates/lys-log-store/src/store.rs",
-      "note": "The LeafStore contract and PinnedRoot (tree_size, root). Unchanged by this cluster."
-    },
-    {
-      "path": "crates/lys/src/commands/log/store.rs",
-      "note": "open() opens FileLeafStore then Log and prints 'recovered interrupted append: state advanced to N' on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
-    },
-    {
-      "path": "crates/lys-anchor-cli/src/commands/anchor/open.rs",
-      "note": "open() opens FileLeafStore then Anchor and prints the same recovery line on stderr. A PinMismatch becomes a directory-invalid error carrying the store's message, printed as 'error: ...' on stderr with exit status 1."
     },
     {
       "path": "crates/lys-anchor/src/witness/observe.rs",
@@ -505,46 +368,6 @@
     {
       "path": "scripts/verify_inclusion.py",
       "note": "Standalone RFC 6962 verifier: verify_inclusion.py <artifact.json> <leaf-file>, exit 0 when the leaf verifies."
-    },
-    {
-      "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "The five adoption criteria for a second LeafStore backend."
-    },
-    {
-      "path": "crates/lys-log-store/src/file.rs",
-      "note": "FileLeafStore with create, open (flushes leaves/, then counts 20-digit names, skipping dot-prefixed ones), leaf, put_leaf (temporary write, flush, no-replace hard link) and pin. No read-only open. 430 code lines of the 500 allowed."
-    },
-    {
-      "path": "crates/lys-log-store/src/error.rs",
-      "note": "StoreError, #[non_exhaustive], 16 variants including PinMismatch; no ReadOnly or RepairPending."
-    },
-    {
-      "path": "crates/lys-log-store/src/log.rs",
-      "note": "Log::open rebuilds from every leaf and reconciles with the pin; repairs exactly one leaf past the pin when the prefix matches, otherwise PinMismatch."
-    },
-    {
-      "path": "crates/lys-log-store/src/store.rs",
-      "note": "The LeafStore trait and PinnedRoot; no fork, merge, delete, truncate or rewrite."
-    },
-    {
-      "path": "crates/lys-log-store/src/file_tests.rs",
-      "note": "34 tests, including a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical; no read-only test."
-    },
-    {
-      "path": "crates/lys-log-store/src/log_tests.rs",
-      "note": "13 tests, including a_tampered_leaf_byte_is_detected_at_open (one byte changed in the pinned prefix, PinMismatch), crash_recovery_repairs_exactly_one_interrupted_append_and_reports_it and crash_recovery_does_not_mask_a_tampered_prefix."
-    },
-    {
-      "path": "crates/lys-anchor/src/anchor/read_only.rs",
-      "note": "Anchor::open_read_only opens its log with Log::open over the writable FileLeafStore::open, so it repairs and pins on a read path."
-    },
-    {
-      "path": "crates/lys/src/commands/log/store.rs",
-      "note": "The lys log commands open with Log::open(FileLeafStore::open(dir)), so status repairs on a read path."
-    },
-    {
-      "path": "docs/design/lys-log-store/BACKENDS.md",
-      "note": "Five criteria a second backend must meet; reading without writing is not among them."
     },
     {
       "path": "docs/design/identity/CONFORMANCE.md",
