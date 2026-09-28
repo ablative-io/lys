@@ -1,5 +1,5 @@
-//! The review route: what the agents a person answers for hold now, so the
-//! person can decide what each still needs.
+//! The review routes: what the agents a person answers for hold now, so the
+//! person can decide what each still needs, and the decision to keep one.
 //!
 //! A grant is due for review when an agent holds it, the agent is not retired
 //! and the grant stands at the moment of asking: no grant on its ancestry is
@@ -8,35 +8,83 @@
 //! authority is shown every agent's. An agent whose person is not active has
 //! no one answering for it, and is listed apart.
 //!
-//! The route reads and never writes. Dropping a grant is
-//! `POST /grants/{id}/revoke`. A decision to keep a grant is not recorded yet,
-//! so the answer carries no decisions and no due date.
+//! Dropping a grant is `POST /grants/{id}/revoke`. Keeping one is
+//! `POST /reviews/{grant}/keep`, with an operation id and the reviewer's
+//! note: only the person the holding agent answers to, or the root
+//! authority, keeps it, and only while it stands. The decision is recorded in
+//! the review decisions' log before it is answered, under its operation id,
+//! so asking it again in the same words answers what was recorded and writes
+//! nothing, and the same operation in other words is refused by name.
+//! `GET /reviews` shows each due grant's latest decision to keep it.
+//!
+//! No next review date is answered. When a kept grant is due again is a
+//! renewal policy that is not decided, so no date is invented for it: a
+//! decision records that the grant was kept, by whom, when and why, and
+//! nothing more.
 
-use std::sync::Arc;
+use std::str::FromStr;
+use std::sync::{Arc, MutexGuard, PoisonError};
 
-use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
+use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::grants::expiry::within_window;
 use lys_identity::grants::revocation::unrevoked;
 use lys_identity::grants::{GrantBook, GrantRecord};
 use lys_identity::projection::{Projection, Record};
-use lys_identity::{AgentId, IdentityId, LifecycleState, PersonId};
-use serde::Serialize;
+use lys_identity::{AgentId, IdentityId, LifecycleState, OperationId, PersonId};
+use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
-use crate::grant_contract::GrantView;
-use crate::grant_sight::is_root;
+use crate::grant_contract::{GrantView, grant_id};
+use crate::grant_sight::{is_root, sees};
 use crate::grants::with_grants;
 use crate::read_api::{own_person, person_summary};
 use crate::read_views::{AgentSummary, PersonSummary};
+use crate::reviews_state::Kept;
+use crate::reviews_store::ReviewStore;
 use crate::routes::{AppState, signed_in};
 use crate::session::now;
 
-/// The review route.
+/// The most characters a reviewer's note carries.
+const NOTE_MAX: usize = 500;
+
+/// The review routes.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/reviews", get(reviews))
+    Router::new()
+        .route("/reviews", get(reviews))
+        .route("/reviews/{grant}/keep", post(keep))
+}
+
+/// A decision to keep a grant, as the reviewer sends it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KeepBody {
+    operation: String,
+    note: String,
+}
+
+/// The latest decision to keep a grant.
+#[derive(Debug, Clone, Serialize)]
+pub struct KeptView {
+    /// The person who kept it.
+    pub by: String,
+    /// When it was kept, in seconds since the Unix epoch.
+    pub at: u64,
+    /// The person's words.
+    pub note: String,
+}
+
+impl From<&Kept> for KeptView {
+    fn from(kept: &Kept) -> Self {
+        Self {
+            by: kept.kept_by.clone(),
+            at: kept.at,
+            note: kept.note.clone(),
+        }
+    }
 }
 
 /// One grant an agent holds, with the agent and the person who reviews it.
@@ -48,6 +96,8 @@ pub struct DueView {
     pub agent: AgentSummary,
     /// The person the agent answers to, who decides whether it is kept.
     pub reviewer: PersonSummary,
+    /// The latest decision to keep the grant, null when it was never kept.
+    pub last_kept: Option<KeptView>,
 }
 
 /// An agent whose person is not active, so no one answers for it.
@@ -72,6 +122,10 @@ pub struct ReviewView {
     pub revision: u64,
     /// The moment the grants were judged to stand, in seconds since the Unix epoch.
     pub judged_at: u64,
+    /// Whether decisions to keep a grant are recorded here; false when the
+    /// configuration names no review decisions' log, and then every
+    /// `last_kept` is null.
+    pub decisions_recorded: bool,
 }
 
 /// An agent in the directory with the person it answers to.
@@ -127,6 +181,17 @@ pub(crate) fn stands(book: &GrantBook, record: &GrantRecord, at: u64) -> bool {
     })
 }
 
+/// The review decisions, settled, or none when the configuration names no
+/// log for them.
+fn decisions(state: &AppState) -> Result<Option<MutexGuard<'_, ReviewStore>>, ServerError> {
+    let Some(store) = state.reviews.as_ref() else {
+        return Ok(None);
+    };
+    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    store.settle()?;
+    Ok(Some(store))
+}
+
 async fn reviews(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -137,6 +202,7 @@ async fn reviews(
         let whole = is_root(IdentityId::Person(person), judged.root);
         let viewer = (!whole).then_some(person);
         let judged_at = now();
+        let kept = decisions(&state)?;
         let book = judged.grants.book();
         let due = book
             .records()
@@ -147,6 +213,11 @@ async fn reviews(
                     grant: GrantView::from(record),
                     agent: held.agent_summary(),
                     reviewer: held.person_summary(),
+                    last_kept: kept.as_ref().and_then(|store| {
+                        store
+                            .last_for(&record.grant().id().to_string())
+                            .map(KeptView::from)
+                    }),
                 })
             })
             .collect();
@@ -166,6 +237,77 @@ async fn reviews(
             unanswered,
             revision: judged.grants.revision(),
             judged_at,
+            decisions_recorded: kept.is_some(),
         }))
+    })
+}
+
+/// The note `text` carries, trimmed, refused when it is too long.
+fn note(text: &str) -> Result<String, ServerError> {
+    let text = text.trim();
+    if text.chars().count() > NOTE_MAX {
+        return Err(ServerError::RequestMalformed {
+            reason: format!("note is longer than {NOTE_MAX} characters"),
+        });
+    }
+    Ok(text.to_owned())
+}
+
+/// Keep the grant `grant`: only its reviewer or the root authority, and only
+/// while it stands. Asked again in the same words it answers what was
+/// recorded and writes nothing.
+async fn keep(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(grant): Path<String>,
+    body: Result<Json<KeepBody>, JsonRejection>,
+) -> Result<Json<Kept>, ServerError> {
+    let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let actor = signed_in(&state, &headers)?;
+    let grant = grant_id(&grant)?;
+    let operation = OperationId::from_str(&body.operation)?.to_string();
+    let note = note(&body.note)?;
+    with_grants(&state, |judged| {
+        let person = own_person(judged.directory, &actor)?;
+        let caller = IdentityId::Person(person);
+        let whole = is_root(caller, judged.root);
+        let book = judged.grants.book();
+        let record = book
+            .record(grant)
+            .filter(|record| sees(&judged, caller, record))
+            .ok_or(ServerError::GrantNotVisible)?;
+        let held = answering(judged.directory, record.grant().holder(), None).ok_or_else(|| {
+            ServerError::GrantNotDue {
+                grant: grant.to_string(),
+                why: "it is not held by an agent that answers to a person and is not retired",
+            }
+        })?;
+        if !whole && held.person != person {
+            return Err(ServerError::ReviewerOnly);
+        }
+        let at = now();
+        let kept = Kept {
+            grant: grant.to_string(),
+            kept_by: person.to_string(),
+            note,
+            operation,
+            at,
+            revision: judged.grants.revision(),
+        };
+        let mut store = decisions(&state)?.ok_or_else(|| ServerError::ReviewsUnavailable {
+            reason: "the configuration names no reviews_dir".to_owned(),
+        })?;
+        if let Some(recorded) = store.already(&kept)? {
+            return Ok(Json(recorded));
+        }
+        if !stands(book, record, at) {
+            return Err(ServerError::GrantNotDue {
+                grant: grant.to_string(),
+                why: "it does not stand: it or a grant it derives from is revoked, not yet started or ended",
+            });
+        }
+        Ok(Json(store.keep(kept)?))
     })
 }

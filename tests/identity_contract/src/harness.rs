@@ -293,6 +293,7 @@ impl Service {
             provisioning_file: Some(dir.path().join("provisioning.json")),
             runtime_dir: Some(dir.path().join("runtime")),
             service_accounts_dir: Some(dir.path().join("service-accounts")),
+            reviews_dir: Some(dir.path().join("reviews")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
