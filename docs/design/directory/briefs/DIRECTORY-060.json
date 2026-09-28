@@ -24,14 +24,15 @@
     {
       "id": "R1",
       "title": "One key per session, and a start that is key, then issue, then spawn",
-      "spec": "Behavioural. When the runner is asked to start a session (DIRECTORY-050 R3), it makes one Ed25519 key for that session in memory with a new Ed25519Identity::generate in crates/lys-core/src/keys/identity.rs, which draws its seed from the operating system's randomness and takes no key material. It answers the key's public key to lys-identity-server before it spawns anything. The server then issues every handle the launch record names through POST /_lys/handles/issue (SECRETS-008 R1), bound to that public key, on behalf of the person starting the agent. Only when every issue has answered does it tell the runner to spawn, with the handle ids and tokens in the session's environment as 050 R3 names them. A refused issue ends the start with that refusal by name, and nothing is spawned. The key lives in the session's record in crates/lys-runner/src/session.rs, is never written to a file, a log, an argument or the environment, and is dropped when the session ends. A restart of the runner loses every key, as it already ends every session (050 R1).",
+      "spec": "Behavioural. When the runner is asked to start a session (DIRECTORY-050 R3), it makes one Ed25519 key for that session in memory with a new Ed25519Identity::generate in crates/lys-core/src/keys/identity.rs, which draws its seed from the operating system's randomness and takes no key material. It answers the key's public key to lys-identity-server before it spawns anything. The server then issues every handle the launch record names through POST /_lys/handles/issue (SECRETS-008 R1), bound to that public key, on behalf of the person starting the agent. Only when every issue has answered does it tell the runner to spawn. Each issued token is kept in the session's record beside the key and never leaves the runner except in an answer of present (R2). The session's environment carries only the handle ids, as crates/lys-identity-server/src/launch_template.rs lines 6 to 9 say secrets ride, and LYS_RUNNER_SOCKET, because a process of the same user can read another's environment. A refused issue ends the start with that refusal by name, and nothing is spawned. The key and the tokens live in the session's record in crates/lys-runner/src/session.rs, are never written to a file, a log, an argument or the environment, and are dropped when the session ends. A restart of the runner loses every key and token, as it already ends every session (050 R1).",
       "acceptance": [
         "A started session's handles are admitted by the broker for presentations the runner signs, in crates/lys-runner/tests/session_key.rs.",
         "A start whose issue is refused answers that refusal by name.",
         "After a start whose issue is refused, the runner has spawned no process for it.",
         "No file the runner writes holds the session key's seed or its hex.",
         "The spawned process's environment and arguments hold no byte of the session key's seed.",
-        "Two sessions started together hold different public keys."
+        "Two sessions started together hold different public keys.",
+        "The spawned process's environment holds no handle token."
       ],
       "files": {
         "create": [
@@ -57,9 +58,10 @@
     {
       "id": "R2",
       "title": "The presentation act, for a peer proved to be the session",
-      "spec": "Behavioural. The runner's socket (crates/lys-runner/src/socket.rs, mode 0600) gains one act, present, beside the acts of 050 R2. It takes a handle id, an operation id, a signing instant and the request digest of lys_secrets::request_digest (crates/lys-secrets/src/handle.rs line 28). It answers one presentation made by Presentation::sign (handle.rs line 184) with the session's key, as the four wire words of to_wire (handle.rs line 129). It refuses present_not_session when the peer is not proved to be a session's, and present_not_this_handle when the handle id is not one issued to that session. The peer is proved on every connection by its credentials and its ancestry. The peer's pid comes from the socket, through nix 0.31.3 with the option LocalPeerPid on macOS and PeerCredentials on Linux. The peer's user must equal the runner's. Its parent chain is walked to a session's own root pid, the pid the runner spawned. On macOS the parent pid comes from libproc 0.14.11. On Linux it comes from reading /proc/<pid>/stat. A chain that reaches no session root, or breaks, is refused present_not_session. The connection stays open while the proof and the answer are made, so the peer's pid cannot be reused meanwhile. The server-signed acts of 050 R1 are unchanged, and present is the only act a session peer may ask. No unsafe block is added to Lys code.",
+      "spec": "Behavioural. The runner's socket (crates/lys-runner/src/socket.rs, mode 0600) gains one act, present, beside the acts of 050 R2. It takes a handle id, an operation id, a signing instant and the request digest of lys_secrets::request_digest (crates/lys-secrets/src/handle.rs line 28). It answers every header a handle route reads (crates/lys-secrets/src/bin/lys-secrets/serve.rs lines 203 to 210). These are the handle's token in hex as lys-handle, from the session's record, and one presentation made by Presentation::sign (handle.rs line 184) with the session's key, as the four wire words of to_wire (handle.rs line 129). It refuses present_not_session when the peer is not proved to be a session's, and present_not_this_handle when the handle id is not one issued to that session. The peer is proved on every connection by its credentials and its ancestry. The peer's pid comes from the socket, through nix 0.31.3 with the option LocalPeerPid on macOS and PeerCredentials on Linux. The peer's user must equal the runner's. Its parent chain is walked to a session's own root pid, the pid the runner spawned. On macOS the parent pid comes from libproc 0.14.11. On Linux it comes from reading /proc/<pid>/stat. A chain that reaches no session root, or breaks, is refused present_not_session. The connection stays open while the proof and the answer are made, so the peer's pid cannot be reused meanwhile. The server-signed acts of 050 R1 are unchanged, and present is the only act a session peer may ask. No unsafe block is added to Lys code.",
       "acceptance": [
         "A child of a session's process asking present for one of its handles gets a presentation the broker admits.",
+        "The answer of present holds the handle's token and the four wire words, and a request carrying them is admitted by the broker.",
         "A process that is not a descendant of any session's root is refused present_not_session.",
         "A descendant of one session asking for another session's handle is refused present_not_this_handle.",
         "A session peer asking any act but present is refused as 050 R1 refuses an unsigned request.",
@@ -89,10 +91,11 @@
     {
       "id": "R3",
       "title": "The harness and lys mcp present through the runner",
-      "spec": "Behavioural. Every broker call a session makes, the hand-over of account values at spawn under 050 R5 included, asks the runner's present act for its presentation. The helper that does so for a Lys-side caller lives in crates/lys-runner/src/present_client.rs, which DIRECTORY-049 R7 names for `lys mcp`. It reaches the runner by the socket path the session's environment names as LYS_RUNNER_SOCKET, and holds no key.",
+      "spec": "Behavioural. Every broker call a session makes, the hand-over of account values at spawn under 050 R5 included, asks the runner's present act for its presentation. The helper that does so for a Lys-side caller lives in crates/lys-runner/src/present_client.rs, which DIRECTORY-049 R7 names for `lys mcp`. It reaches the runner by the socket path the session's environment names as LYS_RUNNER_SOCKET, sets on the broker request the headers present answers, and holds no key and keeps no token past the one request.",
       "acceptance": [
         "A rotation under 050 R5 hands the next account's value to the new session through a presentation the runner signed.",
-        "present_client.rs holds no Ed25519Identity and reads no key file."
+        "present_client.rs holds no Ed25519Identity and reads no key file.",
+        "present_client.rs reads no handle token from the environment."
       ],
       "files": {
         "create": [
@@ -114,6 +117,7 @@
   ],
   "boundaries": [
     "SHALL NOT write, log, pass as an argument or put in the environment any byte of a session key's seed.",
+    "SHALL NOT put a handle token in a spawned session's environment, arguments or any file.",
     "SHALL NOT add an unsafe block, or a dependency other than nix 0.31.3 and libproc 0.14.11.",
     "SHALL NOT sign a presentation for a handle that was not issued to the asking session.",
     "SHALL NOT refuse on macOS what is admitted on Linux, or the reverse.",
