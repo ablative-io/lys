@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nDIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people only (ADR-019). A sign-in identity is a provider account (P1) linked to a person; the directory classifies every issuer-subject pair from its signed history as a current or former sign-in identity, an agent's service account, or unbound, so an account once linked to a person stays refused for agents after an unlink. The refusals sit in seams other rows already own: the DIRECTORY-003 R1 binding API, a check beside the DIRECTORY-003 R4 receiver that the link path asks by issuer-subject pair before the fork links (DIRECTORY-004), and DIRECTORY-006 admission and explanation. One refusal value carries two views: the identity's owner and a directory administrator see the provider and subject, everyone else only that a sign-in identity is involved. The harness login token (SECRETS-002 R5) is the one named exception and never passes through anything lys issues, links or delegates.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 6.4 of docs/design/identity/CONFORMANCE.md, issuance entered in a transparency log and verified offline by anyone, is carried by DIRECTORY-031 on the lys-log-store log that `lys log` keeps (ADR-081): `lys ca issue` enters every certificate it produces as one leaf holding its DER before anything is written, the issuer holds only the CA key, the log's operator makes the inclusion artifact with `lys log prove inclusion`, and `lys ca issuer-cert` gives the stranger the issuer certificate `openssl verify` needs.",
   "principles": [
     {
       "id": "P1",
@@ -65,7 +65,8 @@
     "ADR-093",
     "ADR-094",
     "ADR-079",
-    "ADR-080"
+    "ADR-080",
+    "ADR-081"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -1603,6 +1604,81 @@
       "path": "tests/identity_contract/src/harness.rs",
       "note": "starts the in-process service with a configured directory_id for the session route tests (DIRECTORY-026 R8)",
       "brief": "DIRECTORY-026"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-031.json",
+      "note": "row 6.4: issuance entered in the lys-log-store log, the issuer certificate command and the stranger's proof",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "docs/design/directory/PROOF-ISSUANCE.md",
+      "note": "the recorded stranger's check of an issued certificate and its log entry: commands, exit codes and output, hashes, counts and paths only",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys/src/commands/ca.rs",
+      "note": "`lys ca request`, `issue` and `verify`; gains `issuer_cert` and the issuer certificate stored beside the CA key, and `issue` always carries a log entry (DIRECTORY-031)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/ca_tests.rs",
+      "note": "unit tests of ca.rs",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/ca_log.rs",
+      "note": "entering an issued certificate in a lys-log-store log before anything is written; the issuer-only entry with no log key (DIRECTORY-031)",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/src/commands/ca_log_tests.rs",
+      "note": "unit tests of ca_log.rs",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/ca_log_tests.rs",
+      "note": "`lys ca issue --log` integration tests; registers the ca_log modules",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/ca_log/support.rs",
+      "note": "shared bench: test keys, a test log, openssl and python3 resolved as hard requirements",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/ca_log/outputs.rs",
+      "note": "output refusals and the failure after the append",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/ca_log/issuer_cert.rs",
+      "note": "`lys ca issuer-cert`: the stored issuer certificate, byte identity with `--issuer-out`, and its refusals",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys/tests/ca_log/issuer_only.rs",
+      "note": "issuance with the CA key only, the operator's artifact, the refusal, and the stranger's offline check with no lys on PATH",
+      "brief": "DIRECTORY-031"
+    },
+    {
+      "path": "crates/lys/tests/cli_tests.rs",
+      "note": "CLI integration tests; its `ca issue` invocations name a test log",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/json_output_tests.rs",
+      "note": "--json output tests; its `ca issue` invocations name a test log",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/certified_attestation_tests.rs",
+      "note": "certified attestation tests; its `ca issue` invocations name a test log",
+      "brief": ""
+    },
+    {
+      "path": "README.md",
+      "note": "the project README; its `lys ca issue` example names a log",
+      "brief": ""
     }
   ],
   "inventory": [
@@ -1689,6 +1765,18 @@
     {
       "path": "crates/lys-core/src/ca/authority.rs",
       "note": "issue_certificate_for_request and verify_certificate_chain_at, which DIRECTORY-031 issues and verifies through; read, never changed"
+    },
+    {
+      "path": "crates/lys/src/commands/ca_log.rs",
+      "note": "on main at fa3dd5311e98d1a751c770319e1cfe2570718c76: `lys ca issue --log`, which today takes --log, --log-key, --leaf-out and --artifact-out together or not at all, stages every output before the append, and reports log_dir, leaf_index, tree_size, root_hash, root_base64, leaf_path and artifact_path; a failure after the append is LoggedButUnwritten with the recovering `lys log prove inclusion` command. DIRECTORY-031 changes it (structure row)"
+    },
+    {
+      "path": "crates/lys/tests/ca_log_tests.rs",
+      "note": "on main at fa3dd5311e98d1a751c770319e1cfe2570718c76: the `lys ca issue --log` integration tests and their modules under crates/lys/tests/ca_log/ (support.rs, outputs.rs, tamper.rs), which resolve openssl and python3 as hard requirements, never skips. DIRECTORY-031 adds two modules beside them (structure rows)"
+    },
+    {
+      "path": "scripts/verify_inclusion.py",
+      "note": "the stranger's inclusion checker for lys/log-inclusion-proof/v1: Python standard library only, exit 0 verified, 1 usage or I/O, 2 verification failed, an optional expected-root-base64 third argument; it does not check the checkpoint's signature and says so. Read, never changed"
     }
   ],
   "constraints": [
