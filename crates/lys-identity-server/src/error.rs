@@ -3,8 +3,11 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
+
+use crate::error_status::{grant_status, identity_status};
 
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
@@ -242,6 +245,12 @@ pub enum ServerError {
         /// The agent's lifecycle state.
         state: String,
     },
+    /// The machine may not reach a host the agent's profile needs.
+    #[error("MachineCannotReach: the machine may not reach `{host}`, which the profile needs")]
+    MachineCannotReach {
+        /// The host.
+        host: String,
+    },
     /// The machine is retired, so nothing is started on it.
     #[error("MachineRetired: the machine is retired and nothing is started on it")]
     MachineRetired,
@@ -327,6 +336,67 @@ pub enum ServerError {
         /// The person named.
         owner: String,
     },
+    /// The teams are not configured, or their log could not be read or written.
+    #[error("TeamsUnavailable: {reason}")]
+    TeamsUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// No team by that id was ever created.
+    #[error("TeamUnknown: no team by that id was ever created")]
+    TeamUnknown,
+    /// The operation id already names a team act sent in other words.
+    #[error(
+        "TeamReused: operation `{operation}` already names a team act in other words: send this act under a new operation id"
+    )]
+    TeamReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// The team is retired and takes no more changes.
+    #[error("TeamRetired: team `{team}` is retired and takes no more changes")]
+    TeamRetired {
+        /// The team.
+        team: String,
+    },
+    /// The member is already in the team.
+    #[error("TeamMemberHeld: that member is already in the team")]
+    TeamMemberHeld,
+    /// The member is not in the team.
+    #[error("TeamMemberAbsent: that member is not in the team")]
+    TeamMemberAbsent,
+    /// The member named is not a person or agent the directory holds, or is retired.
+    #[error(
+        "TeamMemberUnknown: a member is a person or agent the directory holds and has not retired"
+    )]
+    TeamMemberUnknown,
+    /// The review decisions are not configured, or their log could not be read or written.
+    #[error("ReviewsUnavailable: {reason}")]
+    ReviewsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The caller may see the grant but is not the one who reviews it.
+    #[error(
+        "ReviewerOnly: only the person the holding agent answers to, or the root authority, keeps this grant"
+    )]
+    ReviewerOnly,
+    /// The grant is not due for review, so there is nothing to keep.
+    #[error("GrantNotDue: grant `{grant}` is not due for review: {why}")]
+    GrantNotDue {
+        /// The grant.
+        grant: String,
+        /// Why it is not due.
+        why: &'static str,
+    },
+    /// The operation id already names a review decision made in other words.
+    #[error(
+        "ReviewReused: operation `{operation}` already names a review decision made in other words: keep this grant under a new operation id"
+    )]
+    ReviewReused {
+        /// The operation id.
+        operation: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -349,7 +419,8 @@ impl ServerError {
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }
-            | Self::MachineNotForAgent => StatusCode::FORBIDDEN,
+            | Self::MachineNotForAgent
+            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
@@ -361,6 +432,8 @@ impl ServerError {
             | Self::RoleVersionUnknown
             | Self::HolderUnknown
             | Self::ServiceAccountUnknown
+            | Self::TeamUnknown
+            | Self::TeamMemberUnknown
             | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
@@ -376,6 +449,7 @@ impl ServerError {
             | Self::CertificateWithdrawn { .. }
             | Self::MachineRetired
             | Self::AgentNotActive { .. }
+            | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
             | Self::RuntimeSessionStarted { .. }
@@ -383,7 +457,13 @@ impl ServerError {
             | Self::RuntimeReportReused { .. }
             | Self::ServiceAccountReused { .. }
             | Self::ServiceAccountRetired { .. }
-            | Self::ServiceAccountOwnerRetired { .. } => StatusCode::CONFLICT,
+            | Self::ServiceAccountOwnerRetired { .. }
+            | Self::TeamReused { .. }
+            | Self::TeamRetired { .. }
+            | Self::TeamMemberHeld
+            | Self::TeamMemberAbsent
+            | Self::GrantNotDue { .. }
+            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
@@ -395,61 +475,13 @@ impl ServerError {
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }
-            | Self::ServiceAccountsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::ServiceAccountsUnavailable { .. }
+            | Self::TeamsUnavailable { .. }
+            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
         }
-    }
-}
-
-fn identity_status(error: &IdentityError) -> StatusCode {
-    match error {
-        IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
-        IdentityError::AppendUncertain { .. }
-        | IdentityError::LogUnavailable { .. }
-        | IdentityError::AppendRefused { .. }
-        | IdentityError::RandomSourceUnavailable { .. }
-        | IdentityError::KeyUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-        _ => StatusCode::CONFLICT,
-    }
-}
-
-fn grant_status(error: &GrantError) -> StatusCode {
-    match error {
-        GrantError::Identity(error) => identity_status(error),
-        GrantError::GrantIdMalformed { .. }
-        | GrantError::TokenInvalid { .. }
-        | GrantError::AuthorityAbsent { .. }
-        | GrantError::PassOnOutside
-        | GrantError::WindowInvalid { .. }
-        | GrantError::LineageMalformed { .. }
-        | GrantError::MemberUnknown { .. }
-        | GrantError::MemberMissing { .. }
-        | GrantError::RecipientKindUnknown { .. }
-        | GrantError::GrantMalformed { .. }
-        | GrantError::GrantNotCanonical
-        | GrantError::EventMalformed { .. }
-        | GrantError::EventNotCanonical
-        | GrantError::EventTooLarge { .. } => StatusCode::BAD_REQUEST,
-        GrantError::SourceUnknown { .. } | GrantError::GrantUnknown { .. } => StatusCode::NOT_FOUND,
-        GrantError::ModelInvalid { .. }
-        | GrantError::EventMismatch { .. }
-        | GrantError::VersionUnsupported { .. }
-        | GrantError::SignerMismatch
-        | GrantError::SignatureInvalid
-        | GrantError::ReceiptInvalid { .. }
-        | GrantError::LogUnavailable { .. }
-        | GrantError::LeafNotAnEvent { .. }
-        | GrantError::AppendRefused { .. }
-        | GrantError::OperationUnresolved { .. }
-        | GrantError::ProjectionPending { .. }
-        | GrantError::StaleDecision { .. }
-        | GrantError::PermissionEngineUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-        GrantError::OperationReused { .. }
-        | GrantError::GrantExists { .. }
-        | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
-        _ => StatusCode::FORBIDDEN,
     }
 }
 

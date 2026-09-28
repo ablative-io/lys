@@ -1,7 +1,9 @@
 //! The review route: a person is shown what the agents answering to them
 //! hold now, the root authority is shown every agent's, a grant that no
 //! longer stands is not due, and an agent whose person is not active is
-//! listed as having no one answering. The service runs with only its own
+//! listed as having no one answering. A grant is kept only by its reviewer
+//! or the root authority and only while it stands; the same decision asked
+//! again is recorded once. The service runs with only its own
 //! disposable log and the in-process issuer, and no other server.
 
 use std::collections::BTreeSet;
@@ -61,7 +63,19 @@ impl Table {
         cookie: &str,
         resource: &str,
     ) -> Result<(String, String), Box<dyn Error>> {
+        self.lend_to(person, person, cookie, resource).await
+    }
+
+    /// As `lend`, with the grant lent to the agent of `recipient`.
+    async fn lend_to(
+        &self,
+        person: usize,
+        recipient: usize,
+        cookie: &str,
+        resource: &str,
+    ) -> Result<(String, String), Box<dyn Error>> {
         let holder = &self.seeded.people[person];
+        let receiver = &self.seeded.people[recipient];
         let root = json!({
             "operation": operation()?,
             "route": "api",
@@ -81,8 +95,8 @@ impl Table {
             "operation": operation()?,
             "route": "api",
             "source": source,
-            "recipient": holder.agents[0].id.to_string(),
-            "responsible": holder.id.to_string(),
+            "recipient": receiver.agents[0].id.to_string(),
+            "responsible": receiver.id.to_string(),
             "resource": { "kind": "doc", "id": resource },
             "relation": "beta",
             "pass_on": { "kind": "use_only" },
@@ -94,6 +108,17 @@ impl Table {
             source,
             issued["grant"].as_str().ok_or("no grant")?.to_owned(),
         ))
+    }
+
+    async fn keep(
+        &self,
+        cookie: &str,
+        grant: &str,
+        body: &Value,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
+        self.service
+            .post(&format!("/reviews/{grant}/keep"), Some(cookie), body)
+            .await
     }
 
     async fn reviews(&self, cookie: &str) -> Result<Value, Box<dyn Error>> {
@@ -216,5 +241,134 @@ async fn an_agent_whose_person_is_suspended_has_no_one_answering() -> TestResult
     assert_eq!(unanswered[0]["agent"]["id"], bea.agents[0].id.to_string());
     assert_eq!(unanswered[0]["person"]["id"], bea.id.to_string());
     assert_eq!(unanswered[0]["person"]["state"], "suspended");
+    Ok(())
+}
+
+fn due_for<'a>(view: &'a Value, grant: &str) -> Result<&'a Value, Box<dyn Error>> {
+    Ok(view["due"]
+        .as_array()
+        .ok_or("due is not a list")?
+        .iter()
+        .find(|due| due["grant"]["id"] == grant)
+        .ok_or("the grant is not due")?)
+}
+
+#[tokio::test]
+async fn a_kept_grant_is_read_back_with_who_kept_it_and_no_due_date() -> TestResult {
+    let table = Table::set().await?;
+    let bea = &table.seeded.people[1];
+    let (_, lent) = table.lend(1, &table.bea, "1").await?;
+    let before = table.reviews(&table.bea).await?;
+    assert_eq!(before["decisions_recorded"], true);
+    assert_eq!(due_for(&before, &lent)?["last_kept"], Value::Null);
+
+    let body = json!({ "operation": operation()?, "note": "  still reads the docs  " });
+    let (status, kept) = table.keep(&table.bea, &lent, &body).await?;
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(kept["grant"], lent);
+    assert_eq!(kept["kept_by"], bea.id.to_string());
+    assert_eq!(kept["note"], "still reads the docs");
+    assert_eq!(kept["operation"], body["operation"]);
+    assert_eq!(kept["revision"], before["revision"]);
+    assert!(kept["at"].as_u64().is_some(), "{kept}");
+
+    for cookie in [&table.bea, &table.ada] {
+        let view = table.reviews(cookie).await?;
+        let last = &due_for(&view, &lent)?["last_kept"];
+        assert_eq!(last["by"], bea.id.to_string());
+        assert_eq!(last["note"], "still reads the docs");
+        assert_eq!(last["at"], kept["at"]);
+        assert_eq!(
+            due_for(&view, &lent)?.get("next_review"),
+            None,
+            "no due date is invented"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_root_authority_keeps_any_agents_grant() -> TestResult {
+    let table = Table::set().await?;
+    let ada = &table.seeded.people[0];
+    let (_, lent) = table.lend(1, &table.bea, "1").await?;
+    let body = json!({ "operation": operation()?, "note": "kept by the root" });
+    let (status, kept) = table.keep(&table.ada, &lent, &body).await?;
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(kept["kept_by"], ada.id.to_string());
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_same_keep_is_recorded_once_and_other_words_are_refused() -> TestResult {
+    let table = Table::set().await?;
+    let (_, lent) = table.lend(1, &table.bea, "1").await?;
+    let body = json!({ "operation": operation()?, "note": "still needed" });
+    let (status, first) = table.keep(&table.bea, &lent, &body).await?;
+    assert_eq!(status, 200, "{first}");
+    let (status, again) = table.keep(&table.bea, &lent, &body).await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(again, first, "asked again it answers what was recorded");
+
+    let reworded = json!({ "operation": body["operation"], "note": "other words" });
+    let (status, refused) = table.keep(&table.bea, &lent, &reworded).await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "ReviewReused");
+    let view = table.reviews(&table.bea).await?;
+    let last = &due_for(&view, &lent)?["last_kept"];
+    assert_eq!(last["note"], "still needed", "nothing refused is recorded");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_person_who_is_not_the_reviewer_is_refused_by_name() -> TestResult {
+    let table = Table::set().await?;
+    let (_, of_ada) = table.lend(0, &table.ada, "1").await?;
+    let body = json!({ "operation": operation()?, "note": "not mine" });
+    let (status, refused) = table.keep(&table.bea, &of_ada, &body).await?;
+    assert_eq!(status, 404, "{refused}");
+    assert_eq!(refused["refusal"], "GrantNotVisible");
+
+    let (_, to_ada) = table.lend_to(1, 0, &table.bea, "2").await?;
+    let body = json!({ "operation": operation()?, "note": "issued, not reviewed" });
+    let (status, refused) = table.keep(&table.bea, &to_ada, &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "ReviewerOnly");
+    let view = table.reviews(&table.ada).await?;
+    assert_eq!(due_for(&view, &to_ada)?["last_kept"], Value::Null);
+
+    let stranger = table.service.sign_in(login(STRANGER)).await?;
+    let (status, refused) = table.keep(&stranger, &to_ada, &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NoPerson");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_grant_that_no_longer_stands_is_not_kept() -> TestResult {
+    let table = Table::set().await?;
+    let (source, lent) = table.lend(1, &table.bea, "1").await?;
+    let kept = json!({ "operation": operation()?, "note": "kept before" });
+    let (status, first) = table.keep(&table.bea, &lent, &kept).await?;
+    assert_eq!(status, 200, "{first}");
+
+    let revoke = json!({ "operation": operation()?, "route": "api", "reason": "review test" });
+    let (status, revoked) = table
+        .service
+        .post(
+            &format!("/grants/{source}/revoke"),
+            Some(&table.ada),
+            &revoke,
+        )
+        .await?;
+    assert_eq!(status, 200, "{revoked}");
+
+    let body = json!({ "operation": operation()?, "note": "too late" });
+    let (status, refused) = table.keep(&table.bea, &lent, &body).await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "GrantNotDue");
+    let (status, again) = table.keep(&table.bea, &lent, &kept).await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(again, first, "a recorded decision is answered as recorded");
     Ok(())
 }

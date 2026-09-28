@@ -101,7 +101,7 @@ impl Table {
         let id = operation()?;
         let body = json!({
             "operation": id, "name": "Build box", "kind": "server", "runtime": runtime,
-            "slots": u32::from(runtime.is_some()), "may_run": may_run, "may_reach": [],
+            "slots": u32::from(runtime.is_some()), "may_run": may_run, "may_reach": ["cambium.example.test"],
         });
         let (status, named) = self
             .service
@@ -297,5 +297,28 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
     assert_eq!(sessions.len(), 1, "{held}");
     assert_eq!(sessions[0]["session"], first["session"]);
     assert_eq!(sessions[0]["shown"], "unconfirmed");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
+    let table = Table::set().await?;
+    let agent = table.agent();
+    table.profile().await?;
+    let machine = operation()?;
+    let body = json!({
+        "operation": machine, "name": "closed", "kind": "laptop", "runtime": "manifold",
+        "slots": 1, "may_run": [agent], "may_reach": ["elsewhere.example.test"],
+    });
+    let (status, named) = table
+        .service
+        .post("/network/machines", Some(&table.ada), &body)
+        .await?;
+    assert_eq!(status, 200, "{named}");
+    refused(
+        &table.ask(&agent, &machine, &table.ada).await?,
+        409,
+        "MachineCannotReach",
+    );
     Ok(())
 }

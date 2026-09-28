@@ -294,6 +294,8 @@ impl Service {
             homes_dir: Some(dir.path().join("homes")),
             runtime_dir: Some(dir.path().join("runtime")),
             service_accounts_dir: Some(dir.path().join("service-accounts")),
+            teams_dir: Some(dir.path().join("teams")),
+            reviews_dir: Some(dir.path().join("reviews")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

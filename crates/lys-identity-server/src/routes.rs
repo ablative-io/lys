@@ -25,6 +25,8 @@ use crate::config::Config;
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
+use crate::reviews_store::ReviewStore;
+use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
 
 /// Everything a request is served from.
@@ -56,7 +58,11 @@ pub struct AppState {
     /// The runtime reports, when the configuration names their directory.
     pub runtime: Option<Mutex<crate::runtime_store::RuntimeStore>>,
     /// The service accounts, when the configuration names their directory.
-    pub service_accounts: Option<Mutex<crate::service_accounts_store::ServiceAccountStore>>,
+    pub service_accounts: Option<Mutex<ServiceAccountStore>>,
+    /// The review decisions, when the configuration names their directory.
+    pub reviews: Option<Mutex<ReviewStore>>,
+    /// The teams, when the configuration names their directory.
+    pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -88,42 +94,11 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             crate::certificates_store::CertificateStore::opened(dir, Arc::clone(&key), &*say)
         })
         .transpose()?;
-    let network = config
-        .network_file
-        .as_deref()
-        .map(crate::network_store::NetworkStore::open)
-        .transpose()?;
-    if let Some(store) = &network {
-        say(&format!(
-            "machines read from one file, holding {} machines",
-            store.machines().len()
-        ));
-    }
-    let roles = config
-        .roles_file
-        .as_deref()
-        .map(crate::roles_store::RolesStore::open)
-        .transpose()?;
-    if let Some(store) = &roles {
-        say(&format!(
-            "roles read from one file, holding {} roles",
-            store.roles().len()
-        ));
-    }
-    let provisioning = config
-        .provisioning_file
-        .as_deref()
-        .map(crate::provisioning_store::ProvisioningStore::open)
-        .transpose()?;
-    if let Some(store) = &provisioning {
-        say(&format!(
-            "provisioning profiles read from one file, holding {} profiles",
-            store.profiles().len()
-        ));
-    }
+    let (network, roles, provisioning) = crate::file_stores::opened(config, &*say)?;
     let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
-    let service_accounts =
-        crate::service_accounts_store::ServiceAccountStore::configured(config, key, &say)?;
+    let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
+    let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
+    let teams = crate::teams_store::TeamStore::configured(config, key, &say)?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -152,6 +127,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         certificates: certificates.map(Mutex::new),
         runtime: runtime.map(Mutex::new),
         service_accounts: service_accounts.map(Mutex::new),
+        reviews: reviews.map(Mutex::new),
+        teams: teams.map(Mutex::new),
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -206,6 +183,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::launch_api::routes())
         .merge(crate::runtime_api::routes())
         .merge(crate::service_accounts_api::routes())
+        .merge(crate::teams_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())
