@@ -1,71 +1,45 @@
 //! The directory's folded state as its snapshot holds it: the version, the
-//! projection, and one receipt per leaf in log order.
+//! number of leaves folded, and the projection. Receipts are not held: each
+//! is built from the log when it is asked for.
 
 use crate::projection::{Projection, state};
-use crate::receipt::{Receipt, decode_receipt, encode_receipt};
 use crate::state_value::{
-    Unreadable, array, decode as decode_value, encode as encode_value, list, read_uint, tuple, uint,
+    Unreadable, array, decode as decode_value, encode as encode_value, read_uint, tuple, uint,
 };
 
 /// The version of the directory state this crate writes and reads.
-const STATE_VERSION: u64 = 1;
+const STATE_VERSION: u64 = 2;
 
-/// The state of `projection` with `receipts`, one per leaf.
-pub(crate) fn encode(projection: &Projection, receipts: &[Receipt]) -> Result<Vec<u8>, Unreadable> {
+/// The state of `projection`, the fold of the first `folded` leaves.
+pub(crate) fn encode(projection: &Projection, folded: u64) -> Result<Vec<u8>, Unreadable> {
     encode_value(&array(vec![
         uint(STATE_VERSION),
+        uint(folded),
         state::encode(projection),
-        array(receipts.iter().map(encode_receipt).collect()),
     ]))
 }
 
-/// The projection and receipts a state holds, refused unless it is this
-/// version, holds `size` receipts in log order, and the last completes `root`.
-pub(crate) fn decode(
-    bytes: &[u8],
-    size: u64,
-    root: [u8; 32],
-) -> Result<(Projection, Vec<Receipt>), Unreadable> {
-    let [version, projection, receipts] = tuple::<3>(decode_value(bytes)?, "a directory state")?;
+/// The projection a state holds, refused unless it is this version and the
+/// fold of exactly `size` leaves.
+pub(crate) fn decode(bytes: &[u8], size: u64) -> Result<Projection, Unreadable> {
+    let [version, folded, projection] = tuple::<3>(decode_value(bytes)?, "a directory state")?;
     let version = read_uint(&version, "a state version")?;
     if version != STATE_VERSION {
         return Err(format!(
             "directory state version {version} is not {STATE_VERSION}"
         ));
     }
-    let receipts = list(receipts, "the receipts")?
-        .into_iter()
-        .map(decode_receipt)
-        .collect::<Result<Vec<_>, _>>()?;
-    check_receipts(receipts.iter().map(Receipt::coordinate), size, root)?;
-    Ok((state::decode(projection)?, receipts))
+    check_folded(read_uint(&folded, "a folded count")?, size)?;
+    state::decode(projection)
 }
 
-/// Refuses receipts that are not one per leaf, in log order, the last
-/// completing the tree of `size` leaves at `root`.
-pub(crate) fn check_receipts(
-    coordinates: impl ExactSizeIterator<Item = crate::log::Coordinate>,
-    size: u64,
-    root: [u8; 32],
-) -> Result<(), Unreadable> {
-    let held = coordinates.len();
-    if u64::try_from(held).ok() != Some(size) {
-        return Err(format!("the state holds {held} receipts for {size} leaves"));
-    }
-    let mut last = None;
-    for (expected, coordinate) in (0_u64..).zip(coordinates) {
-        if coordinate.index != expected || coordinate.tree_size != expected + 1 {
-            return Err(format!(
-                "receipt {expected} names leaf {} of a tree of {}",
-                coordinate.index, coordinate.tree_size
-            ));
-        }
-        last = Some(coordinate.root);
-    }
-    match last {
-        Some(found) if found != root => Err(format!(
-            "the last receipt's root is not the snapshot's root at {size}"
-        )),
-        _ => Ok(()),
+/// Refuses a state folded from another number of leaves than its snapshot's.
+pub(crate) fn check_folded(folded: u64, size: u64) -> Result<(), Unreadable> {
+    if folded == size {
+        Ok(())
+    } else {
+        Err(format!(
+            "the state is the fold of {folded} leaves, and the snapshot is at {size}"
+        ))
     }
 }

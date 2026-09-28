@@ -7,6 +7,7 @@
 //! formats it uses and never changes.
 
 pub mod binding;
+pub mod checkpoints;
 pub mod directory;
 mod directory_state;
 pub mod encoding;

@@ -91,7 +91,8 @@ fn a_restart_of_the_grants_folds_only_the_leaves_after_the_snapshot() -> TestRes
         "the first reopen wrote a snapshot at the whole log"
     );
     assert_eq!(restarted.book(), world.grants.book());
-    assert_eq!(restarted.receipts(), world.grants.receipts());
+    assert_eq!(restarted.events()?, world.grants.events()?);
+    assert_eq!(restarted.receipt(size)?, None);
     assert_eq!(restarted.revision(), size);
     assert_eq!(restarted.ledger().snapshot_failure(), None);
     assert_eq!(restarted.book().on_resource(&alpha()?).count(), 2);

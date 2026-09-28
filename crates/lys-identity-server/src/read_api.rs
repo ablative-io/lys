@@ -226,12 +226,11 @@ fn agent_json(
     let projection = directory.projection()?;
     let scope = scope_of(projection)?;
     let mut view = agent_view(projection, agent, scope)?;
-    view.provenance.registration = view
-        .provenance
-        .events
-        .first()
-        .and_then(|index| directory.receipt_at(*index))
-        .map(receipt_json);
+    let first = view.provenance.events.first().copied();
+    view.provenance.registration = match first {
+        Some(index) => directory.receipt_at(index)?.as_ref().map(receipt_json),
+        None => None,
+    };
     Ok(Json(view))
 }
 

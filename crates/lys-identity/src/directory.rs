@@ -24,7 +24,7 @@ use crate::error::IdentityError;
 use crate::event::{Change, IdentityEvent};
 use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::Transition;
-use crate::log::{EventLog, Reopen};
+use crate::log::{Coordinate, EventLog, Reopen};
 use crate::operation::OperationId;
 use crate::profile::Profile;
 use crate::projection::{Projection, Record};
@@ -41,7 +41,7 @@ pub struct Directory<S: LeafStore> {
     log: EventLog<S>,
     projection: Projection,
     key: Ed25519Identity,
-    receipts: Vec<Receipt>,
+    folded: u64,
     broken: Broken,
 }
 
@@ -63,25 +63,21 @@ impl<S: LeafStore> Directory<S> {
         let read = opening
             .state
             .as_deref()
-            .map(|state| directory_state::decode(state, opening.size, opening.root));
-        let (projection, receipts, events) = match read {
-            None => (Projection::new(), Vec::new(), opening.events),
-            Some(Ok((projection, receipts))) => (projection, receipts, opening.events),
-            Some(Err(reason)) => (
-                Projection::new(),
-                Vec::new(),
-                log.refuse_state(reason, &key)?,
-            ),
+            .map(|state| directory_state::decode(state, opening.size));
+        let (projection, folded, events) = match read {
+            None => (Projection::new(), 0, opening.events),
+            Some(Ok(projection)) => (projection, opening.size, opening.events),
+            Some(Err(reason)) => (Projection::new(), 0, log.refuse_state(reason, &key)?),
         };
         let mut directory = Self {
             log,
             projection,
             key,
-            receipts,
+            folded,
             broken: None,
         };
         for (signed, coordinate) in events {
-            directory.record_committed(&signed, Receipt::of(&signed, coordinate))?;
+            directory.record_committed(&signed, coordinate)?;
         }
         directory.snapshot();
         Ok(directory)
@@ -94,9 +90,9 @@ impl<S: LeafStore> Directory<S> {
         if self.broken.is_some() {
             return;
         }
-        let (projection, receipts) = (&self.projection, &self.receipts);
+        let (projection, folded) = (&self.projection, self.folded);
         self.log
-            .snapshot_if_due(&self.key, || directory_state::encode(projection, receipts));
+            .snapshot_if_due(&self.key, || directory_state::encode(projection, folded));
     }
 
     /// The service's public key, against which every event and receipt verifies.
@@ -123,8 +119,7 @@ impl<S: LeafStore> Directory<S> {
             return Ok(());
         };
         for (signed, coordinate) in reconciled.adopted {
-            let receipt = Receipt::of(&signed, coordinate);
-            if let Err(refusal) = self.record_committed(&signed, receipt) {
+            if let Err(refusal) = self.record_committed(&signed, coordinate) {
                 let reason = format!(
                     "leaf {} in the log is refused by the projection: {refusal}",
                     coordinate.index
@@ -152,22 +147,21 @@ impl<S: LeafStore> Directory<S> {
     fn record_committed(
         &mut self,
         signed: &SignedEvent,
-        receipt: Receipt,
+        coordinate: Coordinate,
     ) -> Result<(), IdentityError> {
-        let index = receipt.coordinate().index;
-        let expected = self.receipts.len() as u64;
+        let (index, expected) = (coordinate.index, self.folded);
         if index != expected {
             return Err(IdentityError::LogUnavailable {
                 reason: format!("leaf {index} arrived where leaf {expected} was expected"),
             });
         }
         self.projection.apply(signed.event(), index)?;
-        self.receipts.push(receipt);
+        self.folded += 1;
         Ok(())
     }
 
-    /// The event and receipt an operation recorded, if it recorded one. The
-    /// event is read back from the log.
+    /// The event and receipt an operation recorded, if it recorded one, both
+    /// built from the log.
     fn answered(
         &self,
         operation: OperationId,
@@ -175,12 +169,16 @@ impl<S: LeafStore> Directory<S> {
         let Some(index) = self.projection.operation(operation) else {
             return Ok(None);
         };
-        let missing = || IdentityError::LogUnavailable {
-            reason: format!("operation {operation} names leaf {index}, which is not held"),
-        };
-        let receipt = self.receipt_at(index).cloned().ok_or_else(missing)?;
-        let signed = self.log.event(index)?.ok_or_else(missing)?;
-        Ok(Some((signed.event().clone(), receipt)))
+        let (signed, coordinate) =
+            self.log
+                .entry(index)?
+                .ok_or_else(|| IdentityError::LogUnavailable {
+                    reason: format!("operation {operation} names leaf {index}, which is not held"),
+                })?;
+        Ok(Some((
+            signed.event().clone(),
+            Receipt::of(&signed, coordinate),
+        )))
     }
 
     /// The first answer to `operation`, if it was answered for the same request.
@@ -210,10 +208,9 @@ impl<S: LeafStore> Directory<S> {
         let signed = sign_event(event, &self.key)?;
         let failure = match self.log.append(&signed) {
             Ok(coordinate) => {
-                let receipt = Receipt::of(&signed, coordinate);
-                self.record_committed(&signed, receipt.clone())?;
+                self.record_committed(&signed, coordinate)?;
                 self.snapshot();
-                return Ok(receipt);
+                return Ok(Receipt::of(&signed, coordinate));
             }
             Err(failure) => failure,
         };
@@ -439,10 +436,16 @@ impl<S: LeafStore> Directory<S> {
         self.change(actor, operation, identity, change, recorded_at)
     }
 
-    /// The receipt of the event at log index `index`.
-    pub fn receipt_at(&self, index: u64) -> Option<&Receipt> {
-        usize::try_from(index)
-            .ok()
-            .and_then(|slot| self.receipts.get(slot))
+    /// The receipt of the event at log index `index`, built from the log:
+    /// its event and root are read from the nearest checkpoint on. `None` for
+    /// a leaf the directory has not folded.
+    pub fn receipt_at(&self, index: u64) -> Result<Option<Receipt>, IdentityError> {
+        if index >= self.folded {
+            return Ok(None);
+        }
+        Ok(self
+            .log
+            .entry(index)?
+            .map(|(signed, coordinate)| Receipt::of(&signed, coordinate)))
     }
 }
