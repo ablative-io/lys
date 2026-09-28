@@ -32,7 +32,7 @@ Serve MCP from lys-identity-server at /mcp and from 'lys mcp' over stdio for age
 
 ### R1: Three tools over the published API
 
-Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI operation ids of DIRECTORY-048 R6) in one line each, marking each read, write or not served through MCP; with a verb, answers its request and response schema. lys_read calls a verb the document marks as a read, whatever its method, so DIRECTORY-048 R5's batch check and its which route (reads sent by POST) are lys_read verbs. lys_write calls a verb the document marks as a write. The read or write mark is the document's own (an x-lys-effect member on each operation, set in openapi.rs from the route's declaration), never inferred from the method. Verbs come from the generated OpenAPI document, so a new route is reachable with no MCP change. Each tool call is dispatched in-process into the router; there is no second implementation of any verb. Dispatch carries the caller as a VerifiedCaller value: a type whose only constructors are the MCP edge's verification of a person's token or an agent's signature (R2) and the HTTP edge's own verification, with no public constructor and no header, extension or query member that can produce one. A route reached in-process takes the VerifiedCaller and does not check a signature over its own method and path again; a route reached over HTTP verifies at its edge exactly as today. Tools carry MCP annotations: lys_read readOnlyHint, lys_write destructiveHint. A verb whose route holds the call open until something happens (DIRECTORY-050's wait route) stays open as one tool call; the caller ends it by closing the call or the session, as 050 says for the route, and nothing in MCP ends it by a clock.
+Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI operation ids of DIRECTORY-048 R6) in one line each, marking each read, write or not served through MCP; with a verb, answers its request and response schema. lys_read calls a verb the document marks as a read, whatever its method, so DIRECTORY-048 R5's batch check and its which route (reads sent by POST) are lys_read verbs. lys_write calls a verb the document marks as a write. The mark is the document's own: an x-lys-effect member on each operation with one of three values, read, write or destructive, and an x-lys-secret member on any response member that carries a secret. The effect is declared once per route, beside the route in the route table in routes.rs, as a required argument of the function that registers a route, so a route with no declared effect does not compile; openapi.rs copies it into the document. Nothing defaults to read. lys_read serves read verbs; lys_write serves write and destructive verbs. Verbs come from the generated OpenAPI document, so a new route is reachable with no MCP change. Each tool call is dispatched in-process into the router; there is no second implementation of any verb. Dispatch carries the caller as a VerifiedCaller value: a type whose only constructors are the MCP edge's verification of a person's token or an agent's signature (R2) and the HTTP edge's own verification, with no public constructor and no header, extension or query member that can produce one. This is a refactor of how every handler learns its caller, and it is part of this brief. Today each handler verifies inside itself from its own headers (signed_in(&state, &headers) and the agent signature checks, 52 calls across the handler files). That verification moves into one axum extractor, VerifiedCaller, which every handler takes as an argument. The HTTP edge builds it from the request's headers with exactly today's checks; the MCP edge builds it once from the /mcp request; a handler never reads identity from headers itself. An ast-grep rule, rules/ast-grep/no-handler-verification.yml, fails the build on any signed_in(&state, &headers) or agent-signature check outside the extractor module. Tools carry MCP annotations: lys_read readOnlyHint, lys_write destructiveHint. A verb whose route holds the call open until something happens (DIRECTORY-050's wait route) stays open as one tool call; the caller ends it by closing the call or the session, as 050 says for the route, and nothing in MCP ends it by a clock.
 
 **Acceptance:**
 - tools/list answers exactly three tools.
@@ -41,16 +41,38 @@ Behavioural. lys_schema: with no argument, answers every verb (the OpenAPI opera
 - A route added in a test router is reachable through MCP with no MCP code change.
 - An agent-signed route reached through MCP by a verified agent applies; the same route reached over HTTP with a forged caller header and no signature is refused, and no header produces a VerifiedCaller (a compile-fail test on constructing one outside the edges).
 - A call to the wait route through MCP ends when the client closes it, and the server holds nothing for it afterwards.
+- A test walks every operation in the document and fails on any operation without x-lys-effect; a route registered without an effect does not compile (a compile-fail test).
+- The no-handler-verification rule reports zero findings on the tree and one on a planted handler that reads its caller from headers.
 
 **Files:**
 - create: crates/lys-identity-server/src/mcp.rs
 - create: crates/lys-identity-server/src/mcp_tools.rs
 - create: crates/lys-identity-server/tests/mcp.rs
+- create: crates/lys-identity-server/src/verified_caller.rs
+- create: crates/lys-identity-server/tests/verified_caller.rs
+- create: rules/ast-grep/no-handler-verification.yml
 - modify: crates/lys-identity-server/src/routes.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/Cargo.toml
 - modify: crates/lys-identity-server/src/openapi.rs
 - modify: crates/lys-identity-server/src/agent_signature.rs
+- modify: crates/lys-identity-server/src/certificates_issue.rs
+- modify: crates/lys-identity-server/src/configuration_api.rs
+- modify: crates/lys-identity-server/src/connections_api.rs
+- modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/launch_api.rs
+- modify: crates/lys-identity-server/src/link_audit_api.rs
+- modify: crates/lys-identity-server/src/network_api.rs
+- modify: crates/lys-identity-server/src/provisioning_api.rs
+- modify: crates/lys-identity-server/src/read_api.rs
+- modify: crates/lys-identity-server/src/reviews_api.rs
+- modify: crates/lys-identity-server/src/runtime_api.rs
+- modify: crates/lys-identity-server/src/service_accounts_api.rs
+- modify: crates/lys-identity-server/src/setup.rs
+- modify: crates/lys-identity-server/src/sign_in_providers.rs
+- modify: crates/lys-identity-server/src/stop_api.rs
+- modify: crates/lys-identity-server/src/teams_api.rs
+- modify: sgconfig.yml
 
 **Checklist:**
 - C369 — The MCP server offers exactly three tools over the published API; the tool list is under 2 KB (DIRECTORY-049 R1, R5).
@@ -103,13 +125,14 @@ Behavioural. Each call runs the route's own grant check as the caller; the MCP l
 
 ### R4: No secret value ever; destructive writes need the target repeated
 
-Behavioural. No MCP answer carries a secret's value, a private key, a token or a password: secret verbs answer the handle and its metadata only. A verb whose response schema carries a member marked secret (x-lys-secret; for example DIRECTORY-048's approval that shows an app's client secret once) is listed by lys_schema as not served through MCP and is refused by name, mcp_secret_answer_not_served, pointing to the Lys screen that serves it. A test walks every response schema in the OpenAPI document and fails if any verb served through MCP has a member marked secret. A write the document marks destructive (retire an identity, revoke a grant, stop, delete a secret, retire an app) is refused confirm_required unless the call carries confirm equal to the target's id; the refusal says in words what the write would do.
+Behavioural. No MCP answer carries a secret's value, a private key, a token or a password: secret verbs answer the handle and its metadata only. A verb whose response schema carries a member marked secret (x-lys-secret; for example DIRECTORY-048's approval that shows an app's client secret once) is listed by lys_schema as not served through MCP and is refused by name, mcp_secret_answer_not_served, pointing to the Lys screen that serves it. A test walks every response schema in the OpenAPI document and fails if any verb served through MCP has a member marked secret. A verb whose x-lys-effect is destructive (at least: retire an identity, revoke a grant, stop, delete a secret, retire an app) is refused confirm_required unless the call carries confirm equal to the target's id; the refusal says in words what the write would do.
 
 **Acceptance:**
 - Reading a secret through MCP answers its handle and never its value.
 - Approving an app through MCP is refused mcp_secret_answer_not_served and lys_schema lists it as not served.
 - The response-schema walk fails on a planted secret field in a served verb.
 - A revoke without confirm is refused confirm_required naming the grant; with it, it applies.
+- Each of the five named destructive verbs carries x-lys-effect destructive in the document and is refused confirm_required without confirm, one test each.
 
 **Files:**
 - modify: crates/lys-identity-server/src/mcp_tools.rs
@@ -190,6 +213,8 @@ Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call t
 - SHALL NOT add a fourth tool; a new capability is a new route, reached through the three.
 - SHALL NOT read a private key out of lys-secrets; signing is a use the broker admits (SECRETS-006).
 - SHALL NOT let any header, extension or query member produce a verified caller.
+- SHALL NOT let a handler read its caller from headers; every handler takes VerifiedCaller.
+- SHALL NOT default an operation's effect; an undeclared effect is a build failure.
 
 ## Verification
 

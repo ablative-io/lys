@@ -737,6 +737,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/secrets_api.rs` | R6: Accounts and secrets stored and reached by handle | DIRECTORY-052 |
 | `crates/lys-install/Cargo.toml` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
 | `crates/lys-install/src/lib.rs` | R2: Opening the app installs and shows every step on a Lys page | DIRECTORY-054 |
+| `crates/lys-identity-server/src/verified_caller.rs` | The one extractor that turns a verified request into the caller every handler takes | DIRECTORY-049 |
+| `crates/lys-identity-server/tests/verified_caller.rs` | Proof that only the edges build a verified caller | DIRECTORY-049 |
+| `rules/ast-grep/no-handler-verification.yml` | Refuses a handler that reads its caller from headers | DIRECTORY-049 |
 
 ## Inventory
 

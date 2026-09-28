@@ -3225,6 +3225,21 @@
       "path": "crates/lys-install/src/lib.rs",
       "note": "R2: Opening the app installs and shows every step on a Lys page",
       "brief": "DIRECTORY-054"
+    },
+    {
+      "path": "crates/lys-identity-server/src/verified_caller.rs",
+      "note": "The one extractor that turns a verified request into the caller every handler takes",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/verified_caller.rs",
+      "note": "Proof that only the edges build a verified caller",
+      "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "rules/ast-grep/no-handler-verification.yml",
+      "note": "Refuses a handler that reads its caller from headers",
+      "brief": "DIRECTORY-049"
     }
   ],
   "inventory": [
