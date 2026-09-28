@@ -49,6 +49,18 @@ fn main() -> ExitCode {
                 identity::configure::run(&config, json)
             }
             identity::IdentityCommand::Health { config } => identity::health::run(&config, json),
+            identity::IdentityCommand::Install {
+                root,
+                admin_email,
+                surface,
+            } => identity::install::run(
+                &identity::install::Options {
+                    root,
+                    admin_email,
+                    surface,
+                },
+                json,
+            ),
         }
         .map_err(commands::error::CliError::from),
         Command::Log(log_command) => match log_command {

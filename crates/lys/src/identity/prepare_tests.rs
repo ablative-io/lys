@@ -110,7 +110,8 @@ fn the_rendered_environment_names_the_configured_database_host() -> Result<(), B
 }
 
 #[test]
-fn the_bootstrap_api_key_grants_only_clients_and_secret_reads() -> Result<(), Box<dyn Error>> {
+fn the_bootstrap_api_key_grants_clients_providers_and_reads_of_secrets_and_users()
+-> Result<(), Box<dyn Error>> {
     let decoded = base64::engine::general_purpose::STANDARD.decode(bootstrap_api_key())?;
     let request: serde_json::Value = serde_json::from_slice(&decoded)?;
     assert_eq!(request["name"], API_KEY_NAME);
@@ -120,9 +121,13 @@ fn the_bootstrap_api_key_grants_only_clients_and_secret_reads() -> Result<(), Bo
         .iter()
         .filter_map(|entry| entry["group"].as_str())
         .collect();
-    assert_eq!(groups, ["Clients", "Secrets"]);
+    assert_eq!(groups, ["Clients", "Secrets", "Users", "Providers"]);
     assert_eq!(
         request["access"][1]["access_rights"],
+        serde_json::json!(["read"])
+    );
+    assert_eq!(
+        request["access"][2]["access_rights"],
         serde_json::json!(["read"])
     );
     Ok(())

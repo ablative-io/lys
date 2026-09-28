@@ -121,6 +121,11 @@ pub struct Config {
     /// `SignInProvidersUnavailable`.
     #[serde(default)]
     pub sign_in_providers: Option<crate::sign_in_providers::SignInProvidersSettings>,
+    /// The compiled screens the service serves at `/`, its own routes then
+    /// answering under `/api`. Without it the routes answer at the root and
+    /// no screen is served.
+    #[serde(default)]
+    pub surface_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
