@@ -75,6 +75,38 @@ DIRECTORY-051 at 17eeac97 defines the versioned agent policy in agent_policy_sto
 **Stories:**
 - S170 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not implemented. None of the acceptance rows (plan revision and digest, unsigned or rebound plan refusal, stale revision refusal, containment_unavailable with zero spawns, tightening exit order, sibling-prefix path, digest change, embedded-key rejection, challenge replay) can be built yet. Each one extends DIRECTORY-051's policy in crates/lys-identity-server/src/agent_policy_store.rs and agent_policy_api.rs, and git log --all shows no commit on any ref has ever touched those files. The SHALL NOT boundary 'SHALL NOT start before DIRECTORY-051 is complete and green' forbids starting.
+- Deviation: Blocked, not implemented. Four blockers must clear first. (1) DIRECTORY-051's policy implementation must land in the base. (2) The brief's reference 'DIRECTORY-051 at 17eeac97' must be corrected: that commit only changes DIRECTORY-051.json and .md. (3) A CN9-reviewed brief revision must extend CN1's documents-only exception to this card's source files. (4) The 17 base compile errors in lys-identity-server must be fixed at their owning cards. Examples: crates/lys-identity-server/src/stop_api.rs:91, 'the trait bound `stop_api::ConfirmedEnd: utoipa::ToSchema` is not satisfied' (struct at :101). The same ToSchema error hits provisioning_store::SessionSettings and grant_contract::views::StandingView and UnreportedView, and there is one E0382 use of a moved Arc. None of these files is in this card's wall.
+- Files changed:
+  - modified: `docs/design/directory/briefs/DIRECTORY-062.md` — Re-rendered from DIRECTORY-062.json so the design gate's render check matches. No behaviour change.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A plan carries the same revision and digest as the DIRECTORY-051 policy used for the session. — Diff is docs-only; agent_policy_store.rs has no history on any ref (git log --all empty).
+  - [ ] A modified plan signed by no admitted authority is refused before a child is spawned. — No source change in diff.
+  - [ ] A plan bound to another runner or session incarnation is refused before a child is spawned. — No source change in diff.
+  - [ ] A stale policy revision is refused before a child is spawned. — No source change in diff.
+  - [ ] An unsupported capability returns containment_unavailable naming that capability and the child-spawn counter remains zero. — No source change in diff.
+  - [ ] A policy tightening records the old session exit before a replacement session is reported enforced. — No source change in diff.
+  - [ ] A sibling path sharing a textual prefix with the workspace receives no writable-root permission. — No source change in diff.
+  - [ ] Changing an enforcement rule changes the canonical policy digest. — No source change in diff.
+  - [ ] Supplying a verification key inside a plan cannot replace the provisioned server key. — No source change in diff.
+  - [ ] Replaying a signed plan on a different connection challenge is refused. — No source change in diff.
+- Issues:
+  - Land DIRECTORY-051's policy implementation (agent_policy_store.rs, agent_policy_api.rs and their tests) in the base; verified absent from every ref.
+  - Revise the brief so it no longer cites 'DIRECTORY-051 at 17eeac97' (a docs-only commit) and instead names the real implementation head, through a reviewed revision.
+  - Obtain a CN9-reviewed brief revision that extends CN1's documents-only exception to this card's named source files.
+  - Fix the base compile break in lys-identity-server (17 errors: ToSchema on ConfirmedEnd, SessionSettings, StandingView and UnreportedView, plus an E0382 Arc move) at its owning card; reproduced with cargo check -p lys-identity-server.
+  - Implement every R1 acceptance row once those blockers clear.
+  - Of this round's work, only the re-render of DIRECTORY-062.md is verified correct.
+
 ### R2: macOS applies Seatbelt before the harness can run
 
 Behavioural. Compile the bound plan to a Seatbelt profile and launch the harness through /usr/bin/sandbox-exec from the runner's PTY path. The first untrusted instruction, its shell tools and all descendants run under that profile. Deny writes outside the isolated home and workspace. Allow only the declared runtime reads and required PTY/stdio operations. Close inherited descriptors that could provide a write, network or control bypass. The agent cannot replace the profile or launch an unsandboxed helper. A narrowly owned egress service evaluates destination host names from the same policy, including name resolution, redirects and each new connection. Seatbelt permits network access only to that service's bound endpoint. Direct IPv4/IPv6, alternative proxies, resolver traffic and local sockets cannot bypass it. This avoids treating a shared IP address as proof of an allowed hostname. Runtime dependencies and the egress endpoint are explicitly part of the bound plan, not blanket file or network exceptions. Kernel denial collection is R4. Refuse launch if this OS cannot enforce the profile or supply its required evidence. A backend probe may check feature support, but a test double cannot establish native Seatbelt enforcement. Apply the existing runner's process ownership and cancellation rules during preparation, start, rotation, stop and restart.
@@ -110,6 +142,31 @@ Do not call sandbox_init through FFI or add unsafe Rust. Native log collection r
 
 **Stories:**
 - S170 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not implemented. The macOS Seatbelt rows depend on R1's signed plan. They also need a CN9 revision admitting Cargo.toml, Cargo.lock and crates/lys-runner, and a native macOS venue for the proof.
+- Deviation: Blocked on R1, DIRECTORY-051 and the CN9 revision named in R1.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] On macOS the same writable outside-root fixture succeeds without the sandbox and is denied inside it. — No source or leg change in diff.
+  - [ ] A write inside the isolated workspace succeeds under Seatbelt. — Not implemented.
+  - [ ] A descendant shell is subject to the same outside-root denial. — Not implemented.
+  - [ ] A symlink from the workspace to the outside fixture does not permit writing the target. — Not implemented.
+  - [ ] An inherited writable descriptor to the outside fixture is not available to the harness. — Not implemented.
+  - [ ] A direct connection to the controlled denied endpoint is refused by Seatbelt. — Not implemented.
+  - [ ] An allowed hostname succeeds through the egress service. — Not implemented.
+  - [ ] A denied hostname sharing an address with an allowed hostname is refused by the egress policy. — Not implemented.
+  - [ ] Removing the Seatbelt entry point causes a named start refusal with no harness execution. — Not implemented.
+- Issues:
+  - Blocked on R1 and DIRECTORY-051. Needs a CN9-reviewed revision admitting Cargo.toml, Cargo.lock and the crates/lys-runner files.
+  - Implement every R2 row and prove it on the native macOS venue.
 
 ### R3: Linux applies Landlock and a network namespace before exec
 
@@ -179,6 +236,49 @@ Linux preparation gives the isolated audit collector CAP_AUDIT_READ or a narrowl
 **Stories:**
 - S170 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As the person responsible for an agent, I want its operating-system sandbox to enforce the same policy as Lys, so a shell or child process cannot bypass my limits.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not implemented. The Linux rows (Landlock ABI 7 or above, namespaces, forwarder, host preparation) depend on R1. They also need a CN9 revision admitting crates/lys-runner, crates/lys and docs/CONTAINMENT-PREPARATION.md, and kernel evidence from venue 205. I did not probe 205 by hand, per the brief.
+- Deviation: Blocked on R1, DIRECTORY-051 and the CN9 revision.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] On Linux the same user successfully writes the outside-root fixture without isolation. — No source change in diff.
+  - [ ] The control file is removed before the Linux denial attempt. — Not implemented.
+  - [ ] Landlock denies the sandboxed write to that fixture. — Not implemented.
+  - [ ] A write inside the allowed workspace succeeds under Landlock. — Not implemented.
+  - [ ] A child exec retains the filesystem restriction. — Not implemented.
+  - [ ] A child exec retains the network restriction. — Not implemented.
+  - [ ] A symlink cannot provide write access to the outside fixture. — Not implemented.
+  - [ ] A rename cannot provide write access to the outside fixture. — Not implemented.
+  - [ ] A direct IPv4 connection is rejected inside the network namespace. — Not implemented.
+  - [ ] A direct IPv6 connection is rejected inside the network namespace. — Not implemented.
+  - [ ] An alternative DNS path cannot reach the denied endpoint. — Not implemented.
+  - [ ] An alternative proxy cannot reach the denied endpoint. — Not implemented.
+  - [ ] An allowed hostname succeeds through the namespace forwarder and the host Unix socket. — Not implemented.
+  - [ ] The forwarder refuses a request bound to another session. — Not implemented.
+  - [ ] A missing required Landlock right refuses start before harness execution. — Not implemented.
+  - [ ] A running ABI below 7 refuses start naming Landlock audit support. — Not implemented.
+  - [ ] Missing namespace permission refuses start by name. — Not implemented.
+  - [ ] Missing kernel audit access refuses start by name. — Not implemented.
+  - [ ] Disabled noninitial-namespace LOG reporting refuses start by name. — Not implemented.
+  - [ ] Without host preparation, start returns containment_preparation_required. — Not implemented.
+  - [ ] Cancelling native OS authorisation returns containment_preparation_refused. — Not implemented.
+  - [ ] Ordinary install makes no privileged host-preparation change. — Not implemented.
+  - [ ] Repeating successful preparation creates no duplicate owned resource. — Not implemented.
+  - [ ] Interrupting preparation then resuming preserves another owner's changed resource. — Not implemented.
+  - [ ] Ubuntu namespace restrictions remain enabled after helper-specific preparation. — Not implemented.
+  - [ ] Cancellation before readiness produces a child-exit record. — Not implemented.
+  - [ ] Cancellation before readiness produces no running-session receipt. — Not implemented.
+- Issues:
+  - Blocked on R1 and DIRECTORY-051. Needs a CN9-reviewed revision admitting crates/lys-runner, crates/lys and docs/CONTAINMENT-PREPARATION.md.
+  - Implement every R3 row with kernel evidence from venue 205.
+
 ### R4: Kernel evidence feeds the existing refusal stream
 
 Behavioural. Collect native denial events using the host's authenticated OS audit/log source: macOS sandbox violation records and Linux Landlock audit plus namespace network-filter audit records. Where the namespace drops network traffic, install a policy-bound reject/log path so the denial is observable, rather than inferring it from a hung curl. Attribute events using OS process lifetime evidence and the runner's admitted descendant lineage, not a reusable PID alone or an agent-supplied label. Bind each report to agent, session incarnation, policy digest, native source event identity, action/resource and timestamp. Feed DIRECTORY-051's authoritative refusal store and cursor delivery. Preserve kernel filesystem/network denials and egress-policy denials as different named sources. a proxy refusal is not a kernel report. A Bash exit status, stderr string or agent explanation is never kernel evidence. Keep native source cursors and deduplication durable across reconnect/reopen with checkpoint-plus-tail reads. If a native source cannot provide complete coverage, loses events, or becomes inaccessible, emit an explicit reporting-gap state and end affected sessions through the runner. never answer an empty all-clear or synthesize a missing event. At start, establish audit capability before untrusted execution. Filter to this runner's admitted processes and safe resource descriptions. no secrets, other users' events or full command credentials enter records. Failure to persist a refusal is visible as evidence unavailable and cannot turn a denial into permission.
@@ -221,6 +321,36 @@ Native macOS logs may coalesce repeated violations. Preserve the source report i
 **Stories:**
 - S171 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not implemented. Native denial events must flow into DIRECTORY-051's refusal store and cursor delivery: refusals_store.rs, refusals_api.rs and crates/lys-runner/src/refusals.rs. None of these exists on any ref.
+- Deviation: Blocked until DIRECTORY-051's refusal store lands in the base.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] A real macOS filesystem denial produces one refusal with the native event identity and the correct session incarnation. — refusals_store.rs and crates/lys-runner/src/refusals.rs have no history on any ref (git log --all empty).
+  - [ ] A real Linux Landlock denial produces one refusal with the native event identity and the correct session incarnation. — Not implemented.
+  - [ ] A denied direct network probe produces a native network refusal rather than a parsed command error. — Not implemented.
+  - [ ] Replaying the same source event after reopening adds no duplicate refusal. — Not implemented.
+  - [ ] An event from a reused PID outside the admitted process lifetime is not attributed to the old agent. — Not implemented.
+  - [ ] A kernel-log gap marks reporting incomplete and records the affected session ending. — Not implemented.
+  - [ ] A forged terminal line resembling a kernel denial creates no refusal. — Not implemented.
+  - [ ] An event containing a secret-bearing command does not persist or display that secret. — Not implemented.
+  - [ ] A restart reads no refusal event before its verified checkpoint. — Not implemented.
+  - [ ] A native report with a duplicate count retains that count in one aggregate refusal. — Not implemented.
+  - [ ] Replaying the same aggregate source identity creates no second aggregate. — Not implemented.
+  - [ ] A coalesced report marks per-attempt coverage incomplete. — Not implemented.
+  - [ ] An uncounted suppression emits a named reporting gap. — Not implemented.
+  - [ ] An aggregate never invents individual syscall identities. — Not implemented.
+- Issues:
+  - Land DIRECTORY-051's refusal store and cursor delivery (refusals_store.rs, refusals_api.rs, crates/lys-runner/src/refusals.rs) in the base first.
+  - Implement every R4 row once they land.
+
 ### R5: The agent page states the sandbox and the evidence
 
 Behavioural. Add a plain containment section to the existing agent page beside DIRECTORY-051's refusal list. It names the OS backend, applied policy revision, allowed write locations and destination hosts, the enforcement state and audit coverage. Explain unavailable or ending states with the actual capability or failure and the person authorized to change the relevant policy. Do not offer an unsandboxed start switch or imply ordinary grants can override an unavailable OS protection. The server exposes these states from runner receipts, not from a browser calculation or profile checkbox. Read visibility and streamed updates use the existing agent authorization boundary. Each refusal links to its applied policy and distinguishes kernel, egress and tool-boundary sources in plain language. Changes arrive through existing push/cursor delivery. The UI keeps the same components, typography, keyboard access and reduced-motion behavior as the agent page. Runtime state must remain truthful after a reconnect, a stop, an audit gap or a policy change.
@@ -259,6 +389,34 @@ When host preparation is absent, display Containment unavailable with a Prepare 
 
 **Stories:**
 - S171 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Not implemented. The page rows extend DIRECTORY-051's surface/identity/src/features/file/AgentRefusals.tsx, which is absent on every ref, and they depend on R1 to R4.
+- Deviation: Blocked on DIRECTORY-051 and R1 to R4.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] The agent page shows enforced only after the matching runner readiness receipt. — surface/identity/src/features/file/AgentRefusals.tsx has no history on any ref.
+  - [ ] The page displays the native backend and applied policy digest returned by the server. — Not implemented.
+  - [ ] A missing capability is shown by name on the page. — Not implemented.
+  - [ ] A reporting gap is visible beside the refusal list. — Not implemented.
+  - [ ] A user without access to the agent cannot read its containment state or streamed changes. — Not implemented.
+  - [ ] Reconnecting resumes the cursor without duplicate denial rows. — Not implemented.
+  - [ ] Keyboard navigation reaches policy details and the refusal source explanation. — Not implemented.
+  - [ ] An unprepared agent page says Containment unavailable. — Not implemented.
+  - [ ] An authorised person reaches native host preparation from the page without a terminal. — Not implemented.
+  - [ ] A denied OS authorisation leaves containment unavailable. — Not implemented.
+  - [ ] A preparation request for another host is refused. — Not implemented.
+  - [ ] An unauthorised browser request never invokes the privileged helper. — Not implemented.
+- Issues:
+  - Land DIRECTORY-051's AgentRefusals.tsx refusal list in the base.
+  - Implement every R5 row after R1 to R4.
 
 ### R6: A person watches real native denials and an allowed control
 
@@ -304,6 +462,39 @@ Route the Linux capability and native test legs to venue 205 through the existin
 
 **Stories:**
 - S171 (Person running an agent under a policy, Operates and inspects a runner-owned session) — As a person watching an agent, I want to see its actual sandbox and OS-backed refusals, so I can distinguish enforced restrictions from missing coverage.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: No native leg is registered and PROOF-CONTAINMENT.md was not written. The brief forbids claiming a native pass without real venue or kernel evidence, and no enforcement exists to prove.
+- Deviation: Blocked on R1 to R5. The legs and proof follow once real receipts from Dean's Mac and venue 205 exist.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] The macOS native leg records a successful unsandboxed write to the outside-root fixture. — No native leg registered; PROOF-CONTAINMENT.md absent.
+  - [ ] The macOS native leg records a denied sandboxed write to that same fixture. — Not run.
+  - [ ] The macOS native leg records a successful sandboxed write inside the workspace. — Not run.
+  - [ ] The macOS native leg records a kernel denial for the controlled direct network probe. — Not run.
+  - [ ] The Linux native leg records a successful allowed workspace write. — Not run.
+  - [ ] The Linux native leg records a native denial for the controlled direct network probe. — Not run.
+  - [ ] The browser shows the source identity of each native refusal. — Not implemented.
+  - [ ] The report names every attempted case and both native leg receipts at the exact card commit. — No report exists.
+  - [ ] An unavailable native capability makes its leg fail by name. — No leg in docs/design/project.json.
+  - [ ] Every owned test fixture is removed after the probe. — Not run.
+  - [ ] The Linux leg on 205 records a successful unsandboxed write to the outside-root fixture. — Not run.
+  - [ ] The Linux leg on 205 records a denied sandboxed write to that fixture. — Not run.
+  - [ ] The macOS browser receives the filesystem denial through the authenticated refusal route. — Not run.
+  - [ ] The macOS browser receives the direct network denial through the authenticated refusal route. — Not run.
+  - [ ] The Linux browser receives the filesystem denial through the authenticated refusal route. — Not run.
+  - [ ] The Linux browser receives the direct network denial through the authenticated refusal route. — Not run.
+  - [ ] The 205 gate receipt names the actual kernel and Landlock ABI. — Not run.
+  - [ ] A missing Linux prerequisite leaves the Linux leg blocked even when macOS passed. — Not implemented.
+- Issues:
+  - Register the macOS and Linux (205) native containment legs and write PROOF-CONTAINMENT.md from real receipts once R1 to R5 exist.
 
 ## Boundaries
 

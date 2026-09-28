@@ -69,7 +69,87 @@
       ],
       "stories": [
         "S170"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-062.md",
+            "change": "modified",
+            "note": "Re-rendered with render-cluster.py so it matches the workflow-written DIRECTORY-062.json; the design gate exits 0."
+          }
+        ],
+        "how": "Not implemented. The signed plan must carry the DIRECTORY-051 policy revision and digest, but that policy implementation (crates/lys-identity-server/src/agent_policy_store.rs, agent_policy_api.rs, tests/agent_policy.rs) has no history on any ref: git log --all is empty, and git ls-tree of origin/main 876e34db has no such file. The first SHALL NOT forbids starting before it is in the base.",
+        "deviation": "Blocked on four things. (1) DIRECTORY-051's policy code must land in the base. (2) A reviewed brief revision must replace the stale 'DIRECTORY-051 at 17eeac97' reference (a docs-only commit) with the real implementation head. (3) A CN9-reviewed revision must extend CN1's documents-only exception to crates/lys-runner, crates/lys, Cargo.toml, Cargo.lock and docs/CONTAINMENT-PREPARATION.md. (4) The base compile break must be fixed at its owning card: crates/lys-identity-server/src/stop_api.rs:91 reports \"the trait bound `stop_api::ConfirmedEnd: utoipa::ToSchema` is not satisfied\" (struct at :101), the same ToSchema bound is missing on SessionSettings, StandingView and UnreportedView, and there is one E0382; rustc ends \"could not compile `lys-identity-server` (lib) due to 17 previous errors\". None of these is fixable inside this card's wall without a boundary breach.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A plan carries the same revision and digest as the DIRECTORY-051 policy used for the session.",
+            "met": false,
+            "evidence": "Diff is docs-only; agent_policy_store.rs has no history on any ref (git log --all empty)."
+          },
+          {
+            "criterion": "A modified plan signed by no admitted authority is refused before a child is spawned.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "A plan bound to another runner or session incarnation is refused before a child is spawned.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "A stale policy revision is refused before a child is spawned.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "An unsupported capability returns containment_unavailable naming that capability and the child-spawn counter remains zero.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "A policy tightening records the old session exit before a replacement session is reported enforced.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "A sibling path sharing a textual prefix with the workspace receives no writable-root permission.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "Changing an enforcement rule changes the canonical policy digest.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "Supplying a verification key inside a plan cannot replace the provisioned server key.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "Replaying a signed plan on a different connection challenge is refused.",
+            "met": false,
+            "evidence": "No source change in diff."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Land DIRECTORY-051's policy implementation (agent_policy_store.rs, agent_policy_api.rs and their tests) in the base; verified absent from every ref.",
+          "Revise the brief so it no longer cites 'DIRECTORY-051 at 17eeac97' (a docs-only commit) and instead names the real implementation head, through a reviewed revision.",
+          "Obtain a CN9-reviewed brief revision that extends CN1's documents-only exception to this card's named source files.",
+          "Fix the base compile break in lys-identity-server (17 errors: ToSchema on ConfirmedEnd, SessionSettings, StandingView and UnreportedView, plus an E0382 Arc move) at its owning card; reproduced with cargo check -p lys-identity-server.",
+          "Implement every R1 acceptance row once those blockers clear.",
+          "Of this round's work, only the re-render of DIRECTORY-062.md is verified correct."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -109,7 +189,72 @@
       ],
       "stories": [
         "S170"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. macOS Seatbelt containment through /usr/bin/sandbox-exec and the egress service need R1's admitted plan and DIRECTORY-051's policy, and neither exists in the base.",
+        "deviation": "Blocked on R1 and DIRECTORY-051, and on a CN9-reviewed revision admitting Cargo.toml, Cargo.lock and crates/lys-runner. Proof also needs the native macOS venue (Dean's Mac).",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "On macOS the same writable outside-root fixture succeeds without the sandbox and is denied inside it.",
+            "met": false,
+            "evidence": "No source or leg change in diff."
+          },
+          {
+            "criterion": "A write inside the isolated workspace succeeds under Seatbelt.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A descendant shell is subject to the same outside-root denial.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A symlink from the workspace to the outside fixture does not permit writing the target.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An inherited writable descriptor to the outside fixture is not available to the harness.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A direct connection to the controlled denied endpoint is refused by Seatbelt.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An allowed hostname succeeds through the egress service.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A denied hostname sharing an address with an allowed hostname is refused by the egress policy.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Removing the Seatbelt entry point causes a named start refusal with no harness execution.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Blocked on R1 and DIRECTORY-051. Needs a CN9-reviewed revision admitting Cargo.toml, Cargo.lock and the crates/lys-runner files.",
+          "Implement every R2 row and prove it on the native macOS venue."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -177,7 +322,162 @@
       ],
       "stories": [
         "S170"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Linux Landlock ABI 7 or above, the user and network namespaces, the forwarder and polkit host preparation all need R1's plan and DIRECTORY-051's policy.",
+        "deviation": "Blocked on R1 and DIRECTORY-051, and on a CN9-reviewed revision admitting crates/lys-runner, crates/lys and docs/CONTAINMENT-PREPARATION.md. Proof needs kernel evidence from venue 205, which may not be probed by hand.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "On Linux the same user successfully writes the outside-root fixture without isolation.",
+            "met": false,
+            "evidence": "No source change in diff."
+          },
+          {
+            "criterion": "The control file is removed before the Linux denial attempt.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Landlock denies the sandboxed write to that fixture.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A write inside the allowed workspace succeeds under Landlock.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A child exec retains the filesystem restriction.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A child exec retains the network restriction.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A symlink cannot provide write access to the outside fixture.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A rename cannot provide write access to the outside fixture.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A direct IPv4 connection is rejected inside the network namespace.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A direct IPv6 connection is rejected inside the network namespace.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An alternative DNS path cannot reach the denied endpoint.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An alternative proxy cannot reach the denied endpoint.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An allowed hostname succeeds through the namespace forwarder and the host Unix socket.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The forwarder refuses a request bound to another session.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A missing required Landlock right refuses start before harness execution.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A running ABI below 7 refuses start naming Landlock audit support.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Missing namespace permission refuses start by name.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Missing kernel audit access refuses start by name.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Disabled noninitial-namespace LOG reporting refuses start by name.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Without host preparation, start returns containment_preparation_required.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Cancelling native OS authorisation returns containment_preparation_refused.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Ordinary install makes no privileged host-preparation change.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Repeating successful preparation creates no duplicate owned resource.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Interrupting preparation then resuming preserves another owner's changed resource.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Ubuntu namespace restrictions remain enabled after helper-specific preparation.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Cancellation before readiness produces a child-exit record.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Cancellation before readiness produces no running-session receipt.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Blocked on R1 and DIRECTORY-051. Needs a CN9-reviewed revision admitting crates/lys-runner, crates/lys and docs/CONTAINMENT-PREPARATION.md.",
+          "Implement every R3 row with kernel evidence from venue 205."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -223,7 +523,97 @@
       ],
       "stories": [
         "S171"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Native denial events must flow into DIRECTORY-051's refusal store and cursor delivery (crates/lys-identity-server/src/refusals_store.rs, refusals_api.rs, crates/lys-runner/src/refusals.rs), and none of these exists on any ref.",
+        "deviation": "Blocked on DIRECTORY-051's refusal store landing in the base, and on R2 and R3.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A real macOS filesystem denial produces one refusal with the native event identity and the correct session incarnation.",
+            "met": false,
+            "evidence": "refusals_store.rs and crates/lys-runner/src/refusals.rs have no history on any ref (git log --all empty)."
+          },
+          {
+            "criterion": "A real Linux Landlock denial produces one refusal with the native event identity and the correct session incarnation.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A denied direct network probe produces a native network refusal rather than a parsed command error.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Replaying the same source event after reopening adds no duplicate refusal.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An event from a reused PID outside the admitted process lifetime is not attributed to the old agent.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A kernel-log gap marks reporting incomplete and records the affected session ending.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A forged terminal line resembling a kernel denial creates no refusal.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An event containing a secret-bearing command does not persist or display that secret.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A restart reads no refusal event before its verified checkpoint.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A native report with a duplicate count retains that count in one aggregate refusal.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Replaying the same aggregate source identity creates no second aggregate.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A coalesced report marks per-attempt coverage incomplete.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An uncounted suppression emits a named reporting gap.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An aggregate never invents individual syscall identities.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Land DIRECTORY-051's refusal store and cursor delivery (refusals_store.rs, refusals_api.rs, crates/lys-runner/src/refusals.rs) in the base first.",
+          "Implement every R4 row once they land."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -266,7 +656,87 @@
       ],
       "stories": [
         "S171"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. The containment state and preparation UI extends DIRECTORY-051's surface/identity/src/features/file/AgentRefusals.tsx, which has no history on any ref.",
+        "deviation": "Blocked on DIRECTORY-051's AgentRefusals.tsx landing in the base, and on R1 to R4.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "The agent page shows enforced only after the matching runner readiness receipt.",
+            "met": false,
+            "evidence": "surface/identity/src/features/file/AgentRefusals.tsx has no history on any ref."
+          },
+          {
+            "criterion": "The page displays the native backend and applied policy digest returned by the server.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A missing capability is shown by name on the page.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A reporting gap is visible beside the refusal list.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A user without access to the agent cannot read its containment state or streamed changes.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Reconnecting resumes the cursor without duplicate denial rows.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "Keyboard navigation reaches policy details and the refusal source explanation.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An unprepared agent page says Containment unavailable.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An authorised person reaches native host preparation from the page without a terminal.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A denied OS authorisation leaves containment unavailable.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "A preparation request for another host is refused.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "An unauthorised browser request never invokes the privileged helper.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Land DIRECTORY-051's AgentRefusals.tsx refusal list in the base.",
+          "Implement every R5 row after R1 to R4."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -315,7 +785,116 @@
       ],
       "stories": [
         "S171"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not run. No native containment leg is registered and PROOF-CONTAINMENT.md is not written, because there is no enforcement to prove; the boundaries forbid claiming a native pass without matching venue and kernel evidence.",
+        "deviation": "Blocked on R1 to R5 and on the base compile break that fails clippy, tests and doc. After that, the macOS and venue 205 legs must be registered and PROOF-CONTAINMENT.md written from their real receipts.",
+        "checklist": [],
+        "stories": []
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "The macOS native leg records a successful unsandboxed write to the outside-root fixture.",
+            "met": false,
+            "evidence": "No native leg registered; PROOF-CONTAINMENT.md absent."
+          },
+          {
+            "criterion": "The macOS native leg records a denied sandboxed write to that same fixture.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The macOS native leg records a successful sandboxed write inside the workspace.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The macOS native leg records a kernel denial for the controlled direct network probe.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux native leg records a successful allowed workspace write.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux native leg records a native denial for the controlled direct network probe.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The browser shows the source identity of each native refusal.",
+            "met": false,
+            "evidence": "Not implemented."
+          },
+          {
+            "criterion": "The report names every attempted case and both native leg receipts at the exact card commit.",
+            "met": false,
+            "evidence": "No report exists."
+          },
+          {
+            "criterion": "An unavailable native capability makes its leg fail by name.",
+            "met": false,
+            "evidence": "No leg in docs/design/project.json."
+          },
+          {
+            "criterion": "Every owned test fixture is removed after the probe.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux leg on 205 records a successful unsandboxed write to the outside-root fixture.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux leg on 205 records a denied sandboxed write to that fixture.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The macOS browser receives the filesystem denial through the authenticated refusal route.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The macOS browser receives the direct network denial through the authenticated refusal route.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux browser receives the filesystem denial through the authenticated refusal route.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The Linux browser receives the direct network denial through the authenticated refusal route.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "The 205 gate receipt names the actual kernel and Landlock ABI.",
+            "met": false,
+            "evidence": "Not run."
+          },
+          {
+            "criterion": "A missing Linux prerequisite leaves the Linux leg blocked even when macOS passed.",
+            "met": false,
+            "evidence": "Not implemented."
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Register the macOS and Linux (205) native containment legs and write PROOF-CONTAINMENT.md from real receipts once R1 to R5 exist."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
