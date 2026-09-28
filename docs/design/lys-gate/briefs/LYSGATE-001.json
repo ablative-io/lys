@@ -48,7 +48,33 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/project.json",
+            "change": "modified",
+            "note": "trees[0].legs[3] 'tests' command is now `cargo test --workspace --all-features --no-fail-fast` (line 29); nothing else changed"
+          }
+        ],
+        "how": "Row 1: met. docs/design/project.json:29 now reads `\"command\": \"cargo test --workspace --all-features --no-fail-fast\"`, and it is legs[3], the fourth leg. Row 2: met in the working tree. git diff --numstat shows `1\t1\tdocs/design/project.json`, and the only difference between the removed and added lines is ` --no-fail-fast` before the closing quote. Row 3: met. `python3 scripts/design/validate.py docs/design/project.json` printed OK and exited 0.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "project.json:29"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "The project gate's tests leg now runs every test binary."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -75,7 +101,48 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The gate 'tests' leg command at line 716 now has --no-fail-fast"
+          },
+          {
+            "path": "docs/design/home/design.json",
+            "change": "modified",
+            "note": "The gate 'tests' leg command at line 776 now has --no-fail-fast"
+          },
+          {
+            "path": "docs/design/secrets/design.json",
+            "change": "modified",
+            "note": "The gate 'tests' leg command at line 185 now has --no-fail-fast"
+          },
+          {
+            "path": "docs/design/lys-gate/design.json",
+            "change": "modified",
+            "note": "The one-line gate array at line 247 now has --no-fail-fast in its 'tests' leg command"
+          }
+        ],
+        "how": "Row 1: met in the working tree. git diff --numstat shows 1/1 for each of the four files. In each, one sed substitution replaced only the exact string `\"command\": \"cargo test --workspace --all-features\"`, so every added line contains the new command. Row 2: met. The only change is that one command string, so every tree, leg name, order, requires, cadence and shorthand is unchanged. Row 3: met. `python3 scripts/design/render-cluster.py` ran on docs/design/directory, home, secrets and lys-gate, and git status --porcelain afterwards listed only the eight edited files, with no markdown under docs/design changed. Row 4: met. Nothing under other clusters' briefs or under docs/design/lys-core was touched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C2",
+            "done": true,
+            "note": "All four gate arrays are updated, and every other leg is byte-identical"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -98,7 +165,33 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": ".land/gates.sh",
+            "change": "modified",
+            "note": "Line 19 is now `leg cargo test --workspace --all-features --no-fail-fast`"
+          }
+        ],
+        "how": "Row 1: met. .land/gates.sh:19 is `leg cargo test --workspace --all-features --no-fail-fast`. Row 2: met. numstat shows 1/1. Row 3: met. `grep '^leg '` prints the seven legs in the required order, with the tests leg fifth. The wrapper, the header comment, the exit logic and every other line are unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C3",
+            "done": true,
+            "note": ".land/gates.sh:19"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -121,7 +214,33 @@
       ],
       "stories": [
         "S2"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "CLAUDE.md",
+            "change": "modified",
+            "note": "The test line of 'Gates before any commit' at line 99 is now `cargo test --workspace --all-features --no-fail-fast`"
+          }
+        ],
+        "how": "Row 1: met. CLAUDE.md:99 is the only `^cargo test` line, and it now reads `cargo test --workspace --all-features --no-fail-fast`. Row 2: met. It matches .land/gates.sh:19 exactly with the `leg ` prefix removed. Row 3: met. numstat shows 1/1. The prose after the block was not edited.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C4",
+            "done": true,
+            "note": "CLAUDE.md:99 matches .land/gates.sh:19"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -145,7 +264,33 @@
       ],
       "stories": [
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": ".github/workflows/ci.yml",
+            "change": "modified",
+            "note": "The Test step at line 46 now runs `cargo test --workspace --no-fail-fast`"
+          }
+        ],
+        "how": "Row 1: met. `grep -n 'run: cargo test'` prints `46:        run: cargo test --workspace --no-fail-fast`. Row 2: met. The count of --no-fail-fast is now 1, and the base had 0 because the flag was absent. Row 3: met. The count of --all-features is 0. Row 4: met. numstat shows 1/1, and env LYS_REQUIRE_GO, the step name and every other step are unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C5",
+            "done": true,
+            "note": "ci.yml:46"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -168,7 +313,27 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "The eight edits of R1 to R5 are in the working tree with no other change. git status lists exactly those eight paths, each at 1/1. Run over the six files named one by one, the R6 grep prints 0 on the working tree now, and at the base it matches the six old command lines. The acceptance rows need <change> to be a commit, but these instructions say to make no commit, so the rows cannot be measured until the reviewed landing commits these eight files as one commit. The lys-gate gate array has not been changed by any other commit.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C6",
+            "done": false,
+            "note": "Waiting for the single landing commit; the grep prints 0 on the working tree"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": false,
+            "note": "Depends on the commit"
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -189,7 +354,27 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "The four green gate rounds, for directory, home, secrets and lys-gate, must run against <change> at the venue that serves heavy builds and full gates. The brief forbids running them on this machine, and the instructions forbid running any gate by hand. The workflow runs scripts/design/gate.sh itself. The re-render showed no markdown drift, so I expect it to stay green. scripts/design is unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C7",
+            "done": false,
+            "note": "Needs venue gate rounds at <change>"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": false,
+            "note": "Depends on the rounds"
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -213,7 +398,27 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "The scratch round needs <change> to exist and must run in a local worktree at the heavy-build venue. It cannot be run from this authoring session. No scratch branch was created and no crate source was changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C8",
+            "done": false,
+            "note": "Needs <change> and the venue"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": false,
+            "note": "Depends on the scratch round"
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -240,7 +445,27 @@
       ],
       "stories": [
         "S1"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "PROOF-LYSGATE-001.md must name the round ids, log-store paths and SHA-256s of the five venue rounds (R7, R8), and must be committed after <change>. None of those rounds exist yet, so the document cannot be written truthfully. For its 'Findings for other cards' section: docs/design holds only the four named design.json files today, so that section would list no paths.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C9",
+            "done": false,
+            "note": "Needs the five rounds' logs"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": false,
+            "note": "Depends on R7 and R8"
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
