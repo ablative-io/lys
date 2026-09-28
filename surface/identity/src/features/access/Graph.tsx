@@ -5,12 +5,13 @@ import { Gate } from '../signin/Gate';
 import { readGrantWorld, nameOf } from '../grants/model';
 import { resourcesSeen } from '../grants/CheckBox';
 import { reachMap } from '../grants/check';
+import { installedOf } from './installed';
 import './graph.css';
 
 async function readGraph() {
   const world = await readGrantWorld();
-  const reach = await reachMap([...resourcesSeen(world).values()]);
-  return { world, reach };
+  const [reach, installed] = await Promise.all([reachMap([...resourcesSeen(world).values()]), installedOf(world)]);
+  return { world, reach, installed };
 }
 
 export function Graph() {
@@ -18,7 +19,7 @@ export function Graph() {
   const load = useLoad(readGraph, 'identity-graph');
   return <div className="page"><div className="eyebrow">Access</div><h1>Graph</h1>
     <p className="sub">Who answers to whom, and which resources the permission service says they can reach. Select an identity to follow its connections.</p>
-    <Gate load={load} title="Graph" ok={({ world, reach }) => {
+    <Gate load={load} title="Graph" ok={({ world, reach, installed }) => {
       const identities = [...world.who];
       const known = id === undefined || world.who.has(id);
       const shown = identities.filter(([key, person]) => !id || key === id || person.responsible === id || world.who.get(id)?.responsible === key);
@@ -37,13 +38,19 @@ export function Graph() {
               </div>)}
             </section>
             <section aria-label="Permission connections"><h2>Reaches</h2>
+              {installed.filter(({ holder }) => !id || holder === id).map(({ holder, name, target, words }) => <div className="graph-installed" key={holder + ':' + target}>
+                {world.who.has(holder) ? <a href={'#/graph/' + encodeURIComponent(holder)}>{name}</a> : <a href="#/apps">{name}</a>}
+                <span aria-hidden="true">→</span>
+                <span>{target}</span>
+                <span className="note">{words}</span>
+              </div>)}
               {edges.map(({ resource, holder, actions }) => <div className="graph-connection" key={holder + ':' + resource}>
                 <a href={'#/graph/' + encodeURIComponent(holder)}>{world.who.has(holder) ? nameOf(world, holder) : holder}</a>
                 <span aria-hidden="true">→</span>
                 <a href={'#/access/who/' + encodeURIComponent(resource)}>{resource}</a>
                 <span className="note">{actions.join(', ')}</span>
               </div>)}
-              {!edges.length ? <p className="note">No permitted connections were returned for the visible resources.</p> : null}
+              {!edges.length ? <p className="note">No grant gives a permitted connection on the visible resources.</p> : null}
             </section>
           </div>
           <p className="note">Answers are limited to the directory and resources you may see. Select a resource to inspect the grant paths. These reads do not exercise a grant.</p>
