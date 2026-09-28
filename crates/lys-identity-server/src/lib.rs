@@ -21,6 +21,7 @@ pub mod requests_api;
 pub mod requests_decide;
 pub mod requests_store;
 pub mod requests_views;
+pub mod resources_api;
 pub mod reviews_api;
 pub mod routes;
 pub mod secrets_api;
