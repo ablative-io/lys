@@ -14,7 +14,8 @@
 //! in that report, whatever has changed since; the same operation id naming
 //! any other report is refused. Only an active agent is started, and only on
 //! a machine whose egress list names every host its profile's servers are
-//! reached at.
+//! reached at, and only from a profile version someone answering for the
+//! agent reviewed.
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
@@ -199,6 +200,11 @@ async fn start_command(
                 .and_then(|profile| profile.versions.last().cloned())
                 .ok_or(ServerError::LaunchRecordMissing)
         })?;
+        if version.reviewed.is_none() {
+            return Err(ServerError::ProfileNotReviewed {
+                version: version.number,
+            });
+        }
         let runtime = with_network(&state, |store| {
             let machine = placed(store, &machine, &agent)?;
             reaches(machine, &version)?;

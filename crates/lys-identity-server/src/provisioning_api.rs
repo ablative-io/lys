@@ -6,6 +6,10 @@
 //! it saw. The administrator, the person responsible for the agent and the
 //! agent itself read it; to anyone else the agent's profile is not visible.
 //!
+//! The person responsible for the agent, or the administrator, reviews a
+//! version under an operation id; an agent is started only from a reviewed
+//! version, and the answer says when the reviewer is the person who set it.
+//!
 //! No runtime applies a profile yet. The answer says so in `enforced`, and
 //! never shows a profile as applied.
 
@@ -15,7 +19,7 @@ use std::sync::{Arc, PoisonError};
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{AgentId, IdentityId, OperationId};
 use reqwest::Url;
@@ -23,7 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
-use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Settings, Version};
+use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Review, Settings, Version};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -60,6 +64,13 @@ pub struct VersionView {
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
     pub set_at: u64,
+    /// The person who reviewed it, null until it is reviewed; an agent is
+    /// started only from a reviewed version.
+    pub reviewed_by: Option<String>,
+    /// When it was reviewed, null until it is.
+    pub reviewed_at: Option<u64>,
+    /// Whether the person who reviewed it is the person who set it.
+    pub self_reviewed: bool,
 }
 
 /// One version of a profile, as the history lists it.
@@ -87,9 +98,11 @@ pub struct ProvisioningView {
     /// Whether a runtime applies the profile. While none does, the profile
     /// is recorded and not applied.
     pub enforced: bool,
-    /// What this change was recorded as, null on a read. A change sent
-    /// again answers the version it was first recorded as, whatever was set
-    /// after it, while `profile` is always the latest.
+    /// What this act was recorded as, null on a read. A change sent again
+    /// answers the version it was first recorded as, whatever was set
+    /// after it, while `profile` is always the latest. A review answers the
+    /// version reviewed and the operation of the review that is kept, which
+    /// is an earlier one when the version was reviewed already.
     pub recorded: Option<Recorded>,
 }
 
@@ -118,7 +131,9 @@ struct SetBody {
 
 /// The provisioning routes.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/provisioning", get(read).post(set))
+    Router::new()
+        .route("/agents/{id}/provisioning", get(read).post(set))
+        .route("/agents/{id}/provisioning/{version}/review", post(review))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -233,6 +248,12 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
             note: version.settings.note.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
+            reviewed_by: version.reviewed.as_ref().map(|review| review.by.clone()),
+            reviewed_at: version.reviewed.as_ref().map(|review| review.at),
+            self_reviewed: version
+                .reviewed
+                .as_ref()
+                .is_some_and(|review| review.by == version.set_by),
         }),
         versions: versions
             .iter()
@@ -280,6 +301,7 @@ async fn set(
             settings: settings(&body)?,
             set_by: own_person(directory, &actor)?.to_string(),
             set_at: now(),
+            reviewed: None,
         };
         let agent = agent.to_string();
         with_provisioning(&state, |store| {
@@ -287,6 +309,55 @@ async fn set(
             let version = store.set(&agent, body.from_version, version)?;
             let recorded = Recorded { operation, version };
             Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))
+        })
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewBody {
+    operation: String,
+}
+
+async fn review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((id, number)): Path<(String, u32)>,
+    body: Result<Json<ReviewBody>, JsonRejection>,
+) -> Result<Json<ProvisioningView>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    with_directory(&state, |directory| {
+        let directory = directory.projection()?;
+        let record = directory
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        let person = own_person(directory, &actor)?;
+        let answers =
+            state.admission.administrator(&actor).is_ok() || record.responsible() == Some(person);
+        if !answers {
+            return Err(ServerError::NotAdmitted {
+                reason: "only the person responsible for the agent or the administrator reviews its profile",
+            });
+        }
+        let review = Review {
+            operation: OperationId::from_str(&body.operation)?.to_string(),
+            by: person.to_string(),
+            at: now(),
+        };
+        let agent = agent.to_string();
+        with_provisioning(&state, |store| {
+            store.review(&agent, number, review)?;
+            let recorded = store
+                .profile(&agent)
+                .and_then(|profile| profile.versions.iter().find(|kept| kept.number == number))
+                .and_then(|kept| kept.reviewed.as_ref())
+                .map(|kept| Recorded {
+                    operation: kept.operation.clone(),
+                    version: number,
+                });
+            Ok(Json(view(&agent, store.profile(&agent), recorded)))
         })
     })
 }

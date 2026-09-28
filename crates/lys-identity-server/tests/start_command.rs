@@ -121,6 +121,13 @@ impl Table {
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;
         assert_eq!(status, 200, "{set}");
+        let reviewed = json!({ "operation": operation()? });
+        let (status, set) = self
+            .service
+            .post(&format!("{path}/1/review"), Some(&self.ada), &reviewed)
+            .await?;
+        assert_eq!(status, 200, "{set}");
+        assert!(set["profile"]["reviewed_by"].is_string(), "{set}");
         Ok(())
     }
 

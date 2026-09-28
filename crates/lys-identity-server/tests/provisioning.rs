@@ -260,6 +260,7 @@ fn version(operation: &str, note: &str) -> Version {
         },
         set_by: "person-a".to_owned(),
         set_at: 10,
+        reviewed: None,
     }
 }
 

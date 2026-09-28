@@ -161,6 +161,14 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The agent's latest profile version is not reviewed, so it is not started.
+    #[error(
+        "ProfileNotReviewed: version {version} of the agent's profile is not reviewed; review it before the agent is started"
+    )]
+    ProfileNotReviewed {
+        /// The version.
+        version: u32,
+    },
     /// The certificate log cannot be read or written.
     #[error("CertificatesUnavailable: {reason}")]
     CertificatesUnavailable {
@@ -449,6 +457,7 @@ impl ServerError {
             | Self::CertificateWithdrawn { .. }
             | Self::MachineRetired
             | Self::AgentNotActive { .. }
+            | Self::ProfileNotReviewed { .. }
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
