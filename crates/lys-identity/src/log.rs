@@ -189,10 +189,11 @@ impl<S: LeafStore> EventLog<S> {
         self.certain()?.leaf(index)
     }
 
-    /// The event at `index`, if the log holds one there, read from the store
-    /// and verified, refused while an append is uncertain.
-    pub fn event(&self, index: u64) -> Result<Option<SignedEvent>, IdentityError> {
-        self.certain()?.event(index, &self.service_key)
+    /// The event at `index` with the coordinate it completed, if the log
+    /// holds one there, read from the store from the nearest checkpoint and
+    /// verified, refused while an append is uncertain.
+    pub fn entry(&self, index: u64) -> Result<Option<(SignedEvent, Coordinate)>, IdentityError> {
+        self.certain()?.entry(index, &self.service_key)
     }
 
     /// An inclusion proof of the leaf at `index` in the log's current tree,

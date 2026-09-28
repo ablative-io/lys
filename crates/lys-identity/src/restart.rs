@@ -33,6 +33,7 @@ use lys_core::Ed25519Identity;
 use lys_core::merkle::InclusionProof;
 use lys_log_store::{Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreError, unseal};
 
+use crate::checkpoints::{self, Checkpoints};
 use crate::log::{Coordinate, Reopen};
 
 /// How many entries a log grows by between snapshots, unless its owner is
@@ -64,8 +65,6 @@ pub struct Opening<E> {
     pub state: Option<Vec<u8>>,
     /// The tree size the state was folded at.
     pub size: u64,
-    /// The root at that size.
-    pub root: [u8; 32],
     /// The events after the state, in log order, with their coordinates.
     pub events: Vec<(E, Coordinate)>,
 }
@@ -84,6 +83,7 @@ impl<E> std::fmt::Debug for Opening<E> {
 pub(crate) struct Ledger<S: LeafStore, K: Leaves> {
     log: FrontierLog<S>,
     frontier: Frontier,
+    checkpoints: Checkpoints,
     every: NonZeroU64,
     start: Start,
     snapshot_at: u64,
@@ -119,10 +119,12 @@ fn check_past_pin<S: LeafStore, K: Leaves>(store: &S, key: &[u8; 32]) -> Result<
     Ok(())
 }
 
-/// Extends `frontier` by `leaves`, which start at its size, verifying each
-/// and answering each event with the coordinate it completed.
+/// Extends `frontier` by `leaves`, which start at its size, verifying each,
+/// keeping a checkpoint at every multiple, and answering each event with the
+/// coordinate it completed.
 fn fold<K: Leaves>(
     frontier: &mut Frontier,
+    checkpoints: &mut Checkpoints,
     leaves: &[Vec<u8>],
     key: &[u8; 32],
 ) -> Result<Events<K::Event>, K::Error> {
@@ -130,6 +132,7 @@ fn fold<K: Leaves>(
     for bytes in leaves {
         let index = frontier.size();
         let leaf_hash = frontier.push(bytes);
+        checkpoints.record(frontier);
         let event =
             K::verify(bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
         events.push((
@@ -184,7 +187,18 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             return Ok(Err(SnapshotRefusal::BeyondLog { size, pinned }));
         }
         let (frontier, state) = snapshot.into_parts();
-        let root = frontier.root();
+        let (mut checkpoints, state) = match checkpoints::unwrap(&state, size) {
+            Ok(unwrapped) => unwrapped,
+            Err(reason) => return Ok(Err(SnapshotRefusal::StateUnreadable { reason })),
+        };
+        if checkpoints
+            .before(size)
+            .is_some_and(|held| held.size() == size && held.root() != frontier.root())
+        {
+            return Ok(Err(SnapshotRefusal::StateUnreadable {
+                reason: format!("the checkpoint at {size} is not the snapshot's tree"),
+            }));
+        }
         let (log, tail) = match FrontierLog::resume(store, frontier.clone()) {
             Ok(resumed) => resumed,
             Err(StoreError::PinMismatch { .. }) => {
@@ -193,11 +207,11 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             Err(error) => return Err(store_down::<K>(&error)),
         };
         let mut frontier = frontier;
-        let events = fold::<K>(&mut frontier, &tail.leaves, key)?;
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)?;
         let replayed = u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX);
         let ledger = Self::new(
             log,
-            frontier,
+            (frontier, checkpoints),
             every,
             Start::Resumed { size, replayed },
             size,
@@ -207,7 +221,6 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             Opening {
                 state: Some(state),
                 size,
-                root,
                 events,
             },
         )))
@@ -215,7 +228,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
 
     fn new(
         log: FrontierLog<S>,
-        frontier: Frontier,
+        (frontier, checkpoints): (Frontier, Checkpoints),
         every: NonZeroU64,
         start: Start,
         snapshot_at: u64,
@@ -224,6 +237,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         Self {
             log,
             frontier,
+            checkpoints,
             every,
             start,
             snapshot_at,
@@ -245,18 +259,17 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let store = reopen().map_err(|error| store_down::<K>(&error))?;
         let (log, tail) = FrontierLog::open(store).map_err(|error| store_down::<K>(&error))?;
         let mut frontier = Frontier::new();
-        let events = fold::<K>(&mut frontier, &tail.leaves, key)?;
+        let mut checkpoints = Checkpoints::default();
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)?;
         let replayed = u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX);
         let start = Start::Rebuilt { refusal, replayed };
         tracing::warn!(domain = K::DOMAIN, "{start}");
-        let empty = Frontier::new().root();
-        let ledger = Self::new(log, frontier, every, start, 0);
+        let ledger = Self::new(log, (frontier, checkpoints), every, start, 0);
         Ok((
             ledger,
             Opening {
                 state: None,
                 size: 0,
-                root: empty,
                 events,
             },
         ))
@@ -307,13 +320,60 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             .map_err(|error| store_down::<K>(&error))
     }
 
-    /// The recorded event at `index`, read from the store and verified.
-    pub(crate) fn event(&self, index: u64, key: &[u8; 32]) -> Result<Option<K::Event>, K::Error> {
-        self.leaf(index)?
-            .map(|bytes| {
-                K::verify(&bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))
-            })
-            .transpose()
+    /// The recorded event at `index` with the coordinate it completed: the
+    /// leaves from the checkpoint at or below it up to it are read from the
+    /// store, the root is that checkpoint extended by them, and the event is
+    /// verified. Never more than
+    /// [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves are read.
+    pub(crate) fn entry(
+        &self,
+        index: u64,
+        key: &[u8; 32],
+    ) -> Result<Option<(K::Event, Coordinate)>, K::Error> {
+        if index >= self.len() {
+            return Ok(None);
+        }
+        let mut frontier =
+            self.checkpoints.before(index).cloned().ok_or_else(|| {
+                K::unavailable(format!("no checkpoint is held below leaf {index}"))
+            })?;
+        let mut last = None;
+        for at in frontier.size()..=index {
+            let bytes = self
+                .log
+                .leaf_bytes(at)
+                .map_err(|error| store_down::<K>(&error))?
+                .ok_or_else(|| {
+                    K::not_an_event(at, "the leaf is missing inside the log".to_owned())
+                })?;
+            let leaf_hash = frontier.push(&bytes);
+            last = Some((bytes, leaf_hash));
+        }
+        let (bytes, leaf_hash) =
+            last.ok_or_else(|| K::unavailable(format!("no leaf was read up to {index}")))?;
+        let event =
+            K::verify(&bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
+        Ok(Some((
+            event,
+            Coordinate {
+                index,
+                tree_size: frontier.size(),
+                root: frontier.root(),
+                leaf_hash,
+            },
+        )))
+    }
+
+    /// Every recorded event from the start of the log with its coordinate,
+    /// read from the store in one pass.
+    pub(crate) fn entries(&self, key: &[u8; 32]) -> Result<Events<K::Event>, K::Error> {
+        let tail = self
+            .log
+            .leaves_from(0)
+            .map_err(|error| store_down::<K>(&error))?;
+        let mut frontier = Frontier::new();
+        let mut checkpoints = Checkpoints::default();
+        fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)
     }
 
     /// An inclusion proof of the leaf at `index` in the recorded tree. The
@@ -332,6 +392,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
     pub(crate) fn append(&mut self, bytes: &[u8]) -> Result<Coordinate, StoreError> {
         let (index, leaf_hash) = self.log.append(bytes)?;
         self.frontier.push_hash(leaf_hash);
+        self.checkpoints.record(&self.frontier);
         Ok(Coordinate {
             index,
             tree_size: self.frontier.size(),
@@ -361,9 +422,11 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let (log, tail) = FrontierLog::resume(store, self.frontier.clone())
             .map_err(|error| store_down::<K>(&error))?;
         let mut frontier = self.frontier.clone();
-        let events = fold::<K>(&mut frontier, &tail.leaves, &public)?;
+        let mut checkpoints = self.checkpoints.clone();
+        let events = fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, &public)?;
         self.log = log;
         self.frontier = frontier;
+        self.checkpoints = checkpoints;
         Ok(events)
     }
 
@@ -380,7 +443,9 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         if !self.snapshot_owed && self.len() / every <= self.snapshot_at / every {
             return;
         }
-        let written = encode().and_then(|state| {
+        let checkpoints = &self.checkpoints;
+        let written = encode().and_then(|owner| {
+            let state = checkpoints::wrap(checkpoints, &owner)?;
             self.log
                 .write_snapshot(K::DOMAIN, &state, key)
                 .map_err(|error| error.to_string())

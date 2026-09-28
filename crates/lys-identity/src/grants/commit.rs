@@ -1,22 +1,21 @@
-//! Folding committed grant events into the book and receipts, projecting
+//! Folding committed grant events into the book, projecting
 //! them into the permission relationships, and committing new ones.
 //!
-//! The grants hold the book and one receipt per leaf; the events themselves
-//! stay in the log and are read back only where an answer must carry one. A
-//! snapshot of the book and receipts is written when one is owed and every
-//! leaf is folded.
+//! The grants hold the book and the number of leaves folded; the events and
+//! their receipts stay in the log and are built from it only where an answer
+//! must carry one. A snapshot of the book is written when one is owed and
+//! every leaf is folded.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lys_log_store::LeafStore;
 
 use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
-use super::events::{
-    GrantChange, GrantEvent, ISSUE, REVOKE, SignedGrantEvent, USE, sign_grant_event,
-};
+use super::events::{GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
 use super::permission::{Relationship, RelationshipStore, naming, relationships_of};
+use super::projection::Changed;
 use super::receipt::GrantReceipt;
 use super::state;
 use super::types::GrantId;
@@ -35,13 +34,13 @@ fn not_held(index: u64) -> GrantError {
 
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Apply a committed event to the book, or keep the book's refusal of it
-    /// by name, and keep its receipt.
+    /// by name, and count it folded.
     pub(super) fn record_committed(
         &mut self,
         signed: &SignedGrantEvent,
         coordinate: Coordinate,
     ) -> Result<(), GrantError> {
-        let index = self.receipts.len() as u64;
+        let index = self.folded;
         if coordinate.index != index {
             return Err(GrantError::LogUnavailable {
                 reason: format!(
@@ -53,16 +52,16 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         if let Err(refusal) = self.book.apply(signed.event(), index) {
             self.book.refuse(signed.event(), index, refusal);
         }
-        self.receipts.push(GrantReceipt::of(signed, coordinate));
+        self.folded += 1;
         Ok(())
     }
 
-    /// Write a snapshot of the book and receipts when one is owed. Called
-    /// only when every leaf of the log is folded.
+    /// Write a snapshot of the book when one is owed. Called only when every
+    /// leaf of the log is folded.
     pub(super) fn snapshot(&mut self) {
-        let (book, receipts) = (&self.book, &self.receipts);
+        let (book, folded) = (&self.book, self.folded);
         self.ledger
-            .snapshot_if_due(&self.key, || state::encode(book, receipts));
+            .snapshot_if_due(&self.key, || state::encode(book, folded));
     }
 
     /// Resolve an uncertain append, and apply every leaf it adopted.
@@ -92,24 +91,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// The relationships the event at `index` writes and deletes, judged from
-    /// its receipt and the book as it stands.
-    fn delta(&self, index: u64) -> Result<Delta, GrantError> {
+    /// what the book records at that index and the book as it stands.
+    fn delta(&self, index: u64, changes: &BTreeMap<u64, Changed>) -> Result<Delta, GrantError> {
         if self.book.refused().contains_key(&index) {
             return Ok((Vec::new(), Vec::new()));
         }
-        let receipt = usize::try_from(index)
-            .ok()
-            .and_then(|slot| self.receipts.get(slot))
-            .ok_or_else(|| not_held(index))?;
-        match receipt.change_kind {
-            ISSUE => {
-                let grant =
-                    self.book
-                        .grant(receipt.grant)
-                        .ok_or_else(|| GrantError::GrantUnknown {
-                            grant: receipt.grant.to_string(),
-                        })?;
-                let live = match self.book.lineage(receipt.grant) {
+        match changes.get(&index) {
+            Some(Changed::Issued(id)) => {
+                let grant = self
+                    .book
+                    .grant(*id)
+                    .ok_or_else(|| GrantError::GrantUnknown {
+                        grant: id.to_string(),
+                    })?;
+                let live = match self.book.lineage(*id) {
                     Ok(lineage) => lineage.path.iter().all(|id| {
                         self.book
                             .record(*id)
@@ -123,47 +118,57 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                     Ok((Vec::new(), Vec::new()))
                 }
             }
-            REVOKE => {
-                let mut tree: BTreeSet<GrantId> =
-                    self.book.descendants(receipt.grant).into_iter().collect();
-                tree.insert(receipt.grant);
+            Some(Changed::Revoked(id)) => {
+                let mut tree: BTreeSet<GrantId> = self.book.descendants(*id).into_iter().collect();
+                tree.insert(*id);
                 Ok((Vec::new(), naming(&self.relationships.read()?, &tree)))
             }
-            USE => Ok((Vec::new(), Vec::new())),
-            other => Err(GrantError::LogUnavailable {
-                reason: format!("leaf {index} names change kind {other}"),
-            }),
+            None => Ok((Vec::new(), Vec::new())),
         }
     }
 
     /// Project every committed event the relationships do not yet reflect, in
-    /// log order, answering the revision they stand at.
+    /// log order, answering the revision they stand at. What each event did
+    /// is read from the book, never from the log.
     pub fn project(&mut self) -> Result<u64, GrantError> {
+        let from = self.relationships.revision()?;
+        if from >= self.folded {
+            return Ok(from);
+        }
+        let changes = self.book.changes_from(from);
         loop {
             let revision = self.relationships.revision()?;
-            if revision >= self.revision() {
+            if revision >= self.folded {
                 return Ok(revision);
             }
-            let (touch, delete) = self.delta(revision)?;
+            let (touch, delete) = self.delta(revision, &changes)?;
             self.relationships.write(revision + 1, &touch, &delete)?;
         }
     }
 
-    /// The event an operation recorded, if it recorded one, read back from
-    /// the log.
-    pub(super) fn answered_event(
+    /// The event an operation recorded and its receipt, if it recorded one,
+    /// built from the log from the nearest checkpoint.
+    pub(super) fn answered(
         &self,
         operation: OperationId,
-    ) -> Result<Option<GrantEvent>, GrantError> {
+    ) -> Result<Option<(GrantEvent, GrantReceipt)>, GrantError> {
         let Some(index) = self.book.operation(operation) else {
             return Ok(None);
         };
-        let signed = self.ledger.event(index)?.ok_or_else(|| not_held(index))?;
-        Ok(Some(signed.event().clone()))
+        let (signed, coordinate) = self.ledger.entry(index)?.ok_or_else(|| not_held(index))?;
+        Ok(Some((
+            signed.event().clone(),
+            GrantReceipt::of(&signed, coordinate),
+        )))
     }
 
-    /// Answer the committed `event` once it is projected, or name what is pending.
-    pub(super) fn answer(&mut self, event: GrantEvent) -> Result<Recorded, GrantError> {
+    /// Answer the committed `event` with its `receipt` once it is projected,
+    /// or name what is pending.
+    pub(super) fn answer(
+        &mut self,
+        event: GrantEvent,
+        receipt: GrantReceipt,
+    ) -> Result<Recorded, GrantError> {
         let operation = event.operation();
         let index = self
             .book
@@ -174,13 +179,14 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         if let Some((_, refusal)) = self.book.refused().get(&index) {
             return Err(refusal.clone());
         }
-        let receipt = usize::try_from(index)
-            .ok()
-            .and_then(|slot| self.receipts.get(slot))
-            .cloned()
-            .ok_or_else(|| GrantError::LogUnavailable {
-                reason: format!("operation {operation} names leaf {index}, which is not held"),
-            })?;
+        if receipt.coordinate.index != index {
+            return Err(GrantError::LogUnavailable {
+                reason: format!(
+                    "operation {operation} names leaf {index}, and its receipt leaf {}",
+                    receipt.coordinate.index
+                ),
+            });
+        }
         let projected = match self.project() {
             Ok(projected) => projected,
             Err(_) => self.relationships.revision().unwrap_or(0),
@@ -249,7 +255,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             Ok(coordinate) => {
                 self.record_committed(&signed, coordinate)?;
                 self.snapshot();
-                self.answer(signed.event().clone())
+                let receipt = GrantReceipt::of(&signed, coordinate);
+                self.answer(signed.event().clone(), receipt)
             }
             Err(failure) => {
                 if self.ledger.uncertain().is_none() {
@@ -258,8 +265,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                     });
                 }
                 self.settle_for_change()?;
-                match self.answered_event(operation)? {
-                    Some(recorded) => self.answer(recorded),
+                match self.answered(operation)? {
+                    Some((recorded, receipt)) => self.answer(recorded, receipt),
                     None => Err(GrantError::AppendRefused {
                         reason: failure.to_string(),
                     }),

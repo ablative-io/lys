@@ -138,26 +138,17 @@ impl<S: LeafStore> GrantLedger<S> {
         Ok(self.certain()?.head())
     }
 
-    /// The event at `index`, read from the store and verified, refused while
-    /// an append is uncertain.
-    pub fn event(&self, index: u64) -> Result<Option<SignedGrantEvent>, GrantError> {
-        self.certain()?.event(index, &self.service_key)
+    /// The event at `index` with the coordinate it completed, read from the
+    /// store from the nearest checkpoint and verified, refused while an
+    /// append is uncertain.
+    pub fn entry(&self, index: u64) -> Result<Option<(SignedGrantEvent, Coordinate)>, GrantError> {
+        self.certain()?.entry(index, &self.service_key)
     }
 
-    /// Every event in log order, read from the store and verified, refused
-    /// while an append is uncertain.
-    pub fn events(&self) -> Result<Vec<SignedGrantEvent>, GrantError> {
-        let ledger = self.certain()?;
-        (0..ledger.len())
-            .map(|index| {
-                ledger
-                    .event(index, &self.service_key)?
-                    .ok_or_else(|| GrantError::LeafNotAnEvent {
-                        index,
-                        reason: "the leaf is missing inside the log".to_owned(),
-                    })
-            })
-            .collect()
+    /// Every event in log order with its coordinate, read from the store in
+    /// one pass and verified, refused while an append is uncertain.
+    pub fn entries(&self) -> Result<Vec<(SignedGrantEvent, Coordinate)>, GrantError> {
+        self.certain()?.entries(&self.service_key)
     }
 
     /// An inclusion proof of the leaf at `index` in the log's current tree.

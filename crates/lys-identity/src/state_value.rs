@@ -12,7 +12,6 @@ use ciborium::Value;
 use crate::binding::LoginBinding;
 use crate::event::wire;
 use crate::id::{AgentId, ID_LEN, IdentityId, PersonId};
-use crate::log::Coordinate;
 use crate::operation::OperationId;
 
 /// Why a state could not be read.
@@ -156,27 +155,6 @@ pub(crate) fn read_binding(value: Value) -> Result<LoginBinding, Unreadable> {
         &read_text(subject, "a binding's subject")?,
     )
     .map_err(|error| error.to_string())
-}
-
-/// A log coordinate.
-pub(crate) fn coordinate(value: Coordinate) -> Value {
-    array(vec![
-        uint(value.index),
-        uint(value.tree_size),
-        bytes(&value.root),
-        bytes(&value.leaf_hash),
-    ])
-}
-
-/// A log coordinate.
-pub(crate) fn read_coordinate(value: Value) -> Result<Coordinate, Unreadable> {
-    let [index, tree_size, root, leaf_hash] = tuple::<4>(value, "a coordinate")?;
-    Ok(Coordinate {
-        index: read_uint(&index, "a coordinate's index")?,
-        tree_size: read_uint(&tree_size, "a coordinate's tree size")?,
-        root: read_fixed::<32>(root, "a coordinate's root")?,
-        leaf_hash: read_fixed::<32>(leaf_hash, "a coordinate's leaf hash")?,
-    })
 }
 
 /// A list of `(key, index)` pairs, sorted so the list has one order.

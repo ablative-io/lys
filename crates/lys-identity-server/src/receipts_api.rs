@@ -45,8 +45,7 @@ async fn receipt(
         let proof = log.inclusion_proof(index)?;
         let receipt =
             directory
-                .receipt_at(index)
-                .cloned()
+                .receipt_at(index)?
                 .ok_or_else(|| ServerError::RequestMalformed {
                     reason: format!("the directory holds no receipt for leaf {index}"),
                 })?;

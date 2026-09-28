@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use lys_core::Ed25519Identity;
 use lys_identity::log::Reopen;
 use lys_identity::projection::Projection;
+use lys_identity::receipt::Receipt;
 use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
 use lys_log_store::{
     FileLeafStore, Frontier, LeafStore, PinnedRoot, SnapshotRefusal, Start, StoreResult, seal,
@@ -120,22 +121,25 @@ fn administrator() -> Result<Actor, Box<dyn Error>> {
     ))
 }
 
-/// Registers `count` people, the `n`th with operation id `first + n`.
+/// Registers `count` people, the `n`th with operation id `first + n`,
+/// answering the receipt each registration was answered with.
 fn register(
     directory: &mut Directory<Counting>,
     first: u8,
     count: u8,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<Receipt>, Box<dyn Error>> {
+    let mut receipts = Vec::new();
     for n in 0..count {
         let seed = first + n;
-        directory.register_person(
+        let (_, receipt) = directory.register_person(
             administrator()?,
             OperationId::from_bytes([seed; 16]),
             Profile::new(&format!("Person {seed}"))?,
             u64::from(seed),
         )?;
+        receipts.push(receipt);
     }
-    Ok(())
+    Ok(receipts)
 }
 
 fn start_of(directory: &mut Directory<Counting>) -> Result<Start, Box<dyn Error>> {
@@ -163,7 +167,7 @@ fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
         Some(&SnapshotRefusal::Missing),
         "a log with no snapshot is refused by name and rebuilt"
     );
-    register(&mut first, 1, 10)?;
+    let answered = register(&mut first, 1, 10)?;
     let before = projection_of(&mut first)?;
     drop(first);
 
@@ -181,6 +185,14 @@ fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
     );
     assert_eq!(projection_of(&mut restarted)?, before);
     assert_eq!(restarted.log()?.len()?, 10);
+    for (index, receipt) in (0_u64..).zip(&answered) {
+        assert_eq!(
+            restarted.receipt_at(index)?.as_ref(),
+            Some(receipt),
+            "the receipt built from the log is the one answered at commit"
+        );
+    }
+    assert_eq!(restarted.receipt_at(10)?, None);
     Ok(())
 }
 
