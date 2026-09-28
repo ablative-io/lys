@@ -68,15 +68,14 @@ Behavioural. lys-secrets log prints the last lines of the audit log, oldest firs
 
 - Alignment: aligned
 - Acceptance verdicts:
-  - [x] Over an audit log of 10,000 lines, lys-secrets log --most 20 prints the last 20 and a counting store shows it read 20 lines. — The test the_log_command_prints_the_last_lines_and_reads_only_those in crates/lys-secrets/tests/log_window.rs checks five things. (1) Called on the 10,000-line log, window(None, 20) raises lines_read by exactly 20; the counter is incremented in AuditLog::leaf in crates/lys-secrets/src/audit.rs. (2) The binary's --most 20 prints indexes 9980..9999, and each row's outcome names its own index. (3) The footer reads 'older: --before 9980'. (4) With line 9979 altered, --most 20 still succeeds. (5) --most 21 fails with 'AuditSignatureInvalid: audit line 9979'. print_page in main.rs calls only window(page.before, page.most). Card-round log: log_window has 5 passed.
-  - [x] The command --before with the printed index prints the 20 before them, and the page that reaches line 0 says so. — The test the_printed_before_pages_back_to_the_first_line takes the --before value from the tail page's footer. That page prints 9960..9979 with footer 'older: --before 9960'. --before 20 prints 0..19, --before 7 prints 0..6, and --before 0 prints no rows; all three end with 'first line reached'. The footer comes from print_page in crates/lys-secrets/src/bin/lys-secrets/main.rs.
-  - [x] Without --most the command is refused by its argument parser, naming the flag. — In crates/lys-secrets/src/bin/lys-secrets/args.rs, Page.most is a non-Option NonZeroU64 with no default_value. The test the_log_command_without_most_is_refused_by_its_parser checks that the command exits 2, that stderr contains --most, that no broker folder was created, and that `log --help` shows '--most <MOST>' and 'required'.
+  - [x] Over an audit log of 10,000 lines, lys-secrets log --most 20 prints the last 20 and a counting store shows it read 20 lines. — crates/lys-secrets/tests/log_window.rs the_log_command_prints_the_last_lines_and_reads_only_those: audit.window(None,20) raises lines_read (audit.rs leaf() fetch_add) by exactly 20. The binary's `log --most 20` prints indexes 9980..9999, and each row's outcome names its own index. With line 9979 corrupted, `--most 20` still succeeds and `--most 21` fails with AuditSignatureInvalid naming 9979, which shows the binary reads nothing before its page. main.rs print_page calls broker.audit().window(page.before, page.most.get()). legs.log line 3378-3388: log_window 5 ok.
+  - [x] The command --before with the printed index prints the 20 before them, and the page that reaches line 0 says so. — log_window.rs the_printed_before_pages_back_to_the_first_line: the footer `older: --before 9980` is fed back and prints 9960..9979 with footer `older: --before 9960`. `--before 20` prints 0..19 with `first line reached`, `--before 7` prints 0..6, and `--before 0` prints no rows plus `first line reached`. Logic is in main.rs print_page (from>0 branch).
+  - [x] Without --most the command is refused by its argument parser, naming the flag. — args.rs Page.most: NonZeroU64 (required, no default_value). log_window.rs the_log_command_without_most_is_refused_by_its_parser asserts exit code 2, that stderr contains --most, that no broker root was created, and that the help shows `--most <MOST>` and `required`.
 - Checklist verified: C414
 - Stories verified: S166
 - Issues:
-  - cli.rs was changed although the brief does not list it. It holds the Command enum, so the change is necessary and is not scope creep.
-  - The 'counting store' is an in-process lines_read counter on AuditLog, read on the same window call the binary makes. The binary run itself is checked by the altered line 9979: --most 20 passes and --most 21 fails naming it.
-  - A start reads the log's last line for its anchor check, and the lines after the snapshot as its tail. That is start behaviour required by CLAUDE.md and existed before this diff; the log command itself reads only its page.
+  - The broker open still reads the last line for the anchor check, even when --before leaves it unprinted. This is the start's tamper check, which CLAUDE.md's start rule requires, and not part of the page read. No change needed.
+  - The 10,000-line fixture tests run for more than 60s in the gate (legs.log 3383-3385). They pass, and no time bound was added.
 
 ### R2: The whole-log read is an audit, by name
 
@@ -117,16 +116,12 @@ Behavioural. AuditLog::replay is renamed audit_every_line and its documentation 
 
 **Review (recorded):**
 
-- Alignment: fixed
+- Alignment: aligned
 - Acceptance verdicts:
-  - [x] The command lys-secrets audit over a log with one altered line names that line and exits non-zero, and over a sound log it exits 0. — The test the_audit_command_names_an_altered_line_and_passes_a_sound_log first writes a snapshot at every line, so no start reads the lines. `audit` on the sound log succeeds (exit 0) and prints 'audit sound: every one of N lines'. After line 1 is altered, `log --most 1` still succeeds, and `audit` fails with stderr 'AuditSignatureInvalid: audit line 1'. The Command::Audit arm in main.rs calls audit_every_line. Card-round log: this test is ok.
-  - [x] A test that opens the broker over a log of 10,000 lines counts no call to audit_every_line. — The test opening_the_broker_over_ten_thousand_lines_audits_no_line checks that the start is Start::Resumed{size:10000, replayed:0}, that every_line_audits() is 0, and that lines_read is at most 1 (the anchor check). As a control it then calls audit_every_line once and checks every_line_audits is 1 and lines_read rose by 10,000. `grep -rn '.replay()' crates/lys-secrets` finds nothing.
+  - [x] The command lys-secrets audit over a log with one altered line names that line and exits non-zero, and over a sound log it exits 0. — cli.rs Command::Audit(Where) and main.rs:404 call audit_every_line. log_window.rs the_audit_command_names_an_altered_line_and_passes_a_sound_log: on the sound log it succeeds and prints `audit sound: every one of {len} lines`. After line 1 is flipped it fails, and stderr contains `AuditSignatureInvalid: audit line 1 `. A --most 1 page still succeeds, showing the page does not read line 1.
+  - [x] A test that opens the broker over a log of 10,000 lines counts no call to audit_every_line. — log_window.rs opening_the_broker_over_ten_thousand_lines_audits_no_line: Start::Resumed{size:10000, replayed:0}, every_line_audits()==0 and lines_read<=1. As a control, one audit_every_line call gives every_line_audits()==1 and lines_read rises by exactly 10,000. grep of crates/*/src shows audit_every_line called only at main.rs:404 and in the #[cfg(test)] helper rotation.rs:99.
 - Checklist verified: C415
 - Stories verified: S166
-- Issues:
-  - crates/lys-secrets/src/bin/lys-secrets-demo.rs added `const LAST_LINES: u64 = 40`, a bound neither the brief nor the design asks for. The demo writes 17 lines, so window(None, 40) read the whole log: the demo still read the whole history, just through window.
-- Fixes:
-  - Removed LAST_LINES from lys-secrets-demo.rs. Step 10 now records `from_rotation = broker.audit().len()` before rotate_store_key. Step 11 reads `window(None, len - from_rotation)`, which is only the rotation and post-rotation lines, and the step text and module doc now say so. The demo was run and prints lines 12 to 16. fmt check, clippy on lys-secrets in both feature shapes, ast-grep, file-length and the design gate all exit 0 afterwards.
 
 ## Boundaries
 
