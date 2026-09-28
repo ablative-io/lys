@@ -8,6 +8,7 @@ import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { useNavigate } from 'react-router';
 import { Gate } from '../signin/Gate';
+import { OwnAccount } from '../people/Account';
 
 interface YouData {
   me: MeView;
@@ -103,6 +104,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
           </table>
         </div>
         <div>
+          <OwnAccount />
           <div className="card" id="signin-identities">
             <h2>Sign-in identities</h2>
             <div className="note" style={{ margin: '2px 0 6px' }}>Accounts that prove you are you. Never lent to an agent.</div>

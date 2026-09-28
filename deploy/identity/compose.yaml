@@ -104,6 +104,9 @@ services:
       RP_ORIGIN: ${RAUTHY_RP_ORIGIN:?issuer_invalid RAUTHY_RP_ORIGIN}
       PROXY_MODE: ${RAUTHY_PROXY_MODE:?config_invalid RAUTHY_PROXY_MODE}
       TRUSTED_PROXIES: ${RAUTHY_TRUSTED_PROXIES-}
+      # Named only when a proxy is trusted: the directory service's
+      # X-Forwarded-For, taken from the trusted proxies alone.
+      PEER_IP_HEADER_NAME: ${RAUTHY_PEER_IP_HEADER_NAME-}
       BOOTSTRAP_ADMIN_EMAIL: ${RAUTHY_BOOTSTRAP_ADMIN_EMAIL:?config_invalid RAUTHY_BOOTSTRAP_ADMIN_EMAIL}
       BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${RAUTHY_BOOTSTRAP_ADMIN_PASSWORD:?secret_missing RAUTHY_BOOTSTRAP_ADMIN_PASSWORD}
       BOOTSTRAP_API_KEY: ${RAUTHY_BOOTSTRAP_API_KEY:?config_invalid RAUTHY_BOOTSTRAP_API_KEY}
@@ -118,6 +121,16 @@ services:
         condition: service_healthy
         required: false
     restart: unless-stopped
+
+# The network's range is named, so its gateway, the one address the directory
+# service on this machine reaches the sign-in service from, is known and is the
+# only trusted proxy.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${IDENTITY_NETWORK:?config_invalid IDENTITY_NETWORK}
+          gateway: ${IDENTITY_GATEWAY:?config_invalid IDENTITY_GATEWAY}
 
 volumes:
   postgres-data:

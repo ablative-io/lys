@@ -125,8 +125,15 @@ pub(crate) fn with_grants<T>(
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = directory.projection()?;
+        let administrator =
+            state
+                .admission
+                .administrator_login()
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "no administrator is set up yet, so there is no root authority to judge a grant under",
+                })?;
         let root = projection
-            .person_for(state.admission.administrator_login())
+            .person_for(&administrator)
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;

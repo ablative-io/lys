@@ -154,6 +154,7 @@ export const SERVICE: Record<string, Route> = {
   '/receipts/4': ok(RECEIPTS[4]),
   '/receipts/5': ok(RECEIPTS[5]),
   '/me': ok(ME),
+  '/me/account': ok({ email: 'ada@example.test', enabled: true }),
   '/roles': ok({ roles: [] }),
   '/teams': ok({ teams: [] }),
   '/runtime/found': ok({ sessions: [] }),

@@ -16,11 +16,16 @@ async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
             reason: format!("{} could not be bound: {error}", config.listen),
         })?;
     println!("lys-identity-server listening on {}", config.listen);
-    axum::serve(listener, app)
-        .await
-        .map_err(|error| ServerError::DirectoryUnavailable {
-            reason: error.to_string(),
-        })
+    // The connection's address is the person's own, carried to the issuer
+    // so its failed sign-in count is per person.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .map_err(|error| ServerError::DirectoryUnavailable {
+        reason: error.to_string(),
+    })
 }
 
 #[tokio::main]

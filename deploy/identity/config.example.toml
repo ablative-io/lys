@@ -11,8 +11,14 @@ node = "dev-node"
 project = "lys-identity"
 # The private state directory, relative to this file. prepare creates it mode 700.
 state_dir = "state"
-# The test identity Rauthy bootstraps as its administrator. Test identities only.
-admin_email = "admin@identity.test"
+# The compose network's private range, written from its first address. Its
+# gateway, the next address (172.29.48.1 here), is the one address lys reaches
+# Rauthy from, and the only one trusted_proxies may name.
+network = "172.29.48.0/24"
+# No administrator is named here: the person makes the administrator on Lys's
+# setup page. An unattended install may name the one email the setup page then
+# takes, for example
+#   admin_email = "owner@example.test"
 
 [issuer]
 # The public origin browsers reach Rauthy at. The issuer is this origin followed
@@ -21,9 +27,9 @@ admin_email = "admin@identity.test"
 # Local origin: plain http is accepted only for a loopback host, as below.
 # TLS origin: name the https origin a TLS-terminating proxy serves, for example
 #   public_origin = "https://id.example.test"
-#   trusted_proxies = ["10.0.0.0/8"]
-# Rauthy then runs in proxy mode behind it and trusts forwarded headers only
-# from the listed proxies.
+#   trusted_proxies = ["172.29.48.1/32"]
+# Rauthy then runs in proxy mode, so it names itself https, and takes a
+# person's forwarded address from the network's gateway alone.
 public_origin = "http://localhost:8480"
 # The loopback port Rauthy's HTTP listener is published on.
 listen_port = 8480
