@@ -1606,6 +1606,128 @@
           "text": "As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes."
         }
       ]
+    },
+    {
+      "name": "Agent",
+      "role": "Runs in a harness and wants to continue somewhere else",
+      "stories": [
+        {
+          "id": "S1",
+          "text": "As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry."
+        },
+        {
+          "id": "S2",
+          "text": "As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it."
+        },
+        {
+          "id": "S7",
+          "text": "As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine."
+        },
+        {
+          "id": "S8",
+          "text": "As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs."
+        },
+        {
+          "id": "S9",
+          "text": "As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness."
+        },
+        {
+          "id": "S14",
+          "text": "As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it."
+        },
+        {
+          "id": "S15",
+          "text": "As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten."
+        },
+        {
+          "id": "S16",
+          "text": "As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again."
+        },
+        {
+          "id": "S20",
+          "text": "As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern."
+        },
+        {
+          "id": "S46",
+          "text": "As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind."
+        }
+      ]
+    },
+    {
+      "name": "Tom",
+      "role": "Owns the platform and reads what a session was given",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives."
+        },
+        {
+          "id": "S4",
+          "text": "As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured."
+        },
+        {
+          "id": "S6",
+          "text": "As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded."
+        },
+        {
+          "id": "S10",
+          "text": "As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process."
+        },
+        {
+          "id": "S12",
+          "text": "As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents."
+        },
+        {
+          "id": "S21",
+          "text": "As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent."
+        },
+        {
+          "id": "S23",
+          "text": "As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything."
+        },
+        {
+          "id": "S44",
+          "text": "As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Checks the proofs before anything relies on them",
+      "stories": [
+        {
+          "id": "S5",
+          "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S11",
+          "text": "As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with."
+        },
+        {
+          "id": "S13",
+          "text": "As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed."
+        },
+        {
+          "id": "S17",
+          "text": "As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes."
+        },
+        {
+          "id": "S18",
+          "text": "As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written."
+        },
+        {
+          "id": "S19",
+          "text": "As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom."
+        },
+        {
+          "id": "S22",
+          "text": "As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone."
+        },
+        {
+          "id": "S45",
+          "text": "As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it."
+        }
+      ]
     }
   ]
 }
