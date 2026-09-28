@@ -130,6 +130,28 @@ pub enum ServerError {
         /// The operation id.
         machine: String,
     },
+    /// The provisioning profiles cannot be read or written.
+    #[error("ProvisioningUnavailable: {reason}")]
+    ProvisioningUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The profile is no longer at the version the change was set over.
+    #[error(
+        "ProvisioningChanged: the profile is at version {latest}, not the version this change was set over: read the profile again and set the change over version {latest}"
+    )]
+    ProvisioningChanged {
+        /// The latest version kept.
+        latest: u32,
+    },
+    /// The operation id already names a profile version set in other words.
+    #[error(
+        "ProvisioningReused: operation `{operation}` already names a profile version set in other words: set this change under a new operation id"
+    )]
+    ProvisioningReused {
+        /// The operation id.
+        operation: String,
+    },
     /// The roles cannot be read or written.
     #[error("RolesUnavailable: {reason}")]
     RolesUnavailable {
@@ -212,14 +234,17 @@ impl ServerError {
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
             | Self::HoldingOver { .. }
-            | Self::HoldingChanged => StatusCode::CONFLICT,
+            | Self::HoldingChanged
+            | Self::ProvisioningChanged { .. }
+            | Self::ProvisioningReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
-            | Self::RolesUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::RolesUnavailable { .. }
+            | Self::ProvisioningUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

@@ -49,6 +49,8 @@ pub struct AppState {
     pub network: Option<Mutex<crate::network_store::NetworkStore>>,
     /// The roles, when the configuration names their file.
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
+    /// The provisioning profiles, when the configuration names their file.
+    pub provisioning: Option<Mutex<crate::provisioning_store::ProvisioningStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -104,6 +106,17 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             store.roles().len()
         ));
     }
+    let provisioning = config
+        .provisioning_file
+        .as_deref()
+        .map(crate::provisioning_store::ProvisioningStore::open)
+        .transpose()?;
+    if let Some(store) = &provisioning {
+        say(&format!(
+            "provisioning profiles read from one file, holding {} profiles",
+            store.profiles().len()
+        ));
+    }
     Ok(router(Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -128,6 +141,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         requests: requests.map(Mutex::new),
         network: network.map(Mutex::new),
         roles: roles.map(Mutex::new),
+        provisioning: provisioning.map(Mutex::new),
         say,
     })))
 }
@@ -173,6 +187,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::connections_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())
+        .merge(crate::provisioning_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

@@ -80,6 +80,11 @@ pub struct Config {
     /// Without it the role routes answer `RolesUnavailable`.
     #[serde(default)]
     pub roles_file: Option<PathBuf>,
+    /// The file the provisioning profiles are kept in, created at the first
+    /// profile set. Without it the provisioning routes answer
+    /// `ProvisioningUnavailable`.
+    #[serde(default)]
+    pub provisioning_file: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

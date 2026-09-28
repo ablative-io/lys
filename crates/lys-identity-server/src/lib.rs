@@ -17,6 +17,8 @@ pub mod link_audit_api;
 pub mod network_api;
 pub mod network_store;
 pub mod oidc;
+pub mod provisioning_api;
+pub mod provisioning_store;
 pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
