@@ -287,6 +287,7 @@ impl Service {
             spicedb,
             secrets,
             requests_dir: Some(dir.path().join("requests")),
+            certificates_dir: Some(dir.path().join("certificates")),
             network_file: Some(dir.path().join("network.json")),
             roles_file: Some(dir.path().join("roles.json")),
             provisioning_file: Some(dir.path().join("provisioning.json")),

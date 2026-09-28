@@ -72,6 +72,11 @@ pub struct Config {
     /// not exist. Without it the request routes answer `RequestsUnavailable`.
     #[serde(default)]
     pub requests_dir: Option<PathBuf>,
+    /// The directory the issued certificates are kept in, created when it
+    /// does not exist. Without it the certificate routes answer
+    /// `CertificatesUnavailable`.
+    #[serde(default)]
+    pub certificates_dir: Option<PathBuf>,
     /// The file the machines are kept in, created at the first machine
     /// named. Without it the network routes answer `NetworkUnavailable`.
     #[serde(default)]
