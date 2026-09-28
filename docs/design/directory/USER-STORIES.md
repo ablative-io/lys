@@ -8,6 +8,8 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
+**S77.** As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -17,6 +19,8 @@
 **S3.** As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
+
+**S79.** As the operator, I want a permission check the permission projection has not yet caught up with to be refused by name, naming the grant, while unrelated checks keep being answered, so that a lagging projection never admits a call and never stops unrelated work.
 
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
@@ -34,4 +38,4 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-**S76.** As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
+**S78.** As a grant holder or reviewer looking at an identity, I want the screen to answer why it can or cannot do a thing, with the path to a responsible person or the named reason, so that I can trust or correct its access from the server's own decision.
