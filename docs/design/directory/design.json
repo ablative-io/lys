@@ -56,7 +56,8 @@
     "ADR-025",
     "ADR-026",
     "ADR-027",
-    "ADR-028"
+    "ADR-028",
+    "ADR-039"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -1027,7 +1028,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.\nAs the lead ruled, CN1 binds DIRECTORY-001 only."
     },
     {
       "id": "CN2",

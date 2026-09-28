@@ -8,8 +8,6 @@
 
 **S5.** As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
-**S15.** As a person signing in, I want my sign-in, and a refusal of it, to leave a receipt signed by the service and never by me, so that a claim about me is never settable by me.
-
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -20,13 +18,9 @@
 
 **S6.** As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen.
 
-**S14.** As the operator of a development install, I want its receipts to be test receipts that verify only with the test key I hold and never as real, so that I can prove the whole path end to end without performing an act reserved for Tom.
-
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
-
-**S13.** As a verifier, I want to check a receipt with the lys CLI alone, given the log and the service's public key, and have a receipt whose payload commitment does not match the record it points at refused, so that the directory's history never rests on the running service's word.
 
 ## Grant holder and reviewer — Exercises or delegates current authority and verifies its exact origin
 
@@ -40,10 +34,14 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Administrator — Suspends, reinstates and retires identities, and reads why a check refused
+## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
-**S16.** As the administrator, I want to suspend, reinstate or retire an identity only by a signed act whose record is the one thing that changes its state, so that no state is ever set without a record saying who changed it, from what, to what and why.
+**S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
 
-**S17.** As the responsible person, I want a suspended or retired agent of mine refused at every check and at its next session refresh by its state alone, whatever grants it holds, so that halting it never depends on finding and revoking every grant first.
+**S32.** As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation.
 
-**S18.** As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory.
+**S34.** As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live.
+
+## Responsible person — Relies on an agent's certificate staying ended once it is revoked
+
+**S33.** As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.

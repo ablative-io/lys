@@ -365,7 +365,7 @@
     {
       "id": "RM-025",
       "title": "Revoke a certificate by appending a leaf and fold the live set from the log",
-      "status": "briefed",
+      "status": "idea",
       "kind": "feature",
       "summary": "Builds DP26 for certificates: revoking is one leaf appended to an append-only certificate log through lys-log-store, never a deletion or rewrite, and the live set is folded from the log. A revoked certificate fails revocation-aware verification, which takes the size N and a tolerance as explicit inputs with no default and names the revocation leaf, while its log proofs, its issuance record and the attestations logged before its revocation still verify, and an attestation by a certificate not revoked needs no log entry. A certificate carries one claim and is the revocable unit, only its issuing authority's key revokes it, a revocation is permanent, and a revocation naming a certificate with no earlier issuance is refused (ADR-039). The code lives in lys-identity; lys-core and every published format are unchanged, and lys ca verify keeps its meaning with help saying it does not check revocation. It stands beside DIRECTORY-006 R4 and leaves C25 open. DIRECTORY-013 carries it in seven rows.",
       "provenance": {
