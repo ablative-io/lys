@@ -86,7 +86,8 @@
     "ADR-126",
     "ADR-127",
     "ADR-128",
-    "ADR-129"
+    "ADR-129",
+    "ADR-131"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -4857,6 +4858,91 @@
       "path": "surface/identity/tests/acceptance/runner-build.spec.ts",
       "note": "Show the same pending restart on the page and CLI",
       "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys-runner/src/codex_policy_contract.rs",
+      "note": "Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/tests/codex_policy_contract.rs",
+      "note": "Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "docs/design/directory/CODEX-POLICY-CONTRACT.md",
+      "note": "Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/policy.rs",
+      "note": "Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/policy_tests.rs",
+      "note": "Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/src/codex_judge.rs",
+      "note": "Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/tests/codex_judge.rs",
+      "note": "Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/hooks.rs",
+      "note": "Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/hooks_tests.rs",
+      "note": "Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/src/codex_refusals.rs",
+      "note": "Record native Codex rejections with honest provenance. DIRECTORY-065 R4.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/tests/codex_refusals.rs",
+      "note": "Record native Codex rejections with honest provenance. DIRECTORY-065 R4.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "surface/identity/tests/codex-policy.test.tsx",
+      "note": "The Codex agent page shows measured policy and refusal coverage. DIRECTORY-065 R5.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "scripts/identity-gates/codex-policy.sh",
+      "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/tests/codex_policy_native.rs",
+      "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys-runner/tests/support/codex_policy_fixture.rs",
+      "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/codex-policy.spec.ts",
+      "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
+      "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "docs/design/directory/PROOF-CODEX-POLICY.md",
+      "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
+      "brief": "DIRECTORY-065"
     }
   ],
   "inventory": [

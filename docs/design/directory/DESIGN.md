@@ -78,6 +78,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-127 — A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers — Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.
 - ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
 - ADR-129 — Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's — The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.
+- ADR-131 — Codex policy comes from Lys and refusal provenance follows the real harness contract — Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.
 
 ## Goals
 
@@ -1069,6 +1070,23 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/status.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
 | `crates/lys/src/identity/status_tests.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
 | `surface/identity/tests/acceptance/runner-build.spec.ts` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys-runner/src/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `docs/design/directory/CODEX-POLICY-CONTRACT.md` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy_tests.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks_tests.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `surface/identity/tests/codex-policy.test.tsx` | The Codex agent page shows measured policy and refusal coverage. DIRECTORY-065 R5. | DIRECTORY-065 |
+| `scripts/identity-gates/codex-policy.sh` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_native.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/support/codex_policy_fixture.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `surface/identity/tests/acceptance/codex-policy.spec.ts` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `docs/design/directory/PROOF-CODEX-POLICY.md` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 
 ## Inventory
 

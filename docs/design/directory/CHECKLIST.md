@@ -414,3 +414,12 @@
 - [ ] **C446** — Record running and placed builds as different facts (DIRECTORY-066 R2).
 - [ ] **C447** — Restart only through an explicit session-aware operation (DIRECTORY-066 R3).
 - [ ] **C448** — Show the same pending restart on the page and CLI (DIRECTORY-066 R4).
+
+## Codex policy and refusal coverage (DIRECTORY-065)
+
+- [ ] **C439** — Pin the actual Codex executable and its supported policy contract (DIRECTORY-065 R1).
+- [ ] **C440** — Render native Codex permissions from the bound Lys policy (DIRECTORY-065 R2).
+- [ ] **C441** — Bind Codex pre-tool policy checks to the existing Lys judge (DIRECTORY-065 R3).
+- [ ] **C442** — Record native Codex rejections with honest provenance (DIRECTORY-065 R4).
+- [ ] **C443** — The Codex agent page shows measured policy and refusal coverage (DIRECTORY-065 R5).
+- [ ] **C444** — Prove config enforcement and denial delivery through the real harness (DIRECTORY-065 R6).

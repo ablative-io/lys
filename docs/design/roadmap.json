@@ -2639,6 +2639,31 @@
       },
       "depends_on": [],
       "notes": "Handwritten follow-up to the 045/050 integration. Distinguishes placing from restarting."
+    },
+    {
+      "id": "RM-106",
+      "title": "Codex uses the Lys policy and shows source-backed refusals",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Extend the signed policy and existing harness owner. Render Codex native config, bind native and Lys refusal evidence, and replace the blanket unsupported display with measured capabilities. Independent implementation branches may build in parallel under Tom's07:32 ruling. Integration must contain the actual051/062/064 seams and pass the fresh full chain before landing.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-29T07:32:00+10:00",
+        "quote": "Lys renders a Codex agent's config with its own sandbox and approval settings from the same Lys policy",
+        "context": "Relayed by Waffles in the Lys room. Card lRpNSAg7."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-131"
+        ],
+        "briefs": [
+          "DIRECTORY-065"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Handwritten.051,062 and064 implementation seams required at integration. Gypsy reviews."
     }
   ]
 }

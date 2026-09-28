@@ -648,6 +648,20 @@
           "text": "As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action."
         }
       ]
+    },
+    {
+      "name": "Person running a Codex agent",
+      "role": "Sets policy and inspects its actual enforcement",
+      "stories": [
+        {
+          "id": "S175",
+          "text": "As a person running Codex under Lys, I want its native permissions to reflect my Lys policy without hand-editing settings."
+        },
+        {
+          "id": "S176",
+          "text": "As the person responsible for an agent, I want real refusals and missing coverage shown separately, so I can trust what the page tells me."
+        }
+      ]
     }
   ]
 }
