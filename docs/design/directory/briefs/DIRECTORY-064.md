@@ -71,6 +71,19 @@ Behavioural. WHEN Lys starts a session requiring context actions or goal deliver
 - S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
 - S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The spec says to keep 051's hooks, usage collector, cursor accounting, budget and goal stores and operations log. None of these exist. The files DIRECTORY-051 R1 creates are absent from the tree: crates/lys-runner/src/tracking.rs, tracking_store.rs, crates/lys-identity-server/src/usage_*.rs and crates/lys-home/src/harness/tracking.rs. The file DIRECTORY-051 R3 creates, crates/lys-runner/src/operations.rs, is also absent. So 'Repeated adapter events add no second usage charge in 051' cannot be met or tested. The dispatcher and the typed event projection would have to invent their own operation identities and cursors, which would duplicate 051's operations log. The brief forbids that. The files this requirement modifies do exist (protocol.rs, session.rs, session/lifecycle.rs, state.rs, socket.rs, runner_acts.rs, runner_sessions.rs and the lys-home launch files), since DIRECTORY-050 is built. But the requirement is defined as an extension of 051 and cannot be finished without it.
+- Deviation: Nothing was implemented. The brief's purpose says 051 is already built at 17eeac97; that commit only changes 051's brief documents. Implementing now would mean creating 051-owned files outside this brief's wall (CN9) and building those owners twice, which the brief forbids.
+- Checklist delivery:
+  - [ ] C433 — One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). — Blocked on DIRECTORY-051 (usage collector, operations log, cursors), which is not implemented.
+- Story delivery:
+  - [ ] S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit. — Blocked on DIRECTORY-051.
+  - [ ] S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice. — Blocked on DIRECTORY-051.
+
 ### R2: Use Claude and Codex control protocols, never terminal typing
 
 Behavioural. WHEN the dispatcher delivers an act, THE SYSTEM SHALL use a machine protocol over runner-owned pipes, with no PTY write, terminal key, shell command construction or external terminal-control application. Claude's adapter launches the selected binary with --print --input-format stream-json --output-format stream-json --verbose --replay-user-messages, an explicit bound session and the existing isolated settings. Send one SDK user envelope with a stable uuid, session_id, parent_tool_use_id null, and message role user/content. A normal result closes a submitted turn; partial assistant text does not. A compaction request is the exact /compact command in this protocol, never terminal text. Discover compact capability from system/init slash_commands. Confirm actual compaction only on that session's system/compact_boundary, not a result success: the documented no-history case succeeds without compacting. User-envelope replay with matching uuid confirms message admission only; it does not prove completion, obedience or goal satisfaction. Validate these wire fixtures against the actual installed Claude version before enabling the adapter; absent required envelope correlation refuses the capability. Codex's adapter owns one app-server stdio child and JSON-RPC initialize/initialized handshake, creates or resumes the explicit bound thread, sends thread/compact/start with threadId and delivers a reminder through turn/start with threadId, clientUserMessageId and input text. The compact response is acceptance only; require the corresponding completed ContextCompaction item and terminal turn observation before declaring compaction complete. A turn/start reply identifies the admitted turn, not a finished goal. Only dispatch while the owned thread is idle; never use turn/steer to inject mid-turn. Resolve server approval requests through the existing policy authority; never automatically approve one to keep the transport moving. Unknown protocol variants or missing proof yield a named unsupported/uncertain state. Preserve existing permissions when starting turns: no sandbox or approval override in a reminder call. The local inspected Codex contract is codex-channels 7cbba483, app-server-protocol/src/protocol/common.rs and v2/{thread,turn,item}.rs and app-server/src/request_processors/thread_processor.rs. A checkout is a fixture source, not installed-binary proof. No app-server function is attributed to legacy notify; notify remains after-turn only.
@@ -106,6 +119,19 @@ Behavioural. WHEN the dispatcher delivers an act, THE SYSTEM SHALL use a machine
 - S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
 - S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The wall modifies crates/lys-home/src/harness/codex/config.rs, which does not exist: DIRECTORY-051 R1 creates it. Rows such as 'A Codex reminder uses turn/start only after turn/completed' and 'The empty Codex compact response leaves the operation accepted' need R1's boundary dispatcher. They also need 051's operation states. The Claude and Codex adapters are the transport under that dispatcher, so building them alone would leave them without a defined owner for operation state.
+- Deviation: Nothing was implemented, for the same dependency reason as R1. codex/config.rs is listed as 'modify' but is one of 051's create outputs.
+- Checklist delivery:
+  - [ ] C434 — Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). — Blocked on DIRECTORY-051 and on R1.
+- Story delivery:
+  - [ ] S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit. — Blocked on DIRECTORY-051.
+  - [ ] S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice. — Blocked on DIRECTORY-051.
+
 ### R3: Enforce context thresholds at the owned boundary
 
 Behavioural. WHEN 051's authoritative context measurement crosses its held threshold, THE SYSTEM SHALL reuse its stable crossing/operation identity and block release of the next normal input before running the configured compact or stop act. Use 051's measurement validity and budget precedence; repeated snapshots are not new crossings. A compact command waits for the active turn to finish, then runs before queued normal input. The context watch must not recursively react to its own compaction events. After actual compaction, require a fresh measurement below the threshold before releasing held input. When compaction fails, is unsupported, finishes above threshold or yields no valid post-measurement, keep the next turn held and show the named reason, without automatic repeated compaction. The responsible person can choose the existing stop act or an authorised policy change; the agent cannot lift its own hold. A configured stop uses the existing proved process/session owner and exit receipt, never a typed stop command; stop confirmation requires actual process exit. Explicit stop takes priority over queued compaction/reminders. Tracking loss under a required context policy holds the next turn instead of assuming the limit was respected. Setting a threshold is an authorised product policy, not a request timeout or watchdog.
@@ -136,6 +162,18 @@ Behavioural. WHEN 051's authoritative context measurement crosses its held thres
 
 **Stories:**
 - S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The spec reuses 051's authoritative context measurement, its crossing and operation identity, and its budget precedence. The wall modifies crates/lys-runner/src/operations.rs, crates/lys-identity-server/src/budgets_act.rs and budgets_state.rs, and none of them exist: DIRECTORY-051 R2 and R3 create them. No threshold or measurement source exists for a crossing to be held against.
+- Deviation: Nothing was implemented; the files this row modifies are 051's unbuilt outputs.
+- Checklist delivery:
+  - [ ] C435 — Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). — Blocked on DIRECTORY-051 R2 and R3 (budgets and operations).
+- Story delivery:
+  - [ ] S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit. — Blocked on DIRECTORY-051.
 
 ### R4: Deliver current goal and reminder words at turn boundaries
 
@@ -170,6 +208,18 @@ Behavioural. WHEN a 051 reminder occurrence is due for an authorised live sessio
 **Stories:**
 - S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The spec enqueues 051's reminder occurrences and goal versions and reuses 051's timers. The wall modifies crates/lys-identity-server/src/goals_state.rs, goals_store.rs, goals_api.rs and crates/lys-runner/src/operations.rs, and none of them exist: DIRECTORY-051 R3 and R4 create them. Without them there is no goal, occurrence or reminder to deliver.
+- Deviation: Nothing was implemented; the files this row modifies are 051's unbuilt outputs.
+- Checklist delivery:
+  - [ ] C436 — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). — Blocked on DIRECTORY-051 R4 (goals and reminders).
+- Story delivery:
+  - [ ] S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice. — Blocked on DIRECTORY-051.
+
 ### R5: Reconcile uncertain delivery with existing operation receipts
 
 Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 operation identity and a prepared request before a pipe write, then record accepted, confirmed, refused or uncertain as evidence arrives. Persist the distinction between safely unsent and possibly sent; after a crash in the write/receipt gap, do not replay or mint a replacement merely because no answer is stored. A matching durable harness observation may reconcile the original operation; a request UUID is correlation, not an unsupported exactly-once claim. For Codex, use available typed thread/item history or persisted observed events; a transient event gap stays uncertain. For Claude, reconcile matching saved admission/completion evidence for the explicit session; never read arbitrary other transcript files. If no authoritative readback exists, leave uncertain and expose an explicit responsible-person reconciliation action on that operation, which records the person's decision and never silently resends. A decision to send again creates a distinct authorised occurrence labelled possible prior delivery; it must pass the same boundary and authority checks. A restarted runner does not claim a dead pipe restored: use 050's actual lifecycle state and only resume a conversation through a separately authorised session start. Snapshot-backed folds and cursor reads preserve the repository's bounded-restart invariant. Goal text stays under holder visibility; exported operational telemetry contains identifiers/states only, never the text or credentials.
@@ -201,6 +251,19 @@ Behavioural. WHEN delivery starts, THE SYSTEM SHALL persist the existing 051 ope
 **Stories:**
 - S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
 - S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The spec persists 'the existing 051 operation identity', and the wall modifies crates/lys-runner/src/operations.rs, which does not exist. Reconciliation also needs R1's event projection and R2's adapters, both blocked. receipts_api.rs and runner_api.rs exist, but there is no operation record to reconcile.
+- Deviation: Nothing was implemented; this row depends on 051's operations log and on R1 and R2.
+- Checklist delivery:
+  - [ ] C437 — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). — Blocked on DIRECTORY-051 R3 and on R1 and R2.
+- Story delivery:
+  - [ ] S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit. — Blocked on DIRECTORY-051.
+  - [ ] S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice. — Blocked on DIRECTORY-051.
 
 ### R6: Plain controls and a real managed-session proof
 
@@ -234,6 +297,19 @@ Behavioural. WHEN the responsible person opens 051's Usage page, THE SYSTEM SHAL
 **Stories:**
 - S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit.
 - S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked, no acceptance row is met. The spec extends 051's Usage page 'in place', and the wall modifies surface/identity/src/features/usage/Usage.tsx, usage.css and surface/identity/tests/usage.test.tsx. None exist: DIRECTORY-051 R5 creates them. The live proofs with two harnesses (a Claude compact_boundary, a completed Codex ContextCompaction, and the browser-created reminder) need R1 to R5. They also need scratch installs on Dean's laptop, which CLAUDE.md rule 3 sends heavy runs to.
+- Deviation: Nothing was implemented; the page this row extends does not exist yet.
+- Checklist delivery:
+  - [ ] C438 — Plain controls and a real managed-session proof (DIRECTORY-064 R6). — Blocked on DIRECTORY-051 R5 (Usage page) and on R1 to R5.
+- Story delivery:
+  - [ ] S173 (Person setting agent context and reminders, Controls agents without a terminal) — As the person responsible for an agent, I want Lys to compact or stop it at my context limit without terminal typing, so the next turn obeys the limit. — Blocked on DIRECTORY-051.
+  - [ ] S174 (Person setting agent context and reminders, Controls agents without a terminal) — As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice. — Blocked on DIRECTORY-051.
 
 ## Boundaries
 

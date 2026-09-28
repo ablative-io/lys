@@ -67,7 +67,92 @@
       "stories": [
         "S173",
         "S174"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. R1's managed-channel dispatcher needs DIRECTORY-051's pieces. From R3 it needs the operation ledger (crates/lys-runner/src/operations.rs); from R1 the cursor and usage accounting (tracking.rs, tracking_store.rs, usage_*.rs, harness/tracking.rs). None of these exist in this tree.",
+        "deviation": "Blocked on DIRECTORY-051. Its owners are not in the tree, and the brief forbids building them twice or outside the walls (CN9). The brief's purpose says 051 is built at 17eeac97, but that is a docs-only commit. The brief must name the real 051 landing commit before it is dispatched again. The lib.rs `pub mod provider` reordering came from the gate's `cargo fmt --all` in its work tree, not from an edit in this checkout, and this checkout's lib.rs is untouched. The failing gate legs fail on base defects outside this card's walls: crates/lys/src/identity/install.rs:154 E0425, crates/lys/src/identity/upgrade/render_tests.rs:92 E0308, crates/lys-identity-server/src/stop_api.rs:91 ToSchema, configure.rs:1 no-app-names-rust, grants.rs at 505 lines, and surface tests/sign-in-providers.test.tsx:45 and 67. They need their own card.",
+        "checklist": [
+          {
+            "id": "C433",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051 (operations.rs and tracking are absent)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S173",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A managed launch records the actual executable identity.",
+            "met": false,
+            "evidence": "No code change in diff; blocked on DIRECTORY-051"
+          },
+          {
+            "criterion": "A PTY-only session requiring automatic controls refuses control_transport_unsupported.",
+            "met": false,
+            "evidence": "No code change; grep finds no control_transport_unsupported"
+          },
+          {
+            "criterion": "The existing manual terminal launch still accepts manual input.",
+            "met": false,
+            "evidence": "No test added; nothing implemented"
+          },
+          {
+            "criterion": "A completed event for another session cannot release a queued reminder.",
+            "met": false,
+            "evidence": "No dispatcher exists"
+          },
+          {
+            "criterion": "A duplicate completed event cannot release a second operation.",
+            "met": false,
+            "evidence": "crates/lys-runner/src/operations.rs absent"
+          },
+          {
+            "criterion": "A reconnect without proved idle state dispatches no message.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A hook callback returns while its turn remains active.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A concurrent human message cannot overtake the boundary dispatcher.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An expired event cursor yields an explicit coverage gap.",
+            "met": false,
+            "evidence": "051 cursor accounting (tracking.rs) absent"
+          },
+          {
+            "criterion": "Repeated adapter events add no second usage charge in 051.",
+            "met": false,
+            "evidence": "051 usage collector (usage_*.rs) absent"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "DIRECTORY-051 must be implemented and landed first: tracking.rs, tracking_store.rs, operations.rs, usage_*.rs and harness/tracking.rs do not exist.",
+          "The brief's purpose falsely says 051 is built at 17eeac97, which is a docs-only commit. The brief must be revised to name the real 051 landing commit before it is dispatched again.",
+          "Out-of-wall edit: cargo fmt reordered `pub mod provider` in crates/lys-identity-server/src/lib.rs."
+        ],
+        "fixes": [
+          "Reverted the out-of-wall reorder in crates/lys-identity-server/src/lib.rs."
+        ]
+      }
     },
     {
       "id": "R2",
@@ -108,7 +193,98 @@
       "stories": [
         "S173",
         "S174"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. The Claude stream-json adapter and the Codex app-server adapter need two things: 051's operation states and codex/config.rs, and R1's dispatcher. Neither exists.",
+        "deviation": "Blocked on DIRECTORY-051 (crates/lys-home/src/harness/codex/config.rs and operations.rs are absent) and on R1.",
+        "checklist": [
+          {
+            "id": "C434",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051 and R1."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S173",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "The Claude fixture sends /compact through the managed JSON pipe.",
+            "met": false,
+            "evidence": "No adapter code in diff"
+          },
+          {
+            "criterion": "The terminal-writer spy records zero automated writes during Claude compaction.",
+            "met": false,
+            "evidence": "No spy/test exists"
+          },
+          {
+            "criterion": "A Claude success result without compact_boundary is recorded not_compacted.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A matching Claude replay uuid records admission.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A mismatched replay uuid cannot confirm delivery.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "The Codex fixture emits thread/compact/start for the bound thread.",
+            "met": false,
+            "evidence": "crates/lys-home/src/harness/codex/config.rs absent"
+          },
+          {
+            "criterion": "The empty Codex compact response leaves the operation accepted.",
+            "met": false,
+            "evidence": "051 operation states absent"
+          },
+          {
+            "criterion": "A completed ContextCompaction item with matching thread/turn confirms compaction.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A Codex reminder uses turn/start only after turn/completed.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A reminder request contains no sandbox override.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A reminder request contains no approval override.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A harness approval request receives no fabricated approval.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement the Claude and Codex managed adapters once DIRECTORY-051 has created codex/config.rs and the operation states, and R1's dispatcher exists."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -145,7 +321,93 @@
       ],
       "stories": [
         "S173"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Context holds need 051 R2 and R3 (budgets_state.rs and budgets_act.rs) and the operation ledger. None of them exists.",
+        "deviation": "Blocked on DIRECTORY-051 R2 and R3.",
+        "checklist": [
+          {
+            "id": "C435",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S173",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A threshold crossing holds a queued normal message.",
+            "met": false,
+            "evidence": "budgets_act.rs and budgets_state.rs absent"
+          },
+          {
+            "criterion": "A compact crossing sends exactly one compact request after the active turn ends.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Repeated equal snapshots send no additional compact request.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A valid fresh below-threshold measurement releases the held next message.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A post-compaction above-threshold measurement keeps the next message held.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A missing post-compaction measurement keeps the next message held.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A compaction event cannot trigger recursive compaction.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An explicit stop supersedes queued reminder delivery.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A stop receipt remains unconfirmed before process exit.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "The actual process exit confirms the stop.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "The judged agent cannot remove its own context hold.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement context holds once DIRECTORY-051 R2 and R3 (budgets, operations) have landed."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -184,7 +446,98 @@
       ],
       "stories": [
         "S174"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Reminder delivery needs 051 R4's goals and reminder scheduler (goals_state.rs, goals_store.rs, goals_api.rs). None of them exists.",
+        "deviation": "Blocked on DIRECTORY-051 R4. Writing these files here would duplicate 051's goal store and scheduler, which a SHALL NOT boundary forbids.",
+        "checklist": [
+          {
+            "id": "C436",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S174",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A reminder due during an active turn sends no input until that turn completes.",
+            "met": false,
+            "evidence": "goals_state.rs, goals_store.rs and goals_api.rs absent"
+          },
+          {
+            "criterion": "The admitted reminder preserves the saved goal words.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A due occurrence records its original due instant.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A late occurrence records its dispatch instant.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A goal marked met before dispatch sends no reminder.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A queued old version sends the current authorised words after an edit.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A revoked goal sends no pending words.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "One unavailable team session does not prevent another member delivery.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A compaction-triggered reminder waits for compaction completion.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A stopped session is not relaunched by a due reminder.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Saved text beginning /compact is delivered as reminder data.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Reminder admission cannot mark the goal met.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement reminder delivery once DIRECTORY-051 R4 (goals and reminders) has landed."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -222,7 +575,88 @@
       "stories": [
         "S173",
         "S174"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. Crash reconciliation needs 051 R3's operation ledger and snapshot, plus this brief's R1 and R2. None of them exists.",
+        "deviation": "Blocked on DIRECTORY-051 R3 and on R1 and R2.",
+        "checklist": [
+          {
+            "id": "C437",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S173",
+            "satisfied": false,
+            "note": "Blocked on DIRECTORY-051."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A crash before any write preserves the safely unsent operation.",
+            "met": false,
+            "evidence": "operations.rs absent"
+          },
+          {
+            "criterion": "A crash after a possible write records uncertain delivery.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Restart after a possible write issues no duplicate pipe request.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Matching saved admission evidence reconciles the original operation.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An unrelated turn result cannot reconcile that operation.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An unavailable readback leaves the operation uncertain.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An unauthorised reconciliation action is refused.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An explicit resend records a distinct authorised occurrence.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Restart read counts depend on the snapshot tail rather than total history length.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "Outbound analytics contains no goal text.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Implement reconciliation once DIRECTORY-051 R3 and this brief's R1 and R2 have landed."
+        ],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -261,7 +695,98 @@
       "stories": [
         "S173",
         "S174"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Not implemented. 051 R5 creates the Usage page (surface/identity/src/features/usage/Usage.tsx), and it is absent. The live two-harness scratch proof on Dean's laptop needs R1 to R5 first.",
+        "deviation": "Blocked on DIRECTORY-051 R5 and on R1 to R5. No scratch launch was run, and no success is claimed.",
+        "checklist": [
+          {
+            "id": "C438",
+            "done": false,
+            "note": "Blocked on DIRECTORY-051 and R1 to R5."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S174",
+            "satisfied": false,
+            "note": "Blocked; no browser or scratch evidence exists."
+          }
+        ]
+      },
+      "review": {
+        "alignment": "drifted",
+        "acceptance": [
+          {
+            "criterion": "A browser-set context threshold persists after reload.",
+            "met": false,
+            "evidence": "surface/identity/src/features/usage/Usage.tsx absent"
+          },
+          {
+            "criterion": "A browser-set goal reminder persists after reload.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "The Usage page shows the held next-turn state.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An uncertain operation is displayed as unconfirmed.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "An unrelated viewer cannot read the saved goal words.",
+            "met": false,
+            "evidence": "Nothing implemented"
+          },
+          {
+            "criterion": "A managed Claude scratch session receives the browser-created reminder.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "The Claude scratch run records actual compact_boundary evidence.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "A managed Codex scratch session receives the browser-created reminder.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "The Codex scratch run records completed ContextCompaction evidence.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "The scratch stop has process-exit evidence.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "The automation trace records zero terminal-writer calls.",
+            "met": false,
+            "evidence": "No scratch run"
+          },
+          {
+            "criterion": "The proof still completes with no Argus connection.",
+            "met": false,
+            "evidence": "No scratch run"
+          }
+        ],
+        "checklist": [],
+        "stories": [],
+        "issues": [
+          "Extend the Usage page once DIRECTORY-051 R5 has created it and R1 to R5 have landed, then run the live two-harness proof on Dean."
+        ],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
