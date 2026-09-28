@@ -7,8 +7,6 @@
 //! reading the resource back before deciding anything: a create is retried
 //! only when the read-back proves the client does not exist.
 
-use std::time::Duration;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeroize::Zeroizing;
@@ -17,8 +15,6 @@ use super::credentials::Credential;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::loopback_http::{self, Authority, Failure, Request, Response};
 use super::prepare::API_KEY_NAME;
-
-const TIMEOUT: Duration = Duration::from_secs(10);
 
 /// One mode of a Rauthy client theme, exactly as the admin API carries it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,15 +133,11 @@ impl RauthyApi {
             headers: &headers,
             body: body.unwrap_or_default(),
         };
-        loopback_http::exchange(&self.authority, TIMEOUT, &request).map_err(|failure| match failure
-        {
+        loopback_http::exchange(&self.authority, &request).map_err(|failure| match failure {
             Failure::Unreachable(detail) => {
                 IdentityError::new(ErrorKind::RauthyUnreachable, "connect", resource, detail)
             }
-            Failure::Uncertain(detail) => {
-                IdentityError::new(ErrorKind::RauthyUncertain, "request", resource, detail)
-            }
-            Failure::Malformed(detail) => {
+            Failure::Uncertain(detail) | Failure::Malformed(detail) => {
                 IdentityError::new(ErrorKind::RauthyUncertain, "request", resource, detail)
             }
         })

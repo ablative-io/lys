@@ -49,17 +49,43 @@ export function Explain() {
     first?.focus();
   }, [marks.length]);
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const remeasure = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => setMarks(measure()), 120);
+    // Layout is re-measured on its own signal, never on a timer: a
+    // ResizeObserver on every element a number could stand on and on the
+    // page itself, and one animation frame after the page's content
+    // changes, scrolls or the window resizes, which move marks without
+    // resizing what they stand on.
+    let frame = 0;
+    const remeasure = () => setMarks(measure());
+    const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(remeasure);
+    const observe = () => {
+      if (!resizes) return;
+      resizes.disconnect();
+      resizes.observe(document.documentElement);
+      for (const concept of CONCEPTS) {
+        for (const el of document.querySelectorAll(concept.sel)) if (!el.closest('.xlayer')) resizes.observe(el);
+      }
     };
-    addEventListener('scroll', remeasure, true);
-    addEventListener('resize', remeasure);
+    const nextFrame = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        observe();
+        remeasure();
+      });
+    };
+    const changes = new MutationObserver((records) => {
+      if (records.some((r) => !(r.target instanceof Element && r.target.closest('.xlayer')))) nextFrame();
+    });
+    observe();
+    changes.observe(document.body, { childList: true, subtree: true, characterData: true });
+    addEventListener('scroll', nextFrame, true);
+    addEventListener('resize', nextFrame);
     return () => {
-      clearTimeout(timer);
-      removeEventListener('scroll', remeasure, true);
-      removeEventListener('resize', remeasure);
+      cancelAnimationFrame(frame);
+      resizes?.disconnect();
+      changes.disconnect();
+      removeEventListener('scroll', nextFrame, true);
+      removeEventListener('resize', nextFrame);
     };
   }, []);
 

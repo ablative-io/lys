@@ -180,11 +180,19 @@ fn a_package_without_its_entry_page_is_refused() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_live_process_is_left_alone_unless_its_configuration_changed() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::TempDir::new()?;
-    let pid = dir.path().join("sleep.pid");
-    let log = dir.path().join("sleep.log");
-    let args = ["60".to_string()];
+    let pid = dir.path().join("scratch.pid");
+    let log = dir.path().join("scratch.log");
+    let never = dir.path().join("never");
+    services::run_to_end(Path::new("mkfifo"), &[never.display().to_string()], "fifo")?;
+    // Blocks opening a fifo nobody writes, so it lives until it is stopped.
+    let args = [
+        "-c".to_string(),
+        r#"read line < "$1""#.to_string(),
+        "scratch".to_string(),
+        never.display().to_string(),
+    ];
     assert!(services::start_detached(
-        Path::new("/bin/sleep"),
+        Path::new("/bin/sh"),
         &args,
         &log,
         &pid,
@@ -193,7 +201,7 @@ fn a_live_process_is_left_alone_unless_its_configuration_changed() -> Result<(),
     let first = std::fs::read_to_string(&pid)?;
     assert!(services::alive(&pid));
     assert!(!services::start_detached(
-        Path::new("/bin/sleep"),
+        Path::new("/bin/sh"),
         &args,
         &log,
         &pid,
@@ -201,7 +209,7 @@ fn a_live_process_is_left_alone_unless_its_configuration_changed() -> Result<(),
     )?);
     assert_eq!(std::fs::read_to_string(&pid)?, first);
     assert!(services::start_detached(
-        Path::new("/bin/sleep"),
+        Path::new("/bin/sh"),
         &args,
         &log,
         &pid,
@@ -226,4 +234,102 @@ fn the_install_names_the_fix_when_docker_is_missing_or_not_running() {
         .expect_err("a docker without compose is refused");
     assert!(failing.to_string().contains("without its compose plugin"));
     assert!(services::require_docker(Path::new("/usr/bin/true")).is_ok());
+}
+
+/// Starts `/bin/sh -c script` detached with a fresh fifo as its first
+/// argument, the pipe the test tells it through. Its pid file and log.
+fn told_service(dir: &Path, script: &str) -> Result<(PathBuf, PathBuf, PathBuf), Box<dyn Error>> {
+    let tell = dir.join("tell");
+    services::run_to_end(Path::new("mkfifo"), &[tell.display().to_string()], "fifo")?;
+    let pid = dir.join("scratch.pid");
+    let log = dir.join("scratch.log");
+    let args = [
+        "-c".to_string(),
+        script.to_string(),
+        "scratch".to_string(),
+        tell.display().to_string(),
+    ];
+    assert!(services::start_detached(
+        Path::new("/bin/sh"),
+        &args,
+        &log,
+        &pid,
+        false
+    )?);
+    Ok((tell, pid, log))
+}
+
+#[test]
+fn a_service_is_ready_within_the_log_event_that_says_so() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let script = r#"read told < "$1"; echo listening; read held < "$1""#;
+    let (tell, pid, log) = told_service(dir.path(), script)?;
+    let mut checks = 0;
+    let mut told = None;
+    services::wait_until("scratch", &log, &pid, &mut || {
+        checks += 1;
+        if told.is_none() {
+            told = Some(std::fs::write(&tell, b"go\n"));
+            return false;
+        }
+        let text = std::fs::read_to_string(&log).unwrap_or_default();
+        text.contains("listening")
+    })?;
+    told.ok_or("the service was never told")??;
+    assert_eq!(checks, 2, "one check as the wait began and one on the event");
+    assert!(services::stop(&pid)?);
+    Ok(())
+}
+
+#[test]
+fn a_service_that_exits_unready_is_refused_naming_its_log() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let script = r#"read told < "$1"; echo giving up; exit 3"#;
+    let (tell, pid, log) = told_service(dir.path(), script)?;
+    let mut told = None;
+    let outcome = services::wait_until("scratch", &log, &pid, &mut || {
+        if told.is_none() {
+            told = Some(std::fs::write(&tell, b"go\n"));
+        }
+        false
+    });
+    told.ok_or("the service was never told")??;
+    let refused = outcome.err().ok_or("an exited service was ready")?;
+    assert_eq!(refused.kind(), ErrorKind::Unready);
+    let message = refused.to_string();
+    assert!(message.contains("the process exited"), "{message}");
+    assert!(message.contains(&log.display().to_string()), "{message}");
+    assert!(!services::alive(&pid));
+    Ok(())
+}
+
+#[test]
+fn the_compose_wait_checks_once_per_output_and_names_each_ready() -> Result<(), Box<dyn Error>> {
+    let mut output: &[u8] = b"rauthy-1  | listening on 0.0.0.0:8080\n";
+    let waiting = vec!["rauthy".to_string(), "spicedb".to_string()];
+    let mut checks = 0;
+    let mut said = Vec::new();
+    services::ready_on_output(
+        &mut output,
+        waiting,
+        &mut || {
+            checks += 1;
+            Vec::new()
+        },
+        &mut |line| said.push(line.to_string()),
+    )?;
+    assert_eq!(checks, 1);
+    assert_eq!(said, ["rauthy ready", "spicedb ready"]);
+    let mut ended: &[u8] = b"";
+    let outcome = services::ready_on_output(
+        &mut ended,
+        vec!["rauthy".to_string()],
+        &mut || vec!["rauthy".to_string()],
+        &mut |line| said.push(line.to_string()),
+    );
+    let refused = outcome.err().ok_or("ended output was ready")?;
+    assert_eq!(refused.kind(), ErrorKind::Unready);
+    assert!(refused.to_string().contains("rauthy not ready"), "{refused}");
+    assert_eq!(said.len(), 2, "nothing was said ready that was not");
+    Ok(())
 }

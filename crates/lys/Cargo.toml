@@ -34,6 +34,12 @@ x509-parser.workspace = true
 # Generated deployment credentials are wiped from memory when dropped.
 zeroize.workspace = true
 
+# `lys identity install` waits on events: a service's log through kqueue or
+# inotify, and its exit through the release of the lock it holds.
+[target.'cfg(unix)'.dependencies]
+mio.workspace = true
+rustix.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 
