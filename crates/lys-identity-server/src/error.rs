@@ -130,6 +130,45 @@ pub enum ServerError {
         /// The operation id.
         machine: String,
     },
+    /// The roles cannot be read or written.
+    #[error("RolesUnavailable: {reason}")]
+    RolesUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No role is kept by that id.
+    #[error("RoleUnknown: no role is kept by that id")]
+    RoleUnknown,
+    /// The role has no version by that number.
+    #[error("RoleVersionUnknown: the role has no version by that number")]
+    RoleVersionUnknown,
+    /// The identity holds no holding of the role, or the directory does not know it.
+    #[error(
+        "HolderUnknown: no such holder: the directory does not know the identity, or it has no holding of the role"
+    )]
+    HolderUnknown,
+    /// The operation id already names a role, a version or a holding made in other words.
+    #[error(
+        "RoleReused: operation `{operation}` already names a role, a version or a holding made in other words"
+    )]
+    RoleReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// The holder already holds the role.
+    #[error("RoleHeld: `{holder}` already holds the role: end that holding or let it lapse first")]
+    RoleHeld {
+        /// The holder.
+        holder: String,
+    },
+    /// The holding is over, so it is not moved.
+    #[error(
+        "HoldingOver: the holding is {state} and is never renewed or moved: assign the role again"
+    )]
+    HoldingOver {
+        /// `lapsed` or `ended`.
+        state: &'static str,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -156,17 +195,24 @@ impl ServerError {
             | Self::GrantNotVisible
             | Self::SessionUnknown
             | Self::RequestUnknown
-            | Self::MachineUnknown => StatusCode::NOT_FOUND,
+            | Self::MachineUnknown
+            | Self::RoleUnknown
+            | Self::RoleVersionUnknown
+            | Self::HolderUnknown => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
-            | Self::MachineReused { .. } => StatusCode::CONFLICT,
+            | Self::MachineReused { .. }
+            | Self::RoleReused { .. }
+            | Self::RoleHeld { .. }
+            | Self::HoldingOver { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
-            | Self::NetworkUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::NetworkUnavailable { .. }
+            | Self::RolesUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
