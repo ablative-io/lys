@@ -4,9 +4,10 @@
 //! real `lys identity prepare` for the test and discarded with it.
 
 use std::error::Error;
-use std::net::TcpListener;
+use std::net::{Ipv4Addr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Mutex, PoisonError};
 
 use super::compose;
 
@@ -24,6 +25,58 @@ pub fn repository_root() -> PathBuf {
 /// A loopback port nothing listens on now.
 pub fn free_port() -> TestResult<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
+}
+
+/// The first three parts of a private /24 range, as `172.29.N.`, that no
+/// container network on this machine overlaps and no deployment earlier in
+/// this run was given: a deployment's compose network, whose gateway is the
+/// range's `.1`.
+pub fn free_network() -> TestResult<String> {
+    static GIVEN: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+    let listed = Command::new("docker")
+        .args(["network", "ls", "--quiet"])
+        .output()?;
+    succeeded(&listed, "docker network ls")?;
+    let ids: Vec<String> = String::from_utf8_lossy(&listed.stdout)
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
+    let mut used = Vec::new();
+    if !ids.is_empty() {
+        let inspected = Command::new("docker")
+            .args(["network", "inspect", "--format"])
+            .arg("{{range .IPAM.Config}}{{.Subnet}} {{end}}")
+            .args(&ids)
+            .output()?;
+        succeeded(&inspected, "docker network inspect")?;
+        used.extend(
+            String::from_utf8_lossy(&inspected.stdout)
+                .split_whitespace()
+                .filter_map(ipv4_range),
+        );
+    }
+    let mut given = GIVEN.lock().unwrap_or_else(PoisonError::into_inner);
+    let base = u64::from(u32::from(Ipv4Addr::new(172, 29, 0, 0)));
+    for third in 0..=255u64 {
+        let start = base | (third << 8);
+        let overlaps = used
+            .iter()
+            .any(|&(first, end)| first < start + 256 && start < end);
+        let first = u32::try_from(start)?;
+        if !overlaps && !given.contains(&first) {
+            given.push(first);
+            return Ok(format!("172.29.{third}."));
+        }
+    }
+    Err("network_in_use: a container network overlaps every 172.29.N.0/24 range".into())
+}
+
+/// The addresses an IPv4 range covers, first and one past the last.
+fn ipv4_range(cidr: &str) -> Option<(u64, u64)> {
+    let (address, prefix) = cidr.split_once('/')?;
+    let first = u64::from(u32::from(address.parse::<Ipv4Addr>().ok()?));
+    let prefix: u32 = prefix.parse().ok().filter(|prefix| *prefix <= 32)?;
+    Some((first, first + (1u64 << (32 - prefix))))
 }
 
 /// The loopback ports one deployment publishes.
@@ -68,6 +121,7 @@ impl Deployment {
             http: free_port()?,
         };
         let project = format!("lys-identity-test-{label}-{}", std::process::id());
+        let network = free_network()?;
         let text = EXAMPLE
             .replace(
                 "project = \"lys-identity\"",
@@ -76,7 +130,8 @@ impl Deployment {
             .replace("8480", &ports.rauthy.to_string())
             .replace("55432", &ports.database.to_string())
             .replace("58051", &ports.grpc.to_string())
-            .replace("58443", &ports.http.to_string());
+            .replace("58443", &ports.http.to_string())
+            .replace("172.29.48.", &network);
         let text = edit(text);
         let bundled = database_bundled(&text)?;
         let config = dir.path().join("identity.toml");

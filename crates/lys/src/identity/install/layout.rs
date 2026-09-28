@@ -172,6 +172,22 @@ impl Layout {
     pub fn service_url() -> String {
         format!("http://localhost:{SERVICE_PORT}")
     }
+
+    /// The setup page's address, without its code.
+    pub fn setup_url() -> String {
+        format!("{}/setup", Self::service_url())
+    }
+
+    /// The file the administrator first-run setup made is recorded in.
+    pub fn administrator_file(&self) -> PathBuf {
+        self.data_dir().join("administrator.json")
+    }
+
+    /// The file a headless install writes the setup code to, owner-only, in
+    /// the install root, because no browser was there to hand it to.
+    pub fn headless_setup_code(&self) -> PathBuf {
+        self.root.join("setup-code")
+    }
 }
 
 /// The data root for `os`, given the variables that may name it.
@@ -199,11 +215,13 @@ pub fn data_root(
     Ok(base.join("lys").join("identity"))
 }
 
-/// The deployment configuration text for `admin_email`, with the state
-/// directory beside it.
-pub fn render_deployment(admin_email: &str) -> String {
+/// The deployment configuration text, naming `admin_email` when an
+/// unattended install was given one and no administrator otherwise, with
+/// the state directory beside it.
+pub fn render_deployment(admin_email: Option<&str>) -> String {
+    let line = admin_email.map_or_else(String::new, |email| format!("admin_email = \"{email}\"\n"));
     DEPLOYMENT_TEMPLATE
-        .replace("{{admin_email}}", admin_email)
+        .replace("{{admin_email_line}}", &line)
         .replace("{{rauthy_port}}", &RAUTHY_PORT.to_string())
         .replace("{{service_port}}", &SERVICE_PORT.to_string())
 }

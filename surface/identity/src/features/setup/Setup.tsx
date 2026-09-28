@@ -1,11 +1,127 @@
-/** First administrator setup asks for a name; the server owns identity and admission. */
+/**
+ * First-run setup on Lys's own setup page, and the configured
+ * administrator's finishing step. The server owns identity and admission.
+ *
+ * The setup page is opened by the install with a one-time code in the
+ * address fragment. The code is taken from the address once and the address
+ * is replaced without it, so it is never left where a person reads it.
+ */
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router';
-import { operationId, request } from '../../api';
+import { Refused, operationId, request } from '../../api';
 import { confirmReceipt } from '../people/recorded-receipt';
+import { SIGNED_IN, reasonOf } from '../sign-in/SignIn';
 import '../people/recorded-form.css';
 import '../people/manage.css';
+import '../sign-in/sign-in.css';
+
+let taken: string | null = null;
+
+/** The setup code this page was opened with, taken from the address once. */
+export function setupCode(): string {
+  if (taken === null) {
+    const match = /(?:^#|&)code=([A-Za-z0-9]+)/.exec(location.hash);
+    taken = match?.[1] ?? '';
+    if (match) history.replaceState(null, '', location.pathname);
+  }
+  return taken;
+}
+
+/** Forget the taken code, as a new page load does. */
+export function forgetSetupCode(): void {
+  taken = null;
+}
+
+interface Policy { length_min: number; length_max: number; words: string }
+interface Opened { purpose: 'first-run' | 'password'; email: string | null; policy: Policy }
+
+function setupRefusal(failure: unknown): string {
+  if (failure instanceof Refused && failure.refusal.refusal === 'SetupClosed') return 'Lys is already set up. Sign in instead.';
+  if (failure instanceof Refused && failure.refusal.refusal === 'SetupCodeRefused') {
+    return 'This setup link is not valid or was already used. Run lys identity setup-code on this machine for a fresh one.';
+  }
+  return reasonOf(failure);
+}
+
+/** Lys's setup page: the first administrator, or the administrator's new password. */
+export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }: { code: string; done?: () => void }) {
+  const [opened, setOpened] = useState<Opened | null>(null);
+  const [refusal, setRefusal] = useState(code ? '' : 'This page needs the setup link the install opened. Run lys identity setup-code on this machine for a fresh one.');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const operation = useRef(operationId());
+  useEffect(() => {
+    if (!code) return undefined;
+    let live = true;
+    request<Opened>('/setup/open', { code }).then(
+      (answer) => { if (live) setOpened(answer); },
+      (failure: unknown) => { if (live) setRefusal(setupRefusal(failure)); },
+    );
+    return () => { live = false; };
+  }, [code]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !opened) return;
+    const form = new FormData(event.currentTarget);
+    const field = (name: string) => String(form.get(name) ?? '');
+    const password = field('password');
+    if (password !== field('confirm')) { setError('The two passwords are not the same.'); return; }
+    if ([...password].length < opened.policy.length_min) { setError(opened.policy.words); return; }
+    const firstRun = opened.purpose === 'first-run';
+    const name = field('display_name').trim();
+    const email = (opened.email ?? field('email')).trim();
+    if (firstRun && (!name || !email)) { setError('Enter your name and your email.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      if (firstRun) {
+        await request('/setup/administrator', { code, operation: operation.current, display_name: name, email, password });
+      } else {
+        await request('/setup/password', { code, password });
+      }
+      done();
+    } catch (failure) {
+      setError(setupRefusal(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const firstRun = opened?.purpose !== 'password';
+  return <div className="page sign-in">
+    <div className="sign-in-mark" aria-hidden="true">ID</div>
+    <div className="eyebrow">Welcome to Lys</div>
+    <h1>{firstRun ? 'Set up Lys' : 'Choose a new password'}</h1>
+    {refusal ? <div role="alert" className="why-not"><p>{refusal}</p><a className="btn" href="/#/sign-in">Go to sign in</a></div> : null}
+    {!refusal && !opened ? <p className="dim">Opening setup…</p> : null}
+    {opened ? <form className="recorded-form sign-in-form" aria-label={firstRun ? 'Set up Lys' : 'New password'} onSubmit={submit} aria-busy={busy} noValidate>
+      <p className="sub">{firstRun ? 'You will be the administrator. Choose how you sign in.' : `Set a new password for ${opened.email ?? 'the administrator'}.`}</p>
+      {firstRun ? <div className="field">
+        <label htmlFor="setup-full-name">Your name</label>
+        <input id="setup-full-name" name="display_name" autoComplete="name" required disabled={busy} />
+      </div> : null}
+      {firstRun ? <div className="field">
+        <label htmlFor="setup-email">Email</label>
+        {opened.email
+          ? <input id="setup-email" name="email" type="email" value={opened.email} readOnly />
+          : <input id="setup-email" name="email" type="email" autoComplete="email" required disabled={busy} />}
+      </div> : null}
+      <div className="field">
+        <label htmlFor="setup-password">Password</label>
+        <input id="setup-password" name="password" type="password" autoComplete="new-password" required disabled={busy} aria-describedby="setup-policy" />
+        <p id="setup-policy" className="note">{opened.policy.words}</p>
+      </div>
+      <div className="field">
+        <label htmlFor="setup-confirm">Password again</label>
+        <input id="setup-confirm" name="confirm" type="password" autoComplete="new-password" required disabled={busy} />
+      </div>
+      {error ? <p role="alert" className="why-not">{error}</p> : null}
+      <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Setting up…' : firstRun ? 'Set up and sign in' : 'Save and sign in'}</button>
+    </form> : null}
+  </div>;
+}
 
 const STORAGE = 'lys.pending.first-setup';
 interface Pending { operation: string; display_name: string }

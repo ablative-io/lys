@@ -337,7 +337,10 @@ impl Callers for Directory {
 
 impl Admission for Directory {
     fn is_administrator(&self, caller: &str) -> bool {
-        caller == self.caller_of(self.0.admission.administrator_login())
+        self.0
+            .admission
+            .administrator_login()
+            .is_some_and(|login| caller == self.caller_of(&login))
     }
 
     /// Step 1 admits the configured administrator alone.
