@@ -61,7 +61,7 @@ fn user(id: &str, parent: Option<&str>) -> Entry {
 fn assistant(id: &str, parent: &str, part: &Value, who: [&str; 3]) -> Entry {
     let [provider, api, model] = who;
     let message = json!({"role": "assistant", "content": [part], "provider": provider,
-        "api": api, "model": model});
+        "api": api, "model": model, "stopReason": "stop"});
     entry(id, Some(parent), message)
 }
 

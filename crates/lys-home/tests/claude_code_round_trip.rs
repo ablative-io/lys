@@ -7,6 +7,7 @@
 //! The multi-result fixture rendered through `run` hashes to the constant
 //! pinned here and recorded in PROOF-RESUME.md (HOME-007 R3).
 
+use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
@@ -410,4 +411,41 @@ fn the_fixture_rendered_through_run_hashes_to_the_constant_pinned_here_and_in_pr
         "PROOF-RESUME.md records the pinned constant once"
     );
     dir.close().unwrap();
+}
+
+#[test]
+fn a_message_with_no_role_is_refused_through_run_writing_nothing() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let root = dir.path().join("home");
+    let home = Home::open(&root)?;
+    let mut session = home.create_session("thin", "/w", None)?;
+    let message = json!({"content": [{"type": "text", "text": "fixture"}], "timestamp": 0});
+    let id = session.append(EntryBody::Message { message })?;
+    drop(session);
+    let out = dir.path().join("out").join("rendered.jsonl");
+    let rendered = run(Cli {
+        command: Command::Render {
+            home: root,
+            session: "thin".into(),
+            uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".into(),
+            cwd: "/w".into(),
+            model: "claude-opus-5-5".into(),
+            out: Some(out.clone()),
+            version: "2.1.281".into(),
+            canon: None,
+        },
+    });
+    let named = match &rendered {
+        Err(HomeError::RenderField {
+            entry,
+            field,
+            missing,
+            ..
+        }) => Some((entry.as_str(), *field, *missing)),
+        _ => None,
+    };
+    assert_eq!(named, Some((id.as_str(), "role", true)), "{rendered:?}");
+    assert!(!out.exists());
+    assert!(!dir.path().join("out").exists());
+    Ok(())
 }

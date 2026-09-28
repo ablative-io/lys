@@ -5,8 +5,9 @@
 //!
 //! In order: the template is parsed (R1); the home and the session are opened
 //! under the session's lock; each of the five target files is refused by path
-//! if it exists; the template is stored (R3); the session head hash is taken
-//! (R4); the session is rendered with its loss account (R2); the MCP file, the
+//! if it exists; the session head hash is taken (R4); the session is rendered
+//! with its loss account (R2); the template is stored (R3), only once the
+//! render has succeeded, so a refused render stores nothing; the MCP file, the
 //! environment file (R6) and the instructions file are written; the five files,
 //! and the seed file when the render wrote one (HOME-006 R6), are hashed; the
 //! manifest block is stored; the documents the session is
@@ -131,7 +132,6 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
         }
     }
-    let stored = home.templates().put(&template_bytes)?;
     let session_head = session.head_hash()?;
     let head = session.head()?.map(str::to_owned);
     let target = RenderTarget {
@@ -143,6 +143,9 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         canon: template.canon.clone(),
     };
     let render = render_claude_code(&session, &target, None)?;
+    // The template is stored only once its render has succeeded, so a
+    // refused render leaves the home's templates as they were.
+    let stored = home.templates().put(&template_bytes)?;
     let process_home = std::env::var_os("HOME").map(PathBuf::from);
     let mcp = Value::Object(std::mem::take(&mut template.mcp));
     let mcp_bytes = serde_json::to_vec_pretty(&mcp).map_err(|source| HomeError::Json {
