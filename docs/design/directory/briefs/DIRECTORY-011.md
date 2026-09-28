@@ -53,6 +53,33 @@ The directory contract docs/design/identity/DIRECTORY-CONTRACT.md SHALL gain one
 **Stories:**
 - S22 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. R1 adds a section to docs/design/identity/DIRECTORY-CONTRACT.md, but that file does not exist in this tree. `ls docs/design/identity/` has no DIRECTORY-CONTRACT.md, and `git log --all -- docs/design/identity/DIRECTORY-CONTRACT.md` is empty. The file is DIRECTORY-003's to create (docs/design/directory/design.json:370), and R1's spec says 'This row SHALL NOT create docs/design/identity/DIRECTORY-CONTRACT.md'. So none of the acceptance rows can be met: rg -c on the heading, the 7-rule list, the three readings, the RM-029 statement, and the one-path diff with no removed lines. The source text is ready once DIRECTORY-003 lands: docs/design/identity/STATEMENT-2026-09-22.md:162-167 holds adjustment 3 at line 166, and RM-029 has status 'idea' in docs/design/roadmap.json.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C49 — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential. — Blocked: the contract file DIRECTORY-003 creates is missing, and this row must not create it.
+- Story delivery:
+  - [ ] S22 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern. — Blocked on DIRECTORY-003 landing docs/design/identity/DIRECTORY-CONTRACT.md.
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] rg -c '^## Enduring agents and session credentials$' docs/design/identity/DIRECTORY-CONTRACT.md prints 1. — The file does not exist: `ls docs/design/identity/` lists no DIRECTORY-CONTRACT.md, and `git log --all` on that path is empty.
+  - [ ] Within that section the string 'STATEMENT-2026-09-22.md:162-167' occurs at least once, and the section's numbered list has exactly 7 items whose texts are rules 1 to 7 of this requirement's spec, in that order. — There is no contract file, so there is no section.
+  - [ ] The section names the three readings of the session credential (a per-session lys certificate, a SpeaksFor delegation, an ADR-001 handle) as open for the road step 2 card, and git diff -U0 <base> HEAD -- crates | grep -c 'SpeaksFor' prints 0. — There is no section. The crates half holds: git diff touches no file under crates.
+  - [ ] The section names RM-029 as the row the proof of rule 5 is blocked on, and says that this contract delivers the written rules and a registered agent with no session credential, not a working second session. — There is no section.
+  - [ ] git diff --stat <base> HEAD for R1's commit lists exactly one path, docs/design/identity/DIRECTORY-CONTRACT.md, and git diff -U0 <base> HEAD -- docs/design/identity/DIRECTORY-CONTRACT.md | grep -c '^-[^-]' prints 0. — There is no R1 commit, and the contract file is absent.
+- Issues:
+  - Blocked on DIRECTORY-003. It must land docs/design/identity/DIRECTORY-CONTRACT.md, then this card must be re-run on a base that contains the file, and the 'Enduring agents and session credentials' section must be added with the seven rules, the STATEMENT-2026-09-22.md:162-167 citation, the three open readings and the RM-029 statement.
+  - The design gate failed because the committed DIRECTORY-011.md no longer matched its JSON render. The drift was already present at the base.
+- Fixes:
+  - Re-rendered docs/design/directory/briefs/DIRECTORY-011.md with scripts/design/render-cluster.py; sh scripts/design/gate.sh now exits 0.
+
 ### R2: Prove an agent registered with no session appears in the directory with no session credential
 
 WHILE an agent is registered under its responsible person and no session of it exists, WHEN the directory lists its agents or reads that agent, THE SYSTEM SHALL list the agent once under its responsible person (DIRECTORY-003 R1) and SHALL answer its read with exactly the members docs/design/identity/DIRECTORY-CONTRACT.md lists for an agent record, none of which carries a session credential (R1, rules 1 and 4). THE SYSTEM SHALL NOT answer that read with a session credential, a placeholder for one, or a member naming a session. The proof is one test file, crates/lys-identity/tests/agent_without_session.rs, driving lys-identity's public registration, list and read (DIRECTORY-003 R1) with a disposable test identity (CN2); its expected member list is copied from the contract's agent-record list, with the contract line it came from cited beside it, so the check is keyed on what the contract supplies and not on a value the test substitutes. The test SHALL NOT assert or change the agent's grant or handle counts, which show whatever they are. This row SHALL NOT add a session record, a session credential type or a member to the agent record, SHALL NOT create crates/lys-identity/ or docs/design/identity/DIRECTORY-CONTRACT.md, and SHALL NOT change a file of DIRECTORY-003: if the landed record fails the test, the row stops and names the failing member, and the act that answers is a revision through the card's lead (CN9).
@@ -70,6 +97,28 @@ WHILE an agent is registered under its responsible person and no session of it e
 
 **Stories:**
 - S23 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked. R2 adds crates/lys-identity/tests/agent_without_session.rs, but crates/lys-identity/ does not exist. `ls crates/lys-identity` gives 'No such file or directory', and design.json:355 assigns that crate to DIRECTORY-003. The test has nothing to call: there is no public registration, list or read API. Its expected member list must be copied from the contract's agent-record list, which also does not exist yet. R2's spec forbids creating the crate or the contract. So d011_r2_ac1, d011_r2_ac2 and the '2 passed' row cannot be met. The red-first commit pair is not possible either, because a test file in a crate that does not exist would not be a failing d011_r2_ac test; it would sit outside the workspace or break the build.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C50 — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential. — Blocked: crates/lys-identity/ and the contract's agent-record member list do not exist until DIRECTORY-003 lands.
+- Story delivery:
+  - [ ] S23 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has. — Blocked on DIRECTORY-003 (crate and contract).
+
+**Review (recorded):**
+
+- Alignment: drifted
+- Acceptance verdicts:
+  - [ ] d011_r2_ac1: a disposable signed-in person registers one agent and no session of it is started; the directory list then returns exactly 1 entry with that agent's enduring id, and that entry's responsible person is the registering person's id. — crates/lys-identity/ does not exist (`ls crates/`), so there is no registration or list API for the test to call.
+  - [ ] d011_r2_ac2: the read of that agent, serialized as the public response, has as its top-level members exactly the agent-record member list copied from docs/design/identity/DIRECTORY-CONTRACT.md (the list holding at least 1 member, with the contract line cited in the test), and the count of members whose name contains 'session' is 0. — Neither the contract nor its agent-record member list exists, and there is no read API.
+  - [ ] cargo test -p lys-identity --test agent_without_session prints 'test result: ok. 2 passed; 0 failed', and rg -c 'fn d011_r2_ac[12]\b' crates/lys-identity/tests/agent_without_session.rs prints 2. — The lys-identity package does not exist, and neither does the test file.
+- Issues:
+  - Blocked on DIRECTORY-003. It must land crates/lys-identity with its public registration, list and read, plus the contract's agent-record member list. Then crates/lys-identity/tests/agent_without_session.rs must be written red-first, with d011_r2_ac1 and d011_r2_ac2.
 
 ## Boundaries
 
