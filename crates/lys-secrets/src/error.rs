@@ -5,10 +5,12 @@ use std::path::PathBuf;
 
 mod lending;
 mod name;
+mod owner;
 mod revocation;
 mod service;
 
 pub use lending::LendingRefusal;
+pub use owner::OwnerChangeRefusal;
 pub use revocation::RevocationRefusal;
 pub use service::ServiceRefusal;
 
@@ -369,6 +371,9 @@ pub enum SecretsError {
     /// A screen service's request on a person's behalf refused.
     #[error(transparent)]
     Service(#[from] ServiceRefusal),
+    /// An owner change refused for its operation id.
+    #[error(transparent)]
+    OwnerChange(#[from] OwnerChangeRefusal),
     /// A scope written as none of the three kinds.
     #[error(
         "InvalidScope: {text:?} is not a scope (act: name it as personal:<person>, team:<name> or organisation:<name>)"

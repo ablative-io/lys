@@ -16,6 +16,7 @@ use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle, Presentation};
 use crate::permission::PermissionCheck;
 
 use super::inflight::CANCELLED_AT_BOUNDARY;
+use super::owner::{Admission, Call, OwnerChanged, RECIPIENTS};
 use super::{Broker, HandleRecord};
 
 /// The deepest a line of derived handles goes.
@@ -145,7 +146,8 @@ impl<P: PermissionCheck> Broker<P> {
         }))
     }
 
-    /// Sets the recipient policy of `secret`, as its owner.
+    /// Sets the recipient policy of `secret`, as its owner, from the
+    /// owner's own command. The change carries no operation id.
     ///
     /// # Errors
     ///
@@ -157,43 +159,51 @@ impl<P: PermissionCheck> Broker<P> {
         secret: &str,
         policy: crate::store::Recipients,
     ) -> Result<(), SecretsError> {
-        self.set_recipients_via(owner, secret, policy, None)
+        self.owns(owner, secret)?;
+        self.apply_recipients(owner, secret, policy, None, None)
     }
 
-    /// Sets the recipient policy of `secret`, as its owner, asked through
-    /// the screen service `via` when one carried the owner's word; the
-    /// audit line names it.
+    /// Sets the recipient policy of `secret`, as its owner, under the
+    /// operation id `operation`, asked through the screen service `via` when
+    /// one carried the owner's word; the audit line names both. An id
+    /// already applied to the secret with this same change answers the
+    /// outcome recorded then, and applies nothing.
     ///
     /// # Errors
     ///
-    /// As `set_recipients`.
+    /// As `set_recipients`, `OperationMissing` for no operation id or one of
+    /// the wrong shape, and `OperationReused` for an id already applied to
+    /// the secret with another change.
     pub fn set_recipients_via(
         &mut self,
         owner: &str,
         secret: &str,
         policy: crate::store::Recipients,
         via: Option<&str>,
-    ) -> Result<(), SecretsError> {
-        let owns = self
-            .store
-            .entry(secret)
-            .is_some_and(|entry| entry.owner == owner);
-        if !owns {
-            return Err(SecretsError::from(LendingRefusal::NotPermitted {
-                holder: owner.to_owned(),
-                secret: secret.to_owned(),
-            }));
+        operation: Option<&str>,
+    ) -> Result<OwnerChanged, SecretsError> {
+        self.owns(owner, secret)?;
+        let change = format!("{RECIPIENTS}{}", policy.label());
+        match self.owner_admission(secret, operation, &change)? {
+            Admission::Repeated(outcome) => Ok(OwnerChanged::Repeated { outcome }),
+            Admission::Fresh(call) => {
+                self.apply_recipients(owner, secret, policy, via, Some(&call))?;
+                Ok(OwnerChanged::Applied)
+            }
         }
+    }
+
+    fn apply_recipients(
+        &mut self,
+        owner: &str,
+        secret: &str,
+        policy: crate::store::Recipients,
+        via: Option<&str>,
+        call: Option<&Call>,
+    ) -> Result<(), SecretsError> {
         self.store.set_recipients(secret, policy)?;
-        let outcome = super::scope::with_via(format!("recipients {}", policy.label()), via);
-        self.record(
-            AuditKind::Seal,
-            (None, Some(owner), Some(secret)),
-            None,
-            None,
-            &outcome,
-        )?;
-        Ok(())
+        let outcome = super::scope::with_via(format!("{RECIPIENTS}{}", policy.label()), via);
+        self.record_owner_change(owner, secret, &outcome, call)
     }
 
     /// Whether `handle` or any handle above it was dropped.
