@@ -3,7 +3,7 @@
 //! grant behind it. The provider's part is confirmed only by its own
 //! answer for that grant; no timer and no second revocation confirms it.
 
-use crate::audit::AuditKind;
+use crate::audit::{AuditKind, AuditLine};
 use crate::error::{RevocationRefusal, SecretsError};
 use crate::handle::HandleId;
 use crate::permission::PermissionCheck;
@@ -14,14 +14,28 @@ const CONFIRMED: &str = "revoked_upstream";
 const UNCONFIRMED: &str = "revocation_unconfirmed";
 
 /// Where the provider's part of a revocation stands.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum UpstreamRevocation {
     /// The provider was never asked.
+    #[default]
     NotAsked,
     /// The provider was asked and has not confirmed, with the reason.
     Unconfirmed(String),
     /// The provider confirmed.
     Confirmed,
+}
+
+/// What a provider revocation line says, when `line` is one for a handle.
+pub(super) fn upstream_of(line: &AuditLine) -> Option<UpstreamRevocation> {
+    if line.kind != AuditKind::Refresh {
+        return None;
+    }
+    if line.outcome == CONFIRMED {
+        return Some(UpstreamRevocation::Confirmed);
+    }
+    line.outcome
+        .strip_prefix(UNCONFIRMED)
+        .map(|reason| UpstreamRevocation::Unconfirmed(reason.trim_start_matches(": ").to_owned()))
 }
 
 /// Both parts of a handle's revocation.
@@ -34,31 +48,20 @@ pub struct RevocationState {
 }
 
 impl<P: PermissionCheck> Broker<P> {
-    /// Both parts of the revocation of the handle `id`, read from the log.
+    /// Both parts of the revocation of the handle `id`, as the log's fold
+    /// holds them.
     ///
     /// # Errors
     ///
-    /// `HandleUnknown`, and the audit log's refusals.
+    /// `HandleUnknown`.
     pub fn revocation_state(&self, id: &HandleId) -> Result<RevocationState, SecretsError> {
-        if !self.handles.contains_key(id.as_str()) {
-            return Err(SecretsError::HandleUnknown);
-        }
-        let mut upstream = UpstreamRevocation::NotAsked;
-        for recorded in self.audit.replay()? {
-            let line = recorded.line;
-            if line.kind != AuditKind::Refresh || line.handle.as_deref() != Some(id.as_str()) {
-                continue;
-            }
-            if line.outcome == CONFIRMED {
-                upstream = UpstreamRevocation::Confirmed;
-            } else if let Some(reason) = line.outcome.strip_prefix(UNCONFIRMED) {
-                upstream =
-                    UpstreamRevocation::Unconfirmed(reason.trim_start_matches(": ").to_owned());
-            }
-        }
+        let record = self
+            .handles
+            .get(id.as_str())
+            .ok_or(SecretsError::HandleUnknown)?;
         Ok(RevocationState {
             stopped_here: self.line_dropped(id.as_str()),
-            upstream,
+            upstream: record.upstream.clone(),
         })
     }
 
@@ -155,13 +158,19 @@ impl<P: PermissionCheck> Broker<P> {
             .into());
         }
         let (identity, secret) = (record.identity.clone(), record.secret.clone());
-        self.record(
+        let line = self.line(
             AuditKind::Refresh,
             (Some(id.as_str()), Some(&identity), Some(&secret)),
             None,
             None,
             outcome,
-        )?;
+        );
+        self.append(&line)?;
+        if let (Some(record), Some(upstream)) =
+            (self.handles.get_mut(id.as_str()), upstream_of(&line))
+        {
+            record.upstream = upstream;
+        }
         Ok(())
     }
 }

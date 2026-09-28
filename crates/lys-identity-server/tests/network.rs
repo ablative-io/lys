@@ -52,7 +52,7 @@ async fn the_administrator_names_and_retires_machines_and_everyone_signed_in_rea
     assert_eq!(status, 401, "{none}");
     let (status, empty) = service.get("/network", Some(&bea)).await?;
     assert_eq!(status, 200, "{empty}");
-    assert_eq!(empty, json!({ "machines": [], "reports_served": false }));
+    assert_eq!(empty, json!({ "machines": [], "reports_served": true }));
 
     let body = build_box(&operation);
     let by_bea = service.post("/network/machines", Some(&bea), &body).await?;

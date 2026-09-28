@@ -83,6 +83,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/secrets/handles", get(handles))
         .route("/secrets/scope", post(scope))
         .route("/secrets/recipients", post(recipients))
+        .route("/secrets/drop", post(drop_handle))
 }
 
 /// The person the session speaks for, as the broker names people.
@@ -95,7 +96,7 @@ fn person(state: &AppState, headers: &HeaderMap) -> Result<String, ServerError> 
 }
 
 /// Asks the broker `path` on behalf of the session's person, with `body`.
-async fn ask(
+pub(crate) async fn ask(
     state: &AppState,
     headers: &HeaderMap,
     method: Method,
@@ -242,6 +243,17 @@ async fn recipients(
     body: Bytes,
 ) -> Result<Json<Value>, ServerError> {
     let answer = ask(&state, &headers, Method::POST, "/_lys/recipients", body).await?;
+    Ok(Json(answer))
+}
+
+/// Ends a handle as the signed-in person, who the broker checks is the
+/// person the handle's holder acts for; the body is forwarded unchanged.
+async fn drop_handle(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ServerError> {
+    let answer = ask(&state, &headers, Method::POST, "/_lys/drop", body).await?;
     Ok(Json(answer))
 }
 

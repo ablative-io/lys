@@ -7,6 +7,7 @@
 
 pub mod admission;
 mod agent_sight;
+pub mod certificates_store;
 pub mod config;
 pub mod configuration_api;
 pub mod connections_api;
@@ -15,6 +16,8 @@ pub mod error;
 pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
+pub mod launch_api;
+pub mod launch_template;
 pub mod link_audit_api;
 pub mod memory_api;
 pub mod network_api;
@@ -37,6 +40,9 @@ pub mod roles_records;
 pub mod roles_store;
 pub mod roles_views;
 pub mod routes;
+pub mod runtime_api;
+pub mod runtime_state;
+pub mod runtime_store;
 pub mod secrets_api;
 pub mod secrets_sign;
 pub mod session;

@@ -158,6 +158,34 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The certificate log cannot be read or written.
+    #[error("CertificatesUnavailable: {reason}")]
+    CertificatesUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No certificate is kept by that serial.
+    #[error("CertificateUnknown: no certificate is kept by serial `{serial}`")]
+    CertificateUnknown {
+        /// The serial asked for.
+        serial: String,
+    },
+    /// The serial already names a certificate issued with other bytes.
+    #[error(
+        "CertificateReused: serial `{serial}` already names a certificate with other bytes: issue this certificate under a new serial"
+    )]
+    CertificateReused {
+        /// The serial.
+        serial: String,
+    },
+    /// The certificate was already withdrawn by someone else, or at another time.
+    #[error("CertificateWithdrawn: certificate `{serial}` was already withdrawn by {by}")]
+    CertificateWithdrawn {
+        /// The serial.
+        serial: String,
+        /// Who withdrew it.
+        by: String,
+    },
     /// The roles cannot be read or written.
     #[error("RolesUnavailable: {reason}")]
     RolesUnavailable {
@@ -203,6 +231,61 @@ pub enum ServerError {
         "HoldingChanged: the holding is not as it was when this change was asked: read the role again and ask the change of the holding as it stands"
     )]
     HoldingChanged,
+    /// The agent has no provisioning profile, so there is nothing to start it from.
+    #[error(
+        "LaunchRecordMissing: the agent has no provisioning profile to start it from: set its profile first"
+    )]
+    LaunchRecordMissing,
+    /// The machine is retired, so nothing is started on it.
+    #[error("MachineRetired: the machine is retired and nothing is started on it")]
+    MachineRetired,
+    /// The machine does not list the agent among those that may run on it.
+    #[error(
+        "MachineNotForAgent: the machine does not list this agent among those that may run on it"
+    )]
+    MachineNotForAgent,
+    /// The machine has no runtime, so nothing is started on it.
+    #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
+    MachineWithoutRuntime,
+    /// The launch template the profile renders to is not one the home takes.
+    #[error("LaunchUnrenderable: {reason}")]
+    LaunchUnrenderable {
+        /// What the home refused.
+        reason: String,
+    },
+    /// The runtime reports are not configured, or their log could not be read or written.
+    #[error("RuntimeUnavailable: {reason}")]
+    RuntimeUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No session by that id is visible to the caller, or the report does not begin one.
+    #[error(
+        "RuntimeSessionUnknown: no session by that id is visible to the caller; an agent's session begins with a starting report and a found session with a running report"
+    )]
+    RuntimeSessionUnknown,
+    /// The session was already started.
+    #[error("RuntimeSessionStarted: session `{session}` was already started")]
+    RuntimeSessionStarted {
+        /// The session.
+        session: String,
+    },
+    /// The runtime confirmed the session stopped, so it takes no further report.
+    #[error(
+        "RuntimeSessionStopped: session `{session}` was confirmed stopped and takes no further report"
+    )]
+    RuntimeSessionStopped {
+        /// The session.
+        session: String,
+    },
+    /// The operation id already names a report sent in other words.
+    #[error(
+        "RuntimeReportReused: operation `{operation}` already names a report sent in other words"
+    )]
+    RuntimeReportReused {
+        /// The operation id.
+        operation: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -224,15 +307,19 @@ impl ServerError {
             Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
-            | Self::Withheld { .. } => StatusCode::FORBIDDEN,
+            | Self::Withheld { .. }
+            | Self::MachineNotForAgent => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
             | Self::RequestUnknown
             | Self::MachineUnknown
+            | Self::LaunchRecordMissing
+            | Self::RuntimeSessionUnknown
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
-            | Self::HolderUnknown => StatusCode::NOT_FOUND,
+            | Self::HolderUnknown
+            | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
@@ -242,7 +329,15 @@ impl ServerError {
             | Self::HoldingOver { .. }
             | Self::HoldingChanged
             | Self::ProvisioningChanged { .. }
-            | Self::ProvisioningReused { .. } => StatusCode::CONFLICT,
+            | Self::ProvisioningReused { .. }
+            | Self::CertificateReused { .. }
+            | Self::CertificateWithdrawn { .. }
+            | Self::MachineRetired
+            | Self::MachineWithoutRuntime
+            | Self::LaunchUnrenderable { .. }
+            | Self::RuntimeSessionStarted { .. }
+            | Self::RuntimeSessionStopped { .. }
+            | Self::RuntimeReportReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
@@ -251,7 +346,9 @@ impl ServerError {
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
             | Self::MemoryUnavailable { .. }
-            | Self::ProvisioningUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::ProvisioningUnavailable { .. }
+            | Self::CertificatesUnavailable { .. }
+            | Self::RuntimeUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

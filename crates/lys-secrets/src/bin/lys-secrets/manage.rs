@@ -2,7 +2,9 @@
 //! speaks for (see `callers`): a secret's scope and who it may be handed
 //! to, both as its owner and each under an operation id the caller made
 //! once for that change, those two settings as they stand with the last
-//! operation id applied, and where a handle's revocation stands. The
+//! operation id applied, where a handle's revocation stands, and a handle
+//! ended by the person its holder acts for, under an operation id made once
+//! for that ending. The
 //! presentation is bound to the request's body, so a signed change cannot
 //! be replayed with another body.
 
@@ -12,7 +14,9 @@ use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
-use lys_secrets::{HandleId, OwnerChanged, Recipients, Scope, SecretsError, UpstreamRevocation};
+use lys_secrets::{
+    HandleEnded, HandleId, OwnerChanged, Recipients, Scope, SecretsError, UpstreamRevocation,
+};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -163,13 +167,66 @@ pub async fn revocation(State(shared): State<Arc<Shared>>, request: Request) -> 
     let state = broker
         .revocation_state_as(&who.identity, &HandleId::from_text(&handle))
         .map_err(|error| refused(&error))?;
-    let (upstream, reason) = match state.upstream {
-        UpstreamRevocation::NotAsked => ("not_asked", None),
-        UpstreamRevocation::Unconfirmed(reason) => ("unconfirmed", Some(reason)),
-        UpstreamRevocation::Confirmed => ("confirmed", None),
-    };
+    let (upstream, reason) = upstream_label(&state.upstream);
     Ok(Json(json!({
         "handle": handle,
+        "stopped_here": state.stopped_here,
+        "upstream": upstream,
+        "upstream_reason": reason,
+    })))
+}
+
+/// The provider's part of a revocation as a screen reads it: its state and
+/// the reason of an unconfirmed one.
+pub fn upstream_label(upstream: &UpstreamRevocation) -> (&'static str, Option<String>) {
+    match upstream {
+        UpstreamRevocation::NotAsked => ("not_asked", None),
+        UpstreamRevocation::Unconfirmed(reason) => ("unconfirmed", Some(reason.clone())),
+        UpstreamRevocation::Confirmed => ("confirmed", None),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Ending {
+    /// The id of the handle to end.
+    handle: String,
+    /// The id the caller made once for this ending.
+    operation: Option<String>,
+}
+
+/// Ends a handle, as the person its holder acts for, once per operation id,
+/// with every handle lent on from it. The provider's part of the revocation
+/// is answered as it stands and is not asked here.
+pub async fn drop_handle(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
+    let (who, asked) = change::<Ending>(&shared, request).await?;
+    if asked.handle.is_empty() {
+        return Err(malformed("request body", "no handle named".to_owned()));
+    }
+    let id = HandleId::from_text(&asked.handle);
+    let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+    let answered = broker
+        .end_handle(
+            &who.identity,
+            &id,
+            who.via.as_deref(),
+            asked.operation.as_deref(),
+        )
+        .map_err(|error| refused(&error))?;
+    let (outcome, ended) = match answered {
+        HandleEnded::Ended { ended } => ("ended", ended),
+        HandleEnded::Repeated { ended } => ("repeated", ended),
+        HandleEnded::AlreadyEnded => ("already_ended", Vec::new()),
+    };
+    let state = broker
+        .revocation_state(&id)
+        .map_err(|error| refused(&error))?;
+    let (upstream, reason) = upstream_label(&state.upstream);
+    Ok(Json(json!({
+        "handle": asked.handle,
+        "operation": asked.operation,
+        "outcome": outcome,
+        "ended": ended,
         "stopped_here": state.stopped_here,
         "upstream": upstream,
         "upstream_reason": reason,

@@ -51,6 +51,10 @@ pub struct AppState {
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
     /// The provisioning profiles, when the configuration names their file.
     pub provisioning: Option<Mutex<crate::provisioning_store::ProvisioningStore>>,
+    /// The certificate log, when the configuration names its directory.
+    pub certificates: Option<Mutex<crate::certificates_store::CertificateStore>>,
+    /// The runtime reports, when the configuration names their directory.
+    pub runtime: Option<Mutex<crate::runtime_store::RuntimeStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -73,26 +77,13 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
-    let requests = match config.requests_dir.as_deref() {
-        Some(dir) => Some(crate::requests_store::RequestStore::open(
-            dir,
-            Arc::new(load_service_key(&config.event_key_file)?),
-        )?),
-        None => None,
-    };
-    if let Some(store) = &requests {
-        if store.adopted() > 0 {
-            say(&format!(
-                "requests log pinned {} leaves written before leaves were pinned",
-                store.adopted()
-            ));
-        }
-        say(&format!(
-            "requests log {}, holding {} requests",
-            store.start(),
-            store.requests().count()
-        ));
-    }
+    let key = Arc::new(load_service_key(&config.event_key_file)?);
+    let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &*say)?;
+    let certificates = config
+        .certificates_dir
+        .as_deref()
+        .map(|dir| crate::certificates_store::CertificateStore::opened(dir, key, &*say))
+        .transpose()?;
     let network = config
         .network_file
         .as_deref()
@@ -126,6 +117,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             store.profiles().len()
         ));
     }
+    let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -151,6 +143,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         network: network.map(Mutex::new),
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),
+        certificates: certificates.map(Mutex::new),
+        runtime: runtime.map(Mutex::new),
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -201,6 +195,8 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())
         .merge(crate::provisioning_api::routes())
+        .merge(crate::launch_api::routes())
+        .merge(crate::runtime_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

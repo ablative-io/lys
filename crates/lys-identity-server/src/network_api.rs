@@ -5,9 +5,10 @@
 //! identity the directory knows may read them. A machine with no runtime
 //! enforces nothing, so it takes no slots and no agent is placed on it.
 //!
-//! No runtime reports to this service yet, so no machine has a last report
-//! and none is shown as running anything. The answer says so in
-//! `reports_served`, and never shows a machine as reporting.
+//! A machine's last report is the latest report any runtime made of a
+//! session on it. When the configuration names no runtime reports, no
+//! machine has one; the answer says so in `reports_served`, and never shows
+//! a machine as reporting.
 
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
@@ -27,6 +28,7 @@ use crate::network_store::{Machine, NetworkStore, Retirement};
 use crate::read_api::own_person;
 use crate::read_views::AgentSummary;
 use crate::routes::{AppState, signed_in, with_directory};
+use crate::runtime_api::last_reports;
 use crate::session::now;
 
 /// The most characters a machine's name, kind or runtime carries.
@@ -59,7 +61,7 @@ pub struct MachineView {
     pub state: &'static str,
     /// When it was retired, in seconds since the Unix epoch, null while in use.
     pub retired_at: Option<u64>,
-    /// When its runtime last reported, null because none has.
+    /// When a runtime last reported a session on it, null while none has.
     pub last_report_at: Option<u64>,
 }
 
@@ -68,7 +70,7 @@ pub struct MachineView {
 pub struct NetworkView {
     /// Every machine, in the order named.
     pub machines: Vec<MachineView>,
-    /// Whether this service takes runtime reports. While it does not, no
+    /// Whether this service keeps runtime reports. While it does not, no
     /// machine has a last report.
     pub reports_served: bool,
 }
@@ -126,7 +128,7 @@ fn host(text: &str) -> Result<String, ServerError> {
     Ok(named)
 }
 
-fn with_network<T>(
+pub(crate) fn with_network<T>(
     state: &AppState,
     act: impl FnOnce(&mut NetworkStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
@@ -141,7 +143,7 @@ fn with_network<T>(
     act(&mut store)
 }
 
-fn view(directory: &Projection, machine: &Machine) -> MachineView {
+fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) -> MachineView {
     let may_run = machine
         .may_run
         .iter()
@@ -171,7 +173,7 @@ fn view(directory: &Projection, machine: &Machine) -> MachineView {
             "in_use"
         },
         retired_at: machine.retired.as_ref().map(|retired| retired.at),
-        last_report_at: None,
+        last_report_at,
     }
 }
 
@@ -182,14 +184,15 @@ async fn list(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         caller(&state, &headers, directory)?;
+        let last = last_reports(&state)?;
         with_network(&state, |store| {
             Ok(Json(NetworkView {
                 machines: store
                     .machines()
                     .iter()
-                    .map(|machine| view(directory, machine))
+                    .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
                     .collect(),
-                reports_served: false,
+                reports_served: state.runtime.is_some(),
             }))
         })
     })
@@ -256,12 +259,13 @@ async fn name(
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
         let machine = named(directory, &body, by, now())?;
+        let last = last_reports(&state)?;
         with_network(&state, |store| {
             store.name(machine.clone())?;
             let kept = store
                 .machine(&machine.id)
                 .ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept)))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
         })
     })
 }
@@ -276,10 +280,11 @@ async fn retire(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
+        let last = last_reports(&state)?;
         with_network(&state, |store| {
             store.retire(&id, Retirement { by, at: now() })?;
             let kept = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-            Ok(Json(view(directory, kept)))
+            Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
         })
     })
 }
