@@ -42,7 +42,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/blocks_tests.rs",
+            "change": "modified",
+            "note": "the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing no longer sleeps. It pins the shard directory's and the block file's modification times to one fixed instant and reads them back. After the second put it asserts both times are unchanged and the shard's entry count is the same."
+          }
+        ],
+        "how": "Each acceptance row, with its evidence (not yet run):\n(1) No sleep: the std::thread::sleep line that was at blocks_tests.rs:22 is removed, and a grep for sleep in the file prints nothing.\n(2) set_modified count at least 1: blocks_tests.rs:18-20 defines shard = store.root().join(&first.hash.as_str()[..2]), file = shard.join(first.hash.as_str()) and the pinned instant. Lines 21-24 loop over [&shard, &file] and call std::fs::File::open(p).unwrap().set_modified(pinned).\n(3) Read-back before the second put: inside that loop, the test asserts std::fs::metadata(p).unwrap().modified().unwrap() == pinned for both paths.\n(4) After the second put: the test asserts files() == count, then the shard's mtime == pinned, then the file's mtime == pinned, then count == 1.\n(5) first.new, !second.new and second.hash == first.hash are all still asserted.\n(6) The workflow runs the named cargo test.\n(7) blocks.rs is unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C95",
+            "done": true,
+            "note": "The test pins both paths, reads them back, asserts they are unchanged after the second put and checks the entry count, with no clock."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": true,
+            "note": "The proof no longer depends on how coarse the filesystem's timestamps are or how busy the host is."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -69,7 +95,33 @@
       ],
       "stories": [
         "S40"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/templates_tests.rs",
+            "change": "modified",
+            "note": "a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing no longer sleeps. It takes the shard's entry count, pins the shard directory's and the template file's modification times and reads them back. After the second put it asserts both times and the entry count are unchanged, and that the count is 1."
+          }
+        ],
+        "how": "Each acceptance row, with its evidence (not yet run):\n(1) No sleep: the sleep that was at templates_tests.rs:31 is removed.\n(2) Pinning: templates_tests.rs:30 sets shard = path.parent().unwrap() and line 31 takes count = read_dir(shard).count(). Lines 33-36 loop over [shard, path.as_path()] and call File::open(p).set_modified(pinned).\n(3) Read-back before the second put: inside that loop, the test asserts metadata(p).modified() == pinned for each path.\n(4) After the second put: the test asserts the shard's mtime == pinned, the file's mtime == pinned, read_dir(shard).count() == count, and count == 1.\n(5) Every earlier assertion is kept: the store root is absent before the first put, first.new, the hash equality, the stored bytes, path_of, !second.new, second.hash == first.hash, contains, get, and the missing-hash error naming the hash.\n(6) The workflow runs the named cargo test.\n(7) templates.rs is unchanged.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C96",
+            "done": true,
+            "note": "The test pins both paths, reads them back, asserts they are unchanged after the second put and checks the entry count, with no clock."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S40",
+            "satisfied": true,
+            "note": "The template store's proof no longer depends on elapsed time."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
