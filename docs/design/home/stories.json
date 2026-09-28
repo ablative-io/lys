@@ -450,6 +450,42 @@
           "text": "As the reviewer, I want a fork to leave the parent's earlier bytes and the block store unchanged, so that forking costs no history and duplicates no block."
         }
       ]
+    },
+    {
+      "name": "Tom",
+      "role": "Owns the platform and reads what a session was given",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives."
+        },
+        {
+          "id": "S4",
+          "text": "As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured."
+        },
+        {
+          "id": "S6",
+          "text": "As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded."
+        },
+        {
+          "id": "S9",
+          "text": "As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it."
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "role": "Checks the proofs before anything relies on them",
+      "stories": [
+        {
+          "id": "S5",
+          "text": "As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught."
+        },
+        {
+          "id": "S10",
+          "text": "As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed."
+        }
+      ]
     }
   ]
 }
