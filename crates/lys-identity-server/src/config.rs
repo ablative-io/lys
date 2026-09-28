@@ -116,6 +116,11 @@ pub struct Config {
     /// exist. Without it the budget routes answer `BudgetsUnavailable`.
     #[serde(default)]
     pub budgets_dir: Option<PathBuf>,
+    /// The directory the agents' tool-boundary policies are kept in, created
+    /// when it does not exist. Without it the policy routes answer
+    /// `PolicyUnavailable`.
+    #[serde(default)]
+    pub policies_dir: Option<PathBuf>,
     /// The directory the teams are kept in, created when it does not exist.
     /// Without it the team routes answer `TeamsUnavailable`.
     #[serde(default)]

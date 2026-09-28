@@ -125,6 +125,7 @@ pub fn render(
         "service_accounts_dir": dir("service-accounts"),
         "teams_dir": dir("teams"),
         "budgets_dir": dir("budgets"),
+        "policies_dir": dir("policies"),
         "stops_dir": dir("stops"),
         "goals_dir": dir("goals"),
         "reviews_dir": dir("reviews"),

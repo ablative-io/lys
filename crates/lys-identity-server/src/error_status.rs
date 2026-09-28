@@ -146,6 +146,7 @@ impl ServerError {
             | Self::TeamReused { .. }
             | Self::StopReused { .. }
             | Self::BudgetVersionConflict { .. }
+            | Self::PolicyVersionConflict { .. }
             | Self::TeamRetired { .. }
             | Self::TeamMemberHeld
             | Self::TeamMemberAbsent
@@ -164,7 +165,8 @@ impl ServerError {
             | Self::CodeUsed
             | Self::CodeExpired
             | Self::VerifierWrong
-            | Self::BudgetRefused { .. } => StatusCode::BAD_REQUEST,
+            | Self::BudgetRefused { .. }
+            | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
@@ -181,6 +183,7 @@ impl ServerError {
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::BudgetsUnavailable { .. }
+            | Self::PolicyUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::SetupUnavailable { .. }
             | Self::ProviderUnavailable { .. }

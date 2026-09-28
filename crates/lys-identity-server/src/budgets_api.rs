@@ -84,7 +84,11 @@ fn kind_name(kind: HolderKind) -> &'static str {
 
 /// The caller's person, once the caller is proved to hold authority over
 /// `holder`: an administrator, or the person responsible for it.
-fn authorised(state: &AppState, actor: &Actor, holder: &Holder) -> Result<String, ServerError> {
+pub(crate) fn authorised(
+    state: &AppState,
+    actor: &Actor,
+    holder: &Holder,
+) -> Result<String, ServerError> {
     let administrator = state.admission.administrator(actor).is_ok();
     let (person, responsible) = with_directory(state, |directory| {
         let projection = directory.projection()?;

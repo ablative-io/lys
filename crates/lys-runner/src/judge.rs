@@ -44,7 +44,9 @@ pub const PATH_TOOLS: [(&str, &str); 5] = [
 pub const HOST_TOOL: &str = "WebFetch";
 
 /// A Lys resource a grantable rule names.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct NamedResource {
     /// The resource's kind, as the grant model declares it.
@@ -54,7 +56,7 @@ pub struct NamedResource {
 }
 
 /// Who may lift a rule.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Authority {
     /// No grant can allow it.
@@ -70,7 +72,9 @@ pub enum Authority {
 }
 
 /// What a rule's target is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RuleKind {
     /// The whole tool; no target.
@@ -82,7 +86,7 @@ pub enum RuleKind {
 }
 
 /// One deny rule.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
     /// The rule's id, unique in its policy.
@@ -99,7 +103,7 @@ pub struct Rule {
 }
 
 /// An agent's policy, one immutable version of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Policy {
     /// The version, from 1; every decision names it.

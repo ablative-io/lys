@@ -76,6 +76,9 @@ pub struct AppState {
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The budgets, when the configuration names their directory.
     pub budgets: Option<Mutex<crate::budgets_store::BudgetStore>>,
+    /// The agents' tool-boundary policies, when the configuration names
+    /// their directory.
+    pub policies: Option<Mutex<crate::agent_policy_store::PolicyStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
     /// The goals and their reminders, when the configuration names their directory.
@@ -137,6 +140,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
     let budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    let policies =
+        crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
     let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
@@ -191,6 +196,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
         budgets: budgets.map(Mutex::new),
+        policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
@@ -296,6 +302,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::stop_api::routes())
         .merge(crate::budgets_api::routes())
         .merge(crate::budgets_act::routes())
+        .merge(crate::agent_policy_api::routes())
         .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())

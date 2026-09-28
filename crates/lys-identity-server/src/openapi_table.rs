@@ -122,6 +122,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, &["AgentNotVisible", "not_permitted"]];
+    GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]];
+    POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [];
     POST "/oauth/token" "Exchange a code for tokens" P [];

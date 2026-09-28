@@ -432,6 +432,31 @@ pub enum ServerError {
         /// Why, in words.
         words: String,
     },
+    /// The agent policies cannot be kept or read.
+    #[error("PolicyUnavailable: {reason}")]
+    PolicyUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// Another change to the policy came between the caller's read and its
+    /// change.
+    #[error(
+        "PolicyVersionConflict: the policy is at version {held}, not {expected}: read it again and send the change on the version read"
+    )]
+    PolicyVersionConflict {
+        /// The version held.
+        held: u64,
+        /// The version the caller read.
+        expected: u64,
+    },
+    /// A policy of the wrong shape, refused by name.
+    #[error("{refusal}: {words}")]
+    PolicyRefused {
+        /// The refusal's name.
+        refusal: &'static str,
+        /// Why, in words.
+        words: String,
+    },
     /// The emergency stops cannot be kept or read.
     #[error("StopsUnavailable: {reason}")]
     StopsUnavailable {

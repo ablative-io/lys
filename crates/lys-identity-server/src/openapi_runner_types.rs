@@ -1,4 +1,4 @@
-//! The types the runner routes and the usage routes take and answer, beside `openapi_types.rs`
+//! The types the runner, usage and policy routes take and answer, beside `openapi_types.rs`
 //! for the rest of the table.
 //!
 //! The acts on a session, the wake, the live list and a machine's runner
@@ -8,6 +8,7 @@
 
 use lys_openapi::Api;
 
+use crate::agent_policy_api::{PolicyBody, PolicyView};
 use crate::budgets_act::{UsageBody, UsageView};
 use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
@@ -20,7 +21,15 @@ use crate::runner_api::{
 pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     let empty = api.schema::<Empty>();
     let usage = api.schema::<UsageView>();
+    let policy = api.schema::<PolicyView>();
     vec![
+        (GET, "/agents/{id}/policy", None, Some(policy.clone())),
+        (
+            POST,
+            "/agents/{id}/policy",
+            Some(api.schema::<PolicyBody>()),
+            Some(policy),
+        ),
         (GET, "/agents/{id}/usage", None, Some(usage.clone())),
         (
             POST,
