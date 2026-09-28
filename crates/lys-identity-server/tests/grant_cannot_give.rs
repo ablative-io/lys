@@ -30,8 +30,7 @@ const BEA: &str = "bea-subject";
 const CARA: &str = "cara-subject";
 
 /// The fixture model: four relations whose names say nothing of their actions.
-const MODEL: &str =
-    r#"{"version":1,"relations":{"alder":["view"],"birch":["comment","view"],"cedar":["edit","view"],"damson":["comment","edit","grant","view"]}}"#;
+const MODEL: &str = r#"{"version":1,"relations":{"alder":["view"],"birch":["comment","view"],"cedar":["edit","view"],"damson":["comment","edit","grant","view"]}}"#;
 
 fn login(subject: &str) -> Login {
     Login {
@@ -109,7 +108,9 @@ impl World {
             "resource": { "kind": "project", "id": resource }, "relation": relation,
             "pass_on": pass_on, "window": { "starts_at": 0, "ends_at": null },
         });
-        let issued = self.post_ok("/grants/roots", &self.ada_cookie, &body).await?;
+        let issued = self
+            .post_ok("/grants/roots", &self.ada_cookie, &body)
+            .await?;
         let id = issued["grant"].as_str().ok_or("no grant")?.to_owned();
         self.grants.push((label.to_owned(), id));
         Ok(())
@@ -130,7 +131,9 @@ impl World {
 
     /// Bea's answer from `source` for `recipient`, through the API.
     async fn bea_asks(&self, source: &str, recipient: &str) -> Result<Value, Box<dyn Error>> {
-        let (status, answer) = self.ask(Some(&self.bea_cookie), "api", source, recipient).await?;
+        let (status, answer) = self
+            .ask(Some(&self.bea_cookie), "api", source, recipient)
+            .await?;
         assert_eq!(status, 200, "{answer}");
         Ok(answer)
     }
@@ -152,7 +155,10 @@ impl World {
             .ok_or("no items")?
             .iter()
             .map(|item| -> Result<(String, String, bool), Box<dyn Error>> {
-                assert!(item.get("standing").is_none(), "an item carries no standing: {item}");
+                assert!(
+                    item.get("standing").is_none(),
+                    "an item carries no standing: {item}"
+                );
                 let subject = match item["subject"].as_str().ok_or("no subject")? {
                     "grant" | "service_account" => {
                         self.label(item["grant"].as_str().ok_or("no grant")?)?
@@ -249,7 +255,9 @@ async fn world(extras: &[&str]) -> Result<World, Box<dyn Error>> {
     let both = json!({ "kind": "to", "actions": ["view"], "recipients": ["person", "agent"] });
     let use_only = json!({ "kind": "use_only" });
     world.root("G1", &bea, "p", "alder", both).await?;
-    world.root("G2", &bea, "p", "birch", use_only.clone()).await?;
+    world
+        .root("G2", &bea, "p", "birch", use_only.clone())
+        .await?;
     let to_people = json!({ "kind": "to", "actions": ["edit", "view"], "recipients": ["person"] });
     world.root("G0", &ada, "p", "cedar", to_people).await?;
     let lent = json!({
@@ -295,7 +303,10 @@ async fn cannot_give_routes() -> TestResult {
         );
     }
     assert_eq!(answers.len(), 3);
-    assert!(answers.iter().all(|answer| answer == &answers[0]), "{answers:?}");
+    assert!(
+        answers.iter().all(|answer| answer == &answers[0]),
+        "{answers:?}"
+    );
     Ok(())
 }
 
@@ -309,22 +320,43 @@ async fn cannot_give_wire() -> TestResult {
         .into_iter()
         .map(|(_, reason, _)| reason)
         .collect();
-    for reason in ["use_only", "lent_to_you", "above_what_you_hold", "sign_in_identity"] {
-        assert!(reasons.iter().any(|named| named == reason), "{reason}: {answer}");
+    for reason in [
+        "use_only",
+        "lent_to_you",
+        "above_what_you_hold",
+        "sign_in_identity",
+    ] {
+        assert!(
+            reasons.iter().any(|named| named == reason),
+            "{reason}: {answer}"
+        );
     }
     let g11: Vec<(String, String, bool)> = world
         .items(&answer)?
         .into_iter()
         .filter(|(subject, ..)| subject == "G11")
         .collect();
-    assert_eq!(g11, vec![("G11".to_owned(), "people_only".to_owned(), false)]);
+    assert_eq!(
+        g11,
+        vec![("G11".to_owned(), "people_only".to_owned(), false)]
+    );
 
     let answer = world.bea_asks(&g1, &world.cara.to_string()).await?;
     let items = world.items(&answer)?;
-    assert!(items.iter().all(|(_, reason, _)| reason != "sign_in_identity"), "{answer}");
-    let g10: Vec<&(String, String, bool)> =
-        items.iter().filter(|(subject, ..)| subject == "G10").collect();
-    assert_eq!(g10, vec![&("G10".to_owned(), "agents_only".to_owned(), false)]);
+    assert!(
+        items
+            .iter()
+            .all(|(_, reason, _)| reason != "sign_in_identity"),
+        "{answer}"
+    );
+    let g10: Vec<&(String, String, bool)> = items
+        .iter()
+        .filter(|(subject, ..)| subject == "G10")
+        .collect();
+    assert_eq!(
+        g10,
+        vec![&("G10".to_owned(), "agents_only".to_owned(), false)]
+    );
     assert!(
         items.iter().all(|(subject, ..)| subject != "G11"),
         "G11 may be given to a person"
@@ -348,7 +380,9 @@ async fn cannot_give_wire_unknown_reason() -> TestResult {
         .err()
         .ok_or("an answer with the reason borrowed parsed")?;
     assert!(
-        error.to_string().starts_with("unknown_cannot_give_reason: `borrowed`"),
+        error
+            .to_string()
+            .starts_with("unknown_cannot_give_reason: `borrowed`"),
         "{error}"
     );
     Ok(())
@@ -360,14 +394,20 @@ async fn cannot_give_auth() -> TestResult {
     let (g1, a1) = (world.grant("G1")?, world.a1());
     let before = world.counts().await?;
     let (status, answer) = world.ask(None, "api", &g1, &a1).await?;
-    assert_eq!((status, answer["refusal"].as_str()), (401, Some("NotSignedIn")), "{answer}");
+    assert_eq!(
+        (status, answer["refusal"].as_str()),
+        (401, Some("NotSignedIn")),
+        "{answer}"
+    );
     assert!(answer.get("items").is_none(), "{answer}");
     assert_eq!(world.counts().await?, before);
 
     let nowhere = format!("grant-{}", "0".repeat(32));
     let mut bodies = Vec::new();
     for source in [g1.as_str(), nowhere.as_str()] {
-        let (status, answer) = world.ask(Some(&world.cara_cookie), "api", source, &a1).await?;
+        let (status, answer) = world
+            .ask(Some(&world.cara_cookie), "api", source, &a1)
+            .await?;
         assert_eq!(
             (status, answer["refusal"].as_str()),
             (404, Some("GrantNotVisible")),
@@ -390,7 +430,9 @@ async fn cannot_give_unknown_recipient() -> TestResult {
     let x0 = IdentityId::Agent(AgentId::generate()?).to_string();
     let mut bodies = Vec::new();
     for recipient in [x0, world.x1()] {
-        let (status, answer) = world.ask(Some(&world.bea_cookie), "api", &g1, &recipient).await?;
+        let (status, answer) = world
+            .ask(Some(&world.bea_cookie), "api", &g1, &recipient)
+            .await?;
         assert_eq!(
             (status, answer["refusal"].as_str()),
             (403, Some("IdentityUnknown")),
@@ -418,6 +460,9 @@ async fn cannot_give_no_leak() -> TestResult {
     world.root("G20", &cara, "p", "damson", everything).await?;
     let after = serde_json::to_string(&world.bea_asks(&g1, &a1).await?)?;
     assert_eq!(before.as_bytes(), after.as_bytes());
-    assert!(!after.contains(&world.grant("G20")?) && !after.contains(&cara), "{after}");
+    assert!(
+        !after.contains(&world.grant("G20")?) && !after.contains(&cara),
+        "{after}"
+    );
     Ok(())
 }
