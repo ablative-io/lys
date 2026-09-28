@@ -291,16 +291,12 @@ mod directory_events {
         let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
         let index = receipt.coordinate().index;
-        let leaf = directory
-            .log()?
-            .leaf(index)?
-            .ok_or("leaf missing")?
-            .to_vec();
+        let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
         let checkpoint = directory.log()?.head()?;
         let proof = directory.log()?.inclusion_proof(index)?;
         let key = directory.service_key();
         verify_receipt(&receipt, &leaf, &key, checkpoint, &proof)?;
-        let other = directory.log()?.leaf(1)?.ok_or("leaf missing")?.to_vec();
+        let other = directory.log()?.leaf(1)?.ok_or("leaf missing")?;
         assert!(verify_receipt(&receipt, &other, &key, checkpoint, &proof).is_err());
         let mut signature_flipped = leaf.clone();
         let last = signature_flipped.len() - 1;
@@ -393,7 +389,7 @@ mod directory_events {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
         directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        let whole = directory.log()?.leaf(0)?.ok_or("leaf missing")?.to_vec();
+        let whole = directory.log()?.leaf(0)?.ok_or("leaf missing")?;
         drop(directory);
         std::fs::write(leaf_file(&harness, 1), &whole[..whole.len() / 2])?;
         let refused = harness.open();
