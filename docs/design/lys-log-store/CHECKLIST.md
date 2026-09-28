@@ -45,7 +45,8 @@
 ## No open reads every leaf (LYSLOGSTORE-007)
 
 - [ ] **C25** — A frontier log opens from its tiles and reads no leaf under the pin (LYSLOGSTORE-007 R1).
-- [ ] **C26** — The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R2).
-- [ ] **C27** — The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R3).
-- [ ] **C28** — Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R4).
-- [ ] **C29** — A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R5).
+- [ ] **C30** — Artifacts are built from a tile proof and a root, byte-for-byte as from a whole tree (LYSLOGSTORE-007 R2).
+- [ ] **C26** — The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R3).
+- [ ] **C27** — The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R4).
+- [ ] **C28** — Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R5).
+- [ ] **C29** — A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R6).

@@ -160,23 +160,28 @@
           "done": false
         },
         {
+          "id": "C30",
+          "text": "Artifacts are built from a tile proof and a root, byte-for-byte as from a whole tree (LYSLOGSTORE-007 R2).",
+          "done": false
+        },
+        {
           "id": "C26",
-          "text": "The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R2).",
+          "text": "The anchor opens, creates, reads and proves through the frontier log and its tiles (LYSLOGSTORE-007 R3).",
           "done": false
         },
         {
           "id": "C27",
-          "text": "The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R3).",
+          "text": "The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R4).",
           "done": false
         },
         {
           "id": "C28",
-          "text": "Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R4).",
+          "text": "Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R5).",
           "done": false
         },
         {
           "id": "C29",
-          "text": "A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R5).",
+          "text": "A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R6).",
           "done": false
         }
       ]

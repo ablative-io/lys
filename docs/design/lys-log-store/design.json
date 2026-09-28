@@ -494,6 +494,131 @@
       "path": "crates/lys/src/commands/log/mod.rs",
       "note": "R4: lys log audit, the one read of every leaf",
       "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/origin.rs",
+      "note": "R1: A frontier log opens from its tiles",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/build_from_proof_tests.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/build.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-core/src/tlog/mod.rs",
+      "note": "R2: Artifacts are built from a tile proof and a root",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/append_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/artifact_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/checkpoint_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/genesis.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/open_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/status_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/anchor/submit_tests.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/src/lib.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/anchor_receipt_conformance/main.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/checkpoint_note_conformance.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/stranger_verification/main.rs",
+      "note": "R3: The anchor runs on the frontier log",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_fold.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_history.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_support/fixtures.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity/tests/revocation_verify.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/store_tests.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/commands/log/status_tests.rs",
+      "note": "R4: The lys log and ca log commands and the revocation appends run on it",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/cli/log.rs",
+      "note": "R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys/src/main.rs",
+      "note": "R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-anchor/tests/open_reads_no_leaf.rs",
+      "note": "R6: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/store_open_reads_the_tail.rs",
+      "note": "R6: A gate test fails when an open reads a leaf under the pin",
+      "brief": "LYSLOGSTORE-007"
     }
   ],
   "inventory": [
