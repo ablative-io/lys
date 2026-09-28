@@ -485,7 +485,7 @@
     {
       "id": "RM-012",
       "title": "Translate a session imported from Claude Code into a Codex rollout with a loss account",
-      "status": "briefed",
+      "status": "idea",
       "kind": "feature",
       "summary": "Stage 4b of the home: lys-home translate-codex renders a session imported from Claude Code as a Codex 0.156.0 rollout in the shape Codex writes for its own threads, carrying every text part, tool call and tool result whole, readable thinking as text and sidechains as marked text, with a JSON loss account beside it of what was kept, changed and lost by entry id and hash, a lys.translation side leaf on the session, and a resume on Codex 0.156.0 measured in a scratch Codex home. The Codex thread is a fork of the session, never the same session.",
       "provenance": {
