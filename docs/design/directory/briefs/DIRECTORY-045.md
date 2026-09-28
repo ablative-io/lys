@@ -97,10 +97,10 @@ Behavioural. `lys identity install` and `lys identity upgrade` write install/bui
 
 ### R4: Prove it on the live install
 
-Evidence. Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show the running server's /authority `build` equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it. The live install was made before this card (R6), so the proof starts with its first move, and the sign-in page still keeps its session over plain http after the upgrade (the cookie setting carried by R5).
+Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show that the `build` member of the running server's /api/authority answer equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it. The live install was made before this card (R6), so the proof starts with its first move, and the sign-in page still keeps its session over plain http after the upgrade (the cookie setting carried by R5). The live service serves the screens at /authority and the server's answer at /api/authority, so the proof reads /api/authority.
 
 **Acceptance:**
-- PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/authority` shows the head commit.
+- PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/api/authority` shows the head commit.
 - After the upgrade, signing in on the live install in a browser keeps the session, and the compose environment holds the cookie setting the new build renders.
 
 **Files:**
@@ -114,12 +114,13 @@ Evidence. Evidence. On the machine the live install runs on, build lys, lys-iden
 
 ### R5: The configuration and compose files move with the binaries
 
-Behavioural. An upgrade renders deployment.toml's derived files, the directory service's configuration and the compose files (compose.yaml and its environment) for the new build, from the install's recorded choices and the new build's templates, inside the swap: the previous ones are kept beside them (config.previous/) and put back with the binaries on failure and by --back (DIRECTORY-053). The compose services whose rendered definition changed are recreated through the engine, waited on for ready, and put back on failure. Running install from a build other than the one placed is refused install_build_differs, naming the placed and the new commit and the upgrade command, never restarting old binaries on a new configuration.
+Behavioural. An upgrade renders deployment.toml's derived files, the directory service's configuration and the compose files (compose.yaml and its environment) for the new build, from the install's recorded choices and the new build's templates, inside the swap: the previous ones are kept beside them (config.previous/) and put back with the binaries on failure and by --back (DIRECTORY-053). The compose services whose rendered definition changed are recreated through the engine, waited on for ready, and put back on failure. Running install from a build other than the one placed is refused install_build_differs, naming the placed and the new commit and the upgrade command, never restarting old binaries on a new configuration. The module note at the head of upgrade.rs says what this requirement makes true. It no longer says an upgrade never writes deployment.toml, identity.json or the compose services, and it names each file an upgrade renders and keeps in config.previous/.
 
 **Acceptance:**
 - A test where build B adds a configuration key and a compose environment value upgrades an install of build A: B runs with the new key and value, and a failed start of B puts A's binaries, configuration and compose files back, byte-identical.
 - Install run from build B over an install of build A is refused install_build_differs and nothing is stopped.
 - data/ and every credential are byte-identical across both.
+- The module note of upgrade.rs names every file an upgrade renders, and no file it calls never written is one an upgrade writes.
 
 **Files:**
 - create: crates/lys/src/identity/upgrade/render.rs
@@ -137,16 +138,18 @@ Behavioural. An upgrade renders deployment.toml's derived files, the directory s
 
 ### R6: The first move of an install made before this card
 
-Behavioural. An install with no install/build.json (made before this card) is upgraded, not re-installed: upgrade reads the placed binaries' versions (a binary that cannot answer --version is recorded as 'built before build stamps'), stops the processes its pid files name through their exit locks, or through the pid when a process has no exit lock, naming which, and proceeds as R2 and R5. Install run again never leaves a process running from a binary it replaced: it stops and restarts any process whose binary it changed, so install/build.json always names what runs.
+Behavioural. An install with no install/build.json (made before this card) is upgraded, not re-installed: upgrade reads the placed binaries' versions (a binary that cannot answer --version is recorded as 'built before build stamps'), stops the processes its pid files name through their exit locks, or through the pid when a process has no exit lock, naming which, and proceeds as R2 and R5. Install run again never leaves a process running from a binary it replaced: it stops and restarts any process whose binary it changed, so install/build.json always names what runs. The binaries placed before this card have no build stamp. lys-identity-server reads --version as a configuration path and fails, and lys, lys-secrets and lys-home refuse it as an unexpected argument. Any installed binary whose --version exits non-zero or prints no stamp is recorded as 'built before build stamps' and the upgrade carries on. It is refused version_unreadable only for a binary in the new build folder.
 
 **Acceptance:**
 - A scratch install laid out as before this card (no build.json, no exit locks, a binary without --version) is upgraded, and /api/authority answers the new commit.
 - Install run again with a changed binary restarts that process, and build.json equals the running build.
+- A test places an installed lys-identity-server stub that fails when given --version as a configuration path and a lys stub that exits 2 with an unexpected argument, and the upgrade records both as 'built before build stamps' and carries on to the new build.
 
 **Files:**
 - create: crates/lys/src/identity/upgrade/adopt.rs
 - create: crates/lys/src/identity/upgrade/adopt_tests.rs
 - modify: crates/lys/src/identity/install/services.rs
+- modify: crates/lys/src/identity/upgrade.rs
 
 **Checklist:**
 - C345 — `lys identity upgrade` swaps the binaries and screens and returns to the previous build on failure (DIRECTORY-045 R2); the configuration and compose files move with the binaries, an install made before it is adopted, and an upgrade stopped part-way is finished or put back (DIRECTORY-045 R5 to R7).
@@ -187,4 +190,4 @@ Behavioural. Before the first stop, an upgrade writes an intent record (install/
 ## Verification
 
 - The full Lys gate and the surface checks exit 0 at the card's head, measured by the card round.
-- The live upgrade of R4 is recorded in PROOF-UPGRADE.md and /authority on the live install names the head commit.
+- The live upgrade of R4 is recorded in PROOF-UPGRADE.md and /api/authority on the live install names the head commit.
