@@ -370,33 +370,6 @@ pub fn verify_grant_event(
     message: &[u8],
     service_key: &[u8; KEY_LEN],
 ) -> Result<SignedGrantEvent, GrantError> {
-    read_grant_event(message, service_key, Trust::Verify)
-}
-
-/// Read `message` as a grant event the service signed, without checking its
-/// signature again: for a leaf carried in a snapshot whose own signature, by
-/// the same key, was checked. Every other check of [`verify_grant_event`] is made.
-pub(crate) fn read_attested_grant_event(
-    message: &[u8],
-    service_key: &[u8; KEY_LEN],
-) -> Result<SignedGrantEvent, GrantError> {
-    read_grant_event(message, service_key, Trust::Attested)
-}
-
-/// Whether a message's own signature is checked when it is read.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Trust {
-    /// The signature is checked.
-    Verify,
-    /// The bytes are vouched for by a checked signature over them elsewhere.
-    Attested,
-}
-
-fn read_grant_event(
-    message: &[u8],
-    service_key: &[u8; KEY_LEN],
-    trust: Trust,
-) -> Result<SignedGrantEvent, GrantError> {
     const SHAPE: &str = "the message is not a tagged COSE_Sign1 of four parts";
     if message.len() > MAX_GRANT_EVENT_BYTES {
         return Err(GrantError::EventTooLarge {
@@ -435,11 +408,8 @@ fn read_grant_event(
     if &kid != service_key {
         return Err(GrantError::SignerMismatch);
     }
-    if signature.len() != SIGNATURE_LEN {
-        return Err(GrantError::SignatureInvalid);
-    }
-    if trust == Trust::Verify
-        && Ed25519Identity::verify(
+    if signature.len() != SIGNATURE_LEN
+        || Ed25519Identity::verify(
             service_key,
             &sig_structure(&protected, &payload),
             &signature,

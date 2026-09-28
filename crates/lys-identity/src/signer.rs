@@ -123,33 +123,6 @@ pub fn verify_event(
     message: &[u8],
     service_key: &[u8; KEY_LEN],
 ) -> Result<SignedEvent, IdentityError> {
-    read_event(message, service_key, Trust::Verify)
-}
-
-/// Read `message` as an event the service signed, without checking its
-/// signature again: for a leaf carried in a snapshot whose own signature, by
-/// the same key, was checked. Every other check of [`verify_event`] is made.
-pub(crate) fn read_attested_event(
-    message: &[u8],
-    service_key: &[u8; KEY_LEN],
-) -> Result<SignedEvent, IdentityError> {
-    read_event(message, service_key, Trust::Attested)
-}
-
-/// Whether a message's own signature is checked when it is read.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Trust {
-    /// The signature is checked.
-    Verify,
-    /// The bytes are vouched for by a checked signature over them elsewhere.
-    Attested,
-}
-
-fn read_event(
-    message: &[u8],
-    service_key: &[u8; KEY_LEN],
-    trust: Trust,
-) -> Result<SignedEvent, IdentityError> {
     if message.len() > MAX_EVENT_BYTES {
         return Err(IdentityError::EventTooLarge {
             len: message.len(),
@@ -170,11 +143,8 @@ fn read_event(
     if &kid != service_key {
         return Err(IdentityError::SignerMismatch);
     }
-    if parts.signature.len() != SIGNATURE_LEN {
-        return Err(IdentityError::SignatureInvalid);
-    }
-    if trust == Trust::Verify
-        && Ed25519Identity::verify(
+    if parts.signature.len() != SIGNATURE_LEN
+        || Ed25519Identity::verify(
             service_key,
             &sig_structure(&parts.protected, &parts.payload),
             &parts.signature,
