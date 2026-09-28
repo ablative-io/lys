@@ -166,7 +166,7 @@ impl Leases {
         answered(
             self.broker
                 .revoke_lease(caller, &lease.id, &mut |ended: &str, _secret: &str| {
-                    asked.push(ended.to_owned())
+                    asked.push(ended.to_owned());
                 }),
         )
     }
