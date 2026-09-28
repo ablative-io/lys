@@ -124,6 +124,7 @@ pub fn render(
         "runtime_dir": dir("runtime"),
         "service_accounts_dir": dir("service-accounts"),
         "teams_dir": dir("teams"),
+        "budgets_dir": dir("budgets"),
         "stops_dir": dir("stops"),
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),

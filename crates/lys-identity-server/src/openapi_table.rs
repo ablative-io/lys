@@ -103,6 +103,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/found" "The sessions found" S [ADMIN];
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]];
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
+    GET "/budgets/{kind}/{id}" "A holder's budgets" S [SIGNED, &["not_permitted"]];
+    PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid"], &["BudgetVersionConflict"]];
     GET "/service-accounts" "The service accounts" S [SIGNED];
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]];
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];

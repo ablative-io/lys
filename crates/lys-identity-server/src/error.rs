@@ -404,6 +404,31 @@ pub enum ServerError {
     /// No team by that id was ever created.
     #[error("TeamUnknown: no team by that id was ever created")]
     TeamUnknown,
+    /// The budgets cannot be kept or read.
+    #[error("BudgetsUnavailable: {reason}")]
+    BudgetsUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// Another change to the budget came between the caller's read and its
+    /// change.
+    #[error(
+        "BudgetVersionConflict: the budget is at version {held}, not {expected}: read it again and send the change on the version read"
+    )]
+    BudgetVersionConflict {
+        /// The version held.
+        held: u64,
+        /// The version the caller read.
+        expected: u64,
+    },
+    /// A budget of the wrong shape, refused by name.
+    #[error("{refusal}: {words}")]
+    BudgetRefused {
+        /// The refusal's name.
+        refusal: &'static str,
+        /// Why, in words.
+        words: String,
+    },
     /// The emergency stops cannot be kept or read.
     #[error("StopsUnavailable: {reason}")]
     StopsUnavailable {

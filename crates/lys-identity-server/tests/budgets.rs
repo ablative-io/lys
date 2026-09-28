@@ -160,3 +160,54 @@ fn a_version_that_does_not_follow_is_refused() -> Result<(), Box<dyn Error>> {
     assert!(held.hold(Leaf::Set(skipped)).is_err());
     Ok(())
 }
+
+#[test]
+fn a_budget_of_the_wrong_shape_is_refused_by_name() {
+    let unperiodic = Budget {
+        period: None,
+        ..budget(HolderKind::Agent, "agent-scribe", 1000, "UTC")
+    };
+    assert_eq!(
+        unperiodic.checked().err().map(|refused| refused.refusal),
+        Some("period_missing")
+    );
+    let over = Budget {
+        measure: Measure::ContextPercent,
+        period: None,
+        limit: 101,
+        ..budget(HolderKind::Agent, "agent-scribe", 1000, "UTC")
+    };
+    assert_eq!(
+        over.checked().err().map(|refused| refused.refusal),
+        Some("budget_invalid")
+    );
+}
+
+#[test]
+fn a_change_that_crossed_another_is_refused_and_the_store_survives_a_restart()
+-> Result<(), Box<dyn Error>> {
+    use lys_identity_server::budgets_store::BudgetStore;
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(lys_core::Ed25519Identity::load_or_generate(
+        &dir.path().join("key"),
+    )?);
+    let logs = dir.path().join("budgets");
+    let mut store = BudgetStore::open(&logs, std::sync::Arc::clone(&key))?;
+    let set = store.set(budget(HolderKind::Agent, "agent-scribe", 1000, "UTC"), 0)?;
+    assert_eq!(set.version, 1);
+    let crossed = store
+        .set(budget(HolderKind::Agent, "agent-scribe", 2000, "UTC"), 0)
+        .err()
+        .ok_or("a change on a stale version was kept")?;
+    assert_eq!(crossed.name(), "BudgetVersionConflict");
+    let Leaf::Used(usage) = used("e1", 1_790_602_200_000, 40) else {
+        return Err("the fixture is not a use".into());
+    };
+    assert!(store.charge(usage.clone())?);
+    assert!(!store.charge(usage)?);
+    drop(store);
+    let again = BudgetStore::open(&logs, key)?;
+    assert_eq!(again.held().budgets.len(), 1);
+    assert_eq!(again.held().uses.len(), 1);
+    Ok(())
+}

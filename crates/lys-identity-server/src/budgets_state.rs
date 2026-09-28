@@ -23,7 +23,9 @@ pub const DOMAIN: &str = "lys/identity/budgets-state/v1";
 const FORMAT: &str = "lys-budgets-state/v1";
 
 /// Who a budget is held on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum HolderKind {
     /// One agent.
@@ -35,7 +37,9 @@ pub enum HolderKind {
 }
 
 /// A budget's holder.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct Holder {
     /// Its kind.
@@ -45,7 +49,9 @@ pub struct Holder {
 }
 
 /// What a budget measures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Measure {
     /// The session's context, in percent of its window; no period.
@@ -57,7 +63,7 @@ pub enum Measure {
 }
 
 /// What a reached budget does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Act {
     /// Ask the harness to compact at its next turn boundary.
@@ -69,7 +75,7 @@ pub enum Act {
 }
 
 /// How long a period is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Length {
     /// From midnight to midnight.
@@ -79,7 +85,7 @@ pub enum Length {
 }
 
 /// The period a budget counts over, in a named zone.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Period {
     /// Its length.
@@ -89,7 +95,7 @@ pub struct Period {
 }
 
 /// One version of a budget.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Budget {
     /// Its holder.
