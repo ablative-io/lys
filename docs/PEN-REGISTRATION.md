@@ -60,7 +60,7 @@ Managed by us, documented here as the single source of truth:
 | Arc | Purpose | Status |
 |---|---|---|
 | `.1` | Capability claims (certificate extension carrying operator-reviewed claim bytes; today's `lys ca issue --claims`) | In use |
-| `.2` | Reserved: identity/issuer extensions for agent certificates (Sigstore-`.1.8`-style — which issuer vouched, runtime identity, session binding) — allocated when the agent-identity design lands | Reserved |
+| `.2` | Reserved family arc: identity/issuer extensions for agent certificates (Sigstore-`.1.8`-style — which issuer vouched, runtime identity, session binding) — allocated when the agent-identity design lands; `.2` is a family arc whose extensions take sub-arcs beneath it, so each keeps room under `.2` — `.2.1` is proposed for the typed capability claim `lys/agent-capability/v1` (docs/design/identity/CAPABILITY-CLAIM.md) | Reserved |
 | `.3+` | Unallocated | — |
 
 Never reuse or renumber an arc once anything has been signed under it — the

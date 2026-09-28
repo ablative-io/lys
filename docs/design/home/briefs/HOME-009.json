@@ -80,7 +80,68 @@
       ],
       "stories": [
         "S30"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/mod.rs",
+            "change": "created",
+            "note": "Holds only `pub mod` and `#[cfg(test)] mod` lines for account, beside, leaf, parts, rollout, zone and their tests."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/zone.rs",
+            "change": "created",
+            "note": "MEASURED_VERSION `0.156.0` and check_version (exact match). resolve_zone checks IANA shape, then looks the zone up in TimeZoneDatabase::bundled(); it reads no environment and has no fallback. parse_stamp is strict RFC 3339 via time::Rfc3339. Local gives the wall-clock date and time with the fraction truncated."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/zone_tests.rs",
+            "change": "created",
+            "note": "The five named R1 tests."
+          },
+          {
+            "path": "crates/lys-home/src/error.rs",
+            "change": "modified",
+            "note": "Adds TranslationTargetExists, StampNotRfc3339, UnmeasuredCodexVersion, UnnamedTimeZone and UnknownTimeZone beside LaunchTargetExists, with the brief's exact messages. No existing variant changed."
+          },
+          {
+            "path": "crates/lys-home/src/harness/mod.rs",
+            "change": "modified",
+            "note": "Declares `pub mod codex` with its doc."
+          },
+          {
+            "path": "crates/lys-home/Cargo.toml",
+            "change": "modified",
+            "note": "Adds `jiff.workspace = true`."
+          },
+          {
+            "path": "Cargo.toml",
+            "change": "modified",
+            "note": "Workspace `jiff = { version = \"0.2\", default-features = false, features = [\"std\", \"tzdb-bundle-always\"] }`."
+          },
+          {
+            "path": "Cargo.lock",
+            "change": "modified",
+            "note": "Resolved offline with `cargo metadata --offline`: adds jiff 0.2.35, jiff-core, jiff-tzdb, jiff-static and their lock-only dependencies. No existing version changed."
+          }
+        ],
+        "how": "Row by row:\n- version_other_than_measured_is_refused: zone.rs:32 compares exactly, so `0.156` is refused; the message is at error.rs:324.\n- unnamed_zone_is_refused: zone.rs:61. None gives `unset`; `` and `:/etc/localtime` fail the IANA shape check.\n- unknown_zone_is_refused: the bundled-database lookup fails and returns UnknownTimeZone (error.rs:338).\n- named_zone_resolves: Local::of plus iso(). Sydney gives 2000-01-02T14:04:05 and UTC resolves; I checked that jiff-tzdb 0.1.8's tzname.rs lists both zones.\n- translation_refusals_name_the_act: messages at error.rs:307 and error.rs:315; Exists is unchanged.\n- Greps: `std::env` in harness/codex and `BlockNotStored` in src both print nothing. The jiff line holds default-features = false and tzdb-bundle-always, and no tzdb-zoneinfo, tzdb-concatenated, tzdb-bundle-platform or tz-system feature is enabled.\n- Nothing is written before the checks: translate runs them first (rollout.rs:227), and cli_translate::run checks version and zone before it opens the home.\n- Red first: not done in this round. See deviation.",
+        "deviation": "Red first is not met by this round. The instructions say to make no commit, so the tests-first commit and the 101 run are the landing step's to arrange. The test files and their `mod` lines are separable: committed without the implementation they fail to compile, so cargo test exits 101.",
+        "checklist": [
+          {
+            "id": "C59",
+            "done": true,
+            "note": "Every refusal is named and raised before any write. Only the red-first commit ordering is pending (see deviation)."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S30",
+            "satisfied": false,
+            "note": "The version refusal is in place. The measured-shape and resume half is R10 and R11, which are blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -105,7 +166,43 @@
       "stories": [
         "S4",
         "S29"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/account.rs",
+            "change": "created",
+            "note": "Account has exactly session, head, head_hash, thread, codex_version, kept, changed and lost. Kept, Changed and Lost rows have exactly the brief's keys (deny_unknown_fields); hash is Option and serialises as null for an entry row. Also: Rows accumulator in walk order, part_hash (SHA-256 of serde_json::to_vec of the part as the entry holds it), account_bytes, and write_new (create_new plus sync, an existing path refused as TranslationTargetExists)."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/account_tests.rs",
+            "change": "created",
+            "note": "account_holds_the_three_lists and part_hash_is_the_entry_bytes."
+          }
+        ],
+        "how": "- account_holds_the_three_lists: serialises an Account built from one row of each list and checks the top-level and row key sets, and that the entry row's hash is null.\n- part_hash_is_the_entry_bytes: part_hash (account.rs:159) hashes serde_json::to_vec. serde_json here has no preserve_order, so keys come out sorted. I verified the expected hash independently with `printf '%s' '{\"text\":\"a\",\"type\":\"text\"}' | shasum -a 256`, which gives a7be9c13…d516.\n- The account is written create_new and synced before the translation reports (rollout.rs through write_new).\n- Rows carry only ids, hashes, kind names, field names and fixed reasons.\n- Red first: not done in this round. See deviation.",
+        "deviation": "Red first is pending, as in R1: no commit may be made in this round.",
+        "checklist": [
+          {
+            "id": "C62",
+            "done": true,
+            "note": "The account shape and hash rule are here; the rows are filled by R3 to R5."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "The account is the written record of what a translation lost."
+          },
+          {
+            "id": "S29",
+            "satisfied": true,
+            "note": "Kept, changed and lost rows are named by entry id and hash, and hold no content."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -143,7 +240,58 @@
       "stories": [
         "S28",
         "S29"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/parts.rs",
+            "change": "created",
+            "note": "message_items maps user, assistant and toolResult messages to Codex items: input_text and output_text messages, function_call (call_id is the part's own id, arguments via serde_json::to_string) and function_call_output. Readable thinking becomes output_text; redacted and empty thinking are lost. A base64 image becomes input_image with a data URL and no detail key; any other image source is lost with its index. Extra fields are named `<field> not carried`, and an entry row names the message keys beyond role and content. A missing id, name, toolCallId or role is a lost row, never a default. No item carries an `id` key."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/parts_tests.rs",
+            "change": "created",
+            "note": "The ten named R3 tests."
+          }
+        ],
+        "how": "Row by row:\n- tool_call_becomes_function_call: tool_call at parts.rs:252 gives the exact item and a kept row.\n- extra_part_field_is_changed: not_carried names `textSignature not carried`.\n- tool_call_without_id_or_name_is_lost: check_call returns NO_CALL_ID or NO_CALL_NAME.\n- tool_result_without_call_id_is_lost: tool_result_items (parts.rs:414) uses `named` for toolCallId.\n- unknown_role_is_lost: message_items (parts.rs:451).\n- one_item_result_is_a_string: result_output (parts.rs:374) gives a string with how `content: one-item text array written as a string; isError not carried; timestamp not carried; toolName not carried`.\n- two_item_result_is_a_list: the list form.\n- assistant_turn_fields_are_named: entry_row (parts.rs:278) names the keys in sorted order.\n- thinking_is_text_and_opaque_is_lost: thinking_part (parts.rs:225).\n- base64_image_is_input_image_and_url_image_is_lost: image_part (parts.rs:174) gives reason `image source url not carried: part 2, never fetched`.\n- Greps: custom_tool_call, encrypted_content, external_agent, truncat, reqwest, ureq and TcpStream all print nothing in parts.rs, and the no-default patterns print nothing in harness/codex.\n- Red first: not done in this round. See deviation.",
+        "deviation": "Four cases the brief does not name are lost rows with reasons I wrote, instead of empty defaults: a toolCall with no arguments; a text part with no text; a base64 image with no media_type or data; a part with no type. A message whose content is neither a string nor a list is also lost. An image in an assistant message is lost as `Codex has no item for kind image in this render`. Red first is pending, as in R1.",
+        "checklist": [
+          {
+            "id": "C60",
+            "done": true,
+            "note": "Texts, arguments and outputs are carried whole. The 10,000-character case is in R8."
+          },
+          {
+            "id": "C61",
+            "done": true,
+            "note": "Readable thinking becomes output_text. Redacted and empty thinking are lost by hash. No signature, redacted data or reasoning item is written."
+          },
+          {
+            "id": "C62",
+            "done": true,
+            "note": "Part rows and entry rows are covered, and no default is ever supplied."
+          },
+          {
+            "id": "C70",
+            "done": false,
+            "note": "input_image with no detail key is done. The resume measurement is R11, which is blocked."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "Items are carried whole, but that Codex actually resumes the thread is R11, which is blocked."
+          },
+          {
+            "id": "S29",
+            "satisfied": true,
+            "note": "Each part is named by its hash with before, after and how."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -178,7 +326,48 @@
       "stories": [
         "S28",
         "S31"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/rollout.rs",
+            "change": "created",
+            "note": "`translate` runs the R1 checks and parses every context-path stamp, then names the rollout sessions/YYYY/MM/DD/rollout-<local>-<record_uuid of head>.jsonl with `.loss.json` beside it. It refuses an existing target, then writes: session_meta with exactly five keys; the marker developer message; each context entry (messages through parts.rs; compaction, branch_summary and custom_message as marked developer text; anything else lost as not conversation); and a lost row for every path entry the compaction left off. Every line is {timestamp, ordinal, type, payload} with the entry's own stamp copied as recorded. The rollout is written create_new and synced, then the account. It reads no clock, random source or env and writes nothing outside --out."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/rollout_tests.rs",
+            "change": "created",
+            "note": "The ten named R4 tests, plus shared helpers used by the leaf and beside tests."
+          }
+        ],
+        "how": "Row by row:\n- path_follows_codex_layout: target_paths (rollout.rs:209) with Local in Australia/Sydney.\n- session_meta_holds_five_keys: the session_meta JSON built in `translate`.\n- marker_opens_the_thread: marker() (rollout.rs:88) uses Session::head_hash taken before any write; the account carries session, head_hash and codex_version.\n- thread_id_is_record_uuid_of_head: record_uuid is reused unchanged.\n- ordinal_is_the_line_number: the ordinal comes from zip((0u64..)); type is session_meta for line 0 and response_item otherwise (rollout.rs:299).\n- line_stamps_are_the_entries_own: each Item carries entry.base.timestamp verbatim.\n- compaction_is_marked_text: marked() (rollout.rs:96) names keys beyond type, id, parentId, timestamp and summary.\n- entries_left_by_a_compaction_are_lost: Beside::left_off, called after the compaction's rows (rollout.rs:285).\n- branch_summary_and_custom_message_are_marked_text: marked() and custom_text() (rollout.rs:124), with the reason `image part 1 not carried: marked text holds text only`.\n- unparsed_stamp_is_refused_and_nothing_written: every stamp is parsed before any path or file work.\n- Grep: fresh_id, rand::, now(, SystemTime, Instant and std::env print nothing in rollout.rs.\n- Red first: not done in this round. See deviation.",
+        "deviation": "A session with no head is refused with the existing HomeError::BodyShape (api `translate-codex`), not a new variant. Red first is pending, as in R1.",
+        "checklist": [
+          {
+            "id": "C59",
+            "done": true,
+            "note": "The target-exists and stamp refusals fire before any write."
+          },
+          {
+            "id": "C63",
+            "done": true,
+            "note": "session_meta has exactly five keys, the thread id is record_uuid, and the marker names session, head hash and version with no template hash."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "The rollout is written in Codex's layout; the resume itself is R11, which is blocked."
+          },
+          {
+            "id": "S31",
+            "satisfied": true,
+            "note": "The thread opens on the marker that names the source session."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -211,7 +400,53 @@
       "stories": [
         "S28",
         "S29"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/beside.rs",
+            "change": "created",
+            "note": "Beside::read reads the session file once through SessionReader and indexes each off-path entry under its nearest root-to-head ancestor. find_sidechains marks `agent ` labels whose parent is on the context path and which name an entry off the path. carry writes the <SIDECHAIN …> developer message stamped with the label's stamp, with the label counted changed (before label, after marker line). member_lines applies R3's losses plus `<kind> part <i> not carried: marked text holds text only`. under() lists every other off-path entry as lost: unlabelled branch; off the context path for compaction, branch_summary and custom_message; not conversation otherwise. left_off names the compaction. forked_prompt reads the seed through seed_of, reopens the parent file once and lists non-text parts."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/beside_tests.rs",
+            "change": "created",
+            "note": "The seven named R5 tests on synthetic Claude Code files imported through cli::run; lantern and fork also run through cli::run."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/rollout.rs",
+            "change": "modified",
+            "note": "translate places each sidechain after its parent's items (beside.under, rollout.rs:287) and writes the forked child's prompt last (rollout.rs:289)."
+          }
+        ],
+        "how": "Row by row:\n- sidechain_is_carried_as_marked_text: carry (beside.rs:318), placed by under (beside.rs:287).\n- lys_entries_are_listed_lost: the lantern and the attachment event are on the context path, so both are lost with the not-conversation reason.\n- sidechain_descendants_and_unlabelled_branch_are_listed: the tool_completed event and the attachment under a1 are lost; the no-agent sidechain's two messages are unlabelled branch rows.\n- off_path_label_compaction_branch_summary_and_model_change_are_lost: four entries appended beside the head, each lost with its kind and reason.\n- forked_child_opens_on_the_point: forked_prompt (beside.rs:436).\n- sidechain_image_is_lost_with_its_reason: member_lines (beside.rs:344).\n- sidechain_under_a_compacted_entry_is_lost: left_off (beside.rs:271).\n- The only files read are the session file and, for a forked child, the parent file.\n- Red first: not done in this round. See deviation.",
+        "deviation": "Two fixture changes against the brief:\n- Closing main-chain record. The importer (unchangeable here) leaves the head on the file's last chain record. So each fixture whose sidechains would otherwise end the file closes with one more main-chain record naming the main chain's last message; without it the sidechain would sit on the context path.\n- Bridge after the summary. The importer gives a compaction a fresh id that no record can name. So in sidechain_under_a_compacted_entry_is_lost, the record after the `summary` is a `system` record with no parentUuid (which the importer hangs under the compaction), followed by the user record. The test module doc records both.\nRed first is pending, as in R1.",
+        "checklist": [
+          {
+            "id": "C62",
+            "done": true,
+            "note": "Every off-path descendant of the path is a row; the agent label is changed, not lost."
+          },
+          {
+            "id": "C69",
+            "done": true,
+            "note": "Sidechains are carried as marked text; branch summary and custom message are marked developer text (R4); lys entries are lost by id; the forked child's prompt is last and counted changed."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "The resume is R11, which is blocked."
+          },
+          {
+            "id": "S29",
+            "satisfied": true,
+            "note": "Subagent traffic is exactly what the account says was carried."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -240,7 +475,53 @@
       ],
       "stories": [
         "S31"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/harness/codex/leaf.rs",
+            "change": "created",
+            "note": "TranslationData has exactly the eight keys; append_leaf appends a lys.translation custom entry through Session::append_beside."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/leaf_tests.rs",
+            "change": "created",
+            "note": "The three named R6 tests."
+          },
+          {
+            "path": "crates/lys-home/src/record/entries.rs",
+            "change": "modified",
+            "note": "Adds CUSTOM_TRANSLATION = \"lys.translation\" beside the other lys custom types."
+          },
+          {
+            "path": "crates/lys-home/src/harness/codex/rollout.rs",
+            "change": "modified",
+            "note": "After the rollout and account are written and synced, translate appends the leaf (rollout.rs:344). The data holds a relative rollout path and the SHA-256 of both files' bytes; head_hash is taken before the append."
+          }
+        ],
+        "how": "- side_leaf_names_the_translation and leaf_data_holds_eight_keys: append_beside leaves the head and the earlier file bytes untouched.\n- second_translation_lists_the_first_leaf_lost: the first leaf is a custom entry off the path under the head, so R5's rule lists it lost.\n- If any earlier write fails, `?` stops before the append.\n- Red first: not done in this round. See deviation.",
+        "deviation": "Red first is pending, as in R1.",
+        "checklist": [
+          {
+            "id": "C64",
+            "done": true,
+            "note": "The leaf is written. That the Claude Code render is unchanged by hash is tested in R8."
+          },
+          {
+            "id": "C69",
+            "done": true,
+            "note": "The leaf itself is listed lost by a later translation."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S31",
+            "satisfied": true,
+            "note": "The durable link back to the session is the leaf plus the account."
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -274,7 +555,63 @@
       ],
       "stories": [
         "S28"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/cli_translate.rs",
+            "change": "created",
+            "note": "TranslateArgs takes --home, --session, --out, --codex-version (required) and --zone (`#[arg(long, env = \"TZ\")]`). run checks version and zone before opening the home, calls translate, and prints {command, report} with exactly rollout, account, entries, blocks, kept, changed and lost. Nothing of the content is printed and Codex is never run."
+          },
+          {
+            "path": "crates/lys-home/src/cli_translate_tests.rs",
+            "change": "created",
+            "note": "The four named R7 tests."
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "Gains only the TranslateCodex variant (full path, no new import) and its dispatch."
+          },
+          {
+            "path": "crates/lys-home/src/lib.rs",
+            "change": "modified",
+            "note": "Declares cli_translate and its #[cfg(test)] sibling test module."
+          },
+          {
+            "path": "Cargo.toml",
+            "change": "modified",
+            "note": "clap gains the `env` feature beside `derive`."
+          },
+          {
+            "path": "Cargo.lock",
+            "change": "modified",
+            "note": "No package change for clap's env feature."
+          }
+        ],
+        "how": "- report_carries_paths_and_counts: exact keys; kept + changed + lost equals the account's rows; no fixture sentinel appears in the report or the account, and every sentinel does appear in the rollout.\n- existing_rollout_is_refused_and_nothing_written: exact message; the files and hashes under --out and the session bytes are unchanged.\n- unmeasured_codex_version_is_refused: exact message; --out stays empty.\n- unknown_zone_is_refused_and_nothing_written: the message ends `set TZ to an IANA name`.\n- --help: clap derives it from TranslateArgs with all five flags.\n- The clap line holds both derive and env.\n- A refusal exits 1 with its message on stderr through the existing main.rs.\n- Red first: not done in this round. See deviation.",
+        "deviation": "The report's `blocks` counts the content parts of the entries on the context path (a string content counts as 1). Red first is pending, as in R1.",
+        "checklist": [
+          {
+            "id": "C58",
+            "done": true,
+            "note": "Subcommand, layout and report are implemented; the report holds no content."
+          },
+          {
+            "id": "C59",
+            "done": true,
+            "note": "Refusals exit 1 and write nothing."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "The resume is R11, which is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -305,7 +642,53 @@
       "stories": [
         "S28",
         "S29"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/tests/codex_translation.rs",
+            "change": "created",
+            "note": "The six R8 tests on synthetic Claude Code files imported through lys_home::cli::run and translated through translate. every_row_names_its_kinds_and_reason counts the seven lost-row terms itself, by walking the home's parent ids and the fixture's records, never the account. It asserts terms [7,3,1,5,7,2,2] and a total equal to the account's lost count, and cross-checks the a1 events and the unlabelled messages against the records."
+          }
+        ],
+        "how": "- text_and_tools_are_carried_whole: each text appears byte-equal once; the arguments parse back to the input; the output equals the result text.\n- tool_result_past_importer_clip_is_whole: a 10,000-character output comes back identical.\n- foreign_thinking_renders_as_text: no signature or redacted data in the rollout; one changed row thinking→output_text and one redacted lost row.\n- every_row_names_its_kinds_and_reason: every changed row has before, after and how; every lost row has kind and reason; the lost count matches the test's own sum.\n- second_translation_gives_equal_bytes: equal rollout SHA-256; the second account minus its one lys.translation row is byte-equal to the first.\n- claude_code_render_is_unchanged_by_hash: `lys-home render` before and after the translation gives equal SHA-256.\n- external_agent grep prints nothing.\n- The R10 tests (fixture_session_matches_recorded_rollout, proof_records_the_fixture_hash) are not added; they are R10's.",
+        "deviation": "The every_row fixture closes with one main-chain user record after the sidechains, for the same importer head rule as R5. Its `system` record doubles as the bridge the importer hangs under the compaction.",
+        "checklist": [
+          {
+            "id": "C60",
+            "done": true,
+            "note": "Tested end to end, including the 10,000-character result."
+          },
+          {
+            "id": "C61",
+            "done": true,
+            "note": "No signature, redacted data or reasoning item enters the rollout."
+          },
+          {
+            "id": "C64",
+            "done": true,
+            "note": "The render is unchanged by SHA-256."
+          },
+          {
+            "id": "C65",
+            "done": true,
+            "note": "Equal rollout bytes; the accounts differ by the one leaf row only."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "Carried whole is proven here; the resume is R11, which is blocked."
+          },
+          {
+            "id": "S29",
+            "satisfied": true,
+            "note": "Every row names its kinds and reason, and the lost count matches an independent count."
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -335,7 +718,58 @@
       ],
       "stories": [
         "S30"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/README.md",
+            "change": "modified",
+            "note": "One paragraph beginning `` `translate-codex --home <dir> --session <id> --out <dir> --codex-version <version> [--zone <iana name>]` ``, a lys.translation row in the custom-type table, and HOME-009 in the design list."
+          },
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "One `- `lys.translation`` item giving its eight data keys and invariants."
+          },
+          {
+            "path": "docs/design/home/DESIGN.md",
+            "change": "modified",
+            "note": "Regenerated by render-cluster.py; carries the amended non-goal. `Claude Code to Codex` now occurs 3 times."
+          },
+          {
+            "path": "docs/design/home/CHECKLIST.md",
+            "change": "modified",
+            "note": "Regenerated by render-cluster.py."
+          },
+          {
+            "path": "docs/design/home/USER-STORIES.md",
+            "change": "modified",
+            "note": "Regenerated by render-cluster.py."
+          },
+          {
+            "path": "docs/design/home/briefs/HOME-009.md",
+            "change": "created",
+            "note": "Rendered from HOME-009.json by render-cluster.py."
+          }
+        ],
+        "how": "- I ran `python3 scripts/design/render-cluster.py docs/design/home`. No rendered markdown was edited by hand, the other briefs rendered unchanged, and no other cluster was touched.\n- Greps: `^- `lys.translation`` in RECORD.md prints 1; `^`translate-codex --home ` in the README prints 1; `Claude Code to Codex` in DESIGN.md prints 3.\n- I did not run scripts/design/gate.sh (the workflow runs it). No design JSON was changed.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C68",
+            "done": true,
+            "note": "The cluster markdown is what its JSON renders to."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S30",
+            "satisfied": false,
+            "note": "The measurement half is R10 and R11, which are blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R10",
@@ -383,7 +817,27 @@
       ],
       "stories": [
         "S30"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked by the brief's own assignment. R10 is performed by the card's lead seat, Archie, on the proving machine, in a scratch Codex home logged into the proof account, after R1 to R9 land and the build is signed off. The chain's builder has no Codex login and must make no Codex request. Not produced here:\n- the start check and the recordings\n- tests/fixtures/codex/rollout-0.156.0.jsonl and claude_code.jsonl\n- PROOF-TRANSLATE.md ## Recording\n- the fixture_session_matches_recorded_rollout and proof_records_the_fixture_hash tests\nIf the recording shows a shape parts.rs or rollout.rs did not write, R10 corrects it there.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C66",
+            "done": false,
+            "note": "Awaits the lead seat's recording in a scratch Codex home."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S30",
+            "satisfied": false,
+            "note": "Awaits R10."
+          }
+        ]
+      }
     },
     {
       "id": "R11",
@@ -437,7 +891,37 @@
       "stories": [
         "S28",
         "S30"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked for the same reason as R10: it is the lead seat's resume, in fresh scratch Codex homes, after R10. Not produced here: claude_code_image.jsonl, the ## Resume section, and any detail-key or session_meta correction a failed resume would call for. Nothing here ran Codex or touched any Codex home.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C67",
+            "done": false,
+            "note": "Awaits the lead seat's resume run."
+          },
+          {
+            "id": "C70",
+            "done": false,
+            "note": "input_image with no detail key is implemented (R3); Codex 0.156.0 resuming a thread that holds one is unmeasured."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S28",
+            "satisfied": false,
+            "note": "Awaits the resume."
+          },
+          {
+            "id": "S30",
+            "satisfied": false,
+            "note": "Awaits the resume record."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

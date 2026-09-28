@@ -23,9 +23,9 @@ title: Launch a Claude Code session from its home through a kept template
 > - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
 > - C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
 > **Stories:**
-> - S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
-> - S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
-> - S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+> - S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+> - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+> - S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ## Purpose
 
@@ -77,7 +77,7 @@ Structure: docs/design/home/launch-template.schema.json is a JSON Schema (draft 
 - C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
 
 **Stories:**
-- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+- S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
 
 ### R2: Make the render's record uuid a function of the entry id, so a session renders byte-identically twice
 
@@ -97,7 +97,7 @@ WHEN render_claude_code maps an entry whose id is not uuid-shaped, THE SYSTEM SH
 - C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
 
 **Stories:**
-- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+- S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
 
 ### R3: Keep each template in the home as an object named by its SHA-256
 
@@ -117,7 +117,7 @@ Structure: a home keeps templates under `templates/` beside `sessions/` and `blo
 - C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
 
 **Stories:**
-- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ### R4: Append an entry beside the context path without moving the head, and name the session head by hash
 
@@ -139,7 +139,7 @@ WHEN Session::append_beside is given an entry body, THE SYSTEM SHALL append it w
 - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
 
 **Stories:**
-- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ### R5: Add template_render as the sixth lys.harness_event kind, carrying the written paths by a manifest block
 
@@ -160,7 +160,7 @@ Structure: a sixth event kind, KIND_TEMPLATE_RENDER = `template_render`, whose d
 - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
 
 **Stories:**
-- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ### R6: Write the environment file: the template's variables and each use-only secret as its handle
 
@@ -178,7 +178,7 @@ WHEN the environment file is written from a parsed template, THE SYSTEM SHALL wr
 - C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
 
 **Stories:**
-- S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
 ### R7: Add `lys-home render-launch`: write the launch files, print the report and the launch line, record the render
 
@@ -213,9 +213,9 @@ Add a subcommand `render-launch --home <dir> --session <id> --template <file> --
 - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
 
 **Stories:**
-- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
-- S10 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
-- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+- S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ### R8: Measure the launch on the installed Claude Code and write it down
 
@@ -239,7 +239,7 @@ WHEN the launch is proved, THE SYSTEM's proof SHALL import the recorded session 
 - C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
 
 **Stories:**
-- S9 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+- S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
 
 ### R9: Record the whole ruling in the tree and re-render the cluster's markdown
 
@@ -260,7 +260,7 @@ Structure: the entry for steps 4 and 5 in the identity cluster's statement docum
 - C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
 
 **Stories:**
-- S11 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
 
 ## Boundaries
 

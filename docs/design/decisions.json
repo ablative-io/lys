@@ -206,6 +206,20 @@
       "decision": "A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.",
       "quote": "",
       "consequences": [
+        "RECORD.md documents both entries with their data keys; a change to either is a new custom type alongside, never a mutation of the shipped one.",
+        "Appending lys.fork to a parent takes the parent's one-owner lock and rewrites no earlier byte (home P1).",
+        "The render skips both entries, as it skips every custom entry, so neither reaches a Claude Code file.",
+        "RECORD.md names lys.loss, its fields, its place and its span rule, and tells it apart from a render's .loss.json.",
+        "A session imported before the block rows existed is reported by the listing as unverified, never guessed at.",
+        "The span is walked by seeking through the index, never by reading the whole session file (CN7).",
+        "HOME-002 delivers it.",
+        "HOME-002 lands the proof with findings recorded one per line, each carded, and leaves the seven cards in review while any finding stands on their rows.",
+        "A card carrying a row with no code at the commit measured (HOME-001 R7, R10) stays in review marked not built until that row is built through the chain.",
+        "Every other row built before the chain needs its own proof card before its card can be done.",
+        "RECORD.md carries lys.given's data shape beside the other lys custom entries.",
+        "A later change to the shape is a new custom type or version alongside, never a mutation of lys.given, once anything is signed over it.",
+        "Settings, hook output, plugin skill and agent listings and output styles are recorded by later cards as further kinds on this same entry shape.",
+        "A check of a file against the record is by hash only, and prints neither file.",
         "RECORD.md's list of lys.harness_event kinds grows to six; the five existing kinds and the 512-byte data cap do not change.",
         "The session gains an append that does not move the head and a head hash: the SHA-256 of the head entry's line.",
         "Claude Code's transcript slot is filled by resuming the rendered file by path with --fork-session, so the rendered file is never written after the render.",
@@ -226,6 +240,12 @@
       "decision": "The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.",
       "quote": "",
       "consequences": [
+        "HOME-001's checklist row C3 says the compact_boundary pair is R3 corrected by measurement.",
+        "HOME-001's R4 text is amended to name the measured render shape, and its render fixture is updated.",
+        "Older compacted sessions without a preservedSegment import as compactions that keep nothing.",
+        "HOME-002 delivers it; a later Claude Code version that changes the shape needs its own measurement.",
+        "What the four rules report on lys code is a finding, recorded as its own line and carded; mod.rs files carrying logic are reported by a check, not by an author's eye.",
+        "The rule set is not yet a leg of .land/gates.sh; wiring it into the gate is its own unit.",
         "RECORD.md carries lys.given's data shape beside the other lys custom entries.",
         "A later change to the shape is a new custom type or version alongside, never a mutation of lys.given, once anything is signed over it.",
         "Settings, hook output, plugin skill and agent listings and output styles are recorded by later cards as further kinds on this same entry shape.",
@@ -245,6 +265,15 @@
       "decision": "A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).",
       "quote": "",
       "consequences": [
+        "Each target version is measured from files that version wrote before it is rendered for; an unmeasured version is refused by name.",
+        "Every translation writes a loss account whose block hashes key to the home's block store.",
+        "Every translated thread carries an in-band marker naming its source session and head hash.",
+        "The target harness's importer is never a dependency and its code is never copied.",
+        "Later pairs (Codex to Claude Code, Pi) are their own renderers under this rule, each proved on its own.",
+        "RECORD.md names the tracked set, the ref namespace and the home's own branch refs/heads/lys-home.",
+        "Ship and fetch check an index and a head without rebuilding either, so a source home is never written outside .git/ and a target refuses rather than repairs.",
+        "Stage 3's second block fetches this ref from another machine, and the off-machine refusal is lifted by the encryption-at-rest card, not before.",
+        "A later change to the tracked set is a decision alongside this one, since a fetched home depends on what was shipped.",
         "HOME-004 defines both custom types and documents their data fields in docs/design/home/RECORD.md.",
         "Lighting appends at the head, so the head moves onto the lantern; the stage 5b fork cuts at the lantern's point, never at the head.",
         "A lantern or epilogue is never a lantern's point; adding to a lantern is an epilogue.",
@@ -264,6 +293,10 @@
       "decision": "A lantern's note and its epilogues are the person's own annotations, not transcript. Recall prints them by design; they are the one exception to P7 and CN3, and only recall prints them. Transcript lines (message, tool and compaction content) still never appear in output, logs or errors, and a recall row never carries a line of the transcript around its point. Rejected: treating notes as transcript and printing only their hashes, which makes recall useless to the person who wrote them.",
       "quote": "",
       "consequences": [
+        "RECORD.md lists arrival among the lys.harness_event kinds with its four detail keys.",
+        "No importer maps a harness record to the arrival kind; only fetch writes it.",
+        "A render of a fetched home carries the same session head hash as a render of its source.",
+        "A remote that would push the arrival past the cap is refused at fetch before the target exists.",
         "P7 and CN3 of docs/design/home/design.json are amended with HOME-004 to state the exception.",
         "The lys-home README and RECORD.md say that lantern notes and epilogues are the one text the crate prints, and only recall prints them.",
         "Errors from lighting and epilogues still name no note, epilogue or transcript text: ids, paths and counts only."
@@ -327,49 +360,6 @@
       "superseded_by": ""
     },
     {
-      "id": "ADR-042",
-      "title": "A root is a repository URL and a pinned commit, resolved through the worker's own checkout and never fetched",
-      "status": "decided",
-      "scope": "roots",
-      "date": "2026-09-27",
-      "decided_by": "Archie, lead for lys, in the rulings on the roots card's rounds",
-      "context": "lys's docs/design/project.json names the estate's other projects by absolute directories on one machine, which no worker on another machine resolves, while the carded-row rule is that workflow inputs name a repository, a commit, a card and a brief, never a folder. The method's reader accepts only absolute directories today, so the shape and the reader must change in a stated order.",
-      "decision": "Each root in project.json is an object with repository, a remote URL, and commit, the full hash of the commit the design was checked against. A worker resolves it through DS2_CHECKOUTS/<last URL segment without .git>, which must hold the commit (git cat-file -e), and otherwise is refused by name with the checkout path, the repository, the commit and the act of fetching that commit into that checkout. The repositories map (project name to remote URL) is retired into root.repository, so a root's repository has one home, and the method's validator refuses a project.json that still carries it, by name, naming the move to root.repository. The pin moves by hand in a gated row. A check prints each root's pin beside origin's head and the distance between them, and exits 0 whatever the distance; a root whose checkout lacks its pin is reported as pin_absent with the act git -C <checkout> fetch origin, a root whose checkout has no refs/remotes/origin/HEAD is reported as origin_head_unset with the act git -C <checkout> remote set-head origin --auto, and either makes the check exit 1, only after it has reported every root. The resolver and the check import only the Python standard library and SDK-free modules of ds2_ledger, so lys's copies run under python3 from a fresh clone. Rejected: keeping absolute directories; a resolver that fetches or clones what is missing; following the moving head or moving pins automatically; a pin per design; a lys-local resolver; and unifying the roots map with the $NAME/ launch tokens in this card.",
-      "quote": "",
-      "consequences": [
-        "lys's project.json does not change shape until the method's reader accepts the object; ROOTS-001 R2 is blocked on that method commit and first refreshes lys's copies from it.",
-        "The resolver and the pin check are written in the method, on the design-system board, and lys receives them only as copies.",
-        "A survey reads the pinned commit, never the moving head, so a stale pin is visible and moving it is a gated, stated act.",
-        "The project.json files of aion, cambium, haematite and the design system follow on their own boards once the method accepts the shape.",
-        "A project.json that still carries a repositories map is refused by the method's validator until its entries move into root.repository.",
-        "The leg-entry reading project.py takes from venues moves into an SDK-free ds2_ledger module, legs.py, which lys copies beside project.py; the pin check's copy differs from the method's only in the line that finds workers/, which SOURCE.md names."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-039",
-      "title": "A certificate carrying one claim is revoked whole, by its issuing authority's key, permanently, by a leaf folded in lys-identity",
-      "status": "decided",
-      "scope": "directory",
-      "date": "2026-09-27",
-      "decided_by": "The lead for the identity line, in answer to the certificate revocation card's survey rounds; recorded with DIRECTORY-013",
-      "context": "DP26 (docs/design/lys-anchor/DECISIONS.md:400-425) rules that revocation is an append and the live set a fold, that the revocable unit is the claim unit, and that the freshness tolerance is a verification input with no default and N in the answer; it is recorded only in the lys-anchor decisions and was never built (docs/design/identity/STATEMENT-2026-09-22.md records it as ruled, not built). Building it for certificates left open what is revoked when a certificate can carry several claims, who may sign a revocation, whether a revocation can be undone, which history must still verify after one, what a revocation of a certificate the log does not yet hold means, where the code lands while lys-core calls revocation a consumer concern, whether it discharges DIRECTORY-006 R4, and whether the published no-log verification changes meaning. This entry records that build in the project ledger; DP26 stays where it is and is the proposal this entry records.",
-      "decision": "A certificate carries one capability claim, so the revocable unit and the claim unit are the same; revoking a claim is revoking its certificate and issuing a new one without it, and the fold never treats a certificate carrying several claims as partially revoked. Only the issuing authority's key signs a revocation leaf; a person responsible for the agent under ADR-003, or an administrator, revokes by asking the directory, which asks the authority to append, and the fold refuses a revocation signed by any other key. A revocation is permanent: no leaf reinstates a certificate, the fold refuses a reinstatement leaf by name, a verbatim replay of an earlier issuance leaf included, and the way back is a new certificate. A revocation always names a certificate the log already holds: the fold refuses a revocation leaf with no earlier issuance leaf for its certificate as revocation_before_issuance, and a later issuance of that certificate is valid. A revoked certificate's inclusion and consistency proofs and its issuance record always verify, and an attestation by its key verifies if and only if its own log entry precedes the revocation leaf, the log order being the evidence of time; an attestation with no entry before the revocation leaf fails, naming the revocation leaf; an attestation by a certificate that is not revoked needs no log entry of its own. The fold and the revocation-aware verification live in lys-identity; lys-core keeps revocation a consumer-side non-goal, and its published verify_certificate_chain and the lys ca verify command keep their meaning and keep passing with no log, while a new library form taking the log, the size N and the tolerance as explicit inputs checks revocation; its command line is a later, separate unpublished binary, and the published lys binary does not depend on lys-identity. Certificate revocation and grant revocation are separate folds: this stands beside DIRECTORY-006 R4 and does not discharge it, and C25 stays open with DP26 as the proposal its review reads. Rejected: revoking claims one by one inside a certificate, letting any key but the issuing authority's sign a revocation, a later leaf reinstating a certificate, letting every attestation made before a revocation stand whatever its log position, a revocation standing for a certificate the log does not hold, building the fold in lys-core, and changing what the published no-log verification means.",
-      "quote": "",
-      "consequences": [
-        "DIRECTORY-013 builds the fold, the append, the verification and the history calls in crates/lys-identity/src/revocation/ and its code rows block on DIRECTORY-003 having landed, checked by the crate existing on main.",
-        "The certificate-log leaf formats are a new wire format, signed only in tests until the repository's constructed-attack review of them is recorded.",
-        "The typed-claim card issues one claim per certificate; no format revokes part of a certificate.",
-        "lys ca verify's help and lys-identity's documentation say that verification without a log does not check revocation; lys-core's published rustdoc of verify_certificate_chain does not, and the act that answers that gap is a documentation-only lys-core release, its own card.",
-        "The revocation request path, through which a person responsible under ADR-003 or an administrator asks the directory server and the issuing authority signs and appends, is a later unit blocked on DIRECTORY-006 R4 and on the directory server; until it lands the only way to revoke is a caller that holds the issuing authority identity.",
-        "A command line that revokes or verifies against a log is a later unit, a separate unpublished binary.",
-        "The directory design's step-2 non-goal and CN11 each gain one appended line naming DIRECTORY-013's revocation fold and history check as step-2 work brought forward; the rest of each stands as written."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
       "id": "ADR-019",
       "title": "The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001)",
       "status": "decided",
@@ -381,10 +371,27 @@
       "quote": "",
       "consequences": [
         "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
+        "The entry stays proposed until Tom gives his word, and then moves to decided with decided_by set to exactly ADR-001's decided_by value, `Tom`, and his word cited in its context; each code row's Blocked by check tests that equality.",
+        "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets, and every code row carries Tom's word on this entry in its own Blocked by; if he keeps the broker inside the door, those rows' file lists are re-briefed as an amendment before any is dispatched.",
+        "CN4 of the secrets design is answered by this entry once it is decided; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
+        "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker.",
+        "Both payloads are reviewed adversarially with the envelope before any durable byte is signed under them, and are frozen from their first signature; a change is a new version alongside.",
+        "The card waits for DIRECTORY-003 R2 and for lys-log-store 0.3.0.",
+        "lys open stays the verifier and writes nothing.",
+        "Entries of other kinds (lys.given, lanterns, forks, messages) are not signed by this.",
+        "lys-proxy keeps R10's own behaviour and records partial or unrecorded as its spec says.",
+        "A test on forward.rs asserts the error kind on a refused connection and that no response bytes are invented; a test on the example asserts the 502.",
+        "If the rule is ever wanted for lys-proxy too, it is a change to R10's contract, stated there, not a change made under the example.",
         "The entry is decided by the owning lead as a technical decision, not by ADR-001's decider, because only the broker's placement moves and the handle model Tom decided in ADR-001 is unchanged; each code row's Blocked by check tests that the entry is decided.",
         "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets.",
         "CN4 of the secrets design is answered by this entry; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
-        "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker."
+        "The directory refuses linking a person's provider account to an agent and delegating a sign-in identity, each by name and writing nothing (DIRECTORY-009).",
+        "An agent's own machine account, bound to no person, stays allowed as its issuer-subject binding (conformance row 1.3).",
+        "The broker refuses to issue an agent any credential derived from a person's sign-in session; this is carried by the broker's card against SECRETS-002, and row 1.2 is met in full only when it passes.",
+        "Every earlier lys gitlink stays reachable through its pre-rebase tag; a pre-rebase tag is never moved or deleted.",
+        "ablative is never left on a head whose build and full suite have not passed.",
+        "Every push of ablative names its lease, so a fork commit pushed while a rebase runs fails the lease instead of being dropped.",
+        "A fork migration takes a number after upstream's highest at the commit it is rebased onto; a collision is a stop, never a fix-up."
       ],
       "supersedes": [],
       "superseded_by": ""
@@ -404,46 +411,9 @@
         "v1's lack of not_after is recorded as a fact; the lys-identity grant's window is the limit a lease is checked against.",
         "These criteria wait on the grant's window, defined by DIRECTORY-006 R1 and enforced at admission by DIRECTORY-006 R4: SECRETS-002 R9 acceptance criteria 5, 8 (SEC_LEASE_ATTENUATION) and 10 (SEC_PROVISIONAL_EXPIRY), SECRETS-002 R7 acceptance criterion 8 (SEC_REINSTATE_CURRENT's expired handle), and SECRETS-003 R3's lease-window refusal leg.",
         "A window carried in a signed delegation stays open, as SECRETS-002 records it, and would be a new version alongside v1.",
-        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-046",
-      "title": "A lantern records the session it was lit in as an optional typed lit_in; a lantern without it is an older record resolved by its holders",
-      "status": "decided",
-      "scope": "home",
-      "date": "2026-09-27",
-      "decided_by": "The lit_in card's request and the lead's answers to its survey; recorded with HOME-014",
-      "context": "ADR-014 fixed what a lantern carries (its point, the note, who lit it and when) and not the session it was lit in, and ADR-017's fork has to know that session, since a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. The light act recorded no lit_in, LanternData refused the key as unknown, and the fork read it from the entry's raw data as a stopgap, with fixtures writing a lit_in lantern by hand. Lanterns lit before this change carry no lit_in, some carry no lit_at either, and none can be rewritten to carry it (P1).",
-      "decision": "LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys; a present null and a present non-string value are kept distinct from an absent key. The light act writes it as the id of the session at whose head it appends the lantern and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the fork's lit_in_not_a_session refusal with the fork's reason text, skipped by note and refused by point, never a row and never entry_shape. The fork reads lit_in through a narrower typed view carrying point, lit_by and the optional lit_in, which requires neither lit_at nor note: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); the fork reading the full LanternData (the older records without lit_at would stop being forkable); and rewriting earlier lanterns to carry it (P1).",
-      "quote": "",
-      "consequences": [
-        "HOME-014 adds the field to LanternData, the light act, its report and recall's rows, switches the fork to the typed view, and documents lit_in in docs/design/home/RECORD.md.",
-        "ADR-014's lantern shape is extended by one optional key, not replaced: a lantern lit before HOME-014 is read as it is and stays forkable.",
-        "ADR-017's older-record rule stays in force for a lantern with no lit_in; retiring it is a separate decision.",
-        "The fork's fixtures light with the light act every lantern it can produce, and write by hand only the records it cannot: a lantern with no lit_in, a copy whose lit_in names another session, and a malformed lit_in, each named in its test as such.",
-        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-021",
-      "title": "The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap",
-      "status": "decided",
-      "scope": "directory",
-      "date": "2026-09-26",
-      "decided_by": "The lead's rulings on the DIRECTORY-002 themes; recorded with DIRECTORY-002",
-      "context": "DIRECTORY-002 R3 asked for all seven HSL fields, button text and border radius of both Rauthy client themes in light and dark mode, but the estate colour tokens name only a dark foundation (ink, surface, raised, text, muted) and each product's accent. They name no light mode, no error colour, no radius, no emphasised text tier, no action colour, no text-on-accent and no per-mode icon, so filling every Rauthy field would mean inventing colours the design system never chose.",
-      "decision": "Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.",
-      "quote": "",
-      "consequences": [
-        "deploy/identity/rauthy-themes.json sets only the dark text, bg, bg_high and accent of each client; the light fields, the dark error and the radius stay as Rauthy holds them.",
-        "deploy/identity/theme-map.md names the eight gaps, and nothing reads a gap.",
-        "A design-system card that names tokens for the gaps fills them; until then each keeps Rauthy's own default.",
-        "Readable contrast is measured, not asserted: WCAG 2.1 AA over named pairs, a gap field measured at Rauthy's own default; a gap field whose default fails over ink stays a gap and stops the row by the pair's name, and the fix is a token the design-system card names."
+        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review.",
+        "The home design's first non-goal names anchoring and every other entry kind, not signing as such.",
+        "lys.given stays unsigned (ADR-013)."
       ],
       "supersedes": [],
       "superseded_by": ""
@@ -486,6 +456,417 @@
       "superseded_by": ""
     },
     {
+      "id": "ADR-024",
+      "title": "Audit receipts are for changes only; answered permission checks go to step 2's separate access record",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W1); recorded with DIRECTORY-007",
+      "context": "The audit receipt card asked whether a permission check that is merely answered, not changed, leaves a receipt. Every signed receipt is a leaf in the lys log in operation order (docs/design/identity/briefs/IDENTITY-001.md:49); a check is answered many times a minute once step 2 enforces anything, so putting answered checks into the signed receipt log would make it a high-volume access log that drowns the changes it exists to prove.",
+      "decision": "Receipts are for changes only. A check that is answered and changes nothing is not a receipt. When step 2 brings enforcement, allows and refusals go into a separate access record that step 2 defines: refusals are always recorded there, and whether allows are too is decided with step 2. Rejected: every answered check as a signed receipt in the lys log, and deferring the question to the build.",
+      "quote": "Receipts are for changes only. A check that is answered and changes nothing is not a receipt.",
+      "consequences": [
+        "DIRECTORY-007 writes this as a boundary and as constraint CN15 of the directory design, so nobody later puts high-volume checks into the signed receipt log.",
+        "Step 2's access record is a non-goal of DIRECTORY-007; the brief that brings enforcement defines it and decides whether allows are recorded.",
+        "In step 1 nothing answers a permission check (CN11), so the only receipts are the listed changes and the directory service's sign-ins and sign-in refusals."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-025",
+      "title": "The receipt verifier lives in the lys CLI, offline, needing only the log and the service's public key",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W2); recorded with DIRECTORY-007",
+      "context": "The audit receipt card asked where the verifier lives: the lys CLI or the directory service. A verifier is what a party holding only the log and the key uses to check the directory's history without the operator's cooperation (story S7, DIRECTORY-003 R2's read-only verification path).",
+      "decision": "The verifier lives in the lys CLI, as lys log verify receipt, offline, needing only the log directory and the service's public key. Changing the published lys binary for this is accepted; the release that carries it is a separate, deliberate act after docs/design/identity/IDENTITY-EVENTS.md's envelope version is ratified and recorded, never before, because publishing a crate that exposes a format freezes it (CLAUDE.md:78-80). Rejected: a verifier inside the directory service, which would be checking the service with the service and defeats the point of an independent audit.",
+      "quote": "A verifier that needs the running directory service would be checking the service with the service, which defeats the point of an independent audit.",
+      "consequences": [
+        "DIRECTORY-007 R3 adds the subcommand under the published discipline of lys log verify: one refusal class for every cryptographic or structural failure, pre-crypto refusals named on their own.",
+        "The verifier's row lands on main behind a check that the ratified envelope version is on main; landing on main publishes nothing.",
+        "The receipt's signed encoding stays with IDENTITY-EVENTS.md under DIRECTORY-003's joint review; the verifier is written against that document's version field and freezes no wire format."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-026",
+      "title": "A development install emits test receipts under a test key and a test tag, and a real key never verifies one",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, the lead, at 22:56 on 26 September 2026 (W3); recorded with DIRECTORY-007",
+      "context": "Emitting any receipt outside a test is one of the three acts reserved for Tom (docs/design/lys-anchor/DECISIONS.md:333-335). A development install signs outside a cargo test harness, so its receipts had to be read either as that reserved act or as test receipts; read as the act, the whole path could never be proved end to end before Tom's release.",
+      "decision": "A development install emits test receipts, signed with a test key and carrying a test tag, inside IDENTITY-001's development isolation, and never performs the reserved act. The verifier refuses a test-tagged receipt by name unless it is given the test key explicitly, and a real key never verifies a test receipt, so a test receipt never passes as real. Harness tests stay as well. Rejected: a development install that emits no receipts, and reading its receipts as the reserved act.",
+      "quote": "A development install emits test receipts, signed with a test key and carrying a test tag, inside IDENTITY-001's development isolation, and never performs the act DECISIONS.md:335 reserves for Tom.",
+      "consequences": [
+        "The test tag is the one field added to IDENTITY-001's receipt contract, under this ruling; IDENTITY-EVENTS.md carries it in the envelope.",
+        "lys log verify receipt takes --test-key beside --verifier-key: a test-tagged receipt is verified only against the test key and refused pre-crypto without it, saying to supply the test key; an untagged receipt is verified only against the verifier key.",
+        "DIRECTORY-007 R5 proves the whole path on the development install with test receipts and records the three outcomes: verified as a test receipt, refused for want of the test key, refused under another key."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-021",
+      "title": "The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead's rulings on the DIRECTORY-002 themes; recorded with DIRECTORY-002",
+      "context": "DIRECTORY-002 R3 asked for all seven HSL fields, button text and border radius of both Rauthy client themes in light and dark mode, but the estate colour tokens name only a dark foundation (ink, surface, raised, text, muted) and each product's accent. They name no light mode, no error colour, no radius, no emphasised text tier, no action colour, no text-on-accent and no per-mode icon, so filling every Rauthy field would mean inventing colours the design system never chose.",
+      "decision": "Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.",
+      "quote": "",
+      "consequences": [
+        "deploy/identity/rauthy-themes.json sets only the dark text, bg, bg_high and accent of each client; the light fields, the dark error and the radius stay as Rauthy holds them.",
+        "deploy/identity/theme-map.md names the eight gaps, and nothing reads a gap.",
+        "A design-system card that names tokens for the gaps fills them; until then each keeps Rauthy's own default.",
+        "Readable contrast is measured, not asserted: WCAG 2.1 AA over named pairs, a gap field measured at Rauthy's own default; a gap field whose default fails over ink stays a gap and stops the row by the pair's name, and the fix is a token the design-system card names."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-027",
+      "title": "An identity's lifecycle state is folded from its signed transition records and never set directly",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lifecycle card's words, requested by tom; recorded with DIRECTORY-009",
+      "context": "ADR-011 makes register, activate, suspend, reinstate and retire the only transitions, each one signed audit record, and DIRECTORY-003 R5 records the state beside each identity with its projection equal to replay. Nothing on main said whether the state is a value an API, a migration or a repair may write, which would leave two sources of truth: the stored state and the records that should explain it (principle P4 forbids a change followed by a best-effort log).",
+      "decision": "The state at any moment is the fold of the identity's transition records in log order, from registered. No API, migration or repair sets a state; a transition validates against the folded state and the cause rule, appends its record through the directory's event path, and the state is read again by folding. A read answers the fold or refuses by name at the coordinate of a record the transition table refuses, and never answers a state past it, repairs the log or skips the record. Rejected: a stored state column set at transition and audited after it; a repair path that writes a state; and treating provisioned as a fifth state rather than a view over the facts beside the state.",
+      "quote": "the state at any moment is folded from the log and never set directly",
+      "consequences": [
+        "DIRECTORY-009 R3 builds the fold with a state type of exactly four values, and the state field DIRECTORY-003 R5's projection keeps is filled from the fold and from nothing else.",
+        "Retirement closes the identity and never its record: a retired identity's state, transitions and the record that put it there are read exactly as a live one's, and no row deletes or hides a record (L2, CN21).",
+        "A record the table refuses is a refusal named at its coordinate, answered by verifying the leaf against its receipt and reading the log by hand; the log is never repaired.",
+        "Every check that reads state reads the fold, so a suspended or retired identity fails by state alone whatever grants it holds."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-028",
+      "title": "A suspension takes effect at the next check, a session refresh is a check, and no Rauthy session is revoked at once",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answer L1 to the lifecycle card, from the lifecycle document on main; recorded with DIRECTORY-009",
+      "context": "The lifecycle card asked whether a Rauthy session that outlives a suspension is revoked at once or at its next refresh. The lifecycle document says suspend and revoke both take effect at the next check and neither promises to roll back an action already admitted, and that a suspended identity's running executions stop at their next admission (docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:51-53 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:23); the directory design keeps open whether suspending a person also ends their sign-in session at Rauthy (its non-goals).",
+      "decision": "A suspension or retirement takes effect at the next check and not before. The directory's resolution of a Rauthy-authenticated session at sign-in and at refresh is a check, so a session that outlives a suspension is refused at its next refresh and at every access check before that, by state, whatever grants it holds. Nothing in DIRECTORY-009 calls Rauthy to revoke, end or invalidate a session, keeps a list of sessions to end, or rolls back an admitted action. An at-once revocation of the Rauthy session would be a later revision of the suspend transition, and whether suspending also ends the sign-in session at Rauthy stays open as the design records it. Rejected: revoking the session at Rauthy at once within this brief, and treating a refresh as something other than a check.",
+      "quote": "A refresh is a check, so a Rauthy session that outlives the suspension is refused at its next refresh and at every access check before that, by state, whatever grants it holds",
+      "consequences": [
+        "DIRECTORY-009 R4 answers the access check state first and R5 refuses a suspended or retired identity at sign-in and at refresh by name, with the grant answerer called zero times.",
+        "The directory design gains constraint CN20 and a non-goal for the at-once revocation, so the later revision is a deliberate act and not a drift.",
+        "DIRECTORY-007 R4's step-1 leg that a suspended identity's sign-in is not refused on state is superseded when DIRECTORY-009 R5 lands, and the brief that lands second reconciles it under CN9.",
+        "An action admitted before a suspension stands; the record of the suspension is the only thing appended."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-029",
+      "title": "What a compaction could not keep is a lys.loss custom entry of ids, counts and SHA-256s",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "",
+      "context": "A Claude Code compaction replaces the model's context with a summary while the originals stay in the file. The home imports the compaction as Pi's compaction entry, which says where the kept range begins but never what fell outside it, so nothing in a home says what a compaction could not keep and nothing proves on a compacted session that the original is still there. Pi's grammar is adopted unchanged (P2), so any account has to be a lys custom entry, and a durable entry shape in the home is decided before homes carry it, as lys.given's was (ADR-013).",
+      "decision": "Each compaction the importer writes is followed directly by one lys.loss custom entry, a side leaf whose parent is the compaction entry, whose data names the compaction by entry id, the first and last entry id of the span it summarised (the root-to-first-kept path entries, from the root or the previous compaction to the entry before the first kept one), the counts of that span's entries, messages, tool calls, tool results and blocks, its line bytes and block bytes counted separately, the counts of side-leaf and sidechain entries hanging from it by number only, the tokensBefore the harness reported (null when it reported none), a logicalParentUuid that names no record as unresolved, the SHA-256 of the span's first source line, of its last and of its lines concatenated in file order, the hash of the summary record's block and the span's distinct block hashes. Its keys are: compaction_id, first_kept (null when nothing is kept), span_first, span_last, entries, messages, tool_calls, tool_results, blocks, line_bytes, block_bytes, side_leaf_entries, sidechain_entries, tokens_before, unresolved_logical_parent, first_line_sha256, last_line_sha256, span_sha256, summary_record, block_hashes. Rejected: adding fields to Pi's compaction entry (it breaks CN4 and P2); hashing or listing side leaves and sidechain entries by id (their ids are drawn fresh on every import, so two imports of one file would disagree); and carrying any content, the summary included (P7).",
+      "quote": "",
+      "consequences": [
+        "HOME-010 adds the field to LanternData, the light act, its report and recall's rows, switches the fork to the typed field, and documents lit_in in docs/design/home/RECORD.md.",
+        "ADR-014's lantern shape is extended by one optional key, not replaced: a lantern lit before HOME-010 is read as it is and stays forkable.",
+        "ADR-017's older-record rule stays in force for a lantern with no lit_in; retiring it is a separate decision.",
+        "The fork's fixtures light with the light act every lantern it can produce, and write by hand only the records it cannot: a lantern with no lit_in, a copy whose lit_in names another session, and a malformed lit_in.",
+        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside.",
+        "RECORD.md states the rule, the exemption, the link-position rule and the unresolved marker.",
+        "Existing records are not rewritten; they compare by canonicalisation at check time.",
+        "A canonicalisation failure other than a path not existing is refused by path and operation.",
+        "The chain and the slug may see different forms of one working directory until the slug rule's own requirement settles it.",
+        "The loss entry is off the chain: context_path finds the compaction on the path unchanged and the render never writes the loss entry.",
+        "Two imports of one Claude Code file give loss entries equal byte for byte once the entry id, parentId, timestamp and data.compaction_id are masked.",
+        "The listing reads a span through the index and checks each named block by hash; a compaction with no loss entry, or pointing at itself, is reported unaccounted by entry id and never rewritten.",
+        "The shape is versioned by its custom type: a change is a new custom type alongside, never a mutation of lys.loss."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-030",
+      "title": "A Claude Code compaction imports as one Pi compaction at the summary record's place, keeping what Claude Code kept, and renders as the compact_boundary pair",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The home card lead's answers to the compaction survey; recorded with HOME-008",
+      "context": "The importer handled only a legacy summary record, pointing the compaction at itself with tokensBefore 0; it read neither compact_boundary nor isCompactSummary, so a current compaction imported as a system harness event and a plain user message, and the render wrote a legacy summary line that the current Claude Code does not write. Measured on the survey's sample of 28 boundaries, anchorUuid named the summary record itself in 28 and all 94 preserved uuids sat before the boundary, so bounding the kept range by anchorUuid would count what Claude Code kept as lost and drop recent turns from the context path.",
+      "decision": "A compact_boundary record imports as today, a lys.harness_event on the chain; the isCompactSummary record under it becomes one Pi compaction entry that takes that record's uuid, sits where the record sat as the child of the boundary's entry, carries the record's text as its summary and tokensBefore from compactMetadata.preTokens, and keeps the record only as a block; it is not a message entry. Its first kept entry is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, otherwise the first record whose parent is the summary record, and when there is none nothing is kept and firstKeptEntryId is the empty string, which keeps Pi's string type and is the only value that names no entry, so a compaction never names itself; anchorUuid is not used. A compact_boundary with no isCompactSummary record under it is not a compaction the harness completed: it stays a lys.harness_event, no summary is invented, and the listing reports it as a boundary without a summary. A legacy summary record keeps the entry its leafUuid names. A first kept entry not on record is refused by uuid. A logicalParentUuid naming no record is not refused. The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record holding the summary, then the kept entries, never the legacy summary line and never a custom entry. Rejected: bounding the kept range by anchorUuid; keeping the summary record as a message entry beside the compaction (the summary would be read twice); placing the compaction off the chain or re-parenting the next message (HOME-001 R3's parent-equals-source acceptance stands with no exception); and rendering the legacy summary line, which the current Claude Code does not write.",
+      "quote": "",
+      "consequences": [
+        "resolve_given lists appended_instructions and mcp_config ahead of user_claude_md, and the lys.given data shape of ADR-013 is unchanged.",
+        "RECORD.md states the one rule and names the old order as superseded by the commit that lands HOME-011 and its date; a reader tells an entry's order by comparing its recorded time with that date, and never by its harness_version.",
+        "A later harness card records its documents in the order its harness's request gives, and a harness-side input the request carries no trace of takes its place from the read order until it is measured.",
+        "A card that measures a real MCP server's tools position fixes mcp_config's place by that measurement.",
+        "HOME-001 R3's self-pointing summary mapping is replaced; the round-trip test that every message entry's parent equals its source parentUuid stands unchanged.",
+        "A home imported before this mapping is reported unaccounted by the listing; the act it names is re-importing the source file into a new home.",
+        "The rendered compact_boundary record's uuid is derived under render-uuid/v2, a new version alongside ADR-016's v1 that carries v1's derivation of the role record byte for byte and adds the role compact_boundary; v1's closed role list is not amended, a render with no compaction stays v1, and the render report names the version used.",
+        "The resume of the rendered pair is a per-version measurement (P6), recorded in PROOF-COMPACTION.md on Claude Code 2.1.283.",
+        "A boundary with no summary under it is counted by the listing by entry id, never turned into a compaction."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-031",
+      "title": "The context record's cross-kind order is the order the harness's request gives",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's ruling on the lys.given order card; recorded with HOME-011",
+      "context": "HOME-003 R2 fixed lys.given's documents in the order Claude Code reads the files: the user CLAUDE.md, the appended instructions, the MCP configuration, the CLAUDE.md chain, the memory index. PROOF-GIVEN then measured on Claude Code 2.1.283 that the request the harness sends differs in one place: the appended instructions sit in the system array, ahead of the first user message that carries every CLAUDE.md-family file and the memory index. The record held two orders, one in code and one in the proof, with no rule saying which the record follows, and the MCP configuration contributed no tool to the measured request, so its place there was unmeasured.",
+      "decision": "The context record's documents follow the order the harness's request gives wherever it and the read order differ: appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position. The within-directory order (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) is unchanged. Entries already written under the old order stand as written and no data member is added to mark the order; the documents name the old order as superseded by the commit that lands HOME-011 and by that commit's date. Rejected: keeping the read order, since the request is what reached the model; rewriting or migrating entries already written, since the record is append-only; adding a data member or relying on harness_version to mark the order, since the old order was written under 2.1.283, the new one is written under the version the re-measurement ran on, which may be the same, and the harness version does not tell the two orders apart.",
+      "quote": "",
+      "consequences": [
+        "Supersedes HOME-003 R2's rule that the template's CLAUDE_CONFIG_DIR names the config directory, on a no answer, for the Claude Code version measured.",
+        "The decision is accepted with the measured answer and the Claude Code version it was measured on; a yes answer leaves lys.given as the record and lys.given.v2 unwritten.",
+        "The config-directory rule is re-measured on each Claude Code upgrade, as a resume path is (home P6).",
+        "A session, canon or fork child holding an entry the render cannot shape no longer renders; the refusal names the entry to repair and nothing is written.",
+        "Sessions the importer wrote with a redacted_thinking part that carried no data hold thinkingSignature null and now refuse to render; the importer's own defaults are the other half of the defect and belong to the importer card, not to the render.",
+        "A session holding an aborted turn does not render until the Claude Code format has a value for it.",
+        "The bytes rendered from a session that carries every field do not change, so every pinned render hash stands.",
+        "The judgement is measured on a checkout of the named commit and recorded against its sha, apart from the landing's own gate and its sha.",
+        "Each finding is its own line; one answered on main names the fixing commit and gets no card, one still true becomes its own card.",
+        "A row whose files are not on main at the named commit is not judged and its card is not set done.",
+        "resolve_given lists appended_instructions and mcp_config ahead of user_claude_md, and the lys.given data shape of ADR-013 is unchanged.",
+        "RECORD.md states the one rule and names the old order as superseded by the commit that lands HOME-011 and its date; a reader tells an entry's order by comparing its recorded time with that date, and never by its harness_version.",
+        "A later harness card records its documents in the order its harness's request gives, and a harness-side input the request carries no trace of takes its place from the read order until it is measured.",
+        "A card that measures a real MCP server's tools position fixes mcp_config's place by that measurement."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-038",
+      "title": "The gate's test leg runs every test binary; it never stops at the first failure",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "The gate test-leg card's words and its lead's answers; recorded with LYSGATE-001",
+      "context": "The gate's test leg runs cargo test over the workspace with all features and without --no-fail-fast, so it stops at the first failing test binary: a run that fails in one crate reports nothing about the binaries and crates after it, and a gate can go red for one reason while hiding others. project.json's legs are copied verbatim into every new cluster's gate, so the fail-fast form spreads with each cluster.",
+      "decision": "Every declaration of the gate's test leg runs `cargo test --workspace --all-features --no-fail-fast`: project.json, every cluster design.json gate, .land/gates.sh and CLAUDE.md's 'Gates before any commit' block; CI's test step gains the same one flag and nothing else. Rejected: keeping cargo's default fail-fast run, which is shorter on a red round but reports only the first failing binary.",
+      "quote": "",
+      "consequences": [
+        "A new cluster's gate copied from project.json carries --no-fail-fast.",
+        "A red test leg runs every test binary before it exits, so a red round holds the build venue's battery lock longer than a fail-fast run did.",
+        "The leg still exits non-zero when any test fails; no timeout is raised and no test is split to compensate.",
+        "--no-fail-fast does not continue past a compile error, so evidence that every binary ran comes from a planted test that compiles and fails."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-040",
+      "title": "An admission policy judges at an instant its caller names; the live path names the present",
+      "status": "decided",
+      "scope": "lys-anchor",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lys lead's answer on admit_at's parameters; recorded with LYSANCHOR-001",
+      "context": "RecognisedCertificate could judge a certificate only at the present, because its admit called lys-core's verify_certificate_chain, which reads the clock itself. Its expiry test therefore slept 2.1 seconds, a wait the suite paid on every run and one whose outcome depends on a host's load. lys-core already exports verify_certificate_chain_at, frozen at 0.2.0, which takes the instant to judge against.",
+      "decision": "RecognisedCertificate gains an inherent admit_at taking the submission, the SubmitterContext and the instant, built on verify_certificate_chain_at; AdmissionPolicy::admit keeps its signature and calls admit_at with the present, so a live request is judged exactly as before, and tests state the instants they judge at. Rejected: keeping the sleep; raising a timeout or splitting the test; injecting a clock into the policy instead of passing an instant; changing the AdmissionPolicy trait; and an admit_at taking only the asserted credential bytes, which would have to collapse the context's provenance before the call and could not represent the unidentified or transport-authenticated arms.",
+      "quote": "The rule to meet: an admission policy judges at an instant its caller names.",
+      "consequences": [
+        "The AdmissionPolicy trait, NotAdmitted and anchor/append.rs are unchanged; DP9 and DP23 in docs/design/lys-anchor/DECISIONS.md stand.",
+        "A test of the certificate gate's validity window states its instants and never sleeps.",
+        "lys-anchor depends on chrono through the workspace's existing entry.",
+        "verify_certificate_chain_at is used as lys-core 0.2.0 publishes it; lys-core is not changed."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-039",
+      "title": "A certificate carrying one claim is revoked whole, by its issuing authority's key, permanently, by a leaf folded in lys-identity",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, in answer to the certificate revocation card's survey rounds; recorded with DIRECTORY-013",
+      "context": "DP26 (docs/design/lys-anchor/DECISIONS.md:400-425) rules that revocation is an append and the live set a fold, that the revocable unit is the claim unit, and that the freshness tolerance is a verification input with no default and N in the answer; it is recorded only in the lys-anchor decisions and was never built (docs/design/identity/STATEMENT-2026-09-22.md records it as ruled, not built). Building it for certificates left open what is revoked when a certificate can carry several claims, who may sign a revocation, whether a revocation can be undone, which history must still verify after one, what a revocation of a certificate the log does not yet hold means, where the code lands while lys-core calls revocation a consumer concern, whether it discharges DIRECTORY-006 R4, and whether the published no-log verification changes meaning. This entry records that build in the project ledger; DP26 stays where it is and is the proposal this entry records.",
+      "decision": "A certificate carries one capability claim, so the revocable unit and the claim unit are the same; revoking a claim is revoking its certificate and issuing a new one without it, and the fold never treats a certificate carrying several claims as partially revoked. Only the issuing authority's key signs a revocation leaf; a person responsible for the agent under ADR-003, or an administrator, revokes by asking the directory, which asks the authority to append, and the fold refuses a revocation signed by any other key. A revocation is permanent: no leaf reinstates a certificate, the fold refuses a reinstatement leaf by name, a verbatim replay of an earlier issuance leaf included, and the way back is a new certificate. A revocation always names a certificate the log already holds: the fold refuses a revocation leaf with no earlier issuance leaf for its certificate as revocation_before_issuance, and a later issuance of that certificate is valid. A revoked certificate's inclusion and consistency proofs and its issuance record always verify, and an attestation by its key verifies if and only if its own log entry precedes the revocation leaf, the log order being the evidence of time; an attestation with no entry before the revocation leaf fails, naming the revocation leaf; an attestation by a certificate that is not revoked needs no log entry of its own. The fold and the revocation-aware verification live in lys-identity; lys-core keeps revocation a consumer-side non-goal, and its published verify_certificate_chain and the lys ca verify command keep their meaning and keep passing with no log, while a new library form taking the log, the size N and the tolerance as explicit inputs checks revocation; its command line is a later, separate unpublished binary, and the published lys binary does not depend on lys-identity. Certificate revocation and grant revocation are separate folds: this stands beside DIRECTORY-006 R4 and does not discharge it, and C25 stays open with DP26 as the proposal its review reads. Rejected: revoking claims one by one inside a certificate, letting any key but the issuing authority's sign a revocation, a later leaf reinstating a certificate, letting every attestation made before a revocation stand whatever its log position, a revocation standing for a certificate the log does not hold, building the fold in lys-core, and changing what the published no-log verification means.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-013 builds the fold, the append, the verification and the history calls in crates/lys-identity/src/revocation/ and its code rows block on DIRECTORY-003 having landed, checked by the crate existing on main.",
+        "The certificate-log leaf formats are a new wire format, signed only in tests until the repository's constructed-attack review of them is recorded.",
+        "The typed-claim card issues one claim per certificate; no format revokes part of a certificate.",
+        "lys ca verify's help and lys-identity's documentation say that verification without a log does not check revocation; lys-core's published rustdoc of verify_certificate_chain does not, and the act that answers that gap is a documentation-only lys-core release, its own card.",
+        "The revocation request path, through which a person responsible under ADR-003 or an administrator asks the directory server and the issuing authority signs and appends, is a later unit blocked on DIRECTORY-006 R4 and on the directory server; until it lands the only way to revoke is a caller that holds the issuing authority identity.",
+        "A command line that revokes or verifies against a log is a later unit, a separate unpublished binary.",
+        "The directory design's step-2 non-goal and CN11 each gain one appended line naming DIRECTORY-013's revocation fold and history check as step-2 work brought forward; the rest of each stands as written."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-044",
+      "title": "A certificate is self-signed when its subject key is the issuer key and its signature verifies under it, never by its names",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for lys, answering the lys-core self-signed survey; recorded with LYSCORE-001",
+      "context": "verify_certificate_chain_at refused a certificate when its raw subject and issuer DN bytes were equal. The authority writes its issuer DN as the lowercase hex of its public key, so a certificate it legitimately issued to a subject named with that string was refused although its signature verified. A certificate whose subject key was the issuer's own key, issued over a request made with the authority's key, carried different names and verified. C23 ('Self-signed certificates are rejected') had been ticked on the name comparison.",
+      "decision": "Self-signed is judged by keys: a certificate is self-signed when its subject public key is the supplied issuer key, compared as decoded Ed25519 points, and its signature verifies under that key with verify_strict, and such a certificate is refused whatever its names. A certificate issued to a subject whose name equals the issuer's hex-key common name is judged on its real issuer and verifies. Rejected: keeping the DN-byte comparison as a heuristic screen; keeping truly self-signed certificates with differing names verifying.",
+      "quote": "",
+      "consequences": [
+        "lys ca verify and lys verify --cert exit 0 for a hex-common-name certificate the issuer signed, and exit 1 for a certificate self-signed by keys.",
+        "C23 is restated with the key-based definition and ticks again only on review.",
+        "A certificate issued by issue_certificate_for_request over a request made with the authority's own key is refused; CHANGELOG records it.",
+        "DIRECTORY-013's fold records certificate_chain_invalid for a leaf self-signed by keys and issues a legitimately issued hex-common-name leaf."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-045",
+      "title": "The self-signed fix and the verify_certificate_chain caveat land on main with no lys-core release, after DIRECTORY-013",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for lys, answering the lys-core self-signed survey; recorded with LYSCORE-001",
+      "context": "The revocation brief's first round ruled the rustdoc caveat on verify_certificate_chain a documentation-only lys-core release of its own. Main carries unreleased lys-core commits including the unpublished lys/delegation/v1, which publishing would freeze before its ordering fold exists, there is no v0.2.0 tag to branch from, and a release carrying the self-signed fix is not documentation-only. DIRECTORY-013's draft forbids changing verify_certificate_chain(_at) and their documentation, and its fold calls verify_certificate_chain_at.",
+      "decision": "This card lands the key-based self-signed rule and the rustdoc caveat on main and cuts no crates.io release; a release is its own act after the ordering fold. DIRECTORY-013 lands first and is not amended; this card's build is blocked until DIRECTORY-013's roadmap row reads landed on origin/main. Rejected: a documentation-only release cut from main or from a 0.2.0 base in this card; landing this card first and amending DIRECTORY-013.",
+      "quote": "",
+      "consequences": [
+        "No lys-core version bump or publish in LYSCORE-001; the change waits under CHANGELOG's Unreleased section.",
+        "LYSCORE-001 carries DIRECTORY-013 in depends_on and a blocked_by command that reads its roadmap row on origin/main.",
+        "LYSCORE-001 adds a fold test to DIRECTORY-013's revocation_fold.rs and edits nothing else of that card."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-042",
+      "title": "A root is a repository URL and a pinned commit, resolved through the worker's own checkout and never fetched",
+      "status": "decided",
+      "scope": "roots",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings on the roots card's rounds",
+      "context": "lys's docs/design/project.json names the estate's other projects by absolute directories on one machine, which no worker on another machine resolves, while the carded-row rule is that workflow inputs name a repository, a commit, a card and a brief, never a folder. The method's reader accepts only absolute directories today, so the shape and the reader must change in a stated order.",
+      "decision": "Each root in project.json is an object with repository, a remote URL, and commit, the full hash of the commit the design was checked against. A worker resolves it through DS2_CHECKOUTS/<last URL segment without .git>, which must hold the commit (git cat-file -e), and otherwise is refused by name with the checkout path, the repository, the commit and the act of fetching that commit into that checkout. The repositories map (project name to remote URL) is retired into root.repository, so a root's repository has one home, and the method's validator refuses a project.json that still carries it, by name, naming the move to root.repository. The pin moves by hand in a gated row. A check prints each root's pin beside origin's head and the distance between them, and exits 0 whatever the distance; a root whose checkout lacks its pin is reported as pin_absent with the act git -C <checkout> fetch origin, a root whose checkout has no refs/remotes/origin/HEAD is reported as origin_head_unset with the act git -C <checkout> remote set-head origin --auto, and either makes the check exit 1, only after it has reported every root. The resolver and the check import only the Python standard library and SDK-free modules of ds2_ledger, so lys's copies run under python3 from a fresh clone. Rejected: keeping absolute directories; a resolver that fetches or clones what is missing; following the moving head or moving pins automatically; a pin per design; a lys-local resolver; and unifying the roots map with the $NAME/ launch tokens in this card.",
+      "quote": "",
+      "consequences": [
+        "lys's project.json does not change shape until the method's reader accepts the object; ROOTS-001 R2 is blocked on that method commit and first refreshes lys's copies from it.",
+        "The resolver and the pin check are written in the method, on the design-system board, and lys receives them only as copies.",
+        "A survey reads the pinned commit, never the moving head, so a stale pin is visible and moving it is a gated, stated act.",
+        "The project.json files of aion, cambium, haematite and the design system follow on their own boards once the method accepts the shape.",
+        "A project.json that still carries a repositories map is refused by the method's validator until its entries move into root.repository.",
+        "The leg-entry reading project.py takes from venues moves into an SDK-free ds2_ledger module, legs.py, which lys copies beside project.py; the pin check's copy differs from the method's only in the line that finds workers/, which SOURCE.md names."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-047",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings on the given-statement card; the canonical form chosen by HOME-008's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "A new underscore-prefixed binding under crates/ fails the ast-grep leg with the rule's reason.",
+        "A guard is named and dropped by name; a value with no use is not bound; the bare `_` stays available.",
+        "The rule is a candidate for Cambium to adopt in its own gated change.",
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1's --cert checks it against a certificate.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-048",
+      "title": "A trait parameter one implementation ignores is a bare `_` where the trait cannot drop it",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering this card's survey; recorded with LYSCORE-002",
+      "context": "The words give an unused trait parameter two ways out: use it, or change the trait so it is not asked for. AdmissionPolicy::admit needs both of its parameters across its implementations, and LeafStore is in the published lys-log-store 0.2.0, where changing it breaks consumers. Neither way out is open without changing behaviour or API.",
+      "decision": "An implementation that has no use for a parameter which another implementation of the same trait needs, or which a published trait asks for, writes the bare `_` pattern. The bare `_` binds nothing, so it is the words' 'not bound at all', and it is not the underscore-prefixed name the rule refuses. The trait is not changed. Rejected: changing AdmissionPolicy or LeafStore, adding a use to a parameter the implementation does not need, and keeping an underscore-prefixed name.",
+      "quote": "",
+      "consequences": [
+        "AcceptAll, MaxSize and the certificate policy under AdmissionPolicy, and the LyingStore, DecliningSigner and RecordPolicy test fakes, write their ignored parameters as a bare `_`.",
+        "The AdmissionPolicy, LeafStore, Signer and AnchorTask declarations do not change.",
+        "The rule admits a bare `_` and refuses an underscore-prefixed name, and one acceptance line shows both."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-046",
+      "title": "A lantern records the session it was lit in as an optional typed lit_in; a lantern without it is an older record resolved by its holders",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lit_in card's request and the lead's answers to its survey; recorded with HOME-014",
+      "context": "ADR-014 fixed what a lantern carries (its point, the note, who lit it and when) and not the session it was lit in, and ADR-017's fork has to know that session, since a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. The light act recorded no lit_in, LanternData refused the key as unknown, and the fork read it from the entry's raw data as a stopgap, with fixtures writing a lit_in lantern by hand. Lanterns lit before this change carry no lit_in, some carry no lit_at either, and none can be rewritten to carry it (P1).",
+      "decision": "LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys; a present null and a present non-string value are kept distinct from an absent key. The light act writes it as the id of the session at whose head it appends the lantern and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the fork's lit_in_not_a_session refusal with the fork's reason text, skipped by note and refused by point, never a row and never entry_shape. The fork reads lit_in through a narrower typed view carrying point, lit_by and the optional lit_in, which requires neither lit_at nor note: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); the fork reading the full LanternData (the older records without lit_at would stop being forkable); and rewriting earlier lanterns to carry it (P1).",
+      "quote": "",
+      "consequences": [
+        "HOME-014 adds the field to LanternData, the light act, its report and recall's rows, switches the fork to the typed view, and documents lit_in in docs/design/home/RECORD.md.",
+        "ADR-014's lantern shape is extended by one optional key, not replaced: a lantern lit before HOME-014 is read as it is and stays forkable.",
+        "ADR-017's older-record rule stays in force for a lantern with no lit_in; retiring it is a separate decision.",
+        "The fork's fixtures light with the light act every lantern it can produce, and write by hand only the records it cannot: a lantern with no lit_in, a copy whose lit_in names another session, and a malformed lit_in, each named in its test as such.",
+        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-054",
+      "title": "lys recognises test code by structure the file carries, for ast-grep and clippy alike",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in rulings to the lys-gate card's runs; recorded with LYSCORE-001",
+      "context": "An unwrap/expect/panic rule needs to tell test code from library code. 227 calls sat outside #[test] fns and #[cfg(test)] mods, in 2 fixtures and 47 sibling *_tests.rs files, and 106 files opted out of clippy with a per-module #![allow], which the new no-lint-bypass-attributes rule reports.",
+      "decision": "Test code is a file whose first line is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under a crate's tests/ directory; every file only ever compiled as a test carries the first-line marker, and clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests replace the per-module #![allow]. Rejected: an exemption list of file names in the rule, and rewriting the test helpers' calls.",
+      "quote": "",
+      "consequences": [
+        "Every new fixture, sibling test file, integration root or test harness module begins with #![cfg(test)].",
+        "No rule or config holds a list of file names to exempt.",
+        "CLAUDE.md and Cargo.toml name clippy.toml in place of the per-module #![allow]; lys's clippy.toml takes the opposite setting from Cambium's.",
+        "No #[allow] of any kind replaces a removed one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-055",
+      "title": "The Claude Code render refuses by name what it cannot shape and never writes a default in place of a value the record did not carry",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings in answer to the render-refusal rounds; recorded with HOME-015",
+      "context": "The Claude Code render filled in a default wherever a home record was missing a field or carried one of the wrong type (an empty role, tool_use_id, text, name or model, an empty content array or input object, is_error false, end_turn for any stopReason, a null signature) and serialised its loss account and the hashes of dropped parts with unwrap_or_default, so a broken session rendered to a file that looked whole and the render reported success.",
+      "decision": "Every value the render copies from a message entry must be present and of the type the target field takes; a missing field or a field of another type refuses the render by the session, the entry id, the field and the expected type, and nothing is written. The value itself is never named, except an unmapped stopReason, which is named because it is a protocol value and not transcript. Every serialisation the render needs, the records, the dropped parts it hashes and the loss account, is done before any directory or file is created, and a failure refuses by name. Only three values are written that the record does not carry, and they are format constants Claude Code's file requires on every record: gitBranch \"\", usage {input_tokens 0, output_tokens 0} and stop_sequence null. Only one field reads a meaning from its absence: a thinking part with no `redacted` field is not redacted, since in Pi's grammar the field is optional and its absence is the source's own statement; a `redacted` present and not a boolean refuses. stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse maps to tool_use, length to max_tokens and stop to end_turn; the error arm and the aborted arm refuse by name, naming the value, because Claude Code's own session files carry no value for an errored or interrupted turn (measured on Claude Code 2.1.283 over every JSONL file of its projects directory, 3379 files, with `grep -rhoE '\"stop_reason\":(\"[a-z_]+\"|null)' --include='*.jsonl' <projects directory> | sort | uniq -c`: tool_use 547470, null 172397, end_turn 53290, stop_sequence 2253, refusal 22, max_tokens 1, error 0, aborted 0); and the wildcard arm refuses by name, naming the value, and maps to no Claude Code value. A present role the render does not know is still skipped. render-launch stores its template in the home only after the render has succeeded. Rejected: rendering a default and naming it in the loss account, refusing only missing fields and copying wrongly typed ones, mapping every unknown stopReason to end_turn, and keeping the template a refused launch had already stored.",
+      "quote": "",
+      "consequences": [
+        "The card that lands lys's first async code carries no-std-mutex-in-async and names this decision in its brief.",
+        "The lys and Cambium rule sets differ, and neither is edited to match the other.",
+        "A _name rule for lys is written by a card of its own that handles each binding by its act.",
+        "A session, canon or fork child holding an entry the render cannot shape no longer renders; the refusal names the entry to repair and nothing is written.",
+        "Sessions the importer wrote with a redacted_thinking part that carried no data hold thinkingSignature null and now refuse to render; the importer's own defaults are the other half of the defect and belong to the importer card, not to the render.",
+        "A session holding an error or an aborted turn does not render until the Claude Code format has a value for it.",
+        "The bytes rendered from a session that carries every field do not change, so every pinned render hash stands."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
       "id": "ADR-058",
       "title": "A handover is a rule-less lys.inherited entry and the letter's turn copied whole into a new successor home, its inheritance read from its first entry",
       "status": "decided",
@@ -500,6 +881,578 @@
         "A letter entry that is not an assistant message, a run that is not contiguous on the path, an entry whose message carries provider `authored`, and a run with no thinking block are each refused by name, naming the entry. A successor path that holds anything is refused by name.",
         "Inherited.rule is optional in the type and skipped when absent, so a canon entry with a rule serialises to the same bytes as before; canon add and a render with --canon refuse a canon holding a rule-less example.",
         "Launching a successor from its handover through the launch template is a later unit; HOME-002's template gains no slot here (ADR-012)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-056",
+      "title": "Needs a new person is a view worked out on read from an agent's registration and its person's retire record, never stored or appended",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey of the lifecycle conformance card; recorded with DIRECTORY-019 (RM-032)",
+      "context": "CONFORMANCE row 3.1 flags an agent whose person is retired as needing a new person. The lifecycle-hand brief DIRECTORY-009 (RM-017) says no policy causes a transition and that the only automatic effect a suspension or retirement has on other identities is the grant check, and ADR-011 keeps an agent's responsible person for life. A flag appended as a signed record on each agent, or one that moved the agent's state, would contradict both.",
+      "decision": "An agent's needs-a-new-person flag is worked out each time its lifecycle record is read, from the responsible person its registration names and that person's retire record: it is true when that person's folded state is retired and false otherwise, a suspended person included. Nothing is appended to any agent's history, no transition is made on the agent, the agent keeps its own state, and no responsible person changes. The flag records a fact, that the agent's person is retired; clearing it needs the reassignment card, which is the one that revises ADR-011's responsible person for life. Rejected: a signed flag record appended on each agent when its person is retired; moving the agent to another state with its person.",
+      "quote": "",
+      "consequences": [
+        "Each agent's history stays as it is, and the lifecycle-hand brief's rule that retiring someone has no automatic effect on other identities except the grant check holds.",
+        "The agent's own state is unchanged by its person's retirement, and its derived grants refuse at the check as they already do.",
+        "ADR-011 and DIRECTORY-003 R1 are not revised: the responsible person stays for life until the reassignment card revises that rule.",
+        "A suspended person's agents are not flagged; what a suspension stops stays open."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-079",
+      "title": "A session credential is a random value the directory issues when the agent's signed report-back over a directory-issued challenge creates the session, and keeps only as a hash",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, answering the session card's rounds; recorded with DIRECTORY-026",
+      "context": "Road step 2 keeps the enduring agent and each session's credential apart (docs/design/identity/STATEMENT-2026-09-22.md:166). The provision card's contract left what a session credential is open for the session card, naming three readings: a per-session lys certificate, a lys/delegation/v1 SpeaksFor delegation, and an ADR-001 handle. The product never runs an agent (ADR-007), so the directory never sees a start directly, and a crashed agent never reports its end. The start card ties a running agent to the command it was given through a launch record id. A new signed tag freezes the first time anything signs under it.",
+      "decision": "The session credential is 32 random bytes the directory issues when the session is created. The directory keeps only their SHA-256, on the session record, and returns the value once, in the answer to the report-back that created the session; the session presents the value to the directory, which is the only party that checks it. A session is created when the started agent first reports back and proves it is the agent with its enrolled key, and only for an agent whose certificate has been issued. Before reporting back, the agent asks the directory for a challenge: 32 random bytes the directory issues once, for that agent and a launch record id the agent supplies, kept until used or until it expires more than 60 seconds after issue. The proof is an Ed25519 signature under the tag lys/session-start/v1 (ADR-080). The directory verifies the signature before anything else: an unsigned or badly signed proof, or one naming an agent it does not hold or one with no enrolled key, is refused proof_invalid with one body and touches no challenge, and only a correctly signed proof receives the state-revealing refusals. It admits the proof only when the challenge is one it issued to that agent, unused and unexpired, the directory named is itself and the launch record id matches the challenge's, and it marks the challenge used in the same act that creates the session. Two acts end a session: the agent reporting its end with its credential, and the directory's administrator stopping it. Ending changes the record's state, so the credential is refused at once, naming the ended session. Rejected: a per-session lys certificate, because nobody verifies a session credential offline in this card, so a signed artifact buys nothing and would freeze a format before anything needs it; a lys/delegation/v1 SpeaksFor delegation, framed for an offline root key and a seat subject, whose module says not to invent a consumer; an ADR-001 handle, which waits on the unbuilt secrets broker (SECRETS-002); creating the session when a start command is rendered; and expiry of a session.",
+      "quote": "None of the three. The session credential is a random value the directory issues when the session is created. The directory keeps only its hash, on the session record, and the session presents the value to the directory. The reason is that in this card the directory is the only party that checks a session credential. Nobody verifies it offline, so a signed artifact buys nothing here and would freeze a format before anything needs it. A handle waits on the unbuilt secrets broker (SECRETS-002). SpeaksFor is framed for an offline root key and a seat subject, and delegation/mod.rs says not to invent a consumer. Refusing is a change to the record's state, so ending a session refuses its credential at once. The brief records this choice and its reason as an ADR at the next free id, and names a signed session credential as later work, for when a party other than the directory must check a session.",
+      "consequences": [
+        "The session credential is distinct from the agent's one certificate (ADR-008) and never replaces it. No session credential value appears in a start command, a launch record, an event, a log or a document; the session_started event carries only its SHA-256, which reveals nothing because the value is 32 random bytes.",
+        "P9 gives way narrowly: an agent authenticated by its enrolled key creates and ends its own session record, and nothing else. Every other mutation by a caller who is not an administrator is still refused in step 1 by name.",
+        "The launch record id is carried as supplied; the check that the launch record exists and belongs to the agent is the start card's, so the two cards do not depend on each other.",
+        "A session is refused to a retired agent and to an agent whose certificate has been revoked, the revocation read only through the certificate revocation card's fold, and no open session is ended by either. Suspension refuses nothing here while it stays open. Ending open sessions is the emergency-stop card's.",
+        "A crashed agent's session stays open until an operator stops it. Lapsing a stale session is its own card.",
+        "A signed session credential is later work, for when a party other than the directory must check a session. It is a new format with its own version and review, never a change to this one.",
+        "This decision supersedes, by closing it, the earlier draft of the same card (run d5055cc1) and the decision it held there, which never reached main."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-080",
+      "title": "lys/session-start/v1 signs five fields, the tag, the agent id, the directory's identifier, the launch record id and a directory-issued nonce, and is proposed in the wire-format register until ratified",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "The session card's report-back is a new signed statement, and a domain-separation tag freezes the first time anything signs under it (CLAUDE.md, wire formats are forever). docs/design/WIRE-FORMATS.md is the register every wire contract passes through, proposed, ratified, frozen, with ratification a recorded human decision in its decision log. The identity line's lead fixed the statement's content in the session card's rounds; the format itself is ratified in the register, not by this ledger.",
+      "decision": "The report-back is an Ed25519 signature by the agent's enrolled key over the 20 ASCII bytes of lys/session-start/v1, one 0x00 byte, then the agent directory id, the directory's own identifier and the launch record id, each as its UTF-8 length in 4 bytes big-endian followed by its bytes, then the 32-byte nonce, a challenge the directory issued once to that agent for that launch record id and admits for 60 seconds after issue. Freshness (the nonce), audience (the directory's identifier) and the launch record id are in the first version because the tag cannot gain them after it freezes. The format is proposed in docs/design/WIRE-FORMATS.md's decision log; the tests sign under it with disposable test keys only, and no production agent signs under it until the register shows it ratified. Rejected: a four-field message without the directory's identifier, which could not say which directory a proof was made for; a message without the launch record id, which could not tie a session to the command it was started by; a signature over the fields without a directory-issued nonce, which a replay would satisfy; and treating this ledger entry as the ratification, which the register reserves to its own decision log.",
+      "quote": "Five fields. The signed lys/session-start/v1 message carries the tag, the agent id, the directory's own identifier, the launch record id and the nonce. The later sentence adds the launch record id and removes nothing, and the acceptance line for a proof naming another directory stands.",
+      "consequences": [
+        "The statement is reviewed adversarially before any code signs under it, and a change after it freezes is a new tag alongside, never a mutation.",
+        "The status moves to decided when docs/design/WIRE-FORMATS.md's decision log records the format ratified; until then no production agent signs under lys/session-start/v1.",
+        "The bytes are a tagged, length-prefixed preimage signed with plain Ed25519, not COSE_Sign1: the directory is the only verifier, as for lys/sealed-envelope/v1, which WIRE-FORMATS.md keeps out of COSE on the same ground."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-073",
+      "title": "A home moves as one fast-forward git ref pushed to a path on this machine, tracking exactly its record stores",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey; recorded with HOME-019",
+      "context": "Stage 3 of the context roadmap moves a home by a pushed ref the target fetches, never a hand copy, with encryption before any bytes leave the machine as its precondition. A home holds, beside its record, lock files and temporaries that must never travel; its blocks hold imported tool results verbatim and a template's env and mcp slots are free strings, so no scan can promise a home holds no secret; and git's own settings can change bytes on the way in or out.",
+      "decision": "A home directory is a git repository whose tracked files are exactly each session's file, index and head, each block and each template, enumerated by name and never by pattern; the first ship initialises it. ship holds every session's lock through its check and snapshot, commits that set, and pushes it without force as the one ref refs/lys/home to a bare repository at a path on this machine, creating it when the path does not exist; a remote ref the new commit does not descend from is refused as ref_diverged. Every other remote, ssh to any host, https, git or file URLs and hosted services, is refused as remote_not_local until stage 3's encryption exists. git runs as the binary with a pinned environment and no filters. Rejected: an allow-list of estate ssh hosts, scanning the home for secrets, a pure-Rust git crate, and force-pushing or overwriting a ref.",
+      "quote": "",
+      "consequences": [
+        "No byte of a home leaves this machine through ship until the secrets step's encryption lands; the second-machine block fetches this ref after that.",
+        "A home with no session, a stale or missing index or head, a session a live owner holds, a repository tracking other files and a remote path that is not a bare repository are each refused by name before anything is pushed.",
+        "The gate machine needs git on PATH."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-074",
+      "title": "An arrival is a seventh lys.harness_event kind, one per arriving session, hung beside the head",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey, and the lead's answer that fetch commits the arrival; recorded with HOME-019",
+      "context": "Stage 3 gives the target a distinct execution id with its ancestry recorded, and the identity documents describe an execution per session or fork. The source is never written, so the ancestry can only be written on the target side, and the arrival is a fact about the record, not a turn.",
+      "decision": "fetch appends to each arriving session one lys.harness_event of kind arrival whose detail carries the source commit, the remote, the ref and a fresh execution id for that session's continuation. It hangs beside the head through append_beside, as template_render does (ADR-012), so the head file, the head hash and the next render's session_head on the target are the source's. fetch then commits the appended entries as one commit whose parent is the fetched commit, naming the source commit, the remote and the ref, so the target's git status is clean and a later ship from it carries the arrival onward; a failed append or commit removes what fetch created. There is no home-level id file and no block is stored for it. Rejected: an arrival that moves the head, arrival lines left uncommitted until the target's next ship, one execution id per home, and a block for the arrival's data.",
+      "quote": "",
+      "consequences": [
+        "A target's head file is byte-identical to the source's after fetch, and a render of the target records the source's session_head.",
+        "A remote whose arrival data would pass the 512-byte cap is refused before fetch writes anything.",
+        "The target's HEAD is one arrival commit on the fetched commit, and a ship from the target carries the arrival to the next home."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-081",
+      "title": "Issuance enters the lys-log-store log `lys log` keeps before any certificate is written, and the issuer holds only the CA key",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, answering the row 6.4 survey",
+      "context": "CONFORMANCE row 6.4 asks that certificate issuance is entered in a transparency log and that anyone verifies the certificate and its inclusion offline with standard tools. The published `lys` crate (0.2.0) cannot depend on lys-anchor, which is publish = false, and docs/design/lys-anchor/BUILD-PLAN.md section 2.5 keeps anchor surface out of `lys`; row 6.4's brief column says 'on lys-log-store'. The lys/log-inclusion-proof/v1 artifact embeds a checkpoint signed with the log's key, so writing it at issuance would make the issuer hold that key too.",
+      "decision": "`lys ca issue` enters every certificate it produces, on both issuance paths, in the lys-log-store log that `lys log` keeps, as one leaf whose bytes are the certificate's DER and nothing else, before any certificate file is written; if the log refuses the entry no certificate is written. The issuer holds only the CA key: issuance appends the leaf, writes the certificate and the leaf file, and reports the log and the leaf index, and the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`, which holds the log's key. Rejected: giving `lys` a dependency on lys-anchor, which would stop `lys` being publishable and reverse BUILD-PLAN section 2.5; putting issue-and-enter in the lys-anchor binary instead of `lys ca issue`; and requiring the issuer to hold the log's key to write the artifact at issuance. The issuer-only entry is the required path, and a production issuer never holds the log's key. `--log-key` and `--artifact-out` stay on `lys ca issue` only as an optional path for one operator who holds both keys, as tests and proofs with test keys do; given one without the other, issuance refuses.",
+      "quote": "",
+      "consequences": [
+        "`lys` keeps lys-core and lys-log-store as its only lys dependencies and stays publishable; lys-anchor and lys-anchor-cli stay publish = false.",
+        "No new wire format: the leaf is the DER alone and the artifact is the existing lys/log-inclusion-proof/v1; no draft format from unstable-anchor is reached by issuance.",
+        "The entry precedes every certificate write, so a refused entry leaves no certificate on disk.",
+        "Tests and proofs use test keys and a test log; production keys and the production log stay the project owner's acts under row 6.6.",
+        "Withdrawal (row 6.3) and typed claims (row 6.2) are not part of issuance-with-entry.",
+        "An issuance that writes the artifact itself happens only where one operator holds both the CA key and the log's key; the production issuer, holding only the CA key, never takes that path."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-078",
+      "title": "Permission enforcement through SpiceDB on the standalone identity server enters the directory design, on a decided grant representation",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The owning lead's answers to the directory road-step-2 survey and drafts, the grant representation with Apollo as second reader and the freshness mechanism as built with a second reader; recorded with DIRECTORY-025",
+      "context": "The directory design lists 'Road step 2 onward: capability certificates, arbitrary grants and their enforcement, ...' as a non-goal, and CN11 gives live capability policy and its enforcement to step 2, while step 1 installs SpiceDB and asks it nothing (DIRECTORY-002 R4). Step 2 is defined in docs/design/identity/STATEMENT-2026-09-22.md (The road, line 143) as the door asking SpiceDB on every call. The road-step-2 card asks for step 2 of the directory design for the identity server, so without a ruling a reader of DESIGN.md would find the brief contradicting the design's own scope.",
+      "decision": "Amend the design narrowly: permission enforcement through SpiceDB on the standalone identity server leaves the 'Road step 2 onward' non-goal and becomes a goal of the directory design, and CN11 gains one appended ruling line saying so. Everything else in the non-goal stays, and neither the non-goal's text nor CN11's is reworded; the non-goal's reason gains one appended sentence saying it does not cover that enforcement. The grant representation (C5) is a technical decision of the owning lead with a second reader, not one left open for Tom, and is decided here: every grant, root or delegated, is its own grant object in SpiceDB, keyed by its grant identifier, and is exactly 3 relationships: the resource's relationship to the grant object under the grant's action; the grant's holder relationship to the identity that holds it, carrying an expiry caveat that ends no later than its source's; and the grant's standing relationship, which for a delegated grant is its source relationship to its source grant, the source relation the permission walks, and for a root grant, which has no source, is its root relationship, the grant object's relationship to the directory's root authority, one object per directory and the same object the issue_root permission is checked against when a person issues a root grant through POST /grants/roots; a permission holds through a grant only while the grant's standing holds, a root grant's through its root relationship and a delegated grant's through its source grant's standing, so derivation is a walk of the source relation that ends at the directory's root authority in a bounded number of steps, a grant that stands on neither a source relationship nor a root relationship is malformed and refused, and deleting a grant's standing relationship refuses its holder and every grant derived from it at once; two live grants giving the same holder the same action on the same resource are two grant objects, each with its own relationships, and revoking one leaves the other standing; withdrawing a grant deletes its relationships and those of every grant derived from it through the source relation on the same committed revoke event, the withdrawn grant's standing relationship alone in the first write and the rest in further writes within SpiceDB's configured max_updates_per_write. The expiry bound is refused, never clamped: a delegation asking for an expiry later than its source grant's is refused by name before anything is committed, and a committed delegation event that nonetheless asks for one is refused by the projector by name, which writes no relationship for it and stops there; a silent clamp would make the record say one thing and the grant another. Rejected: sitting beside the non-goal as a named exception, which leaves the design's stated scope contradicting the brief; rewording the non-goal or CN11; and bringing Cambium's door into this cluster.",
+      "quote": "",
+      "consequences": [
+        "CN11 gains one appended line naming ADR-078, and the 'Road step 2 onward' non-goal's reason gains one appended sentence saying permission enforcement through SpiceDB on the standalone identity server is not covered by it; the non-goal's text and every other sentence of the design are unchanged.",
+        "DIRECTORY-002 R4's step-1 sentence stays word for word in deploy/identity/README.md, which gains one step-2 sentence beside it; nothing in crates/lys/src/identity/ checks SpiceDB or writes to it.",
+        "Every grant and permission check the identity server makes asks SpiceDB; the administrator's admission by configured issuer and subject (P9, C13) is the one named exception and never asks SpiceDB, because it is how an operator bootstraps the directory before any relation exists.",
+        "The reverse question of DIRECTORY-006 R5, who can act on a resource, is answered by SpiceDB's LookupSubjects at the same revision as the forward CheckPermission.",
+        "Cambium's door asking SpiceDB on every call is a later Cambium card; an agent calling through the door is not refused by the identity server's enforcement until that card lands.",
+        "The grant representation (C5) is decided as above and the grant-representation non-goal's reason gains one appended ruling line saying so, its text unchanged; after a root grant is withdrawn no relationship of it or of any grant derived from it remains.",
+        "This ruling, together with DIRECTORY-006 R1 to R5 as built and accepted on hand/DIRECTORY-006-R5 at e525a91 after a second reader's review, stands as the ratification DIRECTORY-006 R1 and DIRECTORY-006's blocked_by ask for; no separate contract review is waited on. The grant-representation non-goal stays recorded as open for Tom, and a later ruling by Tom amends the contract.",
+        "A person's root authority on a resource comes from a root grant the directory's root authority, one person fixed when the grants are opened, issues through DIRECTORY-006's root issue; a root grant has no source, its expiry is the end its issuer states or no end, and every delegated grant ends no later than its source. No other bootstrap is added.",
+        "The freshness mechanism (C25) is settled by the owning lead with a second reader as DIRECTORY-006 R4 builds it: a check is answered only from a projection that has applied every committed revocation it depends on, and otherwise it is refused with StaleDecision, the refusal DIRECTORY-006 builds for a stale projection, to which DIRECTORY-025 R4 adds the affected grant's identifier, while unrelated authority stays usable. Suspension semantics stay open and ADR-011 stays proposed."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-059",
+      "title": "A named leaf in the file store is a whole, flushed leaf, and the no-replace link is its commit point",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lead's answers to its survey; recorded with LYSLOGSTORE-001",
+      "context": "FileLeafStore created a leaf file under its final 20-digit name and then wrote it, so a crash or failed write left a torn leaf that the next open counted and Log::open's one-leaf-ahead repair pinned, and a failure after naming left the extent behind the disk so the store later refused its own leaf as another writer's. BACKENDS.md criterion 1 (durable on return) says nothing about what a named leaf is between a write's start and its return. DIRECTORY-003's uncertain append settles by reading a leaf back and needs a named leaf to mean a committed one.",
+      "decision": "A file under a 20-digit leaf name is always a whole, flushed leaf; only dot-prefixed temporary files in leaves/ may be partial. A leaf is written and flushed in a hidden temporary file, then linked to its final name by an operation that refuses to replace, then the temporary name is removed and leaves/ is flushed. The successful link is the commit point: the extent advances past the leaf whatever happens next. A failed temporary-name removal still returns Ok; a failed leaves/ flush returns StoreError::LeafDurabilityUncertain carrying the index, and the handle refuses further appends with it until reopened. A writable open flushes leaves/ before counting and fails with Io when that flush fails; a read-only open (FileLeafStore::open_read_only) counts the named leaves without flushing; neither counts, deletes or changes a leftover temporary file. Rejected: naming the leaf first and writing into it (today's torn-leaf shape); deleting leftover temporary files at open, which would make a read-only open mutate the store; flushing at a read-only open, which would turn a status on read-only media into an error; and reporting a post-link failure as Io, which left the extent behind and made the next append report the store's own leaf as LeafAlreadyWritten.",
+      "quote": "",
+      "consequences": [
+        "StoreError gains LeafDurabilityUncertain, carrying the index and the failed flush's io error as its source (ADR-060 keeps LeafAlreadyWritten for another writer).",
+        "FileLeafStore::open performs a directory flush and fails with Io when it fails, and FileLeafStore::open_read_only never flushes; neither deletes or rewrites a file.",
+        "Leftover temporary files accumulate after crashes until a separate maintenance act, run only while holding the write lock, clears them.",
+        "The on-disk layout and the LeafStore trait's methods are unchanged; the invariant is local state, not a wire contract.",
+        "DIRECTORY-003 treats LeafDurabilityUncertain as uncertain and settles by reading the leaf back, and lands after LYSLOGSTORE-001."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-060",
+      "title": "LeafAlreadyWritten means another writer holds the index, and the store never reports its own leaf as another writer's",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The card's words and the lead's answers to its survey; recorded with LYSLOGSTORE-001",
+      "context": "store.rs's contract says LeafAlreadyWritten is a conflict, not a resume signal: a refusal at N means another writer holds that position. FileLeafStore named a leaf before put_leaf returned, so a failure after naming left the extent behind the disk and the next put_leaf at that index was refused as LeafAlreadyWritten, the store reporting its own leaf as another writer's. A consumer settling an uncertain append (DIRECTORY-003) would then read a conflict where there was none.",
+      "decision": "LeafAlreadyWritten is returned only when the index is behind the extent or the no-replace link finds the final name taken by an entry this call did not link. Once this call's link succeeds the extent advances past the leaf whatever happens next, so no later step of the same call and no later call on the same handle reports that leaf as LeafAlreadyWritten; a post-link failure that leaves durability in doubt is LeafDurabilityUncertain (ADR-059). Rejected: reporting a post-link failure as Io and leaving the extent behind, which made the next append report the store's own leaf as LeafAlreadyWritten; and treating LeafAlreadyWritten as a resume signal a caller may retry through.",
+      "quote": "",
+      "consequences": [
+        "LeafAlreadyWritten's documentation in error.rs and store.rs keeps meaning another writer only.",
+        "A handle that returned LeafDurabilityUncertain refuses further appends with that error, never with LeafAlreadyWritten, until it is reopened.",
+        "A second backend satisfying BACKENDS.md reports its own uncertain write under a distinct name, never as LeafAlreadyWritten."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-086",
+      "title": "Every command given keeps its own signed launch record, and running is tied to it through lys/session-start/v1",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
+      "context": "ADR-007 renders the start command from a kept launch record and shows a session running only when the agent's report names it. CONFORMANCE 5.4 and 5.5 make both testable. The sessions brief's lys/session-start/v1 draft signs a directory identifier but no launch record id, so a report could not name the command it answers; no agent signs under the tag yet, so adding the id is free now and costs a new version after the tag freezes.",
+      "decision": "Every command given keeps one launch record, a signed directory event naming the machine, the executable, the working directory, the profile version and the credential ids. Its id is carried in lys/session-start/v1, whose signed message then holds five things: the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge. The agent reads the id from LYS_LAUNCH_RECORD and its report names it, and running is tied to the command given through that id. A start given again copies a kept record into a new record with its own id that names the record it was copied from. Rejected: tying running to the agent id alone, re-issuing one record for every command given, and keeping the launch facts only in the command line.",
+      "quote": "",
+      "consequences": [
+        "The sessions brief (run d5055cc1, currently drafted as DIRECTORY-015) adds the launch record id to lys/session-start/v1 before the tag freezes; the lead sends that amendment to its signed message.",
+        "No launch record is ever re-issued, so every report confirms exactly one command and a withdrawal ties to one command.",
+        "While a start for an agent stands unconfirmed, a second start for that agent on any machine is refused as start_unconfirmed, naming the standing request and the act that answers it: wait for its report, or withdraw it first.",
+        "The launch record is the directory's and is distinct from the home's template render event (ADR-012)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-087",
+      "title": "The executable, its arguments and the working directory are fields of the reviewed profile version, never of a start request",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
+      "context": "The command a person gives must be the one that was reviewed. If a start request could set what runs or where, the review of a profile version would say nothing about the command given.",
+      "decision": "The executable, the arguments and the working directory are read from the reviewed profile version's record, as the mock-up draws them, and a start request names only the agent, the profile version and the machine. Rejected: letting a start request set either, and taking either from the machine or a default.",
+      "quote": "",
+      "consequences": [
+        "A start request that sets the executable or the working directory is refused by name.",
+        "When the profile version's record does not yet hold the two fields, DIRECTORY-029 R9 adds them under the roles card Ink1H1Os's record, named in depends_on, and stays blocked on it by that name.",
+        "The command given is the profile version's own executable, with the arguments the profile version records, invoked in its recorded working directory. No lys launcher subcommand is added, and the mock-up's 'identity start <slug>' line is illustrative only."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-088",
+      "title": "Withdrawing a start request records only that the request no longer stands",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
+      "context": "A start with no report is unconfirmed: the agent may or may not have started, and nobody can know it did not. A person still needs to take back a request they no longer want.",
+      "decision": "A start request can be withdrawn by the person who gave it or anyone holding the same right. The withdrawal records that the request no longer stands, with who and when, and never that the agent did not start. If a signed report later arrives for the withdrawn launch record, the session shows as running with the withdrawal beside it. Rejected: recording a withdrawal as not started, and refusing a report that arrives after a withdrawal.",
+      "quote": "",
+      "consequences": [
+        "The screen's words say withdrawn, never not started.",
+        "A withdrawn request no longer stands, so it does not refuse a new start for the agent.",
+        "Acceptance lines cover a withdrawal and a report arriving after one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-091",
+      "title": "One standing start per agent, and the command given as ids-only environment assignments before the recorded executable",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, in the rulings and answers to the start-an-agent survey; recorded with DIRECTORY-029",
+      "context": "A start with no report stands unconfirmed, and a second command for the same agent could start it twice. The command must carry the agent id, the launch record id and the credential ids to the agent without changing the arguments the profile version records, and without a credential value on the command line (CONFORMANCE 5.3).",
+      "decision": "While a start for an agent stands unconfirmed, a second start for that agent, on any machine, is refused as start_unconfirmed, naming the standing request and the act that answers it: wait for its report, or withdraw it first. The given command reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> <executable> <recorded arguments>, with the working directory set to the recorded one. The three values are ids only, each shell-quoted and refused by name if it holds anything outside its id grammar. Rejected: appending the ids to the recorded arguments, and giving a second command while one stands unconfirmed.",
+      "quote": "",
+      "consequences": [
+        "One agent never gets two commands at once; a withdrawn request no longer stands, and a start of an agent that reads running is given as a new launch record.",
+        "The recorded arguments reach the executable exactly as the profile version records them, in order, with nothing appended.",
+        "The agent's lys/session-start/v1 report names the launch record id it read from LYS_LAUNCH_RECORD."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-092",
+      "title": "Row 07 is carried in the directory cluster up to a staged install, with its Cambium parts on Cambium-owned cards and the production acts left to Tom",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the directory survey for the row 07 card; recorded with DIRECTORY-030",
+      "context": "The directory design kept row 07 (gate, install and demonstrate the release) a non-goal until a Cambium cluster or an agreed cross-repository arrangement existed. Row 07 is now to be carried as a brief in this cluster, which scripts/design/gate.sh measures, while its wall names a Cambium install document, its acceptance needs Cambium's gates.json legs on an exact Cambium ref, and its end state touches a production key, production receipts and a Cambium cutover that no card may perform.",
+      "decision": "Row 07 leaves the non-goal and is carried by a directory brief that stops at a staged install on the node the operator names, keyed with a test service key, where standalone acceptance is proved and recorded before any cutover. The Cambium install document lands through its own Cambium card with its own pull request and gate, and row 06's Cambium half stays on its own Cambium card; this brief names both as blockers and lists no Cambium file. The brief registers exactly one release leg, as a demand-cadence leg in docs/design/project.json, and every other row registers the leg it needs in its own brief. The production signing key, production receipts and the Cambium cutover are Tom's three acts. Rejected: leaving row 07 a non-goal beside a brief that carries it, listing the Cambium install document on this brief's wall, adding the release leg to .land/gates.sh where every land would run it, and standing up a staging Cambium inside this row.",
+      "quote": "",
+      "consequences": [
+        "The design's first non-goal no longer covers row 07 and names this decision.",
+        "The release report lists 'preserved Cambium identities are observed' as not met until the cutover, naming the cutover as the act that meets it and Tom as the one who performs it.",
+        "Every receipt the release inspects is test-keyed and marked so in the release report; no signed Lys receipt under a production key is produced.",
+        "A leg that DIRECTORY-002, DIRECTORY-004 or DIRECTORY-005 needs and nothing registers is a finding for that brief's owner and a blocker of DIRECTORY-030, never registered by DIRECTORY-030.",
+        "IDENTITY-001.json and IDENTITY-001.md are not changed; status from evidence is recorded only in DIRECTORY-030 and the release report."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-093",
+      "title": "A Claude Code import builds its session under a staging name and publishes it once",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The home line's lead, answering the survey of the repeated-work card; recorded with HOME-020",
+      "context": "Every imported entry went through Session::append_entry, which syncs the line, syncs the index row and writes the head through a temporary file, a rename and a directory sync: about five syncs per record, though the import sets the head once at its end. Appending in place with no sync until the end cannot be repaired by the existing reconcile: a crash can leave a torn or zero-filled last line that Index::scan refuses as Malformed, so the session will not open, a head still at the header, and a re-import refused as Exists; and the original bytes are never rewritten (P1), so a torn tail cannot be trimmed.",
+      "decision": "The import command builds its new session under the staging name `<id>.jsonl.importing` beside `sessions/<id>.jsonl`, holding `<id>.lock` throughout: the header and every entry line are written to the staging file with no sync, and the index rows and the head are kept in memory. It then publishes once, in this order: one sync of the staging file; the index written whole to `<id>.index.jsonl` through a temporary file, synced and renamed; the head written once to `<id>.head` through a temporary file, synced and renamed; one sync of the sessions directory; the staging file renamed to `<id>.jsonl`; one more sync of the sessions directory. A crash before the rename leaves no session under the final name, so a re-import is not refused as Exists; the next import of that id and the next open of that session file, each holding the lock, remove the staging file and, when `<id>.jsonl` is absent, the `<id>.index.jsonl` and `<id>.head` a part-way publish left. Rejected: appending in place and leaving a session that refuses by name after a crash; extending reconcile to trim an unsynced tail.",
+      "quote": "",
+      "consequences": [
+        "docs/design/directory/design.json gains a goal for the certificate half of step 2, the 'Road step 2 onward' non-goal no longer lists it, and CN11 and CN1 each end with one ruling line citing this decision.",
+        "The rest of step 2 (SpiceDB as a service, the door asking it on every call, per-execution credentials, presenting the certificate at spawn) stays a non-goal of this cluster and belongs to its own cards.",
+        "A brief that lands after DIRECTORY-031 and needs the CN1 ruling cites it rather than writing a second line.",
+        "docs/design/home/RECORD.md states the staged import's rule beside the per-append durability order, which is unchanged for every other append.",
+        "Only an import into a session it creates is staged; import_claude_code given a session that is already open keeps append_entry's per-entry syncs, since a rename cannot publish a session that already exists.",
+        "Reconcile is not extended and no session file is trimmed, rewritten or truncated; recovering a session whose last line a crash tore is its own decision.",
+        "A staging file does not end in `.jsonl`, so Home::session_ids never lists it as a session.",
+        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-094",
+      "title": "An agent certificate's validity window comes from the directory's configuration: 30 days by default, 90 days at most",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, ruling on the capability-claim card; recorded with DIRECTORY-031",
+      "context": "DIRECTORY-031 issues an enduring agent a certificate whose notBefore and notAfter govern its life; its typed claim carries no validity window of its own, and its verifier refuses the certificate past its notAfter through lys-core's certificate-expired check. The draft let the operator set the lifetime on every issuance call, with no default and no upper bound, so one typo could issue a certificate that outlives the grants it lists and the person's role behind it; revocation (the DP26 fold) is not built yet, so expiry is the only thing that bounds a certificate today.",
+      "decision": "The directory's configuration holds a default validity window and a maximum, shipped as 30 days (2592000 seconds) and 90 days (7776000 seconds). An issuance call with no window takes the default; the operator may ask for a shorter window, never a longer one, and a request above the maximum is refused by name, lifetime_above_maximum, naming the maximum. The certificate records the window it was given as its own notBefore and notAfter. A verifier takes a set of trusted issuer keys, never exactly one, and the certificate names the issuer key that signed it in X.509's Authority Key Identifier by its issuer-key fingerprint, the first 20 bytes of the SHA-256 of that key's SubjectPublicKeyInfo (RFC 7093 method 1, matching the SubjectKeyIdentifier of lys-core's issuer certificate), so a later rotation of the issuer key needs no change of format. Rejected: an operator-supplied lifetime with no default and no bound, which lets a typo outlive a withdrawn grant; a window fixed in code with no configuration; and a verifier bound to exactly one issuer key, which would make every rotation a format change.",
+      "quote": "A value the directory's configuration states. The configuration holds a default validity window and a maximum, with 30 days and 90 days as the shipped values. The operator may ask for a shorter window on an issuance call, and never a longer one. A request above the maximum is refused by name, naming the maximum, and a request with no window takes the default. The certificate records the window it was given.",
+      "consequences": [
+        "DIRECTORY-031 R6 reads the default and the maximum from the directory service's configuration and refuses a longer window with lifetime_above_maximum; its acceptance covers a default issuance, a shorter request and a longer request refused by name.",
+        "A short window bounds how long a certificate outlives a withdrawn grant until the DP26 fold of the revocation card is built, and the maximum keeps an operator's typo from issuing a certificate that outlives its person's role.",
+        "verify_agent_capability takes a set of trusted issuer keys and compares the certificate's Authority Key Identifier with the signing key's fingerprint, so the issuer key rotation card changes configuration, not the format of lys/agent-capability/v1."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-095",
+      "title": "Ownership of a secret alone confers no revoke over the leases derived from it",
+      "status": "proposed",
+      "scope": "secrets",
+      "date": "2026-09-27",
+      "decided_by": "Not ruled; proposed by SECRETS-004 for the lead who owns its card to rule",
+      "context": "CONFORMANCE row 7.6 (docs/design/identity/CONFORMANCE.md) says the person acted for may revoke a lease, and leaves open whether a secret's owner may revoke every credential derived from it: a policy choice, not conferred by ownership alone. The mock-up's lease table lets the source secret's owner revoke as well as the person acted for (docs/design/identity/mockup/index.v5.html, the revlease control), so a screen built from it would grant the owner route before anyone ruled it. SECRETS-004 builds the revoke and needs the set of who may revoke written down before it is built.",
+      "decision": "The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.",
+      "quote": "",
+      "consequences": [
+        "Until this entry is ruled, the set of who may revoke a lease beyond the person acted for is empty: SECRETS-004 refuses a revoke by the secret's owner as it refuses any other third person's, and no code and no test grants the owner a revoke.",
+        "The mock-up's owner route to revoke is built by no brief while this entry is proposed.",
+        "Withdrawal of an upstream grant (ADR-003) and emergency stop (CONFORMANCE row 3.4) end leases as their own acts and are not touched by this entry.",
+        "Ruling this entry decided flips its status; ruling the rejected road instead is a new entry that supersedes this one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-077",
+      "title": "A holding with an end date moves at its next renewal by default; one without moves only by a deliberate act",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "Conformance row 4.6 (docs/design/identity/CONFORMANCE.md) is open: which policy is the default. ADR-006 says a holder moves by a deliberate recorded act or by an explicit rule shown in advance, such as a move at the next renewal, and that which of the two is the default is open. No brief on the main branch defines a renewal, so the roles brief introduces it as a recorded act. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
+      "decision": "A move at the next renewal is the default for a holding with an end date, shown on the holder as the date it will move, which is the holding's end date, with the words that its next renewal moves it to the current version and who can stop the move. A renewal, which the roles brief introduces, is a deliberate recorded act by the person the holder answers to (the responsible person of ADR-011) or by an owner of the role's project: a new grant of the holding with a new end date, recorded naming the actor, the holding it renews and the version it lands on. So the move rides on a deliberate recorded act and no holder ever moves without one; unrenewed, the holding lapses at its end date under ADR-006 and does not move. A holding with no end date has no renewal, so whatever the role's default it moves only by a deliberate act, and the screen says so on that holder. A role carries a default policy, and a newly made role's default is a move at the next renewal; a holding with an end date takes that default at grant time, and the person the holder answers to or an owner of the role's project may change the policy of one holding afterwards, recorded with who did it and in which capacity. The holding's own policy governs it. Under a move only by a deliberate act a renewal is made at the version the holding holds; under a move at the next renewal it is made at the role's current version. Changing a role's default applies to holdings granted after the change and moves nothing that exists. Rejected: holders staying on their version until moved as the default for a holding with an end date, because the renewal is a deliberate recorded act the move can ride on; and a policy set only per role, because one holding could not then be kept apart.",
+      "quote": "",
+      "consequences": [
+        "Each holding shows its policy; one with an end date under a move at the next renewal shows its end date as its move date, the words that its next renewal moves it to the current version, and who can stop the move.",
+        "The role screen shows the role's default and marks each holding with an end date whose policy differs from it; a holding with no end date is unmarked and shows only the words Moves only by a deliberate act.",
+        "Nothing renews a holding but the renewal act; a version change never extends an end date (ADR-006)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-089",
+      "title": "A role is a set of grant templates copied at grant time, not a live group",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "",
+      "decided_by": "",
+      "context": "Conformance row 4.7 (docs/design/identity/CONFORMANCE.md) is open: role as live group or template copied at grant time. ADR-006's consequence says the same stays open, while ADR-006 itself forbids a holder changing version silently as a side effect of an edit. The roles card decides the row. Written by Apollo as author with the roles brief DIRECTORY-021, with Archie as second reader. Recorded as proposed: it becomes decided only when Tom rules on it or signs the card off. It answers the sentence ADR-006 left open and cites ADR-006; it does not supersede it.",
+      "decision": "A role is a template copied at grant time, not a live group. A holding names the role and the version it holds, the grants it carries are made from that version's templates when the holding is granted, and an edit to the role changes none of them. Who holds a role remains answerable as a query over holdings. Only the versioned grant templates make a version; a title edit is recorded and makes no version, and conformance 4.1's job and profile stay proposed and outside. Rejected: a live group, whose membership carries the role's current grants, because a live group would change every holder's permissions at the moment of the edit, which ADR-006 forbids.",
+      "quote": "",
+      "consequences": [
+        "A holding records its role, its version and the ids of the grants copied into it; nothing links a granted holding's grants to later versions.",
+        "Editing a role's templates makes the next version and changes no holding, grant or end date.",
+        "Who holds a role, and on which version, is answered from the holdings, never from a member list kept on the role."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-098",
+      "title": "The access graph draws Access's answers and the directory's records, and holds no permission rule",
+      "status": "proposed",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for the identity line, for the working team, in the rulings and answers to the graph card's survey; proposed with DIRECTORY-034, not ruled by Tom",
+      "context": "Conformance row 8.3 says the graph draws the same answers as Access and never computes its own. The accepted mock-up's graph (docs/design/identity/mockup/index.v5.html:1309-1354) draws every grant from raw grant records, decides standing itself, and derives reach through its own can, reach and whoCan functions; ported as it stands, the screen would hold a second permission evaluator beside DIRECTORY-006's. Access as DIRECTORY-006 R5 specifies it has no per-identity reach operation and no list of grants that do not stand, and the directory records no resources.",
+      "decision": "Grant edges and every reachability the graph draws come only from Access answers returned by the directory, paths exactly as returned and a no as Access's reason. Choosing a person or agent reads the grants it holds that the caller may see and asks the forward question for each resource and action they carry; choosing a resource asks the reverse question for each action the resource declares. A grant is drawn as the dashed does not stand edge only when a forward refusal names it, with Access's reason; a grant Access no longer returns disappears on the next draw; the graph never infers that a grant does not stand. A resource's parent and an agent's responsible person are recorded facts drawn as recorded: parents from the permission model through a read-only route that records nothing, serves each resource's declared actions and the model version it read them under, and shows a resource only where the caller holds a grant on it or an ancestor, or is a directory administrator, who sees every resource; a hidden parent is served as withheld, drawn as a mark with no containment edge and never named; responsible people come from the directory's records. The graph holds no rule of its own and asks Access only on navigation, reload or its refresh control. Rejected: porting the mock-up's raw-grant edges, its standing reckoning and its reach(); amending Access to enumerate reach or list grants that do not stand; a new directory record for resources; serving a resource with a hidden parent as a root; and dropping the containment and answers-to edges because they are not Access answers.",
+      "quote": "",
+      "consequences": [
+        "No grant edge is drawn without an Access answer behind it: before a question the graph shows nodes, containment and answers-to edges only.",
+        "Every grant and does not stand edge carries the model version of the answer it came from, every containment edge that of the resource route's answer, and each draw shows its time; a draw of mixed versions names each and is neither refused nor re-asked.",
+        "The graph module imports nothing from the permission engine except the generated Access client: its imports, followed transitively, are limited to that client, React, the surface's router package, the shell modules listed by file name, the surface's stylesheets and its own files, the surface's API client is refused by name wherever it is reached, and a test proves it.",
+        "Visibility is Access's: a person sees their own reach, the reverse question needs its own visibility permission, a directory administrator holding it sees the whole directory, and a refused question is shown by name.",
+        "A suspended holder is drawn as not standing only once Access refuses on suspension, which waits for the lifecycle card and the open suspension semantics."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-100",
+      "title": "The witness keeps a derived per-origin projection in memory and folds only new leaves",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey of the card behind RM-062",
+      "context": "observe in lys-anchor's witness rebuilt its per-origin projection from index 0 on every call, so one observe parsed every leaf before it and n observes cost about n squared over two parses. The card offered two remedies: scan backward from the newest leaf and stop at the first match, or keep a per-origin position. A backward scan still parses the whole log for an origin the witness has never seen. The projection's module invariant also says nothing in it is stored.",
+      "decision": "The witness's per-origin projection is built by one pass when the anchor is opened. It records how many leaves it has folded, and each observe folds only the leaves recorded since then before comparing, then adds the note it just recorded. The projection lives in memory only and is derived from the leaves, so discarding it and folding again gives the same answer, and it is never authoritative. Observe is bounded for a known origin and a first sighting alike. Rejected: the backward scan, which leaves a first sighting unbounded. Also rejected: any stored index, which would be a second copy of the truth beside the leaves.",
+      "quote": "",
+      "consequences": [
+        "observe takes the caller's kept projection, and never calls rebuild or rebuild_prefix itself.",
+        "A test holds the kept projection equal to a fresh rebuild after every observe, including after a rollback, so last recorded wins still holds.",
+        "The parse count per observe is asserted on a counter of the parse path, never on elapsed time.",
+        "The projection stays behind the federation feature and is never written to storage."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-101",
+      "title": "A file log store's only expectation of its leaves is the pin; a damaged pinned prefix is refused without naming a leaf",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, answering the survey and the author's questions on the card behind RM-062",
+      "context": "The card asked that a leaf whose bytes do not hash to the leaf the tree expects be refused by name at open. Nothing in the store records an expected hash per leaf: state.json holds one tree size and one root. One changed leaf breaks every leaf's inclusion against that root, so bisecting against the pin cannot pick out an index. A per-leaf record would change the store's layout, open a new crash window between the record and the leaf, and add a criterion every second backend must meet.",
+      "decision": "The pin is the store's only expectation of its leaves. When the leaves inside the pinned prefix rebuild to another root, Log::open refuses with StoreError::PinMismatch as it does today. That refusal states the pin's tree size and root and the tree size and root recomputed from the leaves, and it never names a leaf index, because which leaf changed is not known. The one-leaf repair for a leaf just past the pin is kept exactly as it is. Rejected: a per-leaf hash record beside the leaves, which changes the layout and BACKENDS.md and adds a crash window. Also rejected: naming a leaf by bisecting the pin's root, which cannot be done. Also rejected: a read-only open of a refused log, and refusing a torn leaf just past the pin, which would turn routine crash recovery into a refusal.",
+      "quote": "",
+      "consequences": [
+        "No per-leaf hash record is added; state.json, the leaves/ layout and BACKENDS.md do not change.",
+        "StoreError::PinMismatch keeps its fields and message, and no refusal claims to know which leaf changed.",
+        "A leaf just past the pin, torn or whole, is adopted, pinned and reported through recovered_to as before.",
+        "Tests hold the refusal's content, the untouched state.json and the one-leaf repair, and the lys and lys-anchor status commands exit 1 with the refusal on stderr."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-104",
+      "title": "The shell and its mock-up change together, and a corrected mock-up is a new version beside the prior",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the shell survey; recorded with DIRECTORY-037",
+      "context": "The identity mock-up is the definition the built shell does not deviate from, and conformance rows 9.2 and 9.3 find gaps in the mock-up itself. Fixing only the build would leave the definition wrong; editing index.v5.html in place would lose the version CONFORMANCE.md was written against. DIRECTORY-006's GRANT_CONFORMANCE acceptance says to pin the accepted mock-up's hash but pins no file and no hash, so no pin of the mock-up exists to move.",
+      "decision": "A change to the shell's behaviour is made in the built shell and in the mock-up in the same change, and the corrected mock-up is written as a new file, index.v6.html, beside the prior, the way v4 was kept beside v5. CONFORMANCE.md's reference line moves to the new file in that change and carries its path and sha256; DIRECTORY-006 pins no file and no hash, so DIRECTORY-037 is the first brief to pin one, and DIRECTORY-006 does not change. Rejected: fixing only the build, which lets the definition drift from what is built; and editing index.v5.html in place, which changes the file the conformance table was written against.",
+      "quote": "",
+      "consequences": [
+        "Every shell behaviour change edits the mock-up as a new version file; the prior file is never changed.",
+        "The new version differs from the prior by the change only, shown by a diff whose hunks lie in named ranges.",
+        "CONFORMANCE.md line 3 and every pin of the accepted mock-up move to the new version in the same change.",
+        "CONFORMANCE.md line 3 names the new version with its sha256, and that line is the one pin of the accepted mock-up; DIRECTORY-006 pins none and is not changed."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-105",
+      "title": "Sign-in identities belong to people only; the harness login token is the one named exception",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The identity line's lead, in the rulings on DIRECTORY-038's survey; the login exception is the standing ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43",
+      "context": "Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. IDENTITY-001 was to state it and never did, no ledger entry records it, and no brief tests it, while the directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006). The seat's harness login token already reaches a seat's process (SECRETS-002 R5), so the rule has to say what it governs.",
+      "decision": "A sign-in identity, a provider account linked to a person in the directory, belongs to that person only: lys never links, delegates or issues from it to an agent, and refuses each such act of its own by name. An agent's own machine account, bound to no person, is a service account and stays allowed. An issuer and subject is bound to one holder, whichever came first. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, and redefining the login token so the rule could be claimed without an exception.",
+      "quote": "",
+      "consequences": [
+        "The directory refuses linking a person's provider account to an agent and delegating from a sign-in identity, each by name and writing nothing (DIRECTORY-038).",
+        "An agent's own machine account, bound to no person, stays allowed as its issuer-subject binding (conformance row 1.3), and a person's later link of that account is refused by name.",
+        "The broker refuses to issue an agent any credential derived from a person's sign-in session; this is carried by the broker's card against SECRETS-002, and row 1.2 is met in full only when it passes."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-106",
+      "title": "A FileLeafStore opened read-only refuses to write and to repair; Log and Anchor gain no read-only mode",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-09-28",
+      "decided_by": "The lead's answers to the lys-log-store survey; recorded with LYSLOGSTORE-003",
+      "context": "A reader of a lys log has only the writer's open: FileLeafStore::open returns a handle that writes a leaf or moves the pin if asked, and Log::open over it repairs a store left one leaf past its pin by a crash, whoever the caller is. The earlier unlanded LYSLOGSTORE-001 answered this by opening a log at its pinned head through a new Log constructor and reporting the repair as pending. LYSLOGSTORE-002's ADR-101, unlanded on its own branch, keeps the pin as the store's only expectation of its leaves and rejects a read-only mode on Log. The card for LYSLOGSTORE-003 asks for a leaf store that, opened read-only, never writes and never repairs, and refuses an interrupted append by name.",
+      "decision": "FileLeafStore gains an inherent open_read_only whose handle refuses put_leaf and pin with StoreError::ReadOnly and which refuses a store exactly one leaf past its pin with StoreError::RepairPending, decided from the count and the pin without reading leaf bytes and without flushing. Log and Anchor gain no read-only mode: Log::open over a read-only handle either finds the tree matching the pin, or refuses with PinMismatch, and never reaches a pin, so the Log needs no mode for the store to hold. Both hold because the refusal of a repair lives at the one place that can know a repair would be needed before any Log sees the store. Rejected: opening a read-only log at its pinned head and reporting the repair as pending (a Log mode, and a served state the store has not reconciled); a read-only mode on Log or Anchor; making read-only opening a LeafStore trait method, which would add a criterion to BACKENDS.md; and a per-leaf hash record so a refusal could name the changed leaf.",
+      "quote": "",
+      "consequences": [
+        "StoreError gains ReadOnly and RepairPending; no existing variant changes.",
+        "The LeafStore trait and BACKENDS.md are unchanged, so a second backend owes no read-only open.",
+        "A changed leaf is refused as PinMismatch from Log::open, naming no leaf index; FileLeafStore::leaf serves unchecked bytes and a leaf is proven whole only through Log::open.",
+        "Readers that must not write (Anchor::open_read_only, the lys log commands) are moved onto open_read_only by a further unit; until then they still repair on a read path.",
+        "LYSLOGSTORE-002 is cut back to the witness, and its line that Log and Anchor gain no read-only mode stands."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-107",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, its hash kept in the render manifest, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-28",
+      "decided_by": "The lead's rulings on the given-statement card, with the lead's answers of 28 September on where the hash is recorded, the refusal message and the certificate check; the canonical form and the statement's keeping chosen by HOME-022's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling, and the hash has to sit in a record a stranger reading the session can find.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data. The SHA-256 of those bytes, the given hash, is recorded in every render's manifest block as given_sha256 and printed in the render-launch report; the template_render event keeps the shape ADR-012 decided and names the manifest by hash. The statement is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event's detail, which changes the shape ADR-012 decided; recording it only in the report, where a stranger reading the session cannot find it; keeping the COSE bytes inline as hex in the entry rather than as a block; and adding the file's path to lys verify's one failure message, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "docs/design/home/RECORD.md states the staged import's rule beside the per-append durability order, which is unchanged for every other append.",
+        "Only an import into a session it creates is staged; import_claude_code given a session that is already open keeps append_entry's per-entry syncs, since a rename cannot publish a session that already exists.",
+        "Reconcile is not extended and no session file is trimmed, rewritten or truncated; recovering a session whose last line a crash tore is its own decision.",
+        "A staging file does not end in `.jsonl`, so Home::session_ids never lists it as a session.",
+        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it.",
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "Every render manifest carries given_sha256, keyed or not; the template_render event and the lys.given entry are unchanged.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement signs what a session was given, not which session: equal lys.given data gives equal payloads, and the tie to a session is the lys.given_statement entry's unsigned place under its lys.given entry.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1 supplies a certificate over the home's key for lys verify --cert.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-108",
+      "title": "A Claude Code import builds its session under a staging name and publishes it once",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The home line's lead, answering the survey of the repeated-work card; recorded with HOME-020",
+      "context": "Every imported entry went through Session::append_entry, which syncs the line, syncs the index row and writes the head through a temporary file, a rename and a directory sync: about five syncs per record, though the import sets the head once at its end. Appending in place with no sync until the end cannot be repaired by the existing reconcile: a crash can leave a torn or zero-filled last line that Index::scan refuses as Malformed, so the session will not open, a head still at the header, and a re-import refused as Exists; and the original bytes are never rewritten (P1), so a torn tail cannot be trimmed.",
+      "decision": "The import command builds its new session under the staging name `<id>.jsonl.importing` beside `sessions/<id>.jsonl`, holding `<id>.lock` throughout: the header and every entry line are written to the staging file with no sync, and the index rows and the head are kept in memory. It then publishes once, in this order: one sync of the staging file; the index written whole to `<id>.index.jsonl` through a temporary file, synced and renamed; the head written once to `<id>.head` through a temporary file, synced and renamed; one sync of the sessions directory; the staging file renamed to `<id>.jsonl`; one more sync of the sessions directory. A crash before the rename leaves no session under the final name, so a re-import is not refused as Exists; the next import of that id and the next open of that session file, each holding the lock, remove the staging file and, when `<id>.jsonl` is absent, the `<id>.index.jsonl` and `<id>.head` a part-way publish left. Rejected: appending in place and leaving a session that refuses by name after a crash; extending reconcile to trim an unsynced tail.",
+      "quote": "",
+      "consequences": [
+        "The LeafStore trait gains no method, and BACKENDS.md and the second backend's adoption criteria do not change.",
+        "Log, Log::open, its one-leaf repair, StoreError::PinMismatch and the anchor do not change; a writable open repairs an interrupted append as before.",
+        "A handle from open_read_only never writes: tests hold every file under the store, dot-prefixed names included, to the same bytes before and after each refusal.",
+        "RepairPending is decided without reading a leaf, and a test proves it with a counter on the read path of leaf files.",
+        "ADR-101's rejection of a read-only open of a refused log stands: open_read_only refuses a store past its pin instead of serving it.",
+        "docs/design/home/RECORD.md states the staged import's rule beside the per-append durability order, which is unchanged for every other append.",
+        "Only an import into a session it creates is staged; import_claude_code given a session that is already open keeps append_entry's per-entry syncs, since a rename cannot publish a session that already exists.",
+        "Reconcile is not extended and no session file is trimmed, rewritten or truncated; recovering a session whose last line a crash tore is its own decision.",
+        "A staging file does not end in `.jsonl`, so Home::session_ids never lists it as a session.",
+        "The block store's two syncs per new block are unchanged and are not part of the import's bounded count; they are counted beside it."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-109",
+      "title": "The server judges a grant's standing and effective end over its chain; the screens render them and walk nothing",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "The lead for the identity line, in answer to the grant-rows conformance survey; recorded with DIRECTORY-035",
+      "context": "The identity screens decided whether a grant stands by walking its chain in the browser (model.ts standing(), with its own clock), while the service decides the same question when a grant is exercised. Two judges of one fact can disagree, and a conformance row proven on the screen would then prove the screen's opinion rather than the service's answer.",
+      "decision": "GrantView carries each grant's effective standing ({stands: true}, or {stands: false, refusal, grant, reason} read through the service's sight rules, so a withheld refusal names no grant or identity the caller may not see) and its effective end, both worked out on the server by the same judgement a check makes, and every screen renders those two members and walks no chain, compares no window with the clock and reads no holder's lifecycle state to decide standing. Rejected: keeping the client chain walk beside the server's judgement, and a screen-side derivation of the effective end.",
+      "quote": "",
+      "consequences": [
+        "Any screen that shows whether a grant stands reads GrantView.standing and nothing else; a client standing derivation is a review finding.",
+        "The two members are the only wire addition; no route, request body or query parameter is added for them, and the grant envelope, log leaves and receipts do not change.",
+        "Because admission refuses a derived grant that ends after any end on its chain, effective_ends_at is the grant's own end or null; a change to that admission rule must revisit this member."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-110",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, its hash kept in the render manifest, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-28",
+      "decided_by": "The lead's rulings on the given-statement card, with the lead's answers of 28 September on where the hash is recorded, the refusal message and the certificate check; the canonical form and the statement's keeping chosen by HOME-022's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling, and the hash has to sit in a record a stranger reading the session can find.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data. The SHA-256 of those bytes, the given hash, is recorded in every render's manifest block as given_sha256 and printed in the render-launch report; the template_render event keeps the shape ADR-012 decided and names the manifest by hash. The statement is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event's detail, which changes the shape ADR-012 decided; recording it only in the report, where a stranger reading the session cannot find it; keeping the COSE bytes inline as hex in the entry rather than as a block; and adding the file's path to lys verify's one failure message, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "Every render manifest carries given_sha256, keyed or not; the template_render event and the lys.given entry are unchanged.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement signs what a session was given, not which session: equal lys.given data gives equal payloads, and the tie to a session is the lys.given_statement entry's unsigned place under its lys.given entry.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1 supplies a certificate over the home's key for lys verify --cert.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
       ],
       "supersedes": [],
       "superseded_by": ""
@@ -592,80 +1545,6 @@
         "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
         "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1's --cert checks it against a certificate.",
         "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-038",
-      "title": "The gate's test leg runs every test binary; it never stops at the first failure",
-      "status": "decided",
-      "scope": "project",
-      "date": "2026-09-27",
-      "decided_by": "The gate test-leg card's words and its lead's answers; recorded with LYSGATE-001",
-      "context": "The gate's test leg runs cargo test over the workspace with all features and without --no-fail-fast, so it stops at the first failing test binary: a run that fails in one crate reports nothing about the binaries and crates after it, and a gate can go red for one reason while hiding others. project.json's legs are copied verbatim into every new cluster's gate, so the fail-fast form spreads with each cluster.",
-      "decision": "Every declaration of the gate's test leg runs `cargo test --workspace --all-features --no-fail-fast`: project.json, every cluster design.json gate, .land/gates.sh and CLAUDE.md's 'Gates before any commit' block; CI's test step gains the same one flag and nothing else. Rejected: keeping cargo's default fail-fast run, which is shorter on a red round but reports only the first failing binary.",
-      "quote": "",
-      "consequences": [
-        "A new cluster's gate copied from project.json carries --no-fail-fast.",
-        "A red test leg runs every test binary before it exits, so a red round holds the build venue's battery lock longer than a fail-fast run did.",
-        "The leg still exits non-zero when any test fails; no timeout is raised and no test is split to compensate.",
-        "--no-fail-fast does not continue past a compile error, so evidence that every binary ran comes from a planted test that compiles and fails."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-031",
-      "title": "The context record's cross-kind order is the order the harness's request gives",
-      "status": "decided",
-      "scope": "home",
-      "date": "2026-09-27",
-      "decided_by": "The lead's ruling on the lys.given order card; recorded with HOME-011",
-      "context": "HOME-003 R2 fixed lys.given's documents in the order Claude Code reads the files: the user CLAUDE.md, the appended instructions, the MCP configuration, the CLAUDE.md chain, the memory index. PROOF-GIVEN then measured on Claude Code 2.1.283 that the request the harness sends differs in one place: the appended instructions sit in the system array, ahead of the first user message that carries every CLAUDE.md-family file and the memory index. The record held two orders, one in code and one in the proof, with no rule saying which the record follows, and the MCP configuration contributed no tool to the measured request, so its place there was unmeasured.",
-      "decision": "The context record's documents follow the order the harness's request gives wherever it and the read order differ: appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position. The within-directory order (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) is unchanged. Entries already written under the old order stand as written and no data member is added to mark the order; the documents name the old order as superseded by the commit that lands HOME-011 and by that commit's date. Rejected: keeping the read order, since the request is what reached the model; rewriting or migrating entries already written, since the record is append-only; adding a data member or relying on harness_version to mark the order, since the old order was written under 2.1.283, the new one is written under the version the re-measurement ran on, which may be the same, and the harness version does not tell the two orders apart.",
-      "quote": "",
-      "consequences": [
-        "resolve_given lists appended_instructions and mcp_config ahead of user_claude_md, and the lys.given data shape of ADR-013 is unchanged.",
-        "RECORD.md states the one rule and names the old order as superseded by the commit that lands HOME-011 and its date; a reader tells an entry's order by comparing its recorded time with that date, and never by its harness_version.",
-        "A later harness card records its documents in the order its harness's request gives, and a harness-side input the request carries no trace of takes its place from the read order until it is measured.",
-        "A card that measures a real MCP server's tools position fixes mcp_config's place by that measurement."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-073",
-      "title": "A home moves as one fast-forward git ref pushed to a path on this machine, tracking exactly its record stores",
-      "status": "decided",
-      "scope": "home",
-      "date": "2026-09-27",
-      "decided_by": "The lead's answers to the move survey; recorded with HOME-019",
-      "context": "Stage 3 of the context roadmap moves a home by a pushed ref the target fetches, never a hand copy, with encryption before any bytes leave the machine as its precondition. A home holds, beside its record, lock files and temporaries that must never travel; its blocks hold imported tool results verbatim and a template's env and mcp slots are free strings, so no scan can promise a home holds no secret; and git's own settings can change bytes on the way in or out.",
-      "decision": "A home directory is a git repository whose tracked files are exactly each session's file, index and head, each block and each template, enumerated by name and never by pattern; the first ship initialises it. ship holds every session's lock through its check and snapshot, commits that set, and pushes it without force as the one ref refs/lys/home to a bare repository at a path on this machine, creating it when the path does not exist; a remote ref the new commit does not descend from is refused as ref_diverged. Every other remote, ssh to any host, https, git or file URLs and hosted services, is refused as remote_not_local until stage 3's encryption exists. git runs as the binary with a pinned environment and no filters. Rejected: an allow-list of estate ssh hosts, scanning the home for secrets, a pure-Rust git crate, and force-pushing or overwriting a ref.",
-      "quote": "",
-      "consequences": [
-        "No byte of a home leaves this machine through ship until the secrets step's encryption lands; the second-machine block fetches this ref after that.",
-        "A home with no session, a stale or missing index or head, a session a live owner holds, a repository tracking other files and a remote path that is not a bare repository are each refused by name before anything is pushed.",
-        "The gate machine needs git on PATH."
-      ],
-      "supersedes": [],
-      "superseded_by": ""
-    },
-    {
-      "id": "ADR-074",
-      "title": "An arrival is a seventh lys.harness_event kind, one per arriving session, hung beside the head",
-      "status": "decided",
-      "scope": "home",
-      "date": "2026-09-27",
-      "decided_by": "The lead's answers to the move survey, and the lead's answer that fetch commits the arrival; recorded with HOME-019",
-      "context": "Stage 3 gives the target a distinct execution id with its ancestry recorded, and the identity documents describe an execution per session or fork. The source is never written, so the ancestry can only be written on the target side, and the arrival is a fact about the record, not a turn.",
-      "decision": "fetch appends to each arriving session one lys.harness_event of kind arrival whose detail carries the source commit, the remote, the ref and a fresh execution id for that session's continuation. It hangs beside the head through append_beside, as template_render does (ADR-012), so the head file, the head hash and the next render's session_head on the target are the source's. fetch then commits the appended entries as one commit whose parent is the fetched commit, naming the source commit, the remote and the ref, so the target's git status is clean and a later ship from it carries the arrival onward; a failed append or commit removes what fetch created. There is no home-level id file and no block is stored for it. Rejected: an arrival that moves the head, arrival lines left uncommitted until the target's next ship, one execution id per home, and a block for the arrival's data.",
-      "quote": "",
-      "consequences": [
-        "A target's head file is byte-identical to the source's after fetch, and a render of the target records the source's session_head.",
-        "A remote whose arrival data would pass the 512-byte cap is refused before fetch writes anything.",
-        "The target's HEAD is one arrival commit on the fetched commit, and a ship from the target carries the arrival to the next home."
       ],
       "supersedes": [],
       "superseded_by": ""

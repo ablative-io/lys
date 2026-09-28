@@ -15,13 +15,13 @@ title: Record the given documents in the request's order, re-measured, with the 
 > - ADR-031 — The context record's cross-kind order is the order the harness's request gives — The context record's documents follow the order the harness's request gives wherever it and the read order differ: appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position. The within-directory order (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) is unchanged. Entries already written under the old order stand as written and no data member is added to mark the order; the documents name the old order as superseded by the commit that lands HOME-011 and by that commit's date. Rejected: keeping the read order, since the request is what reached the model; rewriting or migrating entries already written, since the record is append-only; adding a data member or relying on harness_version to mark the order, since the old order was written under 2.1.283, the new one is written under the version the re-measurement ran on, which may be the same, and the harness version does not tell the two orders apart.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
 > **Checklist:**
-> - C83 — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
-> - C84 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
-> - C85 — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
-> - C86 — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
-> - C87 — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+> - C83 — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.
+> - C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
+> - C85 — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.
+> - C86 — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.
+> - C87 — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.
 > **Stories:**
-> - S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+> - S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 > - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
 ## Purpose
@@ -56,7 +56,7 @@ Before any other requirement runs, THE SYSTEM SHALL take PROOF-GIVEN's measure f
 - modify: docs/design/home/PROOF-GIVEN.md
 
 **Checklist:**
-- C86 — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
+- C86 — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.
 
 **Stories:**
 - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
@@ -83,7 +83,7 @@ Measurement details: at 13:32–13:33 AEST, 27 Sep 2026, I copied the file to /t
   - created: `docs/design/home/proof-given/measure.py` — PROOF-GIVEN's measure fixture. It is byte for byte the blob at 2f1baac9a0e11e643711ec8a49ee0f1357406e91:docs/design/home/proof-given/measure.py, taken with git show after fetching origin fixture/proof-given-measure. SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d, mode 100644.
   - modified: `docs/design/home/PROOF-GIVEN.md` — Adds one section at line 211, after the old last line 209: 'The re-measurement of the request's order (HOME-011 R1), 27 September 2026'. It records the command, the copy's SHA-256, the version printed, a table for the three runs, the request's order, that the MCP server added no tool, the order the entry now records, and the old order named as superseded by the commit that lands HOME-011. No earlier line was changed.
 - Checklist delivery:
-  - [x] C86 — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded. — Earlier text unchanged; the re-measurement by the unchanged committed measure.py on 2.1.283 is appended, and the old order is named superseded. The commit-ordering row is left to the landing step.
+  - [x] C86 — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board. — Earlier text unchanged; the re-measurement by the unchanged committed measure.py on 2.1.283 is appended, and the old order is named superseded. The commit-ordering row is left to the landing step.
 - Story delivery:
   - [x] S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed. — The order was re-measured on the named version 2.1.283 and written in PROOF-GIVEN.md.
 
@@ -111,10 +111,10 @@ WHEN resolve_given resolves the documents for a working directory, a config dire
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C83 — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
+- C83 — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 #### R2 — Execution record
 
@@ -137,9 +137,9 @@ Row 12: README is unchanged (met).
 - Files changed:
   - modified: `crates/lys-home/src/harness/claude_code/given.rs` — resolve_given now pushes appended_instructions and mcp_config first, then user_claude_md, then the chain (skipping a path equal to the user file), then the memory index. The module docs state the request's order, say it wins wherever it and the read order differ, give the MCP configuration's provisional place from the read order, name MEASURED_VERSION as the re-measured version, and word the D/.claude/CLAUDE.md rule as 'listed once, as user_claude_md'.
 - Checklist delivery:
-  - [x] C83 — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory. — The request's order is in resolve_given. The within-directory order and D/.claude/CLAUDE.md-once are unchanged.
+  - [x] C83 — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows. — The request's order is in resolve_given. The within-directory order and D/.claude/CLAUDE.md-once are unchanged.
 - Story delivery:
-  - [x] S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents. — The record lists documents in the order the request gives them.
+  - [x] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — The record lists documents in the order the request gives them.
 
 ### R3: Assert the request's order in the given_tests.rs unit tests
 
@@ -155,10 +155,10 @@ In given_tests.rs, replace a_config_claude_md_is_listed_first_as_user_claude_md 
 - modify: crates/lys-home/src/harness/claude_code/given_tests.rs
 
 **Checklist:**
-- C84 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 #### R3 — Execution record
 
@@ -173,9 +173,9 @@ Row 4: the file still has 15 #[test] functions (counted by grep) (met by count; 
 - Files changed:
   - modified: `crates/lys-home/src/harness/claude_code/given_tests.rs` — a_config_claude_md_is_listed_first_as_user_claude_md is replaced by a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config, which asserts len 5, the five kinds in order and documents[2].path == c/CLAUDE.md. The home_dot_claude test is renamed to drop 'first' and keeps its body.
 - Checklist delivery:
-  - [x] C84 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md. — The unit test asserts appended_instructions and mcp_config precede user_claude_md.
+  - [x] C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict. — The unit test asserts appended_instructions and mcp_config precede user_claude_md.
 - Story delivery:
-  - [x] S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents. — The unit test gates the request's order.
+  - [x] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — The unit test gates the request's order.
 
 ### R4: Give the fixture test a user CLAUDE.md in its config directory and assert the request's order
 
@@ -194,10 +194,10 @@ In tests/given_record.rs, Fixture::new SHALL write a user CLAUDE.md into the con
 - modify: crates/lys-home/tests/given_record.rs
 
 **Checklist:**
-- C84 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 #### R4 — Execution record
 
@@ -215,9 +215,9 @@ Row 7 (drift injection): NOT RUN. The instructions forbid me running any test co
 - Files changed:
   - modified: `crates/lys-home/tests/given_record.rs` — Fixture::new writes c/CLAUDE.md with a fixed line (USER_SENTENCE). KINDS holds the five kinds in the request's order. The first-render test is renamed the_first_render_records_five_documents_in_the_request_s_order_under_the_render_event and asserts 5 documents, the length and hash of each file on disk (c/CLAUDE.md at index 2) and harness_version "2.1.283". The two-renders test and the given listing assert 5 documents per record, and the changed hash is checked at index 3. The fallback test asserts the new kinds with h/.claude/CLAUDE.md at index 2 and the memory index at index 4. The count-of-0 user_claude_md assertion is removed.
 - Checklist delivery:
-  - [x] C84 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md. — The fixture test's config directory now holds a user CLAUDE.md, and the test asserts appended_instructions and mcp_config precede it.
+  - [x] C84 — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict. — The fixture test's config directory now holds a user CLAUDE.md, and the test asserts appended_instructions and mcp_config precede it.
 - Story delivery:
-  - [x] S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents. — The end-to-end binary test gates the request's order by path, length and hash.
+  - [x] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — The end-to-end binary test gates the request's order by path, length and hash.
 
 ### R5: State the one rule and the superseded order in RECORD.md
 
@@ -235,10 +235,10 @@ Rewrite the documents part of the lys.given paragraph in docs/design/home/RECORD
 - modify: docs/design/home/RECORD.md
 
 **Checklist:**
-- C85 — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
+- C85 — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 #### R5 — Execution record
 
@@ -256,9 +256,9 @@ No other paragraph changed.
 - Files changed:
   - modified: `docs/design/home/RECORD.md` — The documents part of the lys.given paragraph now states one rule: the request's order wins over the read order. It gives the order appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, the MCP configuration's place as provisional, the within-directory order unchanged and D/.claude/CLAUDE.md listed once, as user_claude_md. It names the old order as superseded by the commit that lands HOME-011, says entries written under it stand, and says harness_version (2.1.283 for both orders) does not tell the orders apart; an entry's recorded time against that commit's date does.
 - Checklist delivery:
-  - [x] C85 — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version. — One rule is stated, the old order is named superseded, and the reader is told to use recorded time, never harness_version.
+  - [x] C85 — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd. — One rule is stated, the old order is named superseded, and the reader is told to use recorded time, never harness_version.
 - Story delivery:
-  - [x] S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents. — The record's documented order is the request's.
+  - [x] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — The record's documented order is the request's.
 
 ### R6: Record the supersession on HOME-003 and render its markdown
 
@@ -275,10 +275,10 @@ Append one amendment to docs/design/home/briefs/HOME-003.json, as a new `amendme
 - modify: docs/design/home/briefs/HOME-003.md
 
 **Checklist:**
-- C87 — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+- C87 — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 #### R6 — Execution record
 
@@ -298,9 +298,9 @@ Row 4: gate.sh not run by me. render-cluster.py docs/design/home was run and all
   - modified: `docs/design/home/CHECKLIST.md` — Re-rendered from checklist.json as committed in 8c6f5bb: C83 to C87.
   - created: `docs/design/home/briefs/HOME-011.md` — The rendered markdown of HOME-011.json (a path in the design's structure array).
 - Checklist delivery:
-  - [x] C87 — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to. — S12's wording is updated, the HOME-003 amendment is recorded, and every rendered file is re-rendered.
+  - [x] C87 — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts. — S12's wording is updated, the HOME-003 amendment is recorded, and every rendered file is re-rendered.
 - Story delivery:
-  - [x] S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents. — The rendered story reads 'in the order the request gives them'.
+  - [x] S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone. — The rendered story reads 'in the order the request gives them'.
 
 ## Boundaries
 

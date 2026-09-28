@@ -1,0 +1,60 @@
+{
+  "cluster": "lys-anchor",
+  "sections": [
+    {
+      "name": "Dependencies",
+      "items": [
+        {
+          "id": "C1",
+          "text": "crates/lys-anchor/Cargo.toml lists chrono.workspace = true under [dependencies], and no other dependency is added.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Admission at a named instant",
+      "items": [
+        {
+          "id": "C2",
+          "text": "RecognisedCertificate has a public, documented admit_at taking the submission, the SubmitterContext and a DateTime<Utc>, which verifies the chain and validity window at that instant through lys_core::ca::verify_certificate_chain_at.",
+          "done": false
+        },
+        {
+          "id": "C3",
+          "text": "RecognisedCertificate's AdmissionPolicy::admit keeps its signature and calls admit_at with Utc::now().",
+          "done": false
+        },
+        {
+          "id": "C4",
+          "text": "certificate.rs's docs say a certificate is judged at the instant its caller names, and none says 'right now' or 'currently'.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The expiry test",
+      "items": [
+        {
+          "id": "C5",
+          "text": "an_expired_certificate_is_refused contains no sleep and asserts Ok(()) from admit_at at an instant inside the one-second window and Err(NotAdmitted) at issuance plus 2 seconds.",
+          "done": false
+        },
+        {
+          "id": "C6",
+          "text": "grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-anchor prints nothing.",
+          "done": false
+        },
+        {
+          "id": "C7",
+          "text": "certificate_tests.rs's module doc describes the expiry case as judged at named instants, not as waiting for expiry.",
+          "done": false
+        },
+        {
+          "id": "C8",
+          "text": "The other 18 admission tests are byte-unchanged and pass.",
+          "done": false
+        }
+      ]
+    }
+  ]
+}

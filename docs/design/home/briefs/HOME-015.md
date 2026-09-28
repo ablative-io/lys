@@ -16,14 +16,14 @@ title: Hand an outgoing session's letter to a new successor home as inherited me
 > - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 > - ADR-058 — A handover is a rule-less lys.inherited entry and the letter's turn copied whole into a new successor home, its inheritance read from its first entry — The letter is one or more entry ids, a run of assistant message entries standing next to each other on the outgoing session's path, in path order. Each entry is copied whole, keeping its id, its timestamp and its message, with only its parent link rewritten to chain onto the successor, and from_entries lists every id in that order. The successor is a new home directory, absent or empty, holding one new session with a fresh id, the outgoing header's cwd and no parentSession. Its first entry is a lys.inherited entry with no rule, then the copied entries, then a session_info whose name is `inherited from <outgoing session id>`, and no field is added to Pi's grammar. The first entry is what says the successor's first memory is inherited; the handover's own report reads it from there and prints inherited true, and the render report and its count of canon examples are unchanged. The canon loader newly refuses by name a canon example whose lys.inherited entry has no rule; a lys.inherited entry in a session of a home is read without that check. Rejected: merging the run into one message (composing the letter), copying one entry (half a letter), a session_info flag (breaks CN4), writing into the outgoing home, and setting parentSession, which ADR-017 keeps for a fork's ancestry.
 > **Checklist:**
-> - C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-> - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
-> - C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-> - C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-> - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-> - C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
-> - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
-> - C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.
+> - C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+> - C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+> - C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+> - C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+> - C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+> - C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+> - C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+> - C52 — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
 > **Stories:**
 > - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
 > - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
@@ -58,7 +58,7 @@ Structural. `error.rs` gains six named refusals. Each message begins with its na
 - modify: crates/lys-home/src/record/entries.rs
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -74,7 +74,7 @@ Structural. `error.rs` gains six named refusals. Each message begins with its na
   - modified: `crates/lys-home/src/error.rs` — six named refusals, each beginning with its name and naming ids or the path only
   - modified: `crates/lys-home/src/record/entries.rs` — CUSTOM_INHERITED documented for a canon example and a handover; INHERITED_FROM declared; no field added to the header, EntryBase or any EntryBody variant
 - Checklist delivery:
-  - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
+  - [x] C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -103,7 +103,7 @@ Structural, then behaviour. In `record/canon.rs`, `Inherited.rule` becomes `Opti
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -122,7 +122,7 @@ Structural, then behaviour. In `record/canon.rs`, `Inherited.rule` becomes `Opti
   - created: `crates/lys-home/src/record/handover.rs` — module documentation of the handover invariants
   - created: `crates/lys-home/src/record/handover_tests.rs` — opens with #![cfg(test)]; the canon and serialisation gates
 - Checklist delivery:
-  - [x] C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs. — met; see how
+  - [x] C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -146,7 +146,7 @@ WHEN a handover is asked for with an outgoing home, a from session id, a list of
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -162,7 +162,7 @@ WHEN a handover is asked for with an outgoing home, a from session id, a list of
   - modified: `crates/lys-home/src/record/handover.rs` — the checks in order: successor path, session, assistant entries, contiguity on the root-to-head path read through read_head and SessionReader, authored, thinking
   - modified: `crates/lys-home/src/record/handover_tests.rs` — the ten refusal cases
 - Checklist delivery:
-  - [x] C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs. — met; see how
+  - [x] C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -185,9 +185,9 @@ WHEN every check of R3 passes, THE SYSTEM SHALL open the successor path as a new
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -203,9 +203,9 @@ WHEN every check of R3 passes, THE SYSTEM SHALL open the successor path as a new
   - modified: `crates/lys-home/src/record/handover.rs` — write_successor: the rule-less lys.inherited entry, the letter entries with only parentId rewritten, the session_info name, and the report read back from the first entry
   - modified: `crates/lys-home/src/record/handover_tests.rs` — the four-entry gates for an absent and an empty successor
 - Checklist delivery:
-  - [x] C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs. — met; see how
-  - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
-  - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
+  - [x] C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left. — met; see how
+  - [x] C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it. — met; see how
+  - [x] C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -224,7 +224,7 @@ WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>... --s
 - modify: crates/lys-home/src/cli.rs
 
 **Checklist:**
-- C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -239,7 +239,7 @@ WHEN `lys-home handover --home <dir> --from <session> --letter <entry id>... --s
 - Files changed:
   - modified: `crates/lys-home/src/cli.rs` — the handover subcommand and HandoverArgs; the module doc lists handover; 454 code lines
 - Checklist delivery:
-  - [x] C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes. — met; see how
+  - [x] C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -258,7 +258,7 @@ WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule as
 - modify: crates/lys-home/src/record/handover_tests.rs
 
 **Checklist:**
-- C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 
 **Stories:**
 - S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
@@ -273,7 +273,7 @@ WHILE rendering a successor for Claude Code, THE SYSTEM SHALL apply R4's rule as
 - Files changed:
   - modified: `crates/lys-home/src/record/handover_tests.rs` — the two render gates on a successor written by the handover
 - Checklist delivery:
-  - [x] C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass. — met; see how
+  - [x] C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt. — met; see how
 - Story delivery:
   - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover
 
@@ -293,10 +293,10 @@ Structural. RECORD.md's `lys.inherited` item gains the handover form: the data `
 - modify: docs/design/home/CHECKLIST.md
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
 
 **Stories:**
 - S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
@@ -313,10 +313,10 @@ Structural. RECORD.md's `lys.inherited` item gains the handover form: the data `
   - modified: `docs/design/home/design.json` — the notes of the handover, proof and record rows
   - modified: `docs/design/home/DESIGN.md` — re-rendered
 - Checklist delivery:
-  - [x] C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs. — met; see how
-  - [x] C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs. — met; see how
-  - [x] C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line. — met; see how
-  - [x] C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it. — met; see how
+  - [x] C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id. — met; see how
+  - [x] C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left. — met; see how
+  - [x] C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it. — met; see how
+  - [x] C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before. — met; see how
 - Story delivery:
   - [x] S8 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs. — served for the handover
 
@@ -335,7 +335,7 @@ WHEN the build is complete, THE SYSTEM SHALL write PROOF-HANDOVER.md from runs o
 - create: docs/design/home/PROOF-HANDOVER.md
 
 **Checklist:**
-- C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.
+- C52 — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
 
 **Stories:**
 - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
@@ -351,7 +351,7 @@ WHEN the build is complete, THE SYSTEM SHALL write PROOF-HANDOVER.md from runs o
 - Files changed:
   - created: `docs/design/home/PROOF-HANDOVER.md` — the elicited letter, the handover by ids and hashes, the carry-over, and the card counts as not run
 - Checklist delivery:
-  - [x] C52 — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run. — met; see how
+  - [x] C52 — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed. — met; see how
 - Story delivery:
   - [x] S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught. — served for the handover
   - [x] S2 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it. — served for the handover

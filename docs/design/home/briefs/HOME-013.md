@@ -14,13 +14,13 @@ title: Move the home record's logic out of record/mod.rs into home.rs, session.r
 > - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 > - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
 > **Checklist:**
-> - C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
-> - C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
-> - C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
-> - C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
-> - C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-> - C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
-> - C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+> - C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+> - C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+> - C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+> - C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+> - C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+> - C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+> - C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 > **Stories:**
 > - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
 > - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
@@ -49,7 +49,7 @@ Create crates/lys-home/src/record/helpers.rs holding, moved from crates/lys-home
 - create: crates/lys-home/src/record/helpers.rs
 
 **Checklist:**
-- C45 — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
@@ -69,7 +69,7 @@ Create crates/lys-home/src/record/session.rs holding, moved from mod.rs at BASE,
 - create: crates/lys-home/src/record/session.rs
 
 **Checklist:**
-- C46 — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
@@ -86,7 +86,7 @@ Create crates/lys-home/src/record/home.rs holding, moved from mod.rs at BASE, th
 - create: crates/lys-home/src/record/home.rs
 
 **Checklist:**
-- C47 — Home and its impl are defined in crates/lys-home/src/record/home.rs.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
@@ -102,7 +102,7 @@ In crates/lys-home/src/record/fork.rs, import write_durable and custom_type_of f
 - modify: crates/lys-home/src/record/fork.rs
 
 **Checklist:**
-- C48 — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
 
 **Stories:**
 - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
@@ -123,8 +123,8 @@ crates/lys-home/src/record/mod.rs keeps its //! module docs, every pub mod and m
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C49 — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
-- C50 — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
 
 **Stories:**
 - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
@@ -143,7 +143,7 @@ WHEN the moved items in helpers.rs, session.rs and home.rs are compared with mod
 - `find crates/lys-home -name '*.rs' ! -name '*_tests.rs' ! -path 'crates/lys-home/tests/*' -exec sh -c 'n=$(grep -cvE "^[[:space:]]*(//|$)" "$1"); [ "$n" -gt 500 ] && echo "$1 $n"' _ {} \;` prints nothing.
 
 **Checklist:**
-- C51 — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 
 **Stories:**
 - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.

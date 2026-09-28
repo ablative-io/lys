@@ -15,17 +15,17 @@ title: Light a lantern at an entry of a session, grow its note by epilogues, and
 > - ADR-014 — A lantern is a custom entry in its session, and its note grows only by epilogue entries — A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).
 > - ADR-015 — A lantern's note and epilogues are the person's annotations, not transcript — A lantern's note and its epilogues are the person's own annotations, not transcript. Recall prints them by design; they are the one exception to P7 and CN3, and only recall prints them. Transcript lines (message, tool and compaction content) still never appear in output, logs or errors, and a recall row never carries a line of the transcript around its point. Rejected: treating notes as transcript and printing only their hashes, which makes recall useless to the person who wrote them.
 > **Checklist:**
-> - C24 — A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.
-> - C25 — Lighting only appends: the session's earlier bytes are unchanged and the head is the lantern; a point that is not an entry of the session, a lantern or epilogue as the point, an empty or whitespace-only note, and a session another owner holds are each refused by name with nothing written.
-> - C26 — An epilogue is added to a named lantern of a session and appended at that session's head; a lantern the session does not hold and empty or whitespace-only words are each refused by name with nothing written.
-> - C27 — Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.
-> - C28 — Recall by note lists every lantern in the home whose note or one of whose epilogues contains the given words as one phrase, case-folded; recall by point lists every lantern marking a session and entry id, and refuses an unknown session or entry by name; every row is the lantern's id, session, point, lit-by, lit-at, note and its epilogues in order, and never a line of the transcript.
-> - C29 — Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.
-> - C30 — A lantern lives in the home: the rendered Claude Code file of a session carries no lantern or epilogue line, a home file holding them still parses with Pi's parser unchanged, and nothing lights a lantern automatically.
+> - C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+> - C25 — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
+> - C26 — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
+> - C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+> - C28 — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
+> - C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+> - C30 — On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.
 > **Stories:**
 > - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-> - S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
-> - S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+> - S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+> - S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
 > - S17 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
 
 ## Purpose
@@ -56,11 +56,11 @@ Structure: add the custom-type constants `CUSTOM_LANTERN = "lys.lantern"` and `C
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C24 — A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
 
 **Stories:**
 - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
 
 ### R2: Read a session without owning it, and list a home's sessions
 
@@ -80,10 +80,10 @@ Add a read-only session reader. WHEN a session is read through it, THE SYSTEM SH
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C27 — Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.
+- C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
 
 **Stories:**
-- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
 
 ### R3: Light a lantern at an entry of a session
 
@@ -107,8 +107,8 @@ WHEN a lantern is lit with a home, a session id, the entry id of the point, a no
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C24 — A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.
-- C25 — Lighting only appends: the session's earlier bytes are unchanged and the head is the lantern; a point that is not an entry of the session, a lantern or epilogue as the point, an empty or whitespace-only note, and a session another owner holds are each refused by name with nothing written.
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- C25 — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
 
 **Stories:**
 - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
@@ -132,11 +132,11 @@ WHEN an epilogue is added with a home, a session id, the lantern's entry id, the
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C24 — A lantern is a lys.lantern custom entry appended at the session's head, naming an existing entry of that session that is not a lantern or an epilogue as its point, with the note as written, lit-by and lit-at; an epilogue is a lys.lantern_epilogue custom entry naming the lantern's entry id with its words, author and time; both are documented beside the other lys custom entries.
-- C26 — An epilogue is added to a named lantern of a session and appended at that session's head; a lantern the session does not hold and empty or whitespace-only words are each refused by name with nothing written.
+- C24 — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- C26 — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
 
 **Stories:**
-- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
 
 ### R5: Recall lanterns by note and by point
 
@@ -164,11 +164,11 @@ Recall reads through the R2 reader only. WHEN recall by note is asked with some 
 - modify: crates/lys-home/src/lib.rs
 
 **Checklist:**
-- C27 — Recall reads without owning: it takes no session lock and writes no file, and a session it cannot read is skipped and named with its reason while every other session is still listed.
-- C28 — Recall by note lists every lantern in the home whose note or one of whose epilogues contains the given words as one phrase, case-folded; recall by point lists every lantern marking a session and entry id, and refuses an unknown session or entry by name; every row is the lantern's id, session, point, lit-by, lit-at, note and its epilogues in order, and never a line of the transcript.
+- C27 — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+- C28 — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
 
 **Stories:**
-- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
 
 ### R6: Add the lantern subcommands to lys-home
 
@@ -194,12 +194,12 @@ Add a nested `lantern` subcommand to lys-home with three actions, in their own m
 - modify: crates/lys-home/src/lib.rs
 
 **Checklist:**
-- C29 — Three lys-home subcommands light a lantern, add an epilogue and recall, each printing one JSON report that carries no transcript line.
+- C29 — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
 
 **Stories:**
 - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
-- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
-- S16 (Agent, Runs in a harness and wants to continue somewhere else) — As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+- S16 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
 
 ### R7: Keep the lantern in the home
 
@@ -216,7 +216,7 @@ WHILE a session holds lanterns and epilogues, WHEN it is rendered for Claude Cod
 - create: docs/design/home/PROOF-LANTERN.md
 
 **Checklist:**
-- C30 — A lantern lives in the home: the rendered Claude Code file of a session carries no lantern or epilogue line, a home file holding them still parses with Pi's parser unchanged, and nothing lights a lantern automatically.
+- C30 — On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.
 
 **Stories:**
 - S17 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.

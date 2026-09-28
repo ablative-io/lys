@@ -54,6 +54,20 @@ Structural. In docs/design/project.json, the command of the leg named 'tests' in
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: met. docs/design/project.json:29 now reads `"command": "cargo test --workspace --all-features --no-fail-fast"`, and it is legs[3], the fourth leg. Row 2: met in the working tree. git diff --numstat shows `1	1	docs/design/project.json`, and the only difference between the removed and added lines is ` --no-fail-fast` before the closing quote. Row 3: met. `python3 scripts/design/validate.py docs/design/project.json` printed OK and exited 0.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/project.json` — trees[0].legs[3] 'tests' command is now `cargo test --workspace --all-features --no-fail-fast` (line 29); nothing else changed
+- Checklist delivery:
+  - [x] C1 — docs/design/project.json's 'tests' leg command is exactly `cargo test --workspace --all-features --no-fail-fast`. — project.json:29
+- Story delivery:
+  - [x] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others. — The project gate's tests leg now runs every test binary.
+
 ### R2: Change the tests leg of the four cluster gates and re-render them
 
 Structural. In docs/design/directory/design.json, docs/design/home/design.json, docs/design/secrets/design.json and docs/design/lys-gate/design.json, the command of the gate leg named 'tests' becomes exactly `cargo test --workspace --all-features --no-fail-fast`. Each leg's name, requires, cadence and position, every other leg, every other tree and every shorthand stay byte-identical. Each of the four clusters is re-rendered with python3 scripts/design/render-cluster.py <cluster directory>. 'The briefs under docs/design/*/briefs' that the words keep unchanged means the other clusters' briefs; this card's own docs/design/lys-gate/briefs is written by the chain's card and re-render commits and is outside that set. THE SYSTEM SHALL NOT change any field of these files other than the one command string, SHALL NOT edit any other cluster's file under docs/design/*/briefs, and SHALL NOT create, edit or delete anything under docs/design/lys-core.
@@ -76,6 +90,23 @@ Structural. In docs/design/directory/design.json, docs/design/home/design.json, 
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: met in the working tree. git diff --numstat shows 1/1 for each of the four files. In each, one sed substitution replaced only the exact string `"command": "cargo test --workspace --all-features"`, so every added line contains the new command. Row 2: met. The only change is that one command string, so every tree, leg name, order, requires, cadence and shorthand is unchanged. Row 3: met. `python3 scripts/design/render-cluster.py` ran on docs/design/directory, home, secrets and lys-gate, and git status --porcelain afterwards listed only the eight edited files, with no markdown under docs/design changed. Row 4: met. Nothing under other clusters' briefs or under docs/design/lys-core was touched.
+- Deviation: (none)
+- Files changed:
+  - modified: `docs/design/directory/design.json` — The gate 'tests' leg command at line 716 now has --no-fail-fast
+  - modified: `docs/design/home/design.json` — The gate 'tests' leg command at line 776 now has --no-fail-fast
+  - modified: `docs/design/secrets/design.json` — The gate 'tests' leg command at line 185 now has --no-fail-fast
+  - modified: `docs/design/lys-gate/design.json` — The one-line gate array at line 247 now has --no-fail-fast in its 'tests' leg command
+- Checklist delivery:
+  - [x] C2 — The 'tests' leg command of the directory, home, secrets and lys-gate design.json gate arrays is exactly `cargo test --workspace --all-features --no-fail-fast`, and every other leg is byte-identical to before. — All four gate arrays are updated, and every other leg is byte-identical
+- Story delivery:
+  - [x] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
+
 ### R3: Change the landing hook's test leg in .land/gates.sh
 
 Structural. In .land/gates.sh the line `leg cargo test --workspace --all-features` becomes exactly `leg cargo test --workspace --all-features --no-fail-fast`, on the same line, after both clippy legs and before both doc legs, so the tests leg still carries --all-features. The leg() wrapper, the header comment, the other six leg lines and their order, and the exit logic do not change. THE SYSTEM SHALL NOT change any line of .land/gates.sh other than the tests leg's, SHALL NOT remove --all-features from that leg, and SHALL NOT gain a check of the branch name.
@@ -94,6 +125,20 @@ Structural. In .land/gates.sh the line `leg cargo test --workspace --all-feature
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: met. .land/gates.sh:19 is `leg cargo test --workspace --all-features --no-fail-fast`. Row 2: met. numstat shows 1/1. Row 3: met. `grep '^leg '` prints the seven legs in the required order, with the tests leg fifth. The wrapper, the header comment, the exit logic and every other line are unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `.land/gates.sh` — Line 19 is now `leg cargo test --workspace --all-features --no-fail-fast`
+- Checklist delivery:
+  - [x] C3 — .land/gates.sh's test leg line is exactly `leg cargo test --workspace --all-features --no-fail-fast`. — .land/gates.sh:19
+- Story delivery:
+  - [x] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
+
 ### R4: Change the test line of CLAUDE.md's 'Gates before any commit' block
 
 Structural. In CLAUDE.md's 'Gates before any commit' code block, the test line becomes exactly `cargo test --workspace --all-features --no-fail-fast`, so .land/gates.sh still runs its legs exactly as that block lists them. The block's other five lines and their order, and every other line of CLAUDE.md, do not change. THE SYSTEM SHALL NOT edit the prose after the block, including its 'All five clean' sentence and its quotations of cargo commands.
@@ -111,6 +156,20 @@ Structural. In CLAUDE.md's 'Gates before any commit' code block, the test line b
 
 **Stories:**
 - S2 (AI Agent, Runs the gates by hand before a commit) — As an agent running the gates by hand from CLAUDE.md, I want its test line to be the landing hook's test command so that my run measures what landing measures.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: met. CLAUDE.md:99 is the only `^cargo test` line, and it now reads `cargo test --workspace --all-features --no-fail-fast`. Row 2: met. It matches .land/gates.sh:19 exactly with the `leg ` prefix removed. Row 3: met. numstat shows 1/1. The prose after the block was not edited.
+- Deviation: (none)
+- Files changed:
+  - modified: `CLAUDE.md` — The test line of 'Gates before any commit' at line 99 is now `cargo test --workspace --all-features --no-fail-fast`
+- Checklist delivery:
+  - [x] C4 — CLAUDE.md's 'Gates before any commit' test line is exactly `cargo test --workspace --all-features --no-fail-fast`, the same command as .land/gates.sh's test leg. — CLAUDE.md:99 matches .land/gates.sh:19
+- Story delivery:
+  - [x] S2 (AI Agent, Runs the gates by hand before a commit) — As an agent running the gates by hand from CLAUDE.md, I want its test line to be the landing hook's test command so that my run measures what landing measures.
 
 ### R5: Add --no-fail-fast to CI's test step
 
@@ -131,6 +190,20 @@ Structural. In .github/workflows/ci.yml the Test step's `run: cargo test --works
 **Stories:**
 - S3 (Contributor, Reads CI results on a pull request) — As a contributor reading CI on a pull request, I want the test step to report every failing test binary so that I can fix them all from one run.
 
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1: met. `grep -n 'run: cargo test'` prints `46:        run: cargo test --workspace --no-fail-fast`. Row 2: met. The count of --no-fail-fast is now 1, and the base had 0 because the flag was absent. Row 3: met. The count of --all-features is 0. Row 4: met. numstat shows 1/1, and env LYS_REQUIRE_GO, the step name and every other step are unchanged.
+- Deviation: (none)
+- Files changed:
+  - modified: `.github/workflows/ci.yml` — The Test step at line 46 now runs `cargo test --workspace --no-fail-fast`
+- Checklist delivery:
+  - [x] C5 — .github/workflows/ci.yml's Test step runs exactly `cargo test --workspace --no-fail-fast`. — ci.yml:46
+- Story delivery:
+  - [x] S3 (Contributor, Reads CI results on a pull request) — As a contributor reading CI on a pull request, I want the test step to report every failing test binary so that I can fix them all from one run.
+
 ### R6: Make the change one commit and prove no declared test leg lacks --no-fail-fast
 
 WHEN the change is committed, THE SYSTEM SHALL carry every edit of R1 to R5 in exactly one commit, <change>, which changes the eight files R1 to R5 name and no other, and at <change> the grep over the six files named one by one, `grep -rn 'cargo test --workspace --all-features' docs/design/project.json docs/design/directory/design.json docs/design/home/design.json docs/design/secrets/design.json docs/design/lys-gate/design.json .land/gates.sh | grep -vc -- --no-fail-fast` SHALL print 0. The grep's command line and output are recorded in the pull request's evidence and in the proof document of R9. THE SYSTEM SHALL NOT add a script, a test or any other file to carry the check. No other commit on the card's branch SHALL change any of the eight files except docs/design/lys-gate/design.json, which the chain's own commits also write; for that file what is measured is its gate array alone, and no other commit on the card's branch SHALL change the gate array: it is identical at <base> and at <change>~1, and identical at <change> and at the card's head. The grep SHALL NOT be written over a glob of docs/design/*/design.json, and THE SYSTEM SHALL NOT change a design.json of a cluster that is not among the four R2 names.
@@ -148,6 +221,18 @@ WHEN the change is committed, THE SYSTEM SHALL carry every edit of R1 to R5 in e
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: The eight edits of R1 to R5 are in the working tree with no other change. git status lists exactly those eight paths, each at 1/1. Run over the six files named one by one, the R6 grep prints 0 on the working tree now, and at the base it matches the six old command lines. The acceptance rows need <change> to be a commit, but these instructions say to make no commit, so the rows cannot be measured until the reviewed landing commits these eight files as one commit. The lys-gate gate array has not been changed by any other commit.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C6 — The changes of C1 to C5 are one commit, no other commit on the card's branch changes those files except that the lys-gate design.json's gate array alone is held unchanged outside that commit, and the grep over docs/design/project.json, the directory, home, secrets and lys-gate design.json files and .land/gates.sh, named one by one, for test legs without --no-fail-fast prints 0. — Waiting for the single landing commit; the grep prints 0 on the working tree
+- Story delivery:
+  - [ ] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others. — Depends on the commit
+
 ### R7: Keep the design gate green and show each changed tests leg's command in a gate round's log
 
 WHEN the ledger measures one gate round at <change> for each of the four clusters R2 names, each round measured against that cluster's design.json over the repository's working tree at <change> (the directory round, the home round, the secrets round and the lys-gate round), THE SYSTEM SHALL report each round's tests leg green, and each round's log SHALL show its tests leg's logged command line containing 'cargo test' followed by '--no-fail-fast'; that logged line is what shows the leg is still classed as a battery, because the ledger matches its marker 'cargo test' against running command lines and logs each leg's command as '$ command'. The ledger measures one cluster's gate per round, so each changed leg is shown by the round measured against its own cluster. The directory and secrets gates declare every leg as requiring place:here, the place the ledger itself runs, so those two rounds are run by a ledger whose own place is the venue that serves heavy builds and full gates, and place:here is that venue for them. The lys-gate round is the green round R8 and R9 compare against. WHEN sh scripts/design/gate.sh runs at the card's head, THE SYSTEM SHALL exit 0. THE SYSTEM SHALL NOT change the ledger or the method to print a battery class, SHALL NOT show a cluster's changed leg by a round measured against another cluster's design.json, and SHALL NOT run any of the four rounds on the authoring machine.
@@ -162,6 +247,18 @@ WHEN the ledger measures one gate round at <change> for each of the four cluster
 
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: The four green gate rounds, for directory, home, secrets and lys-gate, must run against <change> at the venue that serves heavy builds and full gates. The brief forbids running them on this machine, and the instructions forbid running any gate by hand. The workflow runs scripts/design/gate.sh itself. The re-render showed no markdown drift, so I expect it to stay green. scripts/design is unchanged.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C7 — sh scripts/design/gate.sh exits 0 at the card's head, and four green gate rounds at the change, one measured against each of the directory, home, secrets and lys-gate design.json files, each show the tests leg's '$ command' line as `$ cargo test --workspace --all-features --no-fail-fast`. — Needs venue gate rounds at <change>
+- Story delivery:
+  - [ ] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others. — Depends on the rounds
 
 ### R8: Run one gate round over a local scratch branch with one planted failing test
 
@@ -180,6 +277,18 @@ WHEN one gate round runs over the local branch scratch/lysgate-001, cut from <ch
 
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: The scratch round needs <change> to exist and must run in a local worktree at the heavy-build venue. It cannot be run from this authoring session. No scratch branch was created and no crate source was changed.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C8 — One gate round over a local scratch branch with one planted failing test in crates/lys shows exactly one failed test result and as many test results as the lys-gate green round at the same head, and no ref under scratch/ exists on origin after it. — Needs <change> and the venue
+- Story delivery:
+  - [ ] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others. — Depends on the scratch round
 
 ### R9: Write the proof document that names the scratch round's log
 
@@ -202,6 +311,18 @@ Structural. docs/design/lys-gate/PROOF-LYSGATE-001.md records, in a commit after
 
 **Stories:**
 - S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others.
+
+#### R9 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: PROOF-LYSGATE-001.md must name the round ids, log-store paths and SHA-256s of the five venue rounds (R7, R8), and must be committed after <change>. None of those rounds exist yet, so the document cannot be written truthfully. For its 'Findings for other cards' section: docs/design holds only the four named design.json files today, so that section would list no paths.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C9 — docs/design/lys-gate/PROOF-LYSGATE-001.md names each of the four green rounds and the scratch round by round id, log path in the gate log store and SHA-256, and the scratch round's counts, holds no line of any of those logs, and lists by file name every other cluster's design.json whose test leg lacks --no-fail-fast as a finding for that cluster's card. — Needs the five rounds' logs
+- Story delivery:
+  - [ ] S1 (Lead, Reads a red gate round before landing a card) — As a lead reading a red gate round, I want every failing test binary reported in that one round so that one failure cannot hide the others. — Depends on R7 and R8
 
 ## Boundaries
 

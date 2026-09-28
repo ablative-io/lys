@@ -1,0 +1,322 @@
+{
+  "id": "RAUTHYREBASE-001",
+  "cluster": "rauthy-rebase",
+  "title": "Rebase the Rauthy fork onto the newest hardened upstream release and move the pin",
+  "depends_on": [
+    "DIRECTORY-002"
+  ],
+  "blocked_by": [
+    "The trigger: a non-pre-release upstream tag above v0.36.2 whose tag commit has c44f7cac and 989f9ff9 as ancestors (git merge-base --is-ancestor), with the three guard tests present and passing there. None exists when this brief is written; the newest upstream release is v0.36.2.",
+    "DIRECTORY-002 landed on lys main, checked by a test named ID001_PIN_CLONE being present under crates/lys/tests on main; deploy/identity/versions.json and docs/design/identity/reports/IDENTITY-001-deployment.md arrive with it.",
+    "The fork's own chain and gate in ablative-io/rauthy, which land the guard-test commit and run the fork gate test command (just build-wasm, npm install in frontend/ and just build-ui, then just test-postgres and just test-hiqlite, from the commit's justfile) whose logs trigger-guards and candidate-suite read; it does not exist when this brief is written.",
+    "A build venue holding the fork's toolchain (Rust 1.95.0 or later, edition 2024, the wasm and UI build steps upstream's code_style workflow runs) and Docker for the image, reaching the standalone install's PostgreSQL service."
+  ],
+  "checklist": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16"
+  ],
+  "stories": [
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-005",
+    "ADR-009",
+    "ADR-019"
+  ],
+  "purpose": "Move the maintained Rauthy fork's ablative branch and the lys vendor/rauthy pin off v0.36.2 onto the newest upstream release that carries the authentication hardening (c44f7cac, #1696, and 989f9ff9, #1728) the identity line waits on, with our commits carried onto it unaltered and three guard tests proving the account-status, redirect and logout cases at the tag. This brief is the card IDENTITY-001 and ADR-009 call IDENTITY-002, carried by roadmap row RM-003. Where the card's words say the next hardened release, the base is the newest qualifying release read immediately before the rebase. Its gate result is the evidence the separate decision on IDENTITY-001-UPSTREAM-AUTH-STATE will need.",
+  "task": "Written ahead of its trigger; built only once R1's trigger holds and DIRECTORY-002 has landed. Run the named steps in order: trigger-check and trigger-guards (R1), migration-numbers (R2), rebase (R3), candidate-build and candidate-suite (R4), pre-rebase-tag and ablative-push (R5), pin-move, pin-clone and earlier-clone (R7), install (R8), records (R9) and, once the lys pull request's gate has passed and the pin move has landed, guards-ref-removal (R9), which writes the gate result into the card's landing record. R6 is the reset every step after ablative-push calls on failure, so it comes directly after R5. A failure before ablative-push moves neither ablative, a pre-rebase tag nor the pin, and keeps every rauthy-rebase/<tag commit>-guards and rauthy-rebase/<tag commit> branch for inspection. Both states of the fork are covered. With no fork commits at card start, ablative becomes the tag commit plus exactly one commit adding the three guard tests, and the pin moves to that commit. With fork commits at card start (DIRECTORY-004's provider-link commit, if it has landed), ablative becomes the tag commit, then the fork commits rebased in their order, then exactly one guard-test commit on top, and the pin moves to that top commit; every fork commit must survive the rebase with its behaviour intact. The guard-test file and every fork commit belong to the fork's repository and are named with their owner, never listed as lys files. The lys pull request changes exactly four paths: vendor/rauthy, deploy/identity/versions.json, docs/design/identity/reports/IDENTITY-001-deployment.md and docs/design/identity/reports/IDENTITY-002-rebase.md. The existing data the install proof comes up against is a disposable database the card makes itself, written by the previously pinned build; the kept development database is never touched. Out of scope: lifting IDENTITY-001-UPSTREAM-AUTH-STATE and opening rows 06 and 07; moving the kept development data to the new release; renumbering DIRECTORY-004's migrations; creating the fork's own chain.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Record the trigger as facts, prove the guard tests at each candidate tag, and choose the newest qualifying tag",
+      "spec": "Definitions used by every requirement: the lys start commit is the lys main commit the card starts from; the upstream is the fork's GitHub parent repository; a candidate is an upstream tag above v0.36.2 whose GitHub release has prerelease false (a pre-release tag, and a tag with no GitHub release, is passed over without stopping the card); the tag commit of a tag is git rev-parse <tag>^{commit}; the fork gate test command at a commit is five steps, each taken from that commit's own justfile, run by the fork gate from the commit's checkout in this order and each recorded with its exit status: just build-wasm; npm install in frontend/, which installs from the frontend/package-lock.json the commit carries and fetches nothing that lockfile does not name; just build-ui; then, with no test argument, just test-postgres and just test-hiqlite, each kept as its own log (the test-postgres log and the test-hiqlite log of that commit). The three build steps come first because at v0.36.2 static/ and templates/html are untracked and the api crate embeds static/v1 at compile time (#[derive(Embed)] #[folder = \"../../static/v1/\"] in src/api/src/lib.rs), so cargo build on a fresh checkout fails before any test runs without them; upstream's pre-pr-checks recipe runs build-ui before its test recipes, and its code_style workflow runs build-wasm and build-ui first. A step that exits non-zero ends the command, and no later step runs. At v0.36.2 upstream's test-postgres recipe starts a PostgreSQL container through its postgres-start dependency, runs cargo build, starts the test backend HIQLITE=false HQL_CACHE_STORAGE_DISK=false ./target/debug/rauthy serve -c config-test.toml --test against that database, waits until localhost:8081/auth/v1/ping answers, runs HIQLITE=false cargo test and stops the backend; its test-hiqlite recipe does the same with the backend ./target/debug/rauthy serve -c config-test.toml --test on Hiqlite and runs cargo test. The integration tests under src/bin/tests run only against that started backend, which is why a bare cargo test is not the fork gate test command. Before the first run at a commit, THE SYSTEM SHALL record the recorded command git show <commit>:justfile | awk '/^(build-wasm|build-ui|test-hiqlite|test-postgres)[ :]/{p=1;print;next} p&&/^[^[:space:]]/{p=0} p' and its whole output, which is the four recipe bodies build-wasm, build-ui, test-postgres and test-hiqlite as that commit holds them, including each recipe's line starting the backend with rauthy serve -c config-test.toml --test. WHEN the card starts, THE SYSTEM SHALL, in step trigger-check, read the upstream's releases, and for each candidate resolve its tag commit and run git merge-base --is-ancestor c44f7cac826a278041f325745a7547e78654506e <tag commit> and git merge-base --is-ancestor 989f9ff9a2e18a9a3195084a86541c14f890a9e2 <tag commit>, recording each exit status. In the same step THE SYSTEM SHALL record the measurement that the two hardening commits add no test for the three guard cases: the output of git show --format= --name-only <commit> for each, filtered by grep -E '(^|/)tests?/', and every test function each adds, selected by its attribute and not by its name: the recorded command git show --format= <commit> | awk '/^\\+[[:space:]]*#\\[(tokio::)?test/{t=1;next} t&&/^\\+[[:space:]]*(pub )?(async )?fn /{match($0,/fn [A-Za-z0-9_]+/);print substr($0,RSTART+3,RLENGTH-3);t=0}', which prints the name of the fn following each added #[test] or #[tokio::test] attribute whatever the name's prefix; the report lists that command's whole output for each commit, one name per line, and against each name states the case the test checks as read from its body and the reason it is not one of the three guard tests. As measured on upstream when this brief was written, the command prints for c44f7cac the six names test_validate_no_backchannel_logout_uri, test_validate_dyn_redirect_uri, test_wildcard_prefix_match, test_validate_csrf, test_init_session_needs_exception_path_without_ip_validation, test_validate_atproto_identifier (the first three in src/data/src/entity/clients.rs, the next two in src/data/src/entity/sessions.rs, the last in src/service/src/oidc/auth_providers/login_start.rs), and for 989f9ff9 the six names test_re_atproto_handle, add_member_patch_is_valid_json_for_any_input, add_member_patch_escapes_the_email, remove_member_patch_is_valid_json_for_any_input, replace_group_name_patch_is_valid_json_for_any_input, replace_group_name_patch_nulls_external_id_when_unlinking (the first in src/common/src/regex.rs, the other five in src/data/src/entity/clients_scim.rs); c44f7cac's change to src/bin/tests/zze_handler_clients_dyn.rs adds no test attribute. Against those names the report states: test_validate_no_backchannel_logout_uri checks that a dynamically registered client may not set a backchannel logout URI, not that a logged-out session is not revived; test_validate_dyn_redirect_uri checks which redirect URIs a dynamic client may register (https or loopback http, no wildcard), not that a code is redeemed only with the exact redirect URI it was issued for; test_wildcard_prefix_match checks matching a requested URI against a registered wildcard pattern, not the binding of a code to the redirect URI it was issued for; test_validate_csrf checks a session's CSRF header, not account status, redirect binding or logout; test_init_session_needs_exception_path_without_ip_validation checks Session::is_valid on in-memory sessions by state and path, including that a session in state LoggedOut is not valid at /, not that a logged-out session is refused being set authenticated again; test_validate_atproto_identifier and test_re_atproto_handle check atproto identifier and handle syntax; and the five clients_scim.rs tests check the JSON of SCIM group patches; none checks that an account disabled or expired between authorization and code exchange is refused at exchange. In the same step THE SYSTEM SHALL run the recorded command git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'accepted v0.36.2 exception' and copy its whole output, verbatim with the line numbers it prints, with the command itself, into docs/design/identity/reports/IDENTITY-002-rebase.md under a heading naming the v0.36.2 exception; the pattern keys on the words DIRECTORY-002 writes for the accepted exception of each install, so a line that mentions v0.36.2 without those words (a pinned version, a digest, an install result) is not an exception line; the lines the command prints and no others are the exception lines R9 replaces. WHEN at least one candidate has both ancestry checks exiting 0, THE SYSTEM SHALL, in step trigger-guards, write the guard-test commit once: one fork commit, on the tag commit of the newest such candidate, that adds only src/bin/tests/zzh_guard_auth_state.rs in the fork workspace's rauthy member crate (src/bin, compiled by the workspace's members = [\"src/*\"], so the fork gate's cargo test runs it), holding exactly three tests: guard_account_status_rechecked_at_code_exchange (an account disabled, and an account expired, between authorization and code exchange is refused at exchange), guard_code_bound_to_exact_redirect_uri (a code is redeemed only with the exact redirect URI it was issued for) and guard_logged_out_session_not_revived (a logged-out session is not set authenticated again). Owner of that file and commit: the ablative-io/rauthy fork's maintenance owner, as docs/design/identity/RAUTHY-BASELINE.md:39 records; the file is named here and is not a file of lys (ADR-009). For every candidate whose two ancestry checks exit 0, THE SYSTEM SHALL place the guard-test commit on that candidate's tag commit (git rebase --onto <tag commit> <parent of the guard-test commit> <guard-test commit>), push the result to the fork branch rauthy-rebase/<40-character tag commit>-guards, where it stays, run the fork gate test command there, and read from its test-postgres log and its test-hiqlite log the line reporting each of the three tests. The guard tests are present at a candidate when the guard-test commit applies to its tag commit and git grep -n finds all three test names in src/bin/tests/zzh_guard_auth_state.rs; a candidate qualifies only when both ancestry checks exit 0 and all three guard tests are present and reported passed in both logs. The base is the newest qualifying tag by version. THE SYSTEM SHALL record in the pull request description and in docs/design/identity/reports/IDENTITY-002-rebase.md: every candidate read with its tag commit and its two exit statuses; for each candidate reaching trigger-guards, the rauthy-rebase/<tag commit>-guards ref and the commit pushed to it, the guard-test commit's git patch-id, the recorded justfile recipe output at that commit, and each guard test's name and result in each of the two logs; the list of qualifying tags; the tag chosen, its tag commit, its prerelease flag, and the path and heading line of its entry in CHANGELOG.md at the tag commit. The card's words say the next hardened release; the base is instead the newest qualifying release, because every later stable release carries upstream's later fixes and a rebase costs the same once either way. IF no candidate exists, or none has both ancestry checks exiting 0, THEN THE SYSTEM SHALL stop the card at trigger-check naming each candidate and the check that failed, or naming that no candidate exists. IF the recorded command prints no line, THEN THE SYSTEM SHALL stop the card at trigger-check naming that absence. IF the justfile at a commit the fork gate test command is to run on lacks any of the build-wasm, build-ui, test-postgres and test-hiqlite recipes, or a test recipe holds no line starting the backend with rauthy serve -c config-test.toml --test, THEN THE SYSTEM SHALL stop the card at the step that was to run it, naming the commit and the missing recipe or line, and SHALL NOT substitute a bare cargo build or cargo test for the missing recipe. IF no candidate reaching trigger-guards qualifies, THEN THE SYSTEM SHALL stop the card at trigger-guards naming each such tag, its tag commit and each guard test absent or not passed, keeping every rauthy-rebase/<tag commit>-guards branch it pushed for inspection. THE SYSTEM SHALL NOT treat a release that carries other hardening but not 989f9ff9 as the trigger, SHALL NOT count a candidate as qualifying when a guard test was absent, not run or not passed at its tag commit, SHALL NOT count any test other than the three named here as a guard test, SHALL NOT run just test-postgres or just test-hiqlite at a commit before just build-wasm, npm install in frontend/ and just build-ui have each exited 0 there, SHALL NOT let npm install fetch a package that the commit's frontend/package-lock.json does not name, SHALL NOT read a guard test's result from any log but the test-postgres and test-hiqlite logs of the fork gate test command, SHALL NOT select added tests by a name pattern, SHALL NOT leave a name the attribute command prints out of the report's list or add one it does not print, SHALL NOT change the guard-test commit per candidate, SHALL NOT choose an older qualifying tag over a newer one, SHALL NOT use a pre-release, nightly or untagged commit as the base, SHALL NOT choose the exception lines by any means other than the recorded command, SHALL NOT widen or narrow its pattern, SHALL NOT move ablative, the fork's main, a pre-rebase tag or the lys pin in this requirement, and SHALL NOT record any trigger fact as an opinion: each is the output of the command that measured it.",
+      "acceptance": [
+        "With one qualifying tag and a newer tag whose GitHub release has prerelease true, docs/design/identity/reports/IDENTITY-002-rebase.md records the qualifying tag as the tag chosen, and the pre-release tag appears in no line of its candidate list.",
+        "With two qualifying tags above v0.36.2, docs/design/identity/reports/IDENTITY-002-rebase.md lists both as qualifying and records the newer of the two by version as the tag chosen.",
+        "With one candidate whose tag commit does not have 989f9ff9 as an ancestor (git merge-base --is-ancestor exits 1) and no other candidate, the card stops at trigger-check naming that tag and 989f9ff9, and git ls-remote of ablative-io/rauthy lists the same refs before and after the run.",
+        "With one candidate whose tag commit has both hardening commits as ancestors and whose test-postgres log from just test-postgres on rauthy-rebase/<tag commit>-guards holds 'test guard_code_bound_to_exact_redirect_uri ... FAILED', the card stops at trigger-guards naming that tag, its 40-character tag commit and guard_code_bound_to_exact_redirect_uri; git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run, and the vendor/rauthy gitlink on lys main is unchanged; and refs/heads/rauthy-rebase/<tag commit>-guards is listed at the pushed commit.",
+        "For the tag chosen, docs/design/identity/reports/IDENTITY-002-rebase.md holds the tag name, its 40-character tag commit, the line 'prerelease: false', the CHANGELOG.md heading line of its entry, and the two lines 'c44f7cac: exit 0' and '989f9ff9: exit 0'; the pull request description holds the same facts and the same list of qualifying tags.",
+        "For the tag chosen, git grep -n -e 'fn guard_account_status_rechecked_at_code_exchange' -e 'fn guard_code_bound_to_exact_redirect_uri' -e 'fn guard_logged_out_session_not_revived' at refs/heads/rauthy-rebase/<tag commit>-guards as pushed in trigger-guards prints exactly three lines, each at src/bin/tests/zzh_guard_auth_state.rs, and the test-postgres log of just test-postgres and the test-hiqlite log of just test-hiqlite, run by the fork gate at that commit after docs/design/identity/reports/IDENTITY-002-rebase.md records just build-wasm, npm install in frontend/ and just build-ui there in that order, each with exit status 0, each hold 'test guard_account_status_rechecked_at_code_exchange ... ok', 'test guard_code_bound_to_exact_redirect_uri ... ok' and 'test guard_logged_out_session_not_revived ... ok'.",
+        "git show --format= --name-only of the guard-test commit prints exactly one line, src/bin/tests/zzh_guard_auth_state.rs.",
+        "docs/design/identity/reports/IDENTITY-002-rebase.md records, for c44f7cac826a278041f325745a7547e78654506e, grep output naming exactly one path under a tests directory, src/bin/tests/zze_handler_clients_dyn.rs, and for 989f9ff9a2e18a9a3195084a86541c14f890a9e2 empty grep output.",
+        "Running git show --format= <commit> | awk '/^\\+[[:space:]]*#\\[(tokio::)?test/{t=1;next} t&&/^\\+[[:space:]]*(pub )?(async )?fn /{match($0,/fn [A-Za-z0-9_]+/);print substr($0,RSTART+3,RLENGTH-3);t=0}' prints, for c44f7cac826a278041f325745a7547e78654506e, exactly the six lines test_validate_no_backchannel_logout_uri, test_validate_dyn_redirect_uri, test_wildcard_prefix_match, test_validate_csrf, test_init_session_needs_exception_path_without_ip_validation, test_validate_atproto_identifier, and for 989f9ff9a2e18a9a3195084a86541c14f890a9e2 exactly the six lines test_re_atproto_handle, add_member_patch_is_valid_json_for_any_input, add_member_patch_escapes_the_email, remove_member_patch_is_valid_json_for_any_input, replace_group_name_patch_is_valid_json_for_any_input, replace_group_name_patch_nulls_external_id_when_unlinking; the list of added test names in docs/design/identity/reports/IDENTITY-002-rebase.md holds, under each commit, exactly the names that command prints for it, in the same order and count.",
+        "In docs/design/identity/reports/IDENTITY-002-rebase.md each of the twelve added test names, test_validate_dyn_redirect_uri and add_member_patch_is_valid_json_for_any_input among them, is followed on its line by the case its body checks and the text 'not a guard test', and grep -c 'not a guard test' over that list prints 12.",
+        "For the tag chosen, running git show <tag commit>:justfile | awk '/^(build-wasm|build-ui|test-hiqlite|test-postgres)[ :]/{p=1;print;next} p&&/^[^[:space:]]/{p=0} p' prints a build-wasm recipe, a build-ui recipe, a test-postgres recipe and a test-hiqlite recipe, grep -c -E '^(build-wasm|build-ui|test-hiqlite|test-postgres)[ :]' over that output prints 4, grep -c 'rauthy serve -c config-test.toml --test' over that output prints 2, and that output is identical to the justfile recipe block docs/design/identity/reports/IDENTITY-002-rebase.md records for that commit.",
+        "Running git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'accepted v0.36.2 exception' prints at least one line, every line it prints contains 'accepted v0.36.2 exception', and its output is identical, with the same line numbers and the same count, to the block copied under the v0.36.2 exception heading in docs/design/identity/reports/IDENTITY-002-rebase.md.",
+        "With a deployment report at the lys start commit in which git show <lys start commit>:docs/design/identity/reports/IDENTITY-001-deployment.md | grep -n -F 'accepted v0.36.2 exception' prints nothing, the card stops at trigger-check naming that absence, and git ls-remote of ablative-io/rauthy lists the same refs before and after the run.",
+        "With a deployment report at the lys start commit holding one line that carries 'accepted v0.36.2 exception' and another line that names v0.36.2 without those words, the block copied under the v0.36.2 exception heading in docs/design/identity/reports/IDENTITY-002-rebase.md holds exactly one line, the first, with its line number.",
+        "With a candidate whose justfile at the guard-test commit has no test-hiqlite recipe, the card stops at trigger-guards naming that commit and test-hiqlite, no cargo test is recorded for it, and git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run.",
+        "With a candidate whose justfile at the guard-test commit has no build-wasm recipe, the card stops at trigger-guards naming that commit and build-wasm, no step of the fork gate test command is recorded for it, and git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run.",
+        "With a candidate whose justfile at the guard-test commit has no build-ui recipe, the card stops at trigger-guards naming that commit and build-ui, no step of the fork gate test command is recorded for it, and git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run.",
+        "At every commit where the fork gate test command ran, git status --porcelain -- frontend/package-lock.json in that checkout, run after npm install in frontend/ exits 0, prints nothing."
+      ],
+      "files": {
+        "create": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5"
+      ],
+      "stories": [
+        "S4",
+        "S5"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Read the fork at card start and stop on a shared migration number",
+      "spec": "WHEN the base is chosen, THE SYSTEM SHALL read the ablative head of ablative-io/rauthy with git ls-remote (the previous head) and record it; that value is the lease every later push of ablative names. The fork commits are git rev-list --reverse dd61ac3c84d6b238108dc8438b53043b5177a662..<previous head>, recorded by sha and subject with their count; zero fork commits is a valid state. THE SYSTEM SHALL then, in step migration-numbers, list every migration number under migrations/postgres and migrations/hiqlite on the upstream side (the tree of the tag commit) and on the fork side (the files the fork commits add under those two directories), recording both lists in docs/design/identity/reports/IDENTITY-002-rebase.md. IF one number, in postgres or in hiqlite, is held by an upstream migration and a fork migration alike, THEN THE SYSTEM SHALL stop the card at migration-numbers before any rebased build starts, naming both files and the upstream commit that added the upstream file (git log --diff-filter=A --format=%H <tag commit> -- <upstream file>), even when git would apply the fork commit without a textual conflict. THE SYSTEM SHALL NOT renumber, rename or edit a fork migration to fit, and SHALL NOT move ablative, a pre-rebase tag or the lys pin in this requirement.",
+      "acceptance": [
+        "With a fork commit adding migrations/postgres/V27__identity_links.sql and a tag commit holding migrations/postgres/V27__one_time_password.sql, the card stops at migration-numbers, its stop report names both files and the 40-character commit that added V27__one_time_password.sql, and git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run, and the vendor/rauthy gitlink on lys main is unchanged.",
+        "With a fork commit adding migrations/hiqlite/32_identity_links.sql and a tag commit holding migrations/hiqlite/32_other.sql, the card stops at migration-numbers naming both files.",
+        "With zero fork commits, docs/design/identity/reports/IDENTITY-002-rebase.md records 'fork commits: 0', the previous head, both upstream migration lists, and empty fork lists.",
+        "The previous head recorded in docs/design/identity/reports/IDENTITY-002-rebase.md equals the refs/heads/ablative line of a git ls-remote taken before the run's first push of ablative."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C6"
+      ],
+      "stories": [
+        "S2"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Carry the fork commits onto the tag unaltered with the guard-test commit on top, on the candidate branch",
+      "spec": "WHEN the migration numbers do not collide, THE SYSTEM SHALL, in step rebase, re-read the upstream's releases with the trigger-check command and form the candidate. WHILE zero fork commits exist, the candidate is the commit trigger-guards pushed to rauthy-rebase/<tag commit>-guards (the tag commit plus exactly the guard-test commit), nothing is rebased, and THE SYSTEM SHALL push that same commit to rauthy-rebase/<tag commit> with --force-with-lease=refs/heads/rauthy-rebase/<tag commit>: (the ref must not yet exist); DIRECTORY-004's provider-link commit then lands later on the hardened base, and there is no second rebase. WHILE fork commits exist, THE SYSTEM SHALL rebase them onto the tag commit (git rebase --onto <tag commit> dd61ac3c84d6b238108dc8438b53043b5177a662 <previous head>), place the guard-test commit on top of the rebased head (git rebase --onto <rebased head> <tag commit> <commit trigger-guards pushed to rauthy-rebase/<tag commit>-guards>), and push the result to rauthy-rebase/<tag commit> with --force-with-lease=refs/heads/rauthy-rebase/<tag commit>: (the ref must not yet exist). In both cases rauthy-rebase/<tag commit>-guards stays at the commit trigger-guards pushed, so no gated commit is left reachable from no ref, and THE SYSTEM SHALL record in docs/design/identity/reports/IDENTITY-002-rebase.md both refs, rauthy-rebase/<tag commit>-guards and rauthy-rebase/<tag commit>, each with its 40-character sha. IF the re-read names a non-pre-release tag above the chosen tag that trigger-check did not read, THEN THE SYSTEM SHALL stop the card at rebase naming that tag. IF the rebase stops on a conflict, THEN THE SYSTEM SHALL abort it and stop the card at rebase naming the fork commit, each conflicting path and, for each path, the upstream commit that last changed it (git log -1 --format=%H dd61ac3c84d6b238108dc8438b53043b5177a662..<tag commit> -- <path>), and SHALL NOT push any ref. THE SYSTEM SHALL NOT move or delete rauthy-rebase/<tag commit>-guards in this requirement, and SHALL NOT squash a fork commit into an upstream commit, alter an upstream commit, cherry-pick an upstream commit, reorder the fork commits, or rewrite a fork commit to fit.",
+      "acceptance": [
+        "With zero fork commits, git log --format='%H %s' <tag commit>..<candidate> prints exactly one line, the guard-test commit, and git diff <tag commit> <candidate> --name-only prints exactly src/bin/tests/zzh_guard_auth_state.rs.",
+        "With fork commits at card start, git log --reverse --format='%s' <tag commit>..<candidate> prints the recorded fork commit subjects in their recorded order followed by exactly one further line, the guard-test commit's subject, and git show --format= --name-only <candidate> prints exactly src/bin/tests/zzh_guard_auth_state.rs.",
+        "With fork commits at card start, for each position i the git patch-id of the i-th recorded fork commit equals that of the i-th commit of git rev-list --reverse <tag commit>..<candidate>, and their author names and emails are equal; the patch-id of the top commit equals the guard-test commit's recorded patch-id.",
+        "git merge-base --is-ancestor <tag commit> <candidate> exits 0.",
+        "With fork commits at card start, a rebase conflict stops the card at rebase naming the fork commit, each conflicting path and a 40-character upstream commit per path, and git ls-remote of ablative-io/rauthy lists the same refs before and after the step.",
+        "With one qualifying tag chosen at trigger-check and a new non-pre-release tag above it published to the upstream between trigger-check and rebase, the card stops at rebase naming that new tag; git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run, and the vendor/rauthy gitlink on lys main is unchanged.",
+        "After rebase, git ls-remote of ablative-io/rauthy lists refs/heads/rauthy-rebase/<tag commit>-guards at the guard-test commit sha and refs/heads/rauthy-rebase/<tag commit> at the candidate sha, each equal to the sha docs/design/identity/reports/IDENTITY-002-rebase.md names for that ref; with zero fork commits the two shas are equal, and with fork commits at card start they differ."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C7"
+      ],
+      "stories": [
+        "S2"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Prove the candidate green before anything moves",
+      "spec": "WHEN the candidate is formed, THE SYSTEM SHALL, in steps candidate-build and candidate-suite, build the fork and run its full suite: candidate-build runs just build-wasm, npm install in frontend/ (from the frontend/package-lock.json the candidate carries, fetching nothing that lockfile does not name) and just build-ui, each taken from the candidate's own justfile and recorded with its exit status, then cargo build; candidate-suite runs the fork gate test command of R1 (the same three build steps, each recorded with its exit status, then just test-postgres and just test-hiqlite from the candidate's own justfile with no test argument, each starting its test backend rauthy serve -c config-test.toml --test before cargo test, test-postgres against a PostgreSQL container and test-hiqlite on Hiqlite) through the fork gate at rauthy-rebase/<tag commit> as it holds the candidate, recording the justfile recipe output R1 names for the candidate, recording each step's command, the ref it ran on, exit status and test counts in docs/design/identity/reports/IDENTITY-002-rebase.md. These two steps run in both cases, with zero fork commits and with fork commits at card start, even where the candidate is the same commit trigger-guards gated on rauthy-rebase/<tag commit>-guards. The test-postgres log and the test-hiqlite log of candidate-suite SHALL each report the three guard tests passed and, WHILE fork commits exist, SHALL report ID001_LINK_PAIR, ID001_LINK_REFUSAL, ID001_LINK_MIGRATION and ID001_LINK_AUDIT passed, from the fork's tests/identity_links/ (owner: the ablative-io/rauthy fork's maintenance owner; named here, not a file of lys). IF a build step, cargo build or any test fails, THEN THE SYSTEM SHALL stop the card at candidate-build or candidate-suite naming the failing command, SHALL keep the candidate branch for inspection, and SHALL NOT push a pre-rebase tag, move ablative or move the lys pin. THE SYSTEM SHALL NOT record the fork gate run of trigger-guards on rauthy-rebase/<tag commit>-guards as candidate-build or candidate-suite, SHALL NOT run cargo build or cargo test before just build-wasm, npm install in frontend/ and just build-ui have each exited 0 on the candidate, SHALL NOT run cargo test without the backend the recipe starts, and SHALL NOT skip, ignore or filter out a test of the fork's suite to reach green.",
+      "acceptance": [
+        "After a green run, docs/design/identity/reports/IDENTITY-002-rebase.md records candidate-build as just build-wasm, npm install in frontend/, just build-ui and cargo build, in that order, each with exit status 0, and candidate-suite as just build-wasm, npm install in frontend/ and just build-ui, in that order, each with exit status 0, followed by two runs, just test-postgres and just test-hiqlite, each with exit status 0, the number of tests run and the number failed as 0.",
+        "With zero fork commits, docs/design/identity/reports/IDENTITY-002-rebase.md records candidate-build and candidate-suite as fork gate runs on refs/heads/rauthy-rebase/<tag commit>, each with its own command and exit status, separate from the trigger-guards run it records on refs/heads/rauthy-rebase/<tag commit>-guards.",
+        "The test-postgres log of just test-postgres and the test-hiqlite log of just test-hiqlite, run by the fork gate on refs/heads/rauthy-rebase/<tag commit> in candidate-suite, each hold 'test guard_account_status_rechecked_at_code_exchange ... ok', 'test guard_code_bound_to_exact_redirect_uri ... ok' and 'test guard_logged_out_session_not_revived ... ok', each exactly once in each log.",
+        "With fork commits at card start, the test-postgres log and the test-hiqlite log of candidate-suite each report each of ID001_LINK_PAIR, ID001_LINK_REFUSAL, ID001_LINK_MIGRATION and ID001_LINK_AUDIT run once and passed; with zero fork commits, docs/design/identity/reports/IDENTITY-002-rebase.md records 'ID001_LINK_*: not applicable, fork commits: 0'.",
+        "After a run stopped at candidate-suite, git ls-remote of ablative-io/rauthy lists refs/heads/ablative, refs/heads/main and every refs/tags/pre-rebase-* line identical to its line before the run, and the vendor/rauthy gitlink on lys main is unchanged, and refs/heads/rauthy-rebase/<tag commit> is listed at the candidate and refs/heads/rauthy-rebase/<tag commit>-guards at the guard-test commit."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C8",
+        "C9"
+      ],
+      "stories": [
+        "S3",
+        "S6"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Keep the previous head under a tag and move ablative by lease",
+      "spec": "WHEN candidate-build and candidate-suite have passed, THE SYSTEM SHALL, in step pre-rebase-tag, push the previous head as the tag pre-rebase-v0.36.2-<first 12 hex characters of the previous head> to ablative-io/rauthy without force and confirm it with git ls-remote; only then SHALL it, in step ablative-push, force-push the candidate to ablative with --force-with-lease=ablative:<previous head> and confirm with git ls-remote that ablative is at the candidate. IF the tag push fails, THEN THE SYSTEM SHALL stop the card at pre-rebase-tag without moving ablative. IF the lease is refused, THEN THE SYSTEM SHALL stop the card at ablative-push naming the ablative head the remote holds. THE SYSTEM SHALL NOT push to or reset the fork's main, SHALL NOT move or delete an existing pre-rebase tag, and SHALL NOT force-push ablative without the lease.",
+      "acceptance": [
+        "For a previous head of dd61ac3c84d6b238108dc8438b53043b5177a662, git ls-remote lists refs/tags/pre-rebase-v0.36.2-dd61ac3c84d6 at dd61ac3c84d6b238108dc8438b53043b5177a662 before the ablative push is made.",
+        "After ablative-push, git ls-remote lists refs/heads/ablative at the candidate commit.",
+        "The refs/heads/main line of git ls-remote of ablative-io/rauthy is identical before and after the run.",
+        "The push command recorded in docs/design/identity/reports/IDENTITY-002-rebase.md carries --force-with-lease=ablative:<previous head> with the 40-character previous head.",
+        "With the lease refused because ablative moved after the previous head was read, the card stops at ablative-push naming the head the remote holds, and refs/heads/ablative is listed at that head after the run."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C10"
+      ],
+      "stories": [
+        "S3"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Put ablative back on its tagged head when any later step fails",
+      "spec": "IF a step after ablative-push fails before the lys pull request lands (pin-move, pin-clone or earlier-clone of R7, install of R8, records of R9, or any leg of the lys pull request's own gate), THEN THE SYSTEM SHALL force-push the previous head to ablative with --force-with-lease=ablative:<the candidate commit>, confirm with git ls-remote that ablative is at the previous head, and stop the card naming the failing step; the lys pull request does not land. IF the reset's lease is refused, THEN THE SYSTEM SHALL stop the card naming the ablative head the remote holds. THE SYSTEM SHALL NOT leave ablative on the candidate after a later failure, SHALL NOT delete the pre-rebase tag, the candidate branch or rauthy-rebase/<tag commit>-guards, and SHALL NOT reset ablative without the lease.",
+      "acceptance": [
+        "After a run stopped at install, git ls-remote lists refs/heads/ablative at the sha of refs/tags/pre-rebase-v0.36.2-<12 hex>, and the stop report names the step install.",
+        "After a run stopped at pin-move, git ls-remote lists refs/heads/ablative at the previous head, the stop report names pin-move, and the vendor/rauthy gitlink on lys main is unchanged.",
+        "After a run stopped at a failing leg of the lys pull request's gate, git ls-remote lists refs/heads/ablative at the previous head, the stop report names that leg, and the pull request is not merged.",
+        "The reset command recorded in docs/design/identity/reports/IDENTITY-002-rebase.md carries --force-with-lease=ablative:<candidate commit> with the 40-character candidate commit, followed by the git ls-remote line showing ablative at the previous head.",
+        "After a stop at any of pin-move, pin-clone, earlier-clone, install, records and the lys pull request's gate, git ls-remote still lists the pre-rebase tag, refs/heads/rauthy-rebase/<tag commit> and refs/heads/rauthy-rebase/<tag commit>-guards."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C11"
+      ],
+      "stories": [
+        "S3"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Move the pin and prove it with ID001_PIN_CLONE and a recursive clone of the lys start commit",
+      "spec": "WHEN ablative is at the candidate, THE SYSTEM SHALL, in step pin-move, move the vendor/rauthy gitlink on the lys pull request's branch to the candidate commit (the guard-test commit on top of ablative), leaving .gitmodules unchanged, and push that branch. THE SYSTEM SHALL, in step pin-clone, run ID001_PIN_CLONE (DIRECTORY-002's pin check, the Row 01 gate) on the pushed ref. THE SYSTEM SHALL then, in step earlier-clone, clone recursively the lys start commit, whose vendor/rauthy gitlink is the previous head, and check that vendor/rauthy is checked out at that head, and in a fresh clone of ablative-io/rauthy holding every ref record the output of git for-each-ref --contains <previous head> refs/heads refs/tags in docs/design/identity/reports/IDENTITY-002-rebase.md. IF pin-move, pin-clone or earlier-clone fails, THEN THE SYSTEM SHALL stop the card at that step and reset ablative as R6 states. THE SYSTEM SHALL NOT build a second pin check, and SHALL NOT name in the gitlink any commit other than the candidate commit.",
+      "acceptance": [
+        "git ls-tree <lys branch head> vendor/rauthy prints mode 160000 and the candidate's 40-character sha, and git diff <lys start commit> <lys branch head> -- .gitmodules prints nothing.",
+        "The test named ID001_PIN_CLONE runs once on the pushed lys ref and reports passed.",
+        "git clone --recurse-submodules of lys checked out at the lys start commit exits 0, and git -C vendor/rauthy rev-parse HEAD in that clone prints the previous head recorded in R2.",
+        "In the fresh fork clone, git for-each-ref --contains <previous head> refs/tags/pre-rebase-* prints exactly one line, refs/tags/pre-rebase-v0.36.2-<first 12 hex characters of the previous head>.",
+        "With the push of the lys branch refused, the card stops at pin-move, and git ls-remote of ablative-io/rauthy lists refs/heads/ablative at the previous head after the run."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "vendor/rauthy"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C12",
+        "C13"
+      ],
+      "stories": [
+        "S3"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "Bring the standalone install up from the rebuilt image on data the previously pinned build wrote",
+      "spec": "WHEN pin-clone and earlier-clone have passed, THE SYSTEM SHALL, in step install, create a disposable database for this check on the PostgreSQL service at the standalone install's configured address (ADR-005) and start the standalone install of DIRECTORY-002 against it twice, in this order. First start: the Rauthy image built from the previously pinned commit (the vendor/rauthy gitlink of the lys start commit, recorded in docs/design/identity/reports/IDENTITY-002-rebase.md by its 40-character sha) starts against the disposable database, runs its own start-up migrations, and a test identity made for this check is written with its data; that build is then stopped. Second start: THE SYSTEM SHALL read the Rauthy entry of deploy/identity/versions.json at the lys start commit and record in docs/design/identity/reports/IDENTITY-002-rebase.md the name of the field holding that entry's image value and the command that produced that value; it SHALL rebuild the Rauthy image the standalone install uses from the new pin, run that same command on the rebuilt image, write its output into that same field in place of the previous value, and start the rebuilt image against the same disposable database, where Rauthy's own start-up migration runner applies the upstream migrations; the test identity the first start wrote SHALL then sign in under the rebuilt image. After each start THE SYSTEM SHALL run one recorded read-only query of Rauthy's migration history table in the disposable database and record its output. THE SYSTEM SHALL create and remove the disposable database with CREATE DATABASE and DROP DATABASE connected through the service's maintenance database, postgres; the disposable database and postgres are the only databases any connection of this step names. After the check THE SYSTEM SHALL remove the disposable database. IF the Rauthy entry at the lys start commit has no image field or no recorded producing command, a start does not become ready, the test identity cannot be written, or the sign-in fails, THEN THE SYSTEM SHALL remove the disposable database, stop the card at install naming which of these failed, and reset ablative as R6 states. THE SYSTEM SHALL NOT run a migration by hand (no sqlx migrate, no psql -f or --file, no DDL in psql -c), SHALL NOT create the test identity under the rebuilt image, SHALL NOT connect either build, or any command of this step, to the kept development database, SHALL NOT restore a copy of it, SHALL NOT sign in any real person, and SHALL NOT write into the Rauthy entry a value produced by any command other than the one recorded from the lys start commit.",
+      "acceptance": [
+        "docs/design/identity/reports/IDENTITY-002-rebase.md records the two starts in order, the first naming the previously pinned commit by its 40-character sha and the second naming the candidate commit by its 40-character sha, both against the same disposable database name.",
+        "The highest version in Rauthy's migration history table of the disposable database (table and query recorded in the report) equals the highest number under migrations/postgres at the previously pinned commit after the first start, and the highest number under migrations/postgres at the candidate commit after the second start.",
+        "The test identity written during the first start completes a sign-in under the rebuilt image: an authorization code issued for it is exchanged at the token endpoint for tokens whose sub is that identity's id, and the install step's command log records no creation of that identity after the first start.",
+        "docs/design/identity/reports/IDENTITY-002-rebase.md names the image field and the producing command read from the Rauthy entry of deploy/identity/versions.json at the lys start commit; on the lys branch head the Rauthy entry holds that same field, the command recorded for it is the same command, the field's value equals that command's output for the rebuilt image, and that value differs from the field's value at the lys start commit.",
+        "The install step's command log holds no sqlx migrate invocation, no psql invocation carrying -f or --file, and no psql -c whose SQL contains CREATE TABLE, ALTER TABLE, DROP TABLE or CREATE INDEX; its only psql commands are CREATE DATABASE and DROP DATABASE of the disposable database, each connected to the maintenance database postgres, queries of the service's database list connected to postgres, and after each start one SELECT of Rauthy's migration history table connected to the disposable database; and every database connection string it holds names the disposable database or postgres, and none names the kept development database.",
+        "After the check, the query of the PostgreSQL service's database list does not list the disposable database."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "deploy/identity/versions.json",
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C14",
+        "C15"
+      ],
+      "stories": [
+        "S1"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Record the release, the evidence and the installed hash, and name the acts this card does not perform",
+      "spec": "WHEN install has passed, THE SYSTEM SHALL, in step records, replace in docs/design/identity/reports/IDENTITY-001-deployment.md every line the recorded command of R1 (grep -n -F 'accepted v0.36.2 exception') printed and copied into docs/design/identity/reports/IDENTITY-002-rebase.md with lines naming the new release tag, its tag commit and the upstream release-and-advisory check made for it, and SHALL complete docs/design/identity/reports/IDENTITY-002-rebase.md with the upstream tag commit, the rebased diff (git log --format='%H %s' and git diff --stat from the tag commit to the candidate), the regression results of every step, the installed hash (the value R8 wrote into the Rauthy entry's image field) the two fork refs rauthy-rebase/<tag commit>-guards and rauthy-rebase/<tag commit> with their 40-character shas and the statement that the -guards ref is removed only when the pin has moved to the candidate and that landing is recorded, and the statement that the lys pull request's gate result, the evidence for IDENTITY-001-UPSTREAM-AUTH-STATE's condition, is recorded in the card's landing record once that gate has passed. The report SHALL name, as acts this card does not perform: lifting IDENTITY-001-UPSTREAM-AUTH-STATE and opening real-person sign-in on IDENTITY-001 rows 06 and 07, a separate recorded decision of the human authority (ADR-003) taken with this evidence; and moving the kept development data onto the new release, its own act after DIRECTORY-002's backup and restore has landed, which backs up first. WHEN the lys pull request has landed and git ls-tree of lys main shows vendor/rauthy at the candidate, THE SYSTEM SHALL, in step guards-ref-removal, write the card's landing record with the lys pull request's gate result, stated as the evidence that IDENTITY-001-UPSTREAM-AUTH-STATE's condition is met, the landing commit and the candidate sha, then delete rauthy-rebase/<tag commit>-guards of the chosen tag with --force-with-lease=refs/heads/rauthy-rebase/<tag commit>-guards:<guard-test commit> and confirm with git ls-remote that it is gone. IF writing either report fails, THEN THE SYSTEM SHALL stop the card at records and reset ablative as R6 states. THE SYSTEM SHALL NOT write the gate result into docs/design/identity/reports/IDENTITY-002-rebase.md or any other file of the lys pull request, SHALL NOT remove rauthy-rebase/<tag commit>-guards before that landing is recorded, SHALL NOT state that IDENTITY-001-UPSTREAM-AUTH-STATE is lifted, SHALL NOT open IDENTITY-001 rows 06 and 07, SHALL NOT move the kept development data, and SHALL NOT change docs/design/identity/RAUTHY-BASELINE.md or IDENTITY-001.",
+      "acceptance": [
+        "For each exception line copied into docs/design/identity/reports/IDENTITY-002-rebase.md, grep -cxF '<that line without its line-number prefix>' docs/design/identity/reports/IDENTITY-001-deployment.md on the lys branch head prints 0; the count of lines checked equals the count copied and is at least 1; and docs/design/identity/reports/IDENTITY-001-deployment.md names the new tag and its 40-character tag commit.",
+        "docs/design/identity/reports/IDENTITY-002-rebase.md holds an installed hash equal to the value of the Rauthy entry's image field in deploy/identity/versions.json on the lys branch head.",
+        "The card's landing record holds the lys pull request's gate result, stated as the evidence that IDENTITY-001-UPSTREAM-AUTH-STATE's condition is met, and holds no line stating the blocker lifted; docs/design/identity/reports/IDENTITY-002-rebase.md names the landing record as where the gate result is found, and names the separate decision to lift the blocker and the later move of the kept development data as not performed.",
+        "git diff <lys start commit> <lys branch head> --name-only lists exactly vendor/rauthy, deploy/identity/versions.json, docs/design/identity/reports/IDENTITY-001-deployment.md and docs/design/identity/reports/IDENTITY-002-rebase.md; the lys pull request's gate result is found in the card's landing record, and in none of those four paths.",
+        "docs/design/identity/reports/IDENTITY-002-rebase.md names rauthy-rebase/<tag commit>-guards and rauthy-rebase/<tag commit> each with a 40-character sha and states that the -guards ref is removed only when the pin move to the candidate has landed and is recorded.",
+        "Before the lys pull request lands, git ls-remote of ablative-io/rauthy lists refs/heads/rauthy-rebase/<tag commit>-guards; after it lands with git ls-tree of lys main vendor/rauthy printing the candidate sha and guards-ref-removal has run, git ls-remote does not list refs/heads/rauthy-rebase/<tag commit>-guards and the card's landing record names the lys landing commit, the candidate sha and the lys pull request's gate result."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/reports/IDENTITY-001-deployment.md",
+          "docs/design/identity/reports/IDENTITY-002-rebase.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C16"
+      ],
+      "stories": [
+        "S4"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT change anything in Cambium or Aion.",
+    "SHALL NOT touch a production node or generate a production key; SHALL NOT publish lys-anchor or emit a receipt outside a test.",
+    "SHALL NOT make an upstream contribution, cherry-pick an upstream commit, or use a pre-release, nightly or untagged commit as the base.",
+    "SHALL NOT push to or reset the fork's main branch, and SHALL NOT alter, squash into or reorder an upstream commit.",
+    "SHALL NOT rewrite a fork commit to fit a conflict or renumber a migration to fit a shared number; either stops the card by name.",
+    "SHALL NOT build a second pin check beside ID001_PIN_CLONE.",
+    "SHALL NOT leave ablative on a head whose build and full suite have not passed, and SHALL NOT let the pin name an ungated commit.",
+    "SHALL NOT run a migration by hand, and SHALL NOT connect to, copy or migrate the kept development database.",
+    "SHALL NOT lift IDENTITY-001-UPSTREAM-AUTH-STATE or open IDENTITY-001 rows 06 and 07; the gate result is recorded as evidence for the human authority's separate decision.",
+    "SHALL NOT renumber DIRECTORY-004's migrations, and SHALL NOT change docs/design/identity/RAUTHY-BASELINE.md or IDENTITY-001.",
+    "SHALL NOT list a file of the fork's repository as a file of this brief; fork files and tests are named with their owner."
+  ],
+  "verification": [
+    "git ls-remote https://github.com/ablative-io/rauthy.git lists refs/heads/ablative at the candidate, the pre-rebase tag at the previous head, refs/heads/rauthy-rebase/<tag commit> and, until the pin move has landed, refs/heads/rauthy-rebase/<tag commit>-guards, and refs/heads/main identical to its line before the card.",
+    "git log --reverse --format='%s' <tag commit>..ablative is compared line by line with the fork commit subjects recorded in R2 followed by the guard-test commit's subject; the counts are equal.",
+    "The test named ID001_PIN_CLONE is run on the lys branch head and reports one pass.",
+    "docs/design/identity/reports/IDENTITY-002-rebase.md records, for every step, whether it fired, its command and its exit status; a step recorded as not applicable names the fact that made it so.",
+    "sh scripts/design/gate.sh exits 0 on the lys branch head, and the lys gate legs pass on the build venue."
+  ]
+}

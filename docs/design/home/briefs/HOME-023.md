@@ -1,0 +1,230 @@
+---
+type: brief
+id: HOME-023
+cluster: home
+title: Judge crates/lys-home as found at 0073b966 with the chain's whole judgement, and record it in a proof
+---
+
+# HOME-023: Judge crates/lys-home as found at 0073b966 with the chain's whole judgement, and record it in a proof
+
+> **Cluster:** home
+> **Blocked by:** The seven step 5 cards' ids and the HOME-001 rows each carries are on the Cambium board, not in this tree, except that card UzVQkTaU carries R3 and R4; R5 and R8 read the rest from the board., Jev is reached through the ds2_ledger worker's jev_verdict with a working OpenRouter key; without one every per-file verdict is not_asked and R3 records the Jev check incomplete, so the key is found on the estate before the build starts., The card builds behind the six Lys briefs ahead of it in the one-build queue.
+> **Design anchor:**
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
+> **Checklist:**
+> - C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
+> - C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
+> - C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
+> - C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+> - C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+> - C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+> - C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
+> - C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
+> **Stories:**
+> - S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+> - S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+> - S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+> - S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
+
+## Purpose
+
+HOME-001's rows were built by hand and reached main before every carded row had to pass through its board's chain, so nothing on main says the chain has judged crates/lys-home. This brief adds no code and proves what is there: it runs the chain's whole judgement (Jev per file, fmt, clippy pedantic, tests, ast-grep and the gate) over the crate as it stands at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, records each check's command and outcome in docs/design/home/PROOF-CHAIN.md, and lets the seven step 5 cards be done only when that judgement holds. See docs/design/home/design.json (P11, CN8) and ADR-012 and ADR-013.
+
+## Task
+
+Measure crates/lys-home exactly as it stands at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and write the proof; change nothing in the crate. Add the estate's four sweep rules as lys's ast-grep rule set (configuration, not crate code). Every finding a named check reports is its own line in the proof and becomes its own card on the step 5 board; what the author notices and no check reports goes under `Observed, not measured` and becomes a card only on the lead's word. A landing that records any finding is not green: it lands the proof, and the seven cards stay in review until every finding card on their rows has closed; that later move is not this brief's. Only a card whose rows are built at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff is set done, and a row is built only when every file it names, code and document alike, is in the tree at that commit: R7 and R10 have no code, so the cards carrying them stay in review, recorded not built in the proof's card table, and those rows are built through the chain as their own cards; R4's code is there and its docs/design/home/LOSS-ACCOUNT.md is not, so R4 is recorded partly present, the missing document is a finding carrying R4, and card UzVQkTaU, which carries R3 and R4, stays in review until that finding closes. A finding on a file no HOME-001 row names holds the row that introduced its lines: a *_tests.rs sibling holds the rows of the file it tests, tests/cached_index.rs holds R1, which owns the cached index, and any other such file holds the card named in the title or body of the pull request GitHub gives for the commit that introduced its lines (for error.rs and main.rs, 217e81b322431fe2bad8b21033afe3bbefc23dc0 and pull request 8, which names none); where that pull request names no card, the finding holds none of the seven and its card is filed in todo. The build runs on this Mac in the one-build queue under the load guard, one build at a time, and the full gate runs where the build runs: Tom approved at 06:24 on 26 September 2026, on Dot, that Lys card_build_v3 runs here one at a time under that guard, and that approval is the ruling for Lys cards. Out of scope: any new capability in lys-home, any fix to a finding, any change to HOME-001's rows, any card other than the seven and the finding cards, adding ast-grep to .land/gates.sh, and building R7 or R10.
+
+## Requirements
+
+### R1: Add the estate's four sweep rules to lys as its ast-grep rule set
+
+Add sgconfig.yml at the repository root, whose only key is ruleDirs naming rules/ast-grep, and four rule files under rules/ast-grep: mod-rs-declarations-only.yml, no-let-underscore-on-results.yml, no-lint-bypass-attributes.yml, no-std-mutex-in-async.yml, each byte-identical to the file of the same name under rules/ast-grep in the cambium repository at commit df4dca5de6899df89b06b94cdeeec3619877fc1d. The rule set is configuration, not crate code. The build SHALL NOT change any file under crates/, SHALL NOT add a fifth rule, SHALL NOT edit any rule's pattern, files glob, message or severity, and SHALL NOT add ast-grep to .land/gates.sh or to docs/design/project.json.
+
+**Acceptance:**
+- `ls rules/ast-grep` at the card head lists exactly the four files mod-rs-declarations-only.yml, no-let-underscore-on-results.yml, no-lint-bypass-attributes.yml, no-std-mutex-in-async.yml.
+- For each of the four files, `git -C <cambium checkout> show df4dca5de6899df89b06b94cdeeec3619877fc1d:rules/ast-grep/<name>.yml` piped to `cmp - rules/ast-grep/<name>.yml` exits 0.
+- `ast-grep scan --config sgconfig.yml --json=compact crates/lys-home/src/record/mod.rs` at the card head with ast-grep 0.44.1 exits 1 and its JSON carries at least one match whose ruleId is mod-rs-declarations-only (the rule set fires).
+- `git diff --quiet 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff <card head> -- crates` exits 0.
+
+**Files:**
+- create: sgconfig.yml
+- create: rules/ast-grep/mod-rs-declarations-only.yml
+- create: rules/ast-grep/no-let-underscore-on-results.yml
+- create: rules/ast-grep/no-lint-bypass-attributes.yml
+- create: rules/ast-grep/no-std-mutex-in-async.yml
+
+**Checklist:**
+- C14 — A Claude Code launch template schema in docs/design/home names its five slots (transcript, mcp, env, secrets, instructions), and a template with a slot outside them is refused by that slot's name with nothing written.
+
+**Stories:**
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R2: Open the proof with the commit measured and the tools it was measured with
+
+Create docs/design/home/PROOF-CHAIN.md. Its opening section SHALL name the commit measured, 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, in full; the rustc and cargo version strings the pinned toolchain reports; ast-grep's version string; the SHA-256 of sgconfig.yml and of each rule file; that every per-file Jev verdict came from the jev_ask workflow, with R3's cause text as the question it answered; and that every check ran in the one-build queue under the load guard, one build at a time. It SHALL state that src_land's Jev verdict on this card's landing judges the landing diff (the proof, the rule set and the design rows) and is not a verdict on the crate, and that the per-file verdicts of R3 are the crate's. WHEN main moves past 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff before the card lands, THE SYSTEM SHALL keep 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, and SHALL NOT remeasure at the landing base or name any other commit as the one measured. THE SYSTEM SHALL NOT write transcript content, block content or body content into the document; paths, commands, exit statuses, counts, hashes, verdict words and line numbers only.
+
+**Acceptance:**
+- The opening section of docs/design/home/PROOF-CHAIN.md contains the string 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff on a line labelled as the commit measured, and no other 40-hex commit id is labelled as the commit measured.
+- The toolchain line names rustc 1.97.1, equal to the channel in rust-toolchain.toml at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff.
+- The ast-grep line equals the output of `ast-grep --version` on the build host.
+- Each SHA-256 in the opening section equals `shasum -a 256` of the named file at the card head.
+- The opening section names jev_ask as the workflow every per-file verdict of the Jev section came from.
+- The document contains one sentence stating that src_land's Jev verdict judges the landing diff and is not a verdict on the crate.
+
+**Files:**
+- create: docs/design/home/PROOF-CHAIN.md
+
+**Checklist:**
+- C15 — The home keeps each template it renders as an object under templates/ named by its SHA-256, written once and never rewritten.
+
+**Stories:**
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R3: Ask Jev about every file of crates/lys-home, one file at a time
+
+WHEN the proof is built, THE SYSTEM SHALL ask Jev once for each of the 25 paths `git ls-tree -r --name-only 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff crates/lys-home` lists, through the jev_ask workflow, with part = the path, change = the output of `git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff -- <path>` (the whole file as a diff against the empty tree), and cause = this text with <path> replaced by the path exactly as `git ls-tree` prints it, which already begins crates/lys-home/: "<path> as it stands on lys main at commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff was written for brief HOME-001 (docs/design/home/briefs/HOME-001.json) before the chain judged it. The cause: the coding standards in the repository's CLAUDE.md, and the HOME-001 requirement rows whose files name this path, hold for this file as found." THE SYSTEM SHALL write one line per path in the proof's Jev section: the path, the verdict word (patched, solved, unsure or not_asked, as jev_ask answers it), the patched probability when jev_ask returns one, held, and the reason. A patched verdict is a finding (R6). The Jev check's outcome SHALL be pass when all 25 lines carry a verdict and none is patched, finding when at least one is patched, and incomplete when at least one is not_asked, with each not_asked path named. THE SYSTEM SHALL NOT ask Jev about the crate as one change, SHALL NOT cut a file below whole-file boundaries, SHALL NOT omit a path, SHALL NOT alter the cause text beyond the path, and SHALL NOT record a not_asked line as any other verdict.
+
+**Acceptance:**
+- The Jev section holds exactly 25 verdict lines, and the set of their paths equals the output of `git ls-tree -r --name-only 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff crates/lys-home`.
+- Every verdict line's verdict word is a member of {patched, solved, unsure, not_asked}.
+- The count of Jev finding lines in the findings section equals the count of verdict lines whose word is patched.
+- The Jev check's recorded outcome is incomplete when the section holds at least one not_asked line, and each not_asked path is named beside that outcome.
+- Running jev_ask again with part crates/lys-home/src/record/blocks.rs, the change `git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff -- crates/lys-home/src/record/blocks.rs` and the cause text beginning `crates/lys-home/src/record/blocks.rs as it stands on lys main at commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff` returns the verdict word the proof records for that path.
+
+**Files:**
+- modify: docs/design/home/PROOF-CHAIN.md
+
+**Checklist:**
+- C16 — lys-home render-launch writes the rendered JSONL, its loss account, an MCP configuration file, an environment file and an appended-instructions file into one directory, and a second render of the same template and session writes files with identical SHA-256.
+
+**Stories:**
+- S9 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+
+### R4: Run fmt, clippy pedantic, tests, ast-grep and the gate over the crate as found, and record each
+
+THE SYSTEM SHALL run each check below and record in the proof's checks section its command line verbatim, the commit it ran at, its exit status and its outcome word (pass when the exit status is 0, finding otherwise): fmt: `cargo fmt --all -- --check` in a clean checkout of 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff; clippy pedantic, one line per leg (the workspace lints set pedantic to warn and -D warnings makes every warning an error, so these two legs are clippy pedantic): `cargo clippy --all-targets --all-features -- -D warnings` and `cargo clippy --all-targets -- -D warnings` in that checkout; tests: `cargo test --workspace --all-features` in that checkout, recording for each lys-home test target (the library's unit tests, the binary's unit tests, tests/cached_index.rs, tests/claude_code_round_trip.rs) its passed, failed and ignored counts, and the executed count as passed plus failed summed over those four targets; ast-grep: `ast-grep scan --config sgconfig.yml --json=compact crates/lys-home` at the card head, whose crates/lys-home is byte-identical to 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff (R7), recording the match count for each of the four rule ids with a rule that matched nothing written as 0; the gate: `sh .land/gates.sh` in that checkout of 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, recording the status line of each of its seven legs. IF the lys-home executed count differs from the sum over the files of crates/lys-home at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff of `grep -c '#\[test\]'`, or any lys-home target reports an ignored test, THEN THE SYSTEM SHALL record the tests outcome as finding. THE SYSTEM SHALL NOT run `cargo fmt --all` or any other rewriting form of fmt, SHALL NOT run `cargo clippy --fix`, SHALL NOT run a check at a commit other than the one this requirement names for it, and SHALL NOT change the crate to clear a check.
+
+**Acceptance:**
+- The checks section holds exactly six check lines, in this order: fmt, clippy-all-features, clippy, tests, ast-grep, gate; each carries its command line exactly as this requirement writes it, a commit, an exit status and an outcome word.
+- The fmt, clippy-all-features, clippy, tests and gate lines name 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as their commit; the ast-grep line names the card head.
+- Rerunning each of the five commands in a clean checkout of 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff gives the exit status the proof records for it, and rerunning the ast-grep command at the card head gives the same match count for each of the four rule ids.
+- The tests line's recorded executed count equals passed plus failed as cargo reports them, summed over the four lys-home test targets.
+- The tests line's outcome is finding if and only if that executed count differs from the sum of `grep -c '#\[test\]'` over the files of crates/lys-home at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff (36), or a lys-home target reports an ignored test.
+- The ast-grep line carries four counts, one for each of mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async.
+- The gate line carries seven leg status lines, one for each `leg` call in .land/gates.sh at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff.
+- `git status --porcelain -- crates/lys-home` in the checkout of 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff prints nothing after all five commands have run.
+
+**Files:**
+- modify: docs/design/home/PROOF-CHAIN.md
+
+**Checklist:**
+- C17 — The launch line in render-launch's report resumes the rendered file by path with --fork-session and the template's flags, and the tool never runs it.
+
+**Stories:**
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R5: Record which HOME-001 rows have their files at the commit, and which rows each of the seven cards carries
+
+THE SYSTEM SHALL read docs/design/home/briefs/HOME-001.json at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and write a row table in the proof: for each of R1 to R11, every path its create and modify arrays name, each marked present or absent by `git cat-file -e 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff:<path>`, and the row's state: built when every named path, code and document alike, is present; not built when a named path under crates/lys-home is absent; partly present when every named path under crates/lys-home is present and a named path outside it is absent. A partly present row is not built, and each of its absent paths is a row table finding (R6). THE SYSTEM SHALL write a card table: for each of the seven step 5 cards that carry HOME-001's rows, the card's id as the board gives it, the HOME-001 rows it carries, and each row's state. THE SYSTEM SHALL NOT mark a row from the design's structure array alone, SHALL NOT edit HOME-001.json, and SHALL NOT mark a row built while a path it names is absent, and SHALL NOT record card UzVQkTaU as carrying rows other than the board gives, which include R3 and R4.
+
+**Acceptance:**
+- The row table holds exactly 11 lines, R1 to R11 in order.
+- R7 is recorded not built with crates/lys-home/examples/passthrough.rs absent, and R10 is recorded not built with crates/lys-home/src/proxy/mod.rs absent.
+- R4 is recorded partly present with docs/design/home/LOSS-ACCOUNT.md absent, and not as built.
+- R1, R2, R3, R5, R6, R8, R9 and R11 are recorded built.
+- The card table holds exactly 7 lines, each naming a step 5 card id, and the union of their rows is R1 to R11.
+- The card table's line for card UzVQkTaU names R3 and R4, and R4's state on it is partly present.
+
+**Files:**
+- modify: docs/design/home/PROOF-CHAIN.md
+
+**Checklist:**
+- C19 — Every render appends one lys.harness_event of kind template_render beside the context path, naming the template hash, the session head hash and a manifest block of the written paths, and the head does not move.
+
+**Stories:**
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+
+### R6: Write every finding a named check reports as its own line, and keep the author's observations apart
+
+WHEN a named check reports something (a Jev verdict of patched, an ast-grep match, a clippy or fmt diagnostic, a failing or missing test, a gate leg with a non-zero status, or a file R5's row table records absent for a row whose code is present), THE SYSTEM SHALL write it in the proof's findings section as its own line: one line per path for a Jev verdict, one line per rule id and path for ast-grep with every matched line number listed, one line per diagnostic for fmt, clippy, tests and the gate, and one line per absent file for the row table. Each line SHALL name the check, the rule, lint or verdict, the path, the line numbers where the check gives them, and the HOME-001 rows the finding holds, chosen in this order: the rows whose create or modify arrays name the path; for a *_tests.rs sibling, the rows that name the file it tests (record_tests.rs tests record/mod.rs); for tests/cached_index.rs, R1, which creates record/index.rs and so owns the cached index; for an absent file, the row that names it; for any other path, the card named by the pull request that GitHub's commits/<sha>/pulls answers for the commit `git blame 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff -- <path>` gives for the finding's lines, with that commit and pull request number on the line, written as `holds none of the seven` when that pull request names no card. A pull request names a card only when its title or body contains the id of one of the seven step 5 cards as the board gives it; a branch name, a brief id or a row id is not a card. Each line SHALL be worded so a card can be filed from the line alone. Anything the author notices that no named check reports SHALL go under its own heading, `Observed, not measured`, and SHALL NOT appear in the findings section. THE SYSTEM SHALL NOT drop a finding a check reports, including one a repository convention sanctions elsewhere, SHALL NOT join two checks' reports into one line, SHALL NOT fix a finding in this card, SHALL NOT write a line without the rows or `holds none of the seven`, and SHALL NOT put transcript content into a finding line.
+
+**Acceptance:**
+- The count of ast-grep finding lines equals the count of distinct (ruleId, file) pairs in the JSON the R4 ast-grep command prints.
+- Every finding line names one check from {Jev, fmt, clippy-all-features, clippy, tests, ast-grep, gate, row table}, the name that check gave the finding (the rule id for ast-grep, the lint name for clippy, the verdict word for Jev, `absent` for the row table), and a path.
+- A finding line on crates/lys-home/src/record/mod.rs names HOME-001 rows R1 and R2, a finding line on crates/lys-home/src/record/record_tests.rs names R1 and R2, and a finding line on crates/lys-home/tests/cached_index.rs names R1.
+- The findings section holds a row table line naming docs/design/home/LOSS-ACCOUNT.md as absent and naming R4.
+- Every finding line on crates/lys-home/src/error.rs or crates/lys-home/src/main.rs names commit 217e81b322431fe2bad8b21033afe3bbefc23dc0 and lys pull request 8 (the one GitHub's commits/217e81b322431fe2bad8b21033afe3bbefc23dc0/pulls answers, merged as 7b47115cb08b02c246ff19e3330e5f825ed68163), and reads `holds none of the seven`, because neither that pull request's title nor its body contains a step 5 card id.
+- The proof has a heading `Observed, not measured`, and no line under it also appears in the findings section.
+- When every check's outcome is pass and the row table records no absent file for a row whose code is present, the findings section holds zero lines and says so.
+
+**Files:**
+- modify: docs/design/home/PROOF-CHAIN.md
+
+**Checklist:**
+- C18 — A use-only secret is written as its handle and never its value, and a template marking a secret readable is refused naming secret_reader_unbuilt and SECRETS-002.
+
+**Stories:**
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
+
+### R7: Land only the proof, the rule set and the design rows, with the crate untouched
+
+Render the home cluster with render-cluster.py so docs/design/home/briefs/HOME-002.md, DESIGN.md, CHECKLIST.md and USER-STORIES.md equal what the JSON renders to. The card's diff from its merge base with main SHALL hold only these paths: docs/design/home/PROOF-CHAIN.md, sgconfig.yml, the four rules/ast-grep files, docs/design/home/briefs/HOME-002.json and HOME-002.md, docs/design/home/design.json, checklist.json, stories.json, DESIGN.md, CHECKLIST.md, USER-STORIES.md, docs/design/roadmap.json and docs/design/decisions.json. THE SYSTEM SHALL NOT change any byte under crates/, SHALL NOT edit HOME-001.json or HOME-001.md, and SHALL NOT change .land/gates.sh or docs/design/project.json.
+
+**Acceptance:**
+- `git diff --quiet 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff <card head> -- crates/lys-home` exits 0.
+- `git diff --name-only $(git merge-base main <card head>) <card head>` lists no path outside the set this requirement names.
+- `git diff --quiet 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff <card head> -- docs/design/home/briefs/HOME-001.json docs/design/home/briefs/HOME-001.md .land/gates.sh docs/design/project.json` exits 0.
+- `sh scripts/design/gate.sh` at the card head exits 0.
+
+**Files:**
+- create: docs/design/home/briefs/HOME-002.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+- modify: docs/design/home/USER-STORIES.md
+
+**Checklist:**
+- C20 — PROOF-LAUNCH.md records the launch measured on the installed Claude Code version: template hash, written paths and hashes, launch line, the rendered file unchanged, where the continuation landed; never transcript content.
+
+**Stories:**
+- S10 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+### R8: Land through src_pr and src_land, then set the seven cards by the rule and card each finding
+
+WHEN the card is landed, THE SYSTEM SHALL land it through src_pr and then src_land, and the landing is green only when src_land's Jev verdict is solved or unsure and every leg of .land/gates.sh reports status 0. WHEN the landing is green, the proof's findings section holds zero lines and no check's outcome is incomplete, THE SYSTEM SHALL set to done each of the seven cards whose every row R5 records built, each naming the landing commit, and SHALL leave in review each card that carries a row R5 records not built, whose not built state the proof's card table (R5) records. IF the proof's findings section holds any line, THEN THE SYSTEM SHALL leave all seven cards in review and SHALL file one card on the step 5 board per finding line, its words taken from that line, filing in todo each finding card whose line reads `holds none of the seven`. THE SYSTEM SHALL NOT set done a card that carries a row R5 records partly present, so card UzVQkTaU stays in review while the finding naming docs/design/home/LOSS-ACCOUNT.md is open; SHALL NOT set a card done on a landing that is not green; SHALL NOT move any card other than the seven and the finding cards it files; and SHALL NOT file a card from a line under `Observed, not measured`.
+
+**Acceptance:**
+- src_pr and src_land each record success for this card, and src_land's record carries a Jev verdict word from {solved, unsure} and seven gate legs at status 0.
+- With N lines in the findings section and N greater than 0, the step 5 board carries N new cards, each worded from one finding line, and all seven cards are in review.
+- Each new card worded from a finding line that reads `holds none of the seven` is in todo.
+- Card UzVQkTaU is in review after the landing.
+- With zero lines in the findings section and every check's outcome pass, each of the seven cards whose rows R5 records all built is done and names the landing commit.
+- Each card carrying R7 or R10 is in review after the landing, and the proof's card table records R7 and R10 not built on the lines of the cards that carry them.
+- No card on the step 5 board other than the seven and the filed finding cards changed state.
+
+**Checklist:**
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
+
+**Stories:**
+- S11 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+
+## Boundaries
+
+- No byte under crates/ changes: no fmt rewrite, no clippy fix, no test added, no finding fixed.
+- HOME-001.json and HOME-001.md are not edited, and no HOME-001 row is changed.
+- No check is run in a rewriting form: fmt is measured only as `cargo fmt --all -- --check`, and clippy never with --fix; a rewrite made by any gate leg is never committed.
+- The commit measured is 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and no other, even when main moves before the card lands.
+- No card is moved except the seven that carry HOME-001's rows R1 to R11, and no card is filed except one per finding line.
+- No transcript content, block content or body content appears in the proof, a finding line, a card or a log line.
+- .land/gates.sh and docs/design/project.json are not changed, and ast-grep is not added to the gate.
+- The design's structure array is the whole file list; no path outside it is created.
+
+## Verification
+
+- From the repository root: python3 scripts/design/validate.py docs/design/home exits 0.
+- From the repository root: python3 scripts/design/check-coverage.py docs/design/home exits 0.
+- From the repository root: sh scripts/design/gate.sh exits 0 at the card head.
+- git diff --quiet 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff <card head> -- crates/lys-home exits 0.
+- docs/design/home/PROOF-CHAIN.md names 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, holds 25 Jev verdict lines, six check lines, the findings section, the `Observed, not measured` heading, an 11-line row table and a 7-line card table.
+- In a clean checkout of 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, `sh .land/gates.sh` gives the leg statuses the proof records.

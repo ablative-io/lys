@@ -1,0 +1,188 @@
+{
+  "id": "DIRECTORY-019",
+  "cluster": "directory",
+  "title": "Make CONFORMANCE rows 3.1 and 3.2 true on the lifecycle record: every agent answers to a person, an agent whose person is retired is flagged on read as needing a new person, and the four states are authority only",
+  "depends_on": [
+    "DIRECTORY-003",
+    "DIRECTORY-009"
+  ],
+  "blocked_by": [
+    "The lifecycle-hand brief DIRECTORY-009 (roadmap row RM-017, branch brief/directory/lifecycle-hand) signed off and landed on main with ADR-027 and ADR-028, because this brief reads that brief's lifecycle record, its fold (its R3, crates/lys-identity/src/lifecycle/fold.rs and state.rs), its cause rule (its R2, crates/lys-identity/src/lifecycle/causes.rs), its typed read (its R6, crates/lys-identity-server/src/lifecycle_read.rs) and its contract (its R1, docs/design/identity/LIFECYCLE-CONTRACT.md), and keeps no copy of any of them. Check: git ls-tree -r --name-only origin/main crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs docs/design/identity/LIFECYCLE-CONTRACT.md prints fold.rs, state.rs, causes.rs, error.rs, mod.rs, lifecycle_read.rs and LIFECYCLE-CONTRACT.md. Until then no row starts, R1 included, because R1 adds to that contract.",
+    "The lead's sign-off of this brief before any row is dispatched (DIRECTORY-001 boundary), which is also the manifest review CN9 asks for of the four files this brief adds under crates/lys-identity/ and crates/lys-identity-server/ and of the added lines it names in the lifecycle-hand brief's files. Check: python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory both exit 0, and the card that carries this brief records the sign-off before card_build_v3 runs."
+  ],
+  "checklist": [
+    "C123",
+    "C124",
+    "C125",
+    "C126",
+    "C127"
+  ],
+  "stories": [
+    "S52",
+    "S53"
+  ],
+  "design_anchor": [
+    "ADR-003",
+    "ADR-004",
+    "ADR-007",
+    "ADR-011",
+    "ADR-056"
+  ],
+  "purpose": "CONFORMANCE section 3 (docs/design/identity/CONFORMANCE.md:36-37) holds two lifecycle rows no brief on main makes true. Row 3.1: every agent answers to a person, and an agent whose person is retired is flagged as needing a new one. Row 3.2: the identity states are registered, active, suspended and retired, and the state is authority only and says nothing about running. This brief makes both rows true on the lifecycle record the lifecycle-hand brief DIRECTORY-009 (RM-017) defines, reading its fold and its typed read and keeping no copy of either: an agent recorded with no person is refused by name; an agent's read carries a needs-a-new-person flag worked out each time it is read from its registration and its person's retire record (ADR-056); every change of state is walked, the six in the table admitted and the fourteen others refused by name; and a test shows a change of state starts and stops no process and that the read says nothing about running (ADR-007, ADR-004). Each row maps to at least one acceptance line that tests it on the lifecycle record: row 3.1 to R2 and R3, row 3.2 to R4 and R5.",
+  "task": "Five rows, in order: R1 the conformance section of the lifecycle contract (1 hour), R2 the named refusal of an agent recorded with no person (2 hours), R3 the needs-a-new-person flag worked out on read (3 hours), R4 the walk of every change of state (2 hours), R5 the authority-only test (2 hours): 10 focused implementer hours. R1 is documents only; R2 to R5 stand on files the lifecycle-hand brief DIRECTORY-009 (RM-017) creates, and every such file is touched only by the added lines a row names (CN9).\n\nThe lead's answers are written in as settled. (1) The flag stands, and ADR-011's responsible person for life stays in force: this brief does not revise ADR-011 or DIRECTORY-003 R1. The flag records a fact: the agent's person is retired. Clearing it needs the reassignment card, which is the one that revises that rule. (2) The flag is computed on read, from the agent's registration and its person's retire record, with nothing appended to the agent: each agent's history stays as it is, and the lifecycle-hand brief's rule that retiring someone has no automatic effect on other identities except the grant check holds (ADR-056). (3) The agent's own state is unchanged: it stays in whatever state it was, for example active, and its derived grants refuse at the check, as the lifecycle-states statement's rule that retiring the human makes every derived grant refuse at the next check already says; retiring the person moves no other identity, and this brief neither asserts nor duplicates that grant rule (DIRECTORY-006 R4). (4) Shows is met by the flag in the lifecycle read and in the lifecycle-hand brief's typed read (its R6); the screen that shows it on the people list and the agent file belongs to a later card. (5) Only an agent whose person is retired is flagged. What a suspension stops stays open, so a suspended person's agents are not flagged.\n\nSplit notes. DIRECTORY-003 R5 already refuses four named out-of-table transitions; R4's walk is its superset over all twenty origin-by-target pairs and adds no second table check: every refusal it counts is the one DIRECTORY-003 R5's commit path gives, or the lifecycle-hand brief's lifecycle_unknown_identity. DIRECTORY-003 R1 refuses a registration with no signed-in caller at the server; R2's refusal is of the record, an agent registration naming no responsible person whoever the caller is, and the two stay separate names.\n\nOut: giving an agent a new person (its own card); the screen that shows the flag on the people list and the agent file (a later card); CONFORMANCE row 3.4.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Add the conformance section to the lifecycle contract: rows 3.1 and 3.2 mapped to their tests, the needs-a-new-person rule, and the state as authority only",
+      "spec": "Documents only. The contract is created by DIRECTORY-009 R1, on which this brief depends. THE SYSTEM SHALL add to docs/design/identity/LIFECYCLE-CONTRACT.md, after its existing sections, one section headed 'Conformance rows 3.1 and 3.2' holding, in this order: (1) a table with one row per conformance row, beginning '| 3.1 |' and '| 3.2 |', each naming the test files and test functions of this brief that test it on the lifecycle record: 3.1 to crates/lys-identity/tests/lifecycle_no_person.rs and crates/lys-identity/tests/lifecycle_needs_new_person.rs, 3.2 to crates/lys-identity/tests/lifecycle_walk.rs and crates/lys-identity-server/tests/lifecycle_authority.rs; (2) the needs-a-new-person rule: an agent's needs_a_new_person flag is worked out on read from the agent's registration and its responsible person's retire record, and never appended; it is true on every one of that person's agents when the person is retired and false otherwise, a suspended person included, because what a suspension stops stays open; the flag is not a state and not a transition, the agent keeps its own state, its derived grants refuse at the check, and no responsible person changes; (3) the statement that the flag records a fact, the agent's person is retired, that this contract does not revise ADR-011's responsible person for life or DIRECTORY-003 R1, and that clearing the flag needs the reassignment card, which is the one that revises that rule; (4) the sentence 'the state is authority only: it starts and stops no process and says nothing about whether an identity is running'. The section SHALL NOT change any existing line of the contract, SHALL NOT edit the lifecycle-states statement or CONFORMANCE.md, and SHALL NOT add a state or a transition. Estimate: 1 hour.",
+      "acceptance": [
+        "grep -c '^| 3.1 |\\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2.",
+        "Each of grep -c 'needs_a_new_person', grep -c 'worked out on read', grep -c 'a suspended person included', grep -c 'clearing the flag needs the reassignment card' and grep -c 'the state is authority only' over docs/design/identity/LIFECYCLE-CONTRACT.md prints at least 1.",
+        "git diff --numstat on the R1 commit for docs/design/identity/LIFECYCLE-CONTRACT.md prints a second number of 0, and git diff --stat on the R1 commit for docs/design/identity/CONFORMANCE.md and the lifecycle-states statement under docs/design/identity/ prints nothing.",
+        "sh scripts/design/gate.sh exits 0 on the R1 commit."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/identity/LIFECYCLE-CONTRACT.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C123"
+      ],
+      "stories": [
+        "S52",
+        "S53"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Refuse by name an agent recorded with no responsible person, and append nothing",
+      "spec": "IF a register transition for an agent names no responsible person, THEN THE SYSTEM SHALL refuse it lifecycle_agent_without_person, whose message names the agent and says that every agent is registered under a responsible person, and SHALL append nothing. The check lives in crates/lys-identity/src/lifecycle/responsible.rs, the refusal name in crates/lys-identity/src/lifecycle/error.rs beside the lifecycle-hand brief's names, and it is called by one added line in crates/lys-identity/src/lifecycle/causes.rs on the register path, before the append. THE SYSTEM SHALL NOT fill an absent responsible person from the caller, the administrator or any other source, SHALL NOT apply the check to the registration of a person, and SHALL NOT change DIRECTORY-003 R1's refusal of a registration with no signed-in caller, which stays a separate refusal at the server. The four modified files are created by DIRECTORY-009 R2, on which this brief depends. No wall clock; every time value the test needs is injected through crates/lys-identity/tests/lifecycle_support/mod.rs. Estimate: 2 hours.",
+      "acceptance": [
+        "cf3_r2_ac1: the attested administrator registers an agent whose register request names no responsible person: 1 refusal named lifecycle_agent_without_person, its message containing 'responsible person', and the log's leaf count unchanged; the same request naming a registered test person P as responsible person is admitted, the leaf count rises by exactly 1, and the agent's registration record names P; the test asserts 1 refusal and 1 admission; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r2_ac2: the attested administrator registers a person with no responsible person named: admitted, the leaf count rises by exactly 1, and no refusal named lifecycle_agent_without_person is returned; cargo test -p lys-identity --test lifecycle_no_person cf3_r2_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+        "rg -c 'responsible::' crates/lys-identity/src/lifecycle/causes.rs prints 1, and git diff --numstat on the row's commits for crates/lys-identity/src/lifecycle/causes.rs prints a second number of 0.",
+        "rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2, and on the row's first commit cargo test -p lys-identity --test lifecycle_no_person fails to compile."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/src/lifecycle/responsible.rs",
+          "crates/lys-identity/tests/lifecycle_no_person.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/lifecycle/mod.rs",
+          "crates/lys-identity/src/lifecycle/error.rs",
+          "crates/lys-identity/src/lifecycle/causes.rs",
+          "crates/lys-identity/tests/lifecycle_support/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C124"
+      ],
+      "stories": [
+        "S52"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Work out each agent's needs-a-new-person flag on read from its registration and its person's retire record, and move nothing",
+      "spec": "WHEN an agent's lifecycle record is read, THE SYSTEM SHALL work out its needs_a_new_person flag from the responsible person its registration record names and that person's folded state (the lifecycle-hand brief's fold, in which only the person's retire record makes it retired): true when that person is retired, whatever the agent's own state, and false when that person is registered, active or suspended. The derivation is one function in crates/lys-identity/src/lifecycle/responsible.rs over the lifecycle-hand brief's fold, and the typed read in crates/lys-identity-server/src/lifecycle_read.rs gains one field, needs_a_new_person, filled from that function by added lines and serialised as a JSON boolean. THE SYSTEM SHALL NOT append any record to work out or show the flag, SHALL NOT make a transition on the agent, SHALL NOT change the agent's state, SHALL NOT change the agent's responsible person, SHALL NOT store the flag, SHALL NOT make the flag a state, SHALL NOT flag an agent whose person is suspended, and SHALL NOT read DIRECTORY-006's grant decision to work it out. crates/lys-identity-server/src/lifecycle_read.rs is created by DIRECTORY-009 R6, on which this brief depends. No second store or projection of lifecycle state is added. Estimate: 3 hours.",
+      "acceptance": [
+        "cf3_r3_ac1 (row 3.1): person P, active, with agents A1 active, A2 suspended and A3 retired, and person Q, active, with agent B1 active; the attested administrator retires P; the reads answer A1 needs_a_new_person true with state active, A2 true with state suspended, A3 true with state retired, and B1 false with state active; the test asserts a flagged count of 3, equal to the count of P's agents, a flagged count of 0 among Q's agents, each agent's state equal to its state before the retire, each agent's history length equal to its length before the retire, and a log leaf count exactly 1 higher (the retire of P); cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r3_ac2: person R, active, with agents C1 active and C2 registered: before any change both read needs_a_new_person false; the administrator suspends R and both read false with their states unchanged; the administrator reinstates R and both read false; the administrator retires R and both read true; the test asserts flagged counts 0, 0, 0 and 2 in that order, and each agent's history length unchanged across all three transitions of R; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r3_ac3: the test records the log's leaf count, the count of files under the log directory and the SHA-256 of each file, then reads every agent of cf3_r3_ac1 again, and asserts that the leaf count, the file count and each file's SHA-256 equal those recorded before the read; cargo test -p lys-identity --test lifecycle_needs_new_person cf3_r3_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+        "rg -n '\\.append\\(|fn set_state|grants::' crates/lys-identity/src/lifecycle/responsible.rs prints nothing; rg -c 'needs_a_new_person' crates/lys-identity-server/src/lifecycle_read.rs prints at least 1; git diff --numstat on the row's commits for crates/lys-identity-server/src/lifecycle_read.rs prints a second number of 0.",
+        "rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3, and on the row's first commit cargo test -p lys-identity --test lifecycle_needs_new_person fails to compile."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/tests/lifecycle_needs_new_person.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/lifecycle/responsible.rs",
+          "crates/lys-identity-server/src/lifecycle_read.rs",
+          "crates/lys-identity/tests/lifecycle_support/mod.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C125"
+      ],
+      "stories": [
+        "S52"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Walk every change of state on the lifecycle record: admit the six in the table and refuse the fourteen others by name",
+      "spec": "THE SYSTEM SHALL admit, through the lifecycle-hand brief's transition path over DIRECTORY-003 R5's commit path, exactly the six changes of state in the table: none to registered (register), registered to active (activate), active to suspended (suspend), suspended to active (reinstate), active to retired (retire) and suspended to retired (retire). IF any other change of an origin in none, registered, active, suspended and retired to a target in registered, active, suspended and retired is requested, THEN THE SYSTEM SHALL refuse it by name and append nothing: lifecycle_unknown_identity when the origin is none, and DIRECTORY-003 R5's out-of-table refusal otherwise. This row adds no table check, no refusal name and no source file: the walk is a test, crates/lys-identity/tests/lifecycle_walk.rs, that requests each of the twenty origin-by-target pairs once, self-changes included, as the attested administrator so no refusal is by actor, each pair through the operation the table records for its target (register for registered, activate for active except reinstate from suspended, suspend for suspended, retire for retired). THE SYSTEM SHALL NOT admit a retired identity to any other state, and SHALL NOT add a fifth state. Estimate: 2 hours.",
+      "acceptance": [
+        "cf3_r4_ac1 (row 3.2): setup, before the walk and outside it, registers and transitions the identities that give each origin state (a fresh id for none, and one identity each brought to registered, active, suspended and retired for every pair from that origin); the walk then requests the 20 pairs, and the test samples the log's leaf count immediately before each of the 20 requests and immediately after it; the test asserts exactly 20 requests, 6 admissions (the six pairs of the table, each folding to its target) and 14 refusals, a leaf count difference of exactly +1 across each of the 6 admissions and exactly 0 across each of the 14 refusals, and a sum of the 20 differences equal to 6; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r4_ac2: of the 14 refusals, the 3 whose origin is none are named lifecycle_unknown_identity; each of the other 11 carries a non-empty refusal name that is neither lifecycle_actor_not_permitted nor lifecycle_unknown_identity, and a message containing both its origin state's name and its target state's name; the test asserts the counts 3 and 11; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r4_ac3: the listing of every value of the lifecycle-hand brief's state type has length 4 and names registered, active, suspended and retired; cargo test -p lys-identity --test lifecycle_walk cf3_r4_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+        "rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3, and the row's commits change no file under crates/lys-identity/src: git diff --stat on them for crates/lys-identity/src prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/tests/lifecycle_walk.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C126"
+      ],
+      "stories": [
+        "S53"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Show that a change of state starts and stops no process, and that the lifecycle read says nothing about running",
+      "spec": "WHEN an agent's state changes, THE SYSTEM SHALL record the transition and do nothing else: THE SYSTEM SHALL NOT start, stop, signal or ask any engine to start or stop a process, and the lifecycle code SHALL NOT reference a process API. THE SYSTEM SHALL keep the typed lifecycle read free of any field about running: no key of the read, at any depth, names running, an execution, a process, a pid, liveness or a heartbeat. The test counts the child processes of the test process around each transition, and lives in crates/lys-identity-server/tests/lifecycle_authority.rs; it carries a positive control proving its key matcher fires, so the absence it asserts cannot pass vacuously. This row changes no source file. Estimate: 2 hours.",
+      "acceptance": [
+        "cf3_r5_ac1 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and after each of the 5 transitions the typed read of the agent is serialised to JSON; the key matcher, the case-insensitive pattern run|exec|process|pid|alive|heartbeat applied to every key at every depth, finds 0 matches in each of the 5 reads, and the same matcher applied to the fixture object {\"running\": true, \"pid\": 1} finds 2; the test asserts 5 reads, 0 matches and the control's 2; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac1 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r5_ac2: the same serialised read carries the key needs_a_new_person at its top level after each of the 5 transitions; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac2 prints 'test result: ok. 1 passed; 0 failed'.",
+        "cf3_r5_ac3 (row 3.2): the attested administrator registers, activates, suspends, reinstates and retires one agent, and the test records the count of child processes of the test process immediately before and immediately after each of the 5 transitions; the test asserts 5 comparisons with 0 differences, each after-count equal to its before-count; cargo test -p lys-identity-server --test lifecycle_authority cf3_r5_ac3 prints 'test result: ok. 1 passed; 0 failed'.",
+        "rg -n 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal' crates/lys-identity/src/lifecycle crates/lys-identity-server/src/lifecycle_read.rs prints nothing, and the same pattern's positive control, printf 'Command::new\\n' | rg -c 'std::process|Command::new|tokio::process|process::exit|libc::kill|nix::sys::signal', prints 1.",
+        "rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3, and the row's commits change no file under crates/lys-identity/src and no file under crates/lys-identity-server/src: git diff --stat on them for those two directories prints nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/lifecycle_authority.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C127"
+      ],
+      "stories": [
+        "S53"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No way to give an agent a new person, and no change to any agent's responsible person: that is its own card, the one that revises ADR-011's responsible person for life and clears the flag. This brief revises neither ADR-011 nor DIRECTORY-003 R1.",
+    "No copy of the lifecycle-hand brief's lifecycle record: no second store, projection or fold of lifecycle state. Its files are touched only by the added lines a row names: one line in crates/lys-identity/src/lifecycle/causes.rs (R2), added lines in crates/lys-identity/src/lifecycle/error.rs and mod.rs (R2), crates/lys-identity/tests/lifecycle_support/mod.rs (R2, R3), crates/lys-identity-server/src/lifecycle_read.rs (R3) and one added section of docs/design/identity/LIFECYCLE-CONTRACT.md (R1). A row that needs any other file stops and names it (CN9).",
+    "No fifth state; the needs-a-new-person flag and provisioned are never states; no transition is added and none is caused by the flag, and retiring a person moves no other identity. Nothing is appended except the transitions a test drives through DIRECTORY-003 R5's commit path.",
+    "No flag for an agent whose person is suspended: what a suspension stops stays open.",
+    "No screen: showing the flag on the people list and the agent file is a later card; this brief shows it in the lifecycle read and the typed read.",
+    "No start, stop or execution control in the identity product, and no call to any engine (ADR-007, ADR-004).",
+    "DIRECTORY-006 R4's grant rule is neither asserted nor duplicated: the flag reads the person's folded state, never a grant decision.",
+    "The IDENTITY-001 files, docs/design/identity/LIFECYCLE-STATES-2026-09-22.md, docs/design/identity/CONFORMANCE.md and lys-core's shipped formats are unchanged.",
+    "No audit record is deleted, hidden or rewritten; the checklist and story ledgers are append-only.",
+    "No wall clock in new code, no person's name or date in code, no credential, token or key value anywhere, test identities only."
+  ],
+  "verification": [
+    "From the repository root: sh scripts/design/gate.sh exits 0, and python3 scripts/design/validate.py docs/design/decisions.json and python3 scripts/design/validate.py docs/design/roadmap.json each exit 0.",
+    "From the repository root, after each code row: cargo fmt --all; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps, all clean, with git status showing no change from cargo fmt (heavy runs at the gate venue, CN8).",
+    "From the repository root: rg -c 'fn cf3_r2_ac(1|2)' crates/lys-identity/tests/lifecycle_no_person.rs prints 2; rg -c 'fn cf3_r3_ac(1|2|3)' crates/lys-identity/tests/lifecycle_needs_new_person.rs prints 3; rg -c 'fn cf3_r4_ac(1|2|3)' crates/lys-identity/tests/lifecycle_walk.rs prints 3; rg -c 'fn cf3_r5_ac(1|2|3)' crates/lys-identity-server/tests/lifecycle_authority.rs prints 3.",
+    "grep -c '^| 3.1 |\\|^| 3.2 |' docs/design/identity/LIFECYCLE-CONTRACT.md prints 2, and every test function that section names exists in the file it names.",
+    "The row diffs touch no path under vendor/rauthy, docs/design/identity/briefs, docs/design/identity/CONFORMANCE.md or the lifecycle-states statement, and of the lifecycle-hand brief's source files only added lines: git diff --numstat <base> HEAD -- crates/lys-identity/src/lifecycle/causes.rs crates/lys-identity-server/src/lifecycle_read.rs prints lines whose second number is 0.",
+    "rg -n 'SystemTime::now|Utc::now|Local::now|Instant::now' crates/lys-identity/src/lifecycle/responsible.rs prints nothing."
+  ]
+}
