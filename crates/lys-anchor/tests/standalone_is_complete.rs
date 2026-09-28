@@ -220,7 +220,7 @@ fn a_standalone_anchor_can_be_read_without_the_ability_to_sign_for_it() {
     // No signer, no admission policy, and no signature emitted as a side
     // effect of asking what the log holds.
     let reader = Anchor::open_read_only(
-        FileLeafStore::open(dir).unwrap(),
+        FileLeafStore::open_read_only(dir).unwrap(),
         AnchorConfig::unconfigured(),
     )
     .unwrap();

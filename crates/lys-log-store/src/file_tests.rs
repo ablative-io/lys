@@ -53,6 +53,22 @@
 //! single-rule drift. **The criterion presumes the injection isolates one rule;
 //! an injection that moves a boundary inside a shared condition does not, and
 //! its two failures indict the probe rather than the tests.**
+//!
+//! # The two opens, each rule with the one case built to catch it
+//!
+//! A writable open flushes `leaves/` before counting; a read-only open never
+//! flushes and its handle refuses every write. Each rule has its own case, in
+//! `file_tests/read_only.rs`, and no other case arms the open-time flush
+//! failure or opens read-only, so each drift below is meant to fail exactly
+//! the one case named.
+//!
+//! | injection | the only case that fails |
+//! |---|---|
+//! | make `open_read_only` flush `leaves/` before counting | `a_read_only_open_never_flushes_the_leaves_directory` |
+//! | make `open` ignore a failed `leaves/` flush and count | `a_writable_open_whose_leaves_flush_fails_is_refused_and_writes_nothing` |
+//! | skip the read-only refusal in `put_leaf` | `a_read_only_handle_refuses_put_leaf_by_name` |
+//! | skip the read-only refusal in `pin` | `a_read_only_handle_refuses_pin_by_name` |
+//! | skip the read-only refusal in `put_snapshot` | `a_read_only_handle_refuses_a_snapshot_write_by_name` |
 
 use std::io::Write;
 use std::path::Path;
@@ -67,6 +83,8 @@ mod after_link;
 mod pins;
 #[path = "file_tests/probe.rs"]
 mod probe;
+#[path = "file_tests/read_only.rs"]
+mod read_only;
 
 fn create(dir: &Path) -> FileLeafStore {
     FileLeafStore::create(dir, ORIGIN).unwrap();

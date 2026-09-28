@@ -53,6 +53,33 @@
 //! honest strength for a property whose failure needs a crash to observe, and
 //! which is a different and weaker axis of independence than the crate's Merkle
 //! cross-checks, where two separately written implementations disagree or agree.
+//!
+//! # A named leaf is whole
+//!
+//! A file under a 20-digit leaf name is always a whole, flushed leaf. Only
+//! files whose names begin with `.` may be partial, and those are never counted
+//! as leaves and never changed by an open.
+//!
+//! - A write that fails before a successful link removes its own temporary
+//!   file, and no other.
+//! - The no-replace link is the **commit point**: once it succeeds the leaf is
+//!   this writer's and the extent advances, whatever happens after it.
+//! - A failure to flush `leaves/` after the link is
+//!   [`StoreError::LeafDurabilityUncertain`], and the handle refuses further
+//!   appends until the store is reopened.
+//! - A writable open ([`FileLeafStore::open`]) flushes `leaves/` before
+//!   counting, so a leaf named at a writable open is durable, and it fails
+//!   with [`StoreError::Io`] when that flush fails.
+//! - A read-only open ([`FileLeafStore::open_read_only`]) counts the named
+//!   leaves without flushing, and its handle refuses to write a leaf, a pin or
+//!   a snapshot with [`StoreError::ReadOnly`].
+//! - **Open never deletes a leftover temporary file**, and neither open
+//!   deletes, renames, truncates or writes any file in the store's directory.
+//!   Clearing leftover temporary files that a crash stranded is not done here:
+//!   it is a maintenance act of its own.
+//!
+//! The directory flushes above hold on unix targets only; elsewhere the flush
+//! of a directory is a no-op, as the Durability section says.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -117,12 +144,23 @@ pub struct FileLeafStore {
     origin: String,
     extent: u64,
     pinned: PinnedRoot,
+    /// Whether this handle may write a leaf, a pin or a snapshot.
+    access: Access,
     /// The leaf whose directory flush failed on this handle, if any. While set,
     /// every append is refused until the store is reopened.
     durability_uncertain: Option<u64>,
     /// The temporary names this handle could not remove after a link, in the
     /// order it met them.
     left_behind: Vec<LeftBehind>,
+}
+
+/// Whether a handle was opened to write or only to read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Access {
+    /// Opened by [`FileLeafStore::create`] or [`FileLeafStore::open`].
+    Writable,
+    /// Opened by [`FileLeafStore::open_read_only`]; every write is refused.
+    ReadOnly,
 }
 
 /// The two steps after a leaf is linked, kept as functions so that a test can
@@ -188,6 +226,7 @@ impl FileLeafStore {
             origin: config.origin,
             extent: 0,
             pinned,
+            access: Access::Writable,
             durability_uncertain: None,
             left_behind: Vec::new(),
         })
@@ -205,8 +244,38 @@ impl FileLeafStore {
     /// [`StoreError::NotInitialized`] if `dir` is not a store,
     /// [`StoreError::Corrupt`] with the specific discrepancy for a malformed
     /// `log.json`/`state.json`, an unexpected entry in `leaves/`, or a gap in
-    /// the index set, and [`StoreError::Io`] on filesystem failure.
+    /// the index set, and [`StoreError::Io`] on filesystem failure, including
+    /// a failed flush of `leaves/` before the leaves are counted.
     pub fn open(dir: &Path) -> StoreResult<Self> {
+        Self::open_as(dir, Access::Writable, sync_dir)
+    }
+
+    /// Opens the store at `dir` for a reader, such as the store handed to an
+    /// anchor opened read-only.
+    ///
+    /// Performs every check [`FileLeafStore::open`] performs, in the same
+    /// order, except the flush of `leaves/`: it counts the leaves that are
+    /// named and writes nothing, not even a directory flush. The handle it
+    /// returns refuses [`put_leaf`](LeafStore::put_leaf),
+    /// [`pin`](LeafStore::pin) and [`put_snapshot`](LeafStore::put_snapshot)
+    /// with [`StoreError::ReadOnly`], before any other check.
+    ///
+    /// # Errors
+    ///
+    /// The errors [`FileLeafStore::open`] returns, except a failed flush of
+    /// `leaves/`, which this open never attempts.
+    pub fn open_read_only(dir: &Path) -> StoreResult<Self> {
+        Self::open_as(dir, Access::ReadOnly, sync_dir)
+    }
+
+    /// Opens the store at `dir` with the given access. A writable open flushes
+    /// `leaves/` with `flush_leaves` before counting; a read-only open never
+    /// calls it. The flush is a parameter so that a test can make it fail.
+    fn open_as(
+        dir: &Path,
+        access: Access,
+        flush_leaves: fn(&Path) -> std::io::Result<()>,
+    ) -> StoreResult<Self> {
         let config_path = dir.join("log.json");
         if !config_path.exists() {
             return Err(StoreError::NotInitialized {
@@ -229,13 +298,24 @@ impl FileLeafStore {
             root: decode_pinned_root(dir, &state.root_hash)?,
         };
         // A leaf name linked just before a crash may not yet be durable; the
-        // flush makes every name counted below one that survives.
-        fsync_dir(&dir.join("leaves"))?;
+        // flush makes every name counted below one that survives. A reader
+        // writes nothing, a directory flush included, and counts what is named.
+        if access == Access::Writable {
+            let leaves_dir = dir.join("leaves");
+            flush_leaves(&leaves_dir).map_err(|source| StoreError::Io {
+                context: format!(
+                    "failed to flush the leaves directory {} to disk before counting its leaves",
+                    leaves_dir.display()
+                ),
+                source,
+            })?;
+        }
         Ok(Self {
             dir: dir.to_path_buf(),
             origin: config.origin,
             extent: probed_extent(dir, pinned.tree_size)?,
             pinned,
+            access,
             durability_uncertain: None,
             left_behind: Vec::new(),
         })
@@ -274,6 +354,18 @@ impl FileLeafStore {
         &self.left_behind
     }
 
+    /// Refuses `operation` with [`StoreError::ReadOnly`] when this handle was
+    /// opened read-only, before anything is touched.
+    fn refuse_if_read_only(&self, operation: &'static str) -> StoreResult<()> {
+        match self.access {
+            Access::Writable => Ok(()),
+            Access::ReadOnly => Err(StoreError::ReadOnly {
+                path: self.dir.clone(),
+                operation,
+            }),
+        }
+    }
+
     /// Path of the leaf file for `index`.
     fn leaf_path(&self, index: u64) -> PathBuf {
         self.dir
@@ -307,6 +399,7 @@ impl FileLeafStore {
         after_link: &AfterLink,
         next_sequence: &mut impl FnMut() -> u64,
     ) -> StoreResult<()> {
+        self.refuse_if_read_only("write a leaf")?;
         if let Some(uncertain) = self.durability_uncertain {
             return Err(StoreError::ReopenRequired { index: uncertain });
         }
@@ -378,6 +471,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
+        self.refuse_if_read_only("pin a root")?;
         if pin.tree_size < self.pinned.tree_size {
             return Err(StoreError::PinWentBackwards {
                 pinned: self.pinned.tree_size,
@@ -404,6 +498,7 @@ impl LeafStore for FileLeafStore {
     }
 
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.refuse_if_read_only("write a snapshot")?;
         snapshot_slot::write(&self.dir, bytes)
     }
 }
