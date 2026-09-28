@@ -168,6 +168,19 @@ fn start_runner(
     Ok(())
 }
 
+/// Makes every file the directory service reads from the state folder that
+/// is not there yet, leaving each one that is: the grant model, the
+/// providers' key, the provider signing key and the service key. Install
+/// and upgrade both run it, so an install made by an earlier build gains
+/// what this build's service needs before it starts.
+pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
+    write_providers_key(config)?;
+    provider_key(config)?;
+    service_key(layout)?;
+    Ok(())
+}
+
 /// Runs `lys identity install`. A failure is said in Lys's words, because
 /// the person installing reads it.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
@@ -236,9 +249,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         emitter.note(&format!("screens placed from commit {}", manifest.commit));
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
-    write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
-    write_providers_key(&config)?;
-    provider_key(&config)?;
+    server_state(&layout, &config)?;
     let carried = server_config::carried(&layout)?.unwrap_or_default();
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {

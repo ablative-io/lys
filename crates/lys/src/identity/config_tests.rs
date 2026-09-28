@@ -173,13 +173,49 @@ fn clients_are_distinct_and_never_rauthys_own() {
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
 }
 
+/// A file as an earlier build wrote it: the app client under the product's
+/// own name and no compose network named.
+fn earlier_build_file() -> String {
+    EXAMPLE
+        .replace("[clients.app]", "[clients.product]")
+        .lines()
+        .filter(|line| !line.starts_with("network ="))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
-fn an_install_that_names_its_app_client_cambium_still_reads() -> Result<(), Box<dyn Error>> {
-    let text = EXAMPLE.replace("[clients.app]", "[clients.cambium]");
-    let config = parse(&text)?;
-    let app = parse(EXAMPLE)?.clients.app;
-    assert!(app.is_some(), "the example names an app client");
-    assert_eq!(config.clients.app, app);
+fn an_earlier_builds_file_is_brought_forward_and_read() -> Result<(), Box<dyn Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("deployment.toml");
+    let earlier = earlier_build_file();
+    assert!(
+        parse(&earlier).is_err(),
+        "this build cannot read it as written"
+    );
+    std::fs::write(&path, &earlier)?;
+    let config = DeploymentConfig::load(&path)?;
+    assert_eq!(config.clients.app, parse(EXAMPLE)?.clients.app);
+    assert_eq!(config.deployment.network, bring_forward::DEFAULT_NETWORK);
+    let written = std::fs::read_to_string(&path)?;
+    assert!(written.contains("[clients.app]") && !written.contains("[clients.product]"));
+    assert!(written.contains(&format!("network = \"{}\"", bring_forward::DEFAULT_NETWORK)));
+    DeploymentConfig::load(&path)?;
+    assert_eq!(
+        std::fs::read_to_string(&path)?,
+        written,
+        "brought forward once"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_file_in_this_builds_shape_is_left_as_written() -> Result<(), Box<dyn Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("deployment.toml");
+    std::fs::write(&path, EXAMPLE)?;
+    DeploymentConfig::load(&path)?;
+    assert_eq!(std::fs::read_to_string(&path)?, EXAMPLE);
     Ok(())
 }
 

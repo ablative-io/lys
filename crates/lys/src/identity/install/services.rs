@@ -132,9 +132,28 @@ fn compose_args(layout: &Layout, config: &DeploymentConfig) -> Vec<String> {
 
 /// `docker compose up -d --wait` for the deployment under `layout`.
 pub fn compose_up(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    let args = up_args(layout, config, false);
+    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+}
+
+/// `docker compose up -d --wait --force-recreate` for the deployment under
+/// `layout`: every service is made again from the definition now in place.
+/// Compose recreates a changed network without recreating a container whose
+/// own definition is unchanged, which leaves that container off the network
+/// under its service name, so an upgrade makes every service again.
+pub fn compose_recreate(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    let args = up_args(layout, config, true);
+    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+}
+
+/// The `docker compose up` arguments, recreating every service when asked.
+pub fn up_args(layout: &Layout, config: &DeploymentConfig, recreate: bool) -> Vec<String> {
     let mut args = compose_args(layout, config);
     args.extend(["up", "-d", "--wait"].map(str::to_string));
-    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+    if recreate {
+        args.push("--force-recreate".to_string());
+    }
+    args
 }
 
 /// The declared services of `config` that are not ready now.
