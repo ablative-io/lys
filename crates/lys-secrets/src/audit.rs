@@ -343,7 +343,27 @@ impl AuditLog {
     ///
     /// As [`AuditLog::replay`].
     pub fn lines_from(&self, from: u64) -> Result<Vec<RecordedLine>, SecretsError> {
-        (from..self.len())
+        self.lines_between(from, self.len())
+    }
+
+    /// At most `most` lines, the last before `before`, oldest first, each
+    /// signature verified. Without `before` they are the last of the log.
+    /// It reads those lines only, however long the log is.
+    ///
+    /// # Errors
+    ///
+    /// As [`AuditLog::replay`].
+    pub fn window(
+        &self,
+        before: Option<u64>,
+        most: u64,
+    ) -> Result<Vec<RecordedLine>, SecretsError> {
+        let end = before.map_or(self.len(), |before| before.min(self.len()));
+        self.lines_between(end.saturating_sub(most), end)
+    }
+
+    fn lines_between(&self, from: u64, to: u64) -> Result<Vec<RecordedLine>, SecretsError> {
+        (from..to)
             .map(|index| {
                 let bytes = self.leaf(index)?;
                 let line = decode_signed(index, &bytes, &self.verifying_key)?;
