@@ -352,7 +352,7 @@
 
 ## A receipt's checkpoint is signed (DIRECTORY-058)
 
-- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
+- [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed at open, at each committed append and at each settle that adopts leaves, under the log's own origin (DIRECTORY-058 R1).
 - [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
 
 ## Installed audit sender

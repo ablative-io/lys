@@ -1376,7 +1376,7 @@
       "items": [
         {
           "id": "C403",
-          "text": "The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).",
+          "text": "The receipts route answers its checkpoint as a note signed by the service key, signed at open, at each committed append and at each settle that adopts leaves, under the log's own origin (DIRECTORY-058 R1).",
           "done": false
         },
         {

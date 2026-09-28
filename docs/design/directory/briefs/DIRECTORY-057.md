@@ -87,7 +87,7 @@ Behavioural. The function start_detached (services.rs lines 342 to 377) moves wh
 - Outside tests, the text `exit_wait::hold(` appears under crates/lys/src only in held_start.rs.
 - The text `fn hold(` appears under crates/lys/src/identity/install only once, at exit_wait.rs line 49.
 - A search of crates/lys/src finds try_take called only inside exit_wait.rs.
-- A holder started as the test binary under the real harness is read as held, measured by an install test that starts through it the fifo scratch service of install_tests.rs lines 184 to 192.
+- A holder started as the test binary under the real harness is read as held, measured by an install test that starts through it the fifo scratch service of install_tests.rs lines 185 to 193.
 
 **Files:**
 - create: crates/lys/src/identity/install/start_race_tests.rs
