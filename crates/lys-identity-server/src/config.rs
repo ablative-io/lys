@@ -124,6 +124,11 @@ pub struct Config {
     /// not exist. Without it the stop route answers `StopsUnavailable`.
     #[serde(default)]
     pub stops_dir: Option<PathBuf>,
+    /// The directory the goals, expectations and deliverables are kept in,
+    /// created when it does not exist. Without it the goal routes answer
+    /// `goals_unavailable`.
+    #[serde(default)]
+    pub goals_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]

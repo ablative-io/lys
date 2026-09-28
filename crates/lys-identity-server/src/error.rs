@@ -17,6 +17,9 @@ pub enum ServerError {
     /// An apps refusal: a registration, a schema, a kind or an app's credential.
     #[error(transparent)]
     App(#[from] crate::apps_error::AppError),
+    /// A goals refusal: an item, its judgement or its reminders.
+    #[error(transparent)]
+    Goal(#[from] crate::goals_state::GoalError),
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,
