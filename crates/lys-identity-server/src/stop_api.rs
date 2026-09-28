@@ -4,9 +4,12 @@
 //! secrets broker, and asks the runtime of every session of its to end it.
 //!
 //! The stop never claims a session ended. Each session shows unconfirmed
-//! from the ask until its runtime reports it stopped. Sent again under the
-//! same operation id it is kept once and answers the same; each part is
-//! kept once by its own record.
+//! from the ask until its runtime reports it stopped. Once every part is
+//! done the stop is kept whole in its own log, so sent again under the same
+//! operation id it answers exactly what was kept and does nothing twice;
+//! the same operation in other words is refused `StopReused`. Each part is
+//! kept once by its own record too, so a stop cut off before it was kept
+//! does nothing twice when it is sent again.
 //!
 //! The broker is asked after the suspension, the certificates and the
 //! sessions are recorded, so a broker that cannot be reached leaves those
@@ -33,6 +36,8 @@ use crate::routes::{AppState, hex, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
 use crate::session::now;
+use crate::stops_state::Stop;
+use crate::stops_store::StopStore;
 
 /// The most characters a reason carries.
 const REASON_MAX: usize = 500;
@@ -54,7 +59,11 @@ pub struct StopView {
     pub operation: String,
     /// The agent's lifecycle state after the stop: `suspended`.
     pub state: String,
-    /// The serials of the certificates withdrawn, in the log's order.
+    /// The person who stopped it.
+    pub by: String,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
+    /// The serials of the certificates withdrawn.
     pub certificates_withdrawn: Vec<String>,
     /// The credential handles ended at the broker, by id; null when the
     /// broker refused, and then `credentials_refused` names why.
@@ -68,6 +77,23 @@ pub struct StopView {
     pub reason: String,
 }
 
+impl From<Stop> for StopView {
+    fn from(stop: Stop) -> Self {
+        Self {
+            agent: stop.agent,
+            operation: stop.operation,
+            state: "suspended".to_owned(),
+            by: stop.by,
+            at: stop.at,
+            certificates_withdrawn: stop.certificates_withdrawn,
+            credentials_ended: stop.credentials_ended,
+            credentials_refused: stop.credentials_refused,
+            sessions_asked: stop.sessions_asked,
+            reason: stop.reason,
+        }
+    }
+}
+
 /// The stop route.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/agents/{id}/stop", post(stop))
@@ -77,6 +103,21 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
     }
+}
+
+fn with_stops<T>(
+    state: &AppState,
+    act: impl FnOnce(&mut StopStore) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    let store = state
+        .stops
+        .as_ref()
+        .ok_or_else(|| ServerError::StopsUnavailable {
+            reason: "the configuration names no stops_dir".to_owned(),
+        })?;
+    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    store.settle()?;
+    act(&mut store)
 }
 
 /// An operation id for one part of the stop, the same each time the same
@@ -106,7 +147,7 @@ async fn stop(
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     let administrator = state.admission.administrator(&actor).is_ok();
-    let by = with_directory(&state, |directory| {
+    let (by, lifecycle) = with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
         let record = projection
@@ -115,44 +156,65 @@ async fn stop(
         if !administrator && record.responsible() != Some(person) {
             return Err(ServerError::AgentNotVisible);
         }
-        match record.state() {
-            LifecycleState::Active => {
-                directory.transition(
-                    actor.clone(),
-                    operation,
-                    IdentityId::Agent(agent),
-                    Transition::Suspend,
-                    &reason,
-                    now(),
-                )?;
-            }
-            LifecycleState::Suspended => {}
-            other => {
-                return Err(ServerError::AgentNotActive {
-                    state: other.to_string(),
-                });
-            }
-        }
-        Ok(person.to_string())
+        Ok((person.to_string(), record.state()))
     })?;
+    let asked = Stop {
+        operation: operation.to_string(),
+        agent: agent.to_string(),
+        by: by.clone(),
+        reason: reason.clone(),
+        at: now(),
+        certificates_withdrawn: Vec::new(),
+        sessions_asked: Vec::new(),
+        credentials_ended: None,
+        credentials_refused: None,
+    };
+    let kept = with_stops(&state, |store| {
+        Ok(store.recorded(&asked.operation).cloned())
+    })?;
+    if let Some(kept) = kept {
+        if !kept.same_words(&asked) {
+            return Err(ServerError::StopReused {
+                operation: asked.operation,
+            });
+        }
+        return Ok(Json(kept.into()));
+    }
+    match lifecycle {
+        LifecycleState::Active => with_directory(&state, |directory| {
+            directory.transition(
+                actor.clone(),
+                operation,
+                IdentityId::Agent(agent),
+                Transition::Suspend,
+                &reason,
+                now(),
+            )?;
+            Ok(())
+        })?,
+        LifecycleState::Suspended => {}
+        other => {
+            return Err(ServerError::AgentNotActive {
+                state: other.to_string(),
+            });
+        }
+    }
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;
-    let sessions_asked = ask_sessions(&state, &agent, &operation.to_string(), &by, &reason)?;
+    let sessions_asked = ask_sessions(&state, &agent, &asked.operation, &by, &reason)?;
     let (credentials_ended, credentials_refused) =
-        match end_handles(&state, &headers, &agent, &operation.to_string()).await {
+        match end_handles(&state, &headers, &agent, &asked.operation).await {
             Ok(ended) => (Some(ended), None),
             Err(refused) => (None, Some(refused.to_string())),
         };
-    Ok(Json(StopView {
-        agent,
-        operation: operation.to_string(),
-        state: "suspended".to_owned(),
+    let done = Stop {
         certificates_withdrawn,
+        sessions_asked,
         credentials_ended,
         credentials_refused,
-        sessions_asked,
-        reason,
-    }))
+        ..asked
+    };
+    with_stops(&state, |store| store.keep(done)).map(|stop| Json(stop.into()))
 }
 
 /// Withdraw every certificate of the agent that stands, naming the stop.
@@ -232,7 +294,9 @@ fn ask_sessions(
 }
 
 /// End every handle the agent holds at the broker, each under an operation
-/// id made from the stop's, so the same stop sent again ends nothing twice.
+/// id made from the stop's, so a stop cut off and sent again ends nothing
+/// twice; a handle ended by this stop counts, one ended by anyone else does
+/// not.
 async fn end_handles(
     state: &AppState,
     headers: &HeaderMap,
@@ -253,9 +317,6 @@ async fn end_handles(
                 reason: "the broker listed a handle without an id".to_owned(),
             });
         };
-        if handle["dropped"].as_bool() == Some(true) {
-            continue;
-        }
         let body = json!({ "handle": id, "operation": part(operation, "handle", id) });
         let answer: Value = crate::secrets_api::ask(
             state,
@@ -270,7 +331,15 @@ async fn end_handles(
                 reason: format!("the broker did not confirm ending handle {id}"),
             });
         }
-        ended.push(id.to_owned());
+        match answer["outcome"].as_str() {
+            Some("ended" | "repeated") => ended.push(id.to_owned()),
+            Some("already_ended") => {}
+            other => {
+                return Err(ServerError::SecretsUnavailable {
+                    reason: format!("the broker answered handle {id} with outcome {other:?}"),
+                });
+            }
+        }
     }
     Ok(ended)
 }

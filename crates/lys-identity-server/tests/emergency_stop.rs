@@ -166,6 +166,18 @@ async fn a_stop_suspends_withdraws_and_asks_and_is_kept_once() -> TestResult {
         .await?;
     assert_eq!(status, 200, "{again}");
     assert_eq!(again, stopped, "the same stop sent again answers the same");
+    refused(
+        &table
+            .service
+            .post(
+                &table.path(),
+                Some(&table.bea),
+                &json!({ "operation": body["operation"], "reason": "other words" }),
+            )
+            .await?,
+        409,
+        "StopReused",
+    );
 
     let report = json!({
         "operation": operation()?, "state": "stopped", "machine": session["machine"],

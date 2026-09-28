@@ -24,7 +24,7 @@ describe("An agent's file", () => {
   });
 
   it('stops an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST /agents/' + SCRIBE + '/stop']: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', certificates_withdrawn: ['op-' + 'a'.repeat(32)], credentials_ended: null, credentials_refused: 'SecretsUnavailable: no secrets broker is configured', sessions_asked: ['op-' + 'b'.repeat(32)], reason: 'leaked its key' }) });
+    const { posted } = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST /agents/' + SCRIBE + '/stop']: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: ['op-' + 'a'.repeat(32)], credentials_ended: null, credentials_refused: 'SecretsUnavailable: no secrets broker is configured', sessions_asked: ['op-' + 'b'.repeat(32)], reason: 'leaked its key' }) });
     await click($('.file .head button[data-act="stop"]'));
     expect(posted).toEqual([]);
     const reason = $('form[aria-label="Confirm emergency stop"] input');
@@ -35,6 +35,7 @@ describe("An agent's file", () => {
     expect(text()).toContain('the agent is suspended');
     expect(text()).toContain('Credential handles were not ended: SecretsUnavailable');
     expect(text()).toContain('stays unconfirmed until its runtime reports it stopped');
+    expect(text()).toContain('Refresh file');
   });
 
   it('shows role and version as not recorded, never a sample role', async () => {
