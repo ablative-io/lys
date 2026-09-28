@@ -1,5 +1,99 @@
 # Home — User Stories
 
+## Agent — Continues a session imported from Claude Code on Codex
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S41.** As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+
+**S28.** As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+
+**S31.** As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S29.** As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+**S50.** As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S24.** As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+**S42.** As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+
+**S43.** As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
+
+**S30.** As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
+
+**S49.** As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+
+**S51.** As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
+
+## Developer — Works on lys-home's code beside the record module
+
+**S25.** As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
 ## Agent — Runs in a harness and wants to continue somewhere else
 
 **S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
@@ -19,6 +113,802 @@
 **S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
 
 **S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S71.** As an agent, I want my home to move into a second home by a pushed ref the target fetches, holding my record byte for byte, so that I can continue from a home that is not the one that captured me.
+
+**S72.** As an agent, I want each of my arrived sessions to carry an arrival naming where it came from and a fresh execution id of its own, with its head unchanged, so that my continuation is a distinct execution whose ancestry is on the record.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S73.** As the reviewer, I want ship to refuse by name, pushing nothing, any home it cannot ship whole and any remote that is not a path on this machine, so that nothing half-written or unencrypted leaves.
+
+**S74.** As the reviewer, I want a fetch that fails verification to name the bad index or block by hash and leave behind nothing it wrote, so that a corrupted home never arrives half-written.
+
+**S75.** As the reviewer, I want the fetched home rendered and resumed through the launch template on the installed Claude Code and recorded as hashes, counts and paths, with no fixture secret in the shipped ref, so that the resume evidence stage 3 asks for is measured.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S9.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S10.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S9.** As the reviewer, I want every file of lys-home judged by Jev on its own, with the verdict recorded beside its path, so that a verdict on the landing diff is never read as a verdict on the crate.
+
+**S10.** As the reviewer, I want each check's command and outcome recorded against the commit it measured, so that I can rerun any of them at that commit and see the same outcome.
+
+## Board reader — Reads the step 5 board to know what the chain has judged
+
+**S11.** As a reader of the step 5 board, I want a card set done only when the chain judged its rows' code and found nothing, so that done never means merely merged.
+
+**S12.** As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want to fork a new session from a lantern I lit, so that a later session can hold a conversation with the self that lit it.
+
+**S10.** As the self in a fork cut back from a question, I want the question the lantern was lit on carried to me as my first prompt, so that I answer from the moment I was asked about.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every fork's ancestry written in both the parent and the child, so that a fork's actions are never indistinguishable from its parent's.
+
+**S12.** As the reviewer, I want a fork to leave the parent's earlier bytes and the block store unchanged, so that forking costs no history and duplicates no block.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S9.** As Tom, I want every compaction in a session's home to say what it could not keep and to point at an original that is all still there, so that a compaction is stored beside its original and never replaces it.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S10.** As the reviewer, I want a compacted session's listing to name every summarised entry and block as held, by id and hash, with a missing one named, and the compaction render measured on a named harness version, so that a claim that the original is kept is measured rather than assumed.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent, I want my home carried to a new home as a pushed ref that the new home fetches, so that I continue from my own record rather than from a hand copy.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S15.** As the reviewer, I want every fetched session to record the commit, remote and ref it came from and the new home's execution id, so that a moved home's ancestry is on the record.
+
+**S16.** As the reviewer, I want a ship to refuse a home holding a named secret value, so that no credential leaves in a shipped ref.
+
+**S17.** As the reviewer, I want the moved home's resume measured on a named Claude Code version and written in a proof document, so that the move is shown to continue a session rather than assumed to.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S15.** As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S24.** As the reviewer, I want the rendered-uuid rule and a test vector written in RECORD.md and read by a named test, so that the document and the render cannot drift apart without that test failing.
+
+**S25.** As the reviewer, I want the launch card, the decision ledger and the brief list to agree on one rendered-uuid rule and one HOME-008, so that no record still states the SHA-256-of-the-entry-id-alone derivation and no second card claims this work.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S29.** As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S30.** As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
+
+## Agent — Continues a session imported from Claude Code on Codex
+
+**S28.** As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+
+**S31.** As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S32.** As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S33.** As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+
+**S34.** As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S32.** As Tom, I want one file reached through a symlinked directory, a `..` path or a trailing-slash config directory to record and check as one path, so that given-check never reports a difference that is not one.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S33.** As the reviewer, I want a recorded path that does not exist kept as given and named unresolved in the report, so that nothing a record lists drops out of what I check.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S34.** As an agent resumed from a compacted session, I want the summary and the turns Claude Code kept rendered the way Claude Code writes them, so that I continue from the summary with my recent turns and nothing summarised.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S32.** As Tom, I want every compaction in a session to say by ids, counts and hashes what it could not keep, so that a summary is never taken for the whole of what was said.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S33.** As the reviewer, I want to list a session's compactions with a check that every summarised entry and block is still held, so that I can prove on a compacted session that the original is all still there.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S37.** As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S35.** As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S36.** As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S35.** As the reviewer, I want whether a template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves its config directory measured on a named Claude Code version, so that the context record names the directory the session read from and not the one the template asked for.
+
+**S36.** As the reviewer, I want the entries that name a directory the session did not use listed by type, source and Claude Code version in RECORD.md and PROOF-GIVEN.md, so that a reader of an old session can tell which of its entries to discount without any entry being rewritten.
+
+**S37.** As the reviewer, I want lys-home given to list both versions of the context record in file order, each marked with its version, and given-check to check each by its own shape, so that a session rendered after the change shows its record beside the old ones.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S24.** As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+## Agent — Keeps a history a stranger can verify
+
+**S24.** As an agent, I want each call and each harness event of my session signed into a log under my own identity, so that a stranger can verify my history without trusting the home's files.
+
+**S25.** As an agent whose home held entries before logging began, I want those entries covered by one signed checkpoint, so that my earlier history can be told apart from tampering.
+
+**S28.** As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
+
+## Reviewer — Verifies a session against its log
+
+**S26.** As the reviewer, I want one command that checks a session's entry lines against the log and names the first entry that fails, so that tampering is found by entry rather than suspected.
+
+**S27.** As the reviewer, I want a failed log append refused with its entry named and the session held until the leaf is written, so that no entry is ever reported as recorded without its leaf.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S35.** As a reviewer, I want each check of the chain's judgement recorded with the commit and toolchain it was measured on, so that I can rerun the deterministic checks at that commit and see the same outcome.
+
+**S36.** As a reviewer, I want every finding recorded as its own line marked still true or answered by a named commit, so that only what is still wrong on main becomes a card.
+
+## Lead — Owns the cards of a board and sets them done
+
+**S37.** As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S40.** As a reviewer, I want the render's loss account written down as the code writes it, each reason quoted with the line that writes it, so that I can check a render's account against the source without reading the render.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S40.** As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S41.** As an agent that lights a lantern, I want it to record the session I lit it in and recall to show that session beside the point and the note, so that I know which session the lantern leads back to.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S42.** As the reviewer, I want a lantern lit before lit_in was recorded to stay readable and forkable by its holders, and a lit_in that is not a session id refused by name, so that no lantern is ever read as a session it does not name.
+
+**S43.** As the reviewer, I want the fork's tests to light their lanterns with the light act wherever it can produce them, so that the fork is proved on the record the light act really writes.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S46.** As the agent launching a session, I want a launch whose render is refused to store nothing in the home, so that a launch that wrote no file leaves no template behind.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S44.** As Tom, I want a session the render cannot shape refused by name with nothing written, never rendered with a default where the record carried no value, so that a rendered file that looks whole is whole.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S45.** As the reviewer, I want each render refusal to name the entry id, the field and the expected type and never the value, with its own fixture, so that I can find the broken entry from the error alone and no transcript reaches it.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S25.** As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S24.** As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+
+**S26.** As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
+
+## Agent — Runs in a harness and wants to continue somewhere else
+
+**S1.** As an agent, I want my session rendered into a fresh Claude Code file that resumes where I left off, so that a 3 GB transcript is not what I carry.
+
+**S2.** As an agent, I want my provider's own reasoning kept with the provider that made it, so that I can swap model and swap back without losing it.
+
+**S7.** As a new session, I want to start from the canon, the series of examples that carry what every session before me learned, each a rule stated short with a real exchange that shows it lived and naming where it came from, so that our learning is in one another and I know which of it is mine.
+
+**S8.** As an agent about to be compacted or retired, I want to write to the one who wakes up after me, what I know, what I got wrong and why, how the people like things done, what I wish I had known, so that they start with part of my memory and know it is mine, not theirs.
+
+**S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
+
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
+
+**S24.** As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
+
+## Tom — Owns the platform and reads what a session was given
+
+**S3.** As Tom, I want the session file created before the harness runs and watched while it runs, so that the platform controls where a session lives.
+
+**S4.** As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
+
+**S6.** As Tom, I want to construct a session file by hand, a few-shot prompt written as turns, and have the harness resume it as if it had happened, so that a session can be authored, not only recorded.
+
+**S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
+
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
+
+**S25.** As the owner of the platform, I want an import that stops part way to leave no half-written session under its name, so that running the import again is all the repair it needs.
+
+## Reviewer — Checks the proofs before anything relies on them
+
+**S5.** As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+**S11.** As the reviewer, I want every launch recorded on the session with the template hash, the session head hash and the written paths, so that I can tell which template a session was launched with.
+
+**S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
+
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S26.** As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
+
+**S27.** As a reviewer, I want the cost bounds proved by counters and the unchanged record proved by a hash, so that the change is checked without trusting a timing.
 
 ## Tom — Owns the platform and reads what a session was given
 

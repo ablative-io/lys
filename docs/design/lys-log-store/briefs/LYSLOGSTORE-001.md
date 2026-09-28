@@ -12,33 +12,33 @@ title: Give a leaf its final name only after it is whole and flushed
 > - ADR-059 — A named leaf in the file store is a whole, flushed leaf, and the no-replace link is its commit point — A file under a 20-digit leaf name is always a whole, flushed leaf; only dot-prefixed temporary files in leaves/ may be partial. A leaf is written and flushed in a hidden temporary file, then linked to its final name by an operation that refuses to replace, then the temporary name is removed and leaves/ is flushed. The successful link is the commit point: the extent advances past the leaf whatever happens next. A failed temporary-name removal still returns Ok; a failed leaves/ flush returns StoreError::LeafDurabilityUncertain carrying the index, and the handle refuses further appends with it until reopened. A writable open flushes leaves/ before counting and fails with Io when that flush fails; a read-only open (FileLeafStore::open_read_only) counts the named leaves without flushing; neither counts, deletes or changes a leftover temporary file. Rejected: naming the leaf first and writing into it (today's torn-leaf shape); deleting leftover temporary files at open, which would make a read-only open mutate the store; flushing at a read-only open, which would turn a status on read-only media into an error; and reporting a post-link failure as Io, which left the extent behind and made the next append report the store's own leaf as LeafAlreadyWritten.
 > - ADR-060 — LeafAlreadyWritten means another writer holds the index, and the store never reports its own leaf as another writer's — LeafAlreadyWritten is returned only when the index is behind the extent or the no-replace link finds the final name taken by an entry this call did not link. Once this call's link succeeds the extent advances past the leaf whatever happens next, so no later step of the same call and no later call on the same handle reports that leaf as LeafAlreadyWritten; a post-link failure that leaves durability in doubt is LeafDurabilityUncertain (ADR-059). Rejected: reporting a post-link failure as Io and leaving the extent behind, which made the next append report the store's own leaf as LeafAlreadyWritten; and treating LeafAlreadyWritten as a resume signal a caller may retry through.
 > **Checklist:**
-> - C1 — StoreError has a variant LeafDurabilityUncertain carrying the leaf index and the failed flush's std::io::Error as its source, its message naming both, distinct from Io and from LeafAlreadyWritten, and LeafStore::put_leaf's documented errors name it.
-> - C2 — FileLeafStore::put_leaf writes and flushes a leaf's bytes in a dot-prefixed temporary file in leaves/, named by leaf_temp_name from the process id, the index and a sequence the caller supplies (a process-wide counter for put_leaf) and created with create_new so it never replaces an existing file, before any file exists under the leaf's 20-digit name, and removes that temporary file when writing or flushing it fails.
-> - C3 — put_leaf gives the leaf its final name with a link that refuses to replace an existing entry, and an existing final name returns LeafAlreadyWritten for that index with the existing bytes unchanged and this writer's temporary file removed.
-> - C4 — A successful link advances the extent; put_leaf then removes the temporary name and flushes leaves/, and a failure to remove the temporary name still returns Ok.
-> - C5 — A failure to flush leaves/ after the link returns LeafDurabilityUncertain for that index, and the handle refuses every further put_leaf with that error until the store is reopened.
-> - C6 — FileLeafStore::open flushes leaves/ before it counts the leaves, and when that flush fails it returns Io naming the leaves directory and the flush, and writes nothing.
-> - C7 — FileLeafStore::open never counts, deletes or changes a leftover dot-prefixed temporary file in leaves/.
-> - C8 — file.rs's module docs state that a named leaf is whole and flushed, that only hidden temporary files may be partial, and that the link is the commit point.
-> - C9 — A fault seam that fails a chosen step of put_leaf or the leaves/ flush at open exists in FileLeafStore and compiles only under cfg(test).
-> - C10 — file_tests.rs holds the eighteen new tests of LYSLOGSTORE-001 R8, names the no-replace link wherever it named create_new, and each drift injection in its module-doc tables fails exactly its own test.
-> - C11 — Every leg of the design's gate array passes and file.rs stays under 500 lines of code.
-> - C12 — FileLeafStore::open_read_only performs FileLeafStore::open's checks without flushing leaves/, counts the named leaves, and does not fail because a flush of leaves/ would fail.
-> - C13 — DIRECTORY-003's depends_on names LYSLOGSTORE-001 after DIRECTORY-002, and no other field of DIRECTORY-003 changes.
-> - C14 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and writes nothing.
-> - C15 — Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only.
-> - C16 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and leaves state.json and the pinned root unchanged.
-> - C17 — Log::open_at_pin opens a store found one leaf ahead of its pin at the pinned head without pinning, reports the pending repair, and refuses every append by name while it is pending, never as Poisoned; Log::open alone repairs.
-> - C18 — Anchor::open_read_only never repairs a store found one leaf ahead of its pin: it opens at the pinned head, and its status says in words that one leaf stands ahead of the pin and that a writable open repairs it.
-> - C19 — The lys-log-store cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSLOGSTORE-001.md are what render-cluster.py renders from its JSON documents, and the design gate passes with them present.
+> - C1 — StoreError has a documented ReadOnly variant carrying the store's directory and the refused act.
+> - C2 — StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent.
+> - C3 — FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file.
+> - C4 — FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after.
+> - C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+> - C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+> - C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
+> - C8 — A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.
+> - C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
+> - C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.
+> - C11 — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
+> - C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
+> - C13 — StoreError has two new variants, ReadOnly and RepairPending, neither of which carries or prints a leaf index, and no existing variant's fields or message changes.
+> - C14 — FileLeafStore::open_read_only is a documented inherent constructor that refuses what FileLeafStore::open refuses with the same errors, reports the same leftover temporary files, and never flushes, creates, writes, renames, links or removes a file, leftover temporary files included, and the LeafStore trait has the same methods as on main.
+> - C15 — put_leaf through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and changes no byte of the store.
+> - C16 — pin through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly before any other pin check and changes no byte of the store.
+> - C17 — FileLeafStore::open_read_only over a store whose leaf count is past its pinned tree size returns StoreError::RepairPending, reads no leaf byte and changes no byte of the store.
+> - C18 — A store that FileLeafStore::open_read_only refused with StoreError::RepairPending, opened with FileLeafStore::open and Log::open, is repaired and the repair is reported through recovered_to, as on main.
+> - C19 — The module doc of crates/lys-log-store/src/file.rs states what open and open_read_only do and never do, including that open never deletes a leftover temporary file.
 > **Stories:**
-> - S1 (Consumer library, Settling an uncertain append by reading the leaf back) — As the identity directory committing through the file store, I want a leaf that reads back under its final name to be whole and flushed so that settling an uncertain append by reading the leaf back gives the committed answer.
-> - S2 (Operator, Reopening a log after a crash or a failed write) — As an operator reopening a log after a crash, I want only whole, flushed leaves to be counted so that a torn leaf is never pinned into the tree.
-> - S3 (Writer, Racing another writer for the same index) — As a writer whose index another writer has already taken, I want my write refused by name so that neither writer's leaf is replaced.
-> - S4 (Writer, Seeing a failure after its leaf was named) — As a writer whose append failed after its leaf was named, I want an error that says the leaf is written but its durability is uncertain so that I never mistake my own leaf for another writer's.
-> - S5 (Read-only caller, Opening a store without writing to it) — As a read-only caller opening a store, I want open to leave every file in the directory as it found it so that a read-only open stays read-only.
-> - S6 (Read-only caller, Reading a log on read-only media) — As a reader of a log on media that refuses a directory flush, I want a read-only open to count the named leaves without flushing so that a status opens as it did before this change.
-> - S7 (Read-only caller, Reading a log that a crash left one leaf ahead of its pin) — As a reader of a log one leaf ahead of its pin, I want a read-only open to leave the store as it found it and tell me that a writable open repairs it so that reading never writes and the pending repair is never silent.
+> - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+> - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
+> - S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+> - S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+> - S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
+> - S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
+> - S7 (Leaf store maintainer, Reads the file store's contract before relying on it or changing it) — As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.
 
 ## Purpose
 
@@ -72,10 +72,10 @@ Add to StoreError a variant LeafDurabilityUncertain with two fields: index: u64,
 - modify: crates/lys-log-store/src/store.rs
 
 **Checklist:**
-- C1 — StoreError has a variant LeafDurabilityUncertain carrying the leaf index and the failed flush's std::io::Error as its source, its message naming both, distinct from Io and from LeafAlreadyWritten, and LeafStore::put_leaf's documented errors name it.
+- C1 — StoreError has a documented ReadOnly variant carrying the store's directory and the refused act.
 
 **Stories:**
-- S4 (Writer, Seeing a failure after its leaf was named) — As a writer whose append failed after its leaf was named, I want an error that says the leaf is written but its durability is uncertain so that I never mistake my own leaf for another writer's.
+- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
 
 ### R2: Write and flush each leaf in a hidden, uniquely named temporary file before it has a name
 
@@ -93,11 +93,11 @@ WHEN put_leaf is called with the next free index, THE SYSTEM SHALL first apply i
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C2 — FileLeafStore::put_leaf writes and flushes a leaf's bytes in a dot-prefixed temporary file in leaves/, named by leaf_temp_name from the process id, the index and a sequence the caller supplies (a process-wide counter for put_leaf) and created with create_new so it never replaces an existing file, before any file exists under the leaf's 20-digit name, and removes that temporary file when writing or flushing it fails.
+- C2 — StoreError has a documented RepairPending variant carrying the store's directory, the pinned tree size and the extent.
 
 **Stories:**
-- S1 (Consumer library, Settling an uncertain append by reading the leaf back) — As the identity directory committing through the file store, I want a leaf that reads back under its final name to be whole and flushed so that settling an uncertain append by reading the leaf back gives the committed answer.
-- S2 (Operator, Reopening a log after a crash or a failed write) — As an operator reopening a log after a crash, I want only whole, flushed leaves to be counted so that a torn leaf is never pinned into the tree.
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+- S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 
 ### R3: Give the leaf its final name with a link that refuses to replace
 
@@ -113,10 +113,10 @@ WHEN the temporary file is flushed, THE SYSTEM SHALL give the leaf its 20-digit 
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C3 — put_leaf gives the leaf its final name with a link that refuses to replace an existing entry, and an existing final name returns LeafAlreadyWritten for that index with the existing bytes unchanged and this writer's temporary file removed.
+- C3 — FileLeafStore::open_read_only performs FileLeafStore::open's checks and returns a handle without flushing leaves/ or writing any file.
 
 **Stories:**
-- S3 (Writer, Racing another writer for the same index) — As a writer whose index another writer has already taken, I want my write refused by name so that neither writer's leaf is replaced.
+- S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 
 ### R4: Make the link the commit point for the steps after it
 
@@ -134,12 +134,12 @@ WHEN the link succeeds, THE SYSTEM SHALL advance the extent past the leaf before
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C4 — A successful link advances the extent; put_leaf then removes the temporary name and flushes leaves/, and a failure to remove the temporary name still returns Ok.
-- C5 — A failure to flush leaves/ after the link returns LeafDurabilityUncertain for that index, and the handle refuses every further put_leaf with that error until the store is reopened.
+- C4 — FileLeafStore::open_read_only on a store exactly one leaf past its pin returns StoreError::RepairPending and every file under the store directory holds the same bytes before and after.
+- C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
 
 **Stories:**
-- S1 (Consumer library, Settling an uncertain append by reading the leaf back) — As the identity directory committing through the file store, I want a leaf that reads back under its final name to be whole and flushed so that settling an uncertain append by reading the leaf back gives the committed answer.
-- S4 (Writer, Seeing a failure after its leaf was named) — As a writer whose append failed after its leaf was named, I want an error that says the leaf is written but its durability is uncertain so that I never mistake my own leaf for another writer's.
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
+- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
 
 ### R5: Flush leaves/ at a writable open before counting, count without flushing at a read-only open, refuse a leaf write and a pin on a read-only handle, and leave leftovers untouched
 
@@ -159,17 +159,17 @@ WHEN FileLeafStore::open reaches the leaf count, THE SYSTEM SHALL flush leaves/ 
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C6 — FileLeafStore::open flushes leaves/ before it counts the leaves, and when that flush fails it returns Io naming the leaves directory and the flush, and writes nothing.
-- C7 — FileLeafStore::open never counts, deletes or changes a leftover dot-prefixed temporary file in leaves/.
-- C12 — FileLeafStore::open_read_only performs FileLeafStore::open's checks without flushing leaves/, counts the named leaves, and does not fail because a flush of leaves/ would fail.
-- C14 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and writes nothing.
-- C16 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly naming the store's directory and the act, and leaves state.json and the pinned root unchanged.
+- C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
+- C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
+- C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
+- C14 — FileLeafStore::open_read_only is a documented inherent constructor that refuses what FileLeafStore::open refuses with the same errors, reports the same leftover temporary files, and never flushes, creates, writes, renames, links or removes a file, leftover temporary files included, and the LeafStore trait has the same methods as on main.
+- C16 — pin through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly before any other pin check and changes no byte of the store.
 
 **Stories:**
-- S2 (Operator, Reopening a log after a crash or a failed write) — As an operator reopening a log after a crash, I want only whole, flushed leaves to be counted so that a torn leaf is never pinned into the tree.
-- S5 (Read-only caller, Opening a store without writing to it) — As a read-only caller opening a store, I want open to leave every file in the directory as it found it so that a read-only open stays read-only.
-- S6 (Read-only caller, Reading a log on read-only media) — As a reader of a log on media that refuses a directory flush, I want a read-only open to count the named leaves without flushing so that a status opens as it did before this change.
-- S7 (Read-only caller, Reading a log that a crash left one leaf ahead of its pin) — As a reader of a log one leaf ahead of its pin, I want a read-only open to leave the store as it found it and tell me that a writable open repairs it so that reading never writes and the pending repair is never silent.
+- S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
+- S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
+- S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
+- S7 (Leaf store maintainer, Reads the file store's contract before relying on it or changing it) — As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.
 
 ### R6: State the invariant in file.rs's module docs
 
@@ -184,7 +184,7 @@ file.rs's module docs gain a section stating: a file under a 20-digit leaf name 
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C8 — file.rs's module docs state that a named leaf is whole and flushed, that only hidden temporary files may be partial, and that the link is the commit point.
+- C8 — A torn leaf inside the pinned prefix is refused by Log::open with StoreError::PinMismatch carrying both trees, and state.json is unchanged.
 
 ### R7: Add a test-only fault seam to FileLeafStore
 
@@ -200,7 +200,7 @@ FileLeafStore gains a private field, compiled only under cfg(test), holding at m
 - modify: crates/lys-log-store/src/file.rs
 
 **Checklist:**
-- C9 — A fault seam that fails a chosen step of put_leaf or the leaves/ flush at open exists in FileLeafStore and compiles only under cfg(test).
+- C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
 
 ### R8: Add the tests and prove each against its own drift
 
@@ -218,8 +218,8 @@ file_tests.rs gains the eighteen new tests named in R1, R2, R3, R4 and R5's acce
 - modify: crates/lys-log-store/src/file_tests.rs
 
 **Checklist:**
-- C10 — file_tests.rs holds the eighteen new tests of LYSLOGSTORE-001 R8, names the no-replace link wherever it named create_new, and each drift injection in its module-doc tables fails exactly its own test.
-- C11 — Every leg of the design's gate array passes and file.rs stays under 500 lines of code.
+- C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.
+- C11 — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
 
 ### R9: Record in DIRECTORY-003 that it waits on this brief
 
@@ -236,10 +236,10 @@ DIRECTORY-003's depends_on gains LYSLOGSTORE-001 after DIRECTORY-002, so the dis
 - modify: docs/design/directory/briefs/DIRECTORY-003.md
 
 **Checklist:**
-- C13 — DIRECTORY-003's depends_on names LYSLOGSTORE-001 after DIRECTORY-002, and no other field of DIRECTORY-003 changes.
+- C13 — StoreError has two new variants, ReadOnly and RepairPending, neither of which carries or prints a leaf index, and no existing variant's fields or message changes.
 
 **Stories:**
-- S1 (Consumer library, Settling an uncertain append by reading the leaf back) — As the identity directory committing through the file store, I want a leaf that reads back under its final name to be whole and flushed so that settling an uncertain append by reading the leaf back gives the committed answer.
+- S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 
 ### R10: Open the store for Anchor::open_read_only with FileLeafStore::open_read_only
 
@@ -257,10 +257,10 @@ In lys-anchor, every call to Anchor::open_read_only in Anchor::open_read_only's 
 - modify: crates/lys-anchor/tests/standalone_is_complete.rs
 
 **Checklist:**
-- C15 — Anchor::open_read_only's doc examples and lys-anchor's read-only tests open their store with FileLeafStore::open_read_only.
+- C15 — put_leaf through a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and changes no byte of the store.
 
 **Stories:**
-- S6 (Read-only caller, Reading a log on read-only media) — As a reader of a log on media that refuses a directory flush, I want a read-only open to count the named leaves without flushing so that a status opens as it did before this change.
+- S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
 
 ### R11: Open a log at its pin without repairing it
 
@@ -277,10 +277,10 @@ Log gains a public constructor open_at_pin(store: S) -> StoreResult<Self> and a 
 - modify: crates/lys-log-store/src/log_tests.rs
 
 **Checklist:**
-- C17 — Log::open_at_pin opens a store found one leaf ahead of its pin at the pinned head without pinning, reports the pending repair, and refuses every append by name while it is pending, never as Poisoned; Log::open alone repairs.
+- C17 — FileLeafStore::open_read_only over a store whose leaf count is past its pinned tree size returns StoreError::RepairPending, reads no leaf byte and changes no byte of the store.
 
 **Stories:**
-- S7 (Read-only caller, Reading a log that a crash left one leaf ahead of its pin) — As a reader of a log one leaf ahead of its pin, I want a read-only open to leave the store as it found it and tell me that a writable open repairs it so that reading never writes and the pending repair is never silent.
+- S7 (Leaf store maintainer, Reads the file store's contract before relying on it or changing it) — As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.
 
 ### R12: Make Anchor::open_read_only open at the pinned head and say that a repair is pending
 
@@ -299,10 +299,10 @@ Anchor::open_read_only SHALL open its log with Log::open_at_pin in place of Log:
 - modify: crates/lys-anchor/src/anchor/status.rs
 
 **Checklist:**
-- C18 — Anchor::open_read_only never repairs a store found one leaf ahead of its pin: it opens at the pinned head, and its status says in words that one leaf stands ahead of the pin and that a writable open repairs it.
+- C18 — A store that FileLeafStore::open_read_only refused with StoreError::RepairPending, opened with FileLeafStore::open and Log::open, is repaired and the repair is reported through recovered_to, as on main.
 
 **Stories:**
-- S7 (Read-only caller, Reading a log that a crash left one leaf ahead of its pin) — As a reader of a log one leaf ahead of its pin, I want a read-only open to leave the store as it found it and tell me that a writable open repairs it so that reading never writes and the pending repair is never silent.
+- S7 (Leaf store maintainer, Reads the file store's contract before relying on it or changing it) — As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.
 
 ### R13: Render the lys-log-store cluster's documents from their JSON
 
@@ -320,7 +320,7 @@ docs/design/lys-log-store/DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LY
 - modify: docs/design/lys-log-store/briefs/LYSLOGSTORE-001.md
 
 **Checklist:**
-- C19 — The lys-log-store cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSLOGSTORE-001.md are what render-cluster.py renders from its JSON documents, and the design gate passes with them present.
+- C19 — The module doc of crates/lys-log-store/src/file.rs states what open and open_read_only do and never do, including that open never deletes a leftover temporary file.
 
 ## Boundaries
 

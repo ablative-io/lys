@@ -7,7 +7,7 @@
 
 ## Claude Code in and out
 
-- [ ] **C3** — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.
+- [ ] **C3** — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. A compaction is read as Claude Code 2.1.281 measurably writes it, a compact_boundary system record and its isCompactSummary user record becoming one compaction entry (first kept entry from preservedSegment.headUuid, tokensBefore from compactMetadata.preTokens); this corrects R3's summary record by measurement, and the summary record is still read where a file carries one (the compaction half is HOME-002's).
 - [ ] **C4** — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
 - [ ] **C5** — Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events.
 
@@ -16,6 +16,13 @@
 - [ ] **C10** — A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored.
 - [ ] **C6** — One real session imported, rendered and resumed with --fork-session on Claude Code 2.1.281: it continues, no completed tool action repeats, the original's hash is unchanged.
 - [ ] **C7** — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
+- [ ] **C45** — forward.rs returns a named error (refused, reset, or broken before the status line) to its caller when the upstream fails before any response, and synthesises no status, header or body byte.
+- [ ] **C46** — Against a loopback upstream answering GET / with 418 and three streamed chunks, the pass-through example answers 418 with the same three chunks in order, with no provider.
+- [ ] **C47** — When forwarding fails before any upstream response, the pass-through example answers 502 with an empty body and its call line's status is 502.
+- [ ] **C48** — When the upstream breaks after its status and headers were sent, the pass-through example closes the client connection and its call line records that status and the duration up to the break.
+- [ ] **C49** — The pass-through example rewrites Host to the upstream's authority, drops the fixed hop-by-hop list, and passes every other request header and the body byte for byte.
+- [ ] **C50** — The pass-through example writes one four-field line per call (method, path, status, duration_ms) and no header value, body byte or error text anywhere.
+- [ ] **C51** — The home cluster's DESIGN.md, CHECKLIST.md and briefs/HOME-008.md are what scripts/design/render-cluster.py renders from its JSON, and none is edited by hand.
 
 ## The two captures
 
@@ -30,6 +37,14 @@
 ## The handover
 
 - [ ] **C13** — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
+- [ ] **C45** — A lys.inherited entry's rule may be absent in the type and is skipped when absent, a canon entry with a rule serialises to the same bytes as before, and the canon loader refuses by name a canon example without a rule, naming its entry id and the missing field, which canon add and a render with --canon both reach; a rule-less lys.inherited entry in a session of a home reads cleanly.
+- [ ] **C46** — A handover refuses by name before any file is created: a letter entry that is not an assistant message, a letter run whose entries do not stand next to each other on the outgoing path in the order given, a letter entry whose message carries provider `authored`, a letter holding no thinking block, and a successor path that exists and is not an empty directory.
+- [ ] **C47** — A handover writes a new successor home holding one session with a fresh id, the outgoing header's cwd and no parentSession, and leaves every file of the outgoing home byte for byte as it was.
+- [ ] **C48** — The successor session's first entry is a lys.inherited entry with no rule naming the outgoing session as from_session and curated_by, every letter id in path order as from_entries, the letter's provider, api and model, and the last letter entry's timestamp as curated_at.
+- [ ] **C49** — Each letter entry follows in the successor with its id, timestamp and message equal to the source, every thinkingSignature byte for byte, and then one session_info entry named `inherited from <outgoing session id>` with no other field.
+- [ ] **C50** — lys-home handover prints one JSON report naming the successor home, the session id and its file, with inherited true read from the successor's first entry, and no transcript content.
+- [ ] **C51** — A successor rendered for another model carries each inherited signed thinking block as a text part with one loss-account entry naming it by hash, and rendered for the letter's own model keeps it whole with its signature.
+- [ ] **C52** — PROOF-HANDOVER.md records the handover of an elicited letter by ids, hashes and the signature comparison, whether the inherited signed block appears in a resumed continuation's own file on the installed Claude Code beside 2.1.281, and the seeded and plain card counts as not run.
 
 ## The launch template
 
@@ -77,6 +92,309 @@
 - [ ] **C43** — lys-home fork --home --lantern [--session] prints one JSON report on success, exits 1 with the refusal on stderr and nothing on stdout, and takes no point or entry id.
 - [ ] **C44** — Rendering a child whose coordinate was carried writes the carried message's text parts as a seed prompt beside the rendered file under an in-band marker line, the render report names it, the template's launch line (printed by render-launch only) passes it as the first prompt and is never run, and PROOF-FORK.md records a fork launched on the installed Claude Code version as hashes, counts, paths, commands, versions and exit codes only.
 
+## The record module layout
+
+- [ ] **C45** — The shared helpers and constants safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable and custom_type_of are defined in crates/lys-home/src/record/helpers.rs.
+- [ ] **C46** — Session, its impl, take_lock, load_checked and to_line are defined in crates/lys-home/src/record/session.rs.
+- [ ] **C47** — Home and its impl are defined in crates/lys-home/src/record/home.rs.
+- [ ] **C48** — crates/lys-home/src/record/fork.rs imports write_durable and custom_type_of from crate::record::helpers and changes no other line.
+- [ ] **C49** — crates/lys-home/src/record/mod.rs holds only module docs, pub mod and mod lines with their cfg(test) attributes, and pub use lines, and the item grep HOME-013 names prints nothing on it.
+- [ ] **C50** — Every public path lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolves as before the move, and no crate outside lys-home changes.
+- [ ] **C51** — Every test that passed before the move passes unchanged with an equal count, no test file changes beyond use lines, no non-test source file in crates/lys-home is over 500 lines of code, and the gate legs pass.
+
+## The lit-in session
+
+- [ ] **C100** — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null and a present non-string value distinct from an absent key, and still refuses an unknown key.
+- [ ] **C101** — The light act writes lit_in as the id of the session at whose head it appends the lantern, and its report carries lit_in beside id, session, point and lit_at.
+- [ ] **C102** — Recall rows carry lit_in beside point, note and lit_by, the lighting session for a lantern the light act lit and null for a lantern whose data has no lit_in, and a lantern whose lit_in is present and not a session id is never listed as a row but skipped by note and refused by point as lit_in_not_a_session with the fork's reason text.
+- [ ] **C103** — The fork reads lit_in through a typed view that does not require lit_at or note and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.
+- [ ] **C104** — The fork's fixtures light L2 with the light act and write by hand only the lanterns the light act cannot produce (O2, M2, N3, the copy N2 and N1 to N4), each named in its test as standing for such a record.
+- [ ] **C105** — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record sentence with a note that the light act now records lit_in.
+
+## Translation to Codex
+
+- [ ] **C58** — lys-home translate-codex takes --home, --session, --out, --codex-version and --zone, writes one rollout under <out>/sessions/YYYY/MM/DD/ named as Codex names its own and one loss account beside it, and prints one JSON report of the two paths and the entry, block, kept, changed and lost counts, never content.
+- [ ] **C59** — An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged.
+- [ ] **C60** — Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte.
+- [ ] **C61** — Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout.
+- [ ] **C62** — The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content.
+- [ ] **C63** — The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash.
+- [ ] **C64** — Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256.
+- [ ] **C65** — The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf.
+- [ ] **C66** — A Codex 0.156.0 rollout recorded in a scratch Codex home outside the repository in at most two attempts of one fixed shell command that reads nothing of the machine, after exactly one request that checks the proof account there can make requests and ends when codex exec exits, is committed as a fixture beside the Claude Code file that mirrors it, neither holding a machine path, an email or a token, and that file imported and translated gives response items equal to the recording's apart from ids and timestamps (id, call_id, turn_id and create_time), every Codex command there run with CODEX_HOME set to the scratch home.
+- [ ] **C67** — PROOF-TRANSLATE.md records, with the seat that ran it and the date, Codex 0.156.0 resuming the translated thread in a scratch Codex home outside the repository and answering from its content, and resuming a translated thread that holds an image, with the proof account named by its role, the start checks, the attempts, each retry in a fresh scratch home, the paths, the rollout's hash before and after the resume, the side leaf's rollout hash, counts and exit statuses, and no transcript text, email or credential.
+- [ ] **C68** — The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to.
+- [ ] **C69** — A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost.
+- [ ] **C70** — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.
+
+## The given statement
+
+- [ ] **C118** — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
+- [ ] **C119** — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
+- [ ] **C120** — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- [ ] **C121** — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
+- [ ] **C122** — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
+- [ ] **C123** — A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.
+- [ ] **C124** — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+
+## The request's order
+
+- [ ] **C83** — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
+- [ ] **C84** — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- [ ] **C85** — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
+- [ ] **C86** — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
+- [ ] **C87** — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+
+## Moving a home
+
+- [ ] **C169** — A home's tracked set is enumerated exactly, never by glob: for each session the home lists, `sessions/<id>.jsonl`, `sessions/<id>.index.jsonl` and `sessions/<id>.head`; each `blocks/<hh>/<hash>` and each `templates/<hh>/<hash>` whose name is 64 lowercase hex digits under a directory named by its first two; never a lock file, a temporary, a file at the home root or anything under `.git`.
+- [ ] **C170** — A home is verified strictly, never rebuilt: a missing index, an index that is not its file's, a missing head and a head naming an id its index does not hold are each named per session, and every block and template whose bytes do not hash to its name is named by that name; nothing is written.
+- [ ] **C171** — ship and fetch run the git binary with a pinned environment (no system or global configuration, no hooks, no filters, no line-ending conversion, a fixed identity, the file protocol only), and take a remote only when it is a path on this machine: any ssh remote, https, git or file URL, or hosted service is refused as remote_not_local, with words saying that shipping off this machine waits for stage 3's encryption from the secrets step, and nothing is written.
+- [ ] **C172** — An arrival is a seventh lys.harness_event kind, `arrival`, whose detail carries the source commit, the remote, the ref and a fresh execution id, under the 512-byte data cap; the six existing kinds do not change.
+- [ ] **C173** — lys-home ship initialises the home as a git repository on first use, commits exactly the tracked set, pushes it without force as the one ref `refs/lys/home` to a remote that is a path on this machine, creates a bare repository at a remote path that does not exist, and reports the commit, the ref, the remote and whether it initialised and created; a home unchanged since its last ship reports that commit as unchanged, makes no new commit and pushes it again; the source home's tracked files are byte-identical before and after.
+- [ ] **C174** — ship refuses by name, pushing nothing: a home with no session (empty_home), a remote path that is neither absent nor a bare repository (remote_not_bare, naming the path and what it found), a session whose lock a live owner holds (session_held, with the act 'ship after that seat stops'), a session with no index file (index_missing) or no head file (head_missing), each naming the session, the missing file and the lys-home command that writes it, a stale index (stale_index, in a JSON report naming each session and its reason), a home repository tracking files outside the tracked set (foreign_tracked), and a remote ref the new commit does not descend from (ref_diverged, naming the ref and both commits, the remote's ref unchanged).
+- [ ] **C175** — lys-home fetch refuses a remote that is not a path on this machine (remote_not_local), a target that already holds a home (target_holds_home) and a non-empty target (target_not_empty), each before writing anything, fetches the ref into the target, and the fetched commit's tree hash-matches the source for every session file, index, head, block and template.
+- [ ] **C176** — After fetch each target session's last line is one arrival event hung beside the head, naming the source commit, the remote and ref and a fresh execution id of that session's own; fetch commits those lines as one commit whose only parent is the fetched commit, whose message names the source commit, the remote and the ref, leaving `git status` in the target clean, and a ship from the target carries the arrival; the target's head file is byte-identical to the source's, and every template a template_render event on the target names is held under the target's templates/.
+- [ ] **C177** — When verification fails, fetch prints a JSON report naming each stale index by session and each bad block and template by hash, never by content, records no arrival, and removes exactly the paths it created, deepest first: a target it created is gone, and an empty target that existed before is left existing and empty. When an arrival's append or its commit fails, fetch refuses as arrival_failed and removes exactly the paths it created in the same way.
+- [ ] **C178** — A byte search of every object the shipped ref reaches finds the fixture secret value 0 times, with a control that finds it once where it was planted, and a render of the target records the same session_head as a render of the source.
+- [ ] **C179** — RECORD.md documents the arrival kind and its detail, and that the home directory is a git repository and exactly what it tracks; the crate README documents ship and fetch with their arguments and refusals, and states that no credential lys-home holds is ever written into the home and why ship stays local.
+- [ ] **C180** — A proof document measures a fixture home shipped, fetched, rendered through the launch template and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.
+
+## The context record
+
+- [ ] **C14** — Every launch-template render appends one lys.given custom entry after the render event, listing the instruction documents Claude Code will load for the session's working directory and the files the render wrote, in the order measured on the named Claude Code version, each by kind, path, byte length and SHA-256, with the harness name and version, the kinds resolved, the kinds it leaves unlisted, and the environment variable names the template set; never a document's content and never a variable's value.
+- [ ] **C15** — lys-home lists a session's given records with their documents, and checks a listed document against a file on disk by hash, answering matches or differs and never printing either file.
+- [ ] **C16** — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
+
+## The chain's judgement of lys-home as found
+
+- [ ] **C14** — sgconfig.yml and the four estate sweep rules (mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, no-std-mutex-in-async) exist in lys, each rule byte-identical to cambium's at df4dca5d.
+- [ ] **C15** — PROOF-CHAIN.md names 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff as the commit measured, with the toolchain, the ast-grep version and the Jev workflow the outcomes were measured with.
+- [ ] **C16** — PROOF-CHAIN.md carries one Jev verdict line for each of the 25 files of crates/lys-home at 0073b966.
+- [ ] **C17** — PROOF-CHAIN.md records fmt, both clippy pedantic legs, the tests with lys-home's executed count, ast-grep with a match count per rule, and the gate with its seven legs, each with its exact command and outcome.
+- [ ] **C18** — Each finding a named check reports, the absent document of a partly present row among them, is its own line in PROOF-CHAIN.md naming the check, the file and the HOME-001 rows it holds, or that it holds none of the seven; observations no check reports sit under their own heading.
+- [ ] **C19** — PROOF-CHAIN.md's table records, for HOME-001 R1 to R11, every named file present or absent at 0073b966 and the row's state, and for each of the seven step 5 cards the rows it carries.
+- [ ] **C20** — No byte under crates/lys-home differs between 0073b966 and the card's head, and scripts/design/gate.sh passes on the card's head.
+- [ ] **C21** — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
+
+## Forks
+
+- [ ] **C14** — `lys.fork` and `lys.forked_from` are named custom types in record/entries.rs and are written down in RECORD.md with their data keys.
+- [ ] **C15** — `lys-home fork` cuts from the session a lantern was lit in, as its `lys.lantern` data records it under `lit_in`, never from a child holding a copy of its line, and refuses by name, creating no session and changing no byte of any session: a lantern id the home does not hold as a `lys.lantern` entry, a `--session` that is not the lantern's lit-in session (`lantern_not_lit_here`), an older-record lantern held by more than one session with no `--session` (`lantern_ambiguous`), and a lantern with no assistant message at or before its point (`nothing_to_fork`).
+- [ ] **C16** — A fork's cut is the parent's raw root-to-point chain read through the index, ending at the last assistant message at or before the lantern's point, with nothing after it and no side leaf.
+- [ ] **C17** — The child is a new session with its own id whose header parentSession is the parent session file's path relative to the home, and whose copied entry lines are byte-identical to the parent's lines for the same entries.
+- [ ] **C18** — The fork appends lys.forked_from to the child as the child of the cut entry, then lys.fork at the parent's head naming the child, and every byte of the parent before the fork is unchanged.
+- [ ] **C19** — A fork adds no file and no byte to the block store, and two forks from one lantern are two sessions with distinct ids whose block hash sets are equal.
+- [ ] **C20** — When the lantern's point is a user message, that message is not copied into the child's path but its text parts, in order, are carried as the child's first prompt in a seed file beside the rendered file, and lys.forked_from records it with coordinate_carried true and counts by kind the parts the seed left out.
+- [ ] **C21** — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- [ ] **C22** — Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.
+
+## The compaction
+
+- [ ] **C14** — When a compaction entry enters a session on import (a compact_boundary whose summary record never arrives included, as a compaction with an empty summary, and a summary read after that as a second compaction entry that completes the first without rewriting it), a lys.loss custom entry follows it, points at it by entry id and names what fell outside the kept range: the span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks with their bytes, and the tokensBefore the harness reported, as ids, counts and hashes and never content.
+- [ ] **C15** — A lys-home subcommand lists a session's compactions, each with its loss entry and a check that every entry in the summarised span is readable by id and every block it references is held, as a JSON report of ids, counts and hashes; it prints the whole report, then exits non-zero when an entry cannot be read, a block is missing, the session's blocks are unverified or a compaction has no loss entry (its reason given as unknown), naming each by entry id, block hash, session id or compaction id, and exits 0 only when every compaction's loss entry and every block in every span was read.
+- [ ] **C16** — The hash of every content part stored at import is kept beside the session in <id>.blocks.jsonl, one row per part naming its entry, so the blocks an entry references can be checked as held; a session without the file is reported as unverified.
+- [ ] **C17** — A compaction renders for Claude Code as the target version writes it (a compact_boundary record, then the isCompactSummary record, then the kept records, the parent chain advancing through all three) and the lys.loss entry never renders.
+- [ ] **C18** — One real compacted Claude Code session is imported on the machine that holds it and its listing recorded in a proof document as counts, ids and hashes only; the compaction render is measured resuming on a named Claude Code version.
+
+## Claude Code in and out
+
+- [ ] **C3** — A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.
+- [ ] **C4** — Events render to a Claude Code JSONL under a chosen uuid at the harness path, with a loss account beside it.
+- [ ] **C5** — Provider-native opaque blocks are kept whole, keyed by provider, model family and branch, and rendered only to their own provider with the intervening events.
+
+## The handover
+
+- [ ] **C13** — At compaction or retirement the outgoing session's letter to its successor, with its real thinking, becomes the successor's first entry as lys.inherited; it is never authored and replays only to the same provider, api and model; seeded against plain is measured on a card.
+
+## Moving a home
+
+- [ ] **C24** — lys-home ship commits the home's tracked set (session files, their index and head files, blocks and templates) and pushes it as one ref, refs/lys-home/<commit>, to the remote named on the command line, and its report names the commit and the ref.
+- [ ] **C25** — Ship refuses by name a home whose index is stale or whose head file is missing, exits 1, and writes nothing to the home or the remote; no index is rebuilt and no head persisted.
+- [ ] **C26** — Ship refuses by name any remote that is not a path on this machine or a file:/// URL, naming its scheme and the encryption-at-rest precondition, and writes nothing.
+- [ ] **C27** — No lock, temporary, environment or render file is in a shipped tree, and ship refuses by file and offset a tracked file holding any value of the --secret-values file or matching one of the five standard patterns, naming the pattern and printing no value or matched byte.
+- [ ] **C28** — lys-home fetch fetches the named ref into a new directory, refuses by name a directory that already holds a home (a sessions, blocks or templates directory, a .git entry, or an execution-id file) and accepts one holding only other entries, and checks every index against its file and every head against its index without rebuilding either, leaving nothing behind on a refusal.
+- [ ] **C29** — Fetch appends to each session, beside the head, one lys.harness_event of kind arrival naming the source commit, the remote without userinfo, the ref and the target home's execution id, within the 512-byte cap.
+- [ ] **C30** — On the fixture home, every tracked file at the fetched commit equals its source byte for byte, the source session file and index are byte prefixes of the target's after the arrival, the source home's files are unchanged by ship and fetch, and a search of every object in the remote finds no fixture secret value while a planted one is found.
+- [ ] **C31** — PROOF-MOVE.md records the fetched home rendered by render-launch and resumed by the printed launch line on Claude Code 2.1.283, as hashes, counts and paths only.
+
+## The first translation
+
+- [ ] **C24** — lys-home render-codex takes a home, a session, a target directory that is a Codex sessions root, and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout under that root's dated directories in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.
+- [ ] **C25** — Every text part, tool call and tool result on the context path is carried whole as Codex's own message, function_call and function_call_output items, paired by call id, never clipped or noted; readable thinking is carried as text; an image part whose source is base64 is carried as Codex's input_image item, and any other image source is named lost, never fetched; opaque thinking is dropped and named by hash; a compaction becomes Codex's own compaction item where 0.156.0 writes one with readable text, measured, and otherwise a user message that says it is a compaction summary.
+- [ ] **C26** — The rendered thread announces itself in band as a translated context with the source session id and the source head hash.
+- [ ] **C27** — A JSON loss account beside the rollout lists, by entry id and the importer's block hash, what was kept, what changed shape (before and after kinds, and how), and what was lost and why: sidechains, harness events, lys entries, and any part kind Codex has no item for.
+- [ ] **C28** — The report is JSON with the rollout and account paths, entry and block counts and the loss counts, never content; an existing path is refused by name with nothing written; each translation is recorded on the session as a codex_translation side leaf naming both files by path and SHA-256 and the Codex version; the Claude Code render of the same session is unchanged, checked by hash.
+- [ ] **C29** — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
+- [ ] **C30** — PROOF-TRANSLATE.md records Codex 0.156.0 resuming the rendered rollout in an isolated Codex home and answering from its content, in hashes, counts and paths only.
+
+## The rendered uuid contract
+
+- [ ] **C45** — RECORD.md's rendered-uuid section states the one rule: an entry id that is not uuid-shaped derives as UUIDv5 under a namespace that is UUIDv5 of 32c05904-d1f1-550c-9eee-2f6c8f98b665 over the home session's own id, never the render target's session id that the rendered file's sessionId carries, with the name `<entry id>#record`; a uuid-shaped id passes through unchanged; and it gives a test vector of a session id, an entry id and the uuid they produce, the same entry id `e1` in two sessions giving two uuids.
+- [ ] **C46** — A render test named record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives reads the vector from RECORD.md and asserts the render derives it for each session, the two uuids differ, every existing render test passes unchanged, and a drift command run on a scratch copy that alters the vector in RECORD.md fails exactly that one test.
+- [ ] **C47** — The launch card HOME-002 carries an amendment naming the rendered-uuid rule RECORD.md states in place of its R2 derivation from the SHA-256 of the entry id alone, its existing requirements and amendment unchanged, and HOME-002.md is re-rendered from it.
+- [ ] **C48** — ADR-016 moves from proposed to decided, and the decision ledger's diff from the commit this card starts from changes no line but ADR-016's status and the ledger's updated date.
+- [ ] **C49** — HOME-008 exists once: every commit that touches docs/design/home/briefs/HOME-008.json on any branch is one of this brief's commits.
+
+## The lit-in session
+
+- [ ] **C71** — LanternData carries an optional lit_in, the session that held the point when the lantern was lit, keeping a present null or non-string value distinct from an absent key, and still refuses an unknown key.
+- [ ] **C72** — The light act writes lit_in as the id of the session it appends the lantern to, and its report carries lit_in beside id, session, point and lit_at.
+- [ ] **C73** — Recall rows carry lit_in beside point, note and lit_by: the lighting session for a lantern the light act lit, null for a lantern whose data has no lit_in; a lantern whose lit_in is present and not a session id is never listed as a row, and is skipped by note and refused by point as lit_in_not_a_session naming which.
+- [ ] **C74** — The fork reads lit_in from the typed lantern data and never from a raw JSON key: a lantern with no lit_in resolves by its holders, and a present lit_in that is null, not a string, not a safe session name, or names no session of the home refuses lit_in_not_a_session naming which.
+- [ ] **C75** — The fork's fixtures light L2 and every other lantern the light act can produce with the light act, and write by hand only the lanterns it cannot produce, each marked in its test as standing for such a record.
+- [ ] **C76** — RECORD.md and the lys-home README document lit_in, and PROOF-FORK.md keeps its measured older-record line with a note that the light act now records lit_in.
+
+## Canonical paths in the context record
+
+- [ ] **C71** — One helper canonicalises a given path: a directory whole, a document by its parent directory with its own final name kept and its own entry required to exist (a dangling symlink exists at its link position), a relative path left as written, and a path whose parent or own entry does not exist kept byte for byte and marked unresolved.
+- [ ] **C72** — resolve_given canonicalises the working directory before walking the CLAUDE.md chain and the config directory before recording it, records every absolute document at its canonical parent and own name, and computes the memory index's slug from the working directory as given.
+- [ ] **C73** — A canonicalisation failure other than a path not existing is refused by path and operation: render-launch refuses with its existing status 1 with no lys.given entry written, and given-check exits 2 with nothing on stdout.
+- [ ] **C74** — given-check canonicalises the listed path and the --path argument before comparing, so a record written before the rule compares by its canonical form, and its report names in `unresolved` every path it compared as written because it does not exist.
+- [ ] **C75** — `given` names in each listed record's `unresolved` the recorded absolute paths that do not exist at listing time, and the lys.given entry's data keeps exactly its six fields.
+- [ ] **C76** — One fixture test builds a symlinked directory, a `..` path and a trailing-slash config directory under a temporary directory, proves each records the reference render's config_dir and documents and that given-check matches the symlinked and `..` forms, and asserts the 3 shapes and 2 checks it ran.
+- [ ] **C77** — RECORD.md's lys.given paragraph states the canonicalisation rule, the written files' exemption, the link-position rule for a document, the unresolved marker in the reports, and that the slug takes the working directory as given.
+
+## The request's order
+
+- [ ] **C78** — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
+- [ ] **C79** — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- [ ] **C80** — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
+- [ ] **C81** — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
+- [ ] **C82** — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+
+## Compactions
+
+- [ ] **C71** — A compact_boundary record followed by its isCompactSummary user record imports as a lys.harness_event for the boundary and one Pi compaction entry under the summary record's uuid, the child of the boundary's entry, whose firstKeptEntryId is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, otherwise the first record whose parent is the summary record, and the empty string when there is none, so its context path is the compaction alone and the pair renders back, and whose tokensBefore is compactMetadata.preTokens; the summary record is not a message entry.
+- [ ] **C72** — A legacy summary record imports as a Pi compaction entry whose firstKeptEntryId is the entry its leafUuid names, never the compaction's own id.
+- [ ] **C73** — A compaction whose first kept entry is not on record is refused with an error naming that uuid.
+- [ ] **C74** — Directly after each compaction entry the importer appends one lys.loss custom entry whose parent is the compaction and whose data holds only ids, counts, byte counts and SHA-256 hashes, with the keys RECORD.md sets down, first_kept among them, null when nothing is kept.
+- [ ] **C75** — A lys.loss entry's span is the root-to-first-kept path from the root or the previous compaction to the entry before the first kept one; its three SHA-256s are over those entries' source lines in file order, and side-leaf and sidechain entries hanging from the span are counted by number only.
+- [ ] **C76** — A compact_boundary whose logicalParentUuid names no record in the file imports, and its lys.loss entry names that uuid as unresolved.
+- [ ] **C77** — Two imports of the compaction fixture into two homes give lys.loss lines equal byte for byte once id, parentId, timestamp and data.compaction_id are masked.
+- [ ] **C78** — The context path of an imported compacted session is the compaction, then the kept entries preserved uuids included, then what follows; no span entry is on it and the summary text is on it once.
+- [ ] **C79** — lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held, and exits 0 only when nothing is missing and 1 when anything is, naming the first missing item; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.
+- [ ] **C80** — The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record, then the kept entries, with no legacy summary line and no lys.loss line, and the summary text once; the boundary record's uuid is derived under render-uuid/v2, alongside v1, whose non-boundary uuids equal v1's, and a render with no compaction stays v1, byte for byte, with the version it used named in its report.
+- [ ] **C81** — PROOF-COMPACTION.md records one real compact_boundary session imported read-only with its listing as counts and hashes and its source SHA-256 equal before and after, and a rendered compacted fixture resumed on Claude Code 2.1.283 answering from the summary, by hashes only.
+- [ ] **C82** — A compact_boundary with no isCompactSummary record under it imports as a lys.harness_event only, with no compaction and no lys.loss entry, and lys-home compactions reports it by entry id as a boundary without a summary.
+
+## The two proofs
+
+- [ ] **C10** — A hand-written few-shot session file resumes Claude Code by path from a directory outside the config root; the source is unchanged and the session reports authored.
+- [ ] **C6** — One real session imported, rendered and resumed with --fork-session on Claude Code 2.1.281: it continues, no completed tool action repeats, the original's hash is unchanged.
+- [ ] **C7** — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
+
+## Render refusals
+
+- [ ] **C83** — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise and the entry id when there is one; none carries a transcript value.
+- [ ] **C84** — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+- [ ] **C85** — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- [ ] **C86** — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- [ ] **C87** — stopReason is mapped by one explicit arm per value: toolUse to tool_use, length to max_tokens, stop to end_turn and error to stop_sequence; aborted and every other value refuse by entry id and the value, and there is no catch-all arm.
+- [ ] **C88** — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
+- [ ] **C89** — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
+- [ ] **C90** — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; a stopReason of error renders as stop_sequence where it rendered as end_turn, aborted or an unmapped value refuses, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
+- [ ] **C91** — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+- [ ] **C92** — The cluster's rendered markdown, briefs/HOME-008.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
+
+## The config directory through --settings
+
+- [ ] **C83** — PROOF-GIVEN.md records three launches from render-launch's printed line through a template whose env slot alone sets CLAUDE_CONFIG_DIR to a fresh directory, with the measured machine's host and claude --version answer and, for CLAUDE.md and for the memory index, whether each was read from the template's directory or from HOME/.claude, as paths, counts and hashes only.
+- [ ] **C84** — RECORD.md and PROOF-GIVEN.md state the answer with every Claude Code version and host measured or cited, and on a no or split answer name the affected entries as lys.given entries whose config_dir.source is template and whose harness_version is 2.1.283, standing as written. A build machine whose Claude Code version is not 2.1.283 is recorded as a finding naming both versions, and MEASURED_VERSION stays 2.1.283.
+- [ ] **C85** — On a no answer a render resolves the config directory as HOME/.claude with source home and never takes the template's CLAUDE_CONFIG_DIR as the path. A template CLAUDE_CONFIG_DIR that is not absolute is refused by name before any file is written or entry appended. With no HOME the render is refused with HomeError::NoConfigDir, whose text names the no answer and HOME and does not tell the person to set the template's env slot.
+- [ ] **C86** — On a no answer a render appends one lys.given.v2 entry carrying harness_version 2.1.283, whose config_dir is exactly {path, source, given_not_applied} and no lys.given entry, and lys.given's shape and its key-set test are unchanged.
+- [ ] **C87** — On a no answer lys-home given lists lys.given and lys.given.v2 entries together in file order, each marked version 1 or 2, and given-check checks each entry by its own version's shape.
+- [ ] **C88** — On a yes answer nothing under crates/ changes; on a split answer nothing under crates/ changes and RECORD.md and PROOF-GIVEN.md name each document with its directory and the per-document config directories card.
+
+## The signed entry log
+
+- [ ] **C45** — lys-home depends on lys-core, lys-log-store and lys-identity, and the home-entry leaf (session id, entry id, kind, SHA-256 of the entry line, tag lys/home-entry/v1), the home-entry-copy leaf (those four, the parent session id, the parent leaf's index and the parent entry's position, tag lys/home-entry-copy/v1) and the home checkpoint leaf (tag lys/home-checkpoint/v1) are typed payloads of the identity event envelope, written in docs/design/identity/IDENTITY-EVENTS.md.
+- [ ] **C46** — On a home that logs its entries, every lys.call, lys.harness_event and lys.open entry appended to a session through append_entry, append_beside or append_under appends exactly one leaf to the home's log at log/ under the home, signed with the Ed25519 key of the agent log/agent names through lys_core::attestation::sign_attestation, and no other entry kind appends a leaf.
+- [ ] **C47** — No leaf and no file under the home's log directory carries a byte of transcript content: a byte scan of every file under it for a fixture message's text finds nothing.
+- [ ] **C48** — lys-home log-enable starts a home's log with one checkpoint leaf naming each session of the home with its entry count and the SHA-256 of its file as they stand, and a log never holds a second checkpoint.
+- [ ] **C49** — A failed leaf append is refused naming the entry id, the entry is never reported as recorded, the session is marked pending by log/pending/<session id>.json naming the session and the entry, every further append to it is refused until the pending leaf is written, and the leaf is written first at the session's next open or by lys-home verify --repair.
+- [ ] **C50** — Ingesting a call_id already recorded adds no leaf, and writes the entry's one leaf when the log holds none for it.
+- [ ] **C51** — lys-home verify --home <dir> --session <id> checks every logged entry line against its one leaf under the agent identity's public key and the pre-log history against the checkpoint, prints one JSON report of counts and hashes, and otherwise exits 1 naming the first entry, or the session for the checkpoint, that fails.
+- [ ] **C52** — docs/design/home/RECORD.md records the three leaf formats (home-entry, home-entry-copy and checkpoint), their tags, the log's place in the home, the pending marker and the order of line against leaf.
+- [ ] **C53** — The adversarial review of the three leaf formats (forgery, cross-protocol confusion, replay, a leaf under another key, guessing a short line from its hash) is recorded in docs/design/identity/IDENTITY-EVENTS.md before any durable byte is signed under them.
+- [ ] **C54** — A home that never ran log-enable appends every entry as before, with no leaf and no log; lys-home log-enable --agent names the home's agent in log/agent, and is refused by name, creating nothing, when --agent is missing or the identity crate holds no key for that agent.
+- [ ] **C55** — On a home that logs its entries and whose agent's key the identity crate does not hold, a lys.call, lys.harness_event or lys.open append is refused before its line is written, naming the home and the entry kind and the act that answers it, with nothing written.
+- [ ] **C56** — lys-home open opens a sealed envelope with open_and_verify, writes the plaintext to --out, created new with mode 0600 on Unix, and appends one lys.open entry (the envelope's SHA-256, the sender's public key and the --out path) to the named session with its leaf; an existing --out is refused by name, and a failed open gives lys open's one failure message and writes no plaintext, entry or leaf.
+- [ ] **C57** — A fork on a logging home gives each lys.call, lys.harness_event and lys.open line it copies its own leaf under the child session id, tagged as a copy and naming the parent session id, the parent entry's position and the parent leaf's index, or the checkpoint leaf's index when the parent entry predates the checkpoint, and is never refused for such a line; the child whose copies name parent leaves verifies without the parent's files, and verify refuses a copy whose parent leaf is absent or differs, and a copy naming the checkpoint whose parent line is absent or differs.
+
+## The chain's judgement of HOME-001
+
+- [ ] **C83** — docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.
+- [ ] **C84** — The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.
+- [ ] **C85** — The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.
+- [ ] **C86** — Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.
+- [ ] **C87** — The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.
+- [ ] **C88** — The proof gives each of the seven step 5 cards the verdict done or in review by row, and never done to 0BgjD59r or qY9mBz-y.
+- [ ] **C89** — The landing changes nothing under crates/lys-home and passes src_pr, src_land and sh scripts/design/gate.sh.
+- [ ] **C90** — After the green landing the step 5 board matches the proof: done cards point at the landing, in-review cards at their finding cards.
+
+## The loss account document
+
+- [ ] **C95** — docs/design/home/LOSS-ACCOUNT.md exists, names on its first line the commit it was read from, and states that the loss account is written beside the rendered file under the rendered file's stem with .loss.json, naming the default render path and render-launch as the two cases where that stem is the session uuid.
+- [ ] **C96** — LOSS-ACCOUNT.md states the account's four keys, one entry's two fields hash and reason, and that every render writes the account, with dropped: [] when nothing was dropped.
+- [ ] **C97** — LOSS-ACCOUNT.md quotes every reason string the render passes to the loss constructor, with the line that writes it, and the reason check prints 1 3 3 [] at the landing commit.
+- [ ] **C98** — LOSS-ACCOUNT.md states that an entry's hash is the SHA-256 of the part as serde_json serialises it and that an entry never carries the part's text, signature or redacted data.
+- [ ] **C99** — LOSS-ACCOUNT.md lists the four things the render changes without a loss entry, custom entries and labels, compaction, gitBranch and usage, each with the line that does it.
+
+## Clock-free write-once gates
+
+- [ ] **C95** — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+- [ ] **C96** — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+
+## Render refusals
+
+- [ ] **C106** — HomeError names the render's refusals: a field refusal carrying the session, the entry id, the field, the expected type and whether the field was missing, whose Display for a missing provider or api names the act that answers it, a record whose assistant messages carry provider and api; a stopReason refusal carrying the session, the entry id and the value; and a serialisation refusal carrying the session, what would not serialise (`record`, `loss account` or `dropped part`) and the entry id when there is one; none carries a transcript value.
+- [ ] **C107** — Every value the Claude Code render copies from a message entry is read through a checked reader that refuses a missing field and a field of another type than the target takes, and no reader substitutes a default; the one field read from its absence is `redacted`, absent meaning not redacted.
+- [ ] **C108** — A message entry with no role, or with a role that is not a string, refuses the render by entry id and the field `role`; a role that is a string the render does not know is still skipped and the render succeeds.
+- [ ] **C109** — A toolResult with no toolCallId, content or isError, a user message with no content or a single text part with no text, an assistant message with no content array, model, provider, api or stopReason, a text part with no text, a toolCall part with no id, name or arguments, a thinking part with no thinking text, a redacted thinking part with no thinkingSignature, and any of these present with another type than the target takes (a `redacted` or a thinkingSignature among them) each refuse the render by entry id and field, and nothing is written.
+- [ ] **C110** — stopReason is mapped by one explicit arm each for toolUse, length, stop, error and aborted, and a wildcard arm: toolUse to tool_use, length to max_tokens and stop to end_turn; the error and aborted arms refuse by entry id and the value; the wildcard arm refuses by entry id and the value and maps to no Claude Code value.
+- [ ] **C111** — Every serialisation the render needs, the record lines, the hashes of dropped parts and the loss account, is decided before any directory or file is created; a loss account whose serialiser fails refuses the render and no rendered file, loss account or seed exists afterwards.
+- [ ] **C112** — Each refusal case has its own fixture asserting the entry id and the field it names; one test renders a thinking part with no `redacted` field as not redacted, and one renders past an unknown role.
+- [ ] **C113** — The render's module doc names gitBranch "", usage {input_tokens 0, output_tokens 0} and stop_sequence null as format constants and absence as the only default of `redacted`; the bytes rendered from a session that carries every field and whose assistant stopReasons are toolUse, length or stop do not change; error, aborted or an unmapped stopReason refuses where it rendered as end_turn, and the pinned render hashes, whose fixtures carry only toolUse, length or stop, are unedited.
+- [ ] **C114** — render-launch renders before it stores the template, so a refused launch leaves the home's templates directory with the same entries and hashes as before the call.
+- [ ] **C115** — The cluster's rendered markdown, briefs/HOME-015.md among it, is what its JSON renders to, and scripts/design/gate.sh exits 0.
+
+## The given statement
+
+- [ ] **C45** — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
+- [ ] **C46** — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
+- [ ] **C47** — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- [ ] **C48** — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
+- [ ] **C49** — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
+- [ ] **C50** — A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.
+- [ ] **C51** — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+
+## Repeated work removed
+
+- [ ] **C45** — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+- [ ] **C46** — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- [ ] **C47** — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- [ ] **C48** — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-093 records it.
+- [ ] **C49** — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- [ ] **C50** — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+- [ ] **C51** — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+- [ ] **C52** — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
+- [ ] **C53** — One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged.
+- [ ] **C54** — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit.
+
+## Repeated work removed
+
+- [ ] **C45** — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+- [ ] **C46** — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- [ ] **C47** — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- [ ] **C48** — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-107 records it.
+- [ ] **C49** — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- [ ] **C50** — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+- [ ] **C51** — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt; a later read that meets a row that is not the file's drops the cached index, rebuilds it from the session file and retries once, refuses as Malformed when the rebuilt index fails the same read, and returns a real I/O error at once, never retried.
+- [ ] **C52** — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
+- [ ] **C53** — One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged.
+- [ ] **C54** — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit.
+
 ## The given statement
 
 - [ ] **C181** — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
@@ -87,3 +405,16 @@
 - [ ] **C186** — A byte search of the fixture's statement, payload file, statement block, statement entry and render report finds no fixture secret value and no fixture transcript text.
 - [ ] **C187** — The statement's signed payload hash equals the manifest's and the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
 - [ ] **C188** — lys verify --cert with a test authority's public key accepts the given statement against a test certificate issued over the signing test key, and exits 1 against one issued over a second test key.
+
+## Repeated work removed
+
+- [ ] **C45** — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+- [ ] **C46** — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- [ ] **C47** — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- [ ] **C48** — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+- [ ] **C49** — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- [ ] **C50** — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+- [ ] **C51** — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+- [ ] **C52** — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
+- [ ] **C53** — One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged.
+- [ ] **C54** — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit.

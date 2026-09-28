@@ -12,21 +12,21 @@ title: Sign what a session was given: a lys/attestation/v2 given statement at re
 > **Design anchor:**
 > - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
-> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
+> - ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
+> - ADR-013 — Claude Code's compaction is read and rendered in the shape the measured version writes — The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.
 > - ADR-047 — The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key — The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.
 > **Checklist:**
-> - C45 — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
-> - C46 — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
-> - C47 — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
-> - C48 — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
-> - C49 — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
-> - C50 — A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.
-> - C51 — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+> - C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+> - C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+> - C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+> - C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+> - C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+> - C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+> - C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 > **Stories:**
-> - S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
-> - S25 (Tom, Owns the platform and reads what a session was given) — As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
-> - S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
+> - S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
+> - S25 (Tom, Owns the platform and reads what a session was given) — As the owner of the platform, I want an import that stops part way to leave no half-written session under its name, so that running the import again is all the repair it needs.
+> - S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
 ## Purpose
 
@@ -65,10 +65,10 @@ Add to GivenRecord its canonical bytes and its given hash. WHEN the canonical by
 - modify: crates/lys-home/src/record/given_tests.rs
 
 **Checklist:**
-- C46 — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+- S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
 
 ### R2: Sign a given record and keep the statement beside the lys.given entry
 
@@ -90,10 +90,10 @@ Add lys-core to lys-home's dependencies by workspace path with its default featu
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C47 — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+- S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
 
 ### R3: Take an optional signing key in render-launch, report the given hash and say signed or unsigned
 
@@ -114,12 +114,12 @@ Add an optional --key <path> to render-launch's arguments, naming a raw 32-byte 
 - modify: crates/lys-home/src/error.rs
 
 **Checklist:**
-- C45 — render-launch with no key records the lys.given entry with the same data as before, writes no statement, and its report's signing is unsigned.
-- C46 — render-launch reports given_sha256, the SHA-256 of the RFC 8785 bytes of the lys.given entry's data, and the template_render event does not carry it.
-- C47 — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
 
 **Stories:**
-- S25 (Tom, Owns the platform and reads what a session was given) — As the owner of the platform, I want a render's report to say whether what the session was given was signed, so that an unsigned render is never taken for a signed one.
+- S25 (Tom, Owns the platform and reads what a session was given) — As the owner of the platform, I want an import that stops part way to leave no half-written session under its name, so that running the import again is all the repair it needs.
 
 ### R4: Prove the given statement end to end with two test keys
 
@@ -136,14 +136,14 @@ Add an integration test that renders the fixture template with two keys generate
 - create: crates/lys-home/tests/given_statement.rs
 
 **Checklist:**
-- C48 — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
-- C49 — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
-- C50 — A byte search of the fixture's statement, payload file, statement block and statement entry finds no fixture secret value and no fixture transcript text.
-- C51 — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
-- S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
+- S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
+- S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
 ### R5: Write lys.given_statement into RECORD.md and the crate README
 
@@ -158,10 +158,10 @@ Add lys.given_statement to RECORD.md's lys custom entries: its data keys, that i
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C47 — render-launch with a key signs those bytes as a lys/attestation/v2 statement kept as a block named by a lys.given_statement entry under the lys.given entry and as given-statement.cose and given-data.json under --out, and its report's signing is signed.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
+- S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
 
 ### R6: Record a stranger's check of the given statement in PROOF-GIVEN.md
 
@@ -179,13 +179,13 @@ Add a section to PROOF-GIVEN.md that renders the fixture with two test keys gene
 - modify: docs/design/home/PROOF-GIVEN.md
 
 **Checklist:**
-- C48 — lys verify --attestation accepts the given statement with given-data.json, and refuses a copy with one byte altered with its one message and exit status 1, under a stated command that names the refused file.
-- C49 — A stated command compares the verified statement's signer public key with the test key's and exits 0, and exits 1 for a statement signed by a second test key.
-- C51 — The statement's signed payload hash equals the report's given_sha256 and the SHA-256 recomputed from the lys.given entry in the session file for the same render.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 
 **Stories:**
-- S24 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to check what a session was given with lys verify offline, so that I can trust the record without trusting the home that wrote it.
-- S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want to see which key signed a given statement, so that a statement signed by any other key is not taken for the home's.
+- S24 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session is long, I want recording a call and opening my session to read only what they need, so that a long history does not make each call slower than the last.
+- S26 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want a disk error while a session opens reported as that error, so that a failing disk is seen and never papered over by a rebuilt index.
 
 ## Boundaries
 

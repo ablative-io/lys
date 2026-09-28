@@ -29,8 +29,8 @@ title: Open a leaf store read-only that never writes and never repairs, name its
 > - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
 > - S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 > - S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
-> - S5 (Verifier, Trusting a leaf the log serves) — As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole.
-> - S6 (Developer, Building a reader on the leaf store) — As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole.
+> - S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
+> - S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
 
 ## Purpose
 
@@ -170,7 +170,7 @@ IF a leaf at an index below the pinned tree size is torn short after it was name
 - C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to.
 
 **Stories:**
-- S5 (Verifier, Trusting a leaf the log serves) — As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole.
+- S5 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a store I open read only to refuse every write, so that reading a store can never change it.
 - S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
 
 ### R7: Say in file.rs's module doc what open does and never does
@@ -191,7 +191,7 @@ file.rs's module doc gains a section headed `# What open does and never does`. I
 - C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
 
 **Stories:**
-- S6 (Developer, Building a reader on the leaf store) — As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole.
+- S6 (Log inspector, Opens a log store to read it without changing it) — As a log inspector, I want a read-only open of a store with an interrupted append to refuse and say that a repair is pending, so that I learn the store is past its pin without my open repairing it.
 
 ## Boundaries
 

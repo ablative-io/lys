@@ -12,7 +12,7 @@ title: Translate a Claude Code session in the home into a Codex 0.156.0 rollout 
 > **Design anchor:**
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
 > - ADR-014 — A translation to another harness is a per-target, per-version renderer of our own with a loss account, never that harness's importer — A translation to another harness is a renderer of our own, one per target harness and per measured version, over the home's context path: it carries every text part, tool call and tool result whole as the target's own items, carries readable thinking as text and drops opaque blocks by hash (home P3), announces itself in band as a translated context naming its source session and head hash, writes a JSON loss account beside its output listing kept, changed and lost by entry id and block hash, and is recorded on the session as a side leaf. It is not the target harness's own importer, adopted, wrapped or called, because that importer is a compaction that loses what the home keeps and cannot say what it lost; and it is not one renderer for every version, because a harness's file shape is a per-version measurement (home P6).
 > **Checklist:**
 > - C24 — lys-home render-codex takes a home, a session, a target directory that is a Codex sessions root, and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout under that root's dated directories in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.
@@ -23,8 +23,8 @@ title: Translate a Claude Code session in the home into a Codex 0.156.0 rollout 
 > - C29 — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
 > - C30 — PROOF-TRANSLATE.md records Codex 0.156.0 resuming the rendered rollout in an isolated Codex home and answering from its content, in hashes, counts and paths only.
 > **Stories:**
-> - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
-> - S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+> - S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+> - S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ## Purpose
 
@@ -60,7 +60,7 @@ Before any render code is written, record the fixture rollout from Codex 0.156.0
 - C29 — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
 
 ### R2: Name the Codex render's refusals
 
@@ -81,7 +81,7 @@ Add to HomeError: UnmeasuredCodexVersion, carrying the version asked for and the
 - C27 — A JSON loss account beside the rollout lists, by entry id and the importer's block hash, what was kept, what changed shape (before and after kinds, and how), and what was lost and why: sidechains, harness events, lys entries, and any part kind Codex has no item for.
 
 **Stories:**
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R3: Write the two fixture Claude Code files from the measured part shapes
 
@@ -102,7 +102,7 @@ Write two synthetic Claude Code files, every part in one of the key sets the tas
 - C29 — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
 
 ### R4: Key every account line to the block the importer stored, and account every entry off the context path
 
@@ -128,7 +128,7 @@ In harness/codex/loss.rs, define the loss account and the block hash. The accoun
 - C27 — A JSON loss account beside the rollout lists, by entry id and the importer's block hash, what was kept, what changed shape (before and after kinds, and how), and what was lost and why: sidechains, harness events, lys entries, and any part kind Codex has no item for.
 
 **Stories:**
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R5: Map the context path to Codex 0.156.0's lines, whole, with the marker last
 
@@ -161,8 +161,8 @@ In harness/codex/rollout.rs, WHEN the context path is mapped, THE SYSTEM SHALL w
 - C27 — A JSON loss account beside the rollout lists, by entry id and the importer's block hash, what was kept, what changed shape (before and after kinds, and how), and what was lost and why: sidechains, harness events, lys entries, and any part kind Codex has no item for.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R6: Translate: check the version, refuse an existing path, write both files under the sessions root, record the translation beside the path
 
@@ -192,8 +192,8 @@ Add the pure-Rust jiff crate as a workspace dependency of lys-home, for the time
 - C28 — The report is JSON with the rollout and account paths, entry and block counts and the loss counts, never content; an existing path is refused by name with nothing written; each translation is recorded on the session as a codex_translation side leaf naming both files by path and SHA-256 and the Codex version; the Claude Code render of the same session is unchanged, checked by hash.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R7: Add the render-codex subcommand with a report of paths and counts
 
@@ -213,7 +213,7 @@ Add `render-codex` with the arguments --home, --session, --out and --codex-versi
 - C28 — The report is JSON with the rollout and account paths, entry and block counts and the loss counts, never content; an existing path is refused by name with nothing written; each translation is recorded on the session as a codex_translation side leaf naming both files by path and SHA-256 and the Codex version; the Claude Code render of the same session is unchanged, checked by hash.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
 
 ### R8: Prove the translation end to end on the fixture Claude Code files
 
@@ -239,8 +239,8 @@ Add an integration test that imports each fixture Claude Code file into a fresh 
 - C29 — A fixture session imported from a fixture Claude Code file renders to a rollout whose items match a fixture rollout recorded from Codex 0.156.0, apart from ids and timestamps, over the item kinds the render can produce, with the kinds Codex writes that no source record stands behind named and counted; a tool result longer than Codex's importer clips is carried whole.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R9: Write the translation into RECORD.md and the crate README
 
@@ -259,7 +259,7 @@ Add to RECORD.md a section on the Codex translation: the loss account's keys and
 - C28 — The report is JSON with the rollout and account paths, entry and block counts and the loss counts, never content; an existing path is refused by name with nothing written; each translation is recorded on the session as a codex_translation side leaf naming both files by path and SHA-256 and the Codex version; the Claude Code render of the same session is unchanged, checked by hash.
 
 **Stories:**
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R10: Record the real resume by Codex 0.156.0 in PROOF-TRANSLATE.md
 
@@ -280,7 +280,7 @@ Make a fresh isolated Codex home under a temporary directory, import claude-code
 - C30 — PROOF-TRANSLATE.md records Codex 0.156.0 resuming the rendered rollout in an isolated Codex home and answering from its content, in hashes, counts and paths only.
 
 **Stories:**
-- S15 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+- S15 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
 
 ### R11: Carry the narrowed non-goal in the cluster design and re-render its markdown
 
@@ -302,7 +302,7 @@ Structure: the cluster design's non-goal on other harnesses reads `Harnesses oth
 - C24 — lys-home render-codex takes a home, a session, a target directory that is a Codex sessions root, and a Codex version; renders only for the measured Codex 0.156.0 and refuses any other version naming the version asked for and the one measured; walks the context path the Claude Code render walks; and writes one rollout under that root's dated directories in the shape Codex 0.156.0 writes for its own threads, measured from files that version wrote, with nothing written when it refuses.
 
 **Stories:**
-- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+- S14 (Agent, Runs in a harness and wants to continue somewhere else) — As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
 
 ## Boundaries
 

@@ -13,8 +13,8 @@ title: Translate a session imported from Claude Code into a Codex 0.156.0 rollou
 > **Design anchor:**
 > - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
-> - ADR-014 — A lantern is a custom entry in its session, and its note grows only by epilogue entries — A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).
+> - ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
+> - ADR-014 — A translation to another harness is a per-target, per-version renderer of our own with a loss account, never that harness's importer — A translation to another harness is a renderer of our own, one per target harness and per measured version, over the home's context path: it carries every text part, tool call and tool result whole as the target's own items, carries readable thinking as text and drops opaque blocks by hash (home P3), announces itself in band as a translated context naming its source session and head hash, writes a JSON loss account beside its output listing kept, changed and lost by entry id and block hash, and is recorded on the session as a side leaf. It is not the target harness's own importer, adopted, wrapped or called, because that importer is a compaction that loses what the home keeps and cannot say what it lost; and it is not one renderer for every version, because a harness's file shape is a per-version measurement (home P6).
 > - ADR-016 — A rendered file's derived uuids are a fixed, versioned contract — Derive every uuid a render needs and the record does not hold as UUIDv5 under the session's namespace and the name `<entry id>#<role>`, with a closed set of roles (`record` first); the session's namespace is UUIDv5 over one fixed lys namespace (32c05904-d1f1-550c-9eee-2f6c8f98b665, itself UUIDv5 of the RFC 9562 URL namespace over `lys/home/claude-code/render-uuid/v1`) and the id of the session being rendered, so the same entry id in two sessions never derives one uuid. Treat the namespace, the session namespace rule, the name form and the roles as frozen: a change is a new version alongside, never a mutation. The fork and launch cards derive by this scheme. Rejected: drawing fresh ids (nondeterministic), keying on a hash of the entry id alone without a namespace, a role and a session (two roles on one entry collide, two sessions with one hand-authored id collide, and it is not reproducible with standard UUID tooling), mixing in the target session id (the record does not hold it), and leaving the scheme mutable until a later card (every recorded hash would move with it).
 > - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
 > - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
@@ -36,7 +36,7 @@ title: Translate a session imported from Claude Code into a Codex 0.156.0 rollou
 > - C70 — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.
 > **Stories:**
 > - S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
-> - S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+> - S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 > - S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
 > - S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
 > - S31 (Agent, Continues a session imported from Claude Code on Codex) — As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
@@ -82,6 +82,35 @@ Add crates/lys-home/src/harness/codex/ (mod.rs holding only `pub mod` lines and 
 **Stories:**
 - S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row:
+- version_other_than_measured_is_refused: zone.rs:32 compares exactly, so `0.156` is refused; the message is at error.rs:324.
+- unnamed_zone_is_refused: zone.rs:61. None gives `unset`; `` and `:/etc/localtime` fail the IANA shape check.
+- unknown_zone_is_refused: the bundled-database lookup fails and returns UnknownTimeZone (error.rs:338).
+- named_zone_resolves: Local::of plus iso(). Sydney gives 2000-01-02T14:04:05 and UTC resolves; I checked that jiff-tzdb 0.1.8's tzname.rs lists both zones.
+- translation_refusals_name_the_act: messages at error.rs:307 and error.rs:315; Exists is unchanged.
+- Greps: `std::env` in harness/codex and `BlockNotStored` in src both print nothing. The jiff line holds default-features = false and tzdb-bundle-always, and no tzdb-zoneinfo, tzdb-concatenated, tzdb-bundle-platform or tz-system feature is enabled.
+- Nothing is written before the checks: translate runs them first (rollout.rs:227), and cli_translate::run checks version and zone before it opens the home.
+- Red first: not done in this round. See deviation.
+- Deviation: Red first is not met by this round. The instructions say to make no commit, so the tests-first commit and the 101 run are the landing step's to arrange. The test files and their `mod` lines are separable: committed without the implementation they fail to compile, so cargo test exits 101.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/mod.rs` — Holds only `pub mod` and `#[cfg(test)] mod` lines for account, beside, leaf, parts, rollout, zone and their tests.
+  - created: `crates/lys-home/src/harness/codex/zone.rs` — MEASURED_VERSION `0.156.0` and check_version (exact match). resolve_zone checks IANA shape, then looks the zone up in TimeZoneDatabase::bundled(); it reads no environment and has no fallback. parse_stamp is strict RFC 3339 via time::Rfc3339. Local gives the wall-clock date and time with the fraction truncated.
+  - created: `crates/lys-home/src/harness/codex/zone_tests.rs` — The five named R1 tests.
+  - modified: `crates/lys-home/src/error.rs` — Adds TranslationTargetExists, StampNotRfc3339, UnmeasuredCodexVersion, UnnamedTimeZone and UnknownTimeZone beside LaunchTargetExists, with the brief's exact messages. No existing variant changed.
+  - modified: `crates/lys-home/src/harness/mod.rs` — Declares `pub mod codex` with its doc.
+  - modified: `crates/lys-home/Cargo.toml` — Adds `jiff.workspace = true`.
+  - modified: `Cargo.toml` — Workspace `jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }`.
+  - modified: `Cargo.lock` — Resolved offline with `cargo metadata --offline`: adds jiff 0.2.35, jiff-core, jiff-tzdb, jiff-static and their lock-only dependencies. No existing version changed.
+- Checklist delivery:
+  - [x] C59 — An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged. — Every refusal is named and raised before any write. Only the red-first commit ordering is pending (see deviation).
+- Story delivery:
+  - [ ] S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match. — The version refusal is in place. The measured-shape and resume half is R10 and R11, which are blocked.
+
 ### R2: Define the loss account: kept, changed and lost rows by entry id and hash, and nothing of the content
 
 In harness/codex/account.rs define the account written beside a rollout: a JSON object with exactly the keys `session` (the home session's id), `head` (the head entry's id), `head_hash` (Session::head_hash of the session at translation time, the source head hash the marker names), `thread` (the Codex thread id), `codex_version`, `kept`, `changed` and `lost`. A kept row has exactly `entry`, `hash`, `before` and `after`; a changed row has exactly `entry`, `hash`, `before`, `after` and `how`, where `how` names every field that was not carried or was reshaped, joined by `; `; a lost row has exactly `entry`, `hash`, `kind` and `reason`. `hash` is the block hash: the SHA-256, lowercase hex, of serde_json::to_vec of the part (or of the tool-result or other whole message) as the home entry holds it, the rule the Claude Code render's loss account uses, never a stored block, and is null for a row about an entry rather than a part. Rows are in walk order. The account measures the entry as the home holds it, so it cannot name a field the importer dropped before the entry was written: a tool_use's caller field is dropped at import and recorded nowhere yet, and the board 5 card "The importer records every field it drops" carries it. This account is S4's written account of what a translation lost. The account is written with create_new and synced before the translation reports. THE SYSTEM SHALL NOT write into the account any text, argument, output, summary, note, epilogue or seed, only ids, hashes, kind names, field names and the fixed reason words this brief gives, and SHALL NOT count a part as kept when any of its fields was not carried or was reshaped.
@@ -101,6 +130,26 @@ In harness/codex/account.rs define the account written beside a rollout: a JSON 
 **Stories:**
 - S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured.
 - S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: - account_holds_the_three_lists: serialises an Account built from one row of each list and checks the top-level and row key sets, and that the entry row's hash is null.
+- part_hash_is_the_entry_bytes: part_hash (account.rs:159) hashes serde_json::to_vec. serde_json here has no preserve_order, so keys come out sorted. I verified the expected hash independently with `printf '%s' '{"text":"a","type":"text"}' | shasum -a 256`, which gives a7be9c13…d516.
+- The account is written create_new and synced before the translation reports (rollout.rs through write_new).
+- Rows carry only ids, hashes, kind names, field names and fixed reasons.
+- Red first: not done in this round. See deviation.
+- Deviation: Red first is pending, as in R1: no commit may be made in this round.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/account.rs` — Account has exactly session, head, head_hash, thread, codex_version, kept, changed and lost. Kept, Changed and Lost rows have exactly the brief's keys (deny_unknown_fields); hash is Option and serialises as null for an entry row. Also: Rows accumulator in walk order, part_hash (SHA-256 of serde_json::to_vec of the part as the entry holds it), account_bytes, and write_new (create_new plus sync, an existing path refused as TranslationTargetExists).
+  - created: `crates/lys-home/src/harness/codex/account_tests.rs` — account_holds_the_three_lists and part_hash_is_the_entry_bytes.
+- Checklist delivery:
+  - [x] C62 — The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content. — The account shape and hash rule are here; the rows are filled by R3 to R5.
+- Story delivery:
+  - [x] S4 (Tom, Owns the platform and reads what a session was given) — As Tom, I want a written account of what each render or translation lost, so that nobody claims a faithful continuation that was not measured. — The account is the written record of what a translation lost.
+  - [x] S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript. — Kept, changed and lost rows are named by entry id and hash, and hold no content.
 
 ### R3: Carry each part whole as Codex's own item, thinking as text and base64 images as input_image, and count what changed
 
@@ -132,8 +181,39 @@ In harness/codex/parts.rs map one message entry to Codex 0.156.0 response items 
 - C70 — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 - S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row:
+- tool_call_becomes_function_call: tool_call at parts.rs:252 gives the exact item and a kept row.
+- extra_part_field_is_changed: not_carried names `textSignature not carried`.
+- tool_call_without_id_or_name_is_lost: check_call returns NO_CALL_ID or NO_CALL_NAME.
+- tool_result_without_call_id_is_lost: tool_result_items (parts.rs:414) uses `named` for toolCallId.
+- unknown_role_is_lost: message_items (parts.rs:451).
+- one_item_result_is_a_string: result_output (parts.rs:374) gives a string with how `content: one-item text array written as a string; isError not carried; timestamp not carried; toolName not carried`.
+- two_item_result_is_a_list: the list form.
+- assistant_turn_fields_are_named: entry_row (parts.rs:278) names the keys in sorted order.
+- thinking_is_text_and_opaque_is_lost: thinking_part (parts.rs:225).
+- base64_image_is_input_image_and_url_image_is_lost: image_part (parts.rs:174) gives reason `image source url not carried: part 2, never fetched`.
+- Greps: custom_tool_call, encrypted_content, external_agent, truncat, reqwest, ureq and TcpStream all print nothing in parts.rs, and the no-default patterns print nothing in harness/codex.
+- Red first: not done in this round. See deviation.
+- Deviation: Four cases the brief does not name are lost rows with reasons I wrote, instead of empty defaults: a toolCall with no arguments; a text part with no text; a base64 image with no media_type or data; a part with no type. A message whose content is neither a string nor a list is also lost. An image in an assistant message is lost as `Codex has no item for kind image in this render`. Red first is pending, as in R1.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/parts.rs` — message_items maps user, assistant and toolResult messages to Codex items: input_text and output_text messages, function_call (call_id is the part's own id, arguments via serde_json::to_string) and function_call_output. Readable thinking becomes output_text; redacted and empty thinking are lost. A base64 image becomes input_image with a data URL and no detail key; any other image source is lost with its index. Extra fields are named `<field> not carried`, and an entry row names the message keys beyond role and content. A missing id, name, toolCallId or role is a lost row, never a default. No item carries an `id` key.
+  - created: `crates/lys-home/src/harness/codex/parts_tests.rs` — The ten named R3 tests.
+- Checklist delivery:
+  - [x] C60 — Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte. — Texts, arguments and outputs are carried whole. The 10,000-character case is in R8.
+  - [x] C61 — Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout. — Readable thinking becomes output_text. Redacted and empty thinking are lost by hash. No signature, redacted data or reasoning item is written.
+  - [x] C62 — The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content. — Part rows and entry rows are covered, and no default is ever supplied.
+  - [ ] C70 — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched. — input_image with no detail key is done. The resume measurement is R11, which is blocked.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — Items are carried whole, but that Codex actually resumes the thread is R11, which is blocked.
+  - [x] S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript. — Each part is named by its hash with before, after and how.
 
 ### R4: Walk the context path and write the rollout at Codex's own layout, opening with the marker
 
@@ -162,8 +242,37 @@ In harness/codex/rollout.rs define `translate`, the one entry point every later 
 - C63 — The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 - S31 (Agent, Continues a session imported from Claude Code on Codex) — As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row:
+- path_follows_codex_layout: target_paths (rollout.rs:209) with Local in Australia/Sydney.
+- session_meta_holds_five_keys: the session_meta JSON built in `translate`.
+- marker_opens_the_thread: marker() (rollout.rs:88) uses Session::head_hash taken before any write; the account carries session, head_hash and codex_version.
+- thread_id_is_record_uuid_of_head: record_uuid is reused unchanged.
+- ordinal_is_the_line_number: the ordinal comes from zip((0u64..)); type is session_meta for line 0 and response_item otherwise (rollout.rs:299).
+- line_stamps_are_the_entries_own: each Item carries entry.base.timestamp verbatim.
+- compaction_is_marked_text: marked() (rollout.rs:96) names keys beyond type, id, parentId, timestamp and summary.
+- entries_left_by_a_compaction_are_lost: Beside::left_off, called after the compaction's rows (rollout.rs:285).
+- branch_summary_and_custom_message_are_marked_text: marked() and custom_text() (rollout.rs:124), with the reason `image part 1 not carried: marked text holds text only`.
+- unparsed_stamp_is_refused_and_nothing_written: every stamp is parsed before any path or file work.
+- Grep: fresh_id, rand::, now(, SystemTime, Instant and std::env print nothing in rollout.rs.
+- Red first: not done in this round. See deviation.
+- Deviation: A session with no head is refused with the existing HomeError::BodyShape (api `translate-codex`), not a new variant. Red first is pending, as in R1.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/rollout.rs` — `translate` runs the R1 checks and parses every context-path stamp, then names the rollout sessions/YYYY/MM/DD/rollout-<local>-<record_uuid of head>.jsonl with `.loss.json` beside it. It refuses an existing target, then writes: session_meta with exactly five keys; the marker developer message; each context entry (messages through parts.rs; compaction, branch_summary and custom_message as marked developer text; anything else lost as not conversation); and a lost row for every path entry the compaction left off. Every line is {timestamp, ordinal, type, payload} with the entry's own stamp copied as recorded. The rollout is written create_new and synced, then the account. It reads no clock, random source or env and writes nothing outside --out.
+  - created: `crates/lys-home/src/harness/codex/rollout_tests.rs` — The ten named R4 tests, plus shared helpers used by the leaf and beside tests.
+- Checklist delivery:
+  - [x] C59 — An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged. — The target-exists and stamp refusals fire before any write.
+  - [x] C63 — The rollout's session_meta holds only id, session_id, timestamp, cwd and cli_version, the thread id is record_uuid of the session head, and the first item is a developer message holding the in-band marker that names the source session id, the source head hash and the Codex version, declares the thread a fork and not that session, and carries no template hash. — session_meta has exactly five keys, the thread id is record_uuid, and the marker names session, head hash and version with no template hash.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — The rollout is written in Codex's layout; the resume itself is R11, which is blocked.
+  - [x] S31 (Agent, Continues a session imported from Claude Code on Codex) — As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session. — The thread opens on the marker that names the source session.
 
 ### R5: Carry labelled sidechains as marked text with their agent labels and a forked child's point as the next user prompt after the walked history, and list every other entry off the path as lost, whatever its type
 
@@ -189,8 +298,38 @@ In harness/codex/beside.rs define the sidechain items, the off-path rows and the
 - C69 — A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 - S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row by row:
+- sidechain_is_carried_as_marked_text: carry (beside.rs:318), placed by under (beside.rs:287).
+- lys_entries_are_listed_lost: the lantern and the attachment event are on the context path, so both are lost with the not-conversation reason.
+- sidechain_descendants_and_unlabelled_branch_are_listed: the tool_completed event and the attachment under a1 are lost; the no-agent sidechain's two messages are unlabelled branch rows.
+- off_path_label_compaction_branch_summary_and_model_change_are_lost: four entries appended beside the head, each lost with its kind and reason.
+- forked_child_opens_on_the_point: forked_prompt (beside.rs:436).
+- sidechain_image_is_lost_with_its_reason: member_lines (beside.rs:344).
+- sidechain_under_a_compacted_entry_is_lost: left_off (beside.rs:271).
+- The only files read are the session file and, for a forked child, the parent file.
+- Red first: not done in this round. See deviation.
+- Deviation: Two fixture changes against the brief:
+- Closing main-chain record. The importer (unchangeable here) leaves the head on the file's last chain record. So each fixture whose sidechains would otherwise end the file closes with one more main-chain record naming the main chain's last message; without it the sidechain would sit on the context path.
+- Bridge after the summary. The importer gives a compaction a fresh id that no record can name. So in sidechain_under_a_compacted_entry_is_lost, the record after the `summary` is a `system` record with no parentUuid (which the importer hangs under the compaction), followed by the user record. The test module doc records both.
+Red first is pending, as in R1.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/beside.rs` — Beside::read reads the session file once through SessionReader and indexes each off-path entry under its nearest root-to-head ancestor. find_sidechains marks `agent ` labels whose parent is on the context path and which name an entry off the path. carry writes the <SIDECHAIN …> developer message stamped with the label's stamp, with the label counted changed (before label, after marker line). member_lines applies R3's losses plus `<kind> part <i> not carried: marked text holds text only`. under() lists every other off-path entry as lost: unlabelled branch; off the context path for compaction, branch_summary and custom_message; not conversation otherwise. left_off names the compaction. forked_prompt reads the seed through seed_of, reopens the parent file once and lists non-text parts.
+  - created: `crates/lys-home/src/harness/codex/beside_tests.rs` — The seven named R5 tests on synthetic Claude Code files imported through cli::run; lantern and fork also run through cli::run.
+  - modified: `crates/lys-home/src/harness/codex/rollout.rs` — translate places each sidechain after its parent's items (beside.under, rollout.rs:287) and writes the forked child's prompt last (rollout.rs:289).
+- Checklist delivery:
+  - [x] C62 — The loss account lists kept, changed and lost rows by entry id and the hash of each part as the home entry holds it, in walk order; a changed row names its before and after kinds and every field not carried or reshaped (a key beyond those its item carries, a one-item text array written as a string, an assistant turn's model, usage and stop reason), while a tool_use's caller field, dropped at import, is recorded nowhere yet; a lost row names its reason; every entry of the root-to-head path that a compaction leaves off the context path, and every entry descending from one, is a lost row naming that compaction; a message of any other role, a toolCall with no id or name and a toolResult with no toolCallId are lost rows and never given an empty default; every other entry off the path that descends from the path and is not carried is a lost row whatever its type, the harness events under a sidechain, the entries of a sidechain with no agent label, and every other label, compaction, branch summary and model change off the path among them, while a sidechain's agent label is carried in its marker line and counted changed; the account carries no content. — Every off-path descendant of the path is a row; the agent label is changed, not lost.
+  - [x] C69 — A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost. — Sidechains are carried as marked text; branch summary and custom message are marked developer text (R4); lys entries are lost by id; the forked child's prompt is last and counted changed.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — The resume is R11, which is blocked.
+  - [x] S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript. — Subagent traffic is exactly what the account says was carried.
 
 ### R6: Record each translation as a lys.translation side leaf that never moves the head
 
@@ -214,6 +353,27 @@ Add the custom type `lys.translation` to record/entries.rs beside the other lys 
 
 **Stories:**
 - S31 (Agent, Continues a session imported from Claude Code on Codex) — As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: - side_leaf_names_the_translation and leaf_data_holds_eight_keys: append_beside leaves the head and the earlier file bytes untouched.
+- second_translation_lists_the_first_leaf_lost: the first leaf is a custom entry off the path under the head, so R5's rule lists it lost.
+- If any earlier write fails, `?` stops before the append.
+- Red first: not done in this round. See deviation.
+- Deviation: Red first is pending, as in R1.
+- Files changed:
+  - created: `crates/lys-home/src/harness/codex/leaf.rs` — TranslationData has exactly the eight keys; append_leaf appends a lys.translation custom entry through Session::append_beside.
+  - created: `crates/lys-home/src/harness/codex/leaf_tests.rs` — The three named R6 tests.
+  - modified: `crates/lys-home/src/record/entries.rs` — Adds CUSTOM_TRANSLATION = "lys.translation" beside the other lys custom types.
+  - modified: `crates/lys-home/src/harness/codex/rollout.rs` — After the rollout and account are written and synced, translate appends the leaf (rollout.rs:344). The data holds a relative rollout path and the SHA-256 of both files' bytes; head_hash is taken before the append.
+- Checklist delivery:
+  - [x] C64 — Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256. — The leaf is written. That the Claude Code render is unchanged by hash is tested in R8.
+  - [x] C69 — A sidechain is carried as marked text under the entry it hangs from, opening with a line naming its entry id and its agent id, and counted changed, with the agent label that names it counted changed, before label and after marker line, and a part marked text cannot hold, a base64 image included, listed lost with its reason; a branch summary or custom message on the context path is carried as marked developer text under its own marker and counted changed; lanterns, harness events and every other lys entry, render records included, are listed lost by entry id; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, counted changed with its how, and each of its parts that is not text is listed lost. — The leaf itself is listed lost by a later translation.
+- Story delivery:
+  - [x] S31 (Agent, Continues a session imported from Claude Code on Codex) — As a Codex thread translated from a home session, I want to open on a marker naming the session I was translated from, so that I never mistake myself for that session. — The durable link back to the session is the leaf plus the account.
 
 ### R7: Add the translate-codex subcommand and its report of paths and counts
 
@@ -241,7 +401,34 @@ In crates/lys-home/src/cli_translate.rs add `lys-home translate-codex` taking `-
 - C59 — An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: - report_carries_paths_and_counts: exact keys; kept + changed + lost equals the account's rows; no fixture sentinel appears in the report or the account, and every sentinel does appear in the rollout.
+- existing_rollout_is_refused_and_nothing_written: exact message; the files and hashes under --out and the session bytes are unchanged.
+- unmeasured_codex_version_is_refused: exact message; --out stays empty.
+- unknown_zone_is_refused_and_nothing_written: the message ends `set TZ to an IANA name`.
+- --help: clap derives it from TranslateArgs with all five flags.
+- The clap line holds both derive and env.
+- A refusal exits 1 with its message on stderr through the existing main.rs.
+- Red first: not done in this round. See deviation.
+- Deviation: The report's `blocks` counts the content parts of the entries on the context path (a string content counts as 1). Red first is pending, as in R1.
+- Files changed:
+  - created: `crates/lys-home/src/cli_translate.rs` — TranslateArgs takes --home, --session, --out, --codex-version (required) and --zone (`#[arg(long, env = "TZ")]`). run checks version and zone before opening the home, calls translate, and prints {command, report} with exactly rollout, account, entries, blocks, kept, changed and lost. Nothing of the content is printed and Codex is never run.
+  - created: `crates/lys-home/src/cli_translate_tests.rs` — The four named R7 tests.
+  - modified: `crates/lys-home/src/cli.rs` — Gains only the TranslateCodex variant (full path, no new import) and its dispatch.
+  - modified: `crates/lys-home/src/lib.rs` — Declares cli_translate and its #[cfg(test)] sibling test module.
+  - modified: `Cargo.toml` — clap gains the `env` feature beside `derive`.
+  - modified: `Cargo.lock` — No package change for clap's env feature.
+- Checklist delivery:
+  - [x] C58 — lys-home translate-codex takes --home, --session, --out, --codex-version and --zone, writes one rollout under <out>/sessions/YYYY/MM/DD/ named as Codex names its own and one loss account beside it, and prints one JSON report of the two paths and the entry, block, kept, changed and lost counts, never content. — Subcommand, layout and report are implemented; the report holds no content.
+  - [x] C59 — An unmeasured Codex version, an unnamed time zone, an unknown time zone, an existing rollout or account path and an entry stamp that is not RFC 3339 are each refused by name before anything is written, with messages saying render for 0.156.0 or card a measurement of the new version, set TZ to an IANA name, choose another --out and re-import the source file; the shared session-exists refusal of the other commands is unchanged. — Refusals exit 1 and write nothing.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — The resume is R11, which is blocked.
 
 ### R8: Prove through the binary that everything is carried whole, the bytes repeat and the Claude Code render is unchanged
 
@@ -266,8 +453,33 @@ Add crates/lys-home/tests/codex_translation.rs, which builds synthetic Claude Co
 - C65 — The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 - S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript.
+
+#### R8 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: - text_and_tools_are_carried_whole: each text appears byte-equal once; the arguments parse back to the input; the output equals the result text.
+- tool_result_past_importer_clip_is_whole: a 10,000-character output comes back identical.
+- foreign_thinking_renders_as_text: no signature or redacted data in the rollout; one changed row thinking→output_text and one redacted lost row.
+- every_row_names_its_kinds_and_reason: every changed row has before, after and how; every lost row has kind and reason; the lost count matches the test's own sum.
+- second_translation_gives_equal_bytes: equal rollout SHA-256; the second account minus its one lys.translation row is byte-equal to the first.
+- claude_code_render_is_unchanged_by_hash: `lys-home render` before and after the translation gives equal SHA-256.
+- external_agent grep prints nothing.
+- The R10 tests (fixture_session_matches_recorded_rollout, proof_records_the_fixture_hash) are not added; they are R10's.
+- Deviation: The every_row fixture closes with one main-chain user record after the sidechains, for the same importer head rule as R5. Its `system` record doubles as the bridge the importer hangs under the compaction.
+- Files changed:
+  - created: `crates/lys-home/tests/codex_translation.rs` — The six R8 tests on synthetic Claude Code files imported through lys_home::cli::run and translated through translate. every_row_names_its_kinds_and_reason counts the seven lost-row terms itself, by walking the home's parent ids and the fixture's records, never the account. It asserts terms [7,3,1,5,7,2,2] and a total equal to the account's lost count, and cross-checks the a1 events and the unlabelled messages against the records.
+- Checklist delivery:
+  - [x] C60 — Every text part, tool call and tool result on the context path is carried whole as a Codex message, function_call or function_call_output item, never as a clipped note; a tool result longer than 4,000 characters is carried byte for byte. — Tested end to end, including the 10,000-character result.
+  - [x] C61 — Readable thinking is carried as output_text and counted changed; redacted and empty thinking are dropped and listed lost by hash with a reason; no signature, redacted data or reasoning item enters the rollout. — No signature, redacted data or reasoning item enters the rollout.
+  - [x] C64 — Each translation appends one lys.translation custom entry beside the context path naming the thread, the head, the head hash, the rollout's relative path and the rollout's and account's SHA-256; the head and the session's earlier bytes do not move, and the Claude Code render of the session is unchanged by SHA-256. — The render is unchanged by SHA-256.
+  - [x] C65 — The same session head translated into two fresh --out directories gives rollouts of equal SHA-256, and the second account differs from the first only by the one lost row naming the first translation's side leaf. — Equal rollout bytes; the accounts differ by the one leaf row only.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — Carried whole is proven here; the resume is R11, which is blocked.
+  - [x] S29 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every translation to carry an account, by entry id and hash, of what was kept, what changed and how, and what was lost and why, so that the difference between the session and its Codex fork can be read without reading the transcript. — Every row names its kinds and reason, and the lost count matches an independent count.
 
 ### R9: Document the subcommand and the custom type, and render the cluster's markdown
 
@@ -292,6 +504,27 @@ Add translate-codex to crates/lys-home/README.md as one paragraph beginning `` `
 
 **Stories:**
 - S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
+
+#### R9 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: - I ran `python3 scripts/design/render-cluster.py docs/design/home`. No rendered markdown was edited by hand, the other briefs rendered unchanged, and no other cluster was touched.
+- Greps: `^- `lys.translation`` in RECORD.md prints 1; `^`translate-codex --home ` in the README prints 1; `Claude Code to Codex` in DESIGN.md prints 3.
+- I did not run scripts/design/gate.sh (the workflow runs it). No design JSON was changed.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-home/README.md` — One paragraph beginning `` `translate-codex --home <dir> --session <id> --out <dir> --codex-version <version> [--zone <iana name>]` ``, a lys.translation row in the custom-type table, and HOME-009 in the design list.
+  - modified: `docs/design/home/RECORD.md` — One `- `lys.translation`` item giving its eight data keys and invariants.
+  - modified: `docs/design/home/DESIGN.md` — Regenerated by render-cluster.py; carries the amended non-goal. `Claude Code to Codex` now occurs 3 times.
+  - modified: `docs/design/home/CHECKLIST.md` — Regenerated by render-cluster.py.
+  - modified: `docs/design/home/USER-STORIES.md` — Regenerated by render-cluster.py.
+  - created: `docs/design/home/briefs/HOME-009.md` — Rendered from HOME-009.json by render-cluster.py.
+- Checklist delivery:
+  - [x] C68 — The home design admits exactly one translated pair, Claude Code to Codex, as roadmap stage 4b, and the cluster's rendered markdown is what its JSON renders to. — The cluster markdown is what its JSON renders to.
+- Story delivery:
+  - [ ] S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match. — The measurement half is R10 and R11, which are blocked.
 
 ### R10: Record a Codex 0.156.0 rollout in a scratch Codex home and match the fixture session's render to it
 
@@ -334,6 +567,23 @@ R10 and R11 are performed by the card's lead seat named in the task, on the prov
 
 **Stories:**
 - S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
+
+#### R10 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked by the brief's own assignment. R10 is performed by the card's lead seat, Archie, on the proving machine, in a scratch Codex home logged into the proof account, after R1 to R9 land and the build is signed off. The chain's builder has no Codex login and must make no Codex request. Not produced here:
+- the start check and the recordings
+- tests/fixtures/codex/rollout-0.156.0.jsonl and claude_code.jsonl
+- PROOF-TRANSLATE.md ## Recording
+- the fixture_session_matches_recorded_rollout and proof_records_the_fixture_hash tests
+If the recording shows a shape parts.rs or rollout.rs did not write, R10 corrects it there.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C66 — A Codex 0.156.0 rollout recorded in a scratch Codex home outside the repository in at most two attempts of one fixed shell command that reads nothing of the machine, after exactly one request that checks the proof account there can make requests and ends when codex exec exits, is committed as a fixture beside the Claude Code file that mirrors it, neither holding a machine path, an email or a token, and that file imported and translated gives response items equal to the recording's apart from ids and timestamps (id, call_id, turn_id and create_time), every Codex command there run with CODEX_HOME set to the scratch home. — Awaits the lead seat's recording in a scratch Codex home.
+- Story delivery:
+  - [ ] S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match. — Awaits R10.
 
 ### R11: Resume the rendered thread, and a thread holding an image, on Codex 0.156.0 in the scratch home and record it with hashes, counts and paths only
 
@@ -380,8 +630,22 @@ Each resume attempt runs in a fresh scratch Codex home prepared as R10 gives (a 
 - C70 — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched.
 
 **Stories:**
-- S28 (Agent, Continues a session imported from Claude Code on Codex) — As an agent whose session was imported from Claude Code, I want it rendered as a Codex thread that Codex resumes, with every text, tool call and tool result carried whole, so that I continue on Codex knowing what the session knew rather than a clipped summary of it.
+- S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said.
 - S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match.
+
+#### R11 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked for the same reason as R10: it is the lead seat's resume, in fresh scratch Codex homes, after R10. Not produced here: claude_code_image.jsonl, the ## Resume section, and any detail-key or session_meta correction a failed resume would call for. Nothing here ran Codex or touched any Codex home.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C67 — PROOF-TRANSLATE.md records, with the seat that ran it and the date, Codex 0.156.0 resuming the translated thread in a scratch Codex home outside the repository and answering from its content, and resuming a translated thread that holds an image, with the proof account named by its role, the start checks, the attempts, each retry in a fresh scratch home, the paths, the rollout's hash before and after the resume, the side leaf's rollout hash, counts and exit statuses, and no transcript text, email or credential. — Awaits the lead seat's resume run.
+  - [ ] C70 — A base64 image part, in a user message or inside a tool result, is carried as Codex's input_image item with no detail key and counted changed, and Codex 0.156.0 is measured resuming a thread that holds one, with any detail value it needs taken from a rollout 0.156.0 wrote itself and named; an image of any other source is listed lost with its source type and part index and is never fetched. — input_image with no detail key is implemented (R3); Codex 0.156.0 resuming a thread that holds one is unmeasured.
+- Story delivery:
+  - [ ] S28 (Agent, Keeps a history a stranger can verify) — As an agent, I want each sealed record I open through my home recorded as an entry with its own signed leaf, naming the envelope by hash and never its content, so that a stranger can see what I opened without learning what it said. — Awaits the resume.
+  - [ ] S30 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the Codex rollout shape measured from files Codex 0.156.0 wrote and its resume recorded with hashes and counts, so that a later Codex version is refused until it is measured rather than assumed to match. — Awaits the resume record.
 
 ## Boundaries
 

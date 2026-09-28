@@ -11,17 +11,17 @@ title: Record the given documents in the request's order, re-measured, with the 
 > **Depends on:** HOME-003
 > **Blocked by:** measure.py, the fixture PROOF-GIVEN was measured with (SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d), is not in the repository: its one copy is in the scratch tree of the seat that measured PROOF-GIVEN, at /private/tmp/claude-501/-Users-tom-Developer-archie/34c4f280-dc08-4edc-9fe0-82f1f75bee3b/scratchpad/proof-given/measure/measure.py, which /tmp clearing loses. R1 commits it from there by that hash before anything else runs.
 > **Design anchor:**
-> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
-> - ADR-030 — The context record's cross-kind order is the order the harness's request gives — The context record's documents follow the order the harness's request gives wherever it and the read order differ: appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position. The within-directory order (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) is unchanged. Entries already written under the old order stand as written and no data member is added to mark the order; the documents name the old order as superseded by the commit that lands HOME-011 and by that commit's date. Rejected: keeping the read order, since the request is what reached the model; rewriting or migrating entries already written, since the record is append-only; adding a data member or relying on harness_version to mark the order, since the old order was written under 2.1.283, the new one is written under the version the re-measurement ran on, which may be the same, and the harness version does not tell the two orders apart.
+> - ADR-013 — Claude Code's compaction is read and rendered in the shape the measured version writes — The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.
+> - ADR-030 — A Claude Code compaction imports as one Pi compaction at the summary record's place, keeping what Claude Code kept, and renders as the compact_boundary pair — A compact_boundary record imports as today, a lys.harness_event on the chain; the isCompactSummary record under it becomes one Pi compaction entry that takes that record's uuid, sits where the record sat as the child of the boundary's entry, carries the record's text as its summary and tokensBefore from compactMetadata.preTokens, and keeps the record only as a block; it is not a message entry. Its first kept entry is the earliest in file order of compactMetadata.preservedMessages.uuids when that list is non-empty, otherwise the first record whose parent is the summary record, and when there is none nothing is kept and firstKeptEntryId is the empty string, which keeps Pi's string type and is the only value that names no entry, so a compaction never names itself; anchorUuid is not used. A compact_boundary with no isCompactSummary record under it is not a compaction the harness completed: it stays a lys.harness_event, no summary is invented, and the listing reports it as a boundary without a summary. A legacy summary record keeps the entry its leafUuid names. A first kept entry not on record is refused by uuid. A logicalParentUuid naming no record is not refused. The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record holding the summary, then the kept entries, never the legacy summary line and never a custom entry. Rejected: bounding the kept range by anchorUuid; keeping the summary record as a message entry beside the compaction (the summary would be read twice); placing the compaction off the chain or re-parenting the next message (HOME-001 R3's parent-equals-source acceptance stands with no exception); and rendering the legacy summary line, which the current Claude Code does not write.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
 > **Checklist:**
-> - C78 — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
-> - C79 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
-> - C80 — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
-> - C81 — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
-> - C82 — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+> - C78 — The context path of an imported compacted session is the compaction, then the kept entries preserved uuids included, then what follows; no span entry is on it and the summary text is on it once.
+> - C79 — lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held, and exits 0 only when nothing is missing and 1 when anything is, naming the first missing item; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.
+> - C80 — The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record, then the kept entries, with no legacy summary line and no lys.loss line, and the summary text once; the boundary record's uuid is derived under render-uuid/v2, alongside v1, whose non-boundary uuids equal v1's, and a render with no compaction stays v1, byte for byte, with the version it used named in its report.
+> - C81 — PROOF-COMPACTION.md records one real compact_boundary session imported read-only with its listing as counts and hashes and its source SHA-256 equal before and after, and a rendered compacted fixture resumed on Claude Code 2.1.283 answering from the summary, by hashes only.
+> - C82 — A compact_boundary with no isCompactSummary record under it imports as a lys.harness_event only, with no compaction and no lys.loss entry, and lys-home compactions reports it by entry id as a boundary without a summary.
 > **Stories:**
-> - S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+> - S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 > - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
 ## Purpose
@@ -53,7 +53,7 @@ Commit PROOF-GIVEN's measure fixture, byte for byte, as docs/design/home/proof-g
 - modify: docs/design/home/PROOF-GIVEN.md
 
 **Checklist:**
-- C81 — PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.
+- C81 — PROOF-COMPACTION.md records one real compact_boundary session imported read-only with its listing as counts and hashes and its source SHA-256 equal before and after, and a rendered compacted fixture resumed on Claude Code 2.1.283 answering from the summary, by hashes only.
 
 **Stories:**
 - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
@@ -82,10 +82,10 @@ WHEN resolve_given resolves the documents for a working directory, a config dire
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C78 — resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.
+- C78 — The context path of an imported compacted session is the compaction, then the kept entries preserved uuids included, then what follows; no span entry is on it and the summary text is on it once.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 
 ### R3: Assert the request's order in the given_tests.rs unit tests
 
@@ -101,10 +101,10 @@ In given_tests.rs, replace a_config_claude_md_is_listed_first_as_user_claude_md 
 - modify: crates/lys-home/src/harness/claude_code/given_tests.rs
 
 **Checklist:**
-- C79 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- C79 — lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held, and exits 0 only when nothing is missing and 1 when anything is, naming the first missing item; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 
 ### R4: Give the fixture test a user CLAUDE.md in its config directory and assert the request's order
 
@@ -123,10 +123,10 @@ In tests/given_record.rs, Fixture::new SHALL write a user CLAUDE.md into the con
 - modify: crates/lys-home/tests/given_record.rs
 
 **Checklist:**
-- C79 — The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.
+- C79 — lys-home compactions prints one JSON report of a session's compactions, each with its loss entry, the span's ids, counts and hashes and a check that every span entry is readable by id and every named block is held, and exits 0 only when nothing is missing and 1 when anything is, naming the first missing item; a compaction with no loss entry or pointing at itself is reported unaccounted by entry id.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 
 ### R5: State the one rule and the superseded order in RECORD.md
 
@@ -144,10 +144,10 @@ Rewrite the documents part of the lys.given paragraph in docs/design/home/RECORD
 - modify: docs/design/home/RECORD.md
 
 **Checklist:**
-- C80 — RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.
+- C80 — The Claude Code render writes a compaction as a compact_boundary record followed by an isCompactSummary user record, then the kept entries, with no legacy summary line and no lys.loss line, and the summary text once; the boundary record's uuid is derived under render-uuid/v2, alongside v1, whose non-boundary uuids equal v1's, and a render with no compaction stays v1, byte for byte, with the version it used named in its report.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 
 ### R6: Record the supersession on HOME-003 and render its markdown
 
@@ -164,10 +164,10 @@ Append one amendment to docs/design/home/briefs/HOME-003.json, as a new `amendme
 - modify: docs/design/home/briefs/HOME-003.md
 
 **Checklist:**
-- C82 — S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.
+- C82 — A compact_boundary with no isCompactSummary record under it imports as a lys.harness_event only, with no compaction and no lys.loss entry, and lys-home compactions reports it by entry id as a boundary without a summary.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
 
 ## Boundaries
 

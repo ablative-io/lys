@@ -75,6 +75,58 @@ THE SYSTEM SHALL package the maintained Rauthy at the pinned vendor/rauthy commi
 **Stories:**
 - S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: ID001_DEPLOY: crates/lys/tests/identity_deploy.rs:107 brings a fresh stack up on its own project and volumes (identity_support/mod.rs Stack::up), asserts the compose services are exactly postgres/rauthy/spicedb/spicedb-migrate, and waits for Rauthy /auth/v1/health and SpiceDB /healthz. Restart is identity_restart.rs:45: issuer, JWKS kids, clients and credentials are unchanged after down/up. Met in code; measured only on the identity leg.
+
+ID001_DEPLOY_REFUSAL: identity_refusals.rs:73 covers a missing secret (compose names identity_secret_missing - IDENTITY_RAUTHY_DB_PASSWORD; configure names secret_missing: rauthy_api_key). identity_refusals.rs:106 covers invalid issuer and redirect (prepare exits 1 with error: invalid_issuer / invalid_redirect_uri and writes no state). identity_refusals.rs:34 covers an unavailable database: Rauthy never answers and health names database_unreachable. Met in code; identity leg.
+
+Report: docs/design/identity/reports/IDENTITY-001-deployment.md records digests, versions, resolved config without secrets and the backup/restore result, and states that no directory exists yet. Met.
+
+ID001_SHARED_DB: identity_shared_db.rs:79 covers both writes, both reopens, histories rauthy.refinery_schema_history and spicedb.alembic_version, public empty, SHOW search_path per role, permission denied both ways, then restore of dump plus rauthy-data cache volume plus state_dir keys and repeated readiness. The manual trial reproduced the isolation and restore. Identity leg.
+
+ID001_PIN_CLONE: identity_deploy.rs:220 git-fetches the pushed HEAD from origin into a tempdir, runs submodule update --init --recursive, checks vendor/rauthy HEAD equals versions.json commit, then runs merge-base --is-ancestor against a treeless clone of the fork's ablative branch. It needs HEAD to be pushed; venue only.
+
+192.0.2.10: identity_refusals.rs:34 uses fixtures.rs to copy the example with host 192.0.2.10, compose.rs::render to run prepare, and compose.rs::config to read docker compose config. It asserts PG_HOST, both SpiceDB URI hosts and the absence of postgres, and that health names 192.0.2.10:5432 database_unreachable and never 127.0.0.1:<local port>. Identity leg.
+
+Clippy/test on the identity targets: gates.sh:26-37 runs the exact command with no -A/-W/--cap-lints, and runs the tests only after it. I have not run either, and the integration targets have never been compiled (test = false keeps them out of every hook and workspace build). Unverified until the identity leg runs.
+
+cargo test --workspace: crates/lys/Cargo.toml:41-69 declares test = false, so no identity target is built or run. Met.
+
+With docker absent from PATH, `docker info` fails, gates.sh:28 prints container_runtime_missing, the leg returns 1 and status becomes 1. An unused variable in identity_restart.rs fails clippy -D warnings at gates.sh:31, which names the file, and the leg returns before cargo test. Met by construction; not executed.
+
+CLAUDE.md:102 is the single added line naming both commands. Met.
+- Deviation: 1. The Rauthy image is upstream's ghcr.io/sebadob/rauthy:0.36.2 release image, pinned by digest, not a build of vendor/rauthy. The pin dd61ac3c is exactly the v0.36.2 tag commit and the fork carries no change yet; this is recorded in versions.json and the report.
+2. PostgreSQL is pulled from the public.ecr.aws mirror of the official image, with the same index digest as docker.io. On this machine Docker Hub pulls fail at the keychain credential helper.
+3. Before writing code I brought the stack up once by hand on this Mac with throwaway random credentials (generated ad hoc, then deleted) and probed it with curl and psql, to confirm the packaging. This was a development install, not a build or test command, and it is disclosed in the report.
+4. CN1 ('documents only') contradicts this brief's own file lists; I followed the requirements' file lists.
+5. The 'unavailable database' refusal is shown by compose refusing to start Rauthy after SpiceDB's migration fails, plus health naming the database, rather than by a running Rauthy reporting a DB error.
+- Files changed:
+  - created: `deploy/identity/compose.yaml` — Four services: postgres (profile local-database, runs postgres-init.sql through /docker-entrypoint-initdb.d, healthcheck over TCP), spicedb-migrate (datastore migrate head), spicedb serve and rauthy (HIQLITE=false, PostgreSQL datastore). Images are pinned by digest. Every value is interpolated with ${VAR:?identity_secret_missing|identity_config_missing - ...}, so compose refuses a missing value by name. Startup order is database, then SpiceDB migration, then Rauthy and SpiceDB.
+  - created: `deploy/identity/versions.json` — Releases, index and platform digests, the Rauthy fork/branch/commit dd61ac3c, and the 2026-09-27 release and advisory check with the accepted v0.36.2 exception.
+  - created: `deploy/identity/postgres-init.sql` — Creates the identity_rauthy and identity_spicedb login roles (least privilege, passwords read with \getenv), one owned schema each, per-role search_path, and revokes PUBLIC on the database, public schema and both schemas. Stops by name (identity_secret_missing) if a value is absent.
+  - created: `deploy/identity/config.example.toml` — Deployment configuration with no secrets. The database host is configuration ('postgres' means the local service; anything else is external). It documents the local http loopback origin and the TLS origin behind a trusted proxy, plus the two clients.
+  - created: `deploy/identity/README.md` — Documents the release/advisory check, config, prepare, start and migration order, readiness, configure, the named-failures table, stop/start, and backup/restore. Backup covers the dump plus the state_dir keys/config and the rauthy-data Hiqlite cache volume. Also holds the R4 sentence and the gate section.
+  - created: `docs/design/identity/reports/IDENTITY-001-deployment.md` — Records artifacts, digests, versions, the advisory check and accepted exception, resolved config without secrets, and the manual trial's readiness, isolation, backup/restore and unavailable-database outcomes. It separates the trial from the gate's measured proof and claims no directory.
+  - created: `crates/lys/tests/identity_deploy.rs` — ID001_DEPLOY readiness; configure twice (first run through a proxy that loses the first create response); health captured without secrets; health per stopped service; ID001_PIN_CLONE fresh fetch plus submodule and ancestry check on ablative; no other service among the images.
+  - created: `crates/lys/tests/identity_refusals.rs` — ID001_DEPLOY_REFUSAL: with host 192.0.2.10, compose config resolves PG_HOST and both SpiceDB URIs to that host and omits postgres; up fails and health names database_unreachable at 192.0.2.10:5432 with no local address. Also a missing env secret named by compose, a missing API key named by configure, and invalid issuer/redirect named by prepare with nothing written.
+  - created: `crates/lys/tests/identity_shared_db.rs` — ID001_SHARED_DB: Rauthy writes (configure) and SpiceDB writes (fixture schema plus relationship). Checks the two migration histories in separate schemas, empty public, per-role search_path, and cross-schema reads denied both ways. Restarts and reads back, then dumps the DB and cache volume, destroys the volumes, restores, and repeats readiness with clients, relationship and JWKS intact.
+  - created: `crates/lys/tests/identity_restart.rs` — ID001_DEPLOY restart: down (keeping volumes) then up preserves issuer, signing keys, clients and credentials; configure afterwards changes nothing.
+  - created: `crates/lys/tests/identity_support/mod.rs` — Stack: a fresh fixture rendered via prepare, compose up, wait for readiness, configure, restart, authenticated Rauthy admin requests, down -v on drop.
+  - created: `crates/lys/tests/identity_support/fixtures.rs` — A per-test venue: copies config.example.toml, edits only the project, free ports and database host, runs the lys binary, and reads generated credentials for 8-byte-window leak checks.
+  - created: `crates/lys/tests/identity_support/server.rs` — An independent std::net HTTP/1.1 client (chunked-aware), readiness polling, and Rauthy/SpiceDB health probes.
+  - created: `crates/lys/tests/identity_support/compose.rs` — render() runs lys identity prepare into the env compose interpolates. Compose wraps docker compose (run, config JSON, psql inside the postgres container, pg_dump/pg_restore, down).
+  - modified: `crates/lys/Cargo.toml` — [[test]] entries with test = false for identity_deploy, identity_refusals, identity_shared_db, identity_restart and identity_theme (the dependency additions are R2's).
+  - modified: `.land/gates.sh` — New identity_leg: fails by the name container_runtime_missing when docker info does not answer; otherwise runs cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings and only on success cargo test -p lys --all-features --test 'identity_*'. Runs on every landing.
+  - modified: `CLAUDE.md` — Exactly one line added to the gates block, naming both identity-leg commands.
+- Checklist delivery:
+  - [x] C7 — Rauthy, SpiceDB and one PostgreSQL service and database are packaged and installed for development, with separate roles and schema namespaces, the database address as configuration, and readiness, restart, named refusals, the shared database and restore proved (ID001_DEPLOY, ID001_DEPLOY_REFUSAL, ID001_SHARED_DB, ID001_PIN_CLONE). — Packaging, roles/schemas, the database address as configuration, readiness/restart/refusals/shared DB/restore and the pin-clone tests are all written. The container-backed proof runs only on the identity leg, which I have not run, and those targets are not yet compiled.
+- Story delivery:
+  - [x] S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold. — The operator chooses the database host in config (an external host is never replaced by a local one), restarts with down/up, and restores following README.md; the identity leg is what measures this.
+
 ### R2: Prepare, configure and check the deployment from the lys CLI
 
 THE SYSTEM SHALL implement lys identity prepare, configure and health in the existing lys CLI with exactly revision 5's module manifest (docs/design/identity/briefs/IDENTITY-001.json:154-166): mod.rs declarations and re-exports only; cli.rs the identity subcommand arguments; config.rs typed deployment configuration and validation with no secret value in diagnostics; credentials.rs Zeroizing, redacted credential material and its stable reuse; private_files.rs restricted-mode durable file creation and outcome reconciliation; prepare.rs validating inputs and materialising the declared private artifacts; configure.rs idempotent client and theme reconciliation with stable operation identifiers; rauthy.rs typed Rauthy API requests and responses, named status errors and read-back after an uncertain outcome; health.rs named readiness checks for the declared services; error.rs typed errors carrying operation, resource and path, never secret bytes; themes.rs is R3's. configure SHALL register separate platform and Cambium OIDC clients with exact redirect URIs and RS256 where the Cambium verifier requires it, and the platform's own confidential client with S256 as revision 5 proposes (docs/design/identity/briefs/IDENTITY-001.json:138, docs/design/identity/briefs/IDENTITY-001.json:39). Google and GitHub federation credentials belong to Rauthy; Google API consent remains a different client purpose. Generated credentials stay out of Git and logs, and health output excludes secrets. No Python or shell provisioning engine: health.sh and the external tests/identity_deployment are replaced by these subcommands and Rust integration tests (docs/design/identity/briefs/IDENTITY-001.json:19, docs/design/identity/briefs/IDENTITY-001.json:140). Unit tests sit in the sibling files config_tests.rs, credentials_tests.rs, error_tests.rs and prepare_tests.rs under crates/lys/src/identity/, the one addition this revision makes to the module manifest (CN9). configure SHALL manage exactly two clients, platform and Cambium, beside the built-in rauthy client the pinned Rauthy's own migration inserts, and SHALL NOT create, change or delete that built-in client. The three acceptance lines of this requirement that need a running Rauthy, PostgreSQL and SpiceDB (the capture of health output, configure run twice, and health per service) SHALL run in R1's container-backed target crates/lys/tests/identity_deploy.rs, only in the identity leg of .land/gates.sh under the test = false manifest entry R1 declares, and SHALL NOT run in cargo test --workspace --all-features; the Debug and Display redaction test and prepare's file-mode test stay in cargo test --workspace --all-features. No new test file is added under crates/lys/tests/.
@@ -116,6 +168,54 @@ THE SYSTEM SHALL implement lys identity prepare, configure and health in the exi
 **Stories:**
 - S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Redaction: crates/lys/src/identity/error_tests.rs:119 and credentials_tests.rs cover every IdentityError variant (counted, 20) and every credential type in Debug and Display, with no 8-byte run of any generated secret. They are in the workspace test run, and the hook reported them clippy-clean. Met.
+
+Health output captured without secrets: identity_deploy.rs:107 (end) runs health on a configured deployment and checks leaks against all credentials including kept client secrets. Health reads no credential by construction (health.rs). Identity leg.
+
+Private-file modes: prepare_tests.rs:45 reads each file's mode (0600) and the dirs' (0700), and asserts the file set equals declared_private_files() (10). prepare.rs also reconciles modes after every run. Met.
+
+Configure twice: identity_deploy.rs:107. The first run goes through a proxy that drops the first create's response and expects 'recovered client platform'. The second run expects every op unchanged/reused with identical op ids, including the themes. It asserts exactly {cambium, platform, rauthy}, the built-in rauthy JSON unchanged, and the configured redirect URIs, RS256 and S256-for-platform-only. Identity leg.
+
+Health per service: identity_deploy.rs:192 stops postgres, rauthy and spicedb in turn, expects 'service <name>: unready' and services_unready each time, and asserts the count equals the 3 declared services. Identity leg.
+
+Module manifest: exactly mod, cli, config, credentials, private_files, prepare, configure, rauthy, health, error and themes, plus the sibling *_tests.rs files. All are well under 500 code lines (largest config.rs, 404). Met.
+- Deviation: 1. Cargo.lock was updated by running `cargo metadata --offline`, a lockfile resolution rather than a build/format/lint/test command; I disclose it because the brief forbids other cargo commands.
+2. Adding the toml crate is R2's dependency change; R1 and R3 add none.
+3. configure speaks plain HTTP to Rauthy's published listener on the node; a TLS public origin terminates at the reverse proxy.
+4. configure refuses by name (unmanaged_clients) when Rauthy holds any client other than rauthy/platform/Cambium, rather than ignoring it.
+5. The bootstrap API key gets Clients read/create/update and Secrets read only, with no delete right.
+- Files changed:
+  - created: `crates/lys/src/identity/mod.rs` — Declarations and two re-exports (IdentityCommand, IdentityError) only.
+  - created: `crates/lys/src/identity/cli.rs` — Clap declarations for identity prepare/configure/health.
+  - created: `crates/lys/src/identity/config.rs` — Typed TOML deployment config with deny_unknown_fields, validated on load. Named failures: invalid_issuer, invalid_redirect_uri, invalid_config_value, builtin_client_reserved, duplicate_client_id. Exactly two clients by type; the database probe is the configured address, never a default.
+  - created: `crates/lys/src/identity/credentials.rs` — Secret in Zeroizing with Debug/Display <redacted>. Nine credential kinds are generated from the CSPRNG, written once at 0600 and reused; Rauthy-issued client secrets are kept once.
+  - created: `crates/lys/src/identity/private_files.rs` — 0600/0700 private files: atomic temp-plus-rename with fsync, a WriteOutcome (created/unchanged/replaced/reused), create_once race reconciliation, and refusal of group/other-readable files (private_file_too_open).
+  - created: `crates/lys/src/identity/prepare.rs` — Refuses a state_dir inside a Git work tree, generates or reuses credentials, renders identity.env (COMPOSE_PROFILES chosen by the database host), and reconciles every declared file's mode. Output is paths and outcomes only.
+  - created: `crates/lys/src/identity/configure.rs` — Refuses unmanaged clients, then reconciles the client, theme and secret of platform and Cambium. Operation ids are SHA-256 of the desired state. A lost response is settled by read-back and never becomes a second client. The built-in rauthy client is never touched and nothing is deleted.
+  - created: `crates/lys/src/identity/rauthy.rs` — Typed Rauthy client, theme and secret requests/responses over plain HTTP/1.1. Transport failures are split into not-sent and uncertain; statuses get names; server messages are scrubbed of the API key; the Authorization header is built in a zeroizing buffer.
+  - created: `crates/lys/src/identity/health.rs` — Named readiness checks for database (TCP to the configured probe), Rauthy (/auth/v1/health) and SpiceDB (/healthz only). Fails with services_unready naming each service; reads no credential.
+  - created: `crates/lys/src/identity/error.rs` — IdentityError: 20 named variants carrying operation/resource/path, never secret bytes.
+  - created: `crates/lys/src/identity/config_tests.rs` — Example loads; external host probed where configured; TLS origin needs a proxy; each invalid issuer and redirect refused (case counts asserted); reserved/duplicate ids; unknown keys; env-breaking values.
+  - created: `crates/lys/src/identity/credentials_tests.rs` — Debug/Display redaction of every credential; stable reuse; well-formed distinct values; too-open refusal; missing credential named.
+  - created: `crates/lys/src/identity/error_tests.rs` — Redaction test: all 20 variants, most produced by real failing operations (including an echoing server holding the generated API key), checked for any 8-byte run of any generated secret. An exhaustive match counts the variants.
+  - created: `crates/lys/src/identity/prepare_tests.rs` — Every declared private file exists at mode 0600 (dirs 0700) and the file set equals the declared set of 10; a second run is unchanged/reused; the env covers every compose variable; external host; API key has no delete right; Git refusal.
+  - modified: `Cargo.toml` — Workspace dependency toml 1 (parse, serde, std; no defaults).
+  - modified: `Cargo.lock` — Added toml 1.1.6 and its closure (toml_parser, toml_datetime, toml_writer, serde_spanned, winnow, indexmap, hashbrown, equivalent), plus lys edges to rand, sha2, toml and zeroize, all already locked. Resolved with `cargo metadata --offline`.
+  - modified: `crates/lys/Cargo.toml` — lys depends on rand, sha2, toml, zeroize (workspace).
+  - modified: `crates/lys/src/main.rs` — mod identity; dispatches Command::Identity to prepare/configure/health.
+  - modified: `crates/lys/src/cli.rs` — Adds the Identity subcommand.
+  - modified: `crates/lys/src/commands/error.rs` — CliError::Identity(#[from] IdentityError), transparent.
+  - created: `crates/lys/tests/identity_deploy.rs` — Carries R2's three container-backed lines (listed under R1).
+- Checklist delivery:
+  - [x] C8 — lys identity prepare, configure and health exist in the CLI exactly as revision 5's module manifest names them, register the platform and Cambium clients idempotently, and keep every secret out of Git, logs, errors and health output. — The CLI matches the manifest, clients are reconciled idempotently, and secrets stay out of Git (state_dir refused inside Git), logs, errors (tested) and health output. The container-backed lines are measured on the identity leg.
+- Story delivery:
+  - [x] S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold. — The operator prepares, configures and checks the standalone product from the lys CLI alone.
+
 ### R3: Theme both Rauthy clients with Aion's vocabulary and each product's own accent
 
 THE SYSTEM SHALL configure both Rauthy client themes, dark only (ADR-021), from Aion's pinned neutral and text vocabulary and each client's own product accent (ADR-010): the Cambium client green, the identity client the identity orange. A Rauthy field takes an estate token only where the estate names the same role: in dark mode it SHALL set text from the estate token text, bg from ink, bg_high from raised and accent from the client's product accent, as HSL in deploy/identity/rauthy-themes.json, and SHALL NOT map text to muted. Every other field is a gap that keeps Rauthy's own default and that nothing reads: it SHALL NOT set the light fields, the dark error, the border radius, or the dark text_high, action, btn_text, theme_sun and theme_moon. deploy/identity/theme-map.md SHALL record every source token and colour conversion and name the eight gaps, light mode, the error colour, the radius, text_high, action, btn_text, theme_sun and theme_moon, citing ADR-021; the count is eight rather than the six first named because the pinned Rauthy's theme also carries theme_sun and theme_moon per mode, for which the estate names no token. The themes are read and validated by crates/lys/src/identity/themes.rs, with its unit tests in the sibling crates/lys/src/identity/themes_tests.rs, and it SHALL verify readable contrast (docs/design/identity/briefs/IDENTITY-001.json:139). Readable contrast is WCAG 2.1 AA: a ratio of at least 4.5 to 1 for body text and 3 to 1 for large text, icons and interface components, computed with the WCAG relative-luminance formula over the pairs the acceptance names, a gap field measured at the pinned Rauthy's own default. A gap field whose default fails over ink stays a gap: the requirement stops and names the failing pair (CN9) rather than choosing a value the estate does not name, and the fix is a token the design-system card names. The manifest crates/lys/Cargo.toml SHALL declare a [[test]] entry with test = false for identity_theme, so cargo test --workspace --all-features does not run it and it runs only on the identity leg of .land/gates.sh; this requirement SHALL NOT add a dependency to any manifest or to Cargo.lock. Fonts and page layout remain Rauthy's; no font or layout patch and no cross-application build dependency enters the fork. The colour values are read from the estate colour tokens, docs/design-system-v2/palette/estate-colour-tokens.json in the ablative docs repository (owner: Waffles, who added the identity entry at ablative-docs 385916e; docs/design/identity/briefs/IDENTITY-001.json:44); that file is another repository's, is read and never changed, and is named here rather than listed in files (CN4). Its purple status token is not copied.
@@ -142,6 +242,35 @@ THE SYSTEM SHALL configure both Rauthy client themes, dark only (ADR-021), from 
 **Stories:**
 - S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: ID001_THEME: identity_theme.rs:162 compares each client's exported dark text/bg/bg_high/accent to the mapping, the six dark gaps, all light fields and border_radius to the pinned v0.36.2 defaults, and checks both persist through a restart. The six-pair WCAG check is identity_theme.rs:137, computed from the export. It prints the source ref and the export without credentials. Identity leg.
+
+Contrast leg: identity_theme.rs:137 is the only test matching the filter 'contrast'. It prints 12 lines of pair, ratio to 2 dp and tier, then 'contrast: 12 pairs measured, 12 at or above their tier', and fails naming any pair below its tier with the ratio. Measured offline against the pinned defaults: 16.25, 13.48, 15.61, 9.87, 5.24, and 5.83 (platform) / 3.97 (Cambium); no gap fails over ink, so no CN9 stop. Identity leg.
+
+Accents: themes_tests.rs:51 and identity_theme.rs:193 check Cambium is #5E8C6A (products.cambium.accent) and identity is #D4975A, neither is Aion blue #6B96D1, and no 'purple' or #A78BFA appears in rauthy-themes.json. Met (the unit test is in the workspace run).
+
+theme-map.md: themes_tests.rs:154 parses the Gaps table: exactly the eight names, each 'Rauthy's own default', and ADR-021 is cited. Met.
+
+identity_theme is excluded from the workspace test run (test = false) and runs on the identity leg. Met by manifest; the leg is not run.
+
+Ledger carry-check: comparing docs/design/decisions.json and roadmap.json against f407d5f~1 by id with sorted-key serialisation finds nothing missing or changed, exactly one extra each (ADR-021, RM-014) and no duplicates. This row does not change either ledger. There is no local main ref, so I compared against the brief commit's parent rather than main at src.
+- Deviation: The source values were read from the design-system repository's copy of palette/estate-colour-tokens.json (blob 69743ff), because ablative-docs 385916e is not available locally. The identity values match the brief's cited #D4975A/#A86B2E/#3D2A17, and the mapping records ablative-docs 385916e as the source ref the brief names.
+- Files changed:
+  - created: `deploy/identity/rauthy-themes.json` — Dark-only mapping: text from foundation.text, bg from foundation.ink, bg_high from foundation.raised, accents from products.identity.accent (#D4975A, platform) and products.cambium.accent (#5E8C6A), each with hex and HSL. Cites ablative-docs 385916e and owner Waffles; no purple.
+  - created: `deploy/identity/theme-map.md` — Source tokens, worked hex-to-HSL conversions, and the eight gaps (light mode, error colour, radius, text_high, action, btn_text, theme_sun, theme_moon), each keeping Rauthy's own default. Includes the pinned defaults, cites ADR-021, and records all 12 contrast ratios.
+  - created: `crates/lys/src/identity/themes.rs` — Loads and validates the mapping: schema, ADR-021, source, token roles, HSL equal to the rounded hex conversion, no Aion blue, no purple. apply() sets only the four mapped dark fields and echoes every gap Rauthy holds. The WCAG 2.1 measure covers six pairs per client with CSS var/alpha resolution; check_contrast refuses a pair below its tier by name and ratio.
+  - created: `crates/lys/src/identity/themes_tests.rs` — Mapping and source; accents; apply sets exactly four fields against pinned defaults; 12 measured pairs match theme-map.md; a failing pair is named; WCAG extremes; a drifted conversion is refused; theme-map.md names exactly the eight gaps.
+  - created: `crates/lys/tests/identity_theme.rs` — Container-backed. contrast prints 12 pair lines and 'contrast: 12 pairs measured, 12 at or above their tier' from Rauthy's exports, using its own WCAG implementation. id001_theme_mapping_and_gaps_persist_after_restart checks the mapping, gaps and light mode against pinned defaults, prints the exports, restarts and compares.
+  - modified: `crates/lys/Cargo.toml` — [[test]] identity_theme with test = false.
+- Checklist delivery:
+  - [x] C9 — Both Rauthy client themes carry Aion's neutral vocabulary with each product's own accent, Cambium green and the identity orange (ID001_THEME). — Both themes carry the estate neutrals and their own accents, with contrast measured. The live-export proof runs on the identity leg.
+- Story delivery:
+  - [x] S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold. — The standalone product's sign-in pages carry the estate design with no Cambium or Aion build dependency.
+
 ### R4: State what SpiceDB enforces in step 1, and hold to it
 
 SpiceDB's step-1 role, in one sentence: in step 1 SpiceDB is installed, migrated, backed up and health-checked against the shared PostgreSQL database, and it enforces nothing, because no component asks it for a permission decision or writes a grant to it, and live capability policy and its enforcement stay with road step 2 (docs/design/identity/briefs/IDENTITY-001.json:30; docs/design/identity/STATEMENT-2026-09-22.md:143). What it does not do in step 1: it answers no check for any identity, it holds no grant or relationship of the directory, the lifecycle state recorded by DIRECTORY-003 gates nothing through it, and running it is not permission enforcement. THE SYSTEM SHALL write that sentence into deploy/identity/README.md, and SHALL NOT add to crates/lys/src/identity/ any SpiceDB permission check, relationship write or schema write; health reads SpiceDB's readiness only. Relationships a test writes to prove ID001_SHARED_DB are test fixtures, not grants.
@@ -158,6 +287,22 @@ SpiceDB's step-1 role, in one sentence: in step 1 SpiceDB is installed, migrated
 
 **Stories:**
 - S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: README.md:24: "SpiceDB's step-1 role: in step 1 SpiceDB is installed, migrated, backed up and health-checked against the shared PostgreSQL database, and it enforces nothing, because no component asks it for a permission decision or writes a grant to it, and live capability policy and its enforcement stay with road step 2." Met.
+
+A search of crates/lys/src/identity/ (non-test) finds SpiceDB only in config.rs (SpicedbSection, its publish addresses), credentials.rs/prepare.rs (the role password and preshared key, which are service configuration), and health.rs (GET /healthz only). There is no permission check, relationship write or schema write. The fixture relationship and schema writes live only in crates/lys/tests/identity_shared_db.rs as test fixtures. Met.
+- Deviation: (none)
+- Files changed:
+  - created: `deploy/identity/README.md` — The 'What SpiceDB does in step 1' section carries the R4 sentence word for word (README.md:24) plus the list of what it does not do.
+- Checklist delivery:
+  - [x] C10 — SpiceDB's step-1 role is written down and held: installed and checked, asked for no decision, holding no grant. — The sentence is written and held: no SpiceDB decision or write call exists in crates/lys/src/identity/.
+- Story delivery:
+  - [x] S3 (Operator, Installs and runs the standalone identity product) — As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold. — The operator knows SpiceDB runs and is backed up but enforces nothing in step 1.
 
 ## Boundaries
 

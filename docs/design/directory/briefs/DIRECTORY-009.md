@@ -15,16 +15,16 @@ title: Start the pinned Rauthy against a scratch PostgreSQL in a demand gate leg
 > - ADR-005 — The identity database is PostgreSQL, possibly on a network device — PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.
 > - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 > **Checklist:**
-> - C31 — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
-> - C32 — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
-> - C33 — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
-> - C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
-> - C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+> - C31 — scripts/design/render-brief.py is byte-identical to the design-system method's scripts/render-brief.py at the method commit that lands the prose-list rule, and scripts/design/SOURCE.md names that commit for render-brief.py.
+> - C32 — A brief's blocked_by, and any other list field whose entries are not all bare ids, renders as its label followed by one Markdown list item per entry, in JSON order, each item's text byte-equal to its entry.
+> - C33 — A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field.
+> - C34 — Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged.
+> - C35 — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails.
 > - C36 — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
 > - C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
 > **Stories:**
-> - S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
-> - S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+> - S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
+> - S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
 
 ## Purpose
 
@@ -57,13 +57,13 @@ WHEN python3 scripts/identity-gates/rauthy_ready.py runs, THE SYSTEM SHALL do th
 - create: scripts/identity-gates/rauthy_ready.py
 
 **Checklist:**
-- C33 — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
-- C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
-- C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+- C33 — A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field.
+- C34 — Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged.
+- C35 — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails.
 
 **Stories:**
-- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
-- S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+- S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
+- S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
 
 ### R2: Run the leg against a stub runtime in a round-leg test, counting refusals, cleanup, the probe and every secret it searched for
 
@@ -87,12 +87,12 @@ THE SYSTEM SHALL add the Rust integration test crates/lys/tests/rauthy_ready_leg
 - create: crates/lys/tests/rauthy_ready_leg.rs
 
 **Checklist:**
-- C34 — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
-- C35 — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
+- C34 — Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged.
+- C35 — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails.
 - C36 — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
 
 **Stories:**
-- S14 (Operator, Runs the Rauthy readiness leg at the venue) — As the operator running the readiness leg, I want every missing prerequisite refused by name, so that I know exactly what to put in place and never mistake a skipped check for a pass.
+- S14 (Design gate maintainer, Keeps the repository's rendered documents what its renderer makes of their JSON) — As the maintainer of the design gate, I want the renderer in this repository to stay the method's copy and every rendered brief to be what it makes of its JSON, so that no .md disagrees with the script that made it and a card finished through the chain never turns the gate red.
 
 ### R3: Declare the leg in the lys design project file with cadence demand
 
@@ -108,11 +108,11 @@ docs/design/project.json gains exactly one leg, appended as the last entry of tr
 - modify: docs/design/project.json
 
 **Checklist:**
-- C31 — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
+- C31 — scripts/design/render-brief.py is byte-identical to the design-system method's scripts/render-brief.py at the method commit that lands the prose-list rule, and scripts/design/SOURCE.md names that commit for render-brief.py.
 - C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
 
 **Stories:**
-- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+- S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
 
 ### R4: Carry the same demand leg into the directory cluster's gate
 
@@ -128,11 +128,11 @@ docs/design/directory/design.json's gate gains the same leg, {"name": "rauthy-re
 - modify: docs/design/directory/DESIGN.md
 
 **Checklist:**
-- C32 — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
+- C32 — A brief's blocked_by, and any other list field whose entries are not all bare ids, renders as its label followed by one Markdown list item per entry, in JSON order, each item's text byte-equal to its entry.
 - C37 — .land/gates.sh is unchanged and no round-cadence leg is added.
 
 **Stories:**
-- S13 (Release reviewer, Closes the release's missing Rauthy check with a measurement) — As the release reviewer, I want a gate leg I can ask for that starts the pinned Rauthy against a scratch database and passes only when it answers ready, so that the release's Rauthy blocker is closed by a measured result rather than a claim.
+- S13 (Brief reader, Reads a rendered brief before it is dispatched or built) — As a reader of a rendered brief, I want each blocker and each other prose entry on its own line in the order the brief gives them, so that I can tell where one entry ends and the next begins.
 
 ## Boundaries
 
