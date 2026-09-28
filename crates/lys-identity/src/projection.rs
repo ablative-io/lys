@@ -122,11 +122,21 @@ impl Projection {
         let identity = event.identity();
         let held = self.records.get(&identity);
         match event.change() {
-            Change::RegisterPerson { .. } | Change::RegisterAgent { .. } if held.is_some() => {
+            Change::SetupPerson { .. }
+            | Change::RegisterPerson { .. }
+            | Change::RegisterAgent { .. }
+                if held.is_some() =>
+            {
                 Err(IdentityError::AlreadyRegistered {
                     identity: identity.to_string(),
                 })
             }
+            Change::SetupPerson { .. } => match self.bindings.get(event.actor().binding()) {
+                Some(person) => Err(IdentityError::AlreadyBootstrapped {
+                    person: person.to_string(),
+                }),
+                None => Ok(()),
+            },
             Change::RegisterPerson { .. } => Ok(()),
             Change::RegisterAgent { responsible, .. } => {
                 if self.records.contains_key(&IdentityId::Person(*responsible)) {
@@ -179,6 +189,18 @@ impl Projection {
         self.operations.insert(event.operation(), index);
         let registered_by = event.actor().binding().clone();
         match event.change() {
+            Change::SetupPerson { profile } => {
+                let IdentityId::Person(person) = identity else {
+                    return Err(IdentityError::ChangeMismatch {
+                        reason: "setup names a person",
+                    });
+                };
+                let mut record = fresh(profile, None, registered_by.clone(), index);
+                record.state = LifecycleState::Active;
+                record.bindings.push(registered_by.clone());
+                self.records.insert(identity, record);
+                self.bindings.insert(registered_by, person);
+            }
             Change::RegisterPerson { profile } => {
                 self.records
                     .insert(identity, fresh(profile, None, registered_by, index));

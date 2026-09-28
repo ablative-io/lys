@@ -88,7 +88,9 @@ fn profile(out: &mut Vec<u8>, value: &Profile) {
 
 fn change(out: &mut Vec<u8>, value: &Change) {
     match value {
-        Change::RegisterPerson { profile: shown } | Change::ChangeProfile { profile: shown } => {
+        Change::SetupPerson { profile: shown }
+        | Change::RegisterPerson { profile: shown }
+        | Change::ChangeProfile { profile: shown } => {
             map(out, 1);
             uint(out, 1);
             profile(out, shown);
@@ -259,6 +261,12 @@ fn state(value: &Value) -> Result<LifecycleState, IdentityError> {
 fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
     const TEXT: &str = "a change field is text";
     match kind {
+        wire::SETUP_PERSON => {
+            let [shown] = fields::<1>(value, "a setup is a map of key 1")?;
+            Ok(Change::SetupPerson {
+                profile: decode_profile(shown)?,
+            })
+        }
         wire::REGISTER_PERSON => {
             let [shown] = fields::<1>(value, "a person registration is a map of key 1")?;
             Ok(Change::RegisterPerson {
@@ -314,7 +322,7 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
                 as_uint(&observed_at, "an observation time is seconds")?,
             )?))
         }
-        _ => Err(malformed("a change kind is 1 to 6")),
+        _ => Err(malformed("a change kind is 1 to 7")),
     }
 }
 

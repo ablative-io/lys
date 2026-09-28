@@ -105,6 +105,7 @@ export interface ReceiptAnswer {
 
 /** `event::wire` change kinds. */
 export const CHANGE_KINDS: Readonly<Record<number, string>> = {
+  7: 'Setup completed',
   1: 'registered',
   2: 'registered, under its person',
   3: 'profile changed',
@@ -122,3 +123,13 @@ export interface SignedIn {
 export type IdentityKind = 'person' | 'agent';
 
 export const kindOf = (id: IdentityId): IdentityKind => (id.startsWith('agent-') ? 'agent' : 'person');
+
+/** GET /identities/{id}: record_json in crates/lys-identity-server/src/routes.rs. Administrator only. */
+export interface DirectoryRecord {
+  id: IdentityId;
+  display_name: string;
+  state: LifecycleState;
+  responsible: IdentityId | null;
+  logins: { issuer: string; subject: string }[];
+  events: number[];
+}

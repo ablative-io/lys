@@ -96,6 +96,12 @@ fn every_change() -> Result<Vec<IdentityEvent>, IdentityError> {
         )?,
         event(
             person,
+            Change::SetupPerson {
+                profile: Profile::new("Tom")?,
+            },
+        )?,
+        event(
+            person,
             Change::LinkAudit(LinkObservation::new(
                 "source-op-1",
                 LinkChange::Linked,
@@ -125,7 +131,7 @@ fn every_change_signs_and_verifies_to_the_same_event_and_bytes() -> TestResult {
         );
         verified += 1;
     }
-    assert_eq!(verified, 7);
+    assert_eq!(verified, 8);
     Ok(())
 }
 

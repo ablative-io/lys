@@ -1,3 +1,6 @@
+import { api, useLoad } from '../../api';
+import type { ReceiptAnswer } from '../../generated';
+import { Gate } from '../signin/Gate';
 import type { ReactNode } from 'react';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
@@ -153,14 +156,26 @@ function Table({ heads, note, title, why }: { heads: string[]; note: string; tit
 }
 
 function Record({ data }: { data: FileData }) {
-  const { agent, receipts } = data;
+  if (!data.agent) return <PersonRecord id={data.x.id} />;
+  return <RecordView receipts={data.receipts} />;
+}
+
+function PersonRecord({ id }: { id: string }) {
+  const load = useLoad(async () => {
+    const record = await api.identity(id);
+    return Promise.all(record.events.map((index) => api.receipt(index)));
+  }, 'person-record:' + id);
+  return <Gate load={load} title="Directory record" ok={(receipts) => <RecordView receipts={receipts} />} />;
+}
+
+function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
   return (
     <div className="grid2">
       <div>
         <div className="card">
           <h2>Lifecycle</h2>
           <div className="sec" style={{ marginBottom: 10 }}>registered → active ⇄ suspended → retired</div>
-          {agent ? (
+          {receipts.length ? (
             <div className="timeline">
               {receipts.map((r, i) => (
                 <div className={'tl' + (i === receipts.length - 1 ? ' now' : '')} key={r.receipt.log.index}>
@@ -173,7 +188,7 @@ function Record({ data }: { data: FileData }) {
               ))}
             </div>
           ) : (
-            <NotBuilt>The directory&apos;s view of a person does not carry its events yet.</NotBuilt>
+            <p className="note">No recorded changes were returned for this identity.</p>
           )}
         </div>
       </div>

@@ -111,6 +111,12 @@ impl LinkObservation {
 /// One change to the directory.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Change {
+    /// First-run person creation, active and bound to the event's authenticated actor.
+    /// Admission as the configured administrator belongs to the service.
+    SetupPerson {
+        /// The person's display name.
+        profile: Profile,
+    },
     /// A person is registered with a display profile.
     RegisterPerson {
         /// How the person is shown.
@@ -161,7 +167,7 @@ pub struct IdentityEvent {
 /// Refuse `change` if it does not fit `identity`.
 fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError> {
     match (change, identity) {
-        (Change::RegisterPerson { .. }, IdentityId::Agent(_)) => {
+        (Change::RegisterPerson { .. } | Change::SetupPerson { .. }, IdentityId::Agent(_)) => {
             Err(IdentityError::ChangeMismatch {
                 reason: "a person registration names a person",
             })
@@ -274,9 +280,12 @@ pub(crate) mod wire {
     pub(crate) const TRANSITION: u64 = 5;
     /// An accepted link-audit observation.
     pub(crate) const LINK_AUDIT: u64 = 6;
+    /// An active person bound to the authenticated actor, in one leaf.
+    pub(crate) const SETUP_PERSON: u64 = 7;
 
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
+            Change::SetupPerson { .. } => SETUP_PERSON,
             Change::RegisterPerson { .. } => REGISTER_PERSON,
             Change::RegisterAgent { .. } => REGISTER_AGENT,
             Change::ChangeProfile { .. } => CHANGE_PROFILE,

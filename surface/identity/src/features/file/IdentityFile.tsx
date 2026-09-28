@@ -79,9 +79,10 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
             <span className={'state ' + x.state} id="state">{x.state}</span>
             {ACTIONS[x.state].map((a) => (
-              <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={notBuilt(a[0].toUpperCase() + a.slice(1))}>
+              <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>
                 {a[0].toUpperCase() + a.slice(1)}
               </button>
             ))}

@@ -23,6 +23,7 @@ pub mod secrets_api;
 pub mod secrets_sign;
 pub mod session;
 pub mod sessions_api;
+pub mod setup;
 pub mod spicedb;
 mod spicedb_http;
 

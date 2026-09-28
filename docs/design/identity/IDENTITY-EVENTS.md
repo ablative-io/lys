@@ -44,6 +44,10 @@ A canonical CBOR map (RFC 8949 section 4.2: shortest heads, definite lengths, ke
 | 5 | lifecycle transition | `1` transition, `2` from, `3` to, `4` reason (text) | either |
 | 6 | link audit accepted | `1` source operation id (text), `2` change (`1` linked, `2` unlinked), `3` issuer, `4` subject, `5` observer (text), `6` observed-at (seconds) | a person |
 
+The first-administrator extension (28 September 2026, reviewed by Archie in Cambium post 70165f54c05389a20f1b03770e7e05683a40c548a7f6724cb604c81504e7ccd3) adds kind `7`, setup person, with map `1` profile, naming only a person. Kinds 1 through 6 and their signature-covered bytes remain unchanged. Older readers refuse kind 7; deployment requires a reader that supports it. Before the first live setup leaf is written, every installed log reader, including the server and development seed binary, must support kind 7. Once written, rollback to a reader without kind 7 is not supported; restoring an older executable alone is not recovery.
+
+Setup creates one new active person and binds exactly the event actor's issuer and subject in the same signed leaf. Its payload cannot nominate another login. The HTTP service admits only the configured administrator before calling this operation. It does not issue any resource grant. An existing binding refuses a new setup operation. Repeating the same operation, actor binding and profile returns the original receipt even after a new sign-in or restart; it does not change a subsequently suspended or retired identity. Reusing the operation for a different profile or actor refuses by name.
+
 A profile is the map `1` display name (text).
 
 Lifecycle states are `1` registered, `2` active, `3` suspended, `4` retired. Transitions are `1` activate, `2` suspend, `3` reinstate, `4` retire. A transition event is refused unless its `to` is the state the table gives from its `from`: activate is registered to active, suspend is active to suspended, reinstate is suspended to active, and retire is active or suspended to retired. Suspend and retire name a reason.

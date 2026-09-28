@@ -66,11 +66,13 @@ describe("An agent's file", () => {
     expect($$('.card a.mono').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
   });
 
-  it('says a lifecycle act is not built instead of pretending', async () => {
-    await mount('#/file/' + SCRIBE);
+  it('opens the lifecycle form without changing identity state before submission', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE);
     await click($('[data-act="suspend"]'));
-    expect($('#toast')?.textContent).toContain('not built');
-    expect($('#state')?.textContent).toBe('active');
+    expect(location.hash).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
+    expect(document.querySelector<HTMLSelectElement>('select[name="identity"]')?.value).toBe(SCRIBE);
+    expect($('form[aria-label="Record lifecycle change"]')).not.toBeNull();
+    expect(posted).toHaveLength(0);
   });
 
   it('answers an agent that is not visible as not found, with the refusal', async () => {

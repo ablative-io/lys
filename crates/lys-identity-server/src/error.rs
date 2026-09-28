@@ -27,6 +27,9 @@ pub enum ServerError {
     /// The caller is signed in through a login bound to no person, so no personal view is theirs.
     #[error("NoPerson: the signed-in login is bound to no person in the directory")]
     NoPerson,
+    /// The configured administrator has not completed their first-run identity setup.
+    #[error("SetupRequired: finish setting up your identity to continue")]
+    SetupRequired,
     /// The agent is not one the caller may see: the directory does not hold it, or it answers to another person.
     #[error("AgentNotVisible: no agent by that id is visible to the signed-in caller")]
     AgentNotVisible,
@@ -97,9 +100,10 @@ impl ServerError {
     fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn => StatusCode::UNAUTHORIZED,
-            Self::NotAdmitted { .. } | Self::NoPerson | Self::Withheld { .. } => {
-                StatusCode::FORBIDDEN
-            }
+            Self::NotAdmitted { .. }
+            | Self::NoPerson
+            | Self::SetupRequired
+            | Self::Withheld { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible | Self::GrantNotVisible | Self::SessionUnknown => {
                 StatusCode::NOT_FOUND
             }

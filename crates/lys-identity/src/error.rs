@@ -10,6 +10,12 @@ use crate::lifecycle::{LifecycleState, Transition};
 /// Errors returned by the directory's records and its event encoding.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum IdentityError {
+    /// The login already belongs to a person; setup cannot replace that identity.
+    #[error("AlreadyBootstrapped: this sign-in is already bound to person `{person}`")]
+    AlreadyBootstrapped {
+        /// The person already bound to the login.
+        person: String,
+    },
     /// The secure random source could not produce an identifier.
     #[error(
         "RandomSourceUnavailable: the secure random source could not produce an identifier: {reason}"

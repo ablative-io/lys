@@ -113,6 +113,7 @@ function Body({ w, mode, arg }: { w: GrantWorld; mode: string; arg?: string }) {
     <div className="page">
       <div className="eyebrow">Access</div>
       <h1>Access</h1>
+      <a className="btn primary" href="#/access/issue">Issue root grant</a>
       <p className="sub">Ask it any way round. Every answer traces to a person, or says why not.</p>
       <div className="seg" style={{ marginBottom: 14 }}>
         {segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}
