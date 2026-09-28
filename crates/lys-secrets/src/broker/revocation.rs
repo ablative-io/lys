@@ -131,7 +131,9 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     /// Records what the provider answered to revoking the grant behind the
-    /// dropped handle `id`: confirmed, or unconfirmed with the reason.
+    /// dropped handle `id`: confirmed, or unconfirmed with the reason. A
+    /// failed answer never moves a confirmed state back: once confirmed, it
+    /// stays confirmed and nothing is appended.
     ///
     /// # Errors
     ///
@@ -144,6 +146,11 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<(), SecretsError> {
         match answer {
             Ok(()) => self.deliver_upstream_ack(id).map(|_changed| ()),
+            Err(_reason)
+                if self.revocation_state(id)?.upstream == UpstreamRevocation::Confirmed =>
+            {
+                Ok(())
+            }
             Err(reason) => self.upstream_line(id, &format!("{UNCONFIRMED}: {reason}")),
         }
     }

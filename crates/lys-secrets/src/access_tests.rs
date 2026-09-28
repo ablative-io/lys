@@ -45,10 +45,18 @@ fn fixture() -> Result<(TempDir, Broker<LocalGrants>), Box<dyn Error>> {
     let sealed = [
         (A_PERSONAL, PERSON_A, Scope::Personal(PERSON_A.to_owned())),
         (A_TEAM, PERSON_A, Scope::Team(TEAM_A.to_owned())),
-        (A_ORG, PERSON_A, Scope::Organisation(ORGANISATION.to_owned())),
+        (
+            A_ORG,
+            PERSON_A,
+            Scope::Organisation(ORGANISATION.to_owned()),
+        ),
         (B_PERSONAL, PERSON_B, Scope::Personal(PERSON_B.to_owned())),
         (B_TEAM, PERSON_B, Scope::Team(TEAM_B.to_owned())),
-        (B_ORG, PERSON_B, Scope::Organisation(ORGANISATION.to_owned())),
+        (
+            B_ORG,
+            PERSON_B,
+            Scope::Organisation(ORGANISATION.to_owned()),
+        ),
     ];
     for (name, owner, scope) in sealed {
         let generated = format!("generated test value of {name}");
@@ -134,7 +142,10 @@ fn only_the_holder_and_the_person_acted_for_discover_a_lease_and_only_the_person
 #[test]
 fn a_team_secrets_record_carries_its_scope_and_its_team() -> TestResult {
     let (_dir, broker) = fixture()?;
-    let scope = broker.store().scope(B_TEAM).ok_or("b_team carries no scope")?;
+    let scope = broker
+        .store()
+        .scope(B_TEAM)
+        .ok_or("b_team carries no scope")?;
     assert_eq!(scope.kind(), "team");
     assert_eq!(scope.name(), TEAM_B);
     assert_eq!(scope, Scope::Team(TEAM_B.to_owned()));

@@ -52,7 +52,11 @@ fn conformance_7_6_a_revoke_stops_issuing_at_once_and_reads_upstream_pending() -
 
     assert!(world.ack(&l1)?, "the acknowledgement moves the state");
     assert_eq!(world.upstream(&l1)?, "confirmed");
-    assert_eq!(world.lines(&l1, CONFIRMED)?, 1, "one more line, for that move");
+    assert_eq!(
+        world.lines(&l1, CONFIRMED)?,
+        1,
+        "one more line, for that move"
+    );
     assert_eq!(world.lines(&l1, UNCONFIRMED)?, 1);
     Ok(())
 }
@@ -63,7 +67,10 @@ fn conformance_7_6_a_caller_who_cannot_discover_the_lease_learns_nothing() -> Te
     let l1 = world.issue(AGENT_A, A_ORG)?;
     let person_b = asker(PERSON_B, AskerKind::Person, &[TEAM_B]);
     let seen = names(&list(&world.broker, &person_b, Some("organisation")).1);
-    assert!(seen.contains(&A_ORG.to_owned()), "person_b sees a_org: {seen:?}");
+    assert!(
+        seen.contains(&A_ORG.to_owned()),
+        "person_b sees a_org: {seen:?}"
+    );
     let never = never_issued(&mut world)?;
 
     for caller in [PERSON_B, PERSON_C] {
@@ -72,18 +79,34 @@ fn conformance_7_6_a_caller_who_cannot_discover_the_lease_learns_nothing() -> Te
         assert_eq!(body["error"], "lease_not_found", "{body}");
         assert_eq!(body.to_string(), never.to_string(), "byte-identical");
         let text = body.to_string();
-        for named in [l1.id.as_str(), A_ORG, B_ORG, AGENT_A, PERSON_A, PERSON_B, PERSON_C] {
+        for named in [
+            l1.id.as_str(),
+            A_ORG,
+            B_ORG,
+            AGENT_A,
+            PERSON_A,
+            PERSON_B,
+            PERSON_C,
+        ] {
             assert!(!text.contains(named), "{named} named in {text}");
         }
         let (status, read) = world.read(caller, &l1);
         assert_eq!(status, 404, "{read}");
-        assert_eq!(read.to_string(), never.to_string(), "the read answers alike");
+        assert_eq!(
+            read.to_string(),
+            never.to_string(),
+            "the read answers alike"
+        );
     }
 
     let forwarded = world.forwarded;
     assert!(world.use_lease(&l1)?, "the lease keeps issuing");
     assert_eq!(world.forwarded, forwarded + 1);
-    assert_eq!(world.revoke_requests.len(), 0, "the system behind is not asked");
+    assert_eq!(
+        world.revoke_requests.len(),
+        0,
+        "the system behind is not asked"
+    );
     assert_eq!(world.lines(&l1, REVOKED)?, 0);
     Ok(())
 }
@@ -196,5 +219,23 @@ fn conformance_7_6_nothing_but_the_acknowledgement_confirms_a_revoked_lease() ->
     assert!(world.ack(&l1)?);
     assert_eq!(world.upstream(&l1)?, "confirmed");
     assert_eq!(world.lines(&l1, CONFIRMED)?, 1);
+    Ok(())
+}
+
+#[test]
+fn conformance_7_6_a_failed_provider_answer_never_unconfirms_a_confirmed_lease() -> TestResult {
+    let mut world = Leases::new()?;
+    let l1 = world.issue(AGENT_A, A_ORG)?;
+    let (status, body) = world.revoke(PERSON_A, &l1);
+    assert_eq!(status, 200, "{body}");
+    assert!(world.ack(&l1)?);
+    let before = world.broker.audit().len();
+
+    world
+        .broker
+        .record_upstream_revocation(&l1.id, Err("a late failure".to_owned()))?;
+    assert_eq!(world.upstream(&l1)?, "confirmed");
+    assert_eq!(world.broker.audit().len(), before, "nothing recorded");
+    assert_eq!(world.lines(&l1, UNCONFIRMED)?, 1);
     Ok(())
 }

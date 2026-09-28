@@ -51,10 +51,18 @@ pub fn world(dir: &Path, clock: Clock) -> Result<Broker<LocalGrants>, Failure> {
     let sealed = [
         (A_PERSONAL, PERSON_A, Scope::Personal(PERSON_A.to_owned())),
         (A_TEAM, PERSON_A, Scope::Team(TEAM_A.to_owned())),
-        (A_ORG, PERSON_A, Scope::Organisation(ORGANISATION.to_owned())),
+        (
+            A_ORG,
+            PERSON_A,
+            Scope::Organisation(ORGANISATION.to_owned()),
+        ),
         (B_PERSONAL, PERSON_B, Scope::Personal(PERSON_B.to_owned())),
         (B_TEAM, PERSON_B, Scope::Team(TEAM_B.to_owned())),
-        (B_ORG, PERSON_B, Scope::Organisation(ORGANISATION.to_owned())),
+        (
+            B_ORG,
+            PERSON_B,
+            Scope::Organisation(ORGANISATION.to_owned()),
+        ),
     ];
     for (name, owner, scope) in sealed {
         let generated = format!("generated test value of {name}");
@@ -67,7 +75,11 @@ pub fn world(dir: &Path, clock: Clock) -> Result<Broker<LocalGrants>, Failure> {
 /// The asker `identity` of `kind`, with `groups` injected as the group
 /// claims on its token.
 pub fn asker(identity: &str, kind: AskerKind, groups: &[&str]) -> Asker {
-    Asker::new(identity, kind, &json!({ "sub": identity, "groups": groups }))
+    Asker::new(
+        identity,
+        kind,
+        &json!({ "sub": identity, "groups": groups }),
+    )
 }
 
 /// `person_a` signed in, in `team_a` by one group.
