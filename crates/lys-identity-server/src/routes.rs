@@ -109,6 +109,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::read_api::routes())
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
+        .merge(crate::reviews_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::secrets_api::routes())
         .with_state(state)

@@ -17,6 +17,7 @@ pub mod oidc;
 pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
+pub mod reviews_api;
 pub mod routes;
 pub mod secrets_api;
 pub mod secrets_sign;

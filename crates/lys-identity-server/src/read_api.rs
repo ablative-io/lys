@@ -56,7 +56,7 @@ fn login(binding: &LoginBinding) -> Login {
     }
 }
 
-fn person_summary(id: PersonId, record: &Record) -> PersonSummary {
+pub(crate) fn person_summary(id: PersonId, record: &Record) -> PersonSummary {
     PersonSummary {
         id: id.to_string(),
         display_name: record.profile().display_name().to_owned(),
