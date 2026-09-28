@@ -3488,7 +3488,7 @@
       "brief": "DIRECTORY-059"
     },
     {
-      "path": "crates/lys-identity/tests/support/uncertain_store.rs",
+      "path": "crates/lys-identity/tests/uncertain_support/mod.rs",
       "note": "The receipts route answers a signed checkpoint",
       "brief": "DIRECTORY-058"
     },
