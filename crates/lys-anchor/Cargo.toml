@@ -61,6 +61,7 @@ unstable-anchor = ["lys-core/unstable-anchor"]
 federation = ["unstable-anchor"]
 
 [dependencies]
+chrono.workspace = true
 # Default features only — see [features] above for the measurement that says
 # why `unstable-anchor` is forwarded from this crate instead of being enabled
 # on this edge.

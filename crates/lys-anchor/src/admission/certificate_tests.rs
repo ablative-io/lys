@@ -12,10 +12,12 @@
 //!   is a perfectly valid certificate signed by a different key. That
 //!   distinguishes "this policy checks the chain" from "this policy checks that
 //!   the bytes parse".
-//! - **The passage of time.** One case waits for a certificate to expire rather
-//!   than asserting that expiry is handled. It is the only check here that can
-//!   tell a chain verification that consults the validity window from one that
-//!   does not.
+//! - **The passage of time, at named instants.** One case judges a
+//!   one-second certificate at two named instants — one inside its validity
+//!   window and one two seconds past issuance — rather than asserting that
+//!   expiry is handled. Its refusal is still the only check here that can tell
+//!   a chain verification that consults the validity window from one that does
+//!   not.
 //! - **The written contract on provenance.** [`RecognisedCertificate`]'s docs
 //!   say it admits from *both* arms of [`SubmitterContext`] and treats them
 //!   identically. [`both_provenances_are_admitted_identically`] holds the code
@@ -37,6 +39,7 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
+use chrono::TimeDelta;
 use lys_core::Ed25519Identity;
 use lys_core::ca::CertificateAuthority;
 use tempfile::TempDir;
@@ -187,22 +190,32 @@ fn an_expired_certificate_is_refused() {
         .unwrap();
     let policy = RecognisedCertificate::issued_by(ca.public_key_bytes());
 
-    // Positive control first: it is admitted while it is valid, so the refusal
-    // below is caused by the wait and not by the certificate never having
-    // worked.
+    // Issuance truncates both bounds to whole seconds, so `expires_at` less the
+    // one-second lifetime is exactly `notBefore`. Both instants below are named
+    // from it, so neither depends on how long issuance took.
+    let issued_at = short_lived.expires_at - TimeDelta::seconds(1);
+
+    // Positive control first: it is admitted inside its window, so the refusal
+    // below is caused by the instant it is judged at and not by the certificate
+    // never having worked.
     assert_eq!(
-        policy.admit(&statement(), &asserted(&short_lived.der_bytes)),
+        policy.admit_at(
+            &statement(),
+            &asserted(&short_lived.der_bytes),
+            issued_at + TimeDelta::milliseconds(500),
+        ),
         Ok(())
     );
 
-    // `notAfter` is truncated to whole seconds at issuance, so two seconds is
-    // unambiguously past it. This is the only check here that can distinguish a
-    // chain verification that consults the validity window from one that does
-    // not.
-    std::thread::sleep(Duration::from_millis(2100));
-
+    // Two seconds past issuance is unambiguously past `notAfter`. This is the
+    // only check here that can distinguish a chain verification that consults
+    // the validity window from one that does not.
     assert_eq!(
-        policy.admit(&statement(), &asserted(&short_lived.der_bytes)),
+        policy.admit_at(
+            &statement(),
+            &asserted(&short_lived.der_bytes),
+            issued_at + TimeDelta::seconds(2),
+        ),
         Err(NotAdmitted)
     );
 }
