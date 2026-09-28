@@ -52,7 +52,7 @@ publish_port = 55432
 
 [spicedb]
 # Loopback ports SpiceDB is published on. health reads /healthz on the HTTP port.
-grpc_port = 50051
+grpc_port = 58051
 http_port = 58443
 
 [credentials]

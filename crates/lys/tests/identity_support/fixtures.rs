@@ -75,7 +75,7 @@ impl Deployment {
             )
             .replace("8480", &ports.rauthy.to_string())
             .replace("55432", &ports.database.to_string())
-            .replace("50051", &ports.grpc.to_string())
+            .replace("58051", &ports.grpc.to_string())
             .replace("58443", &ports.http.to_string());
         let text = edit(text);
         let bundled = database_bundled(&text)?;

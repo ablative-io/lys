@@ -23,7 +23,7 @@ check_address = "127.0.0.1:55432"
 publish_port = 55432
 
 [spicedb]
-grpc_port = 50051
+grpc_port = 58051
 http_port = 58443
 
 [credentials]
