@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unreachable } from './harness';
-import { ADA, DIRECTORY, GRANTS, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
+import { ADA, DIRECTORY, GRANTS, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { DelegateBody } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
@@ -167,14 +167,13 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
 });
 
 describe("What you can't give (conformance 2.4)", () => {
-  it('lists each with its reason', async () => {
-    await mount('#/me');
+  it('lists each with its reason, as the service answers it', async () => {
+    const { requests } = await mount('#/me');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    expect(requests).toContain(`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`);
     const reasons = $$('#drawer .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
     expect(reasons).toEqual([
-      ['viewer of project:ledger', `You may use it; G/${LEDGER_G.slice(6, 14)} does not let you pass it on.`],
-      ['owner of project:identity', 'More than you hold.'],
-      ['Service accounts', 'A service-account record does not grant permission. Delegate access through a grant; manage account records in Service accounts.'],
+      ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
       ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
     ]);
   });

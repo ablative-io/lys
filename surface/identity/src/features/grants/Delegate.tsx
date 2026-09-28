@@ -6,7 +6,7 @@ import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
-import { CannotGive } from './CannotGive';
+import { CannotGiveList } from './CannotGiveList';
 import { grantNo, nameOf, onText, passText, relationsOf, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
@@ -30,13 +30,15 @@ type Outcome =
 const uncertain = (r: Refused) => r.status < 400 || r.status >= 500;
 
 /**
- * Give part of a grant to one of your agents (conformance 2.1 to 2.4). Every
- * decision is the service's: this form only asks, and shows its answer.
+ * Give part of a grant to one of your agents, or to a person (conformance 2.1
+ * to 2.4). Every decision is the service's: this form only asks, and shows its
+ * answer, including what the chosen recipient cannot be given.
  */
 export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant; to?: string; done: () => void }) {
   const shell = useShell();
   const me = w.me.person.id;
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
+  const people = [...w.who.entries()].filter(([id, x]) => x.kind === 'person' && id !== me && x.state !== 'retired');
   const relations = relationsOf(w);
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
@@ -69,7 +71,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
     const retry = pending.kind === 'held';
     const passOn: PassOn = pass === 'no' ? { kind: 'use_only' } : { kind: 'to', actions, recipients: ['agent'] };
     const body: DelegateBody = pending.kind === 'held' ? pending.body : {
-      operation: operationId(), route: 'browser', source: source.id, recipient, responsible: me,
+      operation: operationId(), route: 'browser', source: source.id, recipient, responsible: w.who.get(recipient)?.kind === 'person' ? recipient : me,
       resource: source.resource, relation, pass_on: passOn, window: { starts_at: now, ends_at: endFor(lasts) },
     };
     setOutcome({ at: 'sending' });
@@ -116,6 +118,13 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
           {agents.map(([id, x]) => (
             <option key={id} value={id}>{x.name}{x.state !== 'active' ? ' (' + x.state + ')' : ''}</option>
           ))}
+          {people.length > 0 ? (
+            <optgroup label="People">
+              {people.map(([id, x]) => (
+                <option key={id} value={id}>{x.name}{x.state !== 'active' ? ' (' + x.state + ')' : ''}</option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
       </div>
       <div className="field">
@@ -158,7 +167,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
         <div className="row"><span className="sec">Ends no later than <span className="open-q">illustrative</span></span><span>{ends !== null ? day(ends) + ', when yours does' : 'when yours ends or is revoked'}</span></div>
       </div>
-      <div className="card"><h2>What you can&apos;t give</h2><CannotGive w={w} source={source} /></div>
+      <div className="card"><h2>What you can&apos;t give</h2><CannotGiveList w={w} source={source} recipient={recipient} /></div>
       {outcome.at === 'refused' ? (
         <div className="why-not" id="dAnswer"><b>{outcome.refused.refusal.refusal}</b><div className="note">{outcome.refused.refusal.reason}</div></div>
       ) : null}

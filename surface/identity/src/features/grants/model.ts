@@ -123,22 +123,3 @@ export function needsText(w: GrantWorld, action: string, held: string | null): s
 /** Whether every action of `actions` is one `g` lets its holder pass on. */
 export const withinPassOn = (g: Grant, actions: string[]): boolean =>
   g.pass_on.kind === 'to' && actions.every((a) => (g.pass_on as { actions: string[] }).actions.includes(a));
-
-/**
- * What the caller cannot give an agent from the grants the service answered, each
- * with its reason (conformance 2.4): what may not be passed on, then more than is held.
- */
-export function cannotGive(w: GrantWorld, source: Grant | null): [string, string][] {
-  const mine = w.list.grants.filter((g) => g.holder === w.me.person.id && standing(w, g).ok);
-  const out: [string, string][] = [];
-  for (const g of mine) {
-    if (g.pass_on.kind === 'use_only') out.push([`${g.relation} of ${onText(g)}`, `You may use it; ${grantNo(g.id)} does not let you pass it on.`]);
-    else if (!g.pass_on.recipients.includes('agent')) out.push([`${g.relation} of ${onText(g)}`, `People only, never agents: ${grantNo(g.id)} passes on to people.`]);
-  }
-  if (source) {
-    for (const [relation, actions] of relationsOf(w)) {
-      if (!withinPassOn(source, actions)) out.push([`${relation} of ${onText(source)}`, 'More than you hold.']);
-    }
-  }
-  return out;
-}

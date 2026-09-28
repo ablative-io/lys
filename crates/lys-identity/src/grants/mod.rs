@@ -1,9 +1,10 @@
 //! Human-rooted grants: the application grant contract, its model, its
-//! admission, its signed events and their projections, and the one authority
-//! owner every route calls.
+//! admission, its signed events and their projections, the one authority
+//! owner every route calls, and what a person cannot give from it.
 
 pub mod admission;
 pub mod authority;
+pub mod cannot_give;
 pub mod codec;
 mod commit;
 pub mod error;
@@ -24,6 +25,10 @@ pub mod types;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
 pub use authority::{ExerciseRequest, Grants, Permit, Recorded, RevokeRequest};
+pub use cannot_give::{
+    CannotGiveItem, CannotGiveList, CannotGiveReason, CannotGiveRequest, CannotGiveSubject,
+    SERVICE_ACCOUNT,
+};
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
 pub use error::GrantError;
 pub use events::{
