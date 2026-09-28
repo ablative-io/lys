@@ -210,16 +210,9 @@ async fn stop(
         sessions_asked: Vec::new(),
         credentials_ended: None,
         credentials_refused: None,
+        done: false,
     };
-    let kept = with_stops(&state, |store| {
-        Ok(store.recorded(&asked.operation).cloned())
-    })?;
-    if let Some(kept) = kept {
-        if !kept.same_words(&asked) {
-            return Err(ServerError::StopReused {
-                operation: asked.operation,
-            });
-        }
+    if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
         return Ok(Json(kept.into()));
     }
     let suspended = with_directory(&state, |directory| {
