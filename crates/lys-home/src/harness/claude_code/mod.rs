@@ -22,6 +22,9 @@
 //! bare case on 2.1.281, PROOF-RESUME.md the fork on 2.1.281, and
 //! PROOF-LAUNCH.md the launch line on 2.1.283).
 
+mod compaction;
+#[cfg(test)]
+pub(crate) mod compaction_tests;
 pub mod events;
 #[cfg(test)]
 mod events_tests;

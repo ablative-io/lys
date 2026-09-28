@@ -23,6 +23,9 @@
 pub mod beside;
 #[cfg(test)]
 mod beside_tests;
+pub mod block_rows;
+#[cfg(test)]
+mod block_rows_tests;
 pub mod blocks;
 #[cfg(test)]
 mod blocks_tests;
@@ -32,6 +35,9 @@ mod call_tests;
 pub mod canon;
 #[cfg(test)]
 mod canon_tests;
+pub mod compactions;
+#[cfg(test)]
+mod compactions_tests;
 pub mod entries;
 pub mod epilogue;
 #[cfg(test)]
@@ -63,6 +69,9 @@ mod lantern_tests;
 mod lock;
 #[cfg(test)]
 mod lock_tests;
+pub mod loss;
+#[cfg(test)]
+mod loss_tests;
 pub mod reader;
 #[cfg(test)]
 pub(crate) mod reader_tests;

@@ -23,6 +23,8 @@ use crate::record::index::{Index, IndexRow, read_header};
 
 /// The suffix an index file carries beside its session file.
 const INDEX_SUFFIX: &str = ".index.jsonl";
+/// The suffix a block rows file carries beside its session file.
+const BLOCKS_SUFFIX: &str = ".blocks.jsonl";
 /// The suffix every session file carries.
 const SESSION_SUFFIX: &str = ".jsonl";
 
@@ -137,9 +139,10 @@ impl SessionReader {
 
 /// The session ids under a `sessions/` directory, in ascending byte order.
 /// A regular file named `<id>.jsonl` is a session, except one named
-/// `<stem>.index.jsonl` whose first line is not a session header, which is
-/// an index. A file that cannot be read while listing refuses by path; a
-/// missing directory lists nothing.
+/// `<stem>.index.jsonl` or `<stem>.blocks.jsonl` whose first line is not a
+/// session header, which is an index or a block rows file. A file that
+/// cannot be read while listing refuses by path; a missing directory lists
+/// nothing.
 pub fn session_ids(sessions: &Path) -> Result<Vec<String>, HomeError> {
     let entries = match std::fs::read_dir(sessions) {
         Ok(entries) => entries,
@@ -160,7 +163,7 @@ pub fn session_ids(sessions: &Path) -> Result<Vec<String>, HomeError> {
         let Some(id) = name.strip_suffix(SESSION_SUFFIX) else {
             continue;
         };
-        if name.ends_with(INDEX_SUFFIX) {
+        if name.ends_with(INDEX_SUFFIX) || name.ends_with(BLOCKS_SUFFIX) {
             match read_header(&path) {
                 Ok(_) => {}
                 Err(HomeError::NoHeader { .. }) => continue,

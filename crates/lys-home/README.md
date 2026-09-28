@@ -11,6 +11,9 @@ to the entries on it, and `<id>.head` (the persisted head) so reopening
 restores where the session stood. `blocks/<hh>/<hash>` holds content once by
 SHA-256; entries reference blocks by hash. `templates/<hh>/<hash>` holds each
 launch template the home has rendered, once by SHA-256, never rewritten.
+`<id>.blocks.jsonl` beside an imported session holds one `{entry, part, hash}`
+row per content part the import stored: the entry it went into, its index in
+the source record, and the hash the block store returned; never content.
 
 lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 
@@ -26,6 +29,7 @@ lys adds nothing to Pi's grammar. Its own data rides in Pi's `custom` entries:
 | `lys.lantern_epilogue` | further words on a lantern of this session (`lantern`, `words`, `added_by`, `added_at`), appended after it |
 | `lys.forked_from`   | the child's ancestry after a fork (`parent_session`, `lantern`, `point`, `cut_at`, `coordinate_carried`, `carried`, `seed_left_out`), the first entry the fork writes after the copied chain |
 | `lys.fork`          | one fork taken from this session (`child`), appended at the head |
+| `lys.loss`          | what one compaction summarised, the line directly after it: the span's first and last ids and its entry, message, tool call, tool result and block counts, bytes and block digest; ids, counts and hashes only |
 
 One owner at a time: a session file is opened under an exclusive lock on
 `<id>.lock` beside it, held while the `Session` lives, so a second opener in
@@ -202,6 +206,17 @@ free strings, so a secret a tool printed or a person typed can be in a
 home, and no scan can promise to find every such value. That is why ship takes only a
 path on this machine.
 
+`compactions --home <dir> --session <id>` lists a session's compactions in
+path order: for each, whether its summary is present, the compaction it
+completes or is completed by, its first kept entry, its `lys.loss` entry, and
+the span that entry names read back entry by entry through the index with
+its blocks checked as held by hash. It prints one JSON report
+`{"command": "compactions", session, blocks_verified, unreadable,
+compactions: [...]}` of ids, counts and hashes, then exits 1 when an entry
+could not be read, a block is missing, the session has no block rows file
+(`blocks_verified` false), or a compaction has no loss entry (its reason says
+so); 0 only when every check held. It writes nothing and starts nothing.
+
 What the crate does not do: interpret, print or log transcript contents (errors
 and reports carry ids, hashes, offsets and counts only; a lantern's note and
 its epilogues are the one text the crate prints, and only `lantern recall`
@@ -210,6 +225,6 @@ log or anchor; encrypt; move a home between devices; run or supervise an
 agent; talk to Norn.
 
 Design and briefs: `docs/design/home/` (HOME-001, HOME-002, HOME-003,
-HOME-004, HOME-006, HOME-009, HOME-019). Pi
+HOME-004, HOME-006, HOME-009, HOME-019, HOME-030). Pi
 reference: the checkout
 at `3d5cbe98`, `packages/coding-agent/src/core/session-manager.ts`.

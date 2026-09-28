@@ -21,7 +21,7 @@
       "items": [
         {
           "id": "C3",
-          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original.",
+          "text": "A Claude Code JSONL imports to events: user turns, assistant turns with tool calls, tool results, compaction summaries, and sidechains as child branches; harness bookkeeping records are counted and left in the byte-for-byte original. The compaction half is HOME-030's: the compact_boundary and isCompactSummary pair is R3 corrected by measurement.",
           "done": false
         },
         {
