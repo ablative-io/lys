@@ -1795,9 +1795,10 @@
       "decision": "A secret may be sealed as a signing key with one purpose from a closed list. The broker signs for a live, admitted handle, builds the bytes to sign itself from typed members with the same function the verifier uses, and answers a COSE_Sign1 signature and the public key only.",
       "quote": "",
       "consequences": [
-        "A signing key has no value-bearing use, and every value route refuses it by name.",
+        "A signing key has no value-bearing use, and every value route and command refuses it by name.",
         "The bytes of an agent request are built by one function in lys-core, shared by the signer and the verifier.",
-        "Every signature is on the broker's audit record."
+        "Every signature is on the broker's audit record, in the audit line's existing fields, with no digest and no key.",
+        "lys-core's rule that no constructor takes private key material is lifted for Ed25519Identity::from_seed alone, which takes the seed wrapped in Zeroizing."
       ],
       "supersedes": [],
       "superseded_by": ""
