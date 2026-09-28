@@ -4199,12 +4199,12 @@
     },
     {
       "path": "docs/design/directory/reports/DIRECTORY-054-fresh-account.md",
-      "note": "R6: Proof on a fresh macOS account",
+      "note": "R6: Prepare the fresh-account proof and its evidence record",
       "brief": "DIRECTORY-054"
     },
     {
       "path": "docs/design/directory/reports/DIRECTORY-054-open-items.md",
-      "note": "R6: Proof on a fresh macOS account",
+      "note": "R6: Prepare the fresh-account proof and its evidence record",
       "brief": "DIRECTORY-054"
     }
   ],

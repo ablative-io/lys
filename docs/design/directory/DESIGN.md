@@ -932,8 +932,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/commands/error.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
 | `crates/lys/src/commands/error_tests.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
 | `crates/lys/tests/version.rs` | R5: `lys package app` builds the app and disk image | DIRECTORY-054 |
-| `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Proof on a fresh macOS account | DIRECTORY-054 |
-| `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Proof on a fresh macOS account | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-fresh-account.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
+| `docs/design/directory/reports/DIRECTORY-054-open-items.md` | R6: Prepare the fresh-account proof and its evidence record | DIRECTORY-054 |
 
 ## Inventory
 
