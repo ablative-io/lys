@@ -383,4 +383,22 @@ impl Service {
         }
         answer(request.send().await?).await
     }
+
+    /// POST the JSON `body` bytes to `path` carrying the header `name: value`
+    /// and no session cookie, so a request signed over those exact bytes
+    /// arrives as signed.
+    pub async fn post_signed(
+        &self,
+        path: &str,
+        (name, value): (&str, &str),
+        body: Vec<u8>,
+    ) -> Result<Answer, Box<dyn Error>> {
+        let request = self
+            .client
+            .post(format!("{}{path}", self.base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(name, value)
+            .body(body);
+        answer(request.send().await?).await
+    }
 }
