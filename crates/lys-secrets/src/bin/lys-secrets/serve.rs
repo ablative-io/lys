@@ -28,7 +28,12 @@ pub(crate) struct Shared {
     pub(crate) window: Mutex<lys_secrets::ServiceWindow>,
 }
 
-pub fn serve(broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
+pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result<(), SecretsError> {
+    println!("lys-secrets audit log {}", broker.start());
+    if let Some(failure) = broker.snapshot_failure() {
+        println!("lys-secrets {failure}");
+    }
+    broker.report_snapshots_to(Box::new(|failure| println!("lys-secrets {failure}")));
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

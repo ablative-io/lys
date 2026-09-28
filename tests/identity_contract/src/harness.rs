@@ -96,6 +96,12 @@ impl LeafStore for FaultStore {
             Fault::None | Fault::BeforeLeaf | Fault::LeafStoredWriteFailed => self.inner.pin(pin),
         }
     }
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        self.inner.snapshot()
+    }
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.inner.put_snapshot(bytes)
+    }
 }
 
 /// One directory's temporary log and key.

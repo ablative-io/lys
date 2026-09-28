@@ -1,11 +1,13 @@
 //! The broker: issues handles under a person's grant, swaps a presented
 //! handle for its credential only inside the forwarding closure, and writes
 //! one signed audit line for every issue, use, refusal and drop. Use counts,
-//! drops and retry outcomes are read back from the audit log at start, so a
-//! broker killed at any point reopens to what the log says.
+//! drops and retry outcomes are what the audit log says, so a broker killed
+//! at any point reopens to it. A start reads them from the log's signed
+//! snapshot and the lines after it, never from the whole log (see `restart`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -22,10 +24,13 @@ use crate::store::{EntryClass, SecretStore};
 
 mod accounts;
 mod admit;
+mod folded;
 mod inflight;
 mod lineage;
 mod oauth_grants;
 mod records;
+mod restart;
+pub use restart::{SNAPSHOT_EVERY, SnapshotReport};
 mod revocation;
 pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
@@ -142,6 +147,14 @@ pub struct Broker<P: PermissionCheck> {
     /// Every (identity, record) pair the log shows read, so a refusal after
     /// a relation's removal is named `RelationRemoved`.
     readers: BTreeSet<(String, String)>,
+    /// The fold of the log's lines at the last snapshot.
+    sealed: restart::Sealed,
+    /// How many lines the log grows by between snapshots.
+    every: NonZeroU64,
+    /// Why the last snapshot could not be written, while no later one was.
+    snapshot_failure: Option<String>,
+    /// Who is told when a snapshot cannot be written.
+    snapshot_report: Option<SnapshotReport>,
 }
 
 impl<P: PermissionCheck> std::fmt::Debug for Broker<P> {
@@ -181,6 +194,10 @@ impl<P: PermissionCheck> Broker<P> {
             handles_path: paths.store_dir.join(HANDLES),
             paths: paths.clone(),
             readers: BTreeSet::new(),
+            sealed: restart::Sealed::default(),
+            every: SNAPSHOT_EVERY,
+            snapshot_failure: None,
+            snapshot_report: None,
             store,
             store_key,
             audit_key,
@@ -190,93 +207,6 @@ impl<P: PermissionCheck> Broker<P> {
             clock,
         };
         broker.write_handles()?;
-        Ok(broker)
-    }
-
-    /// Opens an existing broker, rebuilding every lease from the audit log.
-    ///
-    /// # Errors
-    ///
-    /// `StoreKeyMissing`, `KeyFileMisplaced`, `StoreKeyMismatch`,
-    /// `StoreLocked`, and every audit refusal of [`AuditLog::open`].
-    pub fn open(paths: &BrokerPaths, permissions: P, clock: Clock) -> Result<Self, SecretsError> {
-        let guarded = paths.guarded();
-        let store_key = StoreKey::load(&paths.store_key, &guarded)?;
-        let audit_key = StoreKey::load(&paths.audit_key, &guarded)?;
-        let store = SecretStore::open(&paths.store_dir, &store_key)?;
-        let audit = AuditLog::open(&paths.log_dir, &paths.anchor, &guarded, &audit_key)?;
-        let handles_path = paths.store_dir.join(HANDLES);
-        let bytes =
-            fs::read(&handles_path).map_err(io(format!("reading {}", handles_path.display())))?;
-        let records: Vec<HandleRecord> =
-            serde_json::from_slice(&bytes).map_err(|error| SecretsError::StoreCorrupt {
-                reason: format!("{HANDLES} does not read: {error}"),
-            })?;
-        let mut handles: BTreeMap<String, HandleRecord> = records
-            .into_iter()
-            .map(|record| (record.id.clone(), record))
-            .collect();
-        let mut rotating = None;
-        let mut readers = BTreeSet::new();
-        for recorded in audit.replay()? {
-            let line = recorded.line;
-            if line.kind == AuditKind::SealedRead && line.outcome == records::READ {
-                if let (Some(identity), Some(record)) = (line.identity, line.secret) {
-                    readers.insert((identity, record));
-                }
-                continue;
-            }
-            if line.kind == AuditKind::Rotation {
-                rotating = line.outcome.strip_prefix(ROTATING).map(str::to_owned);
-                continue;
-            }
-            let Some(id) = line.handle.clone() else {
-                continue;
-            };
-            match line.kind {
-                AuditKind::Drop => {
-                    if let Some(record) = handles.get_mut(&id) {
-                        record.dropped = true;
-                    }
-                }
-                AuditKind::Use if line.outcome == "admitted" => {
-                    if let (Some(operation), Some(mark)) = (&line.operation, &line.request) {
-                        lineage::admitted(
-                            &mut handles,
-                            &id,
-                            (operation, mark),
-                            line.spend.unwrap_or(0),
-                        );
-                    }
-                }
-                AuditKind::Settlement => {
-                    if let Some(operation) = &line.operation {
-                        lineage::settled(
-                            &mut handles,
-                            &id,
-                            operation,
-                            &line.outcome,
-                            line.spend.unwrap_or(0),
-                        );
-                    }
-                }
-                _ => {}
-            }
-        }
-        let mut broker = Self {
-            store,
-            store_key,
-            audit_key,
-            audit,
-            handles,
-            permissions,
-            clock,
-            handles_path,
-            paths: paths.clone(),
-            readers,
-        };
-        broker.settle_rotation(rotating.as_deref())?;
-        broker.settle_unknown_outcomes()?;
         Ok(broker)
     }
 
@@ -452,7 +382,10 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     fn append(&mut self, line: &AuditLine) -> Result<u64, SecretsError> {
-        self.audit.append(line, self.audit_key.identity())
+        let before = self.audit.len();
+        let index = self.audit.append(line, self.audit_key.identity())?;
+        self.snapshot_if_due(before);
+        Ok(index)
     }
 
     fn line(

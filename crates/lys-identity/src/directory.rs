@@ -15,6 +15,7 @@
 //! request is refused `OperationReused`.
 
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
@@ -29,6 +30,7 @@ use crate::profile::Profile;
 use crate::projection::{Projection, Record};
 use crate::provenance::Actor;
 use crate::receipt::Receipt;
+use crate::restart::SNAPSHOT_EVERY;
 use crate::signer::{SignedEvent, sign_event};
 
 /// Why the directory stopped answering, if it has.
@@ -44,10 +46,20 @@ pub struct Directory<S: LeafStore> {
 }
 
 impl<S: LeafStore> Directory<S> {
-    /// Open the directory over the store `reopen` gives, replaying every event
-    /// into the projection.
+    /// Open the directory over the store `reopen` gives from the log's signed
+    /// snapshot, reading only the leaves after it, and fold every event into
+    /// the projection. A snapshot is written every [`SNAPSHOT_EVERY`] entries.
     pub fn open(reopen: Reopen<S>, key: Ed25519Identity) -> Result<Self, IdentityError> {
-        let (log, events) = EventLog::open(reopen, key.public_key_bytes())?;
+        Self::open_with(reopen, key, SNAPSHOT_EVERY)
+    }
+
+    /// As [`Directory::open`], writing a snapshot every `every` entries.
+    pub fn open_with(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        every: NonZeroU64,
+    ) -> Result<Self, IdentityError> {
+        let (log, events) = EventLog::open_with(reopen, &key, every)?;
         let mut directory = Self {
             log,
             projection: Projection::new(),
@@ -81,7 +93,7 @@ impl<S: LeafStore> Directory<S> {
                 reason: reason.clone(),
             });
         }
-        let Some(reconciled) = self.log.reconcile()? else {
+        let Some(reconciled) = self.log.reconcile(&self.key)? else {
             return Ok(());
         };
         for (signed, coordinate) in reconciled.adopted {
@@ -147,7 +159,7 @@ impl<S: LeafStore> Directory<S> {
     fn commit(&mut self, event: IdentityEvent) -> Result<Receipt, IdentityError> {
         self.projection.check(&event)?;
         let signed = sign_event(event, &self.key)?;
-        let failure = match self.log.append(&signed) {
+        let failure = match self.log.append(&signed, &self.key) {
             Ok(coordinate) => {
                 let receipt = Receipt::of(&signed, coordinate);
                 self.record_committed(&signed, receipt.clone())?;

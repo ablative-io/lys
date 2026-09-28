@@ -106,6 +106,12 @@ impl LeafStore for FaultStore {
             }
         }
     }
+    fn snapshot(&self) -> StoreResult<Option<Vec<u8>>> {
+        self.inner.snapshot()
+    }
+    fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
+        self.inner.put_snapshot(bytes)
+    }
 }
 
 /// An in-process engine whose writes fail where its plan says.
