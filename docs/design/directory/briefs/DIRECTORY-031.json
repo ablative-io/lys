@@ -109,44 +109,29 @@
         "files_changed": [
           {
             "path": "docs/design/identity/CAPABILITY-CLAIM.md",
-            "change": "created",
-            "note": "The draft of lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1. It covers the deterministic CBOR (keys 1 content type, 2 holder, 3 grants; each grant has 1 id and 2 not-before, and 3 not-after only when the window has an end; grants sorted by id, no duplicates) and the RFC 7093 method 1 Authority Key Identifier. It gives verify_agent_capability's refusal order and the pinned vectors. Unchanged this round."
+            "change": "modified",
+            "note": "The proposal, already on main from f6f18d3, amended from R2's review. A1: the issuer-key fingerprint is now defined by its bytes, the leftmost 160 bits of the SHA-256 of the whole DER SPKI, as rcgen 0.13 writes it. The text says this is RFC 7093 method 4 truncated, not method 1, and pins the method 1 value fe812c12… for the 0x07 key as refused. A2: step 2 compares the whole AKI value byte for byte against 30168014 followed by the fingerprint, and names the refusal for duplicate extensions. A3: a text key 1 other than v1 is claim_version_unknown whatever the other members are. All pinned vectors are unchanged."
           },
           {
             "path": "docs/design/WIRE-FORMATS.md",
             "change": "modified",
-            "note": "The two ratification sentences are replaced, a pointer to the draft is added, and a D7 PROPOSED row is added. D1 to D6 are byte-identical. Unchanged this round."
-          },
-          {
-            "path": "docs/PEN-REGISTRATION.md",
-            "change": "modified",
-            "note": "Only the .2 row changed. It now names .2.1 as proposed for lys/agent-capability/v1 and keeps its stated purpose, including 'allocated when the agent-identity design lands'. The status cell stays Reserved. Unchanged this round."
-          },
-          {
-            "path": "docs/design/directory/briefs/DIRECTORY-031.md",
-            "change": "modified",
-            "note": "Re-rendered from DIRECTORY-031.json after the workflow wrote this round's review blocks, so the design gate's byte comparison passes."
-          },
-          {
-            "path": "docs/design/directory/briefs/DIRECTORY-031.json",
-            "change": "modified",
-            "note": "Holds the dev and review blocks the workflow wrote. I did not edit it by hand."
+            "note": "Only R1's own D7 row changes: its description no longer calls the identifier RFC 7093 method 1 and states the SPKI-hash construction. The row is still PROPOSED. Against the pre-R1 base f6f18d3~1 the file is still +4/-2, and D1 to D6 are untouched."
           }
         ],
-        "how": "The draft states the claim format, its placement and its verifier's refusals as prose a second party can check against. It proposes .2.1 under the .2 family arc and leaves .1 and .2 themselves unused. In this round the design leg failed only because the rendered brief markdown lagged its JSON. Re-rendering it fixes the cause, and gate.sh exits 0.",
-        "deviation": "I ran scripts/design/render-cluster.py and scripts/design/gate.sh to fix the failed design leg and to confirm the fix. I also ran git fetch plus read-only git show and cat-file on origin/main to re-run the brief's blocked_by checks. I ran no cargo command and made no commit.",
+        "how": "Checked row by row against the tree.\n- Headings: CAPABILITY-CLAIM.md's ten second-level headings are, in order, Transport … Status (grep '^## ').\n- Literal strings: every required string is present, and claim_expired and claim_not_yet_valid each count 0.\n- Hex vectors: the three claim vectors (84, 38 and 55 bytes) and the AKI vector 30168014324be2dea8bc44461b0233e51fa48902ed6b1cc6 are in the Encoding and Issuer key identifier sections. The AKI vector was recomputed independently: the pure-Python Ed25519 public key for seed 0x07 is ea4a6c63…, and the SHA-256 of its SPKI starts 324be2dea8bc…. The draft still states that the fingerprint is new and is not the SHA-256 of a certificate's DER.\n- WIRE-FORMATS.md: against f6f18d3~1, `git diff --numstat` gives 4 added and 2 deleted. Both ratification sentences are in the new wording (lines 3 and 210). D1 to D6 are byte-identical (lines 202-207). The pointer line (line 44) names docs/design/identity/CAPABILITY-CLAIM.md. D7 carries lys/agent-capability/v1, 1.3.6.1.4.1.66364.2.1 and PROPOSED, and does not carry RATIFIED.\n- PEN-REGISTRATION.md: +1/-1. The .2 row (line 63) contains `.2.1`, `lys/agent-capability/v1`, `family arc` and the purpose words, and its last cell is still `Reserved`.\n- crates/: `git diff --stat -- crates/` prints nothing.",
+        "deviation": "R1 was already on main before this round, so it was verified rather than written. This round edited R1's files, which the brief allows only through R2's amend-and-repeat rule, and D7 was corrected with the draft because it carried the same wrong citation. The brief's own Purpose and Task text still says 'RFC 7093 section 2, method 1'. That text is wrong about the RFC while its pinned bytes are right. I did not edit the brief. Its wording needs a brief revision before ratification. CN1 reads 'nothing outside docs/design/directory/…', but R1's and R2's own file lists name docs/design/identity and WIRE-FORMATS.md, and I followed the requirements' file lists.",
         "checklist": [
           {
             "id": "C249",
             "done": true,
-            "note": "The draft is written and the pointers are added. The .2 row stays Reserved and D7 stays PROPOSED."
+            "note": "The proposal and its PROPOSED D7 row are on main. Both ratification sentences name the owning lead with a second reader, D1 to D6 are unchanged, and the .2 row records .2.1 as Reserved. The draft is amended per R2."
           }
         ],
         "stories": [
           {
             "id": "S114",
-            "satisfied": true,
-            "note": "A stranger can read the proposed format, its OID and its refusals in the draft before any code exists."
+            "satisfied": false,
+            "note": "The format is specified and attacked but not ratified. S114 also rides on R2's commit record and on R3."
           }
         ]
       },
@@ -253,21 +238,27 @@
       ],
       "dev": {
         "status": "blocked",
-        "files_changed": [],
-        "how": "Not done. The review needs a committed draft to cite by commit id, and a reviewer who is not the draft's author.",
-        "deviation": "Blocked on two things. First, the draft reaches a commit only through the chain (src_pr, src_land), and this round forbids me from committing. Second, the review must be written by a party other than the draft's author. I wrote the draft, and a subagent of this session is the same party, so writing CAPABILITY-CLAIM-REVIEW.md here would fail the acceptance. The fix is the chain landing R1 and then dispatching the review to an independent reviewer.",
+        "files_changed": [
+          {
+            "path": "docs/design/identity/CAPABILITY-CLAIM-REVIEW.md",
+            "change": "created",
+            "note": "The adversarial review. It names both parties, the reviewed commit 737461d and amendments A1 to A3 with the amended draft's blob id 148b7307…. It holds the 19 required entries and 6 further ones, each with its attack hex (certificates hand-built and signed), the named refusal and the outcome `defeated`, plus a timing-oracle entry covering the four comparisons and the signature check."
+          }
+        ],
+        "how": "Acceptance rows:\n- Parties: the review names the reviewer (this round-1 session) and the author (the R1 drafting session that reached main in f6f18d3), and states that the independence is of session, not of model.\n- The 19 required entries are 1 to 19. Entries 1 to 18 each carry hex and a named refusal. For example, forgery is a certificate signed by the 0x0b key and refused certificate_chain_invalid, and operator JSON 7b22… is refused claim_malformed (text-string length 27 with 15 bytes following).\n- Entry 19, the timing oracle, names the AKI, holder, grant and instant comparisons and verify_certificate_chain_at, and gives for each why both operands are public.\n- Further entries: 20, the RFC 7093 method 1 identifier fe812c…; 21, AKI with extra fields; 22, a BER long-form AKI; 23, duplicate extensions, which x509-parser 0.16 allows at parse and decode_extension refuses; 24, the self-describe tag and a non-shortest length; 25, refusal precedence under v2.\n- Outcomes: all 25 entries record `defeated`. Entries 20, 22 and 25 found draft defects, which were amended (A1 to A3) and then repeated.\n- Commit record: NOT MET. The review records the reviewed commit 737461d, but the draft at 737461d is not byte-identical to the amended draft landing with the review. The commit that holds the amended draft does not exist until this round lands, so the review names the blob id and says the commit is recorded once it exists. A one-line follow-up naming the landing commit satisfies the row. That is the only blocking row.",
+        "deviation": "The reviewer is a separate Claude session from the draft's author, not a different model or person. The review says so. The draft was amended under the rule to amend and repeat, so the recorded reviewed commit cannot yet match the landed draft. The attack bytes come from a pure-Python builder and were not run through lys-core, because this brief forbids running builds and tests. Their independence from lys is of authorship, not platform, and the review says that too.",
         "checklist": [
           {
             "id": "C250",
             "done": false,
-            "note": "Waiting for the draft to land and for an independent reviewer."
+            "note": "Every other part is in place. It waits only on the review naming the commit that holds the amended draft."
           }
         ],
         "stories": [
           {
             "id": "S114",
             "satisfied": false,
-            "note": "No review yet."
+            "note": "Not yet ratified; R3 is outstanding."
           }
         ]
       },
@@ -338,20 +329,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done. The D7 and .2 status flips wait for the landed review and a recorded ratification.",
-        "deviation": "Blocked. The check `git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` exits 128, and the card records no ratification by the owning lead with a second reader. The boundaries forbid flipping to RATIFIED or `In use (.2.1)` before then. D7 still reads PROPOSED and the .2 row still reads Reserved.",
+        "how": "Blocked by its precondition. No ratification by the owning lead with a second reader is recorded on the card, and R2's review is not on main (`git show origin/main:docs/design/identity/CAPABILITY-CLAIM-REVIEW.md` would fail). R3 writes no ratifier or reason the card does not carry, so nothing was changed.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C251",
             "done": false,
-            "note": "Waiting for R2 and the ratification record."
+            "note": "No ratification is recorded."
           }
         ],
         "stories": [
           {
             "id": "S114",
             "satisfied": false,
-            "note": "The format is not ratified."
+            "note": "Waits on the ratification."
           }
         ]
       },
@@ -435,20 +426,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done.",
-        "deviation": "Blocked on R3. At origin/main 412bc52, the grep for a D row with lys/agent-capability/v1 and RATIFIED prints 0. The boundaries also forbid signing or freezing anything under the format before ratification. DIRECTORY-006's grants/types.rs and the lys-identity crate now exist on main, so R3 is the only blocker left for R4.",
+        "how": "Blocked: R3 is not on main. WIRE-FORMATS.md has no RATIFIED lys/agent-capability/v1 row and PEN-REGISTRATION.md has no `In use (.2.1)`, and the brief forbids encoding the claim before ratification. No crate file was touched.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C252",
             "done": false,
-            "note": "Waiting for R3."
+            "note": "Waits on R3."
           }
         ],
         "stories": [
           {
             "id": "S113",
             "satisfied": false,
-            "note": "No codec yet."
+            "note": "Waits on R3."
           }
         ]
       },
@@ -529,20 +520,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done.",
-        "deviation": "Blocked. The brief's own DIRECTORY-003 execution-record check at origin/main prints 'not landed at 412bc5234c2eaff103a77c724094c148b9436a5a' and exits 1. The card branch is also based on 7b53625, which has none of the identity crates.",
+        "how": "Not dispatched. The code rows follow R1 to R3 in order, and R5 needs its DIRECTORY-003 execution-record check to print `landed at`, which was not run. Running it is a gate step before dispatch. No code was built in this round.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C253",
             "done": false,
-            "note": "Waiting for DIRECTORY-003's execution record to read landed."
+            "note": "Not dispatched."
           }
         ],
         "stories": [
           {
             "id": "S115",
             "satisfied": false,
-            "note": "No enrolment yet."
+            "note": "Not dispatched."
           }
         ]
       },
@@ -642,20 +633,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done.",
-        "deviation": "Blocked on R4 and R5, and on DIRECTORY-013. crates/lys-identity/src/revocation/append.rs and fold.rs are absent at origin/main. deploy/identity/config.example.toml is now present on main.",
+        "how": "Blocked on R4 and R5, on R3 being on main, and on DIRECTORY-013's revocation append and fold (crates/lys-identity/src/revocation/ is absent from this tree).",
+        "deviation": "",
         "checklist": [
           {
             "id": "C254",
             "done": false,
-            "note": "Waiting for R4, R5 and DIRECTORY-013."
+            "note": "Blocked."
           }
         ],
         "stories": [
           {
             "id": "S115",
             "satisfied": false,
-            "note": "No issuance yet."
+            "note": "Blocked."
           }
         ]
       },
@@ -816,20 +807,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done.",
-        "deviation": "Blocked on R5 and R6.",
+        "how": "Blocked on R5 and R6.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C255",
             "done": false,
-            "note": "Waiting for R5 and R6."
+            "note": "Blocked."
           }
         ],
         "stories": [
           {
             "id": "S115",
             "satisfied": false,
-            "note": "No key replacement yet."
+            "note": "Blocked."
           }
         ]
       },
@@ -917,20 +908,20 @@
       "dev": {
         "status": "blocked",
         "files_changed": [],
-        "how": "Not done.",
-        "deviation": "Blocked on R3, R4 and R6. `git diff --stat 14e834a -- crates/` still prints nothing, so crates/lys-core and crates/lys are untouched.",
+        "how": "Blocked on R4 and R6 and on R3 being on main. The verifier must not read a claim in a format that is not yet ratified.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C256",
             "done": false,
-            "note": "Waiting for R3, R4 and R6."
+            "note": "Blocked."
           }
         ],
         "stories": [
           {
             "id": "S113",
             "satisfied": false,
-            "note": "No verifier yet."
+            "note": "Blocked."
           }
         ]
       },

@@ -81,7 +81,9 @@ Rules, each a refusal when broken:
 
 - The content type is the payload's own version and its **domain separation** from every
   other lys artifact. A canonical map whose key 1 is any other text string is refused as
-  `claim_version_unknown`, naming the content type it carries.
+  `claim_version_unknown`, naming the content type it carries, **whatever its other
+  members are**: the decoder reads key 1 once the bytes are one canonical CBOR map, and a
+  later version's members are not v1's to judge. Every other defect is `claim_malformed`.
 - All three top-level members are required; no other key is allowed at the top or in a
   grant map. Keys 1 and 2 of a grant map are required.
 - Key 3 of a grant map is **absent, never null**, when the grant's window has no end (the
@@ -150,8 +152,17 @@ a301776c79732f6167656e742d6361706162696c6974792f763102686167656e742d30310381a201
   (`[0] IMPLICIT OCTET STRING`) of **exactly 20 bytes** — no `authorityCertIssuer`, no
   `authorityCertSerialNumber`.
 - Those 20 bytes are the **issuer-key fingerprint**: the first 20 bytes of the SHA-256 of
-  the issuer key's DER `SubjectPublicKeyInfo` (**RFC 7093 section 2, method 1**). This is
-  the keyid rcgen writes as the `SubjectKeyIdentifier` of lys-core's issuer certificate.
+  the issuer key's **whole DER `SubjectPublicKeyInfo`** (the 44 bytes for an Ed25519 key,
+  algorithm identifier included). This is the keyid rcgen 0.13 writes as the
+  `SubjectKeyIdentifier` of lys-core's issuer certificate (`KeyIdMethod::Sha256`, which
+  hashes the whole `SubjectPublicKeyInfo` and keeps the leftmost 160 bits).
+- **The bytes above are the definition; the RFC is cited only for its family.** This is
+  **not** RFC 7093 section 2 method 1, which hashes only the value of the
+  `subjectPublicKey` BIT STRING (the raw 32-byte key) and gives a different identifier for
+  the same key (see the vector below). It is RFC 7093 section 2 method 4 (the hash of the
+  DER encoding of the `SubjectPublicKeyInfo`) with SHA-256, truncated to its leftmost 160
+  bits as methods 1 to 3 truncate. An identifier computed by method 1 is refused as
+  `issuer_key_mismatch`.
 - **The issuer-key fingerprint is new, defined here.** It is **not** lys's existing
   certificate fingerprint, which is the SHA-256 of a certificate's DER. It fingerprints a
   key, not a certificate, and is 20 bytes, not 32. It is the fingerprint by which a
@@ -183,6 +194,10 @@ value is (24 bytes):
     324be2dea8bc44461b0233e51fa48902ed6b1cc6
 ```
 
+For the same key, RFC 7093 method 1 (SHA-256 of the raw 32-byte key, leftmost 160 bits)
+would give `fe812c12f3ab4ce6ac5db69ac352f906cb1b11ef`. That value is **not** this key's
+issuer-key fingerprint, and an Authority Key Identifier carrying it is refused.
+
 ## Scope
 
 v1 has **no scope member and no scope refusal.** Both wait on the grant representation
@@ -202,14 +217,19 @@ under. It reads no clock itself. In this order:
    `certificate_chain_invalid`.
 2. **Compare the Authority Key Identifier**: read the extension under `2.5.29.35` with
    `decode_extension`; its `keyIdentifier` must equal the signing key's issuer-key
-   fingerprint. An absent extension, a value that is not an `AuthorityKeyIdentifier`
-   holding only a 20-byte `keyIdentifier`, or a fingerprint other than the signing key's is
-   refused as `issuer_key_mismatch`, naming the signing key's fingerprint and the one named
-   (or `absent`).
+   fingerprint. The comparison is of the **whole extension value, byte for byte**, against
+   the 24 bytes `30 16 80 14` followed by that fingerprint, so a BER form, a long-form length
+   or any further field of the `AuthorityKeyIdentifier` cannot be read two ways. An absent
+   extension, the extension carried more than once (which `decode_extension` refuses), a
+   value that is not an `AuthorityKeyIdentifier` holding only a 20-byte `keyIdentifier` in
+   exactly that form, or a fingerprint other than the signing key's is refused as
+   `issuer_key_mismatch`, naming the signing key's fingerprint and the one named (or
+   `absent`).
 3. **Parse the claim**: read the extension under `1.3.6.1.4.1.66364.2.1` with
-   `decode_extension` and decode it as [Encoding](#encoding) states. An absent extension or
-   one that does not parse is refused as `claim_malformed`; a content type it does not know
-   as `claim_version_unknown`.
+   `decode_extension` and decode it as [Encoding](#encoding) states. An absent extension,
+   the extension carried more than once (which `decode_extension` refuses), or one that does
+   not parse is refused as `claim_malformed`; a content type it does not know as
+   `claim_version_unknown`.
 4. **Check the holder** against the common name of the certificate's subject:
    `claim_holder_mismatch`, naming both.
 5. **Check the grant acted under** against the listed grant ids: `claim_grant_mismatch`,
