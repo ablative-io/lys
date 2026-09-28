@@ -1041,7 +1041,7 @@
         },
         {
           "id": "C347",
-          "text": "Prove it on the live install (DIRECTORY-045 R4).",
+          "text": "Prove the upgrade on a scratch install in the round; the live install is upgraded and recorded after landing (DIRECTORY-045 R4).",
           "done": false
         }
       ]

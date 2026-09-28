@@ -22,7 +22,7 @@
     "ADR-113"
   ],
   "purpose": "A person running the identity product cannot tell which build is running, and cannot take a newer one: install only fills in what is missing and never restarts. So every landing stays invisible until someone swaps binaries by hand. This brief makes every binary name its commit and gives the product one command that upgrades a running install and puts the previous build back if the new one fails. Amended 28 September 2026 20:35 by Waffles after Archie's review of the first round (card/DIRECTORY-045 ca11e605): an upgrade that leaves the configuration and compose files behind cannot move an install to any build that adds a configuration key (the server refuses unknown keys), and so cannot carry the sign-in cookie fix, which lives in the compose file; an install made before this card must move to it; and an upgrade stopped part-way must be recoverable.",
-  "task": "Stamp the build commit into every Lys binary, add `lys identity upgrade`, surface the running build in /authority and the screens, and prove it by upgrading the live install.",
+  "task": "Stamp the build commit into every Lys binary, add `lys identity upgrade`, surface the running build in /authority and the screens, and prove the upgrade on a scratch install in the round, with the live install upgraded and recorded by the landing lead after landing.",
   "requirements": [
     {
       "id": "R1",
@@ -107,16 +107,15 @@
     },
     {
       "id": "R4",
-      "title": "Prove it on the live install",
-      "spec": "Evidence. On the machine the live install runs on, build lys, lys-identity-server and lys-secrets at the card's head on the build machine through the card's own round, then run `lys identity upgrade --from` that build against the live install, and show that the `build` member of the running server's /api/authority answer equals the card's head. Record the before and after commits and the upgrade's printed lines in docs/design/directory/PROOF-UPGRADE.md. Secrets and passwords never appear in it. The live install was made before this card (R6), so the proof starts with its first move, and the sign-in page still keeps its session over plain http after the upgrade (the cookie setting carried by R5). The live service serves the screens at /authority and the server's answer at /api/authority, so the proof reads /api/authority.",
+      "title": "Prove the upgrade on a scratch install in the round, and on the live install after landing",
+      "spec": "Evidence, in two parts. In the round: the upgrade tests drive `upgrade` end to end against a scratch install each test makes in its own temporary directory (build A's binaries running with the configuration and compose files A renders, then build B's), through the engine that brings the compose services to their definition, so neither a container runtime nor the live install is needed. The build machine has neither, and the round never reaches the live install or its state directory. After landing: the lead who lands the card upgrades the live install with the landed build's `lys identity upgrade --from`, and commits docs/design/directory/PROOF-UPGRADE.md to main naming the installed commit before, the landed commit after, the upgrade's printed lines, the `build` member of http://localhost:8490/api/authority, and the cookie setting in the install's compose environment. Secrets and passwords never appear in it. The live install was made before this card (R6), so that upgrade starts with its first move. The round does not write PROOF-UPGRADE.md.",
       "acceptance": [
-        "PROOF-UPGRADE.md names the installed commit before, the head commit after, and quotes the upgrade's lines; `curl -s http://localhost:8490/api/authority` shows the head commit.",
-        "After the upgrade, signing in on the live install in a browser keeps the session, and the compose environment holds the cookie setting the new build renders."
+        "A test starts build A on a scratch install in a temporary directory, upgrades it to build B, and asserts that the recorded build and every binary's --version name B, that the configuration key and compose environment value only B renders are in place, and that config.previous/ holds A's files.",
+        "A test in which build B exits before it is ready asserts that A is running again, A is the recorded build, and A's configuration and compose files are back in place.",
+        "No test or leg of the round needs a container runtime, a listener on port 8490 or the live install's state directory, and each test removes its temporary install when it ends."
       ],
       "files": {
-        "create": [
-          "docs/design/directory/PROOF-UPGRADE.md"
-        ],
+        "create": [],
         "modify": [],
         "delete": []
       },
@@ -222,6 +221,6 @@
   ],
   "verification": [
     "The full Lys gate and the surface checks exit 0 at the card's head, measured by the card round.",
-    "The live upgrade of R4 is recorded in PROOF-UPGRADE.md and /api/authority on the live install names the head commit."
+    "The upgrade tests of R4 pass in the round's test leg on a build machine with no container runtime and no live install."
   ]
 }
