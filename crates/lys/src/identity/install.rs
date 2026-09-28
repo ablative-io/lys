@@ -5,10 +5,12 @@
 //! configuration, materialises credentials, starts the compose services,
 //! waits until they answer, registers both clients, generates the service
 //! key and the secrets broker, writes the directory service's configuration
-//! and starts the broker and the service. Running it again changes only
-//! what is missing; nothing is rotated or restarted.
+//! and starts the broker, the runner and the service. Running it again
+//! changes only what is missing; nothing is rotated or restarted, and the
+//! runner least of all, since a restart of it ends every session it holds.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use base64::Engine;
 use lys_core::Ed25519Identity;
@@ -139,6 +141,47 @@ fn start_broker(layout: &Layout, emitter: &mut Emitter, replace: bool) -> Identi
     Ok(())
 }
 
+/// Start the runner beside the service, as the service is started: it holds
+/// each agent the service starts in its own pseudo-terminal, on a Unix socket
+/// in the run folder, acting only on the service key's requests. It is never
+/// restarted here, since a restart ends every session it holds.
+fn start_runner(
+    layout: &Layout,
+    key: &Arc<Ed25519Identity>,
+    emitter: &mut Emitter,
+) -> IdentityResult<()> {
+    let program = services::sibling("lys")?;
+    let log = layout.logs_dir().join("runner.log");
+    let pid = layout.run_dir().join("runner.pid");
+    let public = layout.run_dir().join("runner-server.pub");
+    write_plain(&public, &lys_runner::protocol::hex(&key.public_key_bytes()))?;
+    let socket = layout.runner_socket();
+    let args = [
+        "runner",
+        "serve",
+        "--socket",
+        &socket.display().to_string(),
+        "--state",
+        &layout.data_dir().join("runner").display().to_string(),
+        "--server-key",
+        &public.display().to_string(),
+    ]
+    .map(str::to_string);
+    let started = services::start_detached(&program, &args, &log, &pid, false)?;
+    let client = lys_runner::Client::new(socket.clone(), Arc::clone(key));
+    services::wait_until("runner", &log, &pid, &mut || {
+        client
+            .ask(&lys_runner::Act::Status { session: None })
+            .is_ok()
+    })?;
+    emitter.note(&format!(
+        "runner {} on {}",
+        started_word(started, false),
+        socket.display()
+    ));
+    Ok(())
+}
+
 fn start_service(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
     let program = services::sibling("lys-identity-server")?;
     let log = layout.logs_dir().join("identity.log");
@@ -194,7 +237,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     services::wait_ready(&layout, &config, &mut |line| println!("{line}"))?;
     emitter.note("postgres, rauthy and spicedb ready");
     configure::run(&config_path, json)?;
-    let key = service_key(&layout)?;
+    let key = Arc::new(service_key(&layout)?);
     let public = base64::engine::general_purpose::STANDARD.encode(key.public_key_bytes());
     emitter.note(&format!("service key public {public}"));
     if services::broker_init(&layout)? {
@@ -220,6 +263,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
     let changed = configuration != Outcome::Unchanged;
     start_broker(&layout, &mut emitter, changed)?;
+    start_runner(&layout, &key, &mut emitter)?;
     start_service(&layout, &mut emitter, changed)?;
     emitter.field("open", "url", Layout::service_url());
     emitter.field(

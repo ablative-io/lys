@@ -46,6 +46,32 @@ pub struct Settings {
     pub instructions: String,
     /// Why this version was set; may be empty.
     pub note: String,
+    /// How its sessions are driven through a runner, when the profile says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<SessionSettings>,
+}
+
+/// How an agent's sessions are driven through a runner.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionSettings {
+    /// The harness's compaction command, typed as one line; none when the
+    /// harness has none, and then a compaction is refused by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compact: Option<String>,
+    /// What is typed before a message to deliver it, as the harness takes
+    /// one; empty for none. The message follows it, then Enter.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message_prefix: String,
+    /// Whether the session is sensitive. No receipt carries typed text for
+    /// any session: text is kept as its length and digest alone.
+    #[serde(default)]
+    pub sensitive: bool,
+    /// The account handles the session moves between at a usage limit,
+    /// the variable the handle in use is set in, and what says a limit.
+    /// Handles only: the broker swaps each for its account on the way out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<lys_runner::Rotation>,
 }
 
 /// One version of an agent's profile.

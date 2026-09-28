@@ -91,6 +91,7 @@ pub fn render(
         "teams_dir": dir("teams"),
         "stops_dir": dir("stops"),
         "reviews_dir": dir("reviews"),
+        "runner_socket": layout.runner_socket().display().to_string(),
     });
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());

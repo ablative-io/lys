@@ -1,0 +1,37 @@
+[package]
+name = "lys-runner"
+description = "The lys runner: holds each started agent in its own background pseudo-terminal, driven over a published, signed protocol on a Unix socket."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+lys-core.workspace = true
+# Each session's pseudo-terminal: opening it, making it the child's
+# controlling terminal and resizing it, behind a safe interface.
+portable-pty.workspace = true
+rand.workspace = true
+# `wait` takes a regular expression only when the caller names one.
+regex-lite.workspace = true
+# Ending a session's whole process group, through a safe interface.
+rustix.workspace = true
+# The dial bridge's TLS: rustls with ring and the Mozilla roots, each pinned
+# at the version already in the lock, as lys-home pins them.
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# `lys runner serve` ends every session when the process is asked to stop.
+tokio = { workspace = true, features = ["rt", "signal", "macros"] }
+webpki-roots = "=1.0.9"
+
+[dev-dependencies]
+rcgen.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

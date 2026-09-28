@@ -126,6 +126,11 @@ pub struct Config {
     /// no screen is served.
     #[serde(default)]
     pub surface_dir: Option<PathBuf>,
+    /// The Unix socket of this install's own runner, which a machine whose
+    /// record names Lys's runner is driven through. Without it such a
+    /// machine's sessions are refused `runner_unreachable`, by name.
+    #[serde(default)]
+    pub runner_socket: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

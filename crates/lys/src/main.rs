@@ -144,6 +144,7 @@ fn main() -> ExitCode {
                 at,
             } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref(), json),
         },
+        Command::Runner(runner_command) => commands::runner::run(runner_command),
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),
         Command::Verify {
             attestation,

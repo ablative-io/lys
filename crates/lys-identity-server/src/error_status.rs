@@ -74,13 +74,16 @@ impl ServerError {
 
     pub(crate) fn status(&self) -> StatusCode {
         match self {
-            Self::NotSignedIn | Self::AgentSignatureRefused { .. } => StatusCode::UNAUTHORIZED,
+            Self::NotSignedIn | Self::AgentSignatureRefused { .. } | Self::DialRefused { .. } => {
+                StatusCode::UNAUTHORIZED
+            }
             Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }
             | Self::MachineNotForAgent
-            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
+            | Self::ReviewerOnly
+            | Self::NotPermitted { .. } => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
@@ -127,7 +130,10 @@ impl ServerError {
             | Self::TeamMemberHeld
             | Self::TeamMemberAbsent
             | Self::GrantNotDue { .. }
-            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
+            | Self::NoLiveSession { .. }
+            | Self::RunnerAbsent { .. }
+            | Self::ReviewReused { .. }
+            | Self::DialStale { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
@@ -147,8 +153,28 @@ impl ServerError {
             | Self::SignInProvidersUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
+            Self::Runner { refusal, .. } => runner_status(refusal),
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
         }
+    }
+}
+
+/// How a runner's refusal is answered: one the runner never gave, because
+/// it could not be reached or spoke another protocol, is the gateway's; a
+/// session it does not hold is not found; the rest conflict with the
+/// session's state.
+fn runner_status(refusal: &str) -> StatusCode {
+    match refusal {
+        "runner_unreachable"
+        | "runner_reply_malformed"
+        | "runner_protocol_mismatch"
+        | "runner_request_unsigned"
+        | "runner_request_replayed" => StatusCode::BAD_GATEWAY,
+        "session_unknown" => StatusCode::NOT_FOUND,
+        "pattern_invalid" | "size_invalid" | "cursor_ahead" | "session_invalid" => {
+            StatusCode::BAD_REQUEST
+        }
+        _ => StatusCode::CONFLICT,
     }
 }

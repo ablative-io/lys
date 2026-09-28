@@ -4,8 +4,12 @@
 //! session. The endpoint answers the receipt, the signed message, the log's
 //! current checkpoint and an inclusion proof of the leaf in it, which is all a
 //! verifier needs beside the service's public key.
+//!
+//! An act on a session through a runner leaves a receipt of its own, read
+//! at `/runner-receipts/{index}`: the act as its log keeps it, naming the
+//! caller and the act and never the text typed, with the leaf's hash.
 
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 
 use axum::extract::{Path, State};
 use axum::routing::get;
@@ -14,12 +18,14 @@ use serde_json::{Value, json};
 
 use crate::error::ServerError;
 use crate::routes::{AppState, hex, receipt_json, with_directory};
+use crate::runner_acts::ActReceipt;
 
 /// The receipt routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/receipts/{index}", get(receipt))
         .route("/service-key", get(service_key))
+        .route("/runner-receipts/{index}", get(act_receipt))
 }
 
 async fn service_key(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
@@ -56,4 +62,16 @@ async fn receipt(
             "inclusion_proof": hex(proof.as_bytes()),
         })))
     })
+}
+
+async fn act_receipt(
+    State(state): State<Arc<AppState>>,
+    Path(index): Path<u64>,
+) -> Result<Json<ActReceipt>, ServerError> {
+    let acts = state.acts.lock().unwrap_or_else(PoisonError::into_inner);
+    acts.receipt(index)?
+        .map(Json)
+        .ok_or_else(|| ServerError::RequestMalformed {
+            reason: format!("the runner acts' log holds no act {index}"),
+        })
 }

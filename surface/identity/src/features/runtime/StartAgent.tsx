@@ -10,6 +10,8 @@ import { Gate } from '../signin/Gate';
 export interface StartAnswer {
   agent: string; machine: string; runtime: string; session: string; provisioning_version: number; harness: string;
   handles: { env: string; id: string; secret: string }[]; template: string; template_sha256: string; command: string; left_out: string[]; executed: false;
+  /** The machine's runner's word, when the machine names a runner and it ran the start. */
+  runner?: { session: string; state: 'running' | 'ended'; pid: number | null; started_at: number };
 }
 export function StartAgent({ agent }: { agent: string }) {
   const load = useLoad(async () => ({ me: await api.me(), network: await request<NetworkView>('/network'), roles: await readRoles() }), 'launch-options:' + agent);
@@ -38,7 +40,7 @@ function StartForm({ agent, person, network, roles }: { agent: string; person: s
       <label className="field">Machine<select required value={machine} disabled={change.blocked} onChange={(event) => setMachine(event.target.value)}><option value="">Choose where to run</option>{machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.runtime}</option>)}</select></label>
       {!machines.length ? <p>No permitted machine with a runtime was returned. <a href="#/network">Manage machines</a>.</p> : null}
       <button type="submit" className="btn primary" disabled={change.blocked || !machine}>Record start request</button>
-    </form> : <section role="status"><h3>Start recorded — running is unconfirmed</h3><p>Session: <span className="mono">{answer.session}</span></p><p>Profile version {answer.provisioning_version} · {answer.runtime}</p>
+    </form> : <section role="status">{answer.runner ? <><h3>{answer.runner.state === 'running' ? 'Started — its runner has it running' : 'Started — its runner saw it end'}</h3><p><a href={'#/runtime/' + encodeURIComponent(answer.session)}>Open its terminal</a></p></> : <h3>Start recorded — running is unconfirmed</h3>}<p>Session: <span className="mono">{answer.session}</span></p><p>Profile version {answer.provisioning_version} · {answer.runtime}</p>
       {answer.left_out.length ? <div className="why-not"><h3>Not carried into this command</h3><ul>{answer.left_out.map((entry, index) => <li key={index}>{entry}</li>)}</ul></div> : null}
       <label className="field">Command<textarea readOnly rows={4} value={answer.command} /></label><button className="btn" onClick={() => void copy()}>Copy command</button>{copyNotice ? <p role="status">{copyNotice}</p> : null}
       <details><summary>Launch template and evidence</summary><p>Template hash: {answer.template_sha256}</p><pre>{answer.template}</pre></details>
