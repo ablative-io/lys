@@ -53,6 +53,8 @@ pub struct MachineView {
     pub may_run: Vec<AgentSummary>,
     /// The hosts an agent on it may reach.
     pub may_reach: Vec<String>,
+    /// The roles whose holders may run on it, by role id.
+    pub may_run_roles: Vec<String>,
     /// The person who named it.
     pub named_by: String,
     /// When it was named, in seconds since the Unix epoch.
@@ -85,6 +87,8 @@ struct NameBody {
     runtime: Option<String>,
     slots: u32,
     may_run: Vec<String>,
+    #[serde(default)]
+    may_run_roles: Vec<String>,
     may_reach: Vec<String>,
 }
 
@@ -165,6 +169,7 @@ fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) 
         slots: machine.slots,
         may_run,
         may_reach: machine.may_reach.clone(),
+        may_run_roles: machine.may_run_roles.clone(),
         named_by: machine.named_by.clone(),
         named_at: machine.named_at,
         state: if machine.retired.is_some() {
@@ -202,15 +207,16 @@ async fn list(
 fn named(
     directory: &Projection,
     body: &NameBody,
-    by: String,
-    at: u64,
+    (known_roles, by, at): (&[String], String, u64),
 ) -> Result<Machine, ServerError> {
     let runtime = body
         .runtime
         .as_deref()
         .map(|runtime| words("runtime", runtime))
         .transpose()?;
-    if runtime.is_none() && (body.slots > 0 || !body.may_run.is_empty()) {
+    if runtime.is_none()
+        && (body.slots > 0 || !body.may_run.is_empty() || !body.may_run_roles.is_empty())
+    {
         return Err(malformed(
             "a machine with no runtime enforces nothing: it takes no slots and no agent is placed on it",
         ));
@@ -224,6 +230,16 @@ fn named(
         let id = agent.to_string();
         if !may_run.contains(&id) {
             may_run.push(id);
+        }
+    }
+    let mut may_run_roles = Vec::new();
+    for role in &body.may_run_roles {
+        let role = role.trim().to_owned();
+        if !known_roles.contains(&role) {
+            return Err(ServerError::RoleUnknown);
+        }
+        if !may_run_roles.contains(&role) {
+            may_run_roles.push(role);
         }
     }
     let mut may_reach = Vec::new();
@@ -240,6 +256,7 @@ fn named(
         runtime,
         slots: body.slots,
         may_run,
+        may_run_roles,
         may_reach,
         named_by: by,
         named_at: at,
@@ -258,7 +275,8 @@ async fn name(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
-        let machine = named(directory, &body, by, now())?;
+        let known = crate::roles_api::role_ids(&state)?;
+        let machine = named(directory, &body, (&known, by, now()))?;
         let last = last_reports(&state)?;
         with_network(&state, |store| {
             store.name(machine.clone())?;

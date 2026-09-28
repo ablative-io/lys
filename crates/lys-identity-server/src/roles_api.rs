@@ -431,3 +431,37 @@ async fn end(
         })
     })
 }
+
+/// Every role id kept; none when the configuration names no roles.
+pub(crate) fn role_ids(state: &AppState) -> Result<Vec<String>, ServerError> {
+    if state.roles.is_none() {
+        return Ok(Vec::new());
+    }
+    with_roles(state, |store| {
+        Ok(store.roles().iter().map(|role| role.id.clone()).collect())
+    })
+}
+
+/// The ids of the roles `holder` holds at `at`: assigned, not ended, and
+/// not past the end it was assigned with; none when no roles are kept.
+pub(crate) fn held_roles(
+    state: &AppState,
+    holder: &str,
+    at: u64,
+) -> Result<Vec<String>, ServerError> {
+    if state.roles.is_none() {
+        return Ok(Vec::new());
+    }
+    with_roles(state, |store| {
+        Ok(store
+            .roles()
+            .iter()
+            .filter(|role| {
+                role.holding(holder).is_some_and(|holding| {
+                    holding.ended.is_none() && holding.ends_at.is_none_or(|ends| ends > at)
+                })
+            })
+            .map(|role| role.id.clone())
+            .collect())
+    })
+}
