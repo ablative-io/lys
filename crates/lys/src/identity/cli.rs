@@ -45,6 +45,26 @@ pub enum IdentityCommand {
         surface: Option<PathBuf>,
     },
 
+    /// Upgrade a running install to the binaries in a folder: check each
+    /// one's --version, stop the service and the broker, keep the running
+    /// binaries in bin.previous/, place the new ones and start them. When a
+    /// new one does not start or become ready, the previous build is put
+    /// back and started, and the failure is named. Data, credentials,
+    /// configuration and the compose services are never touched.
+    Upgrade {
+        /// The folder holding the newly built lys-secrets and
+        /// lys-identity-server.
+        #[arg(long)]
+        from: PathBuf,
+        /// A compiled screens package to verify and place, keeping the
+        /// previous screens to return to.
+        #[arg(long)]
+        surface: Option<PathBuf>,
+        /// The data root; the platform's application data path when absent.
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
     /// Check that `PostgreSQL`, Rauthy and `SpiceDB` are ready, naming each one
     /// that is not. Prints no credential.
     Health {

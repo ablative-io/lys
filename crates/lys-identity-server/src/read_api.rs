@@ -9,6 +9,12 @@
 //! person's records: an agent that is not the caller's is refused exactly as
 //! an agent the directory does not hold.
 //!
+//! `GET /authority` answers anyone, signed in or not, with how access is
+//! managed and `build`: the commit this service was built from, stamped at
+//! build time, followed by `; dirty` when the tree built had changes, or
+//! `not built from a git commit` when it had no commit to read. It is never
+//! empty and never invented.
+//!
 //! `GET /me` lists the signed-in person's own service accounts that are not
 //! retired, read from the service accounts' log (`service_accounts_store`),
 //! and none when the configuration names no service accounts. The directory
@@ -26,20 +32,31 @@ use axum::{Json, Router};
 use lys_identity::projection::{Projection, Record};
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
 
+use crate::admission::AUTHORITY;
 use crate::error::ServerError;
 use crate::read_views::{
     AgentSummary, AgentView, Login, MeView, PeopleView, PersonSummary, PersonView, Provenance,
 };
 use crate::routes::{AppState, receipt_json, signed_in, with_directory};
 
-/// The read routes: the personal views and the administrator's wider view.
+/// The commit this service was built from, as `build.rs` stamped it.
+pub const BUILD: &str = env!("LYS_BUILD");
+
+/// The read routes: the authority, the personal views and the
+/// administrator's wider view.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/authority", get(authority))
         .route("/me", get(me))
         .route("/people", get(own_people))
         .route("/agents/{id}", get(own_agent))
         .route("/directory/people", get(every_person))
         .route("/directory/agents/{id}", get(any_agent))
+}
+
+/// How access is managed, and the build answering.
+async fn authority() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "authority": AUTHORITY, "build": BUILD }))
 }
 
 /// Whose records a view may show.

@@ -400,14 +400,6 @@ pub fn answers(port: u16, path: &str) -> bool {
     loopback_http::exchange(&authority, &request).is_ok()
 }
 
-/// Waits until the loopback service on `port` answers `path`, or the
-/// process behind the pid file exits, in which case the log is named.
-pub fn wait_answering(port: u16, path: &str, pid_file: &Path, log: &Path) -> IdentityResult<()> {
-    wait_until(&format!("127.0.0.1:{port}"), log, pid_file, &mut || {
-        answers(port, path)
-    })
-}
-
 /// Runs `check` once now and once on each change to `log`, until it
 /// passes; the process behind `pid_file` exiting first is refused as
 /// `what`, naming the log. The log is watched before the first check, so a

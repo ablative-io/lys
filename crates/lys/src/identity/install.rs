@@ -4,9 +4,13 @@
 //! path and never writes outside it. Inside, it writes the deployment
 //! configuration, materialises credentials, starts the compose services,
 //! waits until they answer, registers both clients, generates the service
-//! key and the secrets broker, writes the directory service's configuration
-//! and starts the broker and the service. Running it again changes only
-//! what is missing; nothing is rotated or restarted.
+//! key and the secrets broker, writes the directory service's configuration,
+//! places the broker's and the service's binaries in its own `bin/` and
+//! starts them from there, and records the build running in
+//! `install/build.json`. Running it again changes only what is missing;
+//! nothing is rotated, a placed binary is never replaced (that is
+//! `lys identity upgrade`'s), and nothing is restarted unless its
+//! configuration changed.
 
 use std::path::{Path, PathBuf};
 
@@ -18,7 +22,7 @@ use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::prepare::{API_KEY_NAME, API_KEY_SECRET, read_secret};
 use super::private_files::Outcome;
 use super::rauthy::RauthyApi;
-use super::{configure, prepare, private_files};
+use super::{configure, prepare, private_files, upgrade};
 use crate::commands::output::Emitter;
 
 pub mod exit_wait;
@@ -27,7 +31,7 @@ pub mod server_config;
 pub mod services;
 pub mod surface;
 
-use layout::{BROKER_PORT, Layout, SERVICE_PORT};
+use layout::{BINARIES, Layout};
 
 /// What the operator chose.
 #[derive(Debug)]
@@ -114,43 +118,37 @@ fn started_word(started: bool, replace: bool) -> &'static str {
     }
 }
 
-fn start_broker(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
-    let program = services::sibling("lys-secrets")?;
-    let log = layout.logs_dir().join("secrets.log");
-    let pid = layout.run_dir().join("secrets.pid");
-    let args = [
-        "serve",
-        "--root",
-        &layout.broker_root().display().to_string(),
-        "--keys",
-        &layout.broker_keys().display().to_string(),
-        "--listen",
-        &format!("127.0.0.1:{BROKER_PORT}"),
-        "--directory-config",
-        &layout.service_config().display().to_string(),
-    ]
-    .map(str::to_string);
-    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
-    services::wait_answering(BROKER_PORT, "/", &pid, &log)?;
-    emitter.note(&format!(
-        "secrets broker {} on 127.0.0.1:{BROKER_PORT}",
-        started_word(started, replace)
-    ));
+/// Places each binary the install runs into `bin/` from beside the running
+/// `lys`, when it is not there yet. One already there is never replaced:
+/// that is `lys identity upgrade`'s.
+fn place_binaries(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
+    private_files::ensure_dir(&layout.bin_dir())?;
+    for name in BINARIES {
+        if layout.binary(name).is_file() {
+            continue;
+        }
+        let source = services::sibling(name)?;
+        upgrade::place_binary(&source, &layout.bin_dir(), name)?;
+        emitter.note(&format!("{name} placed in {}", layout.bin_dir().display()));
+    }
     Ok(())
 }
 
-fn start_service(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
-    let program = services::sibling("lys-identity-server")?;
-    let log = layout.logs_dir().join("identity.log");
-    let pid = layout.run_dir().join("identity.pid");
-    let args = [layout.service_config().display().to_string()];
-    let started = services::start_detached(&program, &args, &log, &pid, replace)?;
-    services::wait_answering(SERVICE_PORT, "/api/authority", &pid, &log)?;
-    emitter.note(&format!(
-        "identity service {} on {}",
-        started_word(started, replace),
-        Layout::service_url()
-    ));
+/// Starts the broker and then the service from `bin/`, each waited on for
+/// ready, restarting a running one when `replace` asks.
+fn start_units(layout: &Layout, emitter: &mut Emitter, replace: bool) -> IdentityResult<()> {
+    for unit in upgrade::units(layout) {
+        let started = upgrade::launch(layout, &unit, replace)?;
+        let at = match unit.ready.answers {
+            Some((port, _)) => format!(" on 127.0.0.1:{port}"),
+            None => String::new(),
+        };
+        emitter.note(&format!(
+            "{} {}{at}",
+            unit.binary,
+            started_word(started, replace)
+        ));
+    }
     Ok(())
 }
 
@@ -219,8 +217,20 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     })?;
     let configuration = private_files::write(&layout.service_config(), &encoded)?;
     let changed = configuration != Outcome::Unchanged;
-    start_broker(&layout, &mut emitter, changed)?;
-    start_service(&layout, &mut emitter, changed)?;
+    place_binaries(&layout, &mut emitter)?;
+    start_units(&layout, &mut emitter, changed)?;
+    let build = upgrade::record_build(&layout, &BINARIES, &mut |line| emitter.note(line))?;
+    let build = serde_json::to_value(&build).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::RenderFailed,
+            "render",
+            "build.json",
+            error.to_string(),
+        )
+    })?;
+    if emitter.is_json() {
+        emitter.field("build", "build", build);
+    }
     emitter.field("open", "url", Layout::service_url());
     emitter.field(
         "administrator",
