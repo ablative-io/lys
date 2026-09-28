@@ -658,7 +658,7 @@
     {
       "id": "RM-019",
       "title": "Keep the enduring agent apart from each session's credential",
-      "status": "briefed",
+      "status": "landed",
       "kind": "feature",
       "summary": "Road adjustment 3 (docs/design/identity/STATEMENT-2026-09-22.md:162-167) as a directory contract brief, DIRECTORY-011: the directory contract gains the rules that the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, an agent may be registered before it ever runs, and a second session of the same agent presents the same enduring identity with a new session credential; and one lys-identity test proves an agent registered with no session appears in the directory under its responsible person with no session credential. The brief lands as documents; its build waits on DIRECTORY-003. The second-session proof waits on RM-029; the design's 'Road step 2 onward' non-goal and P6 stand.",
       "provenance": {
@@ -682,12 +682,16 @@
           "DIRECTORY-011",
           "HOME-011"
         ],
-        "commits": []
+        "commits": [
+          "33f34d8967a255004bdd513b5c75637b5d26747f",
+          "605ba3adb5ed80e3f74a062f8fcb43cd307ed34e",
+          "8e5dc427e8a098fef8514442a8ec7046fcd95df8"
+        ]
       },
       "depends_on": [
         "RM-001"
       ],
-      "notes": "Ids: DIRECTORY-011 and RM-019 are kept by the lead's ruling because the earlier run's draft on draft/directory/e5171dbd (fe72451) held them first; this branch supersedes that draft. Measured against all 121 remote branches of ablative-io/lys after fetching at main 7b53625: RM-019 is also appended on other branches for other work (HOME-011, HOME-008, LYSGATE-001, LYSCORE-001), and S22 and S23 on draft/directory/c7d95bf6 for other stories, so whichever lands second renumbers. RM-029 is appended beside this row as the step-2 session row the second-session proof waits on, the highest RM id on any branch being RM-028. No new ADR: the form of the session credential stays open, so the decision the survey proposed waits for it. Further units, not written: Road step 2: the session record, its credential and the presentation step (carried as RM-029, with no card yet); Decide the session credential's form: per-session lys certificate, SpeaksFor delegation or ADR-001 handle. The build's blocker on DIRECTORY-003 reads DIRECTORY-003's own execution record at origin/main, not RM-001, which links five briefs."
+      "notes": "Ids: DIRECTORY-011 and RM-019 are kept by the lead's ruling because the earlier run's draft on draft/directory/e5171dbd (fe72451) held them first; this branch supersedes that draft. Measured against all 121 remote branches of ablative-io/lys after fetching at main 7b53625: RM-019 is also appended on other branches for other work (HOME-011, HOME-008, LYSGATE-001, LYSCORE-001), and S22 and S23 on draft/directory/c7d95bf6 for other stories, so whichever lands second renumbers. RM-029 is appended beside this row as the step-2 session row the second-session proof waits on, the highest RM id on any branch being RM-028. No new ADR: the form of the session credential stays open, so the decision the survey proposed waits for it. Further units, not written: Road step 2: the session record, its credential and the presentation step (carried as RM-029, with no card yet); Decide the session credential's form: per-session lys certificate, SpeaksFor delegation or ADR-001 handle. The build's blocker on DIRECTORY-003 reads DIRECTORY-003's own execution record at origin/main, not RM-001, which links five briefs. Landed on main: DIRECTORY-011 R1 (the contract section) and R2 (the two tests of crates/lys-identity/tests/agent_without_session.rs); the second-session proof stays with RM-029."
     },
     {
       "id": "RM-029",
