@@ -145,5 +145,5 @@ export const SERVICE: Record<string, Route> = {
   '/grants/model': ok(MODEL),
   'POST /grants/why': why,
   'POST /grants/who': who,
-  'POST /grants': ok({ operation: 'op-x', grant: 'grant-' + hex(34), index: 3, receipt: {} }),
+  'POST /grants': (body) => ok({ operation: (body as { operation: string }).operation, grant: 'grant-' + hex(34), index: 3, receipt: { caller: ADA } }),
 };

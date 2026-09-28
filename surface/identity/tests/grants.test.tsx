@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unreachable } from './harness';
 import { ADA, DIRECTORY, GRANTS, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { DelegateBody } from '../src/generated/grants';
+
+beforeEach(() => sessionStorage.clear());
 
 const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr');
 
@@ -86,15 +88,70 @@ describe('The delegation form (conformance 2.1 to 2.3)', () => {
     let calls = 0;
     const { posted } = await open({
       ...SERVICE,
-      'POST /grants': () => (++calls === 1 ? refused(503, 'AppendUncertain', 'AppendUncertain: not known') : ok({ operation: 'x', grant: 'g', index: 1, receipt: {} })),
+      'POST /grants': (body) => (++calls === 1 ? refused(503, 'AppendUncertain', 'AppendUncertain: not known') : ok({ operation: (body as DelegateBody).operation, grant: SCRIBE_G, index: 1, receipt: { caller: ADA } })),
     });
     await click($('[data-act="delegatedo"]'));
     expect($('#dAnswer b')?.textContent).toBe('pending');
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120000);
+    expect(($('#dTo') as HTMLSelectElement).closest('fieldset')?.disabled).toBe(true);
     await click($('[data-act="delegatedo"]'));
+    expect(posted[0].body).toEqual(posted[1].body);
     const ops = posted.filter((p) => p.path === '/grants').map((p) => (p.body as DelegateBody).operation);
     expect(ops).toHaveLength(2);
     expect(ops[0]).toBe(ops[1]);
     expect($('#toast')?.textContent).toContain('Given.');
+  });
+
+  it('retains the exact grant after closing and reopening the drawer, even after the clock changes', async () => {
+    let count = 0;
+    const { posted } = await open({ ...SERVICE, 'POST /grants': (body) => ++count === 1
+      ? refused(503, 'AppendUncertain', 'outcome unknown')
+      : ok({ operation: (body as DelegateBody).operation, grant: SCRIBE_G, receipt: { caller: ADA } }) });
+    await click($('[data-act="delegatedo"]'));
+    await press('Escape');
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000);
+    await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    expect($('#dAnswer')?.textContent).toContain('pending');
+    await click($('[data-act="delegatedo"]'));
+    expect(posted.filter((entry) => entry.path === '/grants')).toHaveLength(2);
+    expect(posted[1].body).toEqual(posted[0].body);
+    expect($('#toast')?.textContent).toContain('Given.');
+  });
+
+  it('keeps an earlier unknown grant held when a retry answers a definite refusal', async () => {
+    let count = 0;
+    const { posted } = await open({ ...SERVICE, 'POST /grants': () => ++count === 1
+      ? refused(503, 'AppendUncertain', 'outcome unknown') : refused(409, 'Expired', 'source expired') });
+    await click($('[data-act="delegatedo"]'));
+    await click($('[data-act="delegatedo"]'));
+    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect(posted[1].body).toEqual(posted[0].body);
+    expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G)).not.toBeNull();
+    expect($('#toast')?.textContent).not.toContain('Given.');
+  });
+
+  it('does not claim a malformed success is this operation or send when retention fails', async () => {
+    const { posted } = await open({ ...SERVICE, 'POST /grants': ok({ operation: 'wrong', grant: SCRIBE_G, receipt: { caller: ADA } }) });
+    await click($('[data-act="delegatedo"]'));
+    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#toast')?.textContent).not.toContain('Given.');
+    expect(posted).toHaveLength(1);
+  });
+
+  it('sends nothing if the browser cannot retain the original grant request', async () => {
+    const { posted } = await open();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage unavailable'); });
+    await click($('[data-act="delegatedo"]'));
+    expect(posted).toEqual([]);
+    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+  });
+
+  it('opens the real bounded grant form from temporary access on an agent file', async () => {
+    await mount('#/file/' + SCRIBE + '/access');
+    await click($('[data-act="temporary-access"]'));
+    expect($('#drawer')?.classList.contains('open')).toBe(true);
+    expect(($('#dTo') as HTMLSelectElement).value).toBe(SCRIBE);
+    expect(($('#dLease') as HTMLSelectElement).value).toBe('7 days');
   });
 
   it('Escape closes the drawer and focus returns', async () => {

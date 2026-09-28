@@ -116,7 +116,7 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
             >
               Grant access
             </button>
-            <button className="btn" data-act="toast" onClick={() => shell.toast('Temporary access goes through Requests, which is not built yet')}>Temporary access…</button>
+            <button className="btn" data-act="temporary-access" onClick={() => mineToGive && passable.length ? shell.openDrawer(<Delegate w={w} source={passable[0]} to={x.id} done={reload} />) : shell.toast(mineToGive ? 'You hold nothing you may pass on to an agent' : `Only the person ${name} answers to gives it access`)}>Temporary access…</button>
           </div>
         ) : null}
       </div>

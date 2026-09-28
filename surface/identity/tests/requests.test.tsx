@@ -164,3 +164,21 @@ describe('Requests', () => {
     expect(button('Approve access')).toBeNull(); expect(button('Decline request')).toBeNull();
   });
 });
+
+describe('Held approval recovery', () => {
+  it('settles the existing server intent without submitting a new decision', async () => {
+    const id = 'op-' + 'e'.repeat(32);
+    const entry = { ...kept({ operation: id, resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' }), held_by: ADA, can_decide: true };
+    const { posted } = await mount('#/requests', { ...routes, '/requests': ok({ requests: [entry] }), ['POST /requests/' + id + '/reconcile']: ok({ ...entry, state: 'approved', held_by: null }) });
+    expect(button('Approve access')).toBeNull(); expect(button('Decline request')).toBeNull();
+    await click(button('Check pending approval'));
+    expect(posted).toEqual([{ path: '/requests/' + id + '/reconcile', body: {} }]);
+  });
+  it('names an unresolved grant log without allowing a new decision', async () => {
+    const id = 'op-' + 'f'.repeat(32);
+    const entry = { ...kept({ operation: id, resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' }), held_by: ADA, can_decide: true };
+    await mount('#/requests', { ...routes, '/requests': ok({ requests: [entry] }), ['POST /requests/' + id + '/reconcile']: refused(409, 'RequestHeld', 'grant outcome uncertain') });
+    await click(button('Check pending approval'));
+    expect(text()).toContain('RequestHeld'); expect(button('Decline request')).toBeNull();
+  });
+});

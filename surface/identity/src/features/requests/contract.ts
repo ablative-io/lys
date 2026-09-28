@@ -20,6 +20,7 @@ export interface AccessRequest {
   can_issue_root?: boolean;
   /** The service may admit a root decider even when it cannot lend to an agent. */
   can_decide?: boolean;
+  held_by?: string | null;
   decision: { by: string; note: string; grant: string | null; decided_at: number } | null;
 }
 
