@@ -391,13 +391,13 @@
     },
     {
       "id": "ADR-019",
-      "title": "The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001)",
-      "status": "proposed",
-      "scope": "secrets",
-      "date": "2026-09-26",
-      "decided_by": "Proposed by the lead's answers to the secrets survey, recorded with SECRETS-003; it waits on Tom's word, because it amends ADR-001, which is his decision",
-      "context": "ADR-001 places the broker inside the door, built in Rust. SECRETS-002 named door-owned files in the cambium checkout while its design's CN4 refused to let those proposals make Cambium a required runtime, and left the broker's host open. Every code row's files wait on which repository they sit in, and ADR-004 requires every project to stand alone. This entry amends ADR-001 rather than superseding it: ADR-001's handle model stands, and only where the broker is built moves, so supersedes stays empty and ADR-001's text is unchanged.",
-      "decision": "The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.",
+      "title": "A forward failure is answered by the pass-through example, never by the shared forward.rs",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the pass-through survey; recorded with HOME-008",
+      "context": "The pass-through example shares R10's forward.rs. A failure before any upstream response must reach the example's client as something, and a break after the status has gone cannot change the status. R10 says the proxy alters no byte and records such calls as partial or unrecorded; a synthesised 502 inside forward.rs would give every lys-proxy client a 502 it would not otherwise get, on a card that is not R10's.",
+      "decision": "forward.rs stays byte-faithful: when it fails before any upstream response it returns an error to its caller naming the kind (refused, reset, or broken before the status line) and synthesises nothing. The pass-through example maps that error to 502 Bad Gateway with an empty body and writes 502 in its call line; when the upstream breaks after its status and headers have gone to the client, the example closes the client connection and its call line records that status and the duration up to the break. No error text, header value or body byte is written anywhere on either path. Rejected: the 502 inside forward.rs, which would change lys-proxy's observable behaviour.",
       "quote": "",
       "consequences": [
         "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
@@ -407,7 +407,10 @@
         "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker.",
         "The entry stays proposed until Tom gives his word, and then moves to decided with decided_by set to exactly ADR-001's decided_by value, `Tom`, and his word cited in its context; each code row's Blocked by check tests that equality.",
         "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets, and every code row carries Tom's word on this entry in its own Blocked by; if he keeps the broker inside the door, those rows' file lists are re-briefed as an amendment before any is dispatched.",
-        "CN4 of the secrets design is answered by this entry once it is decided; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002."
+        "CN4 of the secrets design is answered by this entry once it is decided; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
+        "lys-proxy keeps R10's own behaviour and records partial or unrecorded as its spec says.",
+        "A test on forward.rs asserts the error kind on a refused connection and that no response bytes are invented; a test on the example asserts the 502.",
+        "If the rule is ever wanted for lys-proxy too, it is a change to R10's contract, stated there, not a change made under the example."
       ],
       "supersedes": [],
       "superseded_by": ""
