@@ -125,8 +125,9 @@ const ROWS: ConformanceRow[] = [
       // A separate list: no grant of the hold table is inside it.
       expect(accounts?.querySelector('[data-act="delegate"]')).toBeNull();
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+      // What cannot be given is the service's answer, and it lists no service account.
       const cannot = $$('#drawer .why-not').map((d) => d.querySelector('b')?.textContent);
-      expect(cannot).toContain('Service accounts');
+      expect(cannot).toEqual(['viewer of project:ledger', 'Your sign-in identities']);
     },
   },
   {
@@ -168,7 +169,7 @@ const ROWS: ConformanceRow[] = [
       expect(source).toContain('owner of project:identity');
       expect(source).toContain('Actions it allowsedit, grant, view');
       expect(source).toContain('You may pass it onagent');
-      expect(source).toContain('Ends no later than illustrative27 Oct, when yours does');
+      expect(source).toContain('Ends no later than27 Oct');
     },
   },
   {
@@ -178,11 +179,10 @@ const ROWS: ConformanceRow[] = [
       await mount('#/me');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       const reasons = $$('#drawer .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
-      expect(reasons).toHaveLength(4);
-      expect(reasons[0][0]).toBe('viewer of project:ledger');
-      expect(reasons[0][1]).toContain('does not let you pass it on');
-      expect(reasons[1]).toEqual(['owner of project:identity', 'More than you hold.']);
-      expect(reasons[3]).toEqual(['Your sign-in identities', 'They prove who you are. No agent can hold them.']);
+      expect(reasons).toEqual([
+        ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
+        ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
+      ]);
     },
   },
   {
@@ -211,7 +211,7 @@ const ROWS: ConformanceRow[] = [
       const card = $$('.file .card').filter((c) => (c.textContent ?? '').includes('Passable:'));
       expect(card).toHaveLength(1);
       expect(card[0].textContent).toContain('Last used: 27 Sep 12:00 · tool');
-      expect(card[0].textContent).toContain('Lasts: until 4 Oct');
+      expect(card[0].textContent).toContain('Window: 27 Sep to 4 Oct');
       // Its source, as the chain from the person who issued it.
       expect(card[0].querySelector('.chain')?.textContent).toBe('Ada (test person) · owner of project:identity→Scribe · viewer of project:identity');
       expect(text()).not.toContain('never used');

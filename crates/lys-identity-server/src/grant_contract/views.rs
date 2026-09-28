@@ -146,6 +146,29 @@ impl From<&Usage> for LastUseView {
     }
 }
 
+/// Why a grant does not stand, as the caller may read it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RefusedView {
+    /// The refusal's name, the same for a refusal withheld from the caller.
+    pub refusal: String,
+    /// The grant on the chain the refusal names, or null when it names none
+    /// or is withheld from the caller.
+    pub grant: Option<String>,
+    /// The refusal's text, as the caller may read it.
+    pub reason: String,
+}
+
+/// Whether a grant stands at the service's clock, judged over its whole
+/// chain exactly as a check judges it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StandingView {
+    /// Whether it stands.
+    pub stands: bool,
+    /// Why not, present only when it does not stand.
+    #[serde(flatten)]
+    pub refused: Option<RefusedView>,
+}
+
 /// A grant, as a caller who may inspect it reads it.
 #[derive(Debug, Clone, Serialize)]
 pub struct GrantView {
@@ -181,12 +204,24 @@ pub struct GrantView {
     pub revoked_revision: Option<u64>,
     /// When it was last seen exercised.
     pub last_use: LastUseView,
+    /// Whether it stands, judged over its whole chain.
+    pub standing: StandingView,
+    /// The earliest end on its chain, null when nothing on the chain ends or
+    /// the chain does not resolve. Admission refuses a grant ending after
+    /// its source, so this is the grant's own end.
+    pub effective_ends_at: Option<u64>,
 }
 
 impl GrantView {
-    /// The grant `record` holds, with the exercises of it the log has no
-    /// report of.
-    pub fn new(record: &GrantRecord, unreported: Option<&Unreported>) -> Self {
+    /// The view of `record`: the exercises of it the log has no report of,
+    /// and the standing and effective end the service judged for it.
+    #[must_use]
+    pub fn new(
+        record: &GrantRecord,
+        unreported: Option<&Unreported>,
+        standing: StandingView,
+        effective_ends_at: Option<u64>,
+    ) -> Self {
         let grant = record.grant();
         let parts = grant.parts();
         Self {
@@ -215,6 +250,8 @@ impl GrantView {
             revoked_at: record.revoked().map(|revocation| revocation.at),
             revoked_revision: record.revoked().map(|revocation| revocation.index + 1),
             last_use: LastUseView::from(&Usage::of(record, unreported)),
+            standing,
+            effective_ends_at,
         }
     }
 }

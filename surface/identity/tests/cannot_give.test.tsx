@@ -20,7 +20,8 @@ const [G1, G2, G3, G10] = [1, 2, 3, 10].map((n) => 'grant-' + hex(0x100 + n));
 const grant = (id: string, relation: string, actions: string[], pass_on: PassOn, source: string | null, on = 'p'): Grant => ({
   id, issuer: ADA, holder: ADA, responsible: ADA, resource: { kind: 'project', id: on }, relation, actions, pass_on, source,
   window: { starts_at: 1_759_000_000, ends_at: null }, model_version: 1, operation: 'op-' + hex(500), revoked: false,
-  revoked_at: null, revoked_revision: null, last_use: { seen: false },
+  revoked_at: null, revoked_revision: null, last_use: { seen: false, recorded: 0, source: 'reported' },
+  standing: { stands: true }, effective_ends_at: null,
 });
 
 const GRANTS: Grant[] = [

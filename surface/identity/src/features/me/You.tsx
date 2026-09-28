@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
 import { Delegate } from '../grants/Delegate';
-import { nameOf, onText, passesToAgents, readGrantWorld, standing } from '../grants/model';
+import { nameOf, onText, passesToAgents, readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -45,9 +45,9 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
   const shell = useShell();
   const navigate = useNavigate();
   const { me, agents, w } = data;
-  const mine = w.list.grants.filter((g) => g.holder === me.person.id && standing(w, g).ok);
+  const mine = w.list.grants.filter((g) => g.holder === me.person.id && g.standing.stands);
   const held = (id: string) =>
-    w.list.grants.filter((g) => g.holder === id && !g.revoked).map((g) => `${g.relation} of ${onText(g)}`).join('; ');
+    w.list.grants.filter((g) => g.holder === id && g.standing.stands).map((g) => `${g.relation} of ${onText(g)}`).join('; ');
   const same = (a: Login) => a.provider === me.signed_in.provider && a.subject === me.signed_in.subject;
   return (
     <div className="page">

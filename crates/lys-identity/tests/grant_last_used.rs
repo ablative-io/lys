@@ -41,7 +41,7 @@ fn lent(world: &mut World) -> Result<GrantId, Box<dyn Error>> {
 }
 
 #[test]
-fn grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> TestResult {
+fn row_8_4_grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> TestResult {
     let mut world = World::new()?;
     let tom = IdentityId::Person(world.tom);
     let grant = lent(&mut world)?;
@@ -98,7 +98,7 @@ fn grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time() -> T
 }
 
 #[test]
-fn grant_last_used_a_reopen_restores_it_from_the_log() -> TestResult {
+fn row_8_4_grant_last_used_a_reopen_restores_it_from_the_log() -> TestResult {
     let mut world = World::new()?;
     let grant = lent(&mut world)?;
     let index = world
@@ -133,7 +133,7 @@ fn grant_last_used_a_reopen_restores_it_from_the_log() -> TestResult {
 }
 
 #[test]
-fn grant_last_used_a_refused_check_writes_no_use() -> TestResult {
+fn row_8_4_grant_last_used_a_refused_check_writes_no_use() -> TestResult {
     let mut world = World::new()?;
     let grant = lent(&mut world)?;
     let before = world.events();

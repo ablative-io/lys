@@ -310,7 +310,7 @@ THE SYSTEM SHALL expose typed operations for list/read, delegate, revoke and exp
 
 ### R6: Implement the You and delegation screens from the server contract
 
-THE SYSTEM SHALL render the accepted mock-up's You page and delegation form from the server's generated grant types and decisions. Show sign-in identities separately from service access, source grants, effective operations/resource, affirmative pass-on rights and inherited end boundary. The form SHALL explain refused choices the caller is allowed to discover; it SHALL NOT enumerate other people's private secrets merely to say no. Personal views are scoped to the signed-in person, while an independently authorised directory administrator may inspect the wider directory. A failed or uncertain mutation SHALL remain refused or pending, with the original operation ID, never an optimistic grant or a new retry. The access graph consumes the same explanation response; its rendering belongs to Archie's graph brief. No simulated confirmation timer or sample-data authority calculation ships. Conformance 1.3–1.5, 2.3–2.4, 8.1 and 8.4.
+THE SYSTEM SHALL render the accepted mock-up's You page and delegation form from the server's generated grant types and decisions. Show sign-in identities separately from service access, source grants, effective operations/resource, affirmative pass-on rights and inherited end boundary. The form SHALL explain refused choices the caller is allowed to discover; it SHALL NOT enumerate other people's private secrets merely to say no. Personal views are scoped to the signed-in person, while an independently authorised directory administrator may inspect the wider directory. A failed or uncertain mutation SHALL remain refused or pending, with the original operation ID, never an optimistic grant or a new retry. The access graph consumes the same explanation response; its rendering belongs to Archie's graph brief. No simulated confirmation timer or sample-data authority calculation ships. Conformance 1.3–1.5, 2.3–2.4, 8.1 and 8.4. The screens landed from hand/identity-surface-land at 6f57bf7 (PR 35), not from a build of this brief.
 
 **Acceptance:**
 - GRANT_SCREEN: using two test people and their agents, render the source grant, action/resource scope, pass-on decision and inherited expiry from fixture IDs. Switching the signed-in person changes the personal data; permitted administrator inspection remains possible through its separate route.
@@ -319,11 +319,12 @@ THE SYSTEM SHALL render the accepted mock-up's You page and delegation form from
 - GRANT_CONFORMANCE: pin the accepted mock-up file hash and numbered conformance rows in the test evidence. Exercise keyboard operation and deep linking as well as API refusal parity; sample data and visual similarity alone are not a passing acceptance.
 
 **Files:**
-- create: surface/identity/src/features/grants/YouGrants.tsx
-- create: surface/identity/src/features/grants/DelegateGrant.tsx
-- create: surface/identity/src/features/grants/GrantExplanation.tsx
+- create: surface/identity/src/features/me/You.tsx
+- create: surface/identity/src/features/grants/Delegate.tsx
+- create: surface/identity/src/features/grants/Answer.tsx
 - create: surface/identity/tests/grants.test.tsx
-- create: surface/identity/tests/acceptance/grants.spec.ts
+- create: surface/identity/tests/me.test.tsx
+- create: surface/identity/tests/revoke.test.tsx
 - modify: surface/identity/src/routes.tsx
 - modify: surface/identity/src/generated/index.ts
 

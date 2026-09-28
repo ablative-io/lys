@@ -14,7 +14,7 @@ import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';
 import { GrantCard } from '../grants/GrantCard';
-import { chainOf, onText, passesToAgents, standing } from '../grants/model';
+import { chainOf, onText, passesToAgents } from '../grants/model';
 import { CHANGE_KINDS } from '../../generated';
 import { Pill } from '../people/Pill';
 import { firstName } from '../people/directory';
@@ -78,11 +78,11 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const held = w.list.grants.filter((g) => g.holder === x.id);
   const reach = new Map<string, string[]>();
   for (const g of held) {
-    if (!standing(w, g).ok) continue;
+    if (!g.standing.stands) continue;
     const key = onText(g);
     reach.set(key, [...new Set([...(reach.get(key) ?? []), ...g.actions])]);
   }
-  const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && standing(w, g).ok && passesToAgents(g.pass_on));
+  const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on));
   const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <div className="grid2">

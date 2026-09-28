@@ -15,19 +15,19 @@ The mock-up's sample data, simulated confirmations and "not kept" edits are not 
 | 1.1 | A person signs in with one of several linked providers; each link is listed as a sign-in identity. | test | IDENTITY-001 R03 (exists) | Waffles |
 | 1.2 | Sign-in identities are never lent to or held by an agent. | test | IDENTITY-001 (amend: state it) | Waffles |
 | 1.3 | Service accounts a person may use are a separate list, each marked passable or use-only. | test | DIRECTORY (new row) | Chippy |
-| 1.4 | "What you hold" shows each grant, its source, and whether it may be passed on. | test | DIRECTORY-001 R3 (amend) | Chippy |
-| 1.5 | "You" shows the signed-in person's own agents, grants and personal secrets. This is personal scope, not global hiding: a directory administrator may lawfully see others through the directory screens. | test | DIRECTORY (amend) | Chippy |
+| 1.4 | "What you hold" shows each grant, its source, and whether it may be passed on. | test | DIRECTORY-001 R3 (amend); DIRECTORY-035 surface grants.test.tsx::row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on | Chippy |
+| 1.5 | "You" shows the signed-in person's own agents, grants and personal secrets. This is personal scope, not global hiding: a directory administrator may lawfully see others through the directory screens. | test | DIRECTORY (amend); DIRECTORY-035 surface me.test.tsx::row_1_5_an_administrators_people_shows_others_while_you_shows_only_the_persons_own, SECRETS-002 none | Chippy |
 
 ## 2. Giving an agent access (delegation)
 
 | # | Behaviour | Kind | Brief | Owner |
 |---|---|---|---|---|
-| 2.1 | A person can give an agent only a relation at or below one they hold. | test | DIRECTORY-001 R3 (amend) | Chippy |
-| 2.2 | Only a grant marked may-pass-on can be delegated; may-pass-on is an affirmative fact on the grant, never "no prohibition found". | test | DIRECTORY (amend) | Chippy |
-| 2.3 | The form shows the source grant, the actions it allows, may-pass-on, and that the new grant ends no later than its source. | test | DIRECTORY (amend) | Chippy |
+| 2.1 | A person can give an agent only a relation at or below one they hold. | test | DIRECTORY-001 R3 (amend); DIRECTORY-035 tests grant_contract::row_2_1_grant_model_judges_by_action_sets_and_keeps_its_version, DIRECTORY-035 tests grant_delegation::row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain | Chippy |
+| 2.2 | Only a grant marked may-pass-on can be delegated; may-pass-on is an affirmative fact on the grant, never "no prohibition found". | test | DIRECTORY (amend); DIRECTORY-035 tests grant_contract::row_2_2_grant_contract_supplies_no_permission_by_default, DIRECTORY-035 tests grant_delegation::row_2_2_grant_agent_parity_routes_decide_alike_and_pass_on_decides_who_delegates | Chippy |
+| 2.3 | The form shows the source grant, the actions it allows, may-pass-on, and that the new grant ends no later than its source. | test | DIRECTORY (amend); DIRECTORY-035 tests grant_delegation::row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_a_permitted_chain, DIRECTORY-035 surface grants.test.tsx::row_2_3_the_form_shows_the_source_grant_its_actions_may_pass_on_and_the_effective_end | Chippy |
 | 2.4 | Everything the person cannot give is listed with its reason (use-only, above what you hold, lent to you, sign-in identity). | test | DIRECTORY-024 | Chippy |
-| 2.5 | Withdrawing a grant withdraws everything derived from it. | test | DIRECTORY-001 R3 (exists) | Chippy |
-| 2.6 | Inherited expiry is enforced, not only displayed (leases, statement of 22 Sep). | test | DIRECTORY (new row) | Chippy |
+| 2.5 | Withdrawing a grant withdraws everything derived from it. | test | DIRECTORY-001 R3 (exists); DIRECTORY-035 tests grant_revocation::row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent_one, DIRECTORY-035 surface revoke.test.tsx::row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one | Chippy |
+| 2.6 | Inherited expiry is enforced, not only displayed (leases, statement of 22 Sep). | test | DIRECTORY (new row); DIRECTORY-035 tests grant_expiry::row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_extends_it, DIRECTORY-035 tests grant_expiry::row_2_6_admission_refuses_a_delegation_ending_past_its_source_before_any_commit, DIRECTORY-035 tests grant_expiry::row_2_6_resolve_refuses_a_derived_grant_ending_past_its_source_at_exercise, DIRECTORY-035 tests grant_faults::row_2_6_grant_durability_every_boundary_answers_replay_or_names_what_is_unresolved | Chippy |
 
 ## 3. People and agents (#/people, agent file)
 
@@ -93,7 +93,7 @@ The mock-up's sample data, simulated confirmations and "not kept" edits are not 
 | 8.1 | "Can X do this?" answers yes with the path to a person, or no with the named reason and the model version used. | test | DIRECTORY-001 R3 (exists) | Chippy |
 | 8.2 | "Who can reach this?" lists everyone with the path, from the same answers. | test | DIRECTORY (amend) | Chippy |
 | 8.3 | The graph draws the same answers as Access; it never computes its own. | test | DIRECTORY (new row) | Archie |
-| 8.4 | Every grant shows last used, its source and window; "not seen" is never shown as "never used". | test | DIRECTORY (amend) | Chippy |
+| 8.4 | Every grant shows last used, its source and window; "not seen" is never shown as "never used". | test | DIRECTORY (amend); DIRECTORY-035 tests grant_last_used::row_8_4_grant_last_used_an_exercise_is_recorded_with_its_holder_route_and_time, DIRECTORY-035 surface grants.test.tsx::row_8_4_a_grant_card_shows_last_used_its_source_and_window_and_never_never_used | Chippy |
 | 8.5 | The network view: machines, runtime, reporting state, where each role may run, egress. | test | network routes + Network screen | Waffles |
 
 ## 9. Shell, help and assistant
