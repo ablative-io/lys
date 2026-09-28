@@ -35,7 +35,7 @@ use serde::Deserialize;
 
 use crate::error::ServerError;
 use crate::grant_sight::is_root;
-use crate::grants::{Judged, caller, with_grants};
+use crate::grants::{Judged, caller};
 use crate::read_api::{person_record, person_summary};
 use crate::requests_store::{Asked, Decided, RequestStore};
 use crate::requests_views::{DecisionView, RequestList, RequestView};
@@ -292,7 +292,7 @@ async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<RequestList>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let at = now();
         with_requests(&state, |store| {
@@ -307,6 +307,7 @@ async fn list(
             Ok(Json(RequestList { requests }))
         })
     })
+    .await
 }
 
 async fn ask(
@@ -314,7 +315,7 @@ async fn ask(
     headers: HeaderMap,
     body: Result<Json<AskBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let body = taken(body)?;
         let at = now();
@@ -351,4 +352,5 @@ async fn ask(
             Ok(Json(weighed.view(&judged, caller, kept, decided, held_by)?))
         })
     })
+    .await
 }

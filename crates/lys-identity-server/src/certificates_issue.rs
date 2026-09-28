@@ -29,7 +29,7 @@ use lys_core::ca::{
 };
 use lys_identity::grants::admission::effective;
 use lys_identity::signer::load_service_key;
-use lys_identity::{IdentityId, OperationId};
+use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::str::FromStr;
@@ -38,7 +38,6 @@ use crate::agent_sight::{SeenAgent, seen_agent};
 use crate::certificates_api::{CertificatesView, answer};
 use crate::certificates_store::{CertificateStore, Issued, Withdrawn};
 use crate::error::ServerError;
-use crate::grants::with_grants;
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -91,11 +90,11 @@ fn with_store<T>(
 
 /// The grants the agent holds that stand at `at`, with every grant above
 /// each of them.
-fn grants(state: &AppState, seen: &SeenAgent, at: u64) -> Result<Vec<Value>, ServerError> {
-    with_grants(state, |judged| {
+async fn grants(state: &Arc<AppState>, agent: AgentId, at: u64) -> Result<Vec<Value>, ServerError> {
+    crate::spicedb_cancel::judged(Arc::clone(state), move |judged| {
         let book = judged.grants.book();
         Ok(book
-            .held_by(IdentityId::Agent(seen.agent))
+            .held_by(IdentityId::Agent(agent))
             .filter(|record| effective(book, judged.directory, record.grant().id(), at).is_ok())
             .map(|record| {
                 let grant = record.grant();
@@ -107,6 +106,7 @@ fn grants(state: &AppState, seen: &SeenAgent, at: u64) -> Result<Vec<Value>, Ser
             })
             .collect())
     })
+    .await
 }
 
 /// The roles the agent holds at `at`, null when no roles are kept.
@@ -140,14 +140,17 @@ fn profile_version(state: &AppState, agent: &str) -> Result<Value, ServerError> 
 }
 
 /// What holds for the agent at `at`, as the service keeps it.
-fn claims(state: &AppState, seen: &SeenAgent, at: u64) -> Result<Value, ServerError> {
+async fn claims(state: &Arc<AppState>, seen: &SeenAgent, at: u64) -> Result<Value, ServerError> {
     let agent = seen.agent.to_string();
+    let roles = roles(state, &agent, at)?;
+    let profile_version = profile_version(state, &agent)?;
+    let grants = grants(state, seen.agent, at).await?;
     Ok(json!({
         "agent": agent,
         "person": seen.responsible.map(|person| person.to_string()),
-        "roles": roles(state, &agent, at)?,
-        "profile_version": profile_version(state, &agent)?,
-        "grants": grants(state, seen, at)?,
+        "roles": roles,
+        "profile_version": profile_version,
+        "grants": grants,
         "held_at": at,
     }))
 }
@@ -205,7 +208,7 @@ pub(crate) async fn issue(
         };
     }
     let at = now();
-    let claims = claims(&state, &seen, at)?;
+    let claims = claims(&state, &seen, at).await?;
     let der = certificate(&state, &request, &agent, &claims)?;
     with_store(&state, |store| {
         store.issue(Issued {

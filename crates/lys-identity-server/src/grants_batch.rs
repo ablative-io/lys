@@ -1,5 +1,6 @@
 //! Many questions at once: the batch check and the question of which
-//! resources a subject may act on.
+//! resources a subject may act on, beside the single question of why the
+//! caller may act, `POST /grants/why`, answered by the check's own decision.
 //!
 //! `POST /grants/check/batch` takes up to [`BATCH_MAX`] checks and answers
 //! each allowed or refused with its reason, in the order sent, every one at
@@ -29,7 +30,9 @@ use serde::{Deserialize, Serialize};
 use crate::apps_binding::{Acting, acting};
 use crate::apps_error::AppError;
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grant_contract::{ActionBody, PermitView};
+use crate::grant_sight::as_seen_by;
+use crate::grants::{Decision, Judged, caller, decide};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
 
@@ -218,7 +221,7 @@ pub async fn batch(
     }
     let acting_for = asker(&state, &headers)?;
     let at = now();
-    with_grants(&state, |mut judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |mut judged| {
         let results = body
             .checks
             .iter()
@@ -229,6 +232,33 @@ pub async fn batch(
             results,
         }))
     })
+    .await
+}
+
+/// Why the caller may take the action on the resource: the check's own
+/// decision, explained, recording nothing.
+pub async fn why(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<ActionBody>,
+) -> Result<Json<PermitView>, ServerError> {
+    let (route, resource, action) = body.parts()?;
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |mut judged| {
+        let caller = caller(&state, &headers, judged.directory)?;
+        judged.apps.admit_kind(None, resource.kind())?;
+        judged.apps.admit_action(resource.kind(), action.as_str())?;
+        let request = ExerciseRequest {
+            caller,
+            route,
+            resource,
+            action,
+        };
+        match decide(&mut judged, &request, now(), None, Decision::Explain) {
+            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
+            Err(error) => Err(as_seen_by(&judged, caller, error)),
+        }
+    })
+    .await
 }
 
 /// The ids of `kind` a subject may take `action` on, a page at a time.
@@ -245,7 +275,7 @@ pub async fn which(
     let subject: IdentityId = identity_id(&body.subject)?;
     let action = Action::new(&body.action)?;
     let at = now();
-    with_grants(&state, |mut judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |mut judged| {
         judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
         judged.apps.admit_action(&body.kind, action.as_str())?;
         let mut candidates: BTreeSet<String> = judged
@@ -296,4 +326,5 @@ pub async fn which(
             revision: judged.grants.revision(),
         }))
     })
+    .await
 }

@@ -59,8 +59,10 @@ regex-lite = "0.1"
 # epoll on Linux, so a wait is on the kernel's notice and never a clock.
 mio = { version = "1", default-features = false, features = ["os-ext"] }
 # POSIX record locks through a safe interface: a lock the process owns, never
-# shared with a child through a duplicated descriptor.
-rustix = { version = "1.1", features = ["fs", "process"] }
+# shared with a child through a duplicated descriptor. `event`, `net` and
+# `pipe` carry the SpiceDB call's wait in poll(2) on its socket and on its
+# request's wake pipe, with no timeout.
+rustix = { version = "1.1", features = ["event", "fs", "net", "pipe", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.10"

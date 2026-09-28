@@ -1,12 +1,22 @@
 //! One JSON request to the `SpiceDB` gateway and its answer, over a plain
 //! TCP connection that is closed after the answer.
+//!
+//! The endpoint is a socket address, so no name lookup is waited on. The
+//! socket is non-blocking and every wait, the connect, each write and each
+//! read, is made in poll(2) given no time bound, over the socket and, inside
+//! a request's scope (`spicedb_cancel`), that request's wake pipe. A call ends
+//! on `SpiceDB`'s answer, on `SpiceDB` closing the connection, or on its
+//! request leaving, and never on a clock.
 
-use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
-use std::time::Duration;
+use std::io::{self, Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 
-/// How long one connect, write or read may take.
-const WAIT: Duration = Duration::from_secs(5);
+use rustix::event::{PollFd, PollFlags};
+use rustix::io::{Errno, FdFlags};
+use rustix::net::{AddressFamily, SocketType};
+
+use crate::spicedb_cancel::{Cancel, LEFT, current};
 
 /// An answer: its status and its body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,27 +27,122 @@ pub struct Answer {
     pub body: String,
 }
 
-/// Post `body` to `path` at `authority`, a host and port, carrying `bearer`.
-/// The error is a reason in words and never holds the bearer.
+/// Why an exchange ended without an answer.
+enum Ended {
+    /// The request that asked left.
+    Left,
+    /// The connect, a write or a read failed.
+    Failed(io::Error),
+}
+
+impl From<io::Error> for Ended {
+    fn from(error: io::Error) -> Self {
+        Self::Failed(error)
+    }
+}
+
+/// Post `body` to `path` at `authority`, a socket address, carrying
+/// `bearer`. The error is a reason in words and never holds the bearer.
 pub fn post_json(authority: &str, path: &str, bearer: &str, body: &str) -> Result<Answer, String> {
-    let unreachable = |error: std::io::Error| format!("{authority} could not be reached: {error}");
-    let address = authority
-        .to_socket_addrs()
-        .map_err(unreachable)?
-        .next()
-        .ok_or_else(|| format!("{authority} names no address"))?;
-    let mut stream = TcpStream::connect_timeout(&address, WAIT).map_err(unreachable)?;
-    stream.set_read_timeout(Some(WAIT)).map_err(unreachable)?;
-    stream.set_write_timeout(Some(WAIT)).map_err(unreachable)?;
+    let cancel = current();
+    if cancel.as_deref().is_some_and(Cancel::cancelled) {
+        return Err(LEFT.to_owned());
+    }
+    let address: SocketAddr = authority
+        .parse()
+        .map_err(|error| format!("{authority} is not an address: {error}"))?;
     let request = format!(
         "POST {path} HTTP/1.1\r\nHost: {authority}\r\nAuthorization: Bearer {bearer}\r\n\
          Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
-    stream.write_all(request.as_bytes()).map_err(unreachable)?;
+    let wake = cancel.as_deref().map(Cancel::wake);
+    match exchange(address, request.as_bytes(), wake) {
+        Ok(raw) => parse(&raw).ok_or_else(|| format!("{authority} answered what is not HTTP")),
+        Err(Ended::Left) => Err(LEFT.to_owned()),
+        Err(Ended::Failed(error)) => Err(format!("{authority} could not be reached: {error}")),
+    }
+}
+
+/// Connect to `address`, write `request` whole and read the answer to its
+/// end, every wait in [`wait`]. The socket is closed when this returns.
+fn exchange(
+    address: SocketAddr,
+    request: &[u8],
+    wake: Option<BorrowedFd<'_>>,
+) -> Result<Vec<u8>, Ended> {
+    let mut stream = TcpStream::from(connect(address, wake)?);
+    let mut written = 0;
+    while written < request.len() {
+        match stream.write(&request[written..]) {
+            Ok(0) => return Err(io::Error::from(io::ErrorKind::WriteZero).into()),
+            Ok(count) => written += count,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                wait(&stream, PollFlags::OUT, wake)?;
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
     let mut raw = Vec::new();
-    stream.read_to_end(&mut raw).map_err(unreachable)?;
-    parse(&raw).ok_or_else(|| format!("{authority} answered what is not HTTP"))
+    let mut buffer = [0; 8192];
+    loop {
+        match stream.read(&mut buffer) {
+            Ok(0) => return Ok(raw),
+            Ok(count) => raw.extend_from_slice(&buffer[..count]),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                wait(&stream, PollFlags::IN, wake)?;
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
+/// A non-blocking socket connected to `address`, the connect waited on in
+/// [`wait`].
+fn connect(address: SocketAddr, wake: Option<BorrowedFd<'_>>) -> Result<OwnedFd, Ended> {
+    let family = if address.is_ipv4() {
+        AddressFamily::INET
+    } else {
+        AddressFamily::INET6
+    };
+    let socket = rustix::net::socket(family, SocketType::STREAM, None).map_err(io::Error::from)?;
+    rustix::io::fcntl_setfd(&socket, FdFlags::CLOEXEC).map_err(io::Error::from)?;
+    rustix::io::ioctl_fionbio(&socket, true).map_err(io::Error::from)?;
+    match rustix::net::connect(&socket, &address) {
+        Ok(()) => return Ok(socket),
+        Err(Errno::INPROGRESS | Errno::INTR) => {}
+        Err(error) => return Err(io::Error::from(error).into()),
+    }
+    wait(&socket, PollFlags::OUT, wake)?;
+    rustix::net::sockopt::socket_error(&socket)
+        .map_err(io::Error::from)?
+        .map_err(io::Error::from)?;
+    Ok(socket)
+}
+
+/// Wait in poll(2), given no time bound, until `socket` is ready for `want` or
+/// shows an error or a close, or until `wake` becomes readable because the
+/// request left. With no `wake` only the socket is waited on.
+fn wait(socket: &impl AsFd, want: PollFlags, wake: Option<BorrowedFd<'_>>) -> Result<(), Ended> {
+    loop {
+        let mut watched = vec![PollFd::new(socket, want)];
+        if let Some(wake) = wake {
+            watched.push(PollFd::from_borrowed_fd(wake, PollFlags::IN));
+        }
+        match rustix::event::poll(&mut watched, None) {
+            Ok(_) => {}
+            Err(Errno::INTR) => continue,
+            Err(error) => return Err(io::Error::from(error).into()),
+        }
+        if watched.get(1).is_some_and(|woken| !woken.revents().is_empty()) {
+            return Err(Ended::Left);
+        }
+        if watched.first().is_some_and(|ready| !ready.revents().is_empty()) {
+            return Ok(());
+        }
+    }
 }
 
 /// The answer `raw` holds, or nothing when it is not an HTTP answer.

@@ -26,7 +26,7 @@ use serde::Deserialize;
 use crate::error::ServerError;
 use crate::grant_contract::{RouteWire, grant_id};
 use crate::grant_sight::as_seen_by;
-use crate::grants::{Judged, caller, with_grants};
+use crate::grants::{Judged, caller};
 use crate::requests_api::{
     Weighed, decider, malformed, seen, settled, taken, with_requests, words,
 };
@@ -130,7 +130,7 @@ pub(crate) async fn approve(
     Path(id): Path<String>,
     body: Result<Json<ApproveBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let body = taken(body)?;
         let at = now();
@@ -227,6 +227,7 @@ pub(crate) async fn approve(
             )?))
         })
     })
+    .await
 }
 
 /// Settle the approval being settled on a request, for anyone the request
@@ -237,7 +238,7 @@ pub(crate) async fn settle(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<RequestView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let at = now();
         with_requests(&state, |store| {
@@ -252,6 +253,7 @@ pub(crate) async fn settle(
             )?))
         })
     })
+    .await
 }
 
 pub(crate) async fn decline(
@@ -260,7 +262,7 @@ pub(crate) async fn decline(
     Path(id): Path<String>,
     body: Result<Json<DeclineBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let body = taken(body)?;
         let at = now();
@@ -296,4 +298,5 @@ pub(crate) async fn decline(
             )?))
         })
     })
+    .await
 }

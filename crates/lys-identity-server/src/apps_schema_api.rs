@@ -38,7 +38,7 @@ use crate::apps_state::{Applied, By, Decided, Line, Placed, Proposed, Standing};
 use crate::apps_store::AppStore;
 use crate::apps_views::{AppView, DiffView, SchemaChanged, SchemaCheck, SchemaVersionView};
 use crate::error::ServerError;
-use crate::grants::{Judged, with_grants};
+use crate::grants::Judged;
 use crate::routes::AppState;
 use crate::session::now;
 use crate::spicedb::Relationships;
@@ -169,7 +169,7 @@ async fn check(
     body: Result<Json<CheckBody>, JsonRejection>,
 ) -> Result<Json<SchemaCheck>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let who = acting(&state, judged.apps.held(), &headers)?;
         may_change(&who, &id)?;
         let (old, version) = current(judged.apps, &id)?;
@@ -185,6 +185,7 @@ async fn check(
             stranded,
         }))
     })
+    .await
 }
 
 async fn change(
@@ -195,7 +196,7 @@ async fn change(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let who = acting(&state, judged.apps.held(), &headers)?;
         may_change(&who, &id)?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
@@ -246,6 +247,7 @@ async fn change(
             diff: DiffView::from(&change),
         }))
     })
+    .await
 }
 
 /// The answer to a change sent again under an operation already kept.
@@ -286,7 +288,7 @@ async fn approve(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let who = acting(&state, judged.apps.held(), &headers)?;
         who.administrator()?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
@@ -320,6 +322,7 @@ async fn approve(
             diff: DiffView::from(&change),
         }))
     })
+    .await
 }
 
 async fn decline(

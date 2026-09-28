@@ -1584,6 +1584,7 @@ dependencies = [
  "openidconnect",
  "rand 0.9.5",
  "reqwest",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",

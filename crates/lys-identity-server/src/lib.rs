@@ -82,6 +82,7 @@ pub mod setup;
 pub mod sign_in_providers;
 pub mod spicedb;
 mod spicedb_apps;
+mod spicedb_cancel;
 mod spicedb_http;
 pub mod stop_api;
 pub mod stops_state;

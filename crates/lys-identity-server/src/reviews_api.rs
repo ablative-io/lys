@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::grant_contract::{GrantView, grant_id};
 use crate::grant_sight::{is_root, sees};
-use crate::grants::{grant_view, with_grants};
+use crate::grants::grant_view;
 use crate::read_api::{own_person, person_summary};
 use crate::read_views::{AgentSummary, PersonSummary};
 use crate::reviews_state::Kept;
@@ -197,7 +197,7 @@ async fn reviews(
     headers: HeaderMap,
 ) -> Result<Json<ReviewView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let person = own_person(judged.directory, &actor)?;
         let whole = is_root(IdentityId::Person(person), judged.root);
         let viewer = (!whole).then_some(person);
@@ -240,6 +240,7 @@ async fn reviews(
             decisions_recorded: kept.is_some(),
         }))
     })
+    .await
 }
 
 /// The note `text` carries, trimmed, refused when it is too long.
@@ -269,7 +270,7 @@ async fn keep(
     let grant = grant_id(&grant)?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let note = note(&body.note)?;
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let person = own_person(judged.directory, &actor)?;
         let caller = IdentityId::Person(person);
         let whole = is_root(caller, judged.root);
@@ -310,4 +311,5 @@ async fn keep(
         }
         Ok(Json(store.keep(kept)?))
     })
+    .await
 }

@@ -134,7 +134,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/check", post(check))
         .route("/grants/check/batch", post(crate::grants_batch::batch))
         .route("/grants/which", post(crate::grants_batch::which))
-        .route("/grants/why", post(why))
+        .route("/grants/why", post(crate::grants_batch::why))
         .route("/grants/who", post(who))
         .route("/grants/cannot-give", get(cannot_give))
         .route("/grants/{id}", get(read))
@@ -170,6 +170,7 @@ pub(crate) fn with_grants<T>(
         let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
         apps.settle()?;
         let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
+        crate::spicedb_cancel::still_asked()?;
         let grants = if let Some(grants) = &mut *slot {
             grants
         } else {
@@ -340,7 +341,7 @@ async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<GrantList>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let at = now();
         let mut known = HashMap::new();
@@ -356,6 +357,7 @@ async fn list(
             revision: judged.grants.revision(),
         }))
     })
+    .await
 }
 
 /// The permission model, so a screen offers only the relations it defines.
@@ -373,7 +375,7 @@ async fn read(
     Path(id): Path<String>,
 ) -> Result<Json<GrantView>, ServerError> {
     let id = grant_id(&id)?;
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let record = judged
             .grants
@@ -383,6 +385,7 @@ async fn read(
             .ok_or(ServerError::GrantNotVisible)?;
         Ok(Json(grant_view(&judged, caller, record, now())))
     })
+    .await
 }
 
 async fn issue_root(
@@ -390,7 +393,7 @@ async fn issue_root(
     headers: HeaderMap,
     Json(body): Json<RootBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let request = body.request(caller(&state, &headers, judged.directory)?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
         let recorded = judged
@@ -398,6 +401,7 @@ async fn issue_root(
             .issue_root(judged.directory, &request, now())?;
         Ok(Json(RecordedView::from(&recorded)))
     })
+    .await
 }
 
 async fn delegate(
@@ -405,7 +409,7 @@ async fn delegate(
     headers: HeaderMap,
     Json(body): Json<DelegateBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let request = body.request(caller)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
@@ -422,6 +426,7 @@ async fn delegate(
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
+    .await
 }
 
 async fn revoke(
@@ -431,7 +436,7 @@ async fn revoke(
     Json(body): Json<RevokeBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
     let id = grant_id(&id)?;
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let request = body.request(caller, id)?;
         visible_or(
@@ -447,6 +452,7 @@ async fn revoke(
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
+    .await
 }
 
 /// The enforcement point: the caller is about to take the action, and a
@@ -457,7 +463,7 @@ async fn check(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
-    with_grants(&state, |mut judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |mut judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         judged.apps.admit_kind(None, resource.kind())?;
         judged.apps.admit_action(resource.kind(), action.as_str())?;
@@ -472,29 +478,7 @@ async fn check(
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
-}
-
-async fn why(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<ActionBody>,
-) -> Result<Json<PermitView>, ServerError> {
-    let (route, resource, action) = body.parts()?;
-    with_grants(&state, |mut judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
-        judged.apps.admit_kind(None, resource.kind())?;
-        judged.apps.admit_action(resource.kind(), action.as_str())?;
-        let request = ExerciseRequest {
-            caller,
-            route,
-            resource,
-            action,
-        };
-        match decide(&mut judged, &request, now(), None, Decision::Explain) {
-            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
-            Err(error) => Err(as_seen_by(&judged, caller, error)),
-        }
-    })
+    .await
 }
 
 async fn who(
@@ -509,7 +493,7 @@ async fn who(
     }
     let (route, resource, action) = body.question.parts()?;
     let at = now();
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         judged.apps.admit_kind(None, resource.kind())?;
         judged.apps.admit_action(resource.kind(), action.as_str())?;
@@ -564,6 +548,7 @@ async fn who(
             next,
         }))
     })
+    .await
 }
 
 /// Whether `caller` may name `recipient` on the delegation form: a person the
@@ -582,7 +567,7 @@ async fn cannot_give(
     headers: HeaderMap,
     Query(body): Query<CannotGiveBody>,
 ) -> Result<Json<CannotGiveAnswer>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let request = body.request(caller)?;
         judged
@@ -605,4 +590,5 @@ async fn cannot_give(
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
+    .await
 }

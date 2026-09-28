@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::error::ServerError;
 use crate::grant_sight::sees_with;
-use crate::grants::{caller, with_grants};
+use crate::grants::caller;
 use crate::reviews_api::stands;
 use crate::routes::AppState;
 use crate::session::now;
@@ -62,7 +62,7 @@ async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<ResourceList>, ServerError> {
-    with_grants(&state, |judged| {
+    crate::spicedb_cancel::judged(Arc::clone(&state), move |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let at = now();
         let book = judged.grants.book();
@@ -101,4 +101,5 @@ async fn list(
             judged_at: at,
         }))
     })
+    .await
 }

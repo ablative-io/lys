@@ -21,6 +21,7 @@ lys-runner.workspace = true
 openidconnect.workspace = true
 rand.workspace = true
 reqwest.workspace = true
+rustix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

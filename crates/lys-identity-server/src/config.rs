@@ -160,7 +160,23 @@ impl Config {
             ))
         })?;
         config.validate()?;
+        config.spicedb_address()?;
         Ok(config)
+    }
+
+    /// Refuse a `SpiceDB` endpoint that is not a socket address, so a call
+    /// to it does no name lookup and waits on nothing but `SpiceDB` and the
+    /// request that asked.
+    pub fn spicedb_address(&self) -> Result<(), ServerError> {
+        match &self.spicedb {
+            Some(settings) if settings.endpoint.parse::<SocketAddr>().is_err() => {
+                Err(invalid(format!(
+                    "spicedb.endpoint {}: the SpiceDB endpoint must be an address, so no name lookup is waited on",
+                    settings.endpoint
+                )))
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Refuse a configuration the service cannot run under.
@@ -238,3 +254,7 @@ impl Config {
         Ok(openidconnect::ClientSecret::new(secret.to_owned()))
     }
 }
+
+#[cfg(test)]
+#[path = "config_tests.rs"]
+mod tests;
