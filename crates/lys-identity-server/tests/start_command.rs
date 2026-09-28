@@ -130,8 +130,9 @@ impl Table {
         machine: &str,
         cookie: &str,
     ) -> Result<(u16, Value), Box<dyn Error>> {
-        let path = format!("/agents/{agent}/start-command?machine={machine}");
-        self.service.get(&path, Some(cookie)).await
+        let path = format!("/agents/{agent}/start-command");
+        let body = json!({ "machine": machine, "operation": operation()? });
+        self.service.post(&path, Some(cookie), &body).await
     }
 }
 
@@ -195,7 +196,11 @@ async fn each_refusal_is_by_name() -> TestResult {
 
     let (status, none) = table
         .service
-        .get(&format!("/agents/{agent}/start-command"), Some(&table.ada))
+        .post(
+            &format!("/agents/{agent}/start-command"),
+            Some(&table.ada),
+            &json!({ "operation": operation()? }),
+        )
         .await?;
     assert_eq!(status, 400, "{none}");
     assert_eq!(none["refusal"], "RequestMalformed");
@@ -259,5 +264,38 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
         again["session"], start["session"],
         "each start is its own session"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_start_is_kept_once_under_its_operation() -> TestResult {
+    let table = Table::set().await?;
+    let agent = table.agent();
+    table.profile().await?;
+    let machine = table
+        .machine(Some("manifold"), std::slice::from_ref(&agent))
+        .await?;
+    let path = format!("/agents/{agent}/start-command");
+    let body = json!({ "machine": machine, "operation": operation()? });
+
+    let (status, first) = table.service.post(&path, Some(&table.ada), &body).await?;
+    assert_eq!(status, 200, "{first}");
+    let (status, again) = table.service.post(&path, Some(&table.ada), &body).await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(first["session"], body["operation"]);
+    assert_eq!(again["session"], first["session"]);
+
+    let (status, held) = table
+        .service
+        .get(
+            &format!("/agents/{agent}/runtime/sessions"),
+            Some(&table.ada),
+        )
+        .await?;
+    assert_eq!(status, 200, "{held}");
+    let sessions = held["sessions"].as_array().ok_or("no sessions")?;
+    assert_eq!(sessions.len(), 1, "{held}");
+    assert_eq!(sessions[0]["session"], first["session"]);
+    assert_eq!(sessions[0]["shown"], "unconfirmed");
     Ok(())
 }
