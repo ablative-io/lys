@@ -2335,6 +2335,31 @@
       },
       "depends_on": [],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-094",
+      "title": "Provision the audit sender and authenticated receiver transport during install",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "Make the identity audit connection an installed part of Lys without manual credential handling. Waffles approved the split and scope on 28 September 2026 at 20:22 Melbourne; this brief owns only the Lys side.",
+      "provenance": {
+        "asked_by": "Waffles on Tom's authority",
+        "date": "2026-09-28",
+        "quote": "Split it in two, one brief per repository.",
+        "context": "Cambium review d3e3146b and id reservation 6f40503f, corrected by f39b5d70."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-122"
+        ],
+        "briefs": [
+          "DIRECTORY-055"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Publish docs only after current landing settles; do not dispatch before named brief dependencies. No implementation completed."
     }
   ]
 }

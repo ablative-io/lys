@@ -73,6 +73,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-113 — The identity install and its clients wait on signals, never on a clock — A wait ends on the event it is waiting for or on the failure that makes the event impossible: a service is ready when it says so or when a single connection to it succeeds after a readiness event (its log gaining its listening line, observed through the platform's file-change notification), a stopped process is gone when the platform reports its exit (kqueue EVFILT_PROC on macOS, pidfd on Linux), a peer that refuses or closes is an error at once, and nothing carries a timeout. The screen re-measures on a ResizeObserver or animation-frame signal. Rejected: shorter sleeps, which still wait on a clock; keeping timeouts as a safety net, which the rule forbids and which hides a stuck peer's cause.
 - ADR-114 — An installed identity product names its build and upgrades itself in place, keeping the previous build to return to — Every Lys binary answers --version with the commit and dirty state it was built from, stamped at build time; a build with no commit to read says so in those words, never a made-up value. `lys identity upgrade` takes a folder of newly built binaries (and optionally a screens package), checks each one's --version, stops the service and the broker by their exit events, swaps the binaries by rename keeping the previous set beside them, starts the new ones and waits for them ready; if any new binary fails to start or become ready, it puts the previous set back, starts it, and fails naming what broke. Data, credentials, configuration and the compose services are never touched by an upgrade. Rejected: making install restart what differs, which would mix a first install's promises with an upgrade's risks; asking people to copy binaries by hand.
 - ADR-115 — Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown — Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.
+- ADR-122 — Install provisions the audit agent and separate authenticated transport — Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.
 
 ## Goals
 
@@ -740,6 +741,24 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/verified_caller.rs` | The one extractor that turns a verified request into the caller every handler takes | DIRECTORY-049 |
 | `crates/lys-identity-server/tests/verified_caller.rs` | Proof that only the edges build a verified caller | DIRECTORY-049 |
 | `rules/ast-grep/no-handler-verification.yml` | Refuses a handler that reads its caller from headers | DIRECTORY-049 |
+| `crates/lys/src/identity/config/validate.rs` | Emit an explicit cross-repository sender configuration contract |  |
+| `crates/lys-core/src/ca/mod.rs` | Export the separate installation TLS authority |  |
+| `crates/lys-identity/src/link_audit_config.rs` | Emit an explicit cross-repository sender configuration contract | DIRECTORY-055 |
+| `crates/lys-identity/tests/link_audit_config.rs` | Emit an explicit cross-repository sender configuration contract | DIRECTORY-055 |
+| `crates/lys-core/src/ca/tls_authority.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-core/src/ca/tls_authority_tests.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-identity-server/src/tls.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys-identity-server/tests/tls.rs` | Serve audit traffic with a separate installation TLS authority | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_files.rs` | Publish private provisioning files and read-only mounts | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_files_tests.rs` | Publish private provisioning files and read-only mounts | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys/src/identity/install/link_audit_tests.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/src/link_audit_provisioning.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/src/link_audit_provisioning_tests.rs` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `surface/identity/src/features/setup/SetupAudit.test.tsx` | Browser setup completes the sender enrolment under the new person | DIRECTORY-055 |
+| `crates/lys-identity-server/tests/setup.rs` | Browser setup completes the sender enrolment under the new person |  |
+| `crates/lys/tests/identity_link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
+| `crates/lys/tests/identity_support/link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
 
 ## Inventory
 

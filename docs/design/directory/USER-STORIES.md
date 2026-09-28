@@ -251,3 +251,9 @@
 **S157.** As a person running agents, I want to give an agent goals with deadlines and have it reminded, so that work is paced and I can see where each goal stands.
 
 **S158.** As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.
+
+## Installer and operator — Provision and upgrade the internal audit connection
+
+**S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.
+
+**S164.** As an operator, I want upgrade and interrupted setup to preserve the sender identity so that pending audit work remains verifiable.

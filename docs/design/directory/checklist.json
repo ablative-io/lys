@@ -1385,6 +1385,41 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Installed audit sender",
+      "items": [
+        {
+          "id": "C405",
+          "text": "The service completes sender enrolment as part of browser setup after install returns, resumes the original intent after interruption, and never requires another install invocation.",
+          "done": false
+        },
+        {
+          "id": "C406",
+          "text": "Sender configuration and seed are private, stable, and mounted read-only without exposing the directory private key.",
+          "done": false
+        },
+        {
+          "id": "C407",
+          "text": "A dedicated TLS-only authority key issues the receiver certificate, distinct from capability, event, receiver and sender keys; the receiver listens only on its declared restricted address.",
+          "done": false
+        },
+        {
+          "id": "C408",
+          "text": "Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.",
+          "done": false
+        },
+        {
+          "id": "C409",
+          "text": "Scratch installation proves signed observation acceptance and named transport, identity and response refusals.",
+          "done": false
+        },
+        {
+          "id": "C410",
+          "text": "DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.",
+          "done": false
+        }
+      ]
     }
   ]
 }

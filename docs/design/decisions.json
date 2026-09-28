@@ -1747,6 +1747,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-122",
+      "title": "Install provisions the audit agent and separate authenticated transport",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-28",
+      "decided_by": "Waffles, on Tom's authority",
+      "context": "The verified sender has no provisioned identity or TLS configuration; copying credentials manually does not make an installed product.",
+      "decision": "Install provisions private stable sender material and a separate TLS-only authority key. Browser setup, after creating the real administrator, completes sender enrolment and login binding through one recoverable intent. The capability authority and event signer never sign TLS certificates. The Rauthy sender verifies chain, hostname and pinned server key before HTTP. DIRECTORY-045 R5 swaps public trust/configuration/mounts with binaries and preserves private credentials. Cross-repository source builds are ordered; activation requires matched artifacts.",
+      "quote": "Split it in two, one brief per repository.",
+      "consequences": [
+        "Lys provisioning waits for DIRECTORY-045, DIRECTORY-047 and the current installer landing; install-service acceptance does not depend on the launcher.",
+        "The sender identity and seed survive upgrade byte-for-byte.",
+        "Original-login reassignment and signed checkpoints remain separate follow-ups."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

@@ -81,7 +81,8 @@
     "ADR-112",
     "ADR-113",
     "ADR-114",
-    "ADR-115"
+    "ADR-115",
+    "ADR-122"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -3240,6 +3241,96 @@
       "path": "rules/ast-grep/no-handler-verification.yml",
       "note": "Refuses a handler that reads its caller from headers",
       "brief": "DIRECTORY-049"
+    },
+    {
+      "path": "crates/lys/src/identity/config/validate.rs",
+      "note": "Emit an explicit cross-repository sender configuration contract",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-core/src/ca/mod.rs",
+      "note": "Export the separate installation TLS authority",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-identity/src/link_audit_config.rs",
+      "note": "Emit an explicit cross-repository sender configuration contract",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity/tests/link_audit_config.rs",
+      "note": "Emit an explicit cross-repository sender configuration contract",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-core/src/ca/tls_authority.rs",
+      "note": "Serve audit traffic with a separate installation TLS authority",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-core/src/ca/tls_authority_tests.rs",
+      "note": "Serve audit traffic with a separate installation TLS authority",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity-server/src/tls.rs",
+      "note": "Serve audit traffic with a separate installation TLS authority",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/tls.rs",
+      "note": "Serve audit traffic with a separate installation TLS authority",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/src/identity/install/link_audit_files.rs",
+      "note": "Publish private provisioning files and read-only mounts",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/src/identity/install/link_audit_files_tests.rs",
+      "note": "Publish private provisioning files and read-only mounts",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/src/identity/install/link_audit.rs",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/src/identity/install/link_audit_tests.rs",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity-server/src/link_audit_provisioning.rs",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity-server/src/link_audit_provisioning_tests.rs",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "surface/identity/src/features/setup/SetupAudit.test.tsx",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/setup.rs",
+      "note": "Browser setup completes the sender enrolment under the new person",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys/tests/identity_link_audit_install.rs",
+      "note": "Prove provisioning through a scratch installation and upgrade",
+      "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/tests/identity_support/link_audit_install.rs",
+      "note": "Prove provisioning through a scratch installation and upgrade",
+      "brief": "DIRECTORY-055"
     }
   ],
   "inventory": [

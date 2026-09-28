@@ -354,3 +354,12 @@
 
 - [ ] **C403** — The receipts route answers its checkpoint as a note signed by the service key, signed once per append, with its origin read from configuration (DIRECTORY-058 R1).
 - [ ] **C404** — One function verifies a receipt answer against a pinned key with a named refusal for each failure; a forged tree around a genuine event is refused (DIRECTORY-058 R2).
+
+## Installed audit sender
+
+- [ ] **C405** — The service completes sender enrolment as part of browser setup after install returns, resumes the original intent after interruption, and never requires another install invocation.
+- [ ] **C406** — Sender configuration and seed are private, stable, and mounted read-only without exposing the directory private key.
+- [ ] **C407** — A dedicated TLS-only authority key issues the receiver certificate, distinct from capability, event, receiver and sender keys; the receiver listens only on its declared restricted address.
+- [ ] **C408** — Generated sender configuration names separate TLS trust and receipt trust and a declared positive response-body bound.
+- [ ] **C409** — Scratch installation proves signed observation acceptance and named transport, identity and response refusals.
+- [ ] **C410** — DIRECTORY-045 R5 retains sender credentials and swaps/restores sender configuration, trust material and mounts with the chosen binaries.
