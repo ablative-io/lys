@@ -70,8 +70,12 @@ async fn visitors_and_caller_supplied_identity_claims_cannot_bootstrap() -> Resu
     for field in ["issuer", "subject", "person", "state"] {
         let mut forged = body.clone();
         forged[field] = json!("attacker");
-        let (status, _) = service.post("/setup", Some(&admin), &forged).await?;
-        assert_eq!(status, 422, "{field}");
+        let (status, refused) = service.post("/setup", Some(&admin), &forged).await?;
+        assert_eq!(status, 400, "{field}: {refused}");
+        assert_eq!(refused["refusal"], "RequestMalformed", "{field}");
+        let (status, refused) = service.post("/setup", Some(&other), &forged).await?;
+        assert_eq!(status, 403, "{field}: {refused}");
+        assert_eq!(refused["refusal"], "NotAdmitted", "{field}");
     }
     let (_, people) = service.get("/directory/people", Some(&admin)).await?;
     assert_eq!(people["people"], json!([]));
@@ -139,7 +143,7 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
 async fn setup_never_accepts_changed_retry_content_or_an_invalid_name() -> Result {
     let service = Service::start().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
-    for name in ["".to_owned(), " A ".to_owned(), "A".repeat(201)] {
+    for name in [String::new(), " A ".to_owned(), "A".repeat(201)] {
         let body = json!({"operation": OperationId::generate()?.to_string(), "display_name": name});
         let (status, refusal) = service.post("/setup", Some(&admin), &body).await?;
         assert_eq!(status, 409);
