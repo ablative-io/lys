@@ -90,6 +90,10 @@ pub struct Config {
     /// `ProvisioningUnavailable`.
     #[serde(default)]
     pub provisioning_file: Option<PathBuf>,
+    /// The directory the runtime reports are kept in, created when it does
+    /// not exist. Without it the runtime routes answer `RuntimeUnavailable`.
+    #[serde(default)]
+    pub runtime_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
