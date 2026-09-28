@@ -317,6 +317,53 @@ fn the_same_entry_id_in_two_sessions_derives_two_uuids_salted_by_the_session_id(
     dir.close().unwrap();
 }
 
+/// The design's record of a home, where the rendered-uuid rule and its test vector
+/// are stated for a reader who never opens this crate.
+const RECORD_MD: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/design/home/RECORD.md"
+);
+
+/// The rows of the test vector table in RECORD.md's `## The rendered uuid` section,
+/// each as its backticked cells: session id, entry id, uuid.
+fn record_md_vector_rows(record: &str) -> Vec<[String; 3]> {
+    let start = record.find("\n## The rendered uuid\n").unwrap();
+    let section = &record[start + 1..];
+    let section = &section[..section[1..].find("\n## ").map_or(section.len(), |n| n + 1)];
+    section
+        .lines()
+        .filter(|l| l.starts_with("| `"))
+        .map(|l| {
+            let cells: Vec<String> = l
+                .trim_matches('|')
+                .split('|')
+                .map(|c| c.trim().trim_matches('`').to_owned())
+                .collect();
+            assert_eq!(cells.len(), 3, "a vector row has three cells: {l}");
+            [cells[0].clone(), cells[1].clone(), cells[2].clone()]
+        })
+        .collect()
+}
+
+#[test]
+fn record_md_states_the_rendered_uuid_rule_with_the_vector_the_render_derives() {
+    let record = std::fs::read_to_string(RECORD_MD).unwrap();
+    let rows = record_md_vector_rows(&record);
+    assert_eq!(rows.len(), 2, "RECORD.md states two vector rows");
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    for [session, entry, expected] in &rows {
+        assert_eq!(
+            &rendered_uuid(dir.path(), &home, session, entry),
+            expected,
+            "session {session}, entry {entry}"
+        );
+    }
+    assert_eq!(rows[0][1], rows[1][1], "the rows share one entry id");
+    assert_ne!(rows[0][2], rows[1][2], "the session id is the salt");
+    dir.close().unwrap();
+}
+
 #[test]
 fn the_render_reads_no_clock_and_no_random_source() {
     const SOURCE: &str = include_str!("render.rs");
