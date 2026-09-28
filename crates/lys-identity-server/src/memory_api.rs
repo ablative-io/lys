@@ -19,7 +19,9 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
-use lys_home::{GivenSeen, Home, HomeError, LanternRow, Skipped, last_given, recall_all};
+use lys_home::{
+    GivenSeen, Home, HomeError, LanternRow, SessionReader, Skipped, recall_and_last_given_through,
+};
 use serde::Serialize;
 
 use crate::agent_sight::seen_agent;
@@ -181,7 +183,7 @@ async fn read(
         reason: "the configuration names no homes_dir".to_owned(),
     })?;
     let agent = seen.agent.to_string();
-    let mut view = MemoryView {
+    let view = MemoryView {
         agent: agent.clone(),
         home: false,
         memories: Vec::new(),
@@ -195,16 +197,36 @@ async fn read(
         notes_shown: false,
     };
     let root = dir.join(&agent);
-    let home = match Home::read(&root) {
+    tokio::task::spawn_blocking(move || remembered(view, &root, Home::read_session))
+        .await
+        .map_err(|stopped| ServerError::MemoryUnavailable {
+            reason: format!("the memory read did not finish: {stopped}"),
+        })?
+        .map(Json)
+}
+
+/// `view` with what the home at `root` keeps: every memory, the sessions
+/// that could not be read and the context given last, each session opened
+/// once through `open` and both read from that one reader.
+fn remembered(
+    mut view: MemoryView,
+    root: &FilePath,
+    mut open: impl FnMut(&Home, &str) -> Result<SessionReader, HomeError>,
+) -> Result<MemoryView, ServerError> {
+    let home = match Home::read(root) {
         Ok(home) => home,
-        Err(HomeError::NoHome { .. }) => return Ok(Json(view)),
-        Err(error) => return Err(unavailable(&error, &root)),
+        Err(HomeError::NoHome { .. }) => return Ok(view),
+        Err(error) => return Err(unavailable(&error, root)),
     };
-    let recalled = recall_all(&home).map_err(|error| unavailable(&error, &root))?;
-    let last = last_given(&home).map_err(|error| unavailable(&error, &root))?;
+    let (recalled, last) = recall_and_last_given_through(&home, |session| open(&home, session))
+        .map_err(|error| unavailable(&error, root))?;
     view.home = true;
     view.memories = recalled.lanterns.into_iter().map(line).collect();
-    view.skipped = skipped(recalled.skipped, last.skipped, &root);
+    view.skipped = skipped(recalled.skipped, last.skipped, root);
     view.last_given = last.last.map(given);
-    Ok(Json(view))
+    Ok(view)
 }
+
+#[cfg(test)]
+#[path = "memory_api_tests.rs"]
+mod tests;

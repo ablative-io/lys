@@ -221,7 +221,7 @@ async fn any_agent(
 /// One agent as JSON: the projection is settled once, the scope read from it,
 /// and the registration receipt looked up after the view is built.
 fn agent_json(
-    directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+    directory: &mut lys_identity::Directory<crate::directory_access::DirectoryStore>,
     agent: AgentId,
     scope_of: impl FnOnce(&Projection) -> Result<Scope, ServerError>,
 ) -> Result<Json<AgentView>, ServerError> {

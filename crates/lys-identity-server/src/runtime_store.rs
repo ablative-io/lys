@@ -160,31 +160,41 @@ impl<S: LeafStore> RuntimeStore<S> {
         Ok(())
     }
 
-    /// Append one report as one leaf. A failed append is settled by reading
-    /// back: the report is kept only if the leaf store holds exactly it.
-    fn append(&mut self, report: Report) -> Result<(), ServerError> {
+    /// Append one report as one leaf, on the session at `slot` the caller
+    /// found, or beginning one when none; answers its session's slot. A
+    /// failed append is settled by reading back: the report is kept only if
+    /// the leaf store holds exactly it.
+    fn append(&mut self, slot: Option<usize>, report: Report) -> Result<usize, ServerError> {
         let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
-            if let Err(reason) = self.held.hold(report) {
-                self.uncertain = true;
-                return Err(unavailable(reason));
-            }
+            let slot = match self.held.hold_at(slot, report) {
+                Ok(slot) => slot,
+                Err(reason) => {
+                    self.uncertain = true;
+                    return Err(unavailable(reason));
+                }
+            };
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
             }
-            return Ok(());
+            return Ok(slot);
         };
         self.uncertain = true;
         self.settle()?;
         match self.log.leaf_bytes(index).map_err(unavailable)? {
-            Some(held) if held == bytes => Ok(()),
-            Some(_) => Err(unavailable(format!(
-                "leaf {index} was written by another writer: {failure}"
-            ))),
-            None => Err(unavailable(failure)),
+            Some(held) if held == bytes => {}
+            Some(_) => {
+                return Err(unavailable(format!(
+                    "leaf {index} was written by another writer: {failure}"
+                )));
+            }
+            None => return Err(unavailable(failure)),
         }
+        self.held
+            .slot(&report.session)
+            .ok_or(ServerError::RuntimeSessionUnknown)
     }
 
     /// Every session, in the order first reported.
@@ -197,20 +207,28 @@ impl<S: LeafStore> RuntimeStore<S> {
         self.held.session(session)
     }
 
-    /// Keep `report` and answer the session as it then stands. Sent again in
-    /// the same words it is kept once; the same operation in other words is
-    /// refused, and so is a report the session as it stands does not take.
-    pub fn report(&mut self, report: Report) -> Result<Tracked, ServerError> {
+    /// How many sessions the lookups on the reports as they stand have
+    /// examined: a report on a kept session examines that session alone.
+    pub fn examined(&self) -> u64 {
+        self.held.examined()
+    }
+
+    /// Keep `report` and answer the session as it then stands, borrowed. Sent
+    /// again in the same words it is kept once; the same operation in other
+    /// words is refused, and so is a report the session as it stands does
+    /// not take. The session is found once, by its slot.
+    pub fn report(&mut self, report: Report) -> Result<&Tracked, ServerError> {
         self.settle()?;
-        if let Some(kept) = self.held.operation(&report.operation) {
+        if let Some((slot, kept)) = self.held.operation_at(&report.operation) {
             if !same_words(kept, &report) {
                 return Err(ServerError::RuntimeReportReused {
                     operation: report.operation,
                 });
             }
-            return self.standing(&report.session);
+            return self.standing(slot);
         }
-        match self.held.session(&report.session) {
+        let slot = self.held.slot(&report.session);
+        match slot.and_then(|slot| self.held.at(slot)) {
             None => {
                 let begins = match report.agent {
                     Some(_) => report.state == Reported::Starting,
@@ -244,16 +262,12 @@ impl<S: LeafStore> RuntimeStore<S> {
                 }
             }
         }
-        let session = report.session.clone();
-        self.append(report)?;
-        self.standing(&session)
+        let slot = self.append(slot, report)?;
+        self.standing(slot)
     }
 
-    fn standing(&self, session: &str) -> Result<Tracked, ServerError> {
-        self.held
-            .session(session)
-            .cloned()
-            .ok_or(ServerError::RuntimeSessionUnknown)
+    fn standing(&self, slot: usize) -> Result<&Tracked, ServerError> {
+        self.held.at(slot).ok_or(ServerError::RuntimeSessionUnknown)
     }
 }
 

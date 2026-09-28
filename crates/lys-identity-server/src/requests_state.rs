@@ -22,11 +22,19 @@ pub(crate) struct Held {
     pub(crate) decided: BTreeMap<String, Decided>,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The sealed state as a snapshot reads it back.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+/// The sealed state as a snapshot writes it, borrowing what it seals.
+#[derive(Serialize)]
+struct SealedRef<'a> {
+    format: &'a str,
+    held: &'a Held,
 }
 
 impl Held {
@@ -65,9 +73,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub(crate) fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&SealedRef {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("requests state: {error}"))
     }
@@ -108,3 +116,7 @@ pub(crate) fn pin_unpinned<S: LeafStore>(store: &mut S) -> StoreResult<u64> {
     })?;
     Ok(extent)
 }
+
+#[cfg(test)]
+#[path = "requests_state_tests.rs"]
+mod tests;

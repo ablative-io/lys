@@ -41,7 +41,10 @@ pub use record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
 pub use record::epilogue::{Added, add_epilogue};
 pub use record::fork::{ForkedFrom, fork};
 pub use record::fork_report::ForkReport;
-pub use record::given::{GivenLast, GivenRecord, GivenSeen, last_given};
+pub use record::given::{
+    GivenLast, GivenRecord, GivenSeen, last_given, recall_and_last_given,
+    recall_and_last_given_through,
+};
 pub use record::lantern::{Lit, light};
 pub use record::reader::SessionReader;
 pub use record::recall::{

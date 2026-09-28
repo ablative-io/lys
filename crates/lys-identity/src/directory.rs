@@ -15,6 +15,7 @@
 //! request is refused `OperationReused`.
 
 use std::num::NonZeroU64;
+use std::path::Path;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
@@ -59,6 +60,27 @@ impl<S: LeafStore> Directory<S> {
         key: Ed25519Identity,
         every: NonZeroU64,
     ) -> Result<Self, IdentityError> {
+        Self::opened(reopen, key, every, None)
+    }
+
+    /// As [`Directory::open`], keeping each leaf's coordinate in the file
+    /// `coordinates` beside the log, so a receipt is rebuilt from its one
+    /// leaf. A file missing or disagreeing with the log is rebuilt from the
+    /// log, by name.
+    pub fn open_with_coordinates(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        coordinates: &Path,
+    ) -> Result<Self, IdentityError> {
+        Self::opened(reopen, key, SNAPSHOT_EVERY, Some(coordinates))
+    }
+
+    fn opened(
+        reopen: Reopen<S>,
+        key: Ed25519Identity,
+        every: NonZeroU64,
+        coordinates: Option<&Path>,
+    ) -> Result<Self, IdentityError> {
         let (mut log, opening) = EventLog::open(reopen, &key, every)?;
         let read = opening
             .state
@@ -80,6 +102,9 @@ impl<S: LeafStore> Directory<S> {
             directory.record_committed(&signed, coordinate)?;
         }
         directory.snapshot();
+        if let Some(coordinates) = coordinates {
+            directory.log.keep_coordinates(coordinates);
+        }
         Ok(directory)
     }
 
@@ -144,6 +169,18 @@ impl<S: LeafStore> Directory<S> {
         Ok(&self.projection)
     }
 
+    /// The projection with the number of leaves folded into it, when the
+    /// directory answers its current state without resolving anything: none
+    /// while an append is uncertain and once the directory is broken, where
+    /// [`Directory::projection`] would settle or refuse. Nothing is read or
+    /// written.
+    pub fn settled(&self) -> Option<(u64, &Projection)> {
+        if self.broken.is_some() || self.log.is_uncertain() {
+            return None;
+        }
+        Some((self.folded, &self.projection))
+    }
+
     fn record_committed(
         &mut self,
         signed: &SignedEvent,
@@ -189,7 +226,21 @@ impl<S: LeafStore> Directory<S> {
         identity: Option<IdentityId>,
         change: &Change,
     ) -> Result<Option<(IdentityId, Receipt)>, IdentityError> {
-        let Some((event, receipt)) = self.answered(operation)? else {
+        let answered = self.answered(operation)?;
+        Self::same_request(answered, operation, actor, identity, change)
+    }
+
+    /// The first answer `answered` to `operation`, if it was answered for the
+    /// same request; refused `OperationReused` when it answered another
+    /// request.
+    fn same_request(
+        answered: Option<(IdentityEvent, Receipt)>,
+        operation: OperationId,
+        actor: &Actor,
+        identity: Option<IdentityId>,
+        change: &Change,
+    ) -> Result<Option<(IdentityId, Receipt)>, IdentityError> {
+        let Some((event, receipt)) = answered else {
             return Ok(None);
         };
         let same_identity = identity.is_none_or(|identity| identity == event.identity());
@@ -392,7 +443,8 @@ impl<S: LeafStore> Directory<S> {
         recorded_at: u64,
     ) -> Result<Receipt, IdentityError> {
         self.settle()?;
-        let from = match self.answered(operation)? {
+        let answered = self.answered(operation)?;
+        let from = match &answered {
             Some((event, _)) => match event.change() {
                 Change::Transition { from, .. } => *from,
                 _ => {
@@ -410,18 +462,24 @@ impl<S: LeafStore> Directory<S> {
                 .state(),
         };
         let to = transition.target(from)?;
-        self.change(
-            actor,
+        let change = Change::Transition {
+            transition,
+            from,
+            to,
+            reason: reason.to_owned(),
+        };
+        if let Some((_, receipt)) =
+            Self::same_request(answered, operation, &actor, Some(identity), &change)?
+        {
+            return Ok(receipt);
+        }
+        self.commit(IdentityEvent::new(
             operation,
+            actor,
             identity,
-            Change::Transition {
-                transition,
-                from,
-                to,
-                reason: reason.to_owned(),
-            },
             recorded_at,
-        )
+            change,
+        )?)
     }
 
     /// Commit a change the link-audit receiver built, under the retry rule.

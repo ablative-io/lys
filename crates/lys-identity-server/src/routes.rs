@@ -2,7 +2,7 @@
 //! The read-only views the identity screens draw are in `read_api`.
 
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -22,6 +22,7 @@ use lys_identity::signer::load_service_key;
 
 use crate::admission::{AUTHORITY, Admission};
 use crate::config::Config;
+use crate::directory_access::{DirectoryAccess, DirectoryStore, read_directory, write_directory};
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
@@ -31,8 +32,9 @@ use crate::session::{Sessions, now};
 
 /// Everything a request is served from.
 pub struct AppState {
-    /// The directory, one caller at a time.
-    pub directory: Mutex<Directory<FileLeafStore>>,
+    /// The directory, one locked section at a time, and the projection the
+    /// last section left for reads.
+    pub directory: DirectoryAccess,
     /// Sign-in.
     pub oidc: Oidc,
     /// Live sessions.
@@ -90,7 +92,17 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
-    let mut directory = open_directory(config)?;
+    let state = app_state(config, say, open_directory(config)?).await?;
+    Ok(serving(config, state))
+}
+
+/// Everything a request is served from, as `config` says, over `directory`,
+/// saying through `say` how each thing kept was started.
+pub(crate) async fn app_state(
+    config: &Config,
+    say: Say,
+    mut directory: Directory<DirectoryStore>,
+) -> Result<Arc<AppState>, ServerError> {
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
     let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &*say)?;
@@ -107,8 +119,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, key, &say)?;
-    let state = Arc::new(AppState {
-        directory: Mutex::new(directory),
+    Ok(Arc::new(AppState {
+        directory: DirectoryAccess::new(directory),
         oidc: Oidc::discover(config).await?,
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
         admission: Admission::new(
@@ -145,21 +157,30 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .transpose()?,
         agent_nonces: Mutex::default(),
         say,
-    });
+    }))
+}
+
+/// The service's routes over `state`, with the routes `config` configures
+/// and the surface it names.
+fn serving(config: &Config, state: Arc<AppState>) -> Router {
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
     let api = router(state).merge(configured);
-    Ok(match &config.surface_dir {
+    match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
-    })
+    }
 }
 
+/// The file in the log's directory each leaf's coordinate is kept in, so a
+/// receipt is rebuilt from its one leaf.
+pub const COORDINATES: &str = "coordinates.bin";
+
 /// Open the directory `config` names, creating its log when the log's
-/// directory does not exist.
-pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, ServerError> {
+/// directory does not exist, and keeping each leaf's coordinate beside it.
+pub fn open_directory(config: &Config) -> Result<Directory<DirectoryStore>, ServerError> {
     if !config.log_dir.exists() {
         FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {
             ServerError::ConfigInvalid {
@@ -168,10 +189,11 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
         })?;
     }
     let log_dir = config.log_dir.clone();
-    let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    Ok(Directory::open(
+    let reopen = Box::new(move || DirectoryStore::open_file(&log_dir));
+    Ok(Directory::open_with_coordinates(
         reopen,
         load_service_key(&config.event_key_file)?,
+        &config.log_dir.join(COORDINATES),
     )?)
 }
 
@@ -230,13 +252,9 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
 /// Run `act` on the directory, one caller at a time.
 pub(crate) fn with_directory<T>(
     state: &AppState,
-    act: impl FnOnce(&mut Directory<FileLeafStore>) -> Result<T, ServerError>,
+    act: impl FnOnce(&mut Directory<DirectoryStore>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let mut directory = state
-        .directory
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    act(&mut directory)
+    state.directory.locked(act)
 }
 
 /// A receipt as JSON.
@@ -336,12 +354,13 @@ async fn register_person(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    with_directory(&state, |directory| {
+    write_directory(&state, move |directory| {
         let (id, receipt) = directory.register_person(actor, op, profile, now())?;
         Ok(Json(
             json!({ "person": id.to_string(), "receipt": receipt_json(&receipt) }),
         ))
     })
+    .await
 }
 
 async fn register_agent(
@@ -355,7 +374,7 @@ async fn register_agent(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    with_directory(&state, |directory| {
+    write_directory(&state, move |directory| {
         let responsible = directory
             .projection()?
             .person_for(actor.binding())
@@ -369,6 +388,7 @@ async fn register_agent(
             "receipt": receipt_json(&receipt),
         })))
     })
+    .await
 }
 
 fn state_name(state: LifecycleState) -> String {
@@ -391,9 +411,8 @@ fn record_json(id: IdentityId, record: &lys_identity::projection::Record) -> Val
 async fn list(State(state): State<Shared>, headers: HeaderMap) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
-    with_directory(&state, |directory| {
-        let records = directory
-            .projection()?
+    read_directory(&state, |projection| {
+        let records = projection
             .records()
             .map(|(id, record)| record_json(*id, record))
             .collect::<Vec<_>>();
@@ -409,14 +428,14 @@ async fn read(
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let id = identity_id(&id)?;
-    with_directory(&state, |directory| {
+    read_directory(&state, |projection| {
         let record =
-            directory
-                .record(id)?
+            projection
+                .record(id)
                 .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
                     identity: id.to_string(),
                 })?;
-        Ok(Json(record_json(id, &record)))
+        Ok(Json(record_json(id, record)))
     })
 }
 
@@ -433,10 +452,11 @@ async fn change_profile(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    with_directory(&state, |directory| {
+    write_directory(&state, move |directory| {
         let receipt = directory.change_profile(actor, op, id, profile, now())?;
         Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
     })
+    .await
 }
 
 #[derive(Deserialize)]
@@ -463,11 +483,12 @@ async fn transition(
         "retire" => Transition::Retire,
         other => return Err(malformed(format!("{other} is not a transition"))),
     };
-    let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
-    with_directory(&state, |directory| {
-        let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
+    let (id, op, reason) = (identity_id(&id)?, operation(&body.operation)?, body.reason);
+    write_directory(&state, move |directory| {
+        let receipt = directory.transition(actor, op, id, moved, &reason, now())?;
         Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
     })
+    .await
 }
 
 #[derive(Deserialize)]
@@ -491,8 +512,13 @@ async fn bind_login(
         operation(&body.operation)?,
         LoginBinding::new(&body.issuer, &body.subject)?,
     );
-    with_directory(&state, |directory| {
+    write_directory(&state, move |directory| {
         let receipt = directory.bind_login(actor, op, person, binding, now())?;
         Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
     })
+    .await
 }
+
+#[cfg(test)]
+#[path = "routes_tests.rs"]
+mod tests;

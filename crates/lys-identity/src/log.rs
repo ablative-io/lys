@@ -131,6 +131,14 @@ impl<S: LeafStore> EventLog<S> {
         self.ledger.refuse_state(&self.reopen, reason, key)
     }
 
+    /// Keep the root each leaf completes in the file at `path` beside the
+    /// log, brought level with the log first, so an entry reads its one leaf.
+    /// A file that cannot be kept is logged by name and entries are rebuilt
+    /// from the checkpoints.
+    pub fn keep_coordinates(&mut self, path: &std::path::Path) {
+        self.ledger.keep_roots(path);
+    }
+
     /// Write a snapshot of the state `encode` gives, when one is owed. The
     /// caller calls this only when that state is the fold of every leaf.
     pub fn snapshot_if_due(
@@ -190,8 +198,9 @@ impl<S: LeafStore> EventLog<S> {
     }
 
     /// The event at `index` with the coordinate it completed, if the log
-    /// holds one there, read from the store from the nearest checkpoint and
-    /// verified, refused while an append is uncertain.
+    /// holds one there, read from the store and verified: its one leaf when
+    /// its coordinate is kept, otherwise from the nearest checkpoint. Refused
+    /// while an append is uncertain.
     pub fn entry(&self, index: u64) -> Result<Option<(SignedEvent, Coordinate)>, IdentityError> {
         self.certain()?.entry(index, &self.service_key)
     }

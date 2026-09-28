@@ -337,7 +337,8 @@ fn ask_sessions(
                 reported_by: by.to_owned(),
                 at: now(),
                 launch: None,
-            })
+            })?;
+            Ok(())
         })?;
         asked.push(session);
     }

@@ -45,11 +45,19 @@ pub struct Held {
     pub kept: Vec<Kept>,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The sealed state as a snapshot reads it back.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+/// The sealed state as a snapshot writes it, borrowing what it seals.
+#[derive(Serialize)]
+struct SealedRef<'a> {
+    format: &'a str,
+    held: &'a Held,
 }
 
 impl Held {
@@ -90,9 +98,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&SealedRef {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("review decisions state: {error}"))
     }
@@ -111,3 +119,7 @@ impl Held {
         Ok(sealed.held)
     }
 }
+
+#[cfg(test)]
+#[path = "reviews_state_tests.rs"]
+mod tests;

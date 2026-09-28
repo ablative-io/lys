@@ -25,15 +25,25 @@
 //! and at once after a rebuild. A snapshot that cannot be written does not
 //! undo the append it follows, which is already durable: the failure is
 //! logged by name and kept until a later snapshot succeeds.
+//!
+//! # How a receipt is rebuilt
+//!
+//! An owner that keeps its coordinates (`Ledger::keep_roots`) has the root
+//! each leaf completed in a file beside the log (`coordinates`), written as
+//! each leaf is recorded and brought level with the log when it is opened,
+//! so an entry reads its one leaf. Without that file, or for a leaf it does
+//! not hold, the root is rebuilt from the nearest checkpoint.
 
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
+use std::path::Path;
 
 use lys_core::Ed25519Identity;
-use lys_core::merkle::InclusionProof;
+use lys_core::merkle::{InclusionProof, raw_leaf_hash};
 use lys_log_store::{Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreError, unseal};
 
 use crate::checkpoints::{self, Checkpoints};
+use crate::coordinates::{Level, Roots};
 use crate::log::{Coordinate, Reopen};
 
 /// How many entries a log grows by between snapshots, unless its owner is
@@ -89,6 +99,7 @@ pub(crate) struct Ledger<S: LeafStore, K: Leaves> {
     snapshot_at: u64,
     snapshot_owed: bool,
     snapshot_failure: Option<String>,
+    roots: Option<Roots>,
     kind: PhantomData<fn() -> K>,
 }
 
@@ -243,6 +254,7 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             snapshot_at,
             snapshot_owed,
             snapshot_failure: None,
+            roots: None,
             kind: PhantomData,
         }
     }
@@ -320,10 +332,11 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
             .map_err(|error| store_down::<K>(&error))
     }
 
-    /// The recorded event at `index` with the coordinate it completed: the
-    /// leaves from the checkpoint at or below it up to it are read from the
-    /// store, the root is that checkpoint extended by them, and the event is
-    /// verified. Never more than
+    /// The recorded event at `index` with the coordinate it completed, the
+    /// event verified. With the root kept for it, its one leaf is read;
+    /// otherwise the leaves from the checkpoint at or below it up to it are
+    /// read from the store and the root is that checkpoint extended by them.
+    /// Never more than
     /// [`CHECKPOINT_EVERY`](crate::checkpoints::CHECKPOINT_EVERY) leaves are read.
     pub(crate) fn entry(
         &self,
@@ -332,6 +345,20 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
     ) -> Result<Option<(K::Event, Coordinate)>, K::Error> {
         if index >= self.len() {
             return Ok(None);
+        }
+        if let Some(root) = self.kept_root(index) {
+            let bytes = self.stored(index)?;
+            let event =
+                K::verify(&bytes, key).map_err(|error| K::not_an_event(index, error.to_string()))?;
+            return Ok(Some((
+                event,
+                Coordinate {
+                    index,
+                    tree_size: index + 1,
+                    root,
+                    leaf_hash: raw_leaf_hash(&bytes),
+                },
+            )));
         }
         let mut frontier =
             self.checkpoints.before(index).cloned().ok_or_else(|| {
@@ -376,6 +403,86 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         fold::<K>(&mut frontier, &mut checkpoints, &tail.leaves, key)
     }
 
+    /// The leaf at `index`, which the log records, read from the store.
+    fn stored(&self, index: u64) -> Result<Vec<u8>, K::Error> {
+        self.log
+            .leaf_bytes(index)
+            .map_err(|error| store_down::<K>(&error))?
+            .ok_or_else(|| K::not_an_event(index, "the leaf is missing inside the log".to_owned()))
+    }
+
+    /// The root kept for the leaf at `index`, none when no file keeps it or
+    /// it cannot be read, which is logged by name.
+    fn kept_root(&self, index: u64) -> Option<[u8; 32]> {
+        match self.roots.as_ref()?.root(index) {
+            Ok(root) => root,
+            Err(reason) => {
+                tracing::warn!(
+                    domain = K::DOMAIN,
+                    "CoordinateUnread: {reason}; the receipt is rebuilt from the checkpoints"
+                );
+                None
+            }
+        }
+    }
+
+    /// Keep the root each leaf completes in the file at `path` from now on,
+    /// once it is brought level with the log. A file that cannot be opened
+    /// or brought level is logged by name and not kept: receipts are rebuilt
+    /// from the checkpoints.
+    pub(crate) fn keep_roots(&mut self, path: &Path) {
+        let leaf = |index| self.leaf_for_roots(index);
+        let log = Level {
+            domain: K::DOMAIN,
+            size: self.len(),
+            root: self.frontier.root(),
+            checkpoints: &self.checkpoints,
+            leaf: &leaf,
+        };
+        let levelled = Roots::open(path).and_then(|mut roots| {
+            roots.level(&log)?;
+            Ok(roots)
+        });
+        match levelled {
+            Ok(roots) => self.roots = Some(roots),
+            Err(reason) => {
+                tracing::error!(domain = K::DOMAIN, "CoordinatesNotKept: {reason}");
+                self.roots = None;
+            }
+        }
+    }
+
+    fn leaf_for_roots(&self, index: u64) -> Result<Vec<u8>, String> {
+        self.log
+            .leaf_bytes(index)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| format!("leaf {index} is missing inside the log"))
+    }
+
+    /// Keep the root the leaf at `index` completed, when a file keeps them.
+    /// A root that cannot be kept sets the file aside, logged by name.
+    fn keep_root(&mut self, index: u64, root: &[u8; 32]) {
+        let Some(roots) = self.roots.as_mut() else {
+            return;
+        };
+        let kept = if roots.held() == index {
+            roots.push(root)
+        } else {
+            Err(format!(
+                "{} holds {} roots where leaf {index} was recorded",
+                roots.path().display(),
+                roots.held()
+            ))
+        };
+        if let Err(reason) = kept {
+            tracing::error!(
+                domain = K::DOMAIN,
+                "CoordinatesNotKept: {reason}; receipts are rebuilt from the checkpoints until the next open"
+            );
+            self.roots = None;
+        }
+    }
+
     /// An inclusion proof of the leaf at `index` in the recorded tree. The
     /// proof tree is built from the stored leaves the first time one is asked
     /// for, never at a start.
@@ -393,10 +500,12 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         let (index, leaf_hash) = self.log.append(bytes)?;
         self.frontier.push_hash(leaf_hash);
         self.checkpoints.record(&self.frontier);
+        let root = self.frontier.root();
+        self.keep_root(index, &root);
         Ok(Coordinate {
             index,
             tree_size: self.frontier.size(),
-            root: self.frontier.root(),
+            root,
             leaf_hash,
         })
     }
@@ -427,6 +536,9 @@ impl<S: LeafStore, K: Leaves> Ledger<S, K> {
         self.log = log;
         self.frontier = frontier;
         self.checkpoints = checkpoints;
+        for (_, coordinate) in &events {
+            self.keep_root(coordinate.index, &coordinate.root);
+        }
         Ok(events)
     }
 

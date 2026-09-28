@@ -106,11 +106,19 @@ struct Held {
     certificates: BTreeMap<String, Entered>,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The sealed state as a snapshot reads it back.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+/// The sealed state as a snapshot writes it, borrowing what it seals.
+#[derive(Serialize)]
+struct SealedRef<'a> {
+    format: &'a str,
+    held: &'a Held,
 }
 
 /// How the leaf store is opened again after an append whose outcome is not known.
@@ -158,9 +166,9 @@ impl Held {
     }
 
     fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&SealedRef {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("certificates state: {error}"))
     }
@@ -414,3 +422,7 @@ fn rebuilt<S: LeafStore>(reopen: &Reopen<S>, reason: String) -> Result<Opened<S>
     };
     Ok((log, held, start))
 }
+
+#[cfg(test)]
+#[path = "certificates_store_tests.rs"]
+mod tests;

@@ -86,7 +86,7 @@ pub struct RecallReport {
 /// home lists the file under, and is what every row carries. A lantern or
 /// epilogue entry whose data is not its shape refuses by name, as does a
 /// lantern whose recorded `lit_in` is not a session of `home`.
-fn rows_of(
+pub(crate) fn rows_of(
     home: &Home,
     reader: &SessionReader,
     session: &str,

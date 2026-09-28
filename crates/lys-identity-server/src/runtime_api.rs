@@ -16,7 +16,7 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -35,6 +35,7 @@ use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_api::placed;
 use crate::network_api::with_network;
+use crate::network_store::Placement;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_state::{Report, Reported, Tracked};
 use crate::runtime_store::RuntimeStore;
@@ -206,18 +207,63 @@ fn report(
     })
 }
 
-fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
+/// Each machine's placement by its id.
+type Placements = HashMap<String, Placement>;
+
+/// Every machine's placement, read under one lock of the machines; none
+/// when the machines are not kept here.
+fn placements(state: &AppState) -> Placements {
+    state
+        .network
+        .as_ref()
+        .map(|store| {
+            store
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .placements()
+        })
+        .unwrap_or_default()
+}
+
+/// The placement of the machine `machine` alone, read under one lock of the
+/// machines; none when it is not kept.
+fn placement(state: &AppState, machine: &str) -> Placements {
+    state
+        .network
+        .as_ref()
+        .and_then(|store| {
+            store
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .placement(machine)
+        })
+        .map(|placement| HashMap::from([(machine.to_owned(), placement)]))
+        .unwrap_or_default()
+}
+
+/// The sessions `tracked` lists, each shown with its machine from the
+/// placements `read` gives, which is asked once for the whole listing.
+fn listing<'a>(
+    tracked: impl Iterator<Item = &'a Tracked>,
+    read: impl FnOnce() -> Placements,
+) -> SessionsView {
+    let placements = read();
+    SessionsView {
+        sessions: tracked
+            .filter_map(|tracked| view(&placements, tracked))
+            .collect(),
+    }
+}
+
+fn view(placements: &Placements, tracked: &Tracked) -> Option<SessionView> {
     let (first, latest) = (tracked.first()?, tracked.latest()?);
-    let machine = state.network.as_ref().and_then(|store| {
-        let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-        store.machine(&tracked.machine).cloned()
-    });
+    let placement = placements.get(&tracked.machine);
     Some(SessionView {
         session: tracked.session.clone(),
         agent: tracked.agent.clone(),
         machine: tracked.machine.clone(),
-        machine_name: machine.as_ref().map(|machine| machine.name.clone()),
-        runtime: machine.and_then(|machine| machine.runtime),
+        machine_name: placement.map(|placement| placement.name.clone()),
+        runtime: placement.and_then(|placement| placement.runtime.clone()),
         shown: tracked.shown(),
         last_reported: latest.state.name(),
         first_report_at: first.at,
@@ -236,6 +282,14 @@ fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
         stop_asked_at: tracked.stop_asked_at(),
         reported_by: first.reported_by.clone(),
     })
+}
+
+/// Keep `report` and show its session as it then stands, built from the
+/// kept session in place, with its machine read under one lock.
+fn reported(state: &AppState, report: Report) -> Result<SessionView, ServerError> {
+    let placements = placement(state, &report.machine);
+    with_runtime(state, |store| Ok(view(&placements, store.report(report)?)))?
+        .ok_or(ServerError::RuntimeSessionUnknown)
 }
 
 /// Whether `asker` may see the sessions of `agent`: the administrator, the
@@ -296,8 +350,7 @@ async fn report_agent(
                 placed(store, &report.machine, (&agent, &held)).map(drop)
             })?;
         }
-        let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        reported(&state, report)
     })
     .map(Json)
 }
@@ -324,8 +377,7 @@ async fn report_found(
                 .map(drop)
                 .ok_or(ServerError::MachineUnknown)
         })?;
-        let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        reported(&state, report)
     })
     .map(Json)
 }
@@ -349,14 +401,13 @@ async fn agent_sessions(
             return Err(ServerError::AgentNotVisible);
         }
         with_runtime(&state, |store| {
-            Ok(SessionsView {
-                sessions: store
+            Ok(listing(
+                store
                     .sessions()
                     .iter()
-                    .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str()))
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
-            })
+                    .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str())),
+                || placements(&state),
+            ))
         })
     })
     .map(Json)
@@ -372,19 +423,15 @@ async fn sessions(
         let asker = caller(&state, &headers, directory)?;
         let administrator = state.admission.administrator(&actor).is_ok();
         with_runtime(&state, |store| {
-            Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| {
-                        tracked
-                            .agent
-                            .as_deref()
-                            .is_some_and(|agent| sees(directory, administrator, asker, agent))
-                    })
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
-            })
+            Ok(listing(
+                store.sessions().iter().filter(|tracked| {
+                    tracked
+                        .agent
+                        .as_deref()
+                        .is_some_and(|agent| sees(directory, administrator, asker, agent))
+                }),
+                || placements(&state),
+            ))
         })
     })
     .map(Json)
@@ -397,14 +444,17 @@ async fn found(
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     with_runtime(&state, |store| {
-        Ok(SessionsView {
-            sessions: store
+        Ok(listing(
+            store
                 .sessions()
                 .iter()
-                .filter(|tracked| tracked.agent.is_none())
-                .filter_map(|tracked| view(&state, tracked))
-                .collect(),
-        })
+                .filter(|tracked| tracked.agent.is_none()),
+            || placements(&state),
+        ))
     })
     .map(Json)
 }
+
+#[cfg(test)]
+#[path = "runtime_api_tests.rs"]
+mod tests;

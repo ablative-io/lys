@@ -5,6 +5,8 @@
 //! refused by name (P9). The directory itself is crates/lys-identity: this
 //! crate holds sign-in, sessions, admission and the HTTP routes over it.
 
+#![warn(clippy::await_holding_lock)]
+
 pub mod admission;
 mod agent_sight;
 pub mod agent_signature;
@@ -15,6 +17,7 @@ pub mod config;
 pub mod configuration_api;
 pub mod connections_api;
 pub mod dev_seed;
+pub mod directory_access;
 pub mod error;
 mod error_status;
 pub mod file_stores;

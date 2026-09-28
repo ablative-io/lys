@@ -250,7 +250,7 @@ async fn start_command(
         reason: error.to_string(),
     })?;
     let kept = with_runtime(&state, |store| {
-        store.report(Report {
+        let tracked = store.report(Report {
             operation: session.clone(),
             session: session.clone(),
             agent: Some(agent.clone()),
@@ -261,11 +261,10 @@ async fn start_command(
             reported_by: admitted_by,
             at: now(),
             launch: Some(view),
-        })
+        })?;
+        Ok(tracked.first().and_then(|first| first.launch.clone()))
     })?;
-    kept.first()
-        .and_then(|first| first.launch.clone())
-        .map(Json)
+    kept.map(Json)
         .ok_or(ServerError::RuntimeReportReused { operation: session })
 }
 

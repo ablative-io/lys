@@ -8,6 +8,7 @@
 
 pub mod binding;
 pub mod checkpoints;
+mod coordinates;
 pub mod directory;
 mod directory_state;
 pub mod encoding;

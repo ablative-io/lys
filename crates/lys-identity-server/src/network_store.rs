@@ -10,6 +10,7 @@
 //! again in the same words answers the machine already kept, and the same
 //! operation in other words is refused.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,24 @@ pub struct Machine {
     pub named_at: u64,
     /// Its retirement, null while it is in use.
     pub retired: Option<Retirement>,
+}
+
+/// What a session is shown with of the machine it runs on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Placement {
+    /// The machine's name, as people call it.
+    pub name: String,
+    /// The runtime installed on it, null for none.
+    pub runtime: Option<String>,
+}
+
+impl Placement {
+    fn of(machine: &Machine) -> Self {
+        Self {
+            name: machine.name.clone(),
+            runtime: machine.runtime.clone(),
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -144,6 +163,24 @@ impl NetworkStore {
     /// The machine named `id`.
     pub fn machine(&self, id: &str) -> Option<&Machine> {
         self.kept.machines.iter().find(|machine| machine.id == id)
+    }
+
+    /// Each machine's placement by its id, built in one pass over the
+    /// machines; where two share an id, the first named, as [`Self::machine`]
+    /// finds it.
+    pub fn placements(&self) -> HashMap<String, Placement> {
+        let mut placements = HashMap::with_capacity(self.kept.machines.len());
+        for machine in &self.kept.machines {
+            placements
+                .entry(machine.id.clone())
+                .or_insert_with(|| Placement::of(machine));
+        }
+        placements
+    }
+
+    /// The placement of the machine named `id`.
+    pub fn placement(&self, id: &str) -> Option<Placement> {
+        self.machine(id).map(Placement::of)
     }
 
     /// Keep `machine`. Named again in the same words it is kept once; the

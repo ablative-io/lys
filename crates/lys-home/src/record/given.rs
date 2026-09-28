@@ -43,7 +43,7 @@ use crate::record::Session;
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_GIVEN, Entry, EntryBody};
 use crate::record::reader::SessionReader;
-use crate::record::recall::Skipped;
+use crate::record::recall::{RecallReport, Skipped, rows_of};
 
 /// The kinds a given entry resolves, in the order the record names them.
 pub const RESOLVED_KINDS: [&str; 6] = [
@@ -246,16 +246,7 @@ pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
             .read_session(&session)
             .and_then(|reader| given_of(&reader, &session));
         match given {
-            Ok(given) => {
-                for seen in given {
-                    if last
-                        .as_ref()
-                        .is_none_or(|kept| kept.given_at <= seen.given_at)
-                    {
-                        last = Some(seen);
-                    }
-                }
-            }
+            Ok(given) => keep_last(&mut last, given),
             Err(e) => skipped.push(Skipped {
                 session,
                 reason: e.to_string(),
@@ -263,6 +254,72 @@ pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
         }
     }
     Ok(GivenLast { last, skipped })
+}
+
+/// Keep in `last` the entry of `given` appended last, the later of two
+/// appended at the same moment.
+fn keep_last(last: &mut Option<GivenSeen>, given: Vec<GivenSeen>) {
+    for seen in given {
+        if last
+            .as_ref()
+            .is_none_or(|kept| kept.given_at <= seen.given_at)
+        {
+            *last = Some(seen);
+        }
+    }
+}
+
+/// Every lantern of the home and its `lys.given` entry appended last, read
+/// in one pass: each session is opened once and both are read from that one
+/// reader. The answer is exactly what [`recall_all`](crate::recall_all) and
+/// [`last_given`] answer, each with the sessions it could not read.
+pub fn recall_and_last_given(home: &Home) -> Result<(RecallReport, GivenLast), HomeError> {
+    recall_and_last_given_through(home, |session| home.read_session(session))
+}
+
+/// As [`recall_and_last_given`], each session opened through `open`, which
+/// is asked once for each session the home lists, and never again.
+pub fn recall_and_last_given_through(
+    home: &Home,
+    mut open: impl FnMut(&str) -> Result<SessionReader, HomeError>,
+) -> Result<(RecallReport, GivenLast), HomeError> {
+    let mut recalled = RecallReport {
+        lanterns: Vec::new(),
+        skipped: Vec::new(),
+    };
+    let mut given = GivenLast {
+        last: None,
+        skipped: Vec::new(),
+    };
+    for session in home.session_ids()? {
+        let reader = match open(&session) {
+            Ok(reader) => reader,
+            Err(e) => {
+                let reason = e.to_string();
+                recalled.skipped.push(Skipped {
+                    session: session.clone(),
+                    reason: reason.clone(),
+                });
+                given.skipped.push(Skipped { session, reason });
+                continue;
+            }
+        };
+        match rows_of(home, &reader, &session) {
+            Ok(rows) => recalled.lanterns.extend(rows),
+            Err(e) => recalled.skipped.push(Skipped {
+                session: session.clone(),
+                reason: e.to_string(),
+            }),
+        }
+        match given_of(&reader, &session) {
+            Ok(seen) => keep_last(&mut given.last, seen),
+            Err(e) => given.skipped.push(Skipped {
+                session,
+                reason: e.to_string(),
+            }),
+        }
+    }
+    Ok((recalled, given))
 }
 
 fn not_given(entry: &Entry) -> HomeError {
