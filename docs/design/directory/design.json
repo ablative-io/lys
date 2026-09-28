@@ -2810,6 +2810,11 @@
       "path": "surface/identity/src/features/apps/SchemaBench.tsx",
       "note": "R8: Build an app's permission template on a Lys screen",
       "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "crates/lys-home/src/record/given.rs",
+      "note": "DIRECTORY-052 R3: the given record lists a member's starting memories and opening conversation",
+      "brief": "DIRECTORY-052"
     }
   ],
   "inventory": [

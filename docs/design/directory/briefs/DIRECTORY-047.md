@@ -78,10 +78,10 @@ Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today red
 
 ### R3: Lys is the OpenID provider every product is registered with
 
-Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. Install registers Cambium (and any later product) as a client of Lys, and the configuration it hands a product names only Lys's address. The issuer's ports are published only on the container network, not on the host.
+Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. No product is registered by install and no product is named in Lys: a product registers itself as a client of Lys through the app registration API (DIRECTORY-048), and the configuration a product receives names only Lys's address. Until DIRECTORY-048 lands, acceptance uses a test fixture client. The issuer's ports are published only on the container network, not on the host.
 
 **Acceptance:**
-- Cambium configured from install's output signs in with every URL on Lys's origin or a provider's.
+- a fixture product configured from install's output signs in with every URL on Lys's origin or a provider's.
 - Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks.
 - No port of the issuer answers from the host after install.
 

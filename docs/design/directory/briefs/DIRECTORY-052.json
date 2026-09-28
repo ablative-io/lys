@@ -12,7 +12,8 @@
     "C388",
     "C389",
     "C390",
-    "C391"
+    "C391",
+    "C392"
   ],
   "stories": [
     "S158"
@@ -20,16 +21,18 @@
   "design_anchor": [
     "ADR-119"
   ],
-  "purpose": "Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.'",
+  "purpose": "Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.'",
   "task": "Add team plans: a record that names a team's purpose, budget, deliverables and members; provision it in one all-or-nothing act that creates agents, grants, homes with their starting memories and opening conversation, budgets and goals, and starts them through the runner; hold deliverables to a checker's acceptance with evidence; build, provision and watch plans on a Teams screen and through the API.",
   "requirements": [
     {
       "id": "R1",
       "title": "A team plan record",
-      "spec": "Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence.",
+      "spec": "Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence.",
       "acceptance": [
         "A plan whose member shares exceed its total is refused naming the total.",
-        "A member with no checker is refused naming the member."
+        "A member with no checker is refused naming the member.",
+        "A member given a grant the provisioning person does not hold is refused, naming the grant and the reason from cannot-give.",
+        "A member naming an account handle the broker does not hold is refused account_unknown."
       ],
       "files": {
         "create": [
@@ -140,6 +143,29 @@
       },
       "checklist": [
         "C391"
+      ],
+      "stories": [
+        "S158"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Accounts and secrets stored and reached by handle",
+      "spec": "Behavioural. The Teams screen and the API let the responsible person store a model account or other secret in the secrets broker (lys-secrets), under a scope, and assign it to members by handle; the secret's value is entered once, never shown again, and reaches only the member's process environment through the broker at start. Listing shows handles, scopes, holders and last use, never values.",
+      "acceptance": [
+        "An account stored on the screen is assignable to a member and the member runs on it.",
+        "No answer, screen or log shows the value after it is stored, checked by a test."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/team-plans/TeamPlans.tsx",
+          "crates/lys-identity-server/src/secrets_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C392"
       ],
       "stories": [
         "S158"

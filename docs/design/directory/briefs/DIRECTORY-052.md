@@ -17,12 +17,13 @@ title: Provision a working team in one act: agents with memories, an opening con
 > - C389 — Each member starts with its chosen memories and its opening conversation already in its session (DIRECTORY-052 R3).
 > - C390 — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
 > - C391 — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
+> - C392 — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).
 > **Stories:**
 > - S158 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.
 
 ## Purpose
 
-Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.'
+Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.'
 
 ## Task
 
@@ -32,11 +33,13 @@ Add team plans: a record that names a team's purpose, budget, deliverables and m
 
 ### R1: A team plan record
 
-Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence.
+Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence.
 
 **Acceptance:**
 - A plan whose member shares exceed its total is refused naming the total.
 - A member with no checker is refused naming the member.
+- A member given a grant the provisioning person does not hold is refused, naming the grant and the reason from cannot-give.
+- A member naming an account handle the broker does not hold is refused account_unknown.
 
 **Files:**
 - create: crates/lys-identity-server/src/team_plans_api.rs
@@ -121,6 +124,24 @@ Behavioural. A Teams screen builds a plan from a template (for example: a builde
 
 **Checklist:**
 - C391 — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
+
+**Stories:**
+- S158 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.
+
+### R6: Accounts and secrets stored and reached by handle
+
+Behavioural. The Teams screen and the API let the responsible person store a model account or other secret in the secrets broker (lys-secrets), under a scope, and assign it to members by handle; the secret's value is entered once, never shown again, and reaches only the member's process environment through the broker at start. Listing shows handles, scopes, holders and last use, never values.
+
+**Acceptance:**
+- An account stored on the screen is assignable to a member and the member runs on it.
+- No answer, screen or log shows the value after it is stored, checked by a test.
+
+**Files:**
+- modify: surface/identity/src/features/team-plans/TeamPlans.tsx
+- modify: crates/lys-identity-server/src/secrets_api.rs
+
+**Checklist:**
+- C392 — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).
 
 **Stories:**
 - S158 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.

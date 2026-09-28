@@ -1298,6 +1298,11 @@
           "id": "C391",
           "text": "A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).",
           "done": false
+        },
+        {
+          "id": "C392",
+          "text": "Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).",
+          "done": false
         }
       ]
     }
