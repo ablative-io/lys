@@ -30,3 +30,24 @@ fn ca_issue_help_quotes_the_capability_claims_oid() {
         "`lys ca issue --help` must name OID {expected}; rendered help was:\n{help}"
     );
 }
+
+/// `lys ca verify` checks a certificate's chain and validity window and
+/// nothing about a log, so its help says so, once: verification without a
+/// log does not check revocation.
+#[test]
+fn ca_verify_help_says_no_log_checks_no_revocation() {
+    let mut command = Cli::command();
+    let verify = command
+        .find_subcommand_mut("ca")
+        .expect("`ca` subcommand is declared")
+        .find_subcommand_mut("verify")
+        .expect("`ca verify` subcommand is declared");
+    let help = verify.render_long_help().to_string();
+    let sentence = "Verification without a log does not check revocation.";
+
+    assert_eq!(
+        help.matches(sentence).count(),
+        1,
+        "`lys ca verify --help` must say once that {sentence:?}; rendered help was:\n{help}"
+    );
+}
