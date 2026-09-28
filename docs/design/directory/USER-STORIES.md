@@ -34,16 +34,4 @@
 
 **S12.** As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect.
 
-## Person who signs in — Keeps their sign-in identities to themselves
-
-**S13.** As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
-
-**S14.** As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
-
-**S15.** As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
-
-**S16.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-
-## Directory administrator — Resolves a refused act
-
-**S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+**S76.** As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.

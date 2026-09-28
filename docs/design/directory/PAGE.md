@@ -2,187 +2,332 @@
 
 ## The words, as they were typed
 
-Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. A sign-in identity is a person's link to a provider, such as a Google or GitHub account, through which that person signs in. IDENTITY-001 was to state this and never did, and no brief tests it. The directory holds sign-in identities beside people (DIRECTORY-004 links two providers to one person) and gives grants to agents (DIRECTORY-006), so the refusal belongs at the point where anything would attach a sign-in identity to an agent.
+Write the brief for this card in the directory cluster (docs/design/directory/briefs, the next id not used on main or on any origin branch, which at 13:00 on 27 September was DIRECTORY-015 with three more briefs being written beside this one, so take the id from the branches at write time), as road step 2 of the directory design (docs/design/directory/DESIGN.md): the full list of what a person cannot give, each with its reason. This brief carries conformance row 2.4 of docs/design/identity/CONFORMANCE.md and gives it acceptance lines that name the row. DIRECTORY-006 tests only that a forbidden delegation is refused. This brief makes the server's answer to the delegation form list every relation the person cannot give with exactly one reason from a closed set of four, and the screen shows that list from the answer and nothing the answer did not list, since the browser is never the authority. The four reasons are these. Sign-in identity, when the thing is the person's own sign-in identity, which is never given to an agent, as row 1.2 says. Above what you hold, when the relation is not at or below one the person holds. Lent to you, when the person holds the grant by delegation from someone else and the chain it came through does not permit passing it on again. Use only, when the person's own grant carries no may-pass-on. Where more than one reason applies to one item, exactly one is shown, and the order of precedence is fixed as sign-in identity, then above what you hold, then lent to you, then use only, so that the most fundamental reason wins and two servers never disagree. The reason set is a closed enumeration on the wire, and a client that meets a reason outside it refuses the answer by name rather than showing a blank. Done when a fixture person holding one may-pass-on grant, one use-only grant and one grant lent to them without onward passing, beside a relation above anything they hold and their own sign-in identity, gets a list with every item they cannot give and the one right reason on each, when a case where two reasons apply shows the one the precedence names, and when the screen rendered from that answer shows the same items and reasons and no other. Hold to DIRECTORY-006 R2 and R5 for the delegation rules and the one authenticated seam, to R4 of DIRECTORY-002 and to ADR-009. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). If a sentence of DESIGN.md or CHECKLIST.md is open or contradicted by the repository as it stands, quote it as a question for the lead rather than rewriting the design around it. The card is built from this brief only after Tom or the lead signs it off on the card. Rulings of the lead, Apollo, given on 27 September 2026 to run 687de276-3a37-4150-b9e4-82ba2b47a96d in answer to its rounds, settled here and not reopened by the author. It sits under CONFORMANCE's build-order step 2, grants and delegation, as an amendment beside DIRECTORY-006, and my phrase road step 2 is withdrawn. It waits for no ADR and carries no amendment of the design's non-goal sentence, since DIRECTORY-006 already does grants and delegation on main and this brief only completes row 2.4 of that work. If a sentence of DESIGN.md still reads as excluding it, quote that sentence as a question for the lead in the brief rather than rewriting it. A fifth reason is added, people only, shown when the grant's policy admits only people as recipients and the chosen recipient is an agent. The set is closed at what this round settles, and every reason is one word or phrase on the wire. The flags on the grants decide the reason, never who gave them. Use only means the person's own grant carries no may-pass-on, whoever issued it, so a delegator who could have allowed onward passing and chose not to gives use only, and a grant from the directory administrator without may-pass-on gives use only too. Lent to you means the person's own grant does carry may-pass-on but an earlier grant in its ancestry bounds onward passing, by depth, by an end date or by a limit, so this particular pass is not permitted. The fixture's use-only grant is a grant to the person with no may-pass-on, and its lent-to-you grant is one with may-pass-on whose source grant forbids a second onward pass. Per source grant, as the mock-up draws it. The list covers the relations on the resource of the source grant the form was opened from, plus the person's own sign-in identity as one standing item. A service account under row 1.3 appears when it is the resource of the source grant the form was opened from, and not otherwise. Nothing is enumerated from records the person cannot discover, as DIRECTORY-006 R6 requires. They are listed under a sixth reason, not in force, and the answer names which standing it is, expired, revoked or an ancestor suspended, as DIRECTORY-006 R4 and R6 treat an expired ancestor as a visible refusal. The closed set is therefore six, and the precedence is sign-in identity, not in force, above what you hold, people only, lent to you, use only. Yes. The answer is per recipient. The form sends the chosen recipient with the source grant, and the server's list is computed for that recipient, so the sign-in identity item and the people-only item appear when the recipient is an agent and not when it is a person. When the To choice changes the client asks again, and the browser never computes the list itself. This brief takes row 2.4 over, and DIRECTORY-006's text does not change. The brief records the split in its boundaries in one sentence, that DIRECTORY-006 R6 shows the server's reason for a refused choice while this brief defines the closed reason set and the full per-recipient list that R6's screen consumes. The brief's acceptance names row 2.4, and the brief may amend the Brief column of row 2.4 in CONFORMANCE.md to its own id and nothing else in that file. Yes, the sentence stands as written beside this brief, as it already stands beside DIRECTORY-006 on main. It describes what step 1 of the directory design set out to build, and its amendment is a documents card for the design's owner, not this brief's. The brief records that in one sentence of its boundaries, quoting DESIGN.md's line 63, and changes nothing in DESIGN.md. Yes. CN1 governs the planning documents of the directory design round and nothing else, and every brief's build walls are the brief's own, as DIRECTORY-006 on main already shows. The brief says so in one sentence beside its file walls and treats CN1 as no bar on its code paths or on the one-column change to CONFORMANCE.md row 2.4. The item names one standing, chosen by a fixed precedence of revoked, then ancestor suspended, then expired, so that the standing made by a person's act outranks one made by the passage of time. One acceptance line covers a relation with one revoked and one expired grant and asserts revoked. Yes. The standing is a closed enumeration on the wire exactly as the reason is, and a client that meets a standing outside expired, revoked and ancestor_suspended refuses the answer by name rather than showing a blank. Add the requirement beside the reason's and one test that feeds an unknown standing and asserts the named refusal.
 
-The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".
+Rulings. The lead settled these in brief run 49cc20db-bbe7-42cf-a57f-efd51c031045 on 27 September 2026. Each is decided, so the brief takes it as given and does not ask it again.
 
-Acceptance is that linking a provider account to an agent is refused by name; that delegating from a sign-in identity to an agent is refused by name; that a credential request for an agent that presents a person's sign-in token is refused by name; that each refusal writes nothing to the directory; and that no agent record in the directory ever carries a sign-in identity, checked by one test over the store after all three refusals. This brief names row 1.2 as the row it passes.
+The lead was asked this.
+The mock-up's cannotGive lists use-only grants on every resource the person holds, plus a service account shown unconditionally.
+Should the list really be limited to the source grant's resource, plus the sign-in identity item, plus a service account only when it is that resource, as the ruling says?
+The lead ruled as follows.
+The mock-up governs, since GRANT_CONFORMANCE pins it, and my phrase that the mock-up draws the list per source grant was wrong on the fact and is withdrawn.
+The list covers every grant the person holds that they cannot give to the chosen recipient, on whatever resource, each with its one reason, plus the person's own sign-in identity as one standing item, plus each service account the person holds under row 1.3.
+Every item comes from the person's own grants and accounts, so nothing is enumerated from records they cannot discover and DIRECTORY-006 R6 still holds.
+The list stays per recipient as already ruled, and the source grant the form was opened from is marked in the list when it is itself one the person cannot give.
 
-It waits for DIRECTORY-004 and DIRECTORY-006 to land, each checked by a command a stranger can run against lys main. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.
+The lead was asked this.
+'Lent to you' covers ancestry that bounds onward passing 'by depth … or by a limit', but DIRECTORY-006 R1's proposed grant schema has no depth or onward-pass-limit field, and an ancestor end date either has passed (which is not_in_force/expired) or only caps the new grant's end (row 2.3).
+Which ancestor facts produce lent_to_you in this brief?
+The lead ruled as follows.
+With the fields DIRECTORY-006 R1 has, the fact that tells the two reasons apart is whether the person's grant has a source grant.
+Lent to you is a grant without may-pass-on that the person holds by delegation, so it names a source grant.
+Use only is a grant without may-pass-on that was made to the person directly and names no source grant.
+Depth and limit are withdrawn, since no such field exists, and an ancestor's end date never gives lent to you, since a passed end date is not in force with the standing expired and a live one only caps the new grant's end under row 2.3.
+My earlier sentences that the flags decide the reason and never who gave the grant, and that lent to you is a grant that does carry may-pass-on, are corrected by this answer.
+The fixture's use-only grant is a direct grant without may-pass-on, its lent-to-you grant is a delegated grant without may-pass-on, and the precedence is unchanged.
 
-Rulings of the lead, Archie, given on 27 September 2026 to the run ea580795-f9fa-4284-99e5-1f7cce6b37c4 in answer to its rounds. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.
+The lead was asked this.
+DESIGN.md's non-goal says arbitrary grants and their enforcement are out of step 1.
+The lead ruled that it stands and is quoted, not amended.
+Is that sentence accepted as not excluding this brief, given that the brief adds more grant behaviour to the directory cluster?
+The lead ruled as follows.
+Yes, accepted.
+The sentence at docs/design/directory/DESIGN.md line 63 stands as written and does not exclude this brief, as it does not exclude DIRECTORY-006 on main.
+The brief quotes it in one sentence of its boundaries with this ruling beside it and changes nothing in DESIGN.md.
 
-The exception stays, because it is Tom's ruling and this brief does not overturn it. The brief states it as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18. The harness login token reaches a seat's process under that ruling, and it never passes through anything lys issues, links or delegates. The rule governs everything lys itself gives an agent. The token is not redefined, and the brief does not pretend it is something other than what it is. Answered by Archie, lead for the identity line.
+The lead was asked this.
+Does a service account the person holds that they could give to the chosen recipient still appear in the list, and under which reason?
+Such an account carries may-pass-on, is in force, and its policy admits the recipient's kind, so none of the six reasons applies.
+The lead's answer says 'each service account the person holds' is listed.
+The brief lists a held service account only when one of the six applies, and measures only a use-only one.
+The lead ruled as follows.
+No.
+A service account the person holds that they could give to the chosen recipient does not appear in the list, and the brief is right as it stands.
+The list is of what the person cannot give, and every item in it carries one of the six reasons.
+My round 1 phrase, each service account the person holds under row 1.3, was too wide and is corrected to each service account the person holds to which one of the six reasons applies.
+An account that can be given is offered by the give form and is not explained here.
+The brief adds one acceptance line beside the use-only one, in which a held service account that carries may-pass-on, is in force and admits the recipient's kind is absent from the list.
 
-No seam that exists only to refuse. The directory enforces the two acts it owns, linking a provider account to an agent and delegating a grant whose source is a sign-in identity, each refused by name with an acceptance line. Issuing credentials is the broker's, so the third refusal is a rule the broker enforces. This brief states it and names it as a finding against SECRETS-002, with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card. The brief says that row 1.2 is met in full only when that line passes. Answered by Archie.
+The lead was asked this.
+Is a relation on the source grant's resource that is covered only by grants the person holds that are not in force also listed as its own relation item, with above_what_you_hold, beside each such grant's not_in_force item?
+The brief lists as relation items only the relations that no held grant covers in any standing, and no acceptance line measures the other case.
+The lead ruled as follows.
+No.
+A relation that is covered by a grant the person holds, in whatever standing, is not listed as a relation item.
+The grant's own not_in_force item is the one explanation for it, and above_what_you_hold stays for relations that no held grant covers in any standing, as the brief has it.
+A second item would give two reasons for one fact, and it would be untrue, since the person does hold a grant for that relation and what is wrong is its standing.
+The brief adds an acceptance line for the case, in which a relation covered only by an expired grant yields that grant's not_in_force item and no relation item.
 
-Only that one exists. A refusal returned to anyone other than the identity's owner or a directory administrator names the act, the agent and the fact that a sign-in identity is involved, and states that sign-in identities belong to people only. It never shows the provider or the subject, as DIRECTORY-006 R5 requires. The owner and administrators see the provider and subject. Acceptance lines cover both views. Answered by Archie.
+The lead was asked this.
+Take a grant the person holds that carries may-pass-on and is in force, but whose policy admits only agents as recipients (DIRECTORY-006 R2's agent-only case), when the chosen recipient is a person.
+None of the six reasons applies to it.
+Is it left off the list, does it take an existing reason, or does the closed set gain a reason for it?
+The lead ruled as follows.
+The closed set gains a seventh reason, `agents_only`, with the words This can be passed on only to an agent.
+The grant is listed with that reason when the chosen recipient is a person, because a grant left off the list tells the person nothing about why it cannot be given.
 
-Only a person's account. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. Acceptance lines cover an agent's own account accepted and a person's linked account refused. Answered by Archie.
+The lead was asked this.
+Where does agents_only sit in the reason precedence?
+The brief places it straight after people_only: sign_in_identity, not_in_force, above_what_you_hold, people_only, agents_only, lent_to_you, use_only.
+That means a grant that admits only agents and carries no may-pass-on shows agents_only, not lent_to_you or use_only, when the recipient is a person.
+Is that the order the lead intends?
+The lead ruled as follows.
+No.
+A reason that no choice of recipient can change comes before a reason about the chosen recipient, so the list never suggests that picking someone else would make a grant givable when it would not.
+The order is sign_in_identity, not_in_force, above_what_you_hold, lent_to_you, use_only, people_only, agents_only.
+This moves people_only below lent_to_you and use_only as well, and the brief says so and updates every place the order is stated or tested.
 
-The server's reason is this brief's, and the screen is row 2.4's. Apollo's card jAfmblAP carries the cannot-give list with its four reasons, sign-in identity among them, on the delegation screen. This brief asserts that the server returns the reason 'sign-in identity' for such an entry, and names jAfmblAP as where a person sees it. No screen work is duplicated here. Answered by Archie.
+The lead was asked this.
+R1: the spec cannot be tested as written — The create paths cannot_give.rs and tests/grant_cannot_give.rs are absent, which is correct because crates/lys-identity does not exist.
+The modify target grants/mod.rs is created by DIRECTORY-006 R1, and blocked_by and depends_on declare that.
+The acceptance lines are concrete and each count checks by hand.
+The spec is contradictory for one case.
+Clause (a) lists every grant the person cannot give, and every item must carry exactly one of the six reasons.
+But a grant that carries may-pass-on, is in force, and has a policy admitting only agents cannot be given to a person recipient, and none of the six reasons applies to it (people_only covers only the reverse case).
+DIRECTORY-006 R2's GRANT_RECIPIENT has agent-only grants, so a stranger cannot tell whether such a grant is listed, and if it is, under which reason.
+The lead ruled as follows.
+Apply the correction as settled under r1-service-account-grant-double-listed.
+
+The lead was asked this.
+In R1's spec, say that a grant whose resource is a service account is listed only once, as a service-account item under clause (d), and never also as a grant item under clause (a).
+As written, G7 on SA1 falls under both clauses, which contradicts CANNOT_GIVE_SERVICE_ACCOUNT's 5 items with SA1 appearing once.
+Make the ordering sentence ('grant and service-account items by grant id') consistent with that rule.
+The lead ruled as follows.
+Apply the correction as stated.
+A grant whose resource is a service account is listed once, as a service-account item under clause (d), and never also as a grant item under clause (a).
+Clause (a) lists every grant the person holds on any resource that is not a service account.
+The ordering sentence reads that grant items and service-account items are ordered together by grant id, each grant appearing once.
+So G7 on SA1 is the one service-account item for SA1, and CANNOT_GIVE_SERVICE_ACCOUNT's 5 items stand.
 
 ## What the survey found, and its angles
 
-Archie wants a directory brief that finally states and tests conformance row 1.2: a sign-in identity (a provider account linked to a person) is never lent to or held by an agent. The directory refuses two acts by name: binding a person-linked provider account to an agent, and delegating a sign-in identity to an agent. Each refusal writes nothing, has an owner/administrator view and a redacted view, and is followed by one test over the store showing that no agent record carries a sign-in identity. The third act, issuing an agent a credential derived from a person's sign-in session, is stated as a finding against SECRETS-002 and left for the broker's card to enforce. The harness login token stays as the one named exception, and the "sign-in identity" reason is served to the cannot-give list that Cambium card jAfmblAP displays.
+The words ask for one new brief in the directory cluster, an amendment beside DIRECTORY-006 under CONFORMANCE build-order step 2. It carries conformance row 2.4: for the chosen recipient, the server's delegation-form answer lists everything the person cannot give. Each item carries exactly one reason from a closed wire set of seven, chosen by a fixed precedence: sign_in_identity, not_in_force, above_what_you_hold, lent_to_you, use_only, people_only, agents_only. A not_in_force item also carries one standing from a closed set of three: revoked, ancestor_suspended, expired. The screen renders only that answer and refuses an unknown reason or standing by name. Eleven rounds of the lead's rulings already fix the list's scope, the seven reasons, both precedences, the fixture, how service accounts and not-in-force cover are handled, and the one-column change to CONFORMANCE row 2.4. A near-complete earlier draft exists as DIRECTORY-017 on origin/draft/directory/49cc20db-bbe7-42cf-a57f-efd51c031045. This brief must take a new id.
 
 ### What the tree holds
 
-- `docs/design/identity/CONFORMANCE.md` — Row 1.2 (line 17) reads 'Sign-in identities are never lent to or held by an agent.', with Brief 'IDENTITY-001 (amend: state it)', owner Waffles. Row 1.3 is the separate service-account list. Row 2.4's cannot-give reasons include 'sign-in identity'. This is the row the brief says it passes.
-- `docs/design/identity/briefs/IDENTITY-001.json` — Grep finds no statement of 1.2: no 'lent', 'lend' or 'sign-in identit' in it. CN1 of the directory cluster keeps this file unchanged, so the new brief carries the statement instead of amending it.
-- `docs/design/directory/briefs/DIRECTORY-003.json` — R1 defines the 'external issuer-subject bindings' in crates/lys-identity. Registering an agent there already must not 'manufacture a human login for it'. This binding API is the lys-side seam where linking a provider account to an agent is refused and an agent's own machine account is accepted. R4's link-audit receiver is where a fork link event naming an agent would arrive.
-- `docs/design/directory/briefs/DIRECTORY-004.json` — Provider linking happens inside the Rauthy fork (vendor/rauthy, fork-owned files). It requires an authenticated person and refuses an 'already-owned provider identity' (ID001_LINK_REFUSAL). Its blocked_by says the fork-owned brief 'does not yet exist'. The fork knows only Rauthy users, and DIRECTORY-003 R1 says an agent has none, so the fork alone cannot see an agent-bound subject.
-- `docs/design/directory/briefs/DIRECTORY-006.json` — R1 is the grant contract, still a proposal awaiting review. It gives a grant a 'source grant' but no source kind that is a sign-in identity. R2 is where delegation admission refuses by name with zero mutations. R5 is the explanation seam that must not disclose another identity's protected records, which is what the words cite for the redacted view. R6 renders sign-in identities separately on the You page. The delegation refusal and the 'sign-in identity' reason land here.
-- `docs/design/secrets/briefs/SECRETS-002.json` — R1 is handle issuance, which has to trace to a person. R4 already says 'A provider sign-in identity and an OAuth service-access grant SHALL remain distinct records'. R5 puts the Claude Code login token into the seat's environment at spawn and is the named exception (STATEMENT:43, :167). The finding and its broker acceptance line go against this brief.
-- `docs/design/identity/STATEMENT-2026-09-22.md` — Line 43 is Tom's 13:32 ruling that the seat's own Claude Code login is the one place a credential reaches the process. Line 167 is adjustment 4, which carries the login exception. The rulings require the brief to cite both lines.
-- `docs/design/identity/PROVISIONING-2026-09-22.md` — Line 18 is step 4, the credential handle: 'The login exception stands: the harness login token still reaches its process.' It is the third citation for the exception.
-- `docs/design/directory/design.json / DESIGN.md / checklist.json / stories.json` — This is the cluster the brief continues. Structure rows name every path a row brief touches. The checklist runs to C30 and the stories to S12. C29 already asks that service accounts be kept separate from sign-in identities. The design gate (scripts/design/gate.sh) validates and re-renders every one of these files.
-- `docs/design/roadmap.json` — RM-001 carries the directory briefs. A new brief needs a roadmap row or a link to one. The 26 September 20:31 ruling gives ids from the next number after main's highest and every open brief branch's.
-- `docs/design/identity/mockup/index.v5.html` — Lines 1278 and 1502 are the accepted mock-up's copy: 'Accounts that prove you are you. Never lent to an agent.' and 'They prove who you are. No agent can hold them.'
+- `docs/design/directory/briefs/ (next free id)` — Main holds DIRECTORY-001 to 006 and 008. Across origin branches, DIRECTORY-001 to DIRECTORY-023 are all taken, so the next free id at survey time is DIRECTORY-024. It must be read again at write time. Two ids this brief's own earlier runs took already exist: DIRECTORY-016 (687de276) and DIRECTORY-017 (49cc20db).
+- `origin/draft/directory/49cc20db-bbe7-42cf-a57f-efd51c031045:docs/design/directory/briefs/DIRECTORY-017.json` — The previous round's draft of this very brief. It has R1 (compute, 15 acceptance lines), R2 (seam and wire, 7 lines), R3 (screen, 7 lines) and R4 (CONFORMANCE row 2.4 Brief cell, 1 line), with checklist C118 to C122 and story S51. It already applies every ruling in the words, so the author revises it under the new id rather than starting again. It also proposes a new ADR-054 in decisions.json.
+- `docs/design/directory/briefs/DIRECTORY-006.json` — R1 is the proposed grant contract (source grant, pass-on authority, permitted recipient kinds, time window). R2 is affirmative delegation and GRANT_RECIPIENT. R4 is revocation and inherited expiry. R5 is the one authenticated seam. R6 is the delegation form, with GRANT_SCREEN_REFUSAL and GRANT_CONFORMANCE pinning the mock-up. This brief reads through all of them, and the words say DIRECTORY-006's text must not change.
+- `docs/design/identity/CONFORMANCE.md` — Row 2.4 (line 30) reads 'Everything the person cannot give is listed with its reason (use-only, above what you hold, lent to you, sign-in identity).' Its Brief cell is 'DIRECTORY (new row)'. The words allow changing only that Brief cell to this brief's id. Row 1.2 is the sign-in-identity rule and row 1.3 covers service accounts.
+- `docs/design/identity/mockup/index.v5.html:1496-1505` — The mock-up's cannotGive(g), which GRANT_CONFORMANCE pins. It lists grants on any resource that are in force and cannot be passed to agents, relations ranked above the source, a service account, and 'Your sign-in identities'. It filters on standing(x).ok, so grants not in force are never drawn. It also ranks relations by name, which DIRECTORY-006 R1 forbids.
+- `docs/design/directory/design.json (structure) → DESIGN.md Structure table` — check-coverage.py fails any R# files path that is not in the design.json structure. crates/lys-identity/, crates/lys-identity-server/ and surface/identity/ are directory entries, so R1 to R3 are covered. docs/design/identity/CONFORMANCE.md is not in the structure, so R4 needs a row. render-cluster.py then writes that row, and the brief's own json/md rows, into DESIGN.md.
+- `docs/design/directory/DESIGN.md:57,58,63` — Line 57: the grant representation is 'OPEN for Tom'. Line 58: suspension semantics are 'OPEN for Tom'. Line 63 is the step-2 non-goal sentence, which the lead ruled is quoted and not amended.
+- `docs/design/directory/DESIGN.md:185 (CN1)` — CN1 reads 'Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified'. The lead ruled that CN1 governs only the planning round and is no bar on this brief's code or its one-column CONFORMANCE change.
+- `docs/design/directory/checklist.json, stories.json, USER-STORIES.md, CHECKLIST.md` — The new C and S items go here. Main has C1 to C30, and origin branches reach C168 and S70, so new ids must not collide with those on other branches.
+- `docs/design/directory/briefs/DIRECTORY-002.json R4` — Nothing in crates/lys/src/identity/ may check or write SpiceDB. The words say to hold to it.
+- `scripts/design/gate.sh` — The design leg (28 lines). It runs validate.py on decisions.json and project.json, then for each cluster runs validate.py and check-coverage.py and checks that render-cluster.py's output is byte-identical to the committed markdown.
+- `docs/design/decisions.json` — The ledger ends at ADR-018 on main. Other branches reach ADR-075, and the earlier draft added ADR-054. Whether this brief adds any ADR at all is open (see questions).
+- `docs/design/roadmap.json` — The earlier draft changed roadmap.json by 33 lines. RM-001 (the identity directory) is the natural row to carry this brief.
 
 ### What was already decided
 
-- directory P1 — Issuer plus subject identifies an external login, and an enduring id is stable through provider additions. Bindings are therefore unique per issuer-subject, which is what makes the order of agent binding and person linking matter.
-- directory P3 — Registration issues no Rauthy login, runtime credential or certificate.
-- directory P9 / DIRECTORY-003 R3 — In step 1 the only caller allowed to change the directory is the configured administrator. That is who the 'directory administrator' view means.
-- directory CN1 — Documents only for DIRECTORY-001's cluster. The IDENTITY-001 files are not changed.
-- directory CN12 — DIRECTORY-006 cannot be dispatched until the DIRECTORY-002/003 foundations are implemented and their manifests reconciled.
-- DIRECTORY-003 R1 — Defines external issuer-subject bindings. Registering an agent never manufactures a human login for it or issues it a credential.
-- DIRECTORY-004 R1 — The linking change lives in the fork. It refuses an already-owned provider identity, and it unlinks only when a usable authentication method remains.
-- DIRECTORY-006 R1/R2/R5/R6 — The grant contract (a proposal), affirmative delegation with zero mutations on refusal, the explanation seam that hides other identities' protected records, and the You page with sign-in identities shown apart.
-- SECRETS-002 R4/R5 — A sign-in identity and an OAuth service grant are distinct records. The seat's Claude Code login reaches its environment at spawn.
-- CONFORMANCE 1.2, 1.3, 2.4 — The rule, the separate service-account list, and the cannot-give reasons.
-- ADR-003 — Everything is pegged to a human authority, and an agent holds an explicit subset.
-- ADR-009 — People sign in through the maintained Rauthy fork, pinned as vendor/rauthy.
-- ADR-011 (proposed) — A signed-in person registers an agent and remains its responsible person for life.
-- ADR-001 — The broker holds credentials behind handles. Issuance is the broker's act.
+- DIRECTORY-006 — Enforces delegation: R2 refuses use-only and recipient-kind breaches. R5 is the one authenticated seam. R6 shows the server's reason for a refused choice and must not enumerate others' private records.
+- DIRECTORY-006 R1 — The proposed grant contract carries a source grant, explicit pass-on authority and permitted recipient kinds, but no depth or onward-pass-limit field. This is why the lead withdrew depth and limit.
+- DIRECTORY-006 R4 — An ancestor that is revoked or expired stops derived grants. The broader suspension policy stays with the lifecycle ADR.
+- DIRECTORY-002 R4 — SpiceDB enforces nothing in step 1, and crates/lys/src/identity/ does not check or write SpiceDB.
+- CONFORMANCE 1.2, 1.3, 2.4 — A sign-in identity is never lent to an agent. Service accounts are a separate list, each passable or use-only. Everything the person cannot give is listed with its reason.
+- DESIGN.md non-goal line 63 — 'Road step 2 onward: ... arbitrary grants and their enforcement ...'. The lead ruled it stands and does not exclude this brief.
+- DESIGN.md line 57 — The grant representation (pass-on, derivation, bounds) is OPEN for Tom.
+- DESIGN.md line 58 — Suspension semantics (what else stops with a suspended identity) are OPEN for Tom.
+- CN1 — Documents only, within docs/design/directory and decisions.json. The lead ruled it governs only the planning round.
+- CN12 — DIRECTORY-006's source paths run only after the DIRECTORY-002 and 003 foundations and the surface foundation.
+- C5, C22, C29 — Open decisions are recorded as open. Use-only cannot create delegation. The screens show real server authority and keep service accounts separate from sign-in identities.
+- ADR-003 — Every grant says who may exercise it and who may pass it on. The exact delegation schema is not settled.
+- ADR-009 — Sign-in identities are the provider links of the Rauthy fork.
+- ADR-011 (proposed) — Identities are registered, active, suspended or retired. A suspended identity keeps its grants but they are not effective.
 
 ### What was measured
 
-- Mentions of sign-in identities, lending or lent in IDENTITY-001.json: 0
-- Lys briefs that mention 'sign-in identity' at all: 2: SECRETS-002 R4 (distinct records) and DIRECTORY-006 R6 (shown apart), plus checklist C29
-- Acceptance lines in the tree that test row 1.2: 0
-- Directory briefs on main: 7 (DIRECTORY-001 to 006, and 008)
-- Highest ids on open brief branches this clone could read: DIRECTORY-013, RM-031, SECRETS-003. 18 of 36 brief heads are not in the local object store, so the true highest may be greater.
-- Directory checklist and stories: 30 checklist items (C1 to C30), stories up to S12
-- Conformance rows in CONFORMANCE.md: 52 table rows
-- crates/lys-identity and crates/lys-identity-server: neither exists. Workspace members: 6 (lys, lys-anchor, lys-anchor-cli, lys-core, lys-home, lys-log-store)
-- deploy/identity, surface/identity, tests/identity_contract: none exist
-- vendor/rauthy submodule: not initialised in this clone, pinned at dd61ac3c (v0.36.2). The fork-owned brief DIRECTORY-004 waits on does not exist.
-- DIRECTORY-006 requirements and acceptance lines: 6 requirements, 22 acceptance lines, none about sign-in identities
-- SECRETS-002 requirements: 9 (R1 to R9). R5 is the login-at-spawn exception.
-- Size of the briefs this work cites: DIRECTORY-003.json 16039 B, DIRECTORY-004.json 9588 B, DIRECTORY-006.json 22190 B
-- Matches for jAfmblAP in the lys tree or the cambium checkout: 0 (the card lives on the Cambium board, not in either tree)
+- Highest DIRECTORY brief id on main and on origin branches: main: DIRECTORY-008 (007 absent). origin: DIRECTORY-023, so the next free id is DIRECTORY-024 at survey time.
+- Remote heads on origin: 234
+- Checklist items on main / highest C id on any origin branch: 30 (C1 to C30) / C168
+- Highest story id on any origin branch: S70 (main ends at S12)
+- Highest ADR id on main / on any origin branch: ADR-018 / ADR-075
+- Earlier draft DIRECTORY-017: 4 requirements, 30 acceptance lines (R1 15, R2 7, R3 7, R4 1), 13 boundaries, 4 verification lines, 177 JSON lines. Touches 10 files for +500/-32 lines.
+- Reason and standing sets under the rulings: 7 reasons and 3 standings. The order table has 127 + 7 = 134 cases.
+- design.json structure entries: 96. Directory entries cover crates/lys-identity/, crates/lys-identity-server/ and surface/identity/. docs/design/identity/CONFORMANCE.md is not in the structure.
+- Code the brief depends on that exists today: None: crates/lys-identity, crates/lys-identity-server and surface/ are all absent. The crates directory holds lys, lys-anchor, lys-anchor-cli, lys-core, lys-home and lys-log-store.
+- Document sizes: DESIGN.md 196 lines, CHECKLIST.md 49, CONFORMANCE.md 118, DIRECTORY-006.json 22190 bytes, scripts/design/gate.sh 28 lines
+- check-coverage on main today: Clean, with 1 warning (S3 shared by DIRECTORY-002 and 005)
+- Mock-up cannotGive filter: index.v5.html:1498 keeps only grants where standing(x).ok, so 0 not-in-force grants are drawn.
 
 ### What it means for the other projects
 
-- cambium — Card jAfmblAP (Apollo) shows the 'sign-in identity' reason on the delegation screen and must use the server's reason, not compute its own. SECRETS-002's broker and proxy files are door-owned inside the cambium checkout, so the broker line (refuse any agent credential derived from a person's sign-in session) lands on a Cambium-side card.
-- aion — The brief runs through aion's chain (brief_card, sign-off, card_build_v3, src_pr, src_land). The harness login token aion's claude-worker hands a seat is the named exception, and nothing in aion changes.
+- cambium — The brief becomes a card on the lys board. It goes through brief_card, sign-off, card_build_v3, src_pr and src_land, and is not built before Tom or the lead signs it off on the card.
+- aion — The brief workflow runs (687de276, 49cc20db and this one) take ids from origin branches at write time. Drafts left by earlier runs of the same card each hold an id: this card's runs alone hold DIRECTORY-016 and DIRECTORY-017.
+- method — The brief must pass the vendored design-system scripts (validate.py, check-coverage.py, render-cluster.py) through scripts/design/gate.sh. The requirement to put paths in the structure is what forces new rows in DESIGN.md.
 
 ### The decisions it stands on
 
-- ADR-003 (honour) — A sign-in identity is a person's link to their human authority. An agent's explicit subset never includes it.
-- ADR-009 (honour) — Provider linking stays in the maintained fork (DIRECTORY-004). This brief refuses on the lys side and moves no pin.
-- ADR-011 (honour) — An agent is registered by a person and never manufactures a human login. That is P3 and DIRECTORY-003 R1, which this brief extends.
-- ADR-001 (honour) — Issuance is the broker's, so the third refusal is carried by the broker's card, not by a directory seam.
-- ADR-004 (honour) — The refusals and the store test run against the standalone directory with no Cambium, Aion or Manifold present.
--  (new) — 'Sign-in identities belong to people only; the harness login token (STATEMENT:43, :167; PROVISIONING:18) is the one named exception, and it never passes through anything lys issues, links or delegates.' This is stated nowhere in the ledger today.
+- ADR-003 (honour) — Every item comes from the person's own grants, and may-pass-on is affirmative. The brief freezes no delegation schema.
+- ADR-009 (honour) — Sign-in identities are the Rauthy fork's provider links. The brief lists them as one item and changes nothing in vendor/rauthy.
+- ADR-011 (honour) — ancestor_suspended reads a suspension state that ADR-011 only proposes. The brief decides no suspension policy.
+- ADR-004 (honour) — The answer is served by the standalone identity server, with no Cambium, Aion or Manifold required.
+-  (new) — A closed seven-value reason set and a three-value standing set, each with a fixed precedence and named refusal of unknown values, are a wire contract a client must follow. It is worth one ledger entry, marked proposed, under a free id (not ADR-054, which another branch holds), unless the lead rules the brief records it only in its own text.
 
 ### What it requires
 
-- Binding to an agent a provider account that is already linked to a person is refused with a named error that names the act (link), the agent and the sign-in identity, and states that sign-in identities belong to people only.
-- Binding an agent's own machine account, which is linked to no person, as its DIRECTORY-003 R1 issuer-subject binding succeeds, and an acceptance line proves it.
-- Delegating a sign-in identity to an agent is refused by name at DIRECTORY-006 admission, with zero grant events.
-- The explanation seam returns the reason 'sign-in identity' for each of a person's sign-in identities in the cannot-give list.
-- A refusal returned to the identity's owner or a directory administrator shows the provider and subject. A refusal returned to anyone else shows the act, the agent and that a sign-in identity is involved, and never the provider or the subject. There is one acceptance line per view.
-- Each directory refusal leaves the directory's event count and projection unchanged, and the test counts this.
-- One test over the store, after the refusals, finds no agent record carrying a sign-in identity. It counts the agent records it inspected, and that count is non-zero.
-- The brief states the harness login token as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18.
-- The brief records a finding against SECRETS-002 with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card.
-- The brief names row 1.2 as the row it passes, says the row is met in full only when the broker line passes, and names jAfmblAP as where a person sees the reason.
-- The brief names DIRECTORY-004 and DIRECTORY-006 as dependencies, each with a command a stranger can run against lys main.
-- sh scripts/design/gate.sh passes with the new brief, its rendered markdown and any design, checklist, stories or roadmap rows.
+- The brief file is docs/design/directory/briefs/DIRECTORY-NNN.json plus its rendered .md, with NNN not used on main or any origin branch at write time.
+- Every acceptance line that measures row 2.4 names 'conformance row 2.4'.
+- The server answer takes a source grant and a recipient, and lists every item the person cannot give to that recipient, each with exactly one reason from the seven in the ruled precedence.
+- A not_in_force item carries exactly one standing from revoked, ancestor_suspended and expired, in that precedence. No other item carries a standing.
+- The fixture (G1 may-pass-on, G2 direct use-only, G3 delegated without may-pass-on, a relation above what is held, the sign-in identity) gives exactly the counted items with the right reason on each, for both an agent recipient and a person recipient.
+- Cases where two reasons apply, and where two standings apply, each show the one the precedence names, with an order table asserting 134 cases run.
+- A service account that can be given is absent. A relation covered only by an expired grant yields that grant's not_in_force item and no relation item. A grant on a service account appears once.
+- A client meeting an unknown reason, or an unknown standing, refuses the whole answer by name, renders zero rows, and has one test each.
+- The screen renders exactly the items of the answer, asks again when To changes, discards a superseded answer, and derives no reason itself.
+- Only row 2.4's Brief cell in docs/design/identity/CONFORMANCE.md changes, to this brief's id.
+- One boundary sentence records the split with DIRECTORY-006 R6. One quotes DESIGN.md line 63 with the lead's ruling. One says CN1 is no bar on the brief's walls.
+- sh scripts/design/gate.sh exits 0 with the brief in place.
 
 ### What must not change
 
-- docs/design/identity/briefs/IDENTITY-001.json and .md are not changed (directory CN1).
-- No screen work. The You and delegation screens stay with DIRECTORY-006 R6 and jAfmblAP.
-- No seam that exists only to refuse. Refusals sit in the binding and admission seams that DIRECTORY-003 and 006 already own.
-- SECRETS-002 R5 (the login token at spawn) and the harness login token exception are not changed or redefined.
-- lys-core, its published wire formats and lys/delegation/v1 are not changed (DIRECTORY-006 R1 GRANT_WIRE_BOUNDARY).
-- An agent's own machine-account binding under DIRECTORY-003 R1 stays allowed.
-- The existing briefs' ids, requirements, estimates and dependency order stay unchanged.
-- The rulings of 27 September given to run ea580795 are not reopened.
+- DIRECTORY-006's JSON and markdown do not change.
+- DESIGN.md line 63's non-goal sentence is not amended (and see the open question on generated Structure rows).
+- No cell of CONFORMANCE.md other than row 2.4's Brief cell changes, including row 2.4's Behaviour text.
+- No second authority evaluator: the list is computed through DIRECTORY-006's authority and lineage decisions and served only on its R5 seam.
+- No SpiceDB check or write is added under crates/lys/src/identity/ (DIRECTORY-002 R4).
+- No lys-core code and no published or frozen wire format changes. lys/delegation/v1 is not used as the grant format.
+- The browser never computes, adds, drops or reorders an item, reason or standing.
+- Nothing is enumerated from records the person cannot discover (DIRECTORY-006 R6).
+- No new reason or standing value beyond the ruled seven and three.
+- Settled rulings are not reopened in the brief.
 
 ### What we must put in place first
 
-- DIRECTORY-002 and DIRECTORY-003 must be implemented. crates/lys-identity and crates/lys-identity-server do not exist on main, so the refusal seams have nowhere to land yet.
-- The fork-owned brief for DIRECTORY-004's linking change must be written and landed on a gated ablative commit. Its absence blocks DIRECTORY-004.
-- DIRECTORY-006 R1's grant contract must be ratified by independent review before a delegation refusal can be keyed on it.
-- A stranger-runnable landing check must exist for DIRECTORY-004 and DIRECTORY-006 on lys main.
+- Read the next free DIRECTORY id, C id, S id and (if one is used) ADR id across all origin branches at write time.
+- Add a design.json structure entry for docs/design/identity/CONFORMANCE.md (and the brief's own files) so check-coverage.py passes. This depends on the first product question.
 
 ### The risks
 
-- The build waits on four unimplemented rows and on a fork brief that does not exist, so the brief can sit dispatch-blocked for a long time.
-- The fork links providers only to Rauthy users. If the lys-side check lives only in the receiver, an agent-bound subject that a person later links may slip through, or be refused without an explanation.
-- The ruling's definition (linked to a person) leaves a link, unlink, bind-to-agent path that moves a person's account onto an agent.
-- 'Source is a sign-in identity' has no field in the proposed grant contract. An author could add a source kind that widens R1's reviewed schema without review.
-- The broker line is enforced on another card, in door-owned files in the cambium checkout. Row 1.2 may be reported as passed while that line is unwritten.
-- The redacted view could leak provider or subject through error Debug output, logs or distinct error codes. Tests have to assert the absence, not just the presence.
-- The store test's loop can pass over zero agents unless it counts what it inspected.
-- The words cite DIRECTORY-006 R5 for hiding provider and subject, but R5 only says 'another identity's protected records'. The brief has to cite what R5 actually says.
-- Id collision with open brief branches, 18 of which are not readable in this clone.
+- The id race: at least 23 DIRECTORY ids are taken across origin branches and parallel briefs are being written, so an id read early can collide by the time the brief lands.
+- The DESIGN.md contradiction: the gate forces generated Structure rows into DESIGN.md, against the ruling that the brief changes nothing in DESIGN.md. The earlier draft's verification line asserted an empty DESIGN.md diff while its own diff changed the file.
+- ancestor_suspended rests on suspension semantics that are still OPEN (DESIGN.md:58, ADR-011 proposed), so the standing could be ruled out later.
+- The reason logic rests on DIRECTORY-006 R1's unratified grant fields. Ratification could move them and invalidate the brief's acceptance lines.
+- The pinned mock-up draws no not-in-force grants and ranks relations by name, so GRANT_CONFORMANCE's mock-up evidence and this brief's list can disagree.
+- Nothing it builds on exists yet (lys-identity, lys-identity-server, surface/identity), so every modify path must be reconciled later under CN12.
+- The earlier draft names ADR-054, which is not in main's ledger. Copying it forward would point at a decision main does not hold.
 
 ### Still open
 
-- If an agent's own machine account is bound first and a person later tries to link that same provider account as their sign-in, which side wins: is the person's link refused, or is the agent's binding withdrawn? The sentence of the words it stands on: "An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed.". Why only the lead can settle it: P1 makes an issuer-subject pair unique. The fork's ID001_LINK_REFUSAL (DIRECTORY-004) only knows Rauthy users and cannot see an agent binding held in lys-identity (DIRECTORY-003 R1). If nothing decides, either the person sees an unexplained link refusal or the agent ends up holding a sign-in identity, which breaks row 1.2.
-- Once a person unlinks a provider account from themselves, may it then be bound to an agent (their own or anyone's), or does an account once linked to a person stay refused for agents? The sentence of the words it stands on: "A sign-in identity is a provider account linked to a person in the directory, and only that is refused.". Why only the lead can settle it: DIRECTORY-004 R1 lets a person unlink an account. Read literally, the ruling allows link, unlink, then bind to an agent, which moves a person's own login onto an agent. The person would see the move succeed or be refused.
-- Does 'a grant whose source is a sign-in identity' mean only a delegation that offers the sign-in identity itself, or does it also cover a service-access grant (for example Google Drive OAuth) consented through the same account the person signs in with? The sentence of the words it stands on: "The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session.". Why only the lead can settle it: DIRECTORY-006 R1's proposed grant contract has only source grants, and no source kind is a sign-in identity. SECRETS-002 R4 keeps sign-in identities and OAuth service grants as distinct records. Which reading applies decides whether a person can delegate Drive access to their agent.
-- When the recipient is a person rather than an agent, does the cannot-give list still show the person's sign-in identities with the reason 'sign-in identity', and is that delegation refused too? The sentence of the words it stands on: "The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".". Why only the lead can settle it: DIRECTORY-006 R2 accepts both person and agent recipients, but row 1.2 and the words name agents only. The delegation form shown for a person recipient changes with the answer.
+- The method's gate puts the brief's own rows and a new structure row for docs/design/identity/CONFORMANCE.md into DESIGN.md's rendered Structure table. Are those generated rows allowed, given the ruling that the brief changes nothing in DESIGN.md? The sentence of the words it stands on: "The brief quotes it in one sentence of its boundaries with this ruling beside it and changes nothing in DESIGN.md.". Why only the lead can settle it: check-coverage.py fails any R# files path missing from the design.json structure, and CONFORMANCE.md is not in it. gate.sh then requires DESIGN.md to be byte-identical to what render-cluster.py produces. The earlier draft added 9 Structure rows to DESIGN.md while its own verification line asserted that git diff DESIGN.md is empty. Either DESIGN.md gains generated rows, or R4 cannot be named in files and the gate fails.
+- Does suspending the holder of an ancestor grant put the descendant grants out of force, so that ancestor_suspended is a standing this brief lists? DESIGN.md line 58 records suspension semantics as OPEN for Tom, and ADR-011 is only proposed. The sentence of the words it stands on: "They are listed under a sixth reason, not in force, and the answer names which standing it is, expired, revoked or an ancestor suspended, as DIRECTORY-006 R4 and R6 treat an expired ancestor as a visible refusal.". Why only the lead can settle it: docs/design/directory/DESIGN.md:58 says 'Suspension semantics: ... what else stops with a suspended identity. OPEN for Tom.' DIRECTORY-006 R4 leaves the broader suspension policy to the lifecycle ADR. A person would see an ancestor_suspended item that main's design has not yet decided exists.
+- The reasons rest on may-pass-on, source grant and recipient-kind policy, which are fields of DIRECTORY-006 R1's unratified proposal while DESIGN.md line 57 keeps the grant representation OPEN for Tom. Does this brief proceed blocked on that ratification, as the earlier draft had it? The sentence of the words it stands on: "With the fields DIRECTORY-006 R1 has, the fact that tells the two reasons apart is whether the person's grant has a source grant.". Why only the lead can settle it: docs/design/directory/DESIGN.md:57 records the grant representation as 'OPEN for Tom', and C5 requires it to stay recorded as open. DIRECTORY-006 R1 is marked 'PROPOSAL FOR REVIEW, not a settled grant schema'. If ratification drops or renames the source-grant field, a person would see lent_to_you and use_only told apart differently.
+- GRANT_CONFORMANCE pins the mock-up, and the mock-up draws only grants in force. Is listing grants that are not in force (not_in_force with a standing) a deliberate departure from the pinned mock-up? The sentence of the words it stands on: "The mock-up governs, since GRANT_CONFORMANCE pins it, and my phrase that the mock-up draws the list per source grant was wrong on the fact and is withdrawn.". Why only the lead can settle it: docs/design/identity/mockup/index.v5.html:1498 filters grantsOf(meId) on standing(x).ok, so a revoked or expired grant never appears in 'What you can't give'. Yet the rulings add not_in_force items and CANNOT_GIVE_EXPIRED_COVER. The screen a person sees then differs from the mock-up GRANT_CONFORMANCE pins.
 
 ### The units beyond the first
 
-- SECRETS-002: the broker refuses to issue an agent any credential derived from a person's sign-in session — The lead ruled that issuance is the broker's. The line lands in door-owned files on the broker's card, and row 1.2 is met in full only when it passes.
-- jAfmblAP: the cannot-give list shows 'sign-in identity' from the server's reason — The screen is row 2.4's, and Apollo's Cambium card carries it. This brief supplies only the server reason.
-- The fork-owned brief for DIRECTORY-004's linking change in ablative-io/rauthy — DIRECTORY-004, which this brief waits on, is blocked until that brief exists and lands on a gated commit. It is a separate repository and card.
-- CONFORMANCE.md row 1.2 Brief column repointed from 'IDENTITY-001 (amend: state it)' to this brief — The file lives in docs/design/identity, outside the directory cluster's wall. It is a small document row of its own.
+- Amend DESIGN.md's step-2 non-goal sentence (line 63) to reflect grants and delegation briefed on main — The lead ruled this a documents card for the design's owner, not this brief.
+- Build the cannot-give list (card_build_v3 from the signed-off brief) — Implementation waits for sign-off and for DIRECTORY-002, 003, 005 and 006 to land (CN12). It is its own card run through the chain.
 
 ### The smallest complete shape
 
-One directory brief in docs/design/directory/briefs (JSON plus rendered markdown), with its design, checklist, stories and roadmap rows, all passing the design gate. Its requirements:
-- R1: the lys-identity issuer-subject binding refuses a person-linked provider account for an agent by name and accepts the agent's own machine account.
-- R2: DIRECTORY-006 admission refuses delegating a sign-in identity to an agent by name, and the explanation seam returns the reason 'sign-in identity' for the cannot-give list.
-- R3: two refusal views, one for the owner and administrator and one redacted for everyone else.
-- R4: every refusal writes nothing, and one counted store test finds no agent record carrying a sign-in identity.
-- A stated rule citing the named login-token exception, the SECRETS-002 finding with the broker's line, jAfmblAP named for the screen, and dependencies on DIRECTORY-004 and DIRECTORY-006, each with a stranger-runnable landing check.
+One brief, DIRECTORY-NNN (.json plus rendered .md), with the matching checklist, story, design.json structure rows and roadmap link. It holds four requirements. R1 computes the per-recipient cannot-give list in lys-identity with the seven reasons, the three standings and both precedences. R2 serves it on DIRECTORY-006's one authenticated seam, with closed wire enums and named refusals. R3 has the delegation form render exactly that answer, ask again when the recipient changes, and refuse unknown values by name. R4 changes CONFORMANCE row 2.4's Brief cell. The acceptance lines name row 2.4, and the brief passes scripts/design/gate.sh. It is the earlier DIRECTORY-017 draft carried forward under a fresh id.
 
 ## The roadmap row
 
-- **RM-032** — Refuse by name every act that would give a sign-in identity to an agent (conformance row 1.2) (feature, idea)
-- Summary: States and tests conformance row 1.2: a sign-in identity, a provider account linked to a person, is never lent to or held by an agent. The directory refuses by name linking such an account to an agent and delegating a sign-in identity, each refusal writing nothing, and one counted test over the store finds no agent record carrying a sign-in identity. The broker's refusal of credentials derived from a person's sign-in session is recorded as a finding against SECRETS-002; row 1.2 is met in full only when it passes.
-- Asked by: tom on 2026-09-27T14:22:00+10:00
-- Context: The identity line's card for conformance row 1.2, filed against lys main 7b536253; the lead's rulings of 27 September to run ea580795-f9fa-4284-99e5-1f7cce6b37c4 and the answers to this run's survey are carried into DIRECTORY-009 as settled.
-- Quote: Conformance row 1.2 says a sign-in identity is never lent to or held by an agent. A sign-in identity is a person's link to a provider, such as a Google or GitHub account, through which that person signs in. IDENTITY-001 was to state this and never did, and no brief tests it. The directory holds sign-in identities beside people (DIRECTORY-004 links two providers to one person) and gives grants to agents (DIRECTORY-006), so the refusal belongs at the point where anything would attach a sign-in identity to an agent.
+- **RM-046** — List everything a person cannot give on the delegation form, each with its one reason (feature, idea)
+- Summary: Conformance row 2.4, beside DIRECTORY-006 under CONFORMANCE's build-order step 2 (grants and delegation): the identity server's answer to the delegation form lists, for the recipient chosen, every grant in force the person holds on any resource that they cannot give, the relations above what they hold on the source grant's resource, their own sign-in identity when the recipient is an agent, and each service account they hold to which a reason applies, each with exactly one reason from a closed set of six chosen by a fixed precedence (sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only). The screen shows that list from the answer and nothing else, asks again when the recipient changes, and refuses an answer carrying an unknown reason by name.
+- Asked by: tom on 2026-09-27T13:07:00+10:00
+- Context: The cannot-give card for the directory cluster, carried forward from the draft DIRECTORY-017 on draft/directory/49cc20db under a fresh id. The lead's answers to this round are written in: DESIGN.md gains only the Structure rows render-cluster.py produces, and no hand edit; no ancestor_suspended standing is listed, since suspension semantics stay open; the brief proceeds on the source and pass_on fields DIRECTORY-006 builds, blocked by DIRECTORY-006 landing on main and not by a separate ratification, and is amended if a ratification renames or drops them; the list holds only grants in force, as the pinned mock-up draws it, so not_in_force and every standing are removed and a grant not in force shows on its own grant card as void. The reason set on the wire stays the six in the ruled order, sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only, with lent_to_you and use_only separate; the mock-up's four are the places it draws items from, not reason names. A relation covered only by a grant not in force is one the person does not hold, so the form lists no item and no reason for it, and CANNOT_GIVE_IN_FORCE_ONLY measures that.
+- Quote: Write the brief for this card in the directory cluster (docs/design/directory/briefs, the next id not used on main or on any origin branch, which at 13:00 on 27 September was DIRECTORY-015 with three more briefs being written beside this one, so take the id from the branches at write time), as road step 2 of the directory design (docs/design/directory/DESIGN.md): the full list of what a person cannot give, each with its reason. This brief carries conformance row 2.4 of docs/design/identity/CONFORMANCE.md and gives it acceptance lines that name the row. DIRECTORY-006 tests only that a forbidden delegation is refused. This brief makes the server's answer to the delegation form list every relation the person cannot give with exactly one reason from a closed set of four, and the screen shows that list from the answer and nothing the answer did not list, since the browser is never the authority. The four reasons are these. Sign-in identity, when the thing is the person's own sign-in identity, which is never given to an agent, as row 1.2 says. Above what you hold, when the relation is not at or below one the person holds. Lent to you, when the person holds the grant by delegation from someone else and the chain it came through does not permit passing it on again. Use only, when the person's own grant carries no may-pass-on. Where more than one reason applies to one item, exactly one is shown, and the order of precedence is fixed as sign-in identity, then above what you hold, then lent to you, then use only, so that the most fundamental reason wins and two servers never disagree. The reason set is a closed enumeration on the wire, and a client that meets a reason outside it refuses the answer by name rather than showing a blank. Done when a fixture person holding one may-pass-on grant, one use-only grant and one grant lent to them without onward passing, beside a relation above anything they hold and their own sign-in identity, gets a list with every item they cannot give and the one right reason on each, when a case where two reasons apply shows the one the precedence names, and when the screen rendered from that answer shows the same items and reasons and no other. Hold to DIRECTORY-006 R2 and R5 for the delegation rules and the one authenticated seam, to R4 of DIRECTORY-002 and to ADR-009. Keep to the method (scripts/design/validate.py, check-coverage.py, render-cluster.py, run by scripts/design/gate.sh). If a sentence of DESIGN.md or CHECKLIST.md is open or contradicted by the repository as it stands, quote it as a question for the lead rather than rewriting the design around it. The card is built from this brief only after Tom or the lead signs it off on the card. Rulings of the lead, Apollo, given on 27 September 2026 to run 687de276-3a37-4150-b9e4-82ba2b47a96d in answer to its rounds, settled here and not reopened by the author. It sits under CONFORMANCE's build-order step 2, grants and delegation, as an amendment beside DIRECTORY-006, and my phrase road step 2 is withdrawn. It waits for no ADR and carries no amendment of the design's non-goal sentence, since DIRECTORY-006 already does grants and delegation on main and this brief only completes row 2.4 of that work. If a sentence of DESIGN.md still reads as excluding it, quote that sentence as a question for the lead in the brief rather than rewriting it. A fifth reason is added, people only, shown when the grant's policy admits only people as recipients and the chosen recipient is an agent. The set is closed at what this round settles, and every reason is one word or phrase on the wire. The flags on the grants decide the reason, never who gave them. Use only means the person's own grant carries no may-pass-on, whoever issued it, so a delegator who could have allowed onward passing and chose not to gives use only, and a grant from the directory administrator without may-pass-on gives use only too. Lent to you means the person's own grant does carry may-pass-on but an earlier grant in its ancestry bounds onward passing, by depth, by an end date or by a limit, so this particular pass is not permitted. The fixture's use-only grant is a grant to the person with no may-pass-on, and its lent-to-you grant is one with may-pass-on whose source grant forbids a second onward pass. Per source grant, as the mock-up draws it. The list covers the relations on the resource of the source grant the form was opened from, plus the person's own sign-in identity as one standing item. A service account under row 1.3 appears when it is the resource of the source grant the form was opened from, and not otherwise. Nothing is enumerated from records the person cannot discover, as DIRECTORY-006 R6 requires. They are listed under a sixth reason, not in force, and the answer names which standing it is, expired, revoked or an ancestor suspended, as DIRECTORY-006 R4 and R6 treat an expired ancestor as a visible refusal. The closed set is therefore six, and the precedence is sign-in identity, not in force, above what you hold, people only, lent to you, use only. Yes. The answer is per recipient. The form sends the chosen recipient with the source grant, and the server's list is computed for that recipient, so the sign-in identity item and the people-only item appear when the recipient is an agent and not when it is a person. When the To choice changes the client asks again, and the browser never computes the list itself. This brief takes row 2.4 over, and DIRECTORY-006's text does not change. The brief records the split in its boundaries in one sentence, that DIRECTORY-006 R6 shows the server's reason for a refused choice while this brief defines the closed reason set and the full per-recipient list that R6's screen consumes. The brief's acceptance names row 2.4, and the brief may amend the Brief column of row 2.4 in CONFORMANCE.md to its own id and nothing else in that file. Yes, the sentence stands as written beside this brief, as it already stands beside DIRECTORY-006 on main. It describes what step 1 of the directory design set out to build, and its amendment is a documents card for the design's owner, not this brief's. The brief records that in one sentence of its boundaries, quoting DESIGN.md's line 63, and changes nothing in DESIGN.md. Yes. CN1 governs the planning documents of the directory design round and nothing else, and every brief's build walls are the brief's own, as DIRECTORY-006 on main already shows. The brief says so in one sentence beside its file walls and treats CN1 as no bar on its code paths or on the one-column change to CONFORMANCE.md row 2.4. The item names one standing, chosen by a fixed precedence of revoked, then ancestor suspended, then expired, so that the standing made by a person's act outranks one made by the passage of time. One acceptance line covers a relation with one revoked and one expired grant and asserts revoked. Yes. The standing is a closed enumeration on the wire exactly as the reason is, and a client that meets a standing outside expired, revoked and ancestor_suspended refuses the answer by name rather than showing a blank. Add the requirement beside the reason's and one test that feeds an unknown standing and asserts the named refusal.
 
-The directory refuses, by name, every act that would give an agent a sign-in identity: linking a provider account to an agent, delegating a grant whose source is a sign-in identity, and issuing any credential to an agent that is derived from a person's sign-in session. The refusal names the act, the agent and the sign-in identity, and states that sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. The "cannot give" list of row 2.4 shows sign-in identities with the reason "sign-in identity".
+Rulings. The lead settled these in brief run 49cc20db-bbe7-42cf-a57f-efd51c031045 on 27 September 2026. Each is decided, so the brief takes it as given and does not ask it again.
 
-Acceptance is that linking a provider account to an agent is refused by name; that delegating from a sign-in identity to an agent is refused by name; that a credential request for an agent that presents a person's sign-in token is refused by name; that each refusal writes nothing to the directory; and that no agent record in the directory ever carries a sign-in identity, checked by one test over the store after all three refusals. This brief names row 1.2 as the row it passes.
+The lead was asked this.
+The mock-up's cannotGive lists use-only grants on every resource the person holds, plus a service account shown unconditionally.
+Should the list really be limited to the source grant's resource, plus the sign-in identity item, plus a service account only when it is that resource, as the ruling says?
+The lead ruled as follows.
+The mock-up governs, since GRANT_CONFORMANCE pins it, and my phrase that the mock-up draws the list per source grant was wrong on the fact and is withdrawn.
+The list covers every grant the person holds that they cannot give to the chosen recipient, on whatever resource, each with its one reason, plus the person's own sign-in identity as one standing item, plus each service account the person holds under row 1.3.
+Every item comes from the person's own grants and accounts, so nothing is enumerated from records they cannot discover and DIRECTORY-006 R6 still holds.
+The list stays per recipient as already ruled, and the source grant the form was opened from is marked in the list when it is itself one the person cannot give.
 
-It waits for DIRECTORY-004 and DIRECTORY-006 to land, each checked by a command a stranger can run against lys main. Filed by Archie, lead for the identity line, on 27 September 2026, against lys main 7b536253.
+The lead was asked this.
+'Lent to you' covers ancestry that bounds onward passing 'by depth … or by a limit', but DIRECTORY-006 R1's proposed grant schema has no depth or onward-pass-limit field, and an ancestor end date either has passed (which is not_in_force/expired) or only caps the new grant's end (row 2.3).
+Which ancestor facts produce lent_to_you in this brief?
+The lead ruled as follows.
+With the fields DIRECTORY-006 R1 has, the fact that tells the two reasons apart is whether the person's grant has a source grant.
+Lent to you is a grant without may-pass-on that the person holds by delegation, so it names a source grant.
+Use only is a grant without may-pass-on that was made to the person directly and names no source grant.
+Depth and limit are withdrawn, since no such field exists, and an ancestor's end date never gives lent to you, since a passed end date is not in force with the standing expired and a live one only caps the new grant's end under row 2.3.
+My earlier sentences that the flags decide the reason and never who gave the grant, and that lent to you is a grant that does carry may-pass-on, are corrected by this answer.
+The fixture's use-only grant is a direct grant without may-pass-on, its lent-to-you grant is a delegated grant without may-pass-on, and the precedence is unchanged.
 
-Rulings of the lead, Archie, given on 27 September 2026 to the run ea580795-f9fa-4284-99e5-1f7cce6b37c4 in answer to its rounds. That run took every answer and then failed before writing, when the account pool refused every session. They are settled here, and the author reopens none of them.
+The lead was asked this.
+DESIGN.md's non-goal says arbitrary grants and their enforcement are out of step 1.
+The lead ruled that it stands and is quoted, not amended.
+Is that sentence accepted as not excluding this brief, given that the brief adds more grant behaviour to the directory cluster?
+The lead ruled as follows.
+Yes, accepted.
+The sentence at docs/design/directory/DESIGN.md line 63 stands as written and does not exclude this brief, as it does not exclude DIRECTORY-006 on main.
+The brief quotes it in one sentence of its boundaries with this ruling beside it and changes nothing in DESIGN.md.
 
-The exception stays, because it is Tom's ruling and this brief does not overturn it. The brief states it as the one named exception, citing STATEMENT-2026-09-22.md:43 and :167 and PROVISIONING-2026-09-22.md:18. The harness login token reaches a seat's process under that ruling, and it never passes through anything lys issues, links or delegates. The rule governs everything lys itself gives an agent. The token is not redefined, and the brief does not pretend it is something other than what it is. Answered by Archie, lead for the identity line.
+The lead was asked this.
+Does a service account the person holds that they could give to the chosen recipient still appear in the list, and under which reason?
+Such an account carries may-pass-on, is in force, and its policy admits the recipient's kind, so none of the six reasons applies.
+The lead's answer says 'each service account the person holds' is listed.
+The brief lists a held service account only when one of the six applies, and measures only a use-only one.
+The lead ruled as follows.
+No.
+A service account the person holds that they could give to the chosen recipient does not appear in the list, and the brief is right as it stands.
+The list is of what the person cannot give, and every item in it carries one of the six reasons.
+My round 1 phrase, each service account the person holds under row 1.3, was too wide and is corrected to each service account the person holds to which one of the six reasons applies.
+An account that can be given is offered by the give form and is not explained here.
+The brief adds one acceptance line beside the use-only one, in which a held service account that carries may-pass-on, is in force and admits the recipient's kind is absent from the list.
 
-No seam that exists only to refuse. The directory enforces the two acts it owns, linking a provider account to an agent and delegating a grant whose source is a sign-in identity, each refused by name with an acceptance line. Issuing credentials is the broker's, so the third refusal is a rule the broker enforces. This brief states it and names it as a finding against SECRETS-002, with the acceptance line that the broker refuses to issue an agent any credential derived from a person's sign-in session, to be carried by the broker's card. The brief says that row 1.2 is met in full only when that line passes. Answered by Archie.
+The lead was asked this.
+Is a relation on the source grant's resource that is covered only by grants the person holds that are not in force also listed as its own relation item, with above_what_you_hold, beside each such grant's not_in_force item?
+The brief lists as relation items only the relations that no held grant covers in any standing, and no acceptance line measures the other case.
+The lead ruled as follows.
+No.
+A relation that is covered by a grant the person holds, in whatever standing, is not listed as a relation item.
+The grant's own not_in_force item is the one explanation for it, and above_what_you_hold stays for relations that no held grant covers in any standing, as the brief has it.
+A second item would give two reasons for one fact, and it would be untrue, since the person does hold a grant for that relation and what is wrong is its standing.
+The brief adds an acceptance line for the case, in which a relation covered only by an expired grant yields that grant's not_in_force item and no relation item.
 
-Only that one exists. A refusal returned to anyone other than the identity's owner or a directory administrator names the act, the agent and the fact that a sign-in identity is involved, and states that sign-in identities belong to people only. It never shows the provider or the subject, as DIRECTORY-006 R5 requires. The owner and administrators see the provider and subject. Acceptance lines cover both views. Answered by Archie.
+The lead was asked this.
+Take a grant the person holds that carries may-pass-on and is in force, but whose policy admits only agents as recipients (DIRECTORY-006 R2's agent-only case), when the chosen recipient is a person.
+None of the six reasons applies to it.
+Is it left off the list, does it take an existing reason, or does the closed set gain a reason for it?
+The lead ruled as follows.
+The closed set gains a seventh reason, `agents_only`, with the words This can be passed on only to an agent.
+The grant is listed with that reason when the chosen recipient is a person, because a grant left off the list tells the person nothing about why it cannot be given.
 
-Only a person's account. A sign-in identity is a provider account linked to a person in the directory, and only that is refused. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list, and registering it as the agent's issuer-subject binding under DIRECTORY-003 R1 is allowed. A provider account already linked to a person is refused for an agent by name. Acceptance lines cover an agent's own account accepted and a person's linked account refused. Answered by Archie.
+The lead was asked this.
+Where does agents_only sit in the reason precedence?
+The brief places it straight after people_only: sign_in_identity, not_in_force, above_what_you_hold, people_only, agents_only, lent_to_you, use_only.
+That means a grant that admits only agents and carries no may-pass-on shows agents_only, not lent_to_you or use_only, when the recipient is a person.
+Is that the order the lead intends?
+The lead ruled as follows.
+No.
+A reason that no choice of recipient can change comes before a reason about the chosen recipient, so the list never suggests that picking someone else would make a grant givable when it would not.
+The order is sign_in_identity, not_in_force, above_what_you_hold, lent_to_you, use_only, people_only, agents_only.
+This moves people_only below lent_to_you and use_only as well, and the brief says so and updates every place the order is stated or tested.
 
-The server's reason is this brief's, and the screen is row 2.4's. Apollo's card jAfmblAP carries the cannot-give list with its four reasons, sign-in identity among them, on the delegation screen. This brief asserts that the server returns the reason 'sign-in identity' for such an entry, and names jAfmblAP as where a person sees it. No screen work is duplicated here. Answered by Archie.
-- Cluster: directory; briefs: DIRECTORY-009
-- Notes: Ids: the brief is DIRECTORY-009, the id this run was given; this row is RM-032, the next after RM-031, the highest the survey read on open brief branches (18 of 36 brief heads were not readable, so a collision there is possible), and ADR-019 is the next after main's ADR-018. DIRECTORY-006, which DIRECTORY-009 also waits on, has no roadmap row on main. Findings recorded in DIRECTORY-009's task: against SECRETS-002, the broker refuses to issue an agent any credential derived from a person's sign-in session (row 1.2 is met in full only when that line passes); against DIRECTORY-004, its link path asks lys-identity by issuer-subject pair before the fork links. Further units, not written: SECRETS-002: the broker refuses to issue an agent any credential derived from a person's sign-in session; jAfmblAP: the cannot-give list shows 'sign-in identity' from the server's reason; The fork-owned brief for DIRECTORY-004's linking change in ablative-io/rauthy; CONFORMANCE.md row 1.2 Brief column repointed from 'IDENTITY-001 (amend: state it)' to this brief.
+The lead was asked this.
+R1: the spec cannot be tested as written — The create paths cannot_give.rs and tests/grant_cannot_give.rs are absent, which is correct because crates/lys-identity does not exist.
+The modify target grants/mod.rs is created by DIRECTORY-006 R1, and blocked_by and depends_on declare that.
+The acceptance lines are concrete and each count checks by hand.
+The spec is contradictory for one case.
+Clause (a) lists every grant the person cannot give, and every item must carry exactly one of the six reasons.
+But a grant that carries may-pass-on, is in force, and has a policy admitting only agents cannot be given to a person recipient, and none of the six reasons applies to it (people_only covers only the reverse case).
+DIRECTORY-006 R2's GRANT_RECIPIENT has agent-only grants, so a stranger cannot tell whether such a grant is listed, and if it is, under which reason.
+The lead ruled as follows.
+Apply the correction as settled under r1-service-account-grant-double-listed.
+
+The lead was asked this.
+In R1's spec, say that a grant whose resource is a service account is listed only once, as a service-account item under clause (d), and never also as a grant item under clause (a).
+As written, G7 on SA1 falls under both clauses, which contradicts CANNOT_GIVE_SERVICE_ACCOUNT's 5 items with SA1 appearing once.
+Make the ordering sentence ('grant and service-account items by grant id') consistent with that rule.
+The lead ruled as follows.
+Apply the correction as stated.
+A grant whose resource is a service account is listed once, as a service-account item under clause (d), and never also as a grant item under clause (a).
+Clause (a) lists every grant the person holds on any resource that is not a service account.
+The ordering sentence reads that grant items and service-account items are ordered together by grant id, each grant appearing once.
+So G7 on SA1 is the one service-account item for SA1, and CANNOT_GIVE_SERVICE_ACCOUNT's 5 items stand.
+- Cluster: directory; briefs: DIRECTORY-024
+- Notes: Ids taken as the next free past lys main (7b53625) and all 234 origin branches, read immediately before writing: DIRECTORY-023, RM-045, C180 and S75 are the highest held on any branch, so this row takes DIRECTORY-024, RM-046, C181 to C185 and S76. No new ADR: the words wait for no ADR and the brief records its reason set in its own text. The brief also depends on DIRECTORY-005 and DIRECTORY-006, which main's ledger carries in no row. Further units, not written here: Amend DESIGN.md's step-2 non-goal sentence (line 63) to reflect grants and delegation briefed on main; Build the cannot-give list (card_build_v3 from the signed-off brief); Decide what a suspended ancestor does to its descendant grants and to the cannot-give list, after the lifecycle ADR.
 
 ## The design
 
@@ -208,8 +353,6 @@ IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, an
 
 Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.
 
-DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people only (ADR-019). A sign-in identity is a provider account (P1) linked to a person; the directory classifies every issuer-subject pair from its signed history as a current or former sign-in identity, an agent's service account, or unbound, so an account once linked to a person stays refused for agents after an unlink. The refusals sit in seams other rows already own: the DIRECTORY-003 R1 binding API, a check beside the DIRECTORY-003 R4 receiver that the link path asks by issuer-subject pair before the fork links (DIRECTORY-004), and DIRECTORY-006 admission and explanation. One refusal value carries two views: the identity's owner and a directory administrator see the provider and subject, everyone else only that a sign-in identity is involved. The harness login token (SECRETS-002 R5) is the one named exception and never passes through anything lys issues, links or delegates.
-
 ## Principles
 
 - **P1** — An enduring identity ID is stable through provider additions, key rotation and later sessions; issuer plus subject identifies an external login; email and display name never establish identity equivalence.
@@ -224,7 +367,6 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 
 ## Decisions
 
-- ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 - ADR-005 — The identity database is PostgreSQL, possibly on a network device — PostgreSQL is used for the identity product's database. It may be set up on one of the network devices rather than on Tom's Mac.
@@ -233,7 +375,6 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-- ADR-019 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person, belongs to that person only: lys refuses by name every act of its own that would give one to an agent or to another person, and an account once linked to a person stays refused for agents after it is unlinked. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, dropping the refusal once an account is unlinked, and redefining the login token so the rule could be claimed without an exception.
 
 ## Goals
 
@@ -242,7 +383,6 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
-- DIRECTORY-009 states and tests conformance row 1.2: linking a provider account linked to a person to an agent, and delegating a sign-in identity, are each refused by name and write nothing; one counted test over the store finds no agent record carrying a sign-in identity; the broker's refusal is recorded as a finding against SECRETS-002, on which row 1.2's full pass waits.
 
 ## Non-Goals
 
@@ -257,8 +397,6 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
-- The broker's refusal to issue an agent any credential derived from a person's sign-in session — Issuance is the broker's (ADR-001); DIRECTORY-009 records it as a finding against SECRETS-002, carried by the broker's card.
-- The cannot-give list on the delegation screen — The screen is row 2.4's, carried by Cambium card jAfmblAP; DIRECTORY-009 supplies only the server's reason 'sign-in identity'.
 
 ## Structure
 
@@ -360,18 +498,17 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
-| `docs/design/directory/briefs/DIRECTORY-009.json` | conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent | DIRECTORY-009 |
-| `docs/design/directory/briefs/DIRECTORY-009.md` | rendered markdown | DIRECTORY-009 |
-| `crates/lys-identity/src/sign_in_identity.rs` | classifies an issuer-subject pair as a current or former sign-in identity, an agent's service account, or unbound, from the signed history | DIRECTORY-009 |
-| `crates/lys-identity/src/sign_in_refusal.rs` | the sign-in identity refusal and its owner-and-administrator and redacted views | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_classification.rs` | the four classes of an issuer-subject pair, through unlink and reopen | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_refusal_views.rs` | the two views of the refusal, and the redacted view's absence of provider and subject | DIRECTORY-009 |
-| `crates/lys-identity/tests/sign_in_agent_binding.rs` | a sign-in identity refused as an agent's binding, an agent's own machine account accepted | DIRECTORY-009 |
-| `crates/lys-identity-server/src/sign_in_link_check.rs` | the check the link path asks by issuer-subject pair before a person links a provider account | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/sign_in_link_check.rs` | a person's link of an agent's service account refused by name | DIRECTORY-009 |
-| `crates/lys-identity/tests/grant_sign_in_identity.rs` | delegating a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam | DIRECTORY-009 |
-| `crates/lys-identity-server/tests/sign_in_store.rs` | every refusal writes nothing; no agent record carries a sign-in identity, counted over the store | DIRECTORY-009 |
+| `docs/design/directory/briefs/DIRECTORY-024.json` | the cannot-give list: everything a person cannot give on the delegation form, with its one reason (conformance row 2.4) | DIRECTORY-024 |
+| `docs/design/directory/briefs/DIRECTORY-024.md` | rendered markdown | DIRECTORY-024 |
+| `crates/lys-identity/src/grants/cannot_give.rs` | the closed reason set, its precedence, and the per-recipient cannot-give list computed from the authority and lineage decisions | DIRECTORY-024 |
+| `crates/lys-identity/tests/grant_cannot_give.rs` | the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases | DIRECTORY-024 |
+| `crates/lys-identity-server/tests/grant_cannot_give.rs` | the cannot-give operation across routes, its wire values and its refusals | DIRECTORY-024 |
+| `crates/lys-identity-server/src/grant_contract/requests.rs` | the cannot-give request: the source grant and the chosen recipient | DIRECTORY-024 |
+| `crates/lys-identity-server/src/grant_contract/views.rs` | the cannot-give answer: its items, the closed reason set on the wire and the source mark | DIRECTORY-024 |
+| `surface/identity/src/features/grants/CannotGiveList.tsx` | renders the server's cannot-give answer and nothing else | DIRECTORY-024 |
+| `surface/identity/src/features/grants/cannotGiveAnswer.ts` | decodes the cannot-give answer and refuses an unknown reason by name | DIRECTORY-024 |
+| `surface/identity/tests/cannot_give.test.tsx` | the cannot-give list on the delegation form against fixture answers | DIRECTORY-024 |
+| `docs/design/identity/CONFORMANCE.md` | the conformance rows; DIRECTORY-024 changes only row 2.4's Brief column | DIRECTORY-024 |
 
 ## Inventory
 
@@ -386,7 +523,6 @@ DIRECTORY-009 carries conformance row 1.2, sign-in identities belong to people o
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
-- `docs/design/secrets/briefs/SECRETS-002.json` — the broker brief: R4 keeps a sign-in identity and an OAuth service-access grant as distinct records, R5 puts the seat's login token into its environment at spawn; DIRECTORY-009 records a finding against it and changes nothing in it
 
 ## Constraints
 
@@ -1604,228 +1740,158 @@ THE SYSTEM SHALL append one sentence to the intention of docs/design/directory/d
 
 ---
 type: brief
-id: DIRECTORY-009
+id: DIRECTORY-024
 cluster: directory
-title: Refuse by name every directory act that would give a sign-in identity to an agent
+title: List everything a person cannot give on the delegation form, each with its one reason
 ---
 
-# DIRECTORY-009: Refuse by name every directory act that would give a sign-in identity to an agent
+# DIRECTORY-024: List everything a person cannot give on the delegation form, each with its one reason
 
 > **Cluster:** directory
-> **Depends on:** DIRECTORY-004, DIRECTORY-006
-> **Blocked by:** Sign-off of this brief before it is dispatched (DIRECTORY-001 boundary: no row brief is dispatched until it has been reviewed)., DIRECTORY-004 landed on lys main, checked by a command anyone can run: git clone https://github.com/ablative-io/lys.git lys-check && cd lys-check && git ls-tree origin/main vendor/rauthy prints a commit other than dd61ac3c84d6b238108dc8438b53043b5177a662, and git ls-tree -r --name-only origin/main -- docs/design/identity/PROVIDER-LINK-CONTRACT.md docs/design/identity/reports/IDENTITY-001-links.md prints both paths. Until both hold, this brief is not dispatched., DIRECTORY-006 landed on lys main, checked by a command anyone can run: in the same clone, git ls-tree -r --name-only origin/main -- crates/lys-identity/src/grants/admission.rs crates/lys-identity-server/src/grants.rs crates/lys-identity-server/src/routes.rs crates/lys-identity/tests/grant_delegation.rs crates/lys-identity-server/tests/grant_explanations.rs prints all five paths. crates/lys-identity-server/src/routes.rs is created by DIRECTORY-005 R1 and modified by DIRECTORY-006 R5, and R4 below modifies it, so its presence on lys main is checked here. Until it does, this brief is not dispatched., The binding registration path of DIRECTORY-003 R1 and its link-audit receiver (R4) are named by DIRECTORY-003's reviewed file manifest, which does not exist yet; R1, R3 and R4 below reconcile their call sites to that manifest before dispatch, and a missing seam is a named dispatch blocker, never a new seam invented here., Finding against DIRECTORY-004 (recorded in this brief's task): its link path has no call that asks lys-identity by issuer-subject pair before the fork links. That check does not exist yet: R4 creates it on the lys-identity side (crates/lys-identity-server/src/sign_in_link_check.rs), and the fork-side call, which passes the authenticated person on whose behalf it asks, and its acceptance line are carried by DIRECTORY-004 and the fork-owned brief it waits on.
+> **Depends on:** DIRECTORY-005, DIRECTORY-006
+> **Blocked by:** Sign-off recorded on the card. The card is not built from this brief before that sign-off is recorded., DIRECTORY-006 landed on lys main, checked from a clone of lys by: git fetch origin main && git cat-file -e origin/main:crates/lys-identity/src/grants/lineage.rs && git grep -q UseOnly origin/main -- crates/lys-identity/src/grants/types.rs && git cat-file -e origin/main:surface/identity/src/features/grants/DelegateGrant.tsx — which exits 0 only once DIRECTORY-006's lineage decision, its PassOn type and its delegation form are on main. No separate ratification of the grant contract is waited for. Every modify path below is a file DIRECTORY-006 or DIRECTORY-005 creates, reconciled against its landed form before dispatch (CN12)., The one dependency on the grant representation: this brief reads the two fields DIRECTORY-006 builds, source (null for a root grant) and pass_on (use_only, or to with actions and recipient kinds). The grant representation stays recorded as open (C5); if a ratification renames or drops source or pass_on, this brief is amended to follow it.
 > **Design anchor:**
-> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 > - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 > - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-> - ADR-019 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person, belongs to that person only: lys refuses by name every act of its own that would give one to an agent or to another person, and an account once linked to a person stays refused for agents after it is unlinked. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, dropping the refusal once an account is unlinked, and redefining the login token so the rule could be claimed without an exception.
 > **Checklist:**
-> - C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-> - C32 — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
-> - C33 — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
-> - C34 — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
-> - C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-> - C36 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
+> - C181 — The delegation form's answer lists, for the chosen recipient, every grant in force the person holds on any resource that they cannot give, every relation on the source grant's resource that no grant they hold covers in any standing, their sign-in identity when the recipient is an agent, and each service account they hold to which a reason applies, marks the source grant when it is listed, and lists nothing they can give and nothing not in force.
+> - C182 — Each item carries exactly one reason, the first applicable in the order sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only; lent_to_you and use_only are told apart by whether the person's use-only grant names a source, and coverage is decided by the model's action sets, never by a rank of names.
+> - C183 — The cannot-give answer comes from the one authenticated grant seam, is byte-identical for API, tool and browser callers, refuses an unknown reason on the typed contract, and discloses nothing the person cannot discover.
+> - C184 — The delegation screen shows exactly the items and reasons the answer lists, asks again when the recipient changes and discards a superseded answer, and refuses an answer carrying an unknown reason by name, showing no item and no blank.
+> - C185 — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024.
 > **Stories:**
-> - S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
-> - S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
-> - S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
-> - S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-> - S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+> - S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
 ## Purpose
 
-State and test conformance row 1.2 of docs/design/identity/CONFORMANCE.md: a sign-in identity is never lent to or held by an agent. A sign-in identity is a provider account (issuer plus subject, P1) linked to a person in the directory, through which that person signs in; sign-in identities belong to people only (ADR-019). IDENTITY-001 was to state this and never did, and no brief tests it; this brief carries the statement and its tests instead of amending IDENTITY-001 (CN1). The directory holds sign-in identities beside people (DIRECTORY-004) and gives grants to agents (DIRECTORY-006), so the refusal sits at the two acts the directory owns: linking a provider account to an agent, and delegating a sign-in identity. Each is refused by name, writes nothing, and one counted test over the store then finds no agent record carrying a sign-in identity. The third act, issuing an agent a credential derived from a person's sign-in session, is the broker's (ADR-001): this brief states it as a finding against SECRETS-002 and does not enforce it. This brief names row 1.2 as the row it passes; row 1.2 is met in full only when the broker's line (task, finding 1) also passes. The one named exception is the harness login token, which reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18; it never passes through anything lys issues, links or delegates, it is not redefined here, and the rule governs everything lys itself gives an agent.
+Complete conformance row 2.4 of the grant and delegation work, under CONFORMANCE's build-order step 2 as an amendment beside DIRECTORY-006: the server's answer to the delegation form lists, for the chosen recipient, everything in force that the person cannot give, each item with exactly one reason from a closed set chosen by its fixed precedence, and the screen shows that list and nothing the answer did not list, because the browser is never the authority. DIRECTORY-006 refuses a forbidden delegation; this brief says, before the attempt, everything that would be refused and why.
 
 ## Task
 
-Build R1 to R7 in order, after DIRECTORY-004 and DIRECTORY-006 have landed on lys main (blocked_by gives the command that checks each). R1 classifies an issuer-subject pair from the directory's signed history; R2 is the one refusal value and its two views; R3 refuses a sign-in identity as an agent's binding and accepts an agent's own machine account; R4 is the lys-identity check the link path asks before a person links a provider account; R5 refuses delegating a sign-in identity at DIRECTORY-006 admission; R6 serves the reason 'sign-in identity' on the cannot-give list and the two refusal views at the grant seam; R7 proves every refusal writes nothing and that no agent record carries a sign-in identity. Every path is relative to the repository root (CN3).
-
-The rule. Sign-in identities belong to people only. Nothing an agent holds or presents is ever a person's sign-in session or token. A sign-in identity is never a thing anyone can give, to an agent or to another person; row 1.2 is the agent case, and the person-recipient case follows from the same rule. An agent's own machine account, bound to the agent and to no person, is a service account under row 1.3's separate list and stays allowed as its DIRECTORY-003 R1 issuer-subject binding. A provider account once linked to a person stays refused as any agent's binding after it is unlinked, whether the agent is that person's or anyone else's; the directory keeps the unlink on the record, and the refusal names the account as a former sign-in identity. When an agent's own machine account is bound first and a person later tries to link that same provider account, the agent's binding stands and the person's link is refused by name; nothing is ever withdrawn silently to make room. A service-access grant (for example Google Drive consented through the same account the person signs in with) is a separate record under SECRETS-002 R4, delegated under DIRECTORY-006's own rules; delegating it gives the agent that service's access, never the person's sign-in or session, and this brief does not refuse it.
-
-The named exception. The harness login token reaches a seat's process under the ruling recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and docs/design/identity/STATEMENT-2026-09-22.md:167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 (SECRETS-002 R5). It is the one named exception, it never passes through anything lys issues, links or delegates, and this brief neither overturns nor redefines it.
-
-Finding 1, against SECRETS-002, carried by the broker's card. Issuing credentials is the broker's (ADR-001), so the third refusal is a rule the broker enforces, not a directory seam. Its acceptance line, for the broker's card to carry: the broker refuses to issue an agent any credential derived from a person's sign-in session; a credential request for an agent that presents a person's sign-in token is refused by name, the refusal names the act, the agent and the sign-in identity, and the request issues nothing. Row 1.2 is met in full only when that line passes.
-
-Finding 2, against DIRECTORY-004, carried by DIRECTORY-004 and the fork-owned brief it waits on. DIRECTORY-004's link path has no call that asks lys-identity by issuer-subject pair before the fork links, and the fork knows only Rauthy users, so it cannot see an agent's binding. Its acceptance line: the fork's call passes the issuer-subject pair and the authenticated person on whose behalf it asks, because R4 chooses the refusal's view by that person; with an agent's own machine account bound to issuer https://github.com and subject gh-7 in lys-identity, a person's attempt to link that account in the fork is refused by name with R4's refusal in the view R4 chooses for that person, and the fork creates no link.
-
-The screen. The cannot-give list is row 2.4's screen, carried by Cambium card jAfmblAP on the delegation screen; this brief supplies only the server's reason (R6) and does no screen work.
-
-In: the classification, the refusal and its views, the two directory refusals, the pre-link check, the cannot-give reason and the store test. Out: the broker's refusal (finding 1), the fork-side call (finding 2), any screen, any change to CONFORMANCE.md or to IDENTITY-001, and any change to lys-core or a published wire format.
+Implement R1 to R4 in order after DIRECTORY-006 (R1, R2, R4 and R5 for this brief's R1 and R2; R6 for R3) and DIRECTORY-005. R1 computes the list in lys-identity from DIRECTORY-006's authority and lineage decisions; R2 carries it on the one authenticated seam as a typed operation of the grant contract; R3 renders it in the delegation form; R4 names this brief in row 2.4's Brief column. In scope: the per-recipient cannot-give answer over every grant in force the person holds on any resource, the relations above what they hold on the source grant's resource, the person's own sign-in identity, and each service account they hold under row 1.3 to which a reason applies; the closed six reason values and their precedence, the mark on the source grant, the screen's rendering and its refusal by name of an unknown reason. Out: grants not in force (they show on their own grant card as void, under DIRECTORY-006 R6), any standing on an item, what a suspended ancestor does to its descendants, any change to DIRECTORY-006's admission rules or text, lending from a secret in the secrets broker (CONFORMANCE 7.3, SECRETS-002), CONFORMANCE row 2.4's Behaviour text, and any published lys wire format. Split with DIRECTORY-006: C29 and C30 stay DIRECTORY-006's, and this brief takes row 2.4 through C181 to C185.
 
 ## Requirements
 
-### R1: Classify an issuer-subject pair from the directory's signed history
+### R1: Compute the cannot-give list with one reason per item from the closed set and its precedence
 
-THE SYSTEM SHALL classify an issuer-subject pair, from the directory's signed events, as exactly one of: a current sign-in identity (linked to a person now, naming that person), a former sign-in identity (linked to a person once and since unlinked, naming that person), an agent's service account (bound to an agent and never to a person, naming that agent), or unbound. A person's registration binding and every provider link the DIRECTORY-003 R4 receiver records count as linked to a person; an unlink the receiver records moves the pair to former and never back to unbound. The classification SHALL be derived from the replayed log, so it is the same after reopen. It SHALL NOT use email, display name or provider-side account labels to decide anything (P1), and SHALL NOT drop a former sign-in identity from the projection on unlink, retirement of the person, or replay.
+The reason set is a closed enumeration of six values, declared in precedence order: sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only. WHEN asked for the cannot-give list for a source grant the caller holds and a chosen recipient, THE SYSTEM SHALL list: (a) every grant in force that the person holds on any resource that is not a service account, that they cannot give to that recipient, as a grant item; (b) every relation the model declares on the source grant's resource that no grant the person holds on that resource covers, in any standing, as a relation item; (c) the person's own sign-in identity as one standing item, WHEN the recipient is an agent; and (d) each service account the person holds under conformance row 1.3, through a grant in force whose resource is that service account, to which one of the six reasons applies, as a service-account item. A grant whose resource is a service account is listed once, as a service-account item under (d), and never also as a grant item under (a). A grant is in force exactly when DIRECTORY-006's evaluator answers that it is in force, for the grant itself and for its ancestry; this brief carries no test of its own for revocation, expiry or suspension. A grant covers a relation when the relation's action set is a subset of the grant's. For a grant or service-account item the reasons that apply are read from the fields of the person's own grant: use_only when its pass_on is use_only, whoever issued it, the directory administrator included; lent_to_you when its pass_on is use_only and its source is not null; people_only when its pass_on admits only people as recipients and the recipient is an agent; agents_only when its pass_on admits only agents as recipients and the recipient is a person. A relation item's reason is above_what_you_hold; the sign-in identity item's reason is sign_in_identity. The order puts every reason that no choice of recipient can change before the two reasons about the chosen recipient, people_only and agents_only, so that the list never suggests that picking another recipient would make an item givable when it would not. THE SYSTEM SHALL give each item exactly one reason, the first applicable reason in precedence order. An item SHALL be marked as the source WHEN it is the grant the form was opened from, and no other item is marked. A grant that is not in force SHALL NOT be listed, and no item SHALL carry a standing. A grant or service account whose pass_on admits the recipient's kind SHALL NOT be listed. A relation covered by a grant the person holds, in any standing, SHALL NOT be listed as a relation item. An ancestor's end date that has not passed SHALL NOT give any reason. Coverage SHALL be decided by the model's action and resource sets and SHALL NOT use a rank of relation names or display strings. The computation SHALL read the person's grants, their ancestry and the recipient's kind through DIRECTORY-006's authority and lineage decisions and SHALL NOT carry a second admission check. THE SYSTEM SHALL NOT enumerate anything from records the person cannot discover: every item comes from the person's own grants and accounts or from the model's relations on the source grant's resource, and no item carries an ancestor's id, holder or label. Items are ordered as follows: grant items and service-account items together by the bytes of their grant id, each grant appearing once; then relation items in the model's declared relation order; then the sign-in identity item.
 
 **Acceptance:**
-- With issuer https://accounts.google.com and subject g-100 linked to person P, the classifier returns current sign-in identity naming P.
-- After the receiver records P's unlink of that pair, the classifier returns former sign-in identity naming P; after the store is closed and reopened, it still returns former sign-in identity naming P.
-- With issuer https://accounts.google.com and subject svc-a bound to agent A and to no person, the classifier returns agent's service account naming A.
-- A pair with issuer https://accounts.google.com and subject g-999 that no event names returns unbound, including when P's recorded email is the email of the g-999 account in the fixture.
-- The test counts the four classes it exercised and asserts the count is 4.
+- CANNOT_GIVE_FIXTURE (conformance row 2.4): the fixture model declares four relations on project P whose names do not imply their action sets: alder {view}, birch {view, comment}, cedar {view, edit}, damson {view, comment, edit, grant}. Fixture person P1 holds, all in force: G1, alder on P, source null, pass_on to {view} for recipient kinds {person, agent}; G2, birch on P, source null, pass_on use_only; G3, cedar on P, source G0 (held by fixture person P3), pass_on use_only. P1 holds nothing covering damson and has one linked sign-in identity. For source G1 and fixture agent A1 the list holds exactly 4 items, in this order: G2 use_only, G3 lent_to_you, damson above_what_you_hold, sign-in identity sign_in_identity; G1 and alder are not listed; each item carries exactly one reason, none carries a standing and none is marked as the source.
+- CANNOT_GIVE_PERSON_RECIPIENT (conformance row 2.4): the same fixture, source G1 and fixture person P2 as recipient, gives exactly 3 items, in this order: G2 use_only, G3 lent_to_you, damson above_what_you_hold; no item has reason sign_in_identity.
+- CANNOT_GIVE_PRECEDENCE (conformance row 2.4): in the fixture both use_only and lent_to_you apply to G3 (pass_on use_only, source G0). For source G1 with recipient A1, and again with recipient P2 (2 legs, counted), G3's item carries exactly one reason, lent_to_you, and no item carries use_only for G3.
+- CANNOT_GIVE_ORDER_TABLE: for each of the 63 non-empty subsets of the six reasons the reason chosen is the subset's first member in the order sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only; the test asserts it ran exactly 63 cases.
+- CANNOT_GIVE_PEOPLE_ONLY (conformance row 2.4): the fixture plus G11, a grant on resource U, source null, in force, pass_on to its actions for recipient kinds {person} only. Source G1, recipient A1: the list holds exactly 5 items and G11 carries exactly one reason, people_only. Source G1, recipient P2: the list holds exactly the 3 items of CANNOT_GIVE_PERSON_RECIPIENT and no item names G11.
+- CANNOT_GIVE_AGENTS_ONLY (conformance row 2.4): the fixture plus G10, a grant on resource S, source null, in force, pass_on to its actions for recipient kinds {agent} only. Source G1, recipient P2: the list holds exactly 4 items and G10 carries exactly one reason, agents_only. Source G1, recipient A1: the list holds exactly the 4 items of CANNOT_GIVE_FIXTURE and no item names G10.
+- CANNOT_GIVE_IN_FORCE_ONLY (conformance row 2.4): the fixture plus G5, a grant on resource R, source null, pass_on use_only, revoked; G9, damson on P, source null, pass_on to its actions for recipient kinds {person, agent}, its end passed under a controlled clock; and G14, a grant on resource V, source G13 (held by P3), pass_on use_only, where G13 is revoked. Source G1, recipient A1: the list holds exactly 3 items, in this order: G2 use_only, G3 lent_to_you, sign-in identity sign_in_identity; no item names G5, G9, G13 or G14, no item is the relation damson, and no item carries a standing.
+- CANNOT_GIVE_SOURCE_MARK (conformance row 2.4): the fixture, source G2, recipient A1: the list holds the same 4 items as CANNOT_GIVE_FIXTURE, G2's item is marked as the source, and exactly 1 item is marked.
+- CANNOT_GIVE_SERVICE_ACCOUNT (conformance row 2.4): the fixture plus G7, a grant on service account SA1, source null, in force, pass_on use_only. Source G1, recipient A1: the list holds exactly 5 items, in this order: G2 use_only, G3 lent_to_you, SA1 use_only, damson above_what_you_hold, sign-in identity sign_in_identity; SA1 appears once, as a service-account item, and no grant item names G7.
+- CANNOT_GIVE_SERVICE_ACCOUNT_GIVABLE (conformance row 2.4): the fixture plus G8, a grant on service account SA2, source null, in force, pass_on to its actions for recipient kinds {person, agent}. Source G1, recipient A1: the list holds exactly the 4 items of CANNOT_GIVE_FIXTURE and no item names SA2 or G8.
+- CANNOT_GIVE_NO_RANK: the fixture with the relation names alder and damson swapped, so alder is {view, comment, edit, grant} and damson is {view}, and G1 holds damson. Source G1, recipient A1: alder carries above_what_you_hold and damson is not listed.
+- CANNOT_GIVE_ADMISSION_AGREES: for each of G1, G2 and G3 and each of the 2 recipients A1 and P2 (6 legs, counted), the grant is absent from the list exactly when DIRECTORY-006's delegate admission permits delegating it to that recipient.
+- CANNOT_GIVE_DETERMINISTIC: the fixture built with P1's grants inserted in reverse order gives a list serialised byte-identical to the fixture's.
 
 **Files:**
-- create: crates/lys-identity/src/sign_in_identity.rs
-- create: crates/lys-identity/tests/sign_in_classification.rs
-- modify: crates/lys-identity/src/lib.rs
+- create: crates/lys-identity/src/grants/cannot_give.rs
+- create: crates/lys-identity/tests/grant_cannot_give.rs
+- modify: crates/lys-identity/src/grants/mod.rs
 
 **Checklist:**
-- C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
+- C181 — The delegation form's answer lists, for the chosen recipient, every grant in force the person holds on any resource that they cannot give, every relation on the source grant's resource that no grant they hold covers in any standing, their sign-in identity when the recipient is an agent, and each service account they hold to which a reason applies, marks the source grant when it is listed, and lists nothing they can give and nothing not in force.
+- C182 — Each item carries exactly one reason, the first applicable in the order sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only; lent_to_you and use_only are told apart by whether the person's use-only grant names a source, and coverage is decided by the model's action sets, never by a rank of names.
 
 **Stories:**
-- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
+- S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
-### R2: Define the sign-in identity refusal and its two views
+### R2: Answer the cannot-give list on the one authenticated seam with a closed wire enumeration
 
-THE SYSTEM SHALL define one refusal for acts that would give a sign-in identity away. It names the act (link to an agent, or delegate), the recipient and its kind (agent or person), and the sign-in identity (provider and subject, current or former), and it states the literal sentence 'sign-in identities belong to people only'. WHEN the refusal is returned to the sign-in identity's owner or to a directory administrator (DIRECTORY-003 R3), THE SYSTEM SHALL show the provider and subject. WHEN it is returned to anyone else, THE SYSTEM SHALL show the act, the recipient and its kind, and that a sign-in identity is involved, and SHALL state the literal sentence 'sign-in identities belong to people only'. The view for anyone else SHALL NOT carry the provider or the subject in any form: not in its text, its Display, its Debug, its serialised response or its error code, which SHALL be the same whichever provider and subject are involved. This is what DIRECTORY-006 R5 requires of a why-refused response: it names the blocking condition without disclosing another identity's protected records.
-
-**Acceptance:**
-- For act delegate, recipient agent A, sign-in identity issuer https://accounts.google.com subject g-100 owned by P: the owner view shown to P contains https://accounts.google.com and g-100, and so does the administrator view shown to the configured administrator.
-- The same refusal shown to person Q contains the act delegate, agent A, the kind agent, the words sign-in identity and the literal sentence 'sign-in identities belong to people only', and neither https://accounts.google.com nor g-100 appears in any of its Display, its Debug and its serialised JSON.
-- The redacted views of two refusals that differ only in the sign-in identity (issuer https://accounts.google.com subject g-100, and issuer https://github.com subject gh-200) serialise to byte-identical JSON with the same error code.
-- A refusal for a former sign-in identity shown to its owner names it as a former sign-in identity.
-
-**Files:**
-- create: crates/lys-identity/src/sign_in_refusal.rs
-- create: crates/lys-identity/tests/sign_in_refusal_views.rs
-- modify: crates/lys-identity/src/lib.rs
-
-**Checklist:**
-- C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-
-**Stories:**
-- S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-- S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
-
-### R3: Refuse a sign-in identity as an agent's binding and accept an agent's own machine account
-
-WHEN a caller asks the DIRECTORY-003 R1 binding API to bind an issuer-subject pair to an agent, and R1 classifies the pair as a current or former sign-in identity, THE SYSTEM SHALL refuse with R2's refusal for the act link to an agent, naming the agent and the sign-in identity, and SHALL write no event. This holds whether the agent's responsible person is the sign-in identity's owner or anyone else. WHEN the pair is unbound, THE SYSTEM SHALL accept it as the agent's own machine account, a service account under row 1.3's separate list, as DIRECTORY-003 R1 does today. THE SYSTEM SHALL NOT withdraw, move or alter any existing binding to make room, and SHALL NOT manufacture a human login for the agent (P3).
+THE SYSTEM SHALL expose the cannot-give list as a typed operation of DIRECTORY-006 R5's authenticated grant seam in the standalone identity server, taking the source grant id and the recipient id, calling R1 and nothing else to compute it, so API, tool and browser callers get the same answer. The answer SHALL carry the source grant id, the recipient id and the ordered items; each item SHALL carry its subject kind (grant, relation, service_account or sign_in_identity), the person's own grant id for a grant or service-account item and the relation name for a relation item, exactly one reason spelled as one of the six snake_case values of R1, and the source mark; no item SHALL carry a standing. The contract type SHALL refuse by name, and SHALL NOT default, an answer whose reason is outside the six. IF the caller is unauthenticated, THEN THE SYSTEM SHALL refuse by name with no items. IF the source grant is not one the caller holds, or the recipient is unknown, THEN THE SYSTEM SHALL refuse by name and SHALL NOT disclose whether a grant or identity the caller cannot discover exists. The answer SHALL NOT include another identity's private grants, labels or ids. The operation reads only and SHALL NOT create a grant or an event.
 
 **Acceptance:**
-- Binding issuer https://accounts.google.com subject svc-a, linked to no person, to agent A is accepted: the log gains exactly one event and R1 then returns agent's service account naming A.
-- Binding issuer https://accounts.google.com subject g-100, linked to person P, to agent A whose responsible person is P is refused with the sign-in identity refusal naming act link to an agent, agent A and the sign-in identity, and the log's length is unchanged.
-- The same binding to agent B whose responsible person is Q is refused the same way, and the log's length is unchanged.
-- After P links then unlinks issuer https://github.com subject gh-200, binding that pair to agent A is refused by name as a former sign-in identity, and binding it to agent B is refused the same way; the log's length is unchanged by both.
-- The test counts one accepted case and four refused cases, and asserts both counts.
-
-**Files:**
-- create: crates/lys-identity/tests/sign_in_agent_binding.rs
-- modify: crates/lys-identity/src/lib.rs
-
-**Checklist:**
-- C31 — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-
-**Stories:**
-- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
-- S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
-
-### R4: Answer the link path's question before a person links a provider account
-
-WHEN the link path asks lys-identity, by issuer-subject pair, whether a person may link that provider account, and R1 classifies the pair as an agent's service account, THE SYSTEM SHALL refuse by name. The refusal SHALL say the provider account is bound to an agent as that agent's service account, and SHALL name the act that answers it: the agent's responsible person or a directory administrator withdraws that binding first, and then the person links. The link path SHALL supply the authenticated person on whose behalf it asks, and the refusal's view SHALL be chosen by that person: WHEN that person is the agent's responsible person or a directory administrator (DIRECTORY-003 R3), the refusal SHALL name which agent holds the binding; WHEN that person is anyone else, the refusal SHALL say only that the provider account is bound to an agent as its service account and SHALL NOT name or identify the agent in its text, its Display, its Debug, its serialised response or its error code, as DIRECTORY-006 R5 keeps a refusal from disclosing another identity's protected records. THE SYSTEM SHALL NOT withdraw the agent's binding, SHALL NOT write any event, and SHALL answer only a caller authenticated as the link-audit source the DIRECTORY-003 R4 receiver already admits. WHEN the pair is bound to no agent, THE SYSTEM SHALL answer that lys-identity holds no agent binding for it, and SHALL NOT decide anything the fork's own refusals decide (DIRECTORY-004 R1). The check is new: it does not exist in DIRECTORY-004, and R4 creates it, served by the standalone identity server beside the receiver; the fork-side call, which supplies the pair and the authenticated person, is finding 2 in the task.
-
-**Acceptance:**
-- With issuer https://github.com subject gh-7 bound to agent B, whose responsible person is Q, as B's service account, the check asked on behalf of person P, who is not B's responsible person and not an administrator, returns the refusal: it states the account is bound to an agent as that agent's service account and names the act that answers it: the binding withdrawn first by one of the two who may withdraw it, the agent's responsible person and a directory administrator, and then the person's link; agent B's enduring id and name appear in none of its Display, its Debug and its serialised JSON; the log's length is unchanged and R1 still returns agent's service account naming B.
-- In a second store, created only in this test, the same issuer https://github.com subject gh-7 is bound instead to agent C, whose responsible person is also Q, as C's service account; the check asked on behalf of P in that store and the check asked on behalf of P in the first store, where B holds the binding, return redacted views that serialise to byte-identical JSON with the same error code.
-- The same check asked on behalf of B's responsible person Q, and again on behalf of the configured administrator, returns the refusal naming agent B as the holder of the binding, and the log's length is unchanged.
-- The check for issuer https://github.com subject gh-8, bound to no agent, returns that lys-identity holds no agent binding for it, and the log's length is unchanged.
-- An unauthenticated caller and a caller authenticated as anything other than the link-audit source are each refused by name, and neither receives an answer about gh-7.
-- The test counts the six cases it drove (the three views of the agent-bound refusal, the unbound pair and the two refused callers) and asserts the count is 6.
-
-**Files:**
-- create: crates/lys-identity-server/src/sign_in_link_check.rs
-- create: crates/lys-identity-server/tests/sign_in_link_check.rs
-- modify: crates/lys-identity-server/src/routes.rs
-
-**Checklist:**
-- C32 — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
-
-**Stories:**
-- S15 (Person who signs in, Keeps their sign-in identities to themselves) — As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
-
-### R5: Refuse delegating a sign-in identity at grant admission, for every recipient
-
-WHEN a delegation request reaches DIRECTORY-006 R2 admission and its offered source resolves in the directory to a person's sign-in identity rather than to a grant, THE SYSTEM SHALL refuse with R2's refusal for the act delegate, naming the recipient, the recipient's kind and the sign-in identity, before any mutation, whether the recipient is an agent or a person. The offered source is the value in the request's source grant member, the DIRECTORY-006 R1 member that names what is passed on; every other member is formed as for any delegation. Admission SHALL resolve that value against the directory before its unknown-parent refusal: a value that names a grant resolves to that grant, and a value that is instead an issuer-subject pair, in the form DIRECTORY-003 R1 uses for an external binding, which R1 of this brief classifies as a current or former sign-in identity resolves to that person's sign-in identity. So the request 'P delegates that sign-in identity to A' is a delegation request whose actor is P, whose recipient is A and whose source grant member holds P's issuer-subject pair. Such a request reaches admission through DIRECTORY-006 R1's contract unchanged: the source grant member R1 proposes is a directory reference, and GRANT_CONTRACT parses it as well-formed lineage whether it names a grant or an issuer-subject pair; GRANT_CONTRACT's malformed-lineage refusal is only for a value that is not a well-formed directory reference. So a request whose source grant member holds a well-formed issuer-subject pair passes the parse and reaches R2 admission, where resolution finds the sign-in identity and this requirement refuses it by name. THE SYSTEM SHALL NOT add a source kind or any member to DIRECTORY-006 R1's grant contract to do this. A service-access grant consented through the same provider account the person signs in with is a separate record (SECRETS-002 R4); THE SYSTEM SHALL admit or refuse it by DIRECTORY-006's own rules only, and SHALL NOT refuse it because it shares an account with a sign-in identity.
-
-**Acceptance:**
-- Person P, who signs in with issuer https://accounts.google.com subject g-100, delegates that sign-in identity to P's agent A, by a delegation request whose source grant member holds issuer https://accounts.google.com subject g-100: refused with the sign-in identity refusal naming act delegate, recipient A and kind agent, and zero grant events are written; the refusal returned is the sign-in identity refusal and not GRANT_CONTRACT's malformed-lineage refusal.
-- P delegates the same sign-in identity to person Q: refused naming act delegate, recipient Q and kind person, and zero grant events are written.
-- P sends a delegation request to agent A whose source grant member holds a value that is not a well-formed directory reference: it is refused at the GRANT_CONTRACT parse with GRANT_CONTRACT's malformed-lineage refusal, not the sign-in identity refusal, and zero grant events are written.
-- P holds a Google Drive service-access grant consented through issuer https://accounts.google.com subject g-100, with pass-on authority for agents; P delegates it to agent A: accepted, exactly one grant event is written, and A's new grant names the Drive grant as its source.
-- The test counts three refusals (two sign-in identity refusals and one malformed-lineage refusal) and one acceptance, and asserts both counts.
-
-**Files:**
-- create: crates/lys-identity/tests/grant_sign_in_identity.rs
-- modify: crates/lys-identity/src/grants/admission.rs
-
-**Checklist:**
-- C33 — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
-
-**Stories:**
-- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
-- S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
-
-### R6: Serve the reason 'sign-in identity' on the cannot-give list and the two views at the grant seam
-
-WHEN a person asks DIRECTORY-006 R5's explanation seam what they cannot give to a recipient, THE SYSTEM SHALL list each of that person's current sign-in identities with the reason 'sign-in identity', whoever the recipient is. THE SYSTEM SHALL NOT list another person's sign-in identities to them. WHEN the grant seam returns R5's refusal, THE SYSTEM SHALL choose R2's view by the caller: the owner and a directory administrator see the provider and subject, and anyone else sees the redacted view. The list is shown to a person by Cambium card jAfmblAP on the delegation screen, which uses this reason; THE SYSTEM SHALL NOT add or change any screen file.
-
-**Acceptance:**
-- Person P with sign-in identities issuer https://accounts.google.com subject g-100 and issuer https://github.com subject gh-200 asks what P cannot give to agent A: the response lists exactly those two, each with reason sign-in identity.
-- The same question with recipient person Q lists the same two, each with reason sign-in identity.
-- Q's sign-in identity issuer https://accounts.google.com subject g-300 appears in neither of P's responses.
-- Agent A, holding pass-on authority from P, asks the grant seam to delegate P's sign-in identity g-100 to agent B: A receives the redacted view, whose body contains neither https://accounts.google.com nor g-100; the same refusal read by P and by the configured administrator contains both.
-- No file under surface/ changes in this brief's diff.
+- CANNOT_GIVE_ROUTES (conformance row 2.4): R1's fixture, caller P1, source G1, recipient A1, asked through the API route, the tool route and the browser route (3 routes, counted): the three answers are byte-identical and their items equal R1's CANNOT_GIVE_FIXTURE list.
+- CANNOT_GIVE_WIRE (conformance row 2.4): the answer for R1's fixture serialises the reasons as the strings use_only, lent_to_you, above_what_you_hold and sign_in_identity and carries no standing member on any item; the answer for CANNOT_GIVE_PEOPLE_ONLY with recipient A1 serialises G11's reason as people_only; the answer for CANNOT_GIVE_AGENTS_ONLY with recipient P2 serialises G10's reason as agents_only.
+- CANNOT_GIVE_WIRE_UNKNOWN_REASON (conformance row 2.4): parsing an answer whose one item has reason "borrowed" fails with the named error for an unknown cannot-give reason and yields no answer value.
+- CANNOT_GIVE_AUTH (conformance row 2.4): an unauthenticated request is refused by name with zero items; P2 asking with source G1 is refused with the same refusal body as P2 asking with a grant id that exists nowhere; the grant and event counts are unchanged after every request.
+- CANNOT_GIVE_UNKNOWN_RECIPIENT (conformance row 2.4): P1 asks with source G1 and recipient id X0, which exists nowhere, and again with source G1 and recipient X1, a fixture identity outside what P1 may discover under DIRECTORY-006 R5 and R6: both requests are refused by name, the two refusal bodies are byte-identical, each carries zero items, and the grant and event counts are unchanged after each request.
+- CANNOT_GIVE_NO_LEAK (conformance row 2.4): adding P2's private grant of damson on P to R1's fixture leaves P1's answer for source G1 and recipient A1 byte-identical.
 
 **Files:**
 - create: crates/lys-identity-server/tests/grant_cannot_give.rs
+- modify: crates/lys-identity-server/src/grant_contract/mod.rs
+- modify: crates/lys-identity-server/src/grant_contract/requests.rs
+- modify: crates/lys-identity-server/src/grant_contract/views.rs
 - modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/routes.rs
 
 **Checklist:**
-- C34 — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
-- C35 — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
+- C183 — The cannot-give answer comes from the one authenticated grant seam, is byte-identical for API, tool and browser callers, refuses an unknown reason on the typed contract, and discloses nothing the person cannot discover.
 
 **Stories:**
-- S14 (Person who signs in, Keeps their sign-in identities to themselves) — As a person delegating to an agent or another person, I want my sign-in identities listed as things I cannot give with the reason 'sign-in identity', so that I know why they are never offered.
-- S16 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
-- S17 (Directory administrator, Resolves a refused act) — As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
+- S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
 
-### R7: Prove every refusal writes nothing and no agent record carries a sign-in identity
+### R3: Show on the delegation form exactly the list the answer gives, and refuse an unknown reason by name
 
-WHEN any refusal of R3, R4 or R5 is returned, THE SYSTEM SHALL leave the directory's log length and its projection unchanged. After those refusals, one test over the store SHALL enumerate every agent record, from the projection and again from a replay of the log after reopen, and SHALL find that no agent's binding is classified by R1 as a current or former sign-in identity and that no grant an agent holds has a sign-in identity as its source. The test lives in the lys-identity-server crate, which depends on lys-identity, so it drives all seven refusals, R4's through the server with R4's gh-7 fixture; lys-identity gains no dependency on the server. The test SHALL NOT pass over zero agents: it counts the agent records it inspected and the refusals it drove, and asserts both.
+WHEN the delegation form is opened from a source grant, and again WHEN its To choice changes, THE SYSTEM SHALL ask R2's operation with the source grant and the chosen recipient and SHALL render the answer's items in the answer's order, each with its reason and the source mark. WHEN an answer arrives whose recipient is not the current To choice, THE SYSTEM SHALL discard it and SHALL NOT render any of its items. The screen SHALL NOT compute, add, drop, merge or reorder an item, and SHALL NOT derive a reason from grant data it holds. WHEN an item's reason is agents_only, THE SYSTEM SHALL show it with the words "This can be passed on only to an agent." IF an answer carries a reason outside the six, THEN THE SYSTEM SHALL refuse the whole answer with a refusal named unknown_cannot_give_reason, and SHALL NOT render any item of that answer or a blank reason.
 
 **Acceptance:**
-- Before and after each refusal case of R3, R4 and R5 the test records the log's length and a digest of the projection; for each of the seven refusal cases (the four of R3, R4's agent-bound refusal asked on behalf of P, and the two of R5) the two values are equal, and the test asserts it counted 7 refusals.
-- After the seven refusals, R3's accepted binding of issuer https://accounts.google.com subject svc-a to agent A (responsible person P) and R4's fixture binding of issuer https://github.com subject gh-7 to agent B (responsible person Q), the store holds agents A and B; the test inspects every agent record, asserts it inspected 2, and finds for each agent zero bindings classified as a current sign-in identity, zero bindings classified as a former sign-in identity and zero held grants whose source is a sign-in identity.
-- After the store is closed and reopened, the same enumeration over the replayed log inspects 2 agent records and finds the same zero counts.
+- CANNOT_GIVE_SCREEN (conformance row 2.4): rendered from R2's answer for R1's fixture (source G1, recipient A1), the list shows exactly 4 rows, the answer holds exactly 4 items, and the rows' (subject, reason) pairs in order equal the answer's: G2 use_only, G3 lent_to_you, damson above_what_you_hold, sign-in identity sign_in_identity.
+- CANNOT_GIVE_SCREEN_NO_OTHER (conformance row 2.4): rendered from that answer with the damson item removed, the list shows exactly 3 rows and no damson row, although the fixture grants the screen holds would place damson above what P1 holds.
+- CANNOT_GIVE_SCREEN_RECIPIENT (conformance row 2.4): with the form open for A1, changing To to P2 sends exactly one new request carrying recipient P2, and the list then shows exactly the 3 rows of R1's CANNOT_GIVE_PERSON_RECIPIENT answer, with no sign-in identity row.
+- CANNOT_GIVE_SCREEN_AGENTS_ONLY (conformance row 2.4): rendered from R2's answer for CANNOT_GIVE_AGENTS_ONLY with recipient P2, the list shows exactly 4 rows and G10's row, the only row with reason agents_only, shows the words "This can be passed on only to an agent."
+- CANNOT_GIVE_SCREEN_STALE (conformance row 2.4): with the form open for A1, changing To to P2 and back to A1 before the P2 reply arrives, then delivering the A1 reply before the P2 reply, leaves the list showing exactly the 4 rows of the A1 answer.
+- CANNOT_GIVE_SCREEN_UNKNOWN_REASON (conformance row 2.4): an answer of 4 items whose third has reason "borrowed" renders 0 list rows and one refusal named unknown_cannot_give_reason.
 
 **Files:**
-- create: crates/lys-identity-server/tests/sign_in_store.rs
+- create: surface/identity/src/features/grants/CannotGiveList.tsx
+- create: surface/identity/src/features/grants/cannotGiveAnswer.ts
+- create: surface/identity/tests/cannot_give.test.tsx
+- modify: surface/identity/src/features/grants/DelegateGrant.tsx
+- modify: surface/identity/src/generated/index.ts
 
 **Checklist:**
-- C36 — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
+- C184 — The delegation screen shows exactly the items and reasons the answer lists, asks again when the recipient changes and discards a superseded answer, and refuses an answer carrying an unknown reason by name, showing no item and no blank.
 
 **Stories:**
-- S13 (Person who signs in, Keeps their sign-in identities to themselves) — As a person who signs in with a provider account, I want the directory to refuse every act that would give that account to an agent, so that no agent can ever hold my sign-in.
+- S76 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a person giving part of my access, I want the form to list everything I cannot give to the recipient I chose, each with the one reason that stops it, so that I know what and why before I try, from the server's answer rather than my browser's guess.
+
+### R4: Name this brief in conformance row 2.4
+
+Change the Brief column of row 2.4 in docs/design/identity/CONFORMANCE.md from "DIRECTORY (new row)" to "DIRECTORY-024". No other cell, row or line of that file changes, and no other file under docs/design/identity changes.
+
+**Acceptance:**
+- CANNOT_GIVE_CONFORMANCE_ROW (conformance row 2.4): in docs/design/identity/CONFORMANCE.md the row whose first cell is 2.4 has DIRECTORY-024 as its Brief cell, its other four cells are unchanged, and git diff of that file against the brief's base shows exactly one line removed and one line added, both that row.
+
+**Files:**
+- modify: docs/design/identity/CONFORMANCE.md
+
+**Checklist:**
+- C185 — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024.
 
 ## Boundaries
 
-- SHALL NOT change docs/design/identity/briefs/IDENTITY-001.json, docs/design/identity/briefs/IDENTITY-001.md or docs/design/identity/CONFORMANCE.md (CN1).
-- SHALL NOT change SECRETS-002 R5 or the harness login token exception, and SHALL NOT redefine that token as anything other than what it is.
-- SHALL NOT build the broker's refusal (finding 1) or any credential issuance; issuance is the broker's (ADR-001).
-- SHALL NOT add a seam that exists only to refuse: the refusals sit in the binding seam DIRECTORY-003 owns, the admission seam DIRECTORY-006 owns, and the lys-identity side of the link path's pre-link check, which does not exist yet and which R4 creates as the check the link path asks; the fork side of that check is finding 2.
-- SHALL NOT add or change any screen file; the cannot-give list is shown by Cambium card jAfmblAP.
-- SHALL NOT change lys-core, its published wire formats or lys/delegation/v1, and SHALL NOT add a member or source kind to DIRECTORY-006 R1's grant contract.
-- SHALL NOT refuse an agent's own machine account, linked to no person, as its DIRECTORY-003 R1 binding.
-- SHALL NOT withdraw, move or alter any existing binding or grant to make a refused act succeed.
-- SHALL NOT change any existing brief's id, requirements, estimates or dependency order.
+- DIRECTORY-006 R6 shows the server's reason for a refused choice, while this brief defines the closed reason set and the full per-recipient list that R6's screen consumes; DIRECTORY-006's text does not change.
+- The sentence of docs/design/directory/DESIGN.md at line 63, "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production", stands as written and, by the lead's answer, does not exclude this brief, as it does not exclude DIRECTORY-006; no sentence of DESIGN.md is edited by hand, and DESIGN.md gains only the Structure rows render-cluster.py produces from design.json.
+- CN1 governs the planning documents of the directory design round and nothing else; this brief's build walls are its own R1 to R4 files, CN1 is no bar on its code paths or on its one-column change to CONFORMANCE.md row 2.4, and no file outside those walls changes.
+- In docs/design/identity/CONFORMANCE.md only row 2.4's Brief column changes; the row's Behaviour text is not edited.
+- The reason set is the six values sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only, in that precedence; no value is added, renamed or made open-ended, and no free-text reason stands in for one.
+- The list holds only what is in force, as the pinned mock-up draws it: a grant that is not in force is not listed and carries no reason here; it shows on its own grant card as void with its named reason, under DIRECTORY-006 R6, and no item carries a standing.
+- This brief decides no suspension policy (DESIGN.md line 58 and ADR-011 stay open): whether a grant is in force is DIRECTORY-006's evaluator's answer, and what a suspended ancestor does to its descendants is left to the lifecycle decision.
+- The fields of the person's own grant decide its reason: pass_on, the presence of a source and the recipient kinds pass_on admits; the identity of the issuer never does. The grant representation stays recorded as open (DESIGN.md line 57, C5); if a ratification renames or drops source or pass_on, this brief is amended to follow it.
+- The browser computes no authority: it renders the server's answer, asks again when the recipient changes, and never adds, drops or re-derives an item or a reason.
+- No second evaluator: the list is computed from DIRECTORY-006's authority and lineage decisions and exposed only through its one authenticated seam; DIRECTORY-006 R2's delegation rules and R5's seam are held as written.
+- Nothing in crates/lys/src/identity/ checks or writes SpiceDB (DIRECTORY-002 R4); this brief adds no permission enforcement.
+- A sign-in identity is never offered as givable to an agent (CONFORMANCE 1.2); sign-in identities are the Rauthy fork's provider links (ADR-009) and nothing in vendor/rauthy changes.
+- The list never discloses another identity's private grants, labels, ids or existence to say no (DIRECTORY-006 R6).
+- No lys-core code and no published or frozen wire format changes; lys/delegation/v1 is not used as the grant format.
+- The card is not built from this brief before sign-off is recorded on the card.
 
 ## Verification
 
-- From the repository root: sh scripts/design/gate.sh exits 0.
-- At implementation time, from the exact revision: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps. Report each refusal case and each counted leg the tests exercised.
-- Drift injection, each failing exactly one test file, the one built for the check, and no other. First: make R2's redacted view carry an error code that varies with the sign-in identity's provider and subject without containing either; exactly one test file fails, crates/lys-identity/tests/sign_in_refusal_views.rs (its byte-identical case), because no other test compares redacted views across two sign-in identities, and R6's redacted-view case checks only that the body lacks the provider and subject. Second: make R4's redacted view name agent B, the agent that holds the binding; exactly one test file fails, crates/lys-identity-server/tests/sign_in_link_check.rs (its agent-bound case asked on behalf of P, and its second-store byte-identical case), because crates/lys-identity-server/tests/sign_in_store.rs, which drives R4's refusal with the same gh-7 fixture, records only the log's length and the projection's digest around it, never its content. Revert both.
-- Before reporting row 1.2 passed, confirm the broker's card carries finding 1's acceptance line and that it passes; until then row 1.2 is reported as met by the directory and awaiting the broker.
+- From the repository root: sh scripts/design/gate.sh exits 0, and python3 scripts/design/render-cluster.py docs/design/directory run twice leaves git status unchanged after the first run.
+- DESIGN.md is byte-identical to render-cluster.py's output, and git diff docs/design/directory/DESIGN.md against the brief's base touches only the Structure table.
+- At implementation time run the repository battery from the exact revision: cargo fmt --check, cargo clippy --all-targets --all-features -- -D warnings, cargo clippy --all-targets -- -D warnings, cargo test --workspace --all-features, cargo doc --no-deps --all-features and cargo doc --no-deps, plus the surface's strict type check and tests; report each CANNOT_GIVE_* case with its counted legs.
+- Confirm by search of crates/lys-identity, crates/lys-identity-server and surface/identity/src that the strings new to this brief, sign_in_identity, above_what_you_hold, lent_to_you, people_only, agents_only and unknown_cannot_give_reason, appear only in crates/lys-identity/src/grants/cannot_give.rs, crates/lys-identity-server/src/grant_contract/requests.rs, crates/lys-identity-server/src/grant_contract/views.rs, the generated types, cannotGiveAnswer.ts, CannotGiveList.tsx and the tests; use_only is left out of the search because DIRECTORY-006's grant contract already carries it.
+- Confirm git diff docs/design/identity/ touches only CONFORMANCE.md row 2.4, and git diff docs/design/directory/briefs/DIRECTORY-006.json docs/design/directory/briefs/DIRECTORY-006.md is empty.
 

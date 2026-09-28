@@ -48,11 +48,10 @@
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
 
-## Sign-in identities belong to people (conformance row 1.2)
+## What a person cannot give (DIRECTORY-024)
 
-- [ ] **C31** — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-- [ ] **C32** — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
-- [ ] **C33** — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
-- [ ] **C34** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
-- [ ] **C35** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-- [ ] **C36** — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
+- [ ] **C181** — The delegation form's answer lists, for the chosen recipient, every grant in force the person holds on any resource that they cannot give, every relation on the source grant's resource that no grant they hold covers in any standing, their sign-in identity when the recipient is an agent, and each service account they hold to which a reason applies, marks the source grant when it is listed, and lists nothing they can give and nothing not in force.
+- [ ] **C182** — Each item carries exactly one reason, the first applicable in the order sign_in_identity, above_what_you_hold, lent_to_you, use_only, people_only, agents_only; lent_to_you and use_only are told apart by whether the person's use-only grant names a source, and coverage is decided by the model's action sets, never by a rank of names.
+- [ ] **C183** — The cannot-give answer comes from the one authenticated grant seam, is byte-identical for API, tool and browser callers, refuses an unknown reason on the typed contract, and discloses nothing the person cannot discover.
+- [ ] **C184** — The delegation screen shows exactly the items and reasons the answer lists, asks again when the recipient changes and discards a superseded answer, and refuses an answer carrying an unknown reason by name, showing no item and no blank.
+- [ ] **C185** — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024.

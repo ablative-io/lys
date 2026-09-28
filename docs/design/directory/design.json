@@ -1084,6 +1084,61 @@
       "path": "crates/lys-identity-server/tests/sign_in_store.rs",
       "note": "every refusal writes nothing; no agent record carries a sign-in identity, counted over the store",
       "brief": "DIRECTORY-009"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-024.json",
+      "note": "the cannot-give list: everything a person cannot give on the delegation form, with its one reason (conformance row 2.4)",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-024.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/cannot_give.rs",
+      "note": "the closed reason set, its precedence, and the per-recipient cannot-give list computed from the authority and lineage decisions",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity/tests/grant_cannot_give.rs",
+      "note": "the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/grant_cannot_give.rs",
+      "note": "the cannot-give operation across routes, its wire values and its refusals",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_contract/requests.rs",
+      "note": "the cannot-give request: the source grant and the chosen recipient",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_contract/views.rs",
+      "note": "the cannot-give answer: its items, the closed reason set on the wire and the source mark",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "surface/identity/src/features/grants/CannotGiveList.tsx",
+      "note": "renders the server's cannot-give answer and nothing else",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "surface/identity/src/features/grants/cannotGiveAnswer.ts",
+      "note": "decodes the cannot-give answer and refuses an unknown reason by name",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "surface/identity/tests/cannot_give.test.tsx",
+      "note": "the cannot-give list on the delegation form against fixture answers",
+      "brief": "DIRECTORY-024"
+    },
+    {
+      "path": "docs/design/identity/CONFORMANCE.md",
+      "note": "the conformance rows; DIRECTORY-024 changes only row 2.4's Brief column",
+      "brief": "DIRECTORY-024"
     }
   ],
   "inventory": [
