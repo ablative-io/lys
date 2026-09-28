@@ -70,6 +70,7 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
         format!("http://localhost:{SERVICE_PORT}/api/callback")
     );
     assert_eq!(rendered["administrator"]["subject"], "user-1");
+    assert_eq!(rendered["spicedb"]["endpoint"], "127.0.0.1:58443");
     assert_eq!(
         rendered["sign_in_providers"]["api"],
         format!("http://127.0.0.1:{}/auth/v1", layout::RAUTHY_PORT)

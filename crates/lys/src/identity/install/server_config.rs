@@ -67,7 +67,7 @@ pub fn render(
         "grant_log_origin": GRANT_LOG_ORIGIN,
         "grant_model_file": layout.grant_model().display().to_string(),
         "spicedb": {
-            "endpoint": format!("http://127.0.0.1:{}", config.spicedb.http_port),
+            "endpoint": format!("127.0.0.1:{}", config.spicedb.http_port),
             "key_file": state.join("spicedb-preshared-key").display().to_string(),
         },
         "secrets": {
