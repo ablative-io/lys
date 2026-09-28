@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Second-implementation conformance for D1/D6: cross-check the `lys`
 //! signed-note implementation against Cloudflare's independently written
 //! [`signed_note`] crate (`c2sp.org/signed-note` in Rust).
@@ -12,8 +13,6 @@
 //! authorship; these are the two independent codebases that exist.
 //!
 //! Pure Rust, no toolchain requirement, runs unconditionally — no skip path.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -52,7 +51,8 @@ fn hex_of(bytes: &[u8]) -> String {
     use std::fmt::Write;
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        let _ = s.write_fmt(format_args!("{b:02x}"));
+        s.write_fmt(format_args!("{b:02x}"))
+            .expect("writing to a String cannot fail");
     }
     s
 }

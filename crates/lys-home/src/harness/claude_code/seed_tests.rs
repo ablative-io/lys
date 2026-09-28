@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the seed (HOME-006 R6): an assistant-point child renders its
 //! four messages with no seed; a carried-point child writes the seed's
 //! exact bytes beside the rendered file, its text lives there and nowhere

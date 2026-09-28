@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`FileSigner`].
 //!
 //! # Where the second party comes from
@@ -133,7 +133,7 @@ fn a_missing_key_file_is_refused_and_no_key_is_minted() {
     let absent = tmp.path().join("not-created-by-anyone.key");
     assert!(!absent.exists());
     match FileSigner::load(&absent) {
-        Err(AnchorError::SignerKey { path, .. }) => {
+        Err(AnchorError::Signing(SigningError::SignerKey { path, .. })) => {
             assert_eq!(path, absent.display().to_string());
         }
         other => panic!("expected SignerKey for a missing key file, got {other:?}"),

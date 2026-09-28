@@ -1,0 +1,36 @@
+id: no-unwrap-expect-panic-outside-tests
+language: rust
+severity: error
+message: "unwrap, expect or panic outside test code. Test code is a file whose first item is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a file under tests/ (CLAUDE.md)."
+ignores:
+  - "**/tests/**"
+  - "vendor/**"
+rule:
+  any:
+    - pattern: $X.unwrap()
+    - pattern: $X.expect($$$)
+    - pattern: panic!($$$)
+  not:
+    any:
+      - inside:
+          kind: source_file
+          stopBy: end
+          has:
+            pattern: "#![cfg(test)]"
+            nthChild: 1
+      - inside:
+          kind: mod_item
+          stopBy: end
+          follows:
+            pattern: "#[cfg(test)]"
+            stopBy:
+              not:
+                any: [{kind: attribute_item}, {kind: line_comment}, {kind: block_comment}]
+      - inside:
+          kind: function_item
+          stopBy: end
+          follows:
+            pattern: "#[test]"
+            stopBy:
+              not:
+                any: [{kind: attribute_item}, {kind: line_comment}, {kind: block_comment}]

@@ -7,7 +7,7 @@
 //! for the entry. Neither is optional: a missing tool is a hard failure,
 //! never a skip, because a check that never runs looks exactly like a pass.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 
 #[path = "ca_log/outputs.rs"]
 mod outputs;

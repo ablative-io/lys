@@ -39,7 +39,7 @@ use lys_core::checkpoint::{CheckpointBody, sign_note};
 use lys_log_store::LeafStore;
 
 use crate::admission::AdmissionPolicy;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, SigningError};
 use crate::keys::InProcessSigner;
 
 use super::open::Anchor;
@@ -72,15 +72,17 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// [`AnchorError::Checkpoint`] if `lys-core` refuses to encode the body or
+    /// [`SigningError::Checkpoint`] if `lys-core` refuses to encode the body or
     /// to sign the note. Both are unreachable for a well-formed anchor — the
     /// origin was validated when the store was created, and the body is
     /// machine-generated — and are propagated rather than assumed away.
     pub fn publish_checkpoint(&self) -> AnchorResult<PublishedCheckpoint> {
         let origin = self.origin();
-        let checkpoint_error = |source| AnchorError::Checkpoint {
-            origin: origin.to_string(),
-            source,
+        let checkpoint_error = |source| {
+            AnchorError::Signing(SigningError::Checkpoint {
+                origin: origin.to_string(),
+                source,
+            })
         };
         let body =
             CheckpointBody::from_root(origin, &self.log.tree().root()).map_err(checkpoint_error)?;

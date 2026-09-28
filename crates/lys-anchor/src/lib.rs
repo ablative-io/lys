@@ -236,7 +236,9 @@ pub use anchor::{
 #[cfg(feature = "unstable-anchor")]
 pub use anchor::{GENESIS_SEQUENCE, verify_genesis_delegation};
 pub use config::AnchorConfig;
-pub use error::{AnchorError, AnchorResult};
+#[cfg(feature = "federation")]
+pub use error::CascadeError;
+pub use error::{AnchorError, AnchorResult, GenesisError, ProofError, SigningError};
 pub use keys::{FileSigner, InProcessSigner, Signer};
 #[cfg(feature = "federation")]
 pub use upward::{UpwardPin, bundle_for, pin};

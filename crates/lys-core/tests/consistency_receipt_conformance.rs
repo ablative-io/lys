@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! D6 conformance gate for `lys/consistency-receipt/v1`: round-trip the
 //! artifact against the vendored Go `veraison/go-cose`.
 //!
@@ -46,7 +47,6 @@
 //! skip when `LYS_REQUIRE_GO` is set.
 
 #![cfg(feature = "unstable-anchor")]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod harness;
 
@@ -77,7 +77,7 @@ fn leaf(index: u64) -> Vec<u8> {
 fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::new(), |mut acc, byte| {
-        let _ = write!(acc, "{byte:02x}");
+        write!(acc, "{byte:02x}").expect("writing to a String cannot fail");
         acc
     })
 }

@@ -32,7 +32,7 @@ Future crates (later phases): `lys-anchor` (transparency-ledger service) and `ly
 
 Non-negotiable, enforced by CI (`clippy --all-targets -- -D warnings`):
 
-- **No `unwrap` / `expect` / `panic` / `todo` / `unimplemented` / `unreachable` in library code.** Tests opt out per-module with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
+- **No `unwrap` / `expect` / `panic` / `todo` / `unimplemented` / `unreachable` in library code.** Tests are exempt through `clippy.toml`'s `allow-unwrap-in-tests`, `allow-expect-in-tests` and `allow-panic-in-tests`, which clippy applies to code it knows is test code; a `*_tests.rs` file, a fixture file and an integration test root carry `#![cfg(test)]` as their first line so the whole file is test code.
 - **No silent failures.** Every error handled or propagated with operation-specific context. `thiserror` for the library error type; the CLI may use `anyhow` at the top level only.
 - **Private key material never appears in `Debug`, logs, or error messages.** Redaction is tested, not assumed. Seed buffers are `Zeroizing`.
 - **No file over 500 lines** of code (excluding tests/comments/whitespace). `mod.rs` carries only `pub mod` / `pub use` / module docs. Logic goes in named files; tests in sibling `*_tests.rs` files.
@@ -96,9 +96,10 @@ Tom's rules, in his words, with the date and time each was given.
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets -- -D warnings
-cargo test --workspace --all-features
+cargo test --workspace --all-features --no-fail-fast
 cargo doc --no-deps --all-features
 cargo doc --no-deps
+cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 ```
 
 All five clean. No exceptions.

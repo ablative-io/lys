@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the fork's names and refusals (HOME-006 R1) and on resolving
 //! and cutting (R2): the two custom types are named as the record states,
 //! each refusal names itself and its ids, the cut is the chain to the last
@@ -8,14 +9,17 @@
 //! every refusal writes nothing. The fixture home built here is
 //! the one the fork and report gates build on.
 //!
-//! The lantern `L2` is written by hand carrying `lit_in`, the key the
-//! lantern card records in a later round: the light act on this tree writes
-//! none, so every lantern it lights (`L5`, `L6`, `L1`, `C5`) resolves by the
-//! older-record rule, as `O2` does. No test name carries a content sentinel.
+//! The lantern `L2` is lit with the light act, as `L5`, `L6`, `L1` and `C5`
+//! are, so each carries the `lit_in` the light act records. The lanterns
+//! written by hand stand for records the light act does not write: `O2`, an
+//! older record with no `lit_in`, which resolves by its holders; `N2`, a
+//! copy whose `lit_in` names a session other than the one it stands in; and
+//! `N1` to `N4`, whose `lit_in` is not a session id. No test name carries a
+//! content sentinel.
 
+use crate::error::ForkError;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::Path;
 
 use serde_json::{Map, Value, json};
 use tempfile::TempDir;
@@ -33,6 +37,8 @@ use crate::record::lantern::light;
 use crate::record::{Home, now};
 
 type Gate = Result<(), Box<dyn Error>>;
+
+mod refusals;
 
 /// The fixture's parent session.
 pub(crate) const PARENT: &str = "parent";
@@ -116,8 +122,8 @@ fn event(id: &str, parent: &str, kind: &str, record: &Hash) -> Result<Entry, Box
 }
 
 /// A `lys.lantern` entry written by hand at `point`: with `lit_in`, the
-/// light act's data plus that key; without, the older record's `point`,
-/// `note` and `lit_by` exactly.
+/// light act's data shape naming that session; without, the older record's
+/// `point`, `note` and `lit_by` exactly.
 pub(crate) fn lantern_entry(id: &str, parent: &str, point: &str, lit_in: Option<&str>) -> Entry {
     let data = match lit_in {
         Some(session) => {
@@ -158,10 +164,11 @@ pub(crate) fn fixture_home() -> Result<(TempDir, Home, Lanterns), Box<dyn Error>
         session.append_entry(&event("s2", "e2", KIND_PERMISSION_MODE, &s2_record)?)?;
         session.move_head(Some("e2"))?;
     }
+    let l2 = light(&home, PARENT, "e2", NOTE, LIGHTER)?.id;
     {
         let mut session = home.open_session(PARENT)?;
-        session.append_entry(&lantern_entry("L2", "e2", "e2", Some(PARENT)))?;
-        session.append_entry(&lantern_entry("O2", "L2", "e2", None))?;
+        // An older record with no `lit_in`: the light act cannot produce it.
+        session.append_entry(&lantern_entry("O2", &l2, "e2", None))?;
         session.append_entry(&event("e3", "O2", KIND_ATTACHMENT, &e3_record)?)?;
         session.append_entry(&user("e4", Some("e3"), &[text(4)]))?;
         session.append_entry(&assistant("e5", Some("e4"), &[text(5)]))?;
@@ -195,7 +202,7 @@ pub(crate) fn fixture_home() -> Result<(TempDir, Home, Lanterns), Box<dyn Error>
     }
     let c5 = light(&home, COMPACTED, "e5", NOTE, LIGHTER)?.id;
     let lanterns = Lanterns {
-        l2: "L2".to_owned(),
+        l2,
         o2: "O2".to_owned(),
         l5,
         l6,
@@ -230,17 +237,17 @@ fn the_fork_custom_types_are_named_as_the_record_states() {
 fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     let mut refusals = Vec::new();
 
-    let unknown = HomeError::NoSuchLantern {
+    let unknown = HomeError::Fork(ForkError::NoSuchLantern {
         lantern: "no-such-lantern".into(),
-    }
+    })
     .to_string();
     assert!(unknown.contains("no-such-lantern"), "{unknown}");
     refusals.push(unknown);
 
-    let ambiguous = HomeError::LanternAmbiguous {
+    let ambiguous = HomeError::Fork(ForkError::LanternAmbiguous {
         lantern: "x".into(),
         sessions: vec!["a".into(), "b".into()],
-    }
+    })
     .to_string();
     assert!(ambiguous.starts_with("lantern_ambiguous"), "{ambiguous}");
     for id in ["x", "a", "b"] {
@@ -248,11 +255,11 @@ fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     }
     refusals.push(ambiguous);
 
-    let not_here = HomeError::LanternNotLitHere {
+    let not_here = HomeError::Fork(ForkError::LanternNotLitHere {
         lantern: "x".into(),
         session: "a".into(),
         lit_in: "b".into(),
-    }
+    })
     .to_string();
     assert!(not_here.starts_with("lantern_not_lit_here"), "{not_here}");
     for id in ["x", "a", "b"] {
@@ -260,9 +267,9 @@ fn each_fork_refusal_names_itself_and_the_ids_it_was_given() {
     }
     refusals.push(not_here);
 
-    let nothing = HomeError::NothingToFork {
+    let nothing = HomeError::Fork(ForkError::NothingToFork {
         lantern: "x".into(),
-    }
+    })
     .to_string();
     assert!(nothing.starts_with("nothing_to_fork"), "{nothing}");
     assert!(nothing.contains('x'), "{nothing}");
@@ -281,7 +288,10 @@ fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gat
     let mut cuts = Vec::new();
 
     let l5 = cut(&home, &lanterns.l5, None)?;
-    assert_eq!(l5.ids(), ["e1", "e2", "L2", "O2", "e3", "e4", "e5"]);
+    assert_eq!(
+        l5.ids(),
+        ["e1", "e2", lanterns.l2.as_str(), "O2", "e3", "e4", "e5"]
+    );
     assert_eq!(l5.cut_at, "e5");
     assert!(!l5.coordinate_carried());
     assert!(l5.carried.is_none());
@@ -290,7 +300,10 @@ fn the_cut_is_the_chain_to_the_last_assistant_message_with_no_side_leaf() -> Gat
     cuts.push(l5);
 
     let l6 = cut(&home, &lanterns.l6, None)?;
-    assert_eq!(l6.ids(), ["e1", "e2", "L2", "O2", "e3", "e4", "e5"]);
+    assert_eq!(
+        l6.ids(),
+        ["e1", "e2", lanterns.l2.as_str(), "O2", "e3", "e4", "e5"]
+    );
     assert_eq!(l6.cut_at, "e5");
     assert!(l6.coordinate_carried());
     assert_eq!(l6.carried.as_ref().map(Entry::id), Some("e6"));
@@ -330,7 +343,7 @@ fn resolving_and_cutting_reads_the_lantern_row_and_the_ancestry_only() -> Gate {
         lanterns.l5.as_str(),
         "e1",
         "e2",
-        "L2",
+        lanterns.l2.as_str(),
         "O2",
         "e3",
         "e4",
@@ -350,7 +363,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     {
         let reader = home.read_session(PARENT)?;
         let mut copy = home.create_session("A", "/fixture", None)?;
-        for id in ["e1", "e2", "L2", "O2"] {
+        for id in ["e1", "e2", lanterns.l2.as_str(), "O2"] {
             copy.append_entry(&reader.entry(id)?)?;
         }
         assert_eq!(copy.len()?, 4);
@@ -363,8 +376,8 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert!(
         matches!(
             &elsewhere,
-            Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
-                if lantern == "L2" && session == "A" && lit_in == PARENT
+            Err(HomeError::Fork(ForkError::LanternNotLitHere { lantern, session, lit_in }))
+                if *lantern == lanterns.l2 && session == "A" && lit_in == PARENT
         ),
         "{elsewhere:?}"
     );
@@ -373,7 +386,7 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert!(
         matches!(
             &ambiguous,
-            Err(HomeError::LanternAmbiguous { lantern, sessions })
+            Err(HomeError::Fork(ForkError::LanternAmbiguous { lantern, sessions }))
                 if lantern == "O2" && *sessions == ["A".to_owned(), PARENT.to_owned()]
         ),
         "{ambiguous:?}"
@@ -383,153 +396,5 @@ fn a_lit_in_lantern_cuts_from_its_session_and_an_older_record_needs_one_named() 
     assert_eq!(named.session, PARENT);
     assert_eq!(named.ids(), ["e1", "e2"]);
     assert_eq!(named.lit_in, None);
-    Ok(())
-}
-
-#[test]
-fn each_refusal_names_the_lantern_and_writes_nothing() -> Gate {
-    let (_dir, home, lanterns) = fixture_home()?;
-    let before = session_files(&home)?;
-    let mut refusals: Vec<HomeError> = Vec::new();
-
-    for id in ["no-such-lantern", "e5"] {
-        let refused = resolve_and_cut(&home, id, None);
-        assert!(
-            matches!(&refused, Err(HomeError::NoSuchLantern { lantern }) if lantern == id),
-            "{refused:?}"
-        );
-        refusals.push(refused.err().ok_or("refused")?);
-    }
-    let elsewhere = resolve_and_cut(&home, &lanterns.o2, Some(COMPACTED));
-    assert!(
-        matches!(
-            &elsewhere,
-            Err(HomeError::UnknownLantern { session, id }) if session == COMPACTED && id == "O2"
-        ),
-        "{elsewhere:?}"
-    );
-    refusals.push(elsewhere.err().ok_or("refused")?);
-    let nothing = resolve_and_cut(&home, &lanterns.l1, None);
-    assert!(
-        matches!(&nothing, Err(HomeError::NothingToFork { lantern }) if *lantern == lanterns.l1),
-        "{nothing:?}"
-    );
-    refusals.push(nothing.err().ok_or("refused")?);
-    let absent = resolve_and_cut(&home, &lanterns.l5, Some("no-such-session"));
-    assert!(
-        matches!(&absent, Err(HomeError::UnknownSession { session }) if session == "no-such-session"),
-        "{absent:?}"
-    );
-    refusals.push(absent.err().ok_or("refused")?);
-    let other_kind = resolve_and_cut(&home, "e5", Some(PARENT));
-    assert!(
-        matches!(&other_kind, Err(HomeError::UnknownLantern { session, id }) if session == PARENT && id == "e5"),
-        "{other_kind:?}"
-    );
-    refusals.push(other_kind.err().ok_or("refused")?);
-
-    assert_eq!(refusals.len(), 6);
-    for refused in &refusals {
-        let text = refused.to_string();
-        for sentinel in SENTINELS {
-            assert!(!text.contains(sentinel));
-        }
-        assert!(!text.contains(NOTE));
-    }
-    let after = session_files(&home)?;
-    assert_eq!(after.len(), before.len());
-    assert_eq!(after, before);
-    assert!(
-        !Path::new(&home.root().join("sessions"))
-            .join("A.jsonl")
-            .exists()
-    );
-    Ok(())
-}
-
-#[test]
-fn a_lit_in_session_that_holds_no_copy_refuses_naming_the_holder_read() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
-    {
-        let reader = home.read_session(PARENT)?;
-        let mut copy = home.create_session("A", "/fixture", None)?;
-        copy.append_entry(&reader.entry("e1")?)?;
-        copy.append_entry(&reader.entry("e2")?)?;
-        copy.append_entry(&lantern_entry("N2", "e2", "e2", Some("elsewhere")))?;
-        // A session of the home that holds no copy of the lantern.
-        home.create_session("elsewhere", "/fixture", None)?;
-    }
-    let mut refusals = 0;
-    for (session, named) in [(None, "A"), (Some("A"), "A"), (Some(PARENT), PARENT)] {
-        let refused = resolve_and_cut(&home, "N2", session);
-        assert!(
-            matches!(
-                &refused,
-                Err(HomeError::LanternNotLitHere { lantern, session, lit_in })
-                    if lantern == "N2" && session == named && lit_in == "elsewhere"
-            ),
-            "{refused:?}"
-        );
-        refusals += 1;
-    }
-    assert_eq!(refusals, 3);
-    Ok(())
-}
-
-#[test]
-fn a_lit_in_that_is_not_a_session_id_is_refused_by_name() -> Gate {
-    let (_dir, home, _) = fixture_home()?;
-    {
-        let reader = home.read_session(PARENT)?;
-        let mut copy = home.create_session("A", "/fixture", None)?;
-        copy.append_entry(&reader.entry("e1")?)?;
-        copy.append_entry(&reader.entry("e2")?)?;
-        for (id, lit_in) in [
-            ("N1", json!(null)),
-            ("N2", json!(5)),
-            ("N3", json!("../elsewhere")),
-            ("N4", json!("no-such-session")),
-        ] {
-            let mut entry = lantern_entry(id, "e2", "e2", Some("placeholder"));
-            let EntryBody::Custom {
-                data: Some(data), ..
-            } = &mut entry.body
-            else {
-                return Err("a custom entry with data".into());
-            };
-            data["lit_in"] = lit_in;
-            copy.append_entry(&entry)?;
-        }
-    }
-    let before = session_files(&home)?;
-    let mut refusals = 0;
-    for (id, what) in [
-        ("N1", "is null"),
-        ("N2", "is not a string"),
-        ("N3", "is not a safe session name"),
-        ("N4", "names no session of the home"),
-    ] {
-        for session in [None, Some("A")] {
-            let refused = resolve_and_cut(&home, id, session);
-            assert!(
-                matches!(
-                    &refused,
-                    Err(HomeError::LitInNotASession { lantern, what: found })
-                        if lantern == id && *found == what
-                ),
-                "{refused:?}"
-            );
-            assert!(
-                refused
-                    .err()
-                    .ok_or("refused")?
-                    .to_string()
-                    .starts_with("lit_in_not_a_session")
-            );
-            refusals += 1;
-        }
-    }
-    assert_eq!(refusals, 8);
-    assert_eq!(session_files(&home)?, before);
     Ok(())
 }

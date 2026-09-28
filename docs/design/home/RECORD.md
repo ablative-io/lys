@@ -49,6 +49,28 @@ Read from the Pi checkout at `3d5cbe98`
 new; a block already held is not written again; a block is never rewritten or
 deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
 
+## The home as a git repository
+
+`lys-home ship` (HOME-019) makes a home directory a git repository,
+`<home>/.git`, tracking exactly the home's tracked set, enumerated by name
+and never by a glob pattern or a `.gitignore`:
+
+- for each session the home lists, `sessions/<id>.jsonl`,
+  `sessions/<id>.index.jsonl` and `sessions/<id>.head`;
+- each `blocks/<hh>/<hash>` and each `templates/<hh>/<hash>` whose name is 64
+  lowercase hex digits under a directory named by its first two.
+
+Never tracked: a session's lock file `sessions/<id>..lock` (the doubled dot
+is the lock path's own spelling), a head or block temporary, any file at the
+home root, anything under `.git`. The one ref is fixed, `refs/lys/home`, in
+the home's own repository and on the remote; a ship pushes it without force
+to a bare repository at a path on this machine. `fetch` pulls that ref into a
+new, empty home, verifies every index, head, block and template strictly
+(never rebuilding an index), appends one `arrival` per session, and commits
+those appended lines as one commit whose only parent is the fetched commit,
+with `refs/lys/home` and HEAD set to it, so the target's status is clean and
+a later ship from the target carries the arrivals onward.
+
 ## The lys custom entries
 
 - `lys.call` (R6): `{provider, api, model, request:[hash], response:[hash],
@@ -65,7 +87,7 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   `raw_blocks` separately.
 - `lys.harness_event` (R8): `{kind, harness: "claude-code", source_uuid,
   record, detail}`. `kind` is `hook`, `attachment`, `system`,
-  `permission_mode`, `tool_completed` or `template_render`; `record` is the
+  `permission_mode`, `tool_completed`, `template_render` or `arrival`; `record` is the
   whole source record as a block, by hash; `detail` holds names, ids, exit
   codes and counts only, never output or a body, and the serialised data is
   at most 512 bytes. A record that carries a uuid (`attachment`, `system`)
@@ -85,6 +107,18 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   path as a side leaf under the head (`append_beside`): the head does not
   move, the render walker never sees it, and a second render of the same
   session records the same session head hash in a second event.
+- `arrival` (HOME-019 R4), the seventh kind: written by `fetch`, not
+  imported, one per arriving session. Its `source_uuid` and `record` are both
+  null (no block is stored for it), and its `detail` is exactly
+  `{source_commit, remote, ref, execution}`: `source_commit` the 40-digit
+  commit fetched, `remote` the absolute path of the bare repository it was
+  fetched from, `ref` `refs/lys/home`, and `execution` a fresh execution id of
+  that session's own, 32 lowercase hex digits (`record::fresh_id`), so each
+  arrived session is a distinct execution with its ancestry on the record.
+  It hangs beside the head as `template_render` does (`append_beside`): it
+  moves no head, and the arrived head file is byte-identical to the source's.
+  A remote whose path would carry the data over the 512-byte cap is refused
+  before fetch writes anything.
 - `lys.given` (HOME-003 R3): the context record, what a rendered session was
   given, as hashes only. Data is exactly `{harness, harness_version, kinds,
   config_dir, documents, environment}`. `harness` is `claude-code` and
@@ -101,24 +135,55 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   and `home` when it set none and the path is `HOME/.claude` from the
   rendering process's `HOME` (never that process's `CLAUDE_CONFIG_DIR`).
   `documents` is the ordered list, each `{kind, path, length, sha256}`, in
-  the measured order: `user_claude_md` (`<config>/CLAUDE.md`), then
-  `appended_instructions` and `mcp_config` (the two files the render wrote,
-  named by their path relative to the render's out directory, so two renders
-  that write no per-render bytes give equal lists), then `claude_md_chain`
-  for each directory from the outermost ancestor of the working directory
-  down to it, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in
-  that order, then `memory_index`
+  one order, the order the harness's request gives (HOME-011, ADR-031):
+  wherever the request's order and the read order, the order the harness
+  reads the files in, differ, the request's order wins, since it is what
+  reached the model. So the entry lists `appended_instructions`,
+  `mcp_config`, `user_claude_md`, `claude_md_chain`, `memory_index`:
+  first `appended_instructions` and `mcp_config` (the two files the render
+  wrote, named by their path relative to the render's out directory, so two
+  renders that write no per-render bytes give equal lists), both
+  harness-side inputs ahead of the first message; the MCP configuration sits
+  straight after the appended instructions, a place taken from the read
+  order until a real server's tools position is measured; then
+  `user_claude_md` (`<config>/CLAUDE.md`), then `claude_md_chain` for each
+  directory from the outermost ancestor of the working directory down to it,
+  its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in that order
+  within one directory, then `memory_index`
   (`<config>/projects/<slug>/memory/MEMORY.md`, the slug being every
   character outside ASCII letters and digits replaced by `-`); every path
   but the two written files is absolute. A position whose file is absent is
   omitted; when the config directory is `D/.claude` for a `D` on the chain,
-  `D/.claude/CLAUDE.md` is listed once, first, as `user_claude_md`.
+  `D/.claude/CLAUDE.md` is listed once, as `user_claude_md`, in the user
+  file's place and not again on the chain. The old order, `user_claude_md`,
+  `appended_instructions`, `mcp_config`, `claude_md_chain`, `memory_index`,
+  is superseded by the commit that lands HOME-011 and from that commit's
+  date; entries written under it stand as written and are never rewritten.
+  The old order was written under `harness_version` 2.1.283, and the
+  harness version does not tell the two orders apart: a reader tells an
+  entry's order by comparing its recorded time with the date of the commit
+  that lands HOME-011, an entry written before it listing the old order.
   `environment` is the names of the variables the template set for the
   session, sorted, never a value or a handle. The
   entry hangs under the `template_render` event it follows, beside the
-  context path, so the head does not move. It is unsigned and unencrypted
-  and carries no document content: signing (stage 6) and encryption at rest
+  context path, so the head does not move. The entry itself is unsigned and
+  unencrypted and carries no document content; a render given a key signs
+  its data as a separate `lys.given_statement`, and encryption at rest
   (stage 3) can be added later without changing what is recorded.
+- `lys.given_statement` (HOME-018 R2, R3): `{given, statement}`. `given` is
+  the id of the `lys.given` entry it signs, and it hangs under that entry,
+  beside the context path, so the head does not move. `statement` is the
+  hash of a block holding a `lys/attestation/v2` `COSE_Sign1`, lys-core's
+  existing attestation, whose payload is the RFC 8785 bytes of the
+  `lys.given` entry's data (keys ordered, no whitespace, no trailing
+  newline); the report's `given_sha256` is the SHA-256 of those bytes. The
+  same render writes the statement and its payload under `--out` as
+  `given-statement.cose` and `given-data.json`, which `lys verify
+  --attestation given-statement.cose --payload given-data.json` checks
+  offline. It is written only when `render-launch` is given `--key`, a raw
+  32-byte Ed25519 seed file; a render with no key writes no block, no entry
+  and neither file, and its report's `signing` is `unsigned`. The entry holds
+  no payload byte, no key byte and no document content.
 - `lys.authored` (R3, R4): no data. Precedes the first authored message entry
   of a session; every authored assistant message carries provider, api and
   model `authored`, so a demonstration is never mistaken for history.
@@ -129,7 +194,34 @@ deleted. Written to a temporary file, fsynced, renamed, directory fsynced.
   has `authored: true`, no source, and provider, api and model `authored`.
   The canon is appended only, through the repository's review, and rendered
   first (before a session's own entries) when a render is given `--canon`;
-  R4's thinking rule applies to every inherited thinking block.
+  R4's thinking rule applies to every inherited thinking block. Every
+  `lys.inherited` entry in the canon file is a canon example and states its
+  rule: the canon loader refuses one whose data has no `rule` by name,
+  `canon_example_without_rule`, naming its entry id, so `canon add` and a
+  render with `--canon` both refuse it before writing anything.
+  The handover (HOME-015, HOME-001 R12, ADR-058) uses the same custom type
+  without a rule, since a letter is not a rule: `{authored, from_session,
+  from_entries, provider, api, model, curated_at, curated_by}`, with
+  `authored` false, `from_session` and `curated_by` the outgoing session's
+  id, `from_entries` the letter's entry ids in path order, provider, api and
+  model those of the first letter entry, and `curated_at` the last letter
+  entry's timestamp. `lys-home handover` writes it as the first entry of the
+  one session of a new successor home (fresh id, the outgoing header's cwd,
+  no parentSession), followed by the letter's entries copied whole, each
+  keeping its id, timestamp and message with only its parent link rewritten,
+  then a `session_info` named `inherited from <outgoing session id>` with no
+  other field. That first entry is what says the successor's first memory is
+  inherited; the handover's report reads `inherited` from it. A rule-less
+  `lys.inherited` entry in a session of a home is read without the canon's
+  check. The outgoing session is read without being owned and nothing is
+  written under its home. Before anything is created the handover refuses by
+  name: `letter_not_assistant` (a letter entry that is not an assistant
+  message), `letter_not_contiguous` (a letter entry off the root-to-head
+  path, or not the child of the entry named before it), `letter_authored`
+  (a letter entry whose message carries provider `authored`),
+  `letter_without_thinking` (no letter entry holds a thinking block) and
+  `successor_not_empty` (the successor path exists and is not an empty
+  directory).
 - `lys.lantern` (HOME-004 R1, R3): `{point, note, lit_by, lit_at}`. `point` is
   the entry id of an entry of the same session that is neither a lantern nor
   an epilogue (the head or any entry the head has moved past); `note` is the

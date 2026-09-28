@@ -1,6 +1,6 @@
 {
   "project": "lys",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "decisions": [
     {
       "id": "ADR-001",
@@ -322,6 +322,350 @@
         "The seed lives only in the render's output directory, as the rendered JSONL does; the report, the loss account and the fork entries carry counts and ids.",
         "A seed path that already exists is refused by name and the render writes nothing.",
         "The launch line is printed, never run (ADR-007); the proof runs it by hand and records which line it ran."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-042",
+      "title": "A root is a repository URL and a pinned commit, resolved through the worker's own checkout and never fetched",
+      "status": "decided",
+      "scope": "roots",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings on the roots card's rounds",
+      "context": "lys's docs/design/project.json names the estate's other projects by absolute directories on one machine, which no worker on another machine resolves, while the carded-row rule is that workflow inputs name a repository, a commit, a card and a brief, never a folder. The method's reader accepts only absolute directories today, so the shape and the reader must change in a stated order.",
+      "decision": "Each root in project.json is an object with repository, a remote URL, and commit, the full hash of the commit the design was checked against. A worker resolves it through DS2_CHECKOUTS/<last URL segment without .git>, which must hold the commit (git cat-file -e), and otherwise is refused by name with the checkout path, the repository, the commit and the act of fetching that commit into that checkout. The repositories map (project name to remote URL) is retired into root.repository, so a root's repository has one home, and the method's validator refuses a project.json that still carries it, by name, naming the move to root.repository. The pin moves by hand in a gated row. A check prints each root's pin beside origin's head and the distance between them, and exits 0 whatever the distance; a root whose checkout lacks its pin is reported as pin_absent with the act git -C <checkout> fetch origin, a root whose checkout has no refs/remotes/origin/HEAD is reported as origin_head_unset with the act git -C <checkout> remote set-head origin --auto, and either makes the check exit 1, only after it has reported every root. The resolver and the check import only the Python standard library and SDK-free modules of ds2_ledger, so lys's copies run under python3 from a fresh clone. Rejected: keeping absolute directories; a resolver that fetches or clones what is missing; following the moving head or moving pins automatically; a pin per design; a lys-local resolver; and unifying the roots map with the $NAME/ launch tokens in this card.",
+      "quote": "",
+      "consequences": [
+        "lys's project.json does not change shape until the method's reader accepts the object; ROOTS-001 R2 is blocked on that method commit and first refreshes lys's copies from it.",
+        "The resolver and the pin check are written in the method, on the design-system board, and lys receives them only as copies.",
+        "A survey reads the pinned commit, never the moving head, so a stale pin is visible and moving it is a gated, stated act.",
+        "The project.json files of aion, cambium, haematite and the design system follow on their own boards once the method accepts the shape.",
+        "A project.json that still carries a repositories map is refused by the method's validator until its entries move into root.repository.",
+        "The leg-entry reading project.py takes from venues moves into an SDK-free ds2_ledger module, legs.py, which lys copies beside project.py; the pin check's copy differs from the method's only in the line that finds workers/, which SOURCE.md names."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-039",
+      "title": "A certificate carrying one claim is revoked whole, by its issuing authority's key, permanently, by a leaf folded in lys-identity",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-27",
+      "decided_by": "The lead for the identity line, in answer to the certificate revocation card's survey rounds; recorded with DIRECTORY-013",
+      "context": "DP26 (docs/design/lys-anchor/DECISIONS.md:400-425) rules that revocation is an append and the live set a fold, that the revocable unit is the claim unit, and that the freshness tolerance is a verification input with no default and N in the answer; it is recorded only in the lys-anchor decisions and was never built (docs/design/identity/STATEMENT-2026-09-22.md records it as ruled, not built). Building it for certificates left open what is revoked when a certificate can carry several claims, who may sign a revocation, whether a revocation can be undone, which history must still verify after one, what a revocation of a certificate the log does not yet hold means, where the code lands while lys-core calls revocation a consumer concern, whether it discharges DIRECTORY-006 R4, and whether the published no-log verification changes meaning. This entry records that build in the project ledger; DP26 stays where it is and is the proposal this entry records.",
+      "decision": "A certificate carries one capability claim, so the revocable unit and the claim unit are the same; revoking a claim is revoking its certificate and issuing a new one without it, and the fold never treats a certificate carrying several claims as partially revoked. Only the issuing authority's key signs a revocation leaf; a person responsible for the agent under ADR-003, or an administrator, revokes by asking the directory, which asks the authority to append, and the fold refuses a revocation signed by any other key. A revocation is permanent: no leaf reinstates a certificate, the fold refuses a reinstatement leaf by name, a verbatim replay of an earlier issuance leaf included, and the way back is a new certificate. A revocation always names a certificate the log already holds: the fold refuses a revocation leaf with no earlier issuance leaf for its certificate as revocation_before_issuance, and a later issuance of that certificate is valid. A revoked certificate's inclusion and consistency proofs and its issuance record always verify, and an attestation by its key verifies if and only if its own log entry precedes the revocation leaf, the log order being the evidence of time; an attestation with no entry before the revocation leaf fails, naming the revocation leaf; an attestation by a certificate that is not revoked needs no log entry of its own. The fold and the revocation-aware verification live in lys-identity; lys-core keeps revocation a consumer-side non-goal, and its published verify_certificate_chain and the lys ca verify command keep their meaning and keep passing with no log, while a new library form taking the log, the size N and the tolerance as explicit inputs checks revocation; its command line is a later, separate unpublished binary, and the published lys binary does not depend on lys-identity. Certificate revocation and grant revocation are separate folds: this stands beside DIRECTORY-006 R4 and does not discharge it, and C25 stays open with DP26 as the proposal its review reads. Rejected: revoking claims one by one inside a certificate, letting any key but the issuing authority's sign a revocation, a later leaf reinstating a certificate, letting every attestation made before a revocation stand whatever its log position, a revocation standing for a certificate the log does not hold, building the fold in lys-core, and changing what the published no-log verification means.",
+      "quote": "",
+      "consequences": [
+        "DIRECTORY-013 builds the fold, the append, the verification and the history calls in crates/lys-identity/src/revocation/ and its code rows block on DIRECTORY-003 having landed, checked by the crate existing on main.",
+        "The certificate-log leaf formats are a new wire format, signed only in tests until the repository's constructed-attack review of them is recorded.",
+        "The typed-claim card issues one claim per certificate; no format revokes part of a certificate.",
+        "lys ca verify's help and lys-identity's documentation say that verification without a log does not check revocation; lys-core's published rustdoc of verify_certificate_chain does not, and the act that answers that gap is a documentation-only lys-core release, its own card.",
+        "The revocation request path, through which a person responsible under ADR-003 or an administrator asks the directory server and the issuing authority signs and appends, is a later unit blocked on DIRECTORY-006 R4 and on the directory server; until it lands the only way to revoke is a caller that holds the issuing authority identity.",
+        "A command line that revokes or verifies against a log is a later unit, a separate unpublished binary.",
+        "The directory design's step-2 non-goal and CN11 each gain one appended line naming DIRECTORY-013's revocation fold and history check as step-2 work brought forward; the rest of each stands as written."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-019",
+      "title": "The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001)",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "Waffles, owning lead of the secrets line, on 27 September 2026 at 12:30, as a technical decision under Tom's word of 12:12 that a choice with a technical answer is the leads' to make",
+      "context": "ADR-001 places the broker inside the door, built in Rust. SECRETS-002 named door-owned files in the cambium checkout while its design's CN4 refused to let those proposals make Cambium a required runtime, and left the broker's host open. Every code row's files wait on which repository they sit in, and ADR-004 requires every project to stand alone. This entry amends ADR-001 rather than superseding it: ADR-001's handle model stands, and only where the broker is built moves, so supersedes stays empty and ADR-001's text is unchanged. Decided on 27 September 2026: the broker lives in lys as crates/lys-secrets and Cambium consumes it; ADR-001's handle model is unchanged, and the reason is ADR-004, that every project stands alone.",
+      "decision": "The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.",
+      "quote": "",
+      "consequences": [
+        "Amends ADR-001's placement of the broker inside the door; ADR-001's handle model is unchanged and its entry is not edited.",
+        "The entry is decided by the owning lead as a technical decision, not by ADR-001's decider, because only the broker's placement moves and the handle model Tom decided in ADR-001 is unchanged; each code row's Blocked by check tests that the entry is decided.",
+        "Every SECRETS-003 code row's files sit in the lys repository, under crates/lys-secrets.",
+        "CN4 of the secrets design is answered by this entry; SECRETS-002's open reading of the host is closed by SECRETS-003 without editing SECRETS-002.",
+        "The cambium paths SECRETS-002 names are not walls for any row; no cambium file is edited for the broker."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-020",
+      "title": "A lease is a broker record under the audit log, not a signed format",
+      "status": "decided",
+      "scope": "secrets",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the secrets survey; recorded with SECRETS-003",
+      "context": "SECRETS-002 R9 puts a lease's time window in the signed delegation, but lys/delegation/v1 has no not_after by design (crates/lys-core/src/delegation/mod.rs:218-221), and DIRECTORY-006 R1 puts the time window in the lys-identity grant. A signed lease format would freeze wire bytes that strangers verify.",
+      "decision": "The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.",
+      "quote": "",
+      "consequences": [
+        "No new signed format and no new version beside lys/delegation/v1 is written for the lease.",
+        "v1's lack of not_after is recorded as a fact; the lys-identity grant's window is the limit a lease is checked against.",
+        "These criteria wait on the grant's window, defined by DIRECTORY-006 R1 and enforced at admission by DIRECTORY-006 R4: SECRETS-002 R9 acceptance criteria 5, 8 (SEC_LEASE_ATTENUATION) and 10 (SEC_PROVISIONAL_EXPIRY), SECRETS-002 R7 acceptance criterion 8 (SEC_REINSTATE_CURRENT's expired handle), and SECRETS-003 R3's lease-window refusal leg.",
+        "A window carried in a signed delegation stays open, as SECRETS-002 records it, and would be a new version alongside v1.",
+        "A lease a stranger verifies offline, if a later row needs one, is a new brief with its own adversarial review."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-046",
+      "title": "A lantern records the session it was lit in as an optional typed lit_in; a lantern without it is an older record resolved by its holders",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lit_in card's request and the lead's answers to its survey; recorded with HOME-014",
+      "context": "ADR-014 fixed what a lantern carries (its point, the note, who lit it and when) and not the session it was lit in, and ADR-017's fork has to know that session, since a copied line keeps its id and a fork's child holds a copy of every lantern on the copied chain. The light act recorded no lit_in, LanternData refused the key as unknown, and the fork read it from the entry's raw data as a stopgap, with fixtures writing a lit_in lantern by hand. Lanterns lit before this change carry no lit_in, some carry no lit_at either, and none can be rewritten to carry it (P1).",
+      "decision": "LanternData gains an optional lit_in, the id of the session that held the point when the lantern was lit, and keeps refusing unknown keys; a present null and a present non-string value are kept distinct from an absent key. The light act writes it as the id of the session at whose head it appends the lantern and reports it; recall reports it beside point, note and lit_by, as null for a lantern whose data has no lit_in, and gives a lantern whose lit_in is present and not a session id the fork's lit_in_not_a_session refusal with the fork's reason text, skipped by note and refused by point, never a row and never entry_shape. The fork reads lit_in through a narrower typed view carrying point, lit_by and the optional lit_in, which requires neither lit_at nor note: a lantern whose data has no lit_in is an older record and resolves by its holders as ADR-017 rules (one holder cuts, several refuse lantern_ambiguous until a session is named), and a lit_in that is present but is null, not a string, not a safe session name, or names no session of the home is refused lit_in_not_a_session naming which, never read as any session. Rejected: making lit_in required (every lantern lit before it would become the wrong shape, skipped by recall by note and refused by recall by point); refusing a lantern with no lit_in by name (every lantern lit before it would become unforkable, retiring ADR-017's older-record rule); reading a null lit_in as an absent one (a silent fallback to the holder rule); the fork reading the full LanternData (the older records without lit_at would stop being forkable); and rewriting earlier lanterns to carry it (P1).",
+      "quote": "",
+      "consequences": [
+        "HOME-014 adds the field to LanternData, the light act, its report and recall's rows, switches the fork to the typed view, and documents lit_in in docs/design/home/RECORD.md.",
+        "ADR-014's lantern shape is extended by one optional key, not replaced: a lantern lit before HOME-014 is read as it is and stays forkable.",
+        "ADR-017's older-record rule stays in force for a lantern with no lit_in; retiring it is a separate decision.",
+        "The fork's fixtures light with the light act every lantern it can produce, and write by hand only the records it cannot: a lantern with no lit_in, a copy whose lit_in names another session, and a malformed lit_in, each named in its test as such.",
+        "Once lanterns are lit under it in a real home the shape is frozen; a change to lit_in's meaning is a new version alongside."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-021",
+      "title": "The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-26",
+      "decided_by": "The lead's rulings on the DIRECTORY-002 themes; recorded with DIRECTORY-002",
+      "context": "DIRECTORY-002 R3 asked for all seven HSL fields, button text and border radius of both Rauthy client themes in light and dark mode, but the estate colour tokens name only a dark foundation (ink, surface, raised, text, muted) and each product's accent. They name no light mode, no error colour, no radius, no emphasised text tier, no action colour, no text-on-accent and no per-mode icon, so filling every Rauthy field would mean inventing colours the design system never chose.",
+      "decision": "Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.",
+      "quote": "",
+      "consequences": [
+        "deploy/identity/rauthy-themes.json sets only the dark text, bg, bg_high and accent of each client; the light fields, the dark error and the radius stay as Rauthy holds them.",
+        "deploy/identity/theme-map.md names the eight gaps, and nothing reads a gap.",
+        "A design-system card that names tokens for the gaps fills them; until then each keeps Rauthy's own default.",
+        "Readable contrast is measured, not asserted: WCAG 2.1 AA over named pairs, a gap field measured at Rauthy's own default; a gap field whose default fails over ink stays a gap and stops the row by the pair's name, and the fix is a token the design-system card names."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-022",
+      "title": "The home translates a session imported from Claude Code into a Codex rollout: one admitted pair, a fork with a loss account and a side leaf",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The lead's answers to the translation survey; recorded with HOME-009",
+      "context": "The home design listed harnesses other than Claude Code as a non-goal, and ADR-012 rejected a transcript converter per harness for the launch template. Roadmap stage 4b asks for the first translation as one named pair with its own account. Codex's own importer of Claude Code files is a compaction and not a copy: it drops thinking, sidechains and meta records and clips tool calls to 2,000 and tool results to 4,000 characters. Without a ruling the card would contradict its own cluster, and the fork would either repeat the importer's losses or claim to be the session it came from.",
+      "decision": "Admit exactly one derived harness pair, Claude Code to Codex, as stage 4b, rendered by the home as a fork of the session, the same act the Claude Code render performs, for a second harness. Every text part, tool call and tool result is carried whole as Codex's own items; readable thinking is carried as text and opaque blocks are dropped (P3); a base64 image is carried as Codex's input_image item and an image of any other source is listed lost, never fetched; a sidechain is carried as marked text under the turn that spawned it; a branch summary or custom message on the context path, each of which feeds the model's context, is carried as marked developer text under its own marker, as a compaction is; a child forked at a user message carries that message's text after the walked history as the thread's next user prompt, the continuation's first prompt, read through seed_of from the parent session's file, the one file read beyond the session's own, each of its parts that is not text listed lost; entries a compaction leaves off the context path are listed lost naming the compaction; a message of any other role and a tool call or result with no id, name or call id are listed lost, never given an empty default; harness events, lanterns and other lys entries, render records included, are listed lost. The in-band marker names the source session id, the source head hash and the Codex version, the same three the account carries, and no template hash, since no launch template takes part. A JSON loss account beside the rollout lists kept, changed (with before and after kinds and the fields in how) and lost (with a reason) by entry id and the hash of each part as the home entry holds it; a tool_use's caller field, dropped at import, is recorded nowhere yet and is a later card's to record; and a lys.translation custom entry beside the context path records each translation. The thread id is record_uuid of the session head, so the Codex thread is a fork and never the same session, and its durable link back is the account and the side leaf, not the in-band marker. The recording and the resume run in a scratch Codex home outside the repository, logged in with the proof account, a Codex login named by its role, by the card's lead seat and never by the chain's builder, never the live one, and no credential file is copied. Rejected: adopting, wrapping or calling Codex's importer; listing sidechains as lost; writing into the live Codex home; copying an auth file into a scratch home; treating the Codex thread as the same session; recording the translation as a seventh lys.harness_event kind; a template hash in the marker; reading each part's stored block, with a refusal when it is not stored.",
+      "quote": "",
+      "consequences": [
+        "The home design's non-goal on other harnesses admits this one measured pair and no other; Chat Completions or Responses translation, Pi and every third harness stay out of scope.",
+        "ADR-012's rejected per-harness transcript converter stays confined to the launch template, which never converts a transcript; launching Codex through a template is that template's next version.",
+        "The translation never moves the head and never writes a byte of the Claude Code render, so the Claude Code render of a translated session is unchanged by hash.",
+        "The account and the report carry ids, hashes, kinds, field names and counts only (P7, CN3).",
+        "Each head translates to a new Codex thread; a Codex continuation never comes home."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-023",
+      "title": "A Codex rollout's shape is a per-version measurement, and the translation refuses any Codex version but the one measured",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-26",
+      "decided_by": "The words of the translation card; recorded with HOME-009",
+      "context": "Codex's rollout format changes between releases: rollouts written on the proving machine by 0.155 and 0.156.0 carry line-level ordinal keys and item metadata that the June source checkout does not, and a thread Codex cannot read resumes silently wrong or not at all. P6 already makes a resume path a per-harness, per-version measurement.",
+      "decision": "The translation writes the shape measured from rollouts Codex 0.156.0 wrote, confirmed by a recorded 0.156.0 fixture and a resume on 0.156.0, and refuses any other --codex-version by name, telling the caller to render for 0.156.0 or card a measurement of the new version. Rejected: assuming the shape from Codex's source checkout, accepting a version by prefix, and rendering an unmeasured version on a best-effort basis.",
+      "quote": "",
+      "consequences": [
+        "Each new Codex version is its own measurement card before the translation accepts it.",
+        "The time zone that names a rollout's directory and file is an explicit input, and an unnamed or unknown zone is refused with the words set TZ to an IANA name."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-058",
+      "title": "A handover is a rule-less lys.inherited entry and the letter's turn copied whole into a new successor home, its inheritance read from its first entry",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the handover survey; recorded with HOME-015",
+      "context": "HOME-001 R12 describes the handover, and the tree contradicts three of its sentences. An imported Claude Code turn holds its signed thinking and its text as separate entries, so one entry id cannot carry both. Pi's session_info carries only a name, and CN4 forbids lys data outside custom.data, so session_info cannot hold an inherited field. The canon's Inherited type requires a rule, a letter is not a rule, and the canon reader never reads an example's data today, so making the rule optional would let a rule-less example into the canon unrefused.",
+      "decision": "The letter is one or more entry ids, a run of assistant message entries standing next to each other on the outgoing session's path, in path order. Each entry is copied whole, keeping its id, its timestamp and its message, with only its parent link rewritten to chain onto the successor, and from_entries lists every id in that order. The successor is a new home directory, absent or empty, holding one new session with a fresh id, the outgoing header's cwd and no parentSession. Its first entry is a lys.inherited entry with no rule, then the copied entries, then a session_info whose name is `inherited from <outgoing session id>`, and no field is added to Pi's grammar. The first entry is what says the successor's first memory is inherited; the handover's own report reads it from there and prints inherited true, and the render report and its count of canon examples are unchanged. The canon loader newly refuses by name a canon example whose lys.inherited entry has no rule; a lys.inherited entry in a session of a home is read without that check. Rejected: merging the run into one message (composing the letter), copying one entry (half a letter), a session_info flag (breaks CN4), writing into the outgoing home, and setting parentSession, which ADR-017 keeps for a fork's ancestry.",
+      "quote": "",
+      "consequences": [
+        "A handover writes nothing when it refuses, and the outgoing home is only read. Every refusal is taken before the successor directory is created or written.",
+        "A letter entry that is not an assistant message, a run that is not contiguous on the path, an entry whose message carries provider `authored`, and a run with no thinking block are each refused by name, naming the entry. A successor path that holds anything is refused by name.",
+        "Inherited.rule is optional in the type and skipped when absent, so a canon entry with a rule serialises to the same bytes as before; canon add and a render with --canon refuse a canon holding a rule-less example.",
+        "Launching a successor from its handover through the launch template is a later unit; HOME-002's template gains no slot here (ADR-012)."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-063",
+      "title": "lys enforces its code rules with ast-grep, recognising test code by structure the file carries",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "The lys gate had no ast-grep leg, so its rules against unwrap, expect and panic outside tests, against lint bypasses, against dropped Results and against logic in mod.rs held only where clippy overlapped them. Cambium's rule set carries no unwrap rule and forbids every #[allow], while lys CLAUDE.md sanctioned a per-module #![allow] opt-out for tests. An unwrap rule has to tell test code from library code, and 224 calls at 4dd1c33 sat in fixture.rs files and in helper fns of *_tests.rs files, none of which carried an in-file test marker.",
+      "decision": "Carry Cambium's mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes, and add lys's own no-unwrap-expect-panic-outside-tests. That rule treats as test code a file whose first item is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, and a path under tests/. Every *_tests.rs file, both fixture.rs files, every integration test root and both tests/harness/mod.rs files gain #![cfg(test)] as their first line. The per-module #![allow] opt-outs are replaced by clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests. Every existing hit is fixed at its cause in the same card, so the leg is green when it lands. The leg `ast-grep scan --config sgconfig.yml` runs in docs/design/project.json, .land/gates.sh and CI. Rejected: an exemption list of file names; rewriting the calls in test files; narrowing no-lint-bypass-attributes to spare the test opt-outs; carrying only the rules that were clean at the time.",
+      "quote": "",
+      "consequences": [
+        "A new sibling *_tests.rs, fixture file or integration test root begins with #![cfg(test)], or the unwrap rule reports its helper calls and clippy refuses them.",
+        "No #[allow] remains in the tree; an #[allow] outside tests is fixed at its cause, and one that cannot be is brought to the lead as a question with its line.",
+        "CLAUDE.md and Cargo.toml name clippy.toml in place of the per-module #![allow].",
+        "Every carried rule is at severity error, and the leg fails the gate on any hit.",
+        "The leg needs a gate venue that declares tool:ast-grep."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-064",
+      "title": "A rule that cannot fire on the lys tree is not carried",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "Cambium's set includes no-std-mutex-in-async and two door-timer rules. At 4dd1c33 lys has no async fn, no tokio and no std Mutex, and the door-timer rules are limited to Cambium door-handler paths. Rules that cannot fire would report zero hits forever and look like cover, and a control that never fires cannot be told from one that passed.",
+      "decision": "no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers are recorded as not carried, with that finding. The card that lands the first async code in lys carries no-std-mutex-in-async with it, and its brief names this decision. Rejected: carrying all six of Cambium's rules because the words said the same rule set.",
+      "quote": "",
+      "consequences": [
+        "The first card to add an async fn or tokio to lys adds rules/ast-grep/no-std-mutex-in-async.yml in the same card and cites ADR-064.",
+        "The door-timer rules stay out of lys while it has no door handlers."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-065",
+      "title": "The hand-written lys-core documents are kept as *-PRE-METHOD.md, not replaced by the method's render",
+      "status": "decided",
+      "scope": "lys-core",
+      "date": "2026-09-27",
+      "decided_by": "Archie, lead for lys, in the rulings to the ast-grep card's runs 04213a71, 0d44242f and 6747ce61; recorded with LYSCORE-003",
+      "context": "docs/design/lys-core held a hand-written DESIGN.md, CHECKLIST.md and USER-STORIES.md from before the design method. Once the cluster gains a design.json, the method renders markdown under those same names and the design gate compares it byte for byte, so the render would overwrite the earlier design.",
+      "decision": "Before this cluster is rendered, the three documents are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and the method's render takes the old names. The live citations of the old paths are re-pointed to the new ones. LYSCORE-003's card is the one owner of docs/design/lys-core. Rejected: overwriting the documents with the render, and deleting them.",
+      "quote": "",
+      "consequences": [
+        "The pre-method documents are read, never edited.",
+        "Other cards write nothing under docs/design/lys-core."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-066",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings on the given-statement card; the canonical form chosen by HOME-016's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1's --cert checks it against a certificate.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-072",
+      "title": "The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key",
+      "status": "proposed",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's rulings on the given-statement card; the canonical form chosen by HOME-018's author and proposed with that brief",
+      "context": "CONFORMANCE row 6.5 asks that what an agent was given be a signed statement checked with lys verify --attestation. The lys.given entry records the hashes of the documents a session was given and no hash of itself, lys-core's attestation signs SHA-256 of a payload, and a signed form is frozen from its first signature, so the bytes signed have to be named so a stranger can rebuild them with standard tooling.",
+      "decision": "The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.",
+      "quote": "",
+      "consequences": [
+        "The RFC 8785 form of lys.given's data is a wire contract from the first signature; changing it means a new statement type alongside, never a mutation.",
+        "A render with no key writes the lys.given entry as HOME-003 records it and no statement, and says unsigned.",
+        "The statement is checked with the unchanged lys verify; which key signed is checked by comparing its signer public key with an expected key until row 6.1's --cert checks it against a certificate.",
+        "The start statement and the role-move statement are later statements over the START launch record and the ROLES version record, written when those records land."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-038",
+      "title": "The gate's test leg runs every test binary; it never stops at the first failure",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-27",
+      "decided_by": "The gate test-leg card's words and its lead's answers; recorded with LYSGATE-001",
+      "context": "The gate's test leg runs cargo test over the workspace with all features and without --no-fail-fast, so it stops at the first failing test binary: a run that fails in one crate reports nothing about the binaries and crates after it, and a gate can go red for one reason while hiding others. project.json's legs are copied verbatim into every new cluster's gate, so the fail-fast form spreads with each cluster.",
+      "decision": "Every declaration of the gate's test leg runs `cargo test --workspace --all-features --no-fail-fast`: project.json, every cluster design.json gate, .land/gates.sh and CLAUDE.md's 'Gates before any commit' block; CI's test step gains the same one flag and nothing else. Rejected: keeping cargo's default fail-fast run, which is shorter on a red round but reports only the first failing binary.",
+      "quote": "",
+      "consequences": [
+        "A new cluster's gate copied from project.json carries --no-fail-fast.",
+        "A red test leg runs every test binary before it exits, so a red round holds the build venue's battery lock longer than a fail-fast run did.",
+        "The leg still exits non-zero when any test fails; no timeout is raised and no test is split to compensate.",
+        "--no-fail-fast does not continue past a compile error, so evidence that every binary ran comes from a planted test that compiles and fails."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-031",
+      "title": "The context record's cross-kind order is the order the harness's request gives",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's ruling on the lys.given order card; recorded with HOME-011",
+      "context": "HOME-003 R2 fixed lys.given's documents in the order Claude Code reads the files: the user CLAUDE.md, the appended instructions, the MCP configuration, the CLAUDE.md chain, the memory index. PROOF-GIVEN then measured on Claude Code 2.1.283 that the request the harness sends differs in one place: the appended instructions sit in the system array, ahead of the first user message that carries every CLAUDE.md-family file and the memory index. The record held two orders, one in code and one in the proof, with no rule saying which the record follows, and the MCP configuration contributed no tool to the measured request, so its place there was unmeasured.",
+      "decision": "The context record's documents follow the order the harness's request gives wherever it and the read order differ: appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index. The MCP configuration sits straight after the appended instructions, both harness-side inputs ahead of the first message, until a card measures a real server's tools position. The within-directory order (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md) is unchanged. Entries already written under the old order stand as written and no data member is added to mark the order; the documents name the old order as superseded by the commit that lands HOME-011 and by that commit's date. Rejected: keeping the read order, since the request is what reached the model; rewriting or migrating entries already written, since the record is append-only; adding a data member or relying on harness_version to mark the order, since the old order was written under 2.1.283, the new one is written under the version the re-measurement ran on, which may be the same, and the harness version does not tell the two orders apart.",
+      "quote": "",
+      "consequences": [
+        "resolve_given lists appended_instructions and mcp_config ahead of user_claude_md, and the lys.given data shape of ADR-013 is unchanged.",
+        "RECORD.md states the one rule and names the old order as superseded by the commit that lands HOME-011 and its date; a reader tells an entry's order by comparing its recorded time with that date, and never by its harness_version.",
+        "A later harness card records its documents in the order its harness's request gives, and a harness-side input the request carries no trace of takes its place from the read order until it is measured.",
+        "A card that measures a real MCP server's tools position fixes mcp_config's place by that measurement."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-073",
+      "title": "A home moves as one fast-forward git ref pushed to a path on this machine, tracking exactly its record stores",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey; recorded with HOME-019",
+      "context": "Stage 3 of the context roadmap moves a home by a pushed ref the target fetches, never a hand copy, with encryption before any bytes leave the machine as its precondition. A home holds, beside its record, lock files and temporaries that must never travel; its blocks hold imported tool results verbatim and a template's env and mcp slots are free strings, so no scan can promise a home holds no secret; and git's own settings can change bytes on the way in or out.",
+      "decision": "A home directory is a git repository whose tracked files are exactly each session's file, index and head, each block and each template, enumerated by name and never by pattern; the first ship initialises it. ship holds every session's lock through its check and snapshot, commits that set, and pushes it without force as the one ref refs/lys/home to a bare repository at a path on this machine, creating it when the path does not exist; a remote ref the new commit does not descend from is refused as ref_diverged. Every other remote, ssh to any host, https, git or file URLs and hosted services, is refused as remote_not_local until stage 3's encryption exists. git runs as the binary with a pinned environment and no filters. Rejected: an allow-list of estate ssh hosts, scanning the home for secrets, a pure-Rust git crate, and force-pushing or overwriting a ref.",
+      "quote": "",
+      "consequences": [
+        "No byte of a home leaves this machine through ship until the secrets step's encryption lands; the second-machine block fetches this ref after that.",
+        "A home with no session, a stale or missing index or head, a session a live owner holds, a repository tracking other files and a remote path that is not a bare repository are each refused by name before anything is pushed.",
+        "The gate machine needs git on PATH."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
+    },
+    {
+      "id": "ADR-074",
+      "title": "An arrival is a seventh lys.harness_event kind, one per arriving session, hung beside the head",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-27",
+      "decided_by": "The lead's answers to the move survey, and the lead's answer that fetch commits the arrival; recorded with HOME-019",
+      "context": "Stage 3 gives the target a distinct execution id with its ancestry recorded, and the identity documents describe an execution per session or fork. The source is never written, so the ancestry can only be written on the target side, and the arrival is a fact about the record, not a turn.",
+      "decision": "fetch appends to each arriving session one lys.harness_event of kind arrival whose detail carries the source commit, the remote, the ref and a fresh execution id for that session's continuation. It hangs beside the head through append_beside, as template_render does (ADR-012), so the head file, the head hash and the next render's session_head on the target are the source's. fetch then commits the appended entries as one commit whose parent is the fetched commit, naming the source commit, the remote and the ref, so the target's git status is clean and a later ship from it carries the arrival onward; a failed append or commit removes what fetch created. There is no home-level id file and no block is stored for it. Rejected: an arrival that moves the head, arrival lines left uncommitted until the target's next ship, one execution id per home, and a block for the arrival's data.",
+      "quote": "",
+      "consequences": [
+        "A target's head file is byte-identical to the source's after fetch, and a render of the target records the source's session_head.",
+        "A remote whose arrival data would pass the 512-byte cap is refused before fetch writes anything.",
+        "The target's HEAD is one arrival commit on the fetched commit, and a ship from the target carries the arrival to the next home."
       ],
       "supersedes": [],
       "superseded_by": ""

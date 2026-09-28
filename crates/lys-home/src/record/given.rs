@@ -11,9 +11,20 @@
 //! directory with its source; the documents in the measured order, each as
 //! kind, path, byte length and SHA-256; and the names of the environment
 //! variables the template set, sorted. No document content and no variable value is
-//! carried, nothing is signed or encrypted, and no field is added outside
-//! `custom.data`, so the shape can be signed over and encrypted at rest
-//! later without changing what is recorded.
+//! carried, nothing is encrypted, and no field is added outside
+//! `custom.data`. The entry itself is never signed: a render given a key
+//! signs the record's canonical bytes as a separate `lys.given_statement`
+//! (see [`crate::record::given_statement`]).
+//!
+//! The canonical bytes are RFC 8785 applied to the data: `serde_json`'s map
+//! is ordered by key (the `preserve_order` feature is off in this
+//! workspace), its compact writer puts no whitespace between tokens, escapes
+//! only the quotation mark, the reverse solidus and control characters (the
+//! five short forms, otherwise `\u00` and two lowercase hex digits), and
+//! writes every other character as UTF-8. The data holds only strings,
+//! unsigned integers, arrays and objects whose keys are fixed ASCII names,
+//! so key order by byte equals RFC 8785's order by UTF-16 unit. A literal
+//! vector in the tests pins these bytes.
 //!
 //! The entry is appended as the child of the render event it follows. That
 //! event stands beside the context path, so the given entry stands beside it
@@ -28,6 +39,7 @@ use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
 use crate::harness::claude_code::given::{ConfigDir, GivenDocument, MEASURED_VERSION, Resolution};
 use crate::record::Session;
+use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_GIVEN, Entry, EntryBody};
 
 /// The kinds a given entry resolves, in the order the record names them.
@@ -61,6 +73,25 @@ impl Kinds {
             resolved: RESOLVED_KINDS.iter().map(|k| (*k).to_owned()).collect(),
             unlisted: UNLISTED_KINDS.iter().map(|k| (*k).to_owned()).collect(),
         }
+    }
+}
+
+/// The RFC 8785 bytes of a given record's data, made only from a record, so
+/// nothing else can be handed to a signer in their place.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CanonicalGiven(Vec<u8>);
+
+impl CanonicalGiven {
+    /// The bytes, with no trailing newline.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// The given hash: the SHA-256 of the bytes.
+    #[must_use]
+    pub fn hash(&self) -> Hash {
+        Hash::of(&self.0)
     }
 }
 
@@ -103,6 +134,21 @@ impl GivenRecord {
             context: "a given record could not be serialised",
             source,
         })
+    }
+
+    /// The canonical bytes of the data, the payload a given statement signs.
+    pub fn canonical_bytes(&self) -> Result<CanonicalGiven, HomeError> {
+        serde_json::to_vec(&self.data()?)
+            .map(CanonicalGiven)
+            .map_err(|source| HomeError::Json {
+                context: "a given record's canonical bytes could not be written",
+                source,
+            })
+    }
+
+    /// The given hash: the SHA-256 of the canonical bytes.
+    pub fn given_hash(&self) -> Result<Hash, HomeError> {
+        Ok(self.canonical_bytes()?.hash())
     }
 
     /// Append the record as a `lys.given` entry under `parent`, the render

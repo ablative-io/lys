@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the resolution: the measured order, absent positions omitted,
 //! one directory's three files in the request's order, the config directory
 //! from the template or from HOME, the user CLAUDE.md listed once, the slug
@@ -26,7 +27,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .fold(String::new(), |mut s, b| {
-            let _ = write!(s, "{b:02x}");
+            write!(s, "{b:02x}").expect("writing to a String cannot fail");
             s
         })
 }
@@ -147,18 +148,23 @@ fn the_measured_order_appended_mcp_chain_memory_with_relative_and_absolute_paths
 }
 
 #[test]
-fn a_config_claude_md_is_listed_first_as_user_claude_md() -> Outcome {
+fn a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config() -> Outcome {
     let dir = tempfile::tempdir()?;
     let (w, c, o) = fixture(dir.path())?;
     put(&c.join("CLAUDE.md"), b"user instructions\n")?;
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     assert_eq!(resolution.documents.len(), 5);
-    assert_eq!(resolution.documents[0].kind, DocumentKind::UserClaudeMd);
-    assert_eq!(resolution.documents[0].path, c.join("CLAUDE.md"));
     assert_eq!(
-        resolution.documents[1].kind,
-        DocumentKind::AppendedInstructions
+        kinds(&resolution.documents),
+        [
+            DocumentKind::AppendedInstructions,
+            DocumentKind::McpConfig,
+            DocumentKind::UserClaudeMd,
+            DocumentKind::ClaudeMdChain,
+            DocumentKind::MemoryIndex,
+        ]
     );
+    assert_eq!(resolution.documents[2].path, c.join("CLAUDE.md"));
     Ok(())
 }
 
@@ -315,8 +321,7 @@ fn a_config_dir_that_is_not_absolute_is_refused_naming_the_variable_and_its_shap
 }
 
 #[test]
-fn home_dot_claude_claude_md_is_listed_once_first_as_the_user_file_when_home_is_the_config()
--> Outcome {
+fn home_dot_claude_claude_md_is_listed_once_as_the_user_file_when_home_is_the_config() -> Outcome {
     let dir = tempfile::tempdir()?;
     let h = dir.path().join("h");
     let w = h.join("w");

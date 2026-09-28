@@ -1,7 +1,9 @@
+#![cfg(test)]
 //! Gates on the lys.given entry: read back equal, the data's exact keys, the
 //! config directory's two sources, the fixed kinds, names and never values,
 //! the entry line's exact top-level keys, parented on the render event with
-//! the head unmoved, and the refusals by name.
+//! the head unmoved, the refusals by name, and the canonical bytes and given
+//! hash pinned by a literal vector.
 
 use std::path::PathBuf;
 
@@ -17,7 +19,7 @@ use crate::record::{Home, Session};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
-fn resolution(source: ConfigSource) -> Resolution {
+pub(crate) fn resolution(source: ConfigSource) -> Resolution {
     let path = match source {
         ConfigSource::Template => PathBuf::from("/c"),
         ConfigSource::Home => PathBuf::from("/h/.claude"),
@@ -43,7 +45,9 @@ fn resolution(source: ConfigSource) -> Resolution {
 
 /// A session with one message, a render-shaped event beside the head, and
 /// the head still on the message; returns the session and the event's id.
-fn session_with_a_render_event(dir: &std::path::Path) -> Result<(Session, String), HomeError> {
+pub(crate) fn session_with_a_render_event(
+    dir: &std::path::Path,
+) -> Result<(Session, String), HomeError> {
     let home = Home::open(dir.join("home"))?;
     let mut session = home.create_session("s1", "/w", None)?;
     session.append(EntryBody::Message {
@@ -209,5 +213,62 @@ fn an_entry_of_another_custom_type_and_a_parent_not_on_record_are_refused_by_nam
         Err(HomeError::UnknownParent { parent, .. }) if parent == "absent"
     ));
     assert_eq!(session.customs_everywhere(CUSTOM_GIVEN)?.len(), 0);
+    Ok(())
+}
+
+/// The RFC 8785 vector: keys ordered, no whitespace, a tab escaped in its
+/// short form, a non-ASCII character as its UTF-8 bytes, no newline.
+const CANONICAL: &str = concat!(
+    r#"{"config_dir":{"path":"/c","source":"template"},"#,
+    r#""documents":[{"kind":"claude_md_chain","length":3,"path":"/w/é\tx.md","#,
+    r#""sha256":"0000000000000000000000000000000000000000000000000000000000000000"}],"#,
+    r#""environment":["A"],"harness":"claude-code","harness_version":"2.1.283","#,
+    r#""kinds":{"resolved":["claude_md_chain","user_claude_md","memory_index","#,
+    r#""appended_instructions","mcp_config","environment_names"],"#,
+    r#""unlisted":["claude_md_imports","claude_rules"]}}"#,
+);
+
+fn vector_record() -> GivenRecord {
+    GivenRecord {
+        harness: "claude-code".to_owned(),
+        harness_version: "2.1.283".to_owned(),
+        kinds: Kinds::measured(),
+        config_dir: ConfigDir {
+            path: PathBuf::from("/c"),
+            source: ConfigSource::Template,
+        },
+        documents: vec![GivenDocument {
+            kind: DocumentKind::ClaudeMdChain,
+            path: PathBuf::from("/w/\u{e9}\tx.md"),
+            length: 3,
+            sha256: "0".repeat(64),
+        }],
+        environment: vec!["A".to_owned()],
+    }
+}
+
+#[test]
+fn the_canonical_bytes_are_the_rfc_8785_vector_and_the_given_hash_its_sha256() -> Outcome {
+    let canonical = vector_record().canonical_bytes()?;
+    assert_eq!(CANONICAL.len(), 447);
+    assert_eq!(canonical.as_bytes(), CANONICAL.as_bytes());
+    let expected = "052eda2d4a3284437ed550cc26e30d4faa5332f9d9444210d3c5b08e12bcc1c8";
+    assert_eq!(canonical.hash().as_str(), expected);
+    assert_eq!(vector_record().given_hash()?.as_str(), expected);
+    Ok(())
+}
+
+#[test]
+fn a_record_read_back_from_its_entry_gives_the_same_canonical_bytes() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let (mut session, event) = session_with_a_render_event(dir.path())?;
+    let record = vector_record();
+    record.append_under(&mut session, &event)?;
+    let entries = session.customs_everywhere(CUSTOM_GIVEN)?;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(
+        GivenRecord::from_entry(&entries[0])?.canonical_bytes()?,
+        record.canonical_bytes()?
+    );
     Ok(())
 }

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on `lys/consistency-receipt/v1`.
 //!
 //! # The re-labelling attack is constructed here, not argued

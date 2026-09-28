@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on creating and opening an anchor.
 //!
 //! # Where the second party comes from
@@ -127,7 +127,9 @@ fn opening_a_log_with_no_genesis_leaf_is_refused() {
     // The one difference: the store was created and nothing was appended.
     FileLeafStore::create(refused.path(), ORIGIN).unwrap();
     match reopen(refused.path()) {
-        Err(AnchorError::NoGenesisLeaf { origin }) => assert_eq!(origin, ORIGIN),
+        Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf { origin })) => {
+            assert_eq!(origin, ORIGIN);
+        }
         other => panic!("expected NoGenesisLeaf for an extent-0 log, got {other:?}"),
     }
 }
@@ -241,7 +243,7 @@ fn creating_genesis_over_a_log_that_already_has_leaves_is_refused() {
         AcceptAll,
         AnchorConfig::unconfigured(),
     ) {
-        Err(AnchorError::GenesisAlreadyWritten { origin, tree_size }) => {
+        Err(AnchorError::Genesis(GenesisError::GenesisAlreadyWritten { origin, tree_size })) => {
             assert_eq!(origin, ORIGIN);
             assert_eq!(tree_size, 1);
         }

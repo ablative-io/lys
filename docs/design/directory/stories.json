@@ -16,6 +16,14 @@
         {
           "id": "S5",
           "text": "As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email."
+        },
+        {
+          "id": "S22",
+          "text": "As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern."
+        },
+        {
+          "id": "S23",
+          "text": "As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has."
         }
       ]
     },
@@ -76,6 +84,34 @@
         {
           "id": "S12",
           "text": "As an authorised reviewer, I want to ask why this identity can act and who can reach a resource using the same current decision, without exposing records I may not inspect."
+        }
+      ]
+    },
+    {
+      "name": "Certificate verifier",
+      "role": "Checks an agent's certificate and its record against the certificate log without the issuer's cooperation",
+      "stories": [
+        {
+          "id": "S31",
+          "text": "As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word."
+        },
+        {
+          "id": "S32",
+          "text": "As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation."
+        },
+        {
+          "id": "S34",
+          "text": "As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live."
+        }
+      ]
+    },
+    {
+      "name": "Responsible person",
+      "role": "Relies on an agent's certificate staying ended once it is revoked",
+      "stories": [
+        {
+          "id": "S33",
+          "text": "As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back."
         }
       ]
     }

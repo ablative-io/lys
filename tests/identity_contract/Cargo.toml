@@ -1,0 +1,27 @@
+[package]
+name = "identity-contract"
+description = "The directory's contract tests: registration, signed events, admission, link audit and lifecycle."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+lys-core.workspace = true
+lys-identity.workspace = true
+lys-identity-server.workspace = true
+lys-log-store.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

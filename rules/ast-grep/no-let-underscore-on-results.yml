@@ -1,0 +1,8 @@
+id: no-let-underscore-on-results
+language: rust
+severity: error
+message: "`let _ =` discards a value; if it is a Result this swallows an error. Handle it, propagate it, or name why it is ignorable in a doc comment on a named binding."
+ignores:
+  - "vendor/**"
+rule:
+  pattern: "let _ = $EXPR;"

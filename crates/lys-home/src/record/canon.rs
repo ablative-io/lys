@@ -12,20 +12,33 @@
 //!
 //! The canon is read and appended as a plain file: it has no index or head
 //! beside it, since it lives in a repository and is small. An add holds an
-//! exclusive lock on the canon file itself for the whole of its read, check
-//! and append, so two adds cannot read the same leaf and interleave; a second
-//! adder is refused by name. Curation is a person's act: the tool copies what
+//! exclusive lock for the whole of its read, check and append, so two adds
+//! cannot read the same leaf and interleave; a second adder is refused by
+//! name, with the holding process when the lock names it. The lock is the
+//! sessions' process record lock (`SessionLock`) on `<canon file>.lock`
+//! beside the canon (`canon.jsonl.lock`), never on the canon file itself: a
+//! lock on the canon's own descriptor would be released by the read of the
+//! canon, and a `flock` there was carried by any child spawned while an add
+//! ran. The lock file is created by the first add, held only while an add
+//! runs, and left in place afterwards, since removing it could let two adders
+//! lock two different files; it is empty and safe to delete when no add is
+//! running. Curation is a person's act: the tool copies what
 //! it is told to and records who told it.
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_INHERITED, Entry, EntryBase, EntryBody, SessionHeader};
+use crate::record::lock::SessionLock;
 use crate::record::{PI_FORMAT_VERSION, Session, now};
+
+mod turns;
+
+pub use turns::{Role, parse_turns};
 
 /// The session id the canon file carries.
 pub const CANON_ID: &str = "canon";
@@ -54,8 +67,10 @@ pub struct Inherited {
     pub curated_at: String,
     /// Who told the tool to add it.
     pub curated_by: String,
-    /// The rule this example shows, stated short.
-    pub rule: String,
+    /// The rule this example shows, stated short. Every canon example has
+    /// one; a handover's entry in a session of a home has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
 }
 
 /// The canon as loaded: its header and every entry in file order.
@@ -128,7 +143,10 @@ pub fn create(path: &Path) -> Result<(), HomeError> {
 }
 
 /// Load the canon: the header, then every entry, each parent on record
-/// before its child and no id twice, as Pi's reader expects.
+/// before its child and no id twice, as Pi's reader expects. A
+/// `lys.inherited` entry whose data carries no `rule` is refused by name
+/// ([`HomeError::CanonExampleWithoutRule`]), so `canon add` and a render
+/// with a canon both refuse it before writing anything.
 pub fn load(path: &Path) -> Result<Canon, HomeError> {
     let text =
         std::fs::read_to_string(path).map_err(|e| HomeError::io("reading the canon", path, e))?;
@@ -175,10 +193,26 @@ pub fn load(path: &Path) -> Result<Canon, HomeError> {
                 reason: "its parent is not on record before it".to_owned(),
             });
         }
+        // Every lys.inherited entry in the canon file is a canon example, so
+        // each must state its rule.
+        if entry.is_custom(CUSTOM_INHERITED) && !states_rule(&entry) {
+            return Err(HomeError::CanonExampleWithoutRule {
+                id: entry.id().to_owned(),
+            });
+        }
         seen.insert(entry.id().to_owned());
         entries.push(entry);
     }
     Ok(Canon { header, entries })
+}
+
+/// Whether a `lys.inherited` entry's data carries a `rule` that is not null.
+fn states_rule(entry: &Entry) -> bool {
+    matches!(
+        &entry.body,
+        EntryBody::Custom { data: Some(data), .. }
+            if data.get("rule").is_some_and(|rule| !rule.is_null())
+    )
 }
 
 /// Copy entries of a session into the canon, whole, after a `lys.inherited`
@@ -228,7 +262,7 @@ pub fn add_from(
         model,
         curated_at: now(),
         curated_by: by.to_owned(),
-        rule: rule.to_owned(),
+        rule: Some(rule.to_owned()),
     };
     append_example(canon_path, &inherited, copied)
 }
@@ -277,63 +311,25 @@ pub fn add_authored(
         model: AUTHORED.to_owned(),
         curated_at: now(),
         curated_by: by.to_owned(),
-        rule: rule.to_owned(),
+        rule: Some(rule.to_owned()),
     };
     append_example(canon_path, &inherited, entries)
 }
 
-/// A turn's role.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Role {
-    /// The person's turn.
-    User,
-    /// The assistant's turn.
-    Assistant,
+/// The lock file beside a canon: the canon file's name with `.lock` added.
+pub(crate) fn lock_path(canon_path: &Path) -> PathBuf {
+    let mut name = canon_path
+        .file_name()
+        .map(std::ffi::OsStr::to_os_string)
+        .unwrap_or_default();
+    name.push(".lock");
+    canon_path.with_file_name(name)
 }
 
-/// Parse a turns file: `user: text` or `assistant: text` per line, blank
-/// lines skipped. A line that names another role, has no role, or holds a
-/// thinking block is refused by line number: thinking is never authored.
-pub fn parse_turns(path: &Path) -> Result<Vec<(Role, String)>, HomeError> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| HomeError::io("reading the turns file", path, e))?;
-    let mut out = Vec::new();
-    for (n, line) in text.lines().enumerate() {
-        let line = line.trim_end();
-        if line.is_empty() {
-            continue;
-        }
-        let malformed = |what: &'static str, reason: &str| HomeError::Malformed {
-            path: path.to_path_buf(),
-            line: n + 1,
-            what,
-            reason: reason.to_owned(),
-        };
-        let (role, body) = line.split_once(": ").ok_or_else(|| {
-            malformed(
-                "turn (`user: text` or `assistant: text`)",
-                "no `role: ` prefix",
-            )
-        })?;
-        if body.contains("\"type\":\"thinking\"") || body.contains("\"type\": \"thinking\"") {
-            return Err(malformed("turn", "a thinking block is never authored"));
-        }
-        let role = match role {
-            "user" => Role::User,
-            "assistant" => Role::Assistant,
-            _ => return Err(malformed("turn", "role must be user or assistant")),
-        };
-        out.push((role, body.to_owned()));
-    }
-    if out.is_empty() {
-        return Err(HomeError::Malformed {
-            path: path.to_path_buf(),
-            line: 0,
-            what: "turns file",
-            reason: "no turns".to_owned(),
-        });
-    }
-    Ok(out)
+/// Take the canon's exclusive lock, or refuse by name when another adder
+/// holds it, naming the holding process when the lock does.
+pub(crate) fn hold(canon_path: &Path) -> Result<SessionLock, HomeError> {
+    SessionLock::take_at(&lock_path(canon_path), canon_path)
 }
 
 fn append_example(
@@ -341,23 +337,13 @@ fn append_example(
     inherited: &Inherited,
     mut entries: Vec<Entry>,
 ) -> Result<AddReport, HomeError> {
-    // One adder at a time: the canon file is held exclusively from before the
-    // read to after the sync, so no other add can read the same leaf.
+    // One adder at a time: the canon's lock is held from before the read to
+    // after the sync, so no other add can read the same leaf.
+    let held = hold(canon_path)?;
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(canon_path)
         .map_err(|e| HomeError::io("opening the canon", canon_path, e))?;
-    match file.try_lock() {
-        Ok(()) => {}
-        Err(std::fs::TryLockError::WouldBlock) => {
-            return Err(HomeError::SessionHeld {
-                path: canon_path.to_path_buf(),
-            });
-        }
-        Err(std::fs::TryLockError::Error(e)) => {
-            return Err(HomeError::io("locking the canon", canon_path, e));
-        }
-    }
     let canon = load(canon_path)?;
     let mut fresh = std::collections::HashSet::with_capacity(entries.len());
     for entry in &entries {
@@ -396,6 +382,8 @@ fn append_example(
     }
     file.sync_all()
         .map_err(|e| HomeError::io("syncing the canon", canon_path, e))?;
+    drop(file);
+    drop(held);
     Ok(AddReport {
         canon: canon_path.to_path_buf(),
         inherited_id: mark.base.id,

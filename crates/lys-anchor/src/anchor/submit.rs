@@ -76,7 +76,7 @@ use lys_core::receipt::{AnchorReceipt, sign_receipt};
 use lys_log_store::LeafStore;
 
 use crate::admission::{AdmissionPolicy, SubmitterContext};
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, ProofError};
 use crate::keys::InProcessSigner;
 use crate::wire::{Submission, SubmissionOutcome};
 
@@ -146,34 +146,36 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// - [`AnchorError::TreeTooSmallForReceipt`] if the log holds only its
+    /// - [`ProofError::TreeTooSmallForReceipt`] if the log holds only its
     ///   genesis leaf — see the [module docs](self).
-    /// - [`AnchorError::NoSuchLeaf`] if `leaf_index` is not in the log.
-    /// - [`AnchorError::Receipt`] if `lys-core` refuses to prove inclusion or
+    /// - [`ProofError::NoSuchLeaf`] if `leaf_index` is not in the log.
+    /// - [`ProofError::Receipt`] if `lys-core` refuses to prove inclusion or
     ///   to sign. Both are unreachable for an in-range index on a well-formed
     ///   anchor, and are propagated with their cause rather than assumed away.
-    /// - [`AnchorError::MalformedInclusionPath`] if the proof's byte length is
+    /// - [`ProofError::MalformedInclusionPath`] if the proof's byte length is
     ///   not a whole number of digests, which a tree cannot produce.
     pub fn receipt_for(&self, leaf_index: u64) -> AnchorResult<AnchorReceipt> {
         let tree_size = self.tree_size();
         if tree_size < 2 {
-            return Err(AnchorError::TreeTooSmallForReceipt {
+            return Err(AnchorError::Proof(ProofError::TreeTooSmallForReceipt {
                 origin: self.origin().to_string(),
                 tree_size,
-            });
+            }));
         }
         let Some(leaf) = self.log.leaf_bytes(leaf_index) else {
-            return Err(AnchorError::NoSuchLeaf {
+            return Err(AnchorError::Proof(ProofError::NoSuchLeaf {
                 origin: self.origin().to_string(),
                 leaf_index,
                 tree_size,
-            });
+            }));
         };
-        let receipt_error = |source| AnchorError::Receipt {
-            origin: self.origin().to_string(),
-            leaf_index,
-            tree_size,
-            source,
+        let receipt_error = |source| {
+            AnchorError::Proof(ProofError::Receipt {
+                origin: self.origin().to_string(),
+                leaf_index,
+                tree_size,
+                source,
+            })
         };
         let proof = self
             .log

@@ -43,9 +43,15 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
         env:
           LYS_REQUIRE_GO: "1"
+
+      - name: Install ast-grep
+        run: cargo install ast-grep --locked --version 0.44.1
+
+      - name: ast-grep rules (any hit fails the job)
+        run: ast-grep scan --config sgconfig.yml
 
   # Cryptographic dependencies carry real risk; audit them on every change.
   audit:

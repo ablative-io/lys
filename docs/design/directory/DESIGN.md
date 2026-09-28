@@ -42,6 +42,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
+- ADR-021 — The Rauthy client themes are dark only from the estate tokens, and every field the estate names no token for is a named gap — Both client themes are dark only. A Rauthy field takes an estate token only where the estate names the same role: the dark text takes text, bg takes ink, bg_high takes raised and accent takes the client's product accent. Every other field is a gap that keeps Rauthy's own default: light mode, the error colour, the radius, and the dark text_high, action, btn_text, theme_sun and theme_moon, eight in all, listed by name in deploy/identity/theme-map.md. Rejected: mapping text to muted, which would set the body of every page in the secondary colour; and choosing colours for the fields the estate names no token for.
 
 ## Goals
 
@@ -50,6 +51,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - Every decision still open for Tom is recorded as open and decided nowhere in this cluster.
 - The two live demonstrations to Tom, ID001_LINK_LIVE and ID001_DIRECTORY_LIVE, stay hold points a loop completion never replaces (CN6).
 - DIRECTORY-006 makes the grant/refusal journey enforceable and binds its acceptance to the reviewed mock-up, without rewriting the historical IDENTITY-001 record.
+- A revoked certificate fails verification against the certificate log while its history still verifies, with revocation an appended leaf and the live set folded from the log (DIRECTORY-013, ADR-039).
 
 ## Non-Goals
 
@@ -60,7 +62,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - The name of the identity service. OPEN for Tom. — The statement lists it as not decided (docs/design/identity/STATEMENT-2026-09-22.md:192); no crate or directory name selects it.
 - Which anchor the first agents pin to: our hosted anchor, a self-hosted one, or both. OPEN for Tom. — Lys leaves it as a product decision and so does the statement (docs/design/identity/STATEMENT-2026-09-22.md:193).
 - A nightly Rauthy base versus waiting for an upstream release carrying #1696 and #1728. OPEN for Tom. — Waffles' ruling of 15:36:25: if upstream has published no such release by the row 05 showing, Tom decides (docs/design/identity/briefs/IDENTITY-001.json:18; docs/design/identity/STATEMENT-2026-09-22.md:177); rows 02 to 05 run on v0.36.2 meanwhile.
-- Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production — Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working.
+- Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production. Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-013's certificate revocation fold and its history check. — Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working.
 - The examples in AGENT-PARITY-2026-09-23 (abilities with an assignment or project, seat provisioning within a budget, private and shared notes) — Tom gave them as not yet decided (docs/design/identity/AGENT-PARITY-2026-09-23.md:11-15); they are never turned into requirements.
 - A production Cambium auth cutover, and any upstream Rauthy contribution as a prerequisite — Revision 5 forbids both before scratch acceptance, review and Gypsy's coordinated install (docs/design/identity/briefs/IDENTITY-001.json:31).
 - A shared design-system package extracted for every product — Tom left it as a thing to look at, not a row (ADR-010).
@@ -86,10 +88,12 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `docs/design/directory/briefs/DIRECTORY-005.md` | rendered markdown | DIRECTORY-001 |
 | `Cargo.toml` | workspace manifest; gains the identity dependencies (DIRECTORY-002) and the directory crates (DIRECTORY-003) | DIRECTORY-002 |
 | `Cargo.lock` | lock file; follows Cargo.toml (DIRECTORY-002, DIRECTORY-003) | DIRECTORY-002 |
-| `crates/lys/Cargo.toml` | the CLI crate's manifest; gains the identity subcommand's dependencies | DIRECTORY-002 |
+| `crates/lys/Cargo.toml` | the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets | DIRECTORY-002 |
 | `crates/lys/src/main.rs` | the CLI entry; dispatches lys identity | DIRECTORY-002 |
 | `crates/lys/src/cli.rs` | the CLI arguments; gains the identity subcommand | DIRECTORY-002 |
 | `crates/lys/src/commands/error.rs` | the CLI error type; carries the identity errors | DIRECTORY-002 |
+| `.land/gates.sh` | the landing gate; gains the identity leg: container_runtime_missing when no runtime answers, then clippy and the test = false identity targets | DIRECTORY-002 |
+| `CLAUDE.md` | gates before any commit; gains one line naming both acts of the identity leg | DIRECTORY-002 |
 | `crates/lys/src/identity/mod.rs` | declarations and re-exports only | DIRECTORY-002 |
 | `crates/lys/src/identity/cli.rs` | identity subcommand argument declarations | DIRECTORY-002 |
 | `crates/lys/src/identity/config.rs` | typed deployment configuration and validation; no secret values in diagnostics | DIRECTORY-002 |
@@ -101,6 +105,11 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `crates/lys/src/identity/themes.rs` | reads the declared estate palette mapping and validates both client themes | DIRECTORY-002 |
 | `crates/lys/src/identity/health.rs` | named readiness checks for the declared services; SpiceDB readiness only | DIRECTORY-002 |
 | `crates/lys/src/identity/error.rs` | typed errors carrying operation, resource and path, never secret bytes | DIRECTORY-002 |
+| `crates/lys/src/identity/config_tests.rs` | unit tests of config.rs | DIRECTORY-002 |
+| `crates/lys/src/identity/credentials_tests.rs` | unit tests of credentials.rs, the Debug and Display redaction included | DIRECTORY-002 |
+| `crates/lys/src/identity/error_tests.rs` | unit tests of error.rs, the Debug and Display redaction included | DIRECTORY-002 |
+| `crates/lys/src/identity/prepare_tests.rs` | unit tests of prepare.rs, the private files' modes included | DIRECTORY-002 |
+| `crates/lys/src/identity/themes_tests.rs` | unit tests of themes.rs | DIRECTORY-002 |
 | `crates/lys/tests/identity_deploy.rs` | ID001_DEPLOY | DIRECTORY-002 |
 | `crates/lys/tests/identity_refusals.rs` | ID001_DEPLOY_REFUSAL | DIRECTORY-002 |
 | `crates/lys/tests/identity_theme.rs` | ID001_THEME | DIRECTORY-002 |
@@ -165,6 +174,26 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 | `surface/identity/src/generated/index.ts` | Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch | DIRECTORY-006 |
 | `docs/design/directory/briefs/DIRECTORY-008.json` | the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents | DIRECTORY-008 |
 | `docs/design/directory/briefs/DIRECTORY-008.md` | rendered markdown | DIRECTORY-008 |
+| `docs/design/directory/briefs/DIRECTORY-013.json` | certificate revocation as an appended leaf, the live set folded from the log, and the revoked certificate's history (DP26, ADR-039) | DIRECTORY-013 |
+| `docs/design/directory/briefs/DIRECTORY-013.md` | rendered markdown | DIRECTORY-013 |
+| `docs/design/identity/CERTIFICATE-REVOCATION.md` | the certificate revocation contract: leaf layouts, unit, signer, permanence, fold, N and tolerance, history, no-log forms, refusals | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/mod.rs` | declarations, re-exports and module docs only | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/leaf.rs` | the three certificate-log leaves and the revocation's signed bytes | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/error.rs` | the named revocation refusals, never carrying key material | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/fold.rs` | the live set folded from a LeafStore to its extent; reads only | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/append.rs` | issuance, revocation and attestation-entry leaves appended through Log::append | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/verify.rs` | revocation-aware certificate verification with N and the tolerance as inputs | DIRECTORY-013 |
+| `crates/lys-identity/src/revocation/history.rs` | an attestation by a certificate's key judged against the revocation leaf's position | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_leaf.rs` | leaf encoding, malformed refusals and the revocation signer | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_fold.rs` | the fold's live set, refusals and read-only pass | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_append.rs` | append at the extent, reopen and write failure | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_verify.rs` | revoked, stale, unreadable, not-in-log, expired and no-log legs | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_history.rs` | attestations before and after revocation, proofs and issuance record | DIRECTORY-013 |
+| `crates/lys-identity/tests/revocation_support/mod.rs` | test authorities, certificates and file-backed logs; generated keys only | DIRECTORY-013 |
+| `crates/lys/src/cli_tests.rs` | the CLI's help tests; DIRECTORY-013 adds the no-log revocation sentence test | DIRECTORY-013 |
+| `crates/lys-identity/tests/agent_without_session.rs` | the proof that an agent registered with no session is listed under its responsible person and read with no session credential (R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.json` | the enduring agent kept apart from each session's credential: road adjustment 3 written into the directory contract, and the no-session agent proved (R1, R2) | DIRECTORY-011 |
+| `docs/design/directory/briefs/DIRECTORY-011.md` | rendered markdown | DIRECTORY-011 |
 
 ## Inventory
 
@@ -179,10 +208,11 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - `vendor/rauthy` — the maintained Rauthy fork (ADR-009), the git submodule pinned at dd61ac3c84d6b238108dc8438b53043b5177a662, the upstream v0.36.2 commit the ablative branch was created from; DIRECTORY-004 moves the pin (structure row); read here, never changed by a document row
 - `crates/lys` — the lys CLI crate: Cargo.toml, src/main.rs, src/cli.rs and src/commands/ (attest, ca, key, log, inspect, files); DIRECTORY-002 adds src/identity/ and the identity subcommand to it (structure rows)
 - `docs/design/decisions.json` — the project decision ledger, ADR-001 to ADR-018 at main, holding the decisions this cluster cites (ADR-003, ADR-004, ADR-005, ADR-007 to ADR-011); DIRECTORY-001 recorded that it gained the identity decisions (structure row); read here, never changed by a document row
+ADR-039 was added to the ledger by DIRECTORY-013, a brief recording a decision through the ledger and not a document row.
 
 ## Constraints
 
-- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.
+- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. The ledger entries the method keeps for a brief, its roadmap row in docs/design/roadmap.json and its decision in docs/design/decisions.json, stand outside this wall.
 - **CN2** — Development isolation: rows 02 to 05 use only disposable test identities and test provider registrations; no production tokens, real business sign-in or live Cambium participant migration.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
 - **CN4** — No structure row or files entry carries a root token; a file in another repository is named in a requirement's spec with its owner.
@@ -193,4 +223,5 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - **CN9** — A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28).
 - **CN10** — Rows 02 to 05 run on Rauthy v0.36.2 under Waffles' ruling of 15:36:25; each development install checks current releases and advisories and records the accepted exception; IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in and install, rows 06 and 07 (docs/design/identity/briefs/IDENTITY-001.json:18, docs/design/identity/briefs/IDENTITY-001.json:46).
 - **CN11** — Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30).
+Brought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-013's certificate revocation fold and its history check.
 - **CN12** — DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief.

@@ -322,8 +322,8 @@ dispatch to the per-type decoder and the dispatch must not be what authenticates
 While checking the above I concluded the receipt content-type pin was **not
 covered by any test**, on the strength of a grep for `CONTENT_TYPE` across the
 receipt test modules that returned only the frozen-string test. That was wrong.
-`every_protected_header_pin_is_enforced` (`receipt/encoding_tests.rs:285-321`)
-mutates the content type's first byte at a verified offset (lines 303-308) and
+`every_protected_header_pin_is_enforced` (`receipt/encoding_tests/refusals.rs:56-92`)
+mutates the content type's first byte at a verified offset (lines 74-79) and
 asserts rejection. **Removing the pin fails exactly that test and nothing else —
 confirmed by injection, which is the only reason the false finding was not
 filed.**

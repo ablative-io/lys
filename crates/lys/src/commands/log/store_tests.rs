@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the CLI's translation of storage failures.
 //!
 //! The layout, write-once and integrity rules are gated in `lys-log-store`

@@ -1,0 +1,14 @@
+/* Directory editing uses the existing file tabs and a single, bounded form. */
+.directory-manage .head > .btn { flex-shrink: 0; }
+.directory-manage .tabs { margin-top: 0; }
+.directory-editor { max-width: 560px; padding-top: 8px; }
+.directory-editor .recorded-form { background: none; border: 0; padding: 0; border-radius: 0; }
+.directory-editor .recorded-form h2 { margin: 0 0 6px; }
+.directory-editor .recorded-description { color: var(--text-secondary); margin: 0 0 24px; }
+.directory-editor .field { margin-top: 16px; }
+.directory-editor .recorded-form button[type="submit"] { margin-top: 24px; }
+.directory-editor .note { margin: 8px 0 0; }
+@media (max-width: 640px) {
+  .directory-manage .head { flex-direction: column; gap: 0; }
+  .directory-manage .head > .btn { margin-bottom: 16px; }
+}

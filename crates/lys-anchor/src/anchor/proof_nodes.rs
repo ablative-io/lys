@@ -28,7 +28,7 @@
 //! copy against `lys-core`'s own root reconstruction rather than against
 //! itself.
 
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, ProofError};
 
 /// The SHA-256 digest size, which is the width of every node in an RFC 6962
 /// inclusion path.
@@ -48,7 +48,7 @@ const DIGEST_LEN: usize = 32;
 ///
 /// # Errors
 ///
-/// [`AnchorError::MalformedInclusionPath`] if `proof_bytes.len()` is not a
+/// [`ProofError::MalformedInclusionPath`] if `proof_bytes.len()` is not a
 /// multiple of 32. That cannot arise from a proof this crate produced — a tree
 /// emits whole digests — which is exactly why it is checked rather than
 /// assumed: a precondition nothing currently violates is the one whose
@@ -56,9 +56,9 @@ const DIGEST_LEN: usize = 32;
 pub fn proof_nodes(proof_bytes: &[u8]) -> AnchorResult<Vec<[u8; DIGEST_LEN]>> {
     let chunks = proof_bytes.chunks_exact(DIGEST_LEN);
     if !chunks.remainder().is_empty() {
-        return Err(AnchorError::MalformedInclusionPath {
+        return Err(AnchorError::Proof(ProofError::MalformedInclusionPath {
             byte_len: proof_bytes.len(),
-        });
+        }));
     }
     chunks
         .map(|chunk| {
@@ -67,9 +67,9 @@ pub fn proof_nodes(proof_bytes: &[u8]) -> AnchorResult<Vec<[u8; DIGEST_LEN]>> {
             // it is mapped to a refusal instead of an `unwrap` so that it
             // still cannot panic if that ever stops being true.
             <[u8; DIGEST_LEN]>::try_from(chunk).map_err(|_err| {
-                AnchorError::MalformedInclusionPath {
+                AnchorError::Proof(ProofError::MalformedInclusionPath {
                     byte_len: proof_bytes.len(),
-                }
+                })
             })
         })
         .collect()

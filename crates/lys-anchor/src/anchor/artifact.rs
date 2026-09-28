@@ -95,7 +95,7 @@ use lys_core::tlog::{InclusionProofArtifact, build_inclusion_artifact};
 use lys_log_store::LeafStore;
 
 use crate::admission::AdmissionPolicy;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, ProofError};
 use crate::keys::InProcessSigner;
 
 use super::open::Anchor;
@@ -119,10 +119,10 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// - [`AnchorError::NoSuchLeaf`] if `leaf_index` is not in the log. The same
+    /// - [`ProofError::NoSuchLeaf`] if `leaf_index` is not in the log. The same
     ///   variant `receipt_for` returns, for the same condition — a second name
     ///   for one fact is a second thing to keep in step.
-    /// - [`AnchorError::InclusionArtifact`] if `lys-core` refuses to build the
+    /// - [`ProofError::InclusionArtifact`] if `lys-core` refuses to build the
     ///   artifact or its own self-verification of it fails. Unreachable for an
     ///   in-range index on a well-formed anchor, and propagated with its cause
     ///   rather than assumed away.
@@ -132,11 +132,11 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     pub fn inclusion_artifact(&self, leaf_index: u64) -> AnchorResult<InclusionProofArtifact> {
         let tree_size = self.tree_size();
         let Some(leaf) = self.log.leaf_bytes(leaf_index) else {
-            return Err(AnchorError::NoSuchLeaf {
+            return Err(AnchorError::Proof(ProofError::NoSuchLeaf {
                 origin: self.origin().to_string(),
                 leaf_index,
                 tree_size,
-            });
+            }));
         };
         build_inclusion_artifact(
             self.log.tree(),
@@ -145,11 +145,13 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
             self.signer.identity(),
             leaf_index,
         )
-        .map_err(|source| AnchorError::InclusionArtifact {
-            origin: self.origin().to_string(),
-            leaf_index,
-            tree_size,
-            source,
+        .map_err(|source| {
+            AnchorError::Proof(ProofError::InclusionArtifact {
+                origin: self.origin().to_string(),
+                leaf_index,
+                tree_size,
+                source,
+            })
         })
     }
 }

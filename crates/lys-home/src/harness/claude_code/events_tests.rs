@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the `template_render` event: under the 512-byte cap with long
 //! paths riding in the manifest block, the five earlier kinds and the cap
 //! unchanged, and RECORD.md naming the kind and the manifest's fields.
@@ -112,4 +112,52 @@ fn record_md_names_the_sixth_kind_and_the_manifest_fields() {
     let found = fields.iter().filter(|f| section.contains(*f)).count();
     assert_eq!(found, fields.len(), "{section}");
     assert!(section.contains("side leaf"));
+}
+
+#[test]
+fn an_arrival_carries_exactly_its_four_detail_keys_and_no_block()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crate::harness::claude_code::events::{KIND_ARRIVAL, arrival};
+    let event = arrival(&"a".repeat(40), "/r.git", "refs/lys/home", &"b".repeat(32));
+    let data = event.data()?;
+    let expected: Value = serde_json::from_str(
+        r#"{"kind":"arrival","harness":"claude-code","source_uuid":null,"record":null,"detail":{"execution":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ref":"refs/lys/home","remote":"/r.git","source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#,
+    )?;
+    assert_eq!(data, expected);
+    assert_eq!(KIND_ARRIVAL, "arrival");
+    Ok(())
+}
+
+#[test]
+fn an_arrival_over_the_cap_is_refused_as_too_large() {
+    use crate::error::HomeError;
+    use crate::harness::claude_code::events::arrival;
+    let remote = format!("/{}", "x".repeat(399));
+    let event = arrival(&"a".repeat(40), &remote, "refs/lys/home", &"b".repeat(32));
+    let refused = event.data();
+    assert!(
+        matches!(&refused, Err(HomeError::EventTooLarge { len, .. }) if *len > MAX_DATA_BYTES),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn the_six_existing_kinds_and_the_cap_keep_their_values_beside_the_arrival() {
+    use crate::harness::claude_code::events::KIND_ARRIVAL;
+    let kinds = [
+        (KIND_HOOK, "hook"),
+        (KIND_PERMISSION_MODE, "permission_mode"),
+        (KIND_TOOL_COMPLETED, "tool_completed"),
+        (KIND_ATTACHMENT, "attachment"),
+        (KIND_SYSTEM, "system"),
+        (KIND_TEMPLATE_RENDER, "template_render"),
+    ];
+    let mut checked = 0;
+    for (constant, value) in kinds {
+        assert_eq!(constant, value);
+        assert_ne!(constant, KIND_ARRIVAL);
+        checked += 1;
+    }
+    assert_eq!(checked, 6);
+    assert_eq!(MAX_DATA_BYTES, 512);
 }

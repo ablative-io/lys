@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the canon: examples copied whole with their signatures behind a
 //! `lys.inherited` entry, no example twice, no authored thinking, and a render
 //! that places the canon first and applies the thinking rule to it.
@@ -7,7 +7,9 @@ use serde_json::{Value, json};
 
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::record::Home;
-use crate::record::canon::{AddReport, Inherited, add_authored, add_from, create, load};
+use crate::record::canon::{
+    AddReport, Inherited, add_authored, add_from, create, hold, load, lock_path,
+};
 use crate::record::entries::{CUSTOM_INHERITED, EntryBody};
 
 fn thinking_exchange(home: &Home) -> (String, Vec<String>) {
@@ -79,7 +81,7 @@ fn an_example_is_copied_whole_behind_an_inherited_entry_and_never_twice() {
             &inherited.from_entries,
             inherited.model.as_str(),
             inherited.curated_by.as_str(),
-            inherited.rule.as_str()
+            inherited.rule.as_deref()
         ),
         (
             false,
@@ -87,7 +89,7 @@ fn an_example_is_copied_whole_behind_an_inherited_entry_and_never_twice() {
             &ids,
             "claude-opus-5-5",
             "tom",
-            "verify before claiming"
+            Some("verify before claiming")
         )
     );
     // The copies keep their ids and bodies; only the parent links chain onto the canon.
@@ -293,15 +295,13 @@ fn duplicate_ids_in_one_example_a_self_parent_and_a_second_adder_are_each_refuse
         "{err}"
     );
     assert_eq!(load(&canon).unwrap().entries.len(), 0);
-    // A second adder holding the canon is refused by name, and nothing is written.
-    let holder = std::fs::OpenOptions::new()
-        .append(true)
-        .open(&canon)
-        .unwrap();
-    holder.try_lock().unwrap();
+    // A second adder while the canon's lock is held is refused by name,
+    // naming this process, and nothing is written.
+    let holder = hold(&canon).unwrap();
     let err = add_from(&canon, &s, &ids, "held", "tom").unwrap_err();
+    let pid = std::process::id();
     assert!(
-        matches!(err, crate::error::HomeError::SessionHeld { .. }),
+        matches!(err, crate::error::HomeError::SessionHeld { holder: Some(h), .. } if h == pid),
         "{err}"
     );
     drop(holder);
@@ -319,4 +319,39 @@ fn duplicate_ids_in_one_example_a_self_parent_and_a_second_adder_are_each_refuse
     assert!(err.contains("not on record before it"), "{err}");
     drop(s);
     dir.close().unwrap();
+}
+
+/// A child given a copy of the canon lock's descriptor, as a child spawned
+/// while an add runs has, outlives the adder; the next add still goes in, and
+/// the lock is the file beside the canon, never the canon itself.
+#[cfg(unix)]
+#[test]
+fn a_child_holding_a_copied_lock_descriptor_does_not_keep_the_canon_locked()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::process::{Command, Stdio};
+    let dir = tempfile::tempdir()?;
+    let canon = dir.path().join("canon.jsonl");
+    create(&canon)?;
+    let turns = dir.path().join("turns.txt");
+    std::fs::write(
+        &turns,
+        "user: is it verified?\nassistant: not yet; running it now\n",
+    )?;
+    let held = hold(&canon)?;
+    let copied = held.file().try_clone()?;
+    let mut child = Command::new("/bin/sleep")
+        .arg("60")
+        .stdin(Stdio::from(copied))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    drop(held);
+    let added = add_authored(&canon, &turns, "name the gate", "tom");
+    child.kill()?;
+    child.wait()?;
+    assert_eq!(added?.examples, 1);
+    assert_eq!(lock_path(&canon), dir.path().join("canon.jsonl.lock"));
+    assert!(lock_path(&canon).is_file());
+    assert_eq!(load(&canon)?.examples().len(), 1);
+    Ok(())
 }

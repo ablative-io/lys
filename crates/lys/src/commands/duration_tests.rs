@@ -1,11 +1,10 @@
+#![cfg(test)]
 //! Tests for validity-window parsing.
 //!
 //! The refusals matter more than the acceptances here. A validity window that
 //! parses to something *shorter* than the operator asked for is the dangerous
 //! direction — it looks like it worked — so every ambiguous spec is pinned as
 //! refused rather than left to whatever `str::parse` happens to do with it.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
 

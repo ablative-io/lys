@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Gates on the project slug: the rule measured on Claude Code 2.1.283
 //! against dotted, underscored and hyphenated working directories.
 

@@ -22,18 +22,25 @@
 //! other, so a copy of its line inside a child (copied lines keep their ids)
 //! is a copy and not a second lantern; one whose data carries no `lit_in` is
 //! an older record and resolves by the sessions holding it: one holder cuts,
-//! several refuse by name until one is named. Every refusal comes before any
-//! file is created or written, and none carries a note or an entry's data.
+//! several refuse by name until one is named. The entry's data is read
+//! through the typed view [`LanternHeld`], which carries the point, who lit
+//! it and an optional `lit_in` and requires neither the note nor the time,
+//! so an older record whose data is exactly `{point, note, lit_by}` reads
+//! as it always has; data that is not that view refuses `entry_shape`, and a
+//! present `lit_in` is checked by `lit_in_session`, never looked up in raw
+//! JSON. Every refusal comes before any file is created or written, and
+//! none carries a note or an entry's data.
 
+use crate::error::ForkError;
 use std::path::PathBuf;
 
 use serde_json::Value;
 
 use crate::error::HomeError;
-use crate::record::entries::{CUSTOM_LANTERN, Entry, EntryBody};
+use crate::record::Home;
+use crate::record::entries::{CUSTOM_LANTERN, Entry, EntryBody, LanternHeld};
 use crate::record::index::{Index, IndexRow};
-use crate::record::lantern::session_file;
-use crate::record::{Home, safe_component};
+use crate::record::lantern::{data_of, lit_in_session, session_file};
 
 /// A session whose index holds a `lys.lantern` row under the lantern id.
 struct Holder {
@@ -122,42 +129,12 @@ fn read_lantern(
         path: holder.file.clone(),
         reason: "a row read no entry",
     })?;
-    let shape = || HomeError::EntryShape {
-        session: holder.id.clone(),
-        id: lantern.to_owned(),
-        custom_type: CUSTOM_LANTERN.to_owned(),
-        source: None,
-    };
-    let EntryBody::Custom {
-        data: Some(data), ..
-    } = &entry.body
-    else {
-        return Err(shape());
-    };
-    let point = data
-        .get("point")
-        .and_then(Value::as_str)
-        .ok_or_else(shape)?
-        .to_owned();
-    let not_a_session = |what| HomeError::LitInNotASession {
-        lantern: lantern.to_owned(),
-        what,
-    };
-    let lit_in = match data.get("lit_in") {
-        None => None,
-        Some(Value::Null) => return Err(not_a_session("is null")),
-        Some(Value::String(session)) => {
-            if safe_component("session id", session).is_err() {
-                return Err(not_a_session("is not a safe session name"));
-            }
-            if session_file(home, session).is_err() {
-                return Err(not_a_session("names no session of the home"));
-            }
-            Some(session.clone())
-        }
-        Some(_) => return Err(not_a_session("is not a string")),
-    };
-    Ok((point, lit_in, read))
+    let held: LanternHeld = data_of(&holder.id, &entry, CUSTOM_LANTERN)?;
+    let lit_in = held
+        .lit_in
+        .map(|lit_in| lit_in_session(home, lantern, &lit_in))
+        .transpose()?;
+    Ok((held.point, lit_in, read))
 }
 
 /// The role of a message entry; `None` for any other entry.
@@ -186,25 +163,27 @@ pub fn resolve_and_cut(
                 session: named.to_owned(),
                 id: lantern.to_owned(),
             },
-            None => HomeError::NoSuchLantern {
+            None => HomeError::Fork(ForkError::NoSuchLantern {
                 lantern: lantern.to_owned(),
-            },
+            }),
         });
     }
     let first = 0;
     let (mut point, lit_in, mut bytes_read) = read_lantern(home, &holders[first], lantern)?;
     let chosen = match (&lit_in, session) {
         (Some(lit_in), Some(named)) if lit_in != named => {
-            return Err(HomeError::LanternNotLitHere {
+            return Err(HomeError::Fork(ForkError::LanternNotLitHere {
                 lantern: lantern.to_owned(),
                 session: named.to_owned(),
                 lit_in: lit_in.clone(),
-            });
+            }));
         }
-        (Some(lit_in), _) => position(lit_in).ok_or_else(|| HomeError::LanternNotLitHere {
-            lantern: lantern.to_owned(),
-            session: holders[first].id.clone(),
-            lit_in: lit_in.clone(),
+        (Some(lit_in), _) => position(lit_in).ok_or_else(|| {
+            HomeError::Fork(ForkError::LanternNotLitHere {
+                lantern: lantern.to_owned(),
+                session: holders[first].id.clone(),
+                lit_in: lit_in.clone(),
+            })
         })?,
         (None, Some(named)) => position(named).ok_or_else(|| HomeError::UnknownLantern {
             session: named.to_owned(),
@@ -212,10 +191,10 @@ pub fn resolve_and_cut(
         })?,
         (None, None) if holders.len() == 1 => first,
         (None, None) => {
-            return Err(HomeError::LanternAmbiguous {
+            return Err(HomeError::Fork(ForkError::LanternAmbiguous {
                 lantern: lantern.to_owned(),
                 sessions: holders.iter().map(|holder| holder.id.clone()).collect(),
-            });
+            }));
         }
     };
     if chosen != first {
@@ -237,9 +216,9 @@ pub fn resolve_and_cut(
         .iter()
         .rposition(|entry| role_of(entry) == Some("assistant"))
     else {
-        return Err(HomeError::NothingToFork {
+        return Err(HomeError::Fork(ForkError::NothingToFork {
             lantern: lantern.to_owned(),
-        });
+        }));
     };
     let carried = entries
         .last()

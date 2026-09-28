@@ -20,6 +20,7 @@
 //! and returns the refusal that stopped the fork; a cleanup that fails too
 //! is refused naming both, so a half-written child is never silent.
 
+use crate::error::ForkError;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -31,9 +32,10 @@ use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, Entry, EntryBody};
 use crate::record::fork_cut::{Cut, resolve_and_cut};
 use crate::record::fork_report::{ForkReport, candidate_hashes, count_held};
+use crate::record::helpers::{custom_type_of, write_durable};
 use crate::record::index::{Index, IndexRow, write_head};
 use crate::record::lantern::own;
-use crate::record::{Home, Session, custom_type_of, fresh_id, write_durable};
+use crate::record::{Home, Session, fresh_id};
 
 /// What a `lys.forked_from` entry carries in `custom.data`: the ancestry
 /// as the child records it.
@@ -245,11 +247,11 @@ pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkRep
         drop(child);
         return Err(match remove_child(home, &child_id) {
             Ok(()) => reason,
-            Err(cleanup) => HomeError::ForkHalfWritten {
+            Err(cleanup) => HomeError::Fork(ForkError::ForkHalfWritten {
                 child: child_id,
                 reason: reason.to_string(),
                 cleanup: cleanup.to_string(),
-            },
+            }),
         });
     }
     let (blocks, unstored) = count_held(&home.blocks()?, &candidates);

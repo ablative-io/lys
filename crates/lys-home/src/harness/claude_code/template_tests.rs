@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on the launch template parser: the fixture parses to what the brief
 //! states, each refusal names its cause, the parser and the schema file agree
 //! on the five slots, and the hash is of the bytes as read.

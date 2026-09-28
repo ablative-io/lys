@@ -1,30 +1,37 @@
 //! The `lys-home` command line: import, render, fewshot, ingest-call,
-//! resume-check, render-launch, given, given-check, lantern, fork. Every command prints one
+//! resume-check, render-launch, given, given-check, lantern, fork, handover,
+//! ship, fetch. Every command prints one
 //! JSON report of paths, hashes and counts, never transcript, block or body
 //! content. A missing required argument is refused by clap with exit code 2,
 //! naming the argument. A command that refuses exits 1, except `given-check`,
 //! which answers as `diff` does: 0 on matches, 1 on differs, 2 on a refusal
 //! ([`given`]).
+//! `ship` and `fetch` ([`crate::cli_move`]) print two refusals as reports on
+//! stdout with exit 1: `stale_index` and `verification_failed`.
 
+mod fewshot;
 pub mod given;
+mod resume;
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
+pub use resume::ResumeReport;
 
-use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+
+use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
 
 use crate::cli::given::{GivenArgs, GivenCheckArgs, Outcome, STATUS_REFUSED};
 use crate::cli_fork::ForkArgs;
 use crate::cli_lantern::LanternAction;
+use crate::cli_move::{FetchArgs, ShipArgs};
+use crate::cli_translate::TranslateArgs;
 use crate::error::HomeError;
-use crate::harness::claude_code::AUTHORED;
 use crate::harness::claude_code::import::import_claude_code;
 use crate::harness::claude_code::launch::{LaunchArgs, render_launch};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::record::call::{Api, CallMeta, ingest_call_files};
-use crate::record::canon::Role;
-use crate::record::{Home, fresh_id, now};
+use crate::record::handover::handover;
+use crate::record::{Home, now};
 
 /// The home: sessions held under an identity, in Pi's session tree.
 #[derive(Debug, Parser)]
@@ -68,6 +75,25 @@ pub enum CanonAction {
         #[arg(long)]
         by: String,
     },
+}
+
+/// The arguments of `handover`: the outgoing home and session, the letter's
+/// entry ids in path order, and the successor home to write. No rule is
+/// taken, since a letter is not a rule.
+#[derive(Clone, Debug, PartialEq, Eq, Args)]
+pub struct HandoverArgs {
+    /// The outgoing home, read and never written.
+    #[arg(long)]
+    pub home: PathBuf,
+    /// The outgoing session id.
+    #[arg(long)]
+    pub from: String,
+    /// The letter's entry ids, in path order.
+    #[arg(long, required = true, num_args = 1..)]
+    pub letter: Vec<String>,
+    /// The successor home: an absent path or an empty directory.
+    #[arg(long)]
+    pub successor: PathBuf,
 }
 
 /// The commands.
@@ -187,6 +213,14 @@ pub enum Command {
     },
     /// Fork a child session from a lantern's point, with its ancestry on both sides.
     Fork(ForkArgs),
+    /// Translate a session into a Codex rollout with a loss account beside it.
+    TranslateCodex(TranslateArgs),
+    /// Hand an outgoing session's letter to a new successor home as inherited memory.
+    Handover(HandoverArgs),
+    /// Ship the home as the one ref refs/lys/home to a bare repository at a path on this machine.
+    Ship(ShipArgs),
+    /// Fetch a shipped home into a new, empty home and hang an arrival beside each session's head.
+    Fetch(FetchArgs),
 }
 
 impl Command {
@@ -212,6 +246,8 @@ pub fn run(cli: Cli) -> Result<Value, HomeError> {
 pub fn run_with_status(cli: Cli) -> Result<Outcome, HomeError> {
     match cli.command {
         Command::GivenCheck(args) => given::check(&args),
+        Command::Ship(args) => crate::cli_move::run_ship(&args),
+        Command::Fetch(args) => crate::cli_move::run_fetch(&args),
         other => report(other).map(Outcome::done),
     }
 }
@@ -287,7 +323,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
             }
         },
         Command::Fewshot { out, turns, cwd } => {
-            let written = fewshot(&out, &turns, &cwd)?;
+            let written = fewshot::fewshot(&out, &turns, &cwd)?;
             // The person's own command, carried in the one JSON report; never run here.
             let resume = format!("claude --resume {}", out.display());
             Ok(
@@ -347,7 +383,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
             Ok(json!({"command": "ingest-call", "report": report}))
         }
         Command::ResumeCheck { rendered, forked } => {
-            let check = resume_check(&rendered, &forked)?;
+            let check = resume::resume_check(&rendered, &forked)?;
             if check.repeated_tool_use_ids != 0 {
                 return Err(HomeError::RepeatedToolActions {
                     count: check.repeated_tool_use_ids,
@@ -360,178 +396,16 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::GivenCheck(args) => given::check(&args).map(|outcome| outcome.report),
         Command::Lantern { action } => crate::cli_lantern::run(action),
         Command::Fork(args) => crate::cli_fork::run(&args),
-    }
-}
-
-/// Write the authored file: user records as plain strings, assistant records
-/// with model `authored`, the parent chain intact, a fresh session id.
-fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeError> {
-    let turns = crate::record::canon::parse_turns(turns)?;
-    let session_id = uuid_shaped();
-    let mut prev: Option<String> = None;
-    let mut lines = Vec::new();
-    for (n, (role, body)) in turns.into_iter().enumerate() {
-        let uuid = uuid_shaped();
-        let (kind, message) = match role {
-            Role::User => ("user", json!({"role": "user", "content": body})),
-            Role::Assistant => (
-                "assistant",
-                json!({"id": format!("msg_authored_{n}"), "type": "message", "role": "assistant", "model": AUTHORED,
-                "content": [{"type": "text", "text": body}], "stop_reason": "end_turn", "stop_sequence": null,
-                "usage": {"input_tokens": 0, "output_tokens": 0}}),
-            ),
-        };
-        lines.push(json!({
-            "parentUuid": prev, "isSidechain": false, "userType": "external", "cwd": cwd,
-            "sessionId": session_id, "version": "2.1.281", "gitBranch": "", "uuid": uuid,
-            "timestamp": now(), "type": kind, "message": message,
-        }));
-        prev = Some(uuid);
-    }
-    if let Some(dir) = out.parent() {
-        std::fs::create_dir_all(dir)
-            .map_err(|e| HomeError::io("creating the output directory", dir, e))?;
-    }
-    let mut body = String::new();
-    for l in &lines {
-        body.push_str(&serde_json::to_string(l).map_err(|source| HomeError::Json {
-            context: "a record could not be serialised",
-            source,
-        })?);
-        body.push('\n');
-    }
-    // Never over an existing transcript: the create is exclusive, so a second
-    // writer between a check and a write cannot slip in; then the file and its
-    // directory are synced before the path is reported.
-    let mut file = match std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(out)
-    {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            return Err(HomeError::Exists {
-                path: out.to_path_buf(),
-            });
+        Command::TranslateCodex(args) => crate::cli_translate::run(&args),
+        Command::Handover(args) => {
+            let report = handover(&args.home, &args.from, &args.letter, &args.successor)?;
+            let report = serde_json::to_value(&report).map_err(|source| HomeError::Json {
+                context: "the handover report could not be serialised",
+                source,
+            })?;
+            Ok(json!({"command": "handover", "report": report}))
         }
-        Err(e) => return Err(HomeError::io("creating the authored file", out, e)),
-    };
-    file.write_all(body.as_bytes())
-        .map_err(|e| HomeError::io("writing the authored file", out, e))?;
-    file.sync_all()
-        .map_err(|e| HomeError::io("syncing the authored file", out, e))?;
-    if let Some(dir) = out.parent() {
-        crate::record::blocks::sync_dir(dir)?;
+        Command::Ship(args) => crate::cli_move::run_ship(&args).map(|outcome| outcome.report),
+        Command::Fetch(args) => crate::cli_move::run_fetch(&args).map(|outcome| outcome.report),
     }
-    Ok(lines.len() as u64)
-}
-
-/// A fresh id in Claude Code's uuid shape.
-fn uuid_shaped() -> String {
-    let h = fresh_id();
-    format!(
-        "{}-{}-4{}-8{}-{}",
-        &h[..8],
-        &h[8..12],
-        &h[13..16],
-        &h[17..20],
-        &h[20..32]
-    )
-}
-
-/// What a resume check measured. `repeated_tool_use_ids` is exactly that: ids
-/// that appear more times in the fork than in the rendered file; it says
-/// nothing about an action repeated under a fresh id. `new_tool_uses` counts
-/// every `tool_use` part in the fork's own records (those not copied from the
-/// rendered file), which for a one-turn question answerable without tools is
-/// expected to be 0.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
-pub struct ResumeReport {
-    /// Records in the rendered file.
-    pub rendered_records: u64,
-    /// Records in the fork.
-    pub forked_records: u64,
-    /// Records in the fork whose uuid is not in the rendered file.
-    pub forked_new_records: u64,
-    /// `tool_use` ids appearing more times in the fork than in the rendered file.
-    pub repeated_tool_use_ids: u64,
-    /// `tool_use` parts in the fork's new records.
-    pub new_tool_uses: u64,
-}
-
-/// One record's uuid and its `tool_use` ids.
-fn tool_uses(path: &Path) -> Result<Vec<(String, Vec<String>)>, HomeError> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| HomeError::io("reading a transcript", path, e))?;
-    let mut out = Vec::new();
-    for (n, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let v: Value = serde_json::from_str(line).map_err(|e| HomeError::Malformed {
-            path: path.to_path_buf(),
-            line: n + 1,
-            what: "Claude Code record",
-            reason: e.to_string(),
-        })?;
-        let uuid = v
-            .get("uuid")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned();
-        let mut ids = Vec::new();
-        if let Some(parts) = v
-            .get("message")
-            .and_then(|m| m.get("content"))
-            .and_then(Value::as_array)
-        {
-            for p in parts {
-                if p.get("type").and_then(Value::as_str) == Some("tool_use")
-                    && let Some(id) = p.get("id").and_then(Value::as_str)
-                {
-                    ids.push(id.to_owned());
-                }
-            }
-        }
-        out.push((uuid, ids));
-    }
-    Ok(out)
-}
-
-fn resume_check(rendered: &Path, forked: &Path) -> Result<ResumeReport, HomeError> {
-    let before = tool_uses(rendered)?;
-    let after = tool_uses(forked)?;
-    let rendered_uuids: std::collections::BTreeSet<&str> =
-        before.iter().map(|(u, _)| u.as_str()).collect();
-    let count = |records: &[(String, Vec<String>)], id: &str| -> u64 {
-        u64::try_from(
-            records
-                .iter()
-                .flat_map(|(_, ids)| ids.iter())
-                .filter(|x| x.as_str() == id)
-                .count(),
-        )
-        .unwrap_or(u64::MAX)
-    };
-    // A tool action the fork *inherited* by copying the rendered records is not a repeat;
-    // a repeat is an id that appears more times in the fork than in the rendered file.
-    let mut repeated = 0u64;
-    for id in before
-        .iter()
-        .flat_map(|(_, ids)| ids.iter())
-        .collect::<std::collections::BTreeSet<_>>()
-    {
-        repeated += count(&after, id).saturating_sub(count(&before, id));
-    }
-    let new: Vec<&(String, Vec<String>)> = after
-        .iter()
-        .filter(|(u, _)| !rendered_uuids.contains(u.as_str()))
-        .collect();
-    Ok(ResumeReport {
-        rendered_records: before.len() as u64,
-        forked_records: after.len() as u64,
-        forked_new_records: new.len() as u64,
-        repeated_tool_use_ids: repeated,
-        new_tool_uses: new.iter().map(|(_, ids)| ids.len() as u64).sum(),
-    })
 }

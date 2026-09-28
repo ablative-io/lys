@@ -47,3 +47,18 @@
 - [ ] **C28** — Observed grant usage names its source and time; not seen is not reported as never used.
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
+
+## Certificate revocation folded from the log
+
+- [ ] **C65** — docs/design/identity/CERTIFICATE-REVOCATION.md states the certificate-log leaves, the one-claim certificate as the revocable unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table.
+- [ ] **C66** — The issuance leaf, the revocation leaf and the attestation entry encode and decode under lys-identity/certificate-log/v1, and a revocation verifies only under the issuing authority's key for the log's origin.
+- [ ] **C67** — The live set is folded from the certificate log with its folded size; revocations not signed by the issuing authority, revocations of a certificate with no earlier issuance and reinstatements are refused by name at their index, and a leaf the fold cannot read blocks every permit.
+- [ ] **C68** — A revocation is one leaf appended at the log's extent through lys-log-store, and the LeafStore trait gains no delete, rewrite, truncate, fork or merge.
+- [ ] **C69** — Revocation-aware verification takes N and a tolerance with no default, carries the folded size in every answer, and refuses a revoked certificate naming its revocation leaf.
+- [ ] **C70** — A revoked certificate's inclusion and consistency proofs and issuance record still verify, an attestation by its key verifies only when its own entry precedes the revocation leaf, and an attestation by a certificate not revoked needs no entry.
+- [ ] **C71** — lys ca verify keeps its meaning and its help says verification without a log does not check revocation, with lys-core unchanged.
+
+## The enduring agent and its session credentials
+
+- [ ] **C49** — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
+- [ ] **C50** — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(test)]
 //! Gates on [`WitnessProjection`] and [`checkpoint_in_leaf`].
 //!
 //! # Where the second party comes from

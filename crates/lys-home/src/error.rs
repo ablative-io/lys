@@ -3,6 +3,14 @@
 
 use std::path::PathBuf;
 
+mod fork;
+mod moving;
+mod translate;
+
+pub use fork::ForkError;
+pub use moving::MoveError;
+pub use translate::TranslateError;
+
 /// What went wrong, named so a caller can act on it.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -121,10 +129,12 @@ pub enum HomeError {
     },
 
     /// The session file is held open by another owner, in this process or another.
-    #[error("session {} is held by another owner; one owner at a time", path.display())]
+    #[error("session {} is held by {}; one owner at a time", path.display(), held_by(*holder))]
     SessionHeld {
         /// The session file.
         path: PathBuf,
+        /// The process holding it, when the lock names one.
+        holder: Option<u32>,
     },
 
     /// An entry id is already on record in this session.
@@ -302,6 +312,23 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// The signing key file given to render-launch could not be loaded.
+    #[error("render-launch signing key could not be loaded from {}: {reason}", path.display())]
+    SigningKey {
+        /// The key file.
+        path: PathBuf,
+        /// lys-core's reason, which names a length or an I/O error, never a key byte.
+        reason: String,
+    },
+
+    /// An entry's stamp does not parse as RFC 3339, so the translation cannot
+    /// place it in time.
+    #[error("entry {entry} has a stamp that is not RFC 3339: re-import the source file")]
+    StampNotRfc3339 {
+        /// The entry's id.
+        entry: String,
+    },
+
     /// The session's config directory has no name: the template's env slot
     /// sets no `CLAUDE_CONFIG_DIR` and the rendering process has no `HOME`.
     #[error(
@@ -329,78 +356,6 @@ pub enum HomeError {
         path: PathBuf,
     },
 
-    /// A lantern id was named that no session of the home holds as a
-    /// `lys.lantern` entry, an id of another kind of entry included.
-    #[error(
-        "no session of the home holds a lantern `{lantern}`; name the entry id a light report printed"
-    )]
-    NoSuchLantern {
-        /// The lantern id named.
-        lantern: String,
-    },
-
-    /// A lantern whose data carries no lit-in session is held by more than
-    /// one session, and none was named to cut from.
-    #[error(
-        "lantern_ambiguous: lantern `{lantern}` carries no lit-in session and is held by {}; name one of them with --session", sessions.join(", ")
-    )]
-    LanternAmbiguous {
-        /// The lantern id.
-        lantern: String,
-        /// Every session holding it, in ascending byte order.
-        sessions: Vec<String>,
-    },
-
-    /// A session was named to cut from that is not the one the lantern
-    /// records it was lit in.
-    #[error(
-        "lantern_not_lit_here: lantern `{lantern}` was lit in session {lit_in}, not in {session}; fork from {lit_in}, or leave --session out"
-    )]
-    LanternNotLitHere {
-        /// The lantern id.
-        lantern: String,
-        /// The session named.
-        session: String,
-        /// The session the lantern's data records it was lit in.
-        lit_in: String,
-    },
-
-    /// A lantern's point has no assistant message at or before it on its
-    /// chain, so there is nothing said yet to fork.
-    #[error(
-        "nothing_to_fork: lantern `{lantern}` sits before any assistant message; a fork carries what was said up to its point, and a point before the first reply would carry only a seed, which is a new session and not a fork"
-    )]
-    NothingToFork {
-        /// The lantern id.
-        lantern: String,
-    },
-
-    /// A lantern's data carries a `lit_in` that is not a session id: null,
-    /// not a string, not a safe session name, or no session of the home.
-    #[error(
-        "lit_in_not_a_session: lantern `{lantern}` records a lit-in session that {what}; a fork cuts from the session a lantern was lit in and no other"
-    )]
-    LitInNotASession {
-        /// The lantern id.
-        lantern: String,
-        /// What is wrong with the recorded value, naming no content.
-        what: &'static str,
-    },
-
-    /// A fork failed after its child session was created, and removing the
-    /// child failed too, so the child's files stand half-written.
-    #[error(
-        "fork of child {child} failed ({reason}), and removing the child failed too ({cleanup}); the child's files under sessions/ are half-written and the parent holds no lys.fork line for it"
-    )]
-    ForkHalfWritten {
-        /// The child's session id.
-        child: String,
-        /// The refusal that stopped the fork, as displayed.
-        reason: String,
-        /// The refusal the cleanup met, as displayed.
-        cleanup: String,
-    },
-
     /// A path that must be absolute is not: it would resolve against
     /// lys-home's own working directory, which is never the session's.
     #[error(
@@ -414,6 +369,90 @@ pub enum HomeError {
         /// The path given.
         path: PathBuf,
     },
+
+    /// A letter entry is not an assistant message.
+    #[error(
+        "letter_not_assistant: entry `{id}` of session {session} is not an assistant message; a letter is the outgoing session's own assistant turn"
+    )]
+    LetterNotAssistant {
+        /// The outgoing session id.
+        session: String,
+        /// The letter entry named.
+        id: String,
+    },
+
+    /// A letter entry does not stand, on the outgoing session's root-to-head
+    /// path, as the child of the letter entry named before it.
+    #[error(
+        "letter_not_contiguous: letter entry `{id}` of session {session} does not follow the entry before it on the root-to-head path; name the letter's entries in path order, each the child of the one before"
+    )]
+    LetterNotContiguous {
+        /// The outgoing session id.
+        session: String,
+        /// The first letter entry out of place.
+        id: String,
+    },
+
+    /// A letter entry's message carries provider `authored`.
+    #[error(
+        "letter_authored: entry `{id}` of session {session} carries provider `authored`; a letter is the session's own turn, never one written by hand"
+    )]
+    LetterAuthored {
+        /// The outgoing session id.
+        session: String,
+        /// The first authored letter entry.
+        id: String,
+    },
+
+    /// No letter entry holds a thinking block.
+    #[error(
+        "letter_without_thinking: the letter [{}] of session {session} holds no thinking block; a letter carries the session's own thinking", ids.join(", ")
+    )]
+    LetterWithoutThinking {
+        /// The outgoing session id.
+        session: String,
+        /// Every letter entry, in the order given.
+        ids: Vec<String>,
+    },
+
+    /// The successor path exists and is not an empty directory.
+    #[error(
+        "successor_not_empty: {} exists and is not an empty directory; name an absent path or an empty directory for the successor home", path.display()
+    )]
+    SuccessorNotEmpty {
+        /// The successor path given.
+        path: PathBuf,
+    },
+
+    /// A canon example's `lys.inherited` entry carries no rule.
+    #[error(
+        "canon_example_without_rule: canon example `{id}` has no `rule` in its lys.inherited data; every canon example states the rule it shows"
+    )]
+    CanonExampleWithoutRule {
+        /// The example's `lys.inherited` entry id.
+        id: String,
+    },
+
+    /// A refusal of ship or fetch.
+    #[error(transparent)]
+    Move(#[from] MoveError),
+
+    /// A refusal of a translation.
+    #[error(transparent)]
+    Translate(#[from] TranslateError),
+
+    /// A refusal of a fork.
+    #[error(transparent)]
+    Fork(#[from] ForkError),
+}
+
+/// Who holds a session, as a refusal names them.
+fn held_by(holder: Option<u32>) -> String {
+    match holder {
+        Some(pid) if pid == std::process::id() => format!("another owner in this process ({pid})"),
+        Some(pid) => format!("process {pid}"),
+        None => "another owner".to_owned(),
+    }
 }
 
 impl HomeError {

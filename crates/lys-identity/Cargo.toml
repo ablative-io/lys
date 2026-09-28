@@ -1,0 +1,29 @@
+[package]
+name = "lys-identity"
+description = "The lys directory of people and agents: enduring identifiers, signed identity events, and the projection rebuilt from them."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+ciborium.workspace = true
+lys-core.workspace = true
+lys-log-store.workspace = true
+rand.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[features]
+# The failing permission engine the grant tests drive an outage with.
+test-support = []
+
+[dev-dependencies]
+lys-identity = { path = ".", features = ["test-support"] }
+tempfile.workspace = true
+
+[lints]
+workspace = true

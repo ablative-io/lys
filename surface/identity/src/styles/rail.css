@@ -1,0 +1,19 @@
+/* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
+.shell { display: flex; height: 100vh; }
+.shell.dock-right { flex-direction: row-reverse; }
+.rail { width: var(--rail); flex: none; background: var(--surface-base); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; transition: width .32s var(--spring); overflow: hidden; }
+.dock-right .rail { border-right: 0; border-left: 1px solid var(--border-subtle); }
+.rail.open { width: var(--rail-open); }
+.mark { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 7px; margin-bottom: 10px; font-weight: 600; font-size: 12px; white-space: nowrap; }
+.mark .seal { width: 18px; height: 18px; flex: none; border: 1.5px solid var(--accent); border-radius: 50%; display: grid; place-items: center; font: 600 8px "JetBrains Mono"; color: var(--accent); }
+.rail a, .rail button.rb { display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 8px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; white-space: nowrap; position: relative; }
+.rail a:hover, .rail button.rb:hover, .rail button.rb.on { color: var(--text-primary); background: var(--surface-hover); }
+.rail a.on { color: var(--text-primary); background: var(--surface-hover); }
+.rail a.on::before { content: ""; position: absolute; left: -8px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--accent); }
+.dock-right .rail a.on::before { left: auto; right: -8px; }
+.rail svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rail .lbl { opacity: 0; transition: opacity .15s; font-size: 12.5px; }
+.rail.open .lbl { opacity: 1; transition-delay: .08s; }
+.rail .grow { flex: 1; }
+.rail .sep { height: 1px; background: var(--border-subtle); margin: 8px 4px; }
+.kbd { font: 10px "JetBrains Mono"; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 4px; padding: 0 4px; margin-left: auto; }
