@@ -1548,6 +1548,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-111",
+      "title": "The 500-line limit on code files is a gate leg, not a sentence in CLAUDE.md",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom's word in the terminal on 28 September 2026; recorded by Waffles with LYSGATE-002",
+      "context": "CLAUDE.md's coding standards say no file holds over 500 lines of code, excluding tests, comments and whitespace. No gate leg measures it: not project.json, not a cluster gate, not .land/gates.sh, not CI. On main 6194599 the largest code files are 498 lines, so the rule holds today by care alone, and a build could land a 700-line file through every gate.",
+      "decision": "A gate leg, `sh scripts/file-length.sh`, runs the checker's own tests and then measures every tracked Rust and TypeScript source file, and fails naming each file whose code lines exceed 500. It is declared in project.json, in every cluster design.json gate, in .land/gates.sh, in CLAUDE.md's 'Gates before any commit' block and in CI. Rejected: an ast-grep rule, which matches syntax and cannot count lines; a clippy lint, since too_many_lines counts one function, not a file, and says nothing of TypeScript; counting raw lines, which would punish documentation.",
+      "quote": "Make sure everything follows the ast-grep scan rules. Make sure that no files are over 500 lines of code. Make sure it is all fully finished and make sure it actually works and meets the point of doing it. No lazy code, nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+      "consequences": [
+        "A file over the limit is refused in the build's own round, not found later at landing or by a reader.",
+        "The count is defined once, in the checker, with its tests beside it; CLAUDE.md's sentence points at the leg.",
+        "Splitting a file that grows past 500 lines is the build's work in the round it grows, never a follow-up card."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

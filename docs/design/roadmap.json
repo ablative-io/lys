@@ -1772,6 +1772,31 @@
         "RM-007"
       ],
       "notes": "Further units, not written: Sign an agent's start when a launch is recorded (START 98qkhhCb); Sign a role move when it is recorded (ROLES Ink1H1Os); Check a given statement's signer against a trusted certificate with lys verify --cert (row 6.1). Ids: written as HOME-008 and renumbered by the lead past every open brief, draft and hand branch, first freeing HOME-008 and HOME-013 to HOME-015, then yielding to drafts that wrote first: HOME-016 to the home drafts aefa8236 and 44d1b603, RM-041 and RM-042 to the directory drafts 8c1bee6c and 526867e5, ADR-066 to ADR-069 to the directory drafts 526867e5, 7494cb8b and 8c1bee6c and the home draft 44d1b603. HOME-018, RM-044, ADR-070 and ADR-071 are left for 44d1b603, which is moving, so this brief takes HOME-018, RM-044 and ADR-072; CN16, C118 to C124 and S49 to S51 are free on every head and kept."
+    },
+    {
+      "id": "RM-073",
+      "title": "Enforce the 500-line limit on code files as a gate leg",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "CLAUDE.md limits every code file to 500 lines of code, excluding tests, comments and whitespace, and no gate measures it. A checker with its own tests becomes a gate leg declared everywhere the gate is declared, so a file over the limit is refused in the round that makes it.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:50:00+10:00",
+        "quote": "Make sure everything follows the ast-grep scan rules. Make sure that no files are over 500 lines of code. Make sure it is all fully finished and make sure it actually works and meets the point of doing it. No lazy code, nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Waffles measured main 6194599: ast-grep scan clean (a planted unwrap is reported, so the scan works), largest code file 498 raw lines, and no gate leg that counts lines anywhere."
+      },
+      "links": {
+        "cluster": "lys-gate",
+        "decisions": [
+          "ADR-111"
+        ],
+        "briefs": [
+          "LYSGATE-002"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main (Tom, 28 September: briefs are never written by a workflow). Ids are the next free on main 6194599: ADR-111, RM-073, C10 to C16, S4 and S5."
     }
   ]
 }

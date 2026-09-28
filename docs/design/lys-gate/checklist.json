@@ -55,6 +55,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The file-length leg",
+      "items": [
+        {
+          "id": "C10",
+          "text": "scripts/check_file_length.py counts the code lines of every tracked Rust and TypeScript source file as ADR-111 defines them and exits non-zero naming each file over 500, with its count.",
+          "done": false
+        },
+        {
+          "id": "C11",
+          "text": "scripts/check_file_length_test.py covers every counting rule (comments, block and nested comments, strings and raw strings holding comment markers, test code, blank lines, the 500 and 501 boundary, an unreadable file) and passes.",
+          "done": false
+        },
+        {
+          "id": "C12",
+          "text": "scripts/file-length.sh runs the tests, then the checker, and exits non-zero if either fails.",
+          "done": false
+        },
+        {
+          "id": "C13",
+          "text": "The file-length leg is declared identically in docs/design/project.json and in the '.' tree of every cluster design.json gate, directly after the ast-grep leg.",
+          "done": false
+        },
+        {
+          "id": "C14",
+          "text": ".land/gates.sh runs `leg sh scripts/file-length.sh`, CLAUDE.md's 'Gates before any commit' block lists the same command and the ast-grep command it was missing, and CI runs the same script.",
+          "done": false
+        },
+        {
+          "id": "C15",
+          "text": "The leg exits 0 on the card's head and exits non-zero on a scratch file of 501 code lines that never reaches origin, naming that file.",
+          "done": false
+        },
+        {
+          "id": "C16",
+          "text": "sh scripts/design/gate.sh exits 0 at the card's head.",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -26,11 +26,13 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 - **P2** — Every place that declares the gate's test leg declares the same command, so a gate copied from any of them carries --no-fail-fast.
 - **P3** — A gate change moves one command string and nothing else: leg names, order, requirements and cadence stay byte-identical.
 - **P4** — Evidence of a round is named by its path, its SHA-256 and its counts; the log's content is not copied into the documents.
+- **P5** — A standard written in CLAUDE.md is measured by a gate leg; a rule no leg measures holds only by care.
 
 ## Decisions
 
 - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 - ADR-038 — The gate's test leg runs every test binary; it never stops at the first failure — Every declaration of the gate's test leg runs `cargo test --workspace --all-features --no-fail-fast`: project.json, every cluster design.json gate, .land/gates.sh and CLAUDE.md's 'Gates before any commit' block; CI's test step gains the same one flag and nothing else. Rejected: keeping cargo's default fail-fast run, which is shorter on a red round but reports only the first failing binary.
+- ADR-111 — The 500-line limit on code files is a gate leg, not a sentence in CLAUDE.md — A gate leg, `sh scripts/file-length.sh`, runs the checker's own tests and then measures every tracked Rust and TypeScript source file, and fails naming each file whose code lines exceed 500. It is declared in project.json, in every cluster design.json gate, in .land/gates.sh, in CLAUDE.md's 'Gates before any commit' block and in CI. Rejected: an ast-grep rule, which matches syntax and cannot count lines; a clippy lint, since too_many_lines counts one function, not a file, and says nothing of TypeScript; counting raw lines, which would punish documentation.
 
 ## Goals
 
@@ -39,6 +41,7 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 - CI's test step runs `cargo test --workspace --no-fail-fast`.
 - sh scripts/design/gate.sh exits 0 at the card's head.
 - One gate round over a local scratch branch with one planted failing test in crates/lys shows exactly one failed test result and as many test results as the green round at the same head, and no scratch/ ref exists on origin after it.
+- Every tracked Rust and TypeScript source file holds at most 500 lines of code, measured by a gate leg that every gate declaration carries (LYSGATE-002).
 
 ## Non-Goals
 
@@ -51,6 +54,7 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 - Rewording CLAUDE.md's 'All five clean' sentence under the six gate commands — This card changes only the block's test line.
 - Changing the method project, including the ledger's gate.py, or the vendored method under scripts/design — The card keeps to the method as it stands; the logged '$ command' line shows the battery text.
 - Adding a script for the check that no test leg lacks --no-fail-fast — The check is one grep recorded as evidence.
+- Splitting any file in LYSGATE-002 — No file on main 6194599 is over the limit; the leg's first run is green, and a later file over it is split by the build that grows it.
 
 ## Structure
 
@@ -74,6 +78,16 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 | `.github/workflows/ci.yml` | CI; the Test step's cargo test command gains --no-fail-fast and nothing else (LYSGATE-001 R5) |  |
 | `scripts/design/gate.sh` | the design leg; validates, checks coverage and compares rendered markdown for every cluster with a design.json; read, not changed |  |
 | `scripts/design/render-cluster.py` | renders a cluster's markdown from its JSON; does not render the gate array; read, not changed |  |
+| `scripts/check_file_length.py` | the file-length checker (LYSGATE-002 R1) | LYSGATE-002 |
+| `scripts/check_file_length_test.py` | its tests (LYSGATE-002 R2) | LYSGATE-002 |
+| `scripts/file-length.sh` | the leg's command: tests, then the checker (LYSGATE-002 R3) | LYSGATE-002 |
+| `docs/design/decisions-words/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/lys-anchor/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/lys-core/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/lys-log-store/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/rauthy-rebase/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/roots/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
+| `docs/design/lys-gate/PROOF-LYSGATE-002.md` | the green and red runs of the file-length leg (LYSGATE-002 R6) | LYSGATE-002 |
 
 ## Inventory
 
@@ -99,3 +113,4 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 - **CN5** — No crate source, test source or wire format changes on the card's branch.
 - **CN6** — No timeout is raised and no test is split.
 - **CN7** — The scratch branch and its planted test never reach origin: no ref under scratch/ exists on the lys origin after the scratch round.
+- **CN8** — The file-length checker reads the tracked file list once and each file once, in one process, with no subprocess per file and no network.

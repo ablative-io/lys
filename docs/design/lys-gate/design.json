@@ -20,18 +20,24 @@
     {
       "id": "P4",
       "text": "Evidence of a round is named by its path, its SHA-256 and its counts; the log's content is not copied into the documents."
+    },
+    {
+      "id": "P5",
+      "text": "A standard written in CLAUDE.md is measured by a gate leg; a rule no leg measures holds only by care."
     }
   ],
   "decisions": [
     "ADR-004",
-    "ADR-038"
+    "ADR-038",
+    "ADR-111"
   ],
   "goals": [
     "docs/design/project.json, the directory, home, secrets and lys-gate design.json gate arrays and .land/gates.sh declare their test leg as exactly `cargo test --workspace --all-features --no-fail-fast`, and the grep over them prints 0.",
     "CLAUDE.md's 'Gates before any commit' test line and .land/gates.sh's test leg are the same command, `cargo test --workspace --all-features --no-fail-fast`.",
     "CI's test step runs `cargo test --workspace --no-fail-fast`.",
     "sh scripts/design/gate.sh exits 0 at the card's head.",
-    "One gate round over a local scratch branch with one planted failing test in crates/lys shows exactly one failed test result and as many test results as the green round at the same head, and no scratch/ ref exists on origin after it."
+    "One gate round over a local scratch branch with one planted failing test in crates/lys shows exactly one failed test result and as many test results as the green round at the same head, and no scratch/ ref exists on origin after it.",
+    "Every tracked Rust and TypeScript source file holds at most 500 lines of code, measured by a gate leg that every gate declaration carries (LYSGATE-002)."
   ],
   "non_goals": [
     {
@@ -69,6 +75,10 @@
     {
       "text": "Adding a script for the check that no test leg lacks --no-fail-fast",
       "reason": "The check is one grep recorded as evidence."
+    },
+    {
+      "text": "Splitting any file in LYSGATE-002",
+      "reason": "No file on main 6194599 is over the limit; the leg's first run is green, and a later file over it is split by the build that grows it."
     }
   ],
   "structure": [
@@ -161,6 +171,56 @@
       "path": "scripts/design/render-cluster.py",
       "note": "renders a cluster's markdown from its JSON; does not render the gate array; read, not changed",
       "brief": ""
+    },
+    {
+      "path": "scripts/check_file_length.py",
+      "note": "the file-length checker (LYSGATE-002 R1)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "scripts/check_file_length_test.py",
+      "note": "its tests (LYSGATE-002 R2)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "scripts/file-length.sh",
+      "note": "the leg's command: tests, then the checker (LYSGATE-002 R3)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/decisions-words/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/lys-anchor/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/lys-core/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/lys-log-store/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/rauthy-rebase/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/roots/design.json",
+      "note": "cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4)",
+      "brief": "LYSGATE-002"
+    },
+    {
+      "path": "docs/design/lys-gate/PROOF-LYSGATE-002.md",
+      "note": "the green and red runs of the file-length leg (LYSGATE-002 R6)",
+      "brief": "LYSGATE-002"
     }
   ],
   "inventory": [
@@ -241,6 +301,10 @@
     {
       "id": "CN7",
       "text": "The scratch branch and its planted test never reach origin: no ref under scratch/ exists on the lys origin after the scratch round."
+    },
+    {
+      "id": "CN8",
+      "text": "The file-length checker reads the tracked file list once and each file once, in one process, with no subprocess per file and no network."
     }
   ],
   "gate": [
