@@ -67,7 +67,9 @@ fn run(args: Args) -> Result<(), ProxyError> {
     runtime.block_on(async {
         let listener = tokio::net::TcpListener::bind(&args.listen)
             .await
-            .map_err(|source| ProxyError::io("binding the listen address", &config.state, source))?;
+            .map_err(|source| {
+                ProxyError::io("binding the listen address", &config.state, source)
+            })?;
         let started = Proxy::start(config)?;
         for report in &started.lost {
             print_report(report);

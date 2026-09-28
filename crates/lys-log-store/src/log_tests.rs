@@ -392,7 +392,11 @@ fn a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte() {
     let read = Log::open(FileLeafStore::open_read_only(&dir).unwrap()).unwrap();
     assert_eq!(read.tree().len(), 2);
     assert_eq!(read.recovered_to(), None);
-    assert_eq!(tree_bytes(&dir), before, "the read-only open changed no file");
+    assert_eq!(
+        tree_bytes(&dir),
+        before,
+        "the read-only open changed no file"
+    );
 }
 
 #[test]

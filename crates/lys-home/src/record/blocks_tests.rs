@@ -19,15 +19,24 @@ fn the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing()
     let file = shard.join(first.hash.as_str());
     let pinned = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
     for p in [&shard, &file] {
-        std::fs::File::open(p).unwrap().set_modified(pinned).unwrap();
+        std::fs::File::open(p)
+            .unwrap()
+            .set_modified(pinned)
+            .unwrap();
         assert_eq!(std::fs::metadata(p).unwrap().modified().unwrap(), pinned);
     }
     let second = store.put(&block).unwrap();
     assert!(!second.new);
     assert_eq!(second.hash, first.hash);
     assert_eq!(files(), count);
-    assert_eq!(std::fs::metadata(&shard).unwrap().modified().unwrap(), pinned);
-    assert_eq!(std::fs::metadata(&file).unwrap().modified().unwrap(), pinned);
+    assert_eq!(
+        std::fs::metadata(&shard).unwrap().modified().unwrap(),
+        pinned
+    );
+    assert_eq!(
+        std::fs::metadata(&file).unwrap().modified().unwrap(),
+        pinned
+    );
     assert_eq!(count, 1);
     drop(store);
     dir.close().unwrap();

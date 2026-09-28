@@ -104,10 +104,7 @@ where
         async move {
             match request.into_body().collect().await {
                 Ok(_) => answer().await,
-                Err(error) => whole(
-                    StatusCode::BAD_REQUEST,
-                    &json!({"fake": error.to_string()}),
-                ),
+                Err(error) => whole(StatusCode::BAD_REQUEST, &json!({"fake": error.to_string()})),
             }
         }
     }));
@@ -223,7 +220,10 @@ pub(super) fn message_response() -> Value {
 }
 
 fn sse_event(value: &Value) -> Bytes {
-    let kind = value.get("type").and_then(Value::as_str).unwrap_or("message");
+    let kind = value
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("message");
     Bytes::from(format!("event: {kind}\ndata: {value}\n\n"))
 }
 
@@ -244,7 +244,9 @@ pub(super) fn messages_events(deltas: usize) -> Vec<Bytes> {
             "delta": {"type": "text_delta", "text": "x"}
         })));
     }
-    events.push(sse_event(&json!({"type": "content_block_stop", "index": 0})));
+    events.push(sse_event(
+        &json!({"type": "content_block_stop", "index": 0}),
+    ));
     events.push(sse_event(&json!({"type": "message_stop"})));
     events
 }
@@ -494,7 +496,10 @@ async fn a_read_only_capture_directory_is_unrecorded_and_the_client_gets_it_all(
         let (response, _connection) = send(addr, messages_request(Some(KEY), false)?).await?;
         Ok::<_, Box<dyn Error + Send + Sync>>(response.into_body().collect().await?.to_bytes())
     });
-    arrived_rx.recv().await.ok_or("the upstream saw no request")?;
+    arrived_rx
+        .recv()
+        .await
+        .ok_or("the upstream saw no request")?;
     let capture = harness.state("capture");
     std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
     go_tx.send(()).await?;

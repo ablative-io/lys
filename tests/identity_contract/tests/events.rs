@@ -846,7 +846,8 @@ mod faults {
             directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         drop(directory);
         let mut restarted = harness.open()?;
-        let (found, again) = restarted.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let (found, again) =
+            restarted.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(found, lost);
         assert_eq!(again, receipt);
         assert_eq!(restarted.log()?.len()?, 1);

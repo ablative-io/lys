@@ -13,7 +13,10 @@ use crate::record::call::Api;
 fn sse(events: &[Value]) -> String {
     let mut out = String::new();
     for event in events {
-        let kind = event.get("type").and_then(Value::as_str).unwrap_or("message");
+        let kind = event
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("message");
         for piece in ["event: ", kind, "\ndata: ", &event.to_string(), "\n\n"] {
             out.push_str(piece);
         }
@@ -90,7 +93,10 @@ fn a_messages_stream_assembles_to_the_content_a_json_response_holds_split_at_any
     ];
     let mut splits = 0;
     for step in [1, 2, 3, 7, 64, stream.len()] {
-        assert_eq!(read(Api::Messages, stream.as_bytes(), step), Some(expected.clone()));
+        assert_eq!(
+            read(Api::Messages, stream.as_bytes(), step),
+            Some(expected.clone())
+        );
         splits += 1;
     }
     assert_eq!(splits, 6);
@@ -98,7 +104,10 @@ fn a_messages_stream_assembles_to_the_content_a_json_response_holds_split_at_any
 
 #[test]
 fn a_messages_stream_without_message_stop_is_partial() {
-    assert_eq!(read(Api::Messages, messages_stream(false).as_bytes(), 5), None);
+    assert_eq!(
+        read(Api::Messages, messages_stream(false).as_bytes(), 5),
+        None
+    );
 }
 
 #[test]
@@ -148,7 +157,10 @@ fn a_chat_stream_assembles_each_choice_with_its_tool_calls() {
         "function": {"name": "probe", "arguments": "{\"n\":1}"}
     });
     let expected = vec![json!({"role": "assistant", "content": "delta", "tool_calls": [call]})];
-    assert_eq!(read(Api::ChatCompletions, stream.as_bytes(), 3), Some(expected));
+    assert_eq!(
+        read(Api::ChatCompletions, stream.as_bytes(), 3),
+        Some(expected)
+    );
     let unfinished = data_lines(&chunks);
     assert_eq!(read(Api::ChatCompletions, unfinished.as_bytes(), 3), None);
 }
@@ -170,7 +182,10 @@ fn a_responses_stream_gives_the_completed_output_and_a_failed_one_gives_nothing(
             "response": {"status": "completed", "output": [item]}
         }),
     ]);
-    assert_eq!(read(Api::Responses, completed.as_bytes(), 11), Some(vec![item]));
+    assert_eq!(
+        read(Api::Responses, completed.as_bytes(), 11),
+        Some(vec![item])
+    );
     let failed = sse(&[
         done.clone(),
         json!({"type": "response.failed", "response": {"status": "failed"}}),

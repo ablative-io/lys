@@ -31,14 +31,23 @@ fn a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing() {
     let count = std::fs::read_dir(shard).unwrap().count();
     let pinned = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
     for p in [shard, path.as_path()] {
-        std::fs::File::open(p).unwrap().set_modified(pinned).unwrap();
+        std::fs::File::open(p)
+            .unwrap()
+            .set_modified(pinned)
+            .unwrap();
         assert_eq!(std::fs::metadata(p).unwrap().modified().unwrap(), pinned);
     }
     let second = store.put(&bytes).unwrap();
     assert!(!second.new);
     assert_eq!(second.hash, first.hash);
-    assert_eq!(std::fs::metadata(shard).unwrap().modified().unwrap(), pinned);
-    assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(), pinned);
+    assert_eq!(
+        std::fs::metadata(shard).unwrap().modified().unwrap(),
+        pinned
+    );
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().modified().unwrap(),
+        pinned
+    );
     assert_eq!(std::fs::read_dir(shard).unwrap().count(), count);
     assert_eq!(count, 1);
     assert!(store.contains(&first.hash));

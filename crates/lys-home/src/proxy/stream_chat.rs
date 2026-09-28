@@ -108,7 +108,10 @@ impl ChatAssembler {
             }
             let function = call.get("function");
             join(&mut piece.name, function.and_then(|f| f.get("name")));
-            join(&mut piece.arguments, function.and_then(|f| f.get("arguments")));
+            join(
+                &mut piece.arguments,
+                function.and_then(|f| f.get("arguments")),
+            );
         }
     }
 

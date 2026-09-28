@@ -113,8 +113,8 @@ impl Journal {
             .map_err(|e| ProxyError::io("listing the open-call journal", &self.dir, e))?;
         let mut paths = Vec::new();
         for item in listing {
-            let item = item
-                .map_err(|e| ProxyError::io("listing the open-call journal", &self.dir, e))?;
+            let item =
+                item.map_err(|e| ProxyError::io("listing the open-call journal", &self.dir, e))?;
             let path = item.path();
             let name = item.file_name();
             let name = name.to_string_lossy();
@@ -259,7 +259,10 @@ fn run(
             }
             if let Err(unread) = reports.send(report) {
                 // The sink goes on recording; the report is named on stderr.
-                eprintln!("lys-proxy: no reader for the report of call {}", unread.0.call_id);
+                eprintln!(
+                    "lys-proxy: no reader for the report of call {}",
+                    unread.0.call_id
+                );
             }
         }
     }
@@ -300,7 +303,10 @@ fn record(home: &Home, journal: &Journal, job: &mut Job) -> CallReport {
             return report;
         }
     }
-    for path in [job.request.take(), job.response.take()].into_iter().flatten() {
+    for path in [job.request.take(), job.response.take()]
+        .into_iter()
+        .flatten()
+    {
         if std::fs::remove_file(&path).is_err() {
             report.spool_kept += 1;
         }

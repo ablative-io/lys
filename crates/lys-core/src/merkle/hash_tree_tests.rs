@@ -80,7 +80,11 @@ impl Pair {
         let ours = self.hashes.prove_inclusion(index)?;
         let theirs = self.base.prove_inclusion(index)?;
         let n = self.len();
-        assert_eq!(ours.as_bytes(), theirs.as_bytes(), "inclusion {index} of {n}");
+        assert_eq!(
+            ours.as_bytes(),
+            theirs.as_bytes(),
+            "inclusion {index} of {n}"
+        );
         let leaf = self.leaves.get(usize::try_from(index)?).ok_or("no leaf")?;
         verify_inclusion_raw(&self.base.root(), leaf, index, &ours)?;
         Ok(())
@@ -91,8 +95,15 @@ impl Pair {
         let n = self.len();
         let ours = self.hashes.prove_consistency(old, n)?;
         let theirs = self.base.prove_consistency(old, n)?;
-        assert_eq!(ours.as_bytes(), theirs.as_bytes(), "consistency {old} to {n}");
-        let old_root = self.base_roots.get(usize::try_from(old)?).ok_or("no root")?;
+        assert_eq!(
+            ours.as_bytes(),
+            theirs.as_bytes(),
+            "consistency {old} to {n}"
+        );
+        let old_root = self
+            .base_roots
+            .get(usize::try_from(old)?)
+            .ok_or("no root")?;
         verify_consistency(old_root, &self.base.root(), &ours)?;
         Ok(())
     }
@@ -113,8 +124,16 @@ fn every_proof_over_every_small_log_is_the_base_trees_and_verifies() -> Outcome 
             consistencies += 1;
         }
     }
-    assert_eq!(inclusions, 70 * 71 / 2, "every leaf of every size was proved");
-    assert_eq!(consistencies, 70 * 71 / 2, "every prefix of every size was proved");
+    assert_eq!(
+        inclusions,
+        70 * 71 / 2,
+        "every leaf of every size was proved"
+    );
+    assert_eq!(
+        consistencies,
+        70 * 71 / 2,
+        "every prefix of every size was proved"
+    );
     Ok(())
 }
 
@@ -190,14 +209,29 @@ fn out_of_range_requests_are_refused_with_the_base_trees_reasons() -> Outcome {
     let pair = Pair::over(Random(7).log(9))?;
     let (hashes, base) = (&pair.hashes, &pair.base);
     let refused = [
-        (hashes.prove_inclusion(9).err(), base.prove_inclusion(9).err()),
-        (hashes.prove_consistency(0, 9).err(), base.prove_consistency(0, 9).err()),
-        (hashes.prove_consistency(10, 9).err(), base.prove_consistency(10, 9).err()),
-        (hashes.prove_consistency(3, 10).err(), base.prove_consistency(3, 10).err()),
+        (
+            hashes.prove_inclusion(9).err(),
+            base.prove_inclusion(9).err(),
+        ),
+        (
+            hashes.prove_consistency(0, 9).err(),
+            base.prove_consistency(0, 9).err(),
+        ),
+        (
+            hashes.prove_consistency(10, 9).err(),
+            base.prove_consistency(10, 9).err(),
+        ),
+        (
+            hashes.prove_consistency(3, 10).err(),
+            base.prove_consistency(3, 10).err(),
+        ),
     ];
     let mut checked = 0;
     for (ours, theirs) in &refused {
-        assert!(matches!(ours, Some(TrustError::MerkleTree { .. })), "{ours:?}");
+        assert!(
+            matches!(ours, Some(TrustError::MerkleTree { .. })),
+            "{ours:?}"
+        );
         assert_eq!(
             ours.as_ref().map(ToString::to_string),
             theirs.as_ref().map(ToString::to_string)
@@ -217,7 +251,11 @@ fn a_tree_built_to_its_size_holds_fewer_than_two_hashes_per_leaf() -> Outcome {
             tree.push_leaf_hash(raw_leaf_hash(&index.to_le_bytes()));
         }
         let hashes = 2 * size - u64::from(size.count_ones());
-        assert_eq!(u64::try_from(tree.retained_bytes())?, 32 * hashes, "size {size}");
+        assert_eq!(
+            u64::try_from(tree.retained_bytes())?,
+            32 * hashes,
+            "size {size}"
+        );
         measured += 1;
     }
     assert_eq!(measured, 10);

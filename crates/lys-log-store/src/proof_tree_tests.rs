@@ -108,8 +108,16 @@ fn a_100_000_leaf_proof_tree_holds_hashes_only_and_is_built_one_leaf_at_a_time()
     let hashed_before = leaf_hashes();
     let tree = log.proof_tree()?;
     assert_eq!(log.store().inner.reads(), LEAVES, "each leaf read once");
-    assert_eq!(leaf_hashes() - hashed_before, LEAVES, "each leaf hashed once");
-    assert_eq!(log.store().peak.get(), 1, "the build held more than one leaf at once");
+    assert_eq!(
+        leaf_hashes() - hashed_before,
+        LEAVES,
+        "each leaf hashed once"
+    );
+    assert_eq!(
+        log.store().peak.get(),
+        1,
+        "the build held more than one leaf at once"
+    );
     let retained = u64::try_from(tree.retained_bytes())?;
     assert!(
         retained <= 2 * 32 * LEAVES,
@@ -135,7 +143,11 @@ fn each_append_to_a_built_proof_tree_hashes_its_leaf_once() -> Outcome {
         "eight appends hash eight leaves: the tree takes the frontier's hash"
     );
     let tree = log.proof_tree()?;
-    assert_eq!(log.store().reads(), 12, "the built tree was extended, not rebuilt");
+    assert_eq!(
+        log.store().reads(),
+        12,
+        "the built tree was extended, not rebuilt"
+    );
     let mut verified = 0;
     for index in 0..20 {
         let proof = tree.prove_inclusion(index)?;

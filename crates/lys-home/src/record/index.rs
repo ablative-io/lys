@@ -31,8 +31,8 @@ use crate::record::io_counts::IoCounter;
 
 mod head;
 
-pub use head::{read_head, read_header, write_head};
 pub(crate) use head::{place_head, write_head_counted};
+pub use head::{read_head, read_header, write_head};
 
 /// One row of the index: where an entry's line lies.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

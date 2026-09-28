@@ -47,7 +47,10 @@ fn both_spellings_of_the_key_are_read_and_an_unsafe_one_links_nothing() {
     let object = json!({"device_id": "d", "session_id": KEY}).to_string();
     assert_eq!(session_key(&object), Some(KEY.to_owned()));
     let body = json!({"metadata": {"user_id": object}, "messages": []});
-    assert_eq!(scan(body.to_string().as_bytes(), 7), Link::Session(KEY.to_owned()));
+    assert_eq!(
+        scan(body.to_string().as_bytes(), 7),
+        Link::Session(KEY.to_owned())
+    );
     assert_eq!(session_key("user_ab_account_cd_session_../x"), None);
     assert_eq!(session_key("user_ab_account_cd"), None);
     assert_eq!(session_key("{\"session_id\": \"a/b\"}"), None);

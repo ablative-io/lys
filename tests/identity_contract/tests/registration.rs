@@ -207,10 +207,7 @@ async fn credential_count(service: &Service, cookie: &str) -> Result<usize, Box<
         .len();
     let (status, body) = service.get("/sessions", Some(cookie)).await?;
     assert_eq!(status, 200, "{body}");
-    count += body["sessions"]
-        .as_array()
-        .ok_or("no sessions list")?
-        .len();
+    count += body["sessions"].as_array().ok_or("no sessions list")?.len();
     Ok(count)
 }
 

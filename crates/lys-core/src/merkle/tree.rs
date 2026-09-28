@@ -343,7 +343,9 @@ impl HashTree {
         let mut levels = Vec::new();
         let mut width = leaves;
         while width > 0 {
-            levels.push(Vec::with_capacity(usize::try_from(width).unwrap_or_default()));
+            levels.push(Vec::with_capacity(
+                usize::try_from(width).unwrap_or_default(),
+            ));
             width >>= 1;
         }
         Self { size: 0, levels }

@@ -48,7 +48,10 @@ fn actions(names: &[&str]) -> Result<BTreeSet<Action>, Box<dyn Error>> {
 }
 
 fn to(names: &[&str], kinds: &[RecipientKind]) -> Result<PassOn, Box<dyn Error>> {
-    Ok(PassOn::to(actions(names)?, kinds.iter().copied().collect())?)
+    Ok(PassOn::to(
+        actions(names)?,
+        kinds.iter().copied().collect(),
+    )?)
 }
 
 const BOTH: [RecipientKind; 2] = [RecipientKind::Person, RecipientKind::Agent];
@@ -111,8 +114,12 @@ impl People {
             )?;
             Ok(id)
         };
-        let (admin, holder, other, lender) =
-            (person("Admin")?, person("P1")?, person("P2")?, person("P3")?);
+        let (admin, holder, other, lender) = (
+            person("Admin")?,
+            person("P1")?,
+            person("P2")?,
+            person("P3")?,
+        );
         directory.bind_login(
             administrator()?,
             OperationId::generate()?,
@@ -411,7 +418,13 @@ fn ask(
         recipient,
     };
     let directory = people.projection()?;
-    Ok(cannot_give(&book.book, directory, &book.model, &request, AT)?)
+    Ok(cannot_give(
+        &book.book,
+        directory,
+        &book.model,
+        &request,
+        AT,
+    )?)
 }
 
 fn grant_number(id: GrantId) -> Result<u8, Box<dyn Error>> {
@@ -529,7 +542,11 @@ fn cannot_give_precedence() -> TestResult {
             .filter(|item| item.subject == CannotGiveSubject::Grant(g(3)))
             .map(|item| item.reason)
             .collect();
-        assert_eq!(g3, vec![LentToYou], "{recipient}: G3 carries lent_to_you alone");
+        assert_eq!(
+            g3,
+            vec![LentToYou],
+            "{recipient}: G3 carries lent_to_you alone"
+        );
         legs += 1;
     }
     assert_eq!(legs, 2);
@@ -547,7 +564,11 @@ fn cannot_give_order_table() {
             .map(|(_, reason)| reason)
             .collect();
         let reversed: Vec<CannotGiveReason> = subset.iter().rev().copied().collect();
-        assert_eq!(CannotGiveReason::first(reversed), subset.first().copied(), "{subset:?}");
+        assert_eq!(
+            CannotGiveReason::first(reversed),
+            subset.first().copied(),
+            "{subset:?}"
+        );
         cases += 1;
     }
     assert_eq!(cases, 63);
@@ -621,12 +642,19 @@ fn cannot_give_in_force_only() -> TestResult {
     assert_eq!(list.items.len(), 3, "{list:?}");
     assert_eq!(
         seen(&list)?,
-        vec![Seen::Grant(2, UseOnly), Seen::Grant(3, LentToYou), Seen::SignIn]
+        vec![
+            Seen::Grant(2, UseOnly),
+            Seen::Grant(3, LentToYou),
+            Seen::SignIn
+        ]
     );
     for id in [5, 9, 13, 14] {
         assert!(!names_grant(&list, g(id)), "G{id} is not in force");
     }
-    assert!(!names_relation(&list, "damson"), "G9 covers damson, in any standing");
+    assert!(
+        !names_relation(&list, "damson"),
+        "G9 covers damson, in any standing"
+    );
     // Before G9's end passes it is in force, and may be given, so it is still unlisted.
     let request = CannotGiveRequest {
         caller: IdentityId::Person(people.p1),

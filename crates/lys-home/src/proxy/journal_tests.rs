@@ -42,7 +42,11 @@ fn a_restart_records_each_open_call_lost_once_with_what_was_spooled() -> Res {
     std::fs::write(capture.join("c1.request"), b"{\"model\": \"m\", \"messa")?;
     let first = recover(&home, &journal, &capture)?;
     assert_eq!(first.len(), 2);
-    assert!(first.iter().all(|r| r.status == CallStatus::Lost && r.entry_id.is_some()));
+    assert!(
+        first
+            .iter()
+            .all(|r| r.status == CallStatus::Lost && r.entry_id.is_some())
+    );
     assert_eq!(first[0].session, KEY);
     assert_eq!(first[1].session, "unlinked-2026-09-28");
     assert_eq!(journal.open_calls()?.len(), 0);
@@ -102,10 +106,12 @@ async fn a_call_open_when_the_proxy_stops_is_recorded_lost_by_the_next_start() -
     .await?;
     let harness = Harness::start(upstream, 4).await?;
     let addr = harness.addr;
-    let in_flight = tokio::spawn(async move {
-        send(addr, messages_request(Some(KEY), false)?).await
-    });
-    arrived_rx.recv().await.ok_or("the upstream saw no request")?;
+    let in_flight =
+        tokio::spawn(async move { send(addr, messages_request(Some(KEY), false)?).await });
+    arrived_rx
+        .recv()
+        .await
+        .ok_or("the upstream saw no request")?;
     assert_eq!(std::fs::read_dir(harness.state("journal"))?.count(), 1);
     let base = Base::parse(&format!("http://{upstream}"))?;
     let restarted = Proxy::start(ProxyConfig {
@@ -136,7 +142,9 @@ async fn a_journal_that_cannot_be_written_refuses_the_call_before_it_is_sent() -
     std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o700))?;
     let (response, _connection) = sent?;
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let text = http_body_util::BodyExt::collect(response.into_body()).await?.to_bytes();
+    let text = http_body_util::BodyExt::collect(response.into_body())
+        .await?
+        .to_bytes();
     assert!(String::from_utf8_lossy(&text).contains("open-call journal could not be written"));
     assert_eq!(count.load(Ordering::SeqCst), 0);
     Ok(())
@@ -165,14 +173,20 @@ async fn a_journal_lost_after_admission_forwards_and_records_unrecorded_once_wri
         let body = http_body_util::BodyExt::collect(response.into_body()).await?;
         Ok::<_, Box<dyn std::error::Error + Send + Sync>>(body.to_bytes())
     });
-    arrived_rx.recv().await.ok_or("the upstream saw no request")?;
+    arrived_rx
+        .recv()
+        .await
+        .ok_or("the upstream saw no request")?;
     let journal = harness.state("journal");
     std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o500))?;
     go_tx.send(()).await?;
     let received = call.await??;
     let held = harness.report()?;
     std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o700))?;
-    assert_eq!(received, hyper::body::Bytes::from(message_response().to_string()));
+    assert_eq!(
+        received,
+        hyper::body::Bytes::from(message_response().to_string())
+    );
     assert_eq!(held.status, CallStatus::Unrecorded);
     assert!(held.held.is_some());
     assert!(held.entry_id.is_none());
