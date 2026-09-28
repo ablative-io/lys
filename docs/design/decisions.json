@@ -1867,15 +1867,19 @@
       "status": "decided",
       "scope": "directory",
       "date": "2026-09-29",
-      "decided_by": "Tom via Waffles at 07:14 and 07:16 Melbourne; recorded by Chippy",
+      "decided_by": "Tom via Waffles at 07:14, 07:16 and 07:23 Melbourne, following Archie's 07:22 review. Recorded by Chippy.",
       "context": "DIRECTORY-051 creates Lys-owned hooks and refusal recording at the tool boundary. A shell can execute outside a tool hook. OS confinement and source-backed denial reporting are separate capabilities. Linux Landlock network rules apply to ports, not destination hostnames (https://docs.kernel.org/userspace-api/landlock.html). Native audit availability is an explicit host capability (https://www.kernel.org/doc/html/latest/admin-guide/LSM/landlock.html). Apple describes sandbox denial diagnostics and inherited helper restrictions (https://developer.apple.com/documentation/security/discovering-and-diagnosing-app-sandbox-violations).",
-      "decision": "Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch; gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.",
+      "decision": "Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.",
       "quote": "",
       "consequences": [
-        "The card is11VnzLRp and the handwritten implementation brief isDIRECTORY-062, after051.",
-        "A narrowly privileged host setup or audit helper may be required; its authenticated policy-bound interface and installation are part of the card, not a request for users to disable OS security.",
-        "Only safe OS interfaces are allowed; if supported interfaces cannot deliver the policy or evidence, report the specific capability and stop that start.",
-        "Hostname enforcement and kernel network isolation have separate receipts and neither substitutes for the other."
+        "The card is 11VnzLRp and the handwritten implementation brief is DIRECTORY-062, after 051.",
+        "Host preparation is a separate one-time privileged act from the Lys page using native macOS administrator or Linux distribution authorisation. It is outside ordinary install. Missing preparation refuses a contained start by name. No terminal is required.",
+        "Linux requires Landlock ABI 7 audit support, introduced with kernel 6.15, and audit-reader privilege. Ubuntu namespace restrictions remain enabled. A helper-specific profile supplies namespace access. Noninitial-namespace LOG capability is explicitly authorised and checked.",
+        "The Linux namespace uses a named local forwarder and a bound host Unix egress socket. It receives no direct host route. Hostnames remain enforced by the same Lys policy.",
+        "Use sandbox-exec on macOS and a separately executed self-restricting Linux helper. Do not use unsafe Rust or pre_exec callbacks.",
+        "Native coalescing retains the aggregate count and marks per-attempt coverage incomplete. Never invent syscall events.",
+        "051 creates the policy version and its store. 062 adds its digest there. The existing pinned Lys server key signs the launch act containing the plan.",
+        "The Linux venue is 205 and is probed only through the gate workflow. Missing kernel or audit capability requires a separate linked venue-prerequisite card. macOS may pass first but both native legs and the full battery must pass on the integrated head before 062 is complete."
       ],
       "supersedes": [],
       "superseded_by": ""

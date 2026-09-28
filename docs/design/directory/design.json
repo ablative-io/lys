@@ -4687,6 +4687,46 @@
       "path": "docs/design/directory/briefs/DIRECTORY-063.md",
       "note": "the unknown API path and health brief",
       "brief": "DIRECTORY-063"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_forwarder.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare_macos.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_prepare_linux.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_prepare.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "crates/lys-runner/tests/containment_forwarder.rs",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "docs/CONTAINMENT-PREPARATION.md",
+      "note": "Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3.",
+      "brief": "DIRECTORY-062"
+    },
+    {
+      "path": "scripts/identity-gates/containment-capabilities.sh",
+      "note": "A person watches real native denials and an allowed control. DIRECTORY-062 R6.",
+      "brief": "DIRECTORY-062"
     }
   ],
   "inventory": [
