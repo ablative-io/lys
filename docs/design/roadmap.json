@@ -2053,6 +2053,31 @@
       },
       "depends_on": [],
       "notes": "Written by hand straight to main from the verified low findings (scratchpad audit-low-verified.json)."
+    },
+    {
+      "id": "RM-084",
+      "title": "Lys is the only sign-in anyone sees, set up by an ordinary person",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "First-run setup, sign-in, provider setup and account changes are Lys pages; every product signs in through Lys; the issuer inside is never shown.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T19:10:00+10:00",
+        "quote": "Lys is meant to be the sign-in for everything. It's meant to be our only own single sign-on for absolutely everything. Cambium uses Lys, not Rauthy. How is an average person supposed to do it?",
+        "context": "Tom could not sign in to the live install for an hour on 28 September 2026: the issuer's own pages, a password file read in Terminal, and an administrator email taken from the machine."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-115"
+        ],
+        "briefs": [
+          "DIRECTORY-047"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main."
     }
   ]
 }

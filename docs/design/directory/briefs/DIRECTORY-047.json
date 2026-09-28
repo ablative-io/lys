@@ -1,0 +1,194 @@
+{
+  "id": "DIRECTORY-047",
+  "cluster": "directory",
+  "title": "Lys is the only sign-in anyone sees: first-run setup, sign-in, providers and accounts on Lys pages, every product a client of Lys",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C355",
+    "C356",
+    "C357",
+    "C358",
+    "C359",
+    "C360"
+  ],
+  "stories": [
+    "S149",
+    "S150"
+  ],
+  "design_anchor": [
+    "ADR-115"
+  ],
+  "purpose": "Tom's word on 28 September 2026: 'Lys is meant to be the sign-in for everything. It's meant to be our only own single sign-on for absolutely everything. Cambium uses Lys, not Rauthy.' and 'How is an average person supposed to do it?' That night the live install showed the issuer's own sign-in page, kept the administrator in the issuer's admin site, took the administrator's email from the machine, and needed a password file read in Terminal. This brief makes Lys the one sign-in a person or product meets, and makes first-run setup something an ordinary person can do.",
+  "task": "Move every path a person follows (first run, sign-in, provider setup, own account, administration of accounts) onto Lys pages served by lys-identity-server, with the service speaking to the issuer server-side; make Lys the OpenID provider every product is registered with; remove every default and every mention of the issuer from what a person sees.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "First run is a Lys setup page that asks for the administrator; install fills nothing from the machine",
+      "spec": "Behavioural. Today first-run setup (crates/lys-identity-server/src/setup.rs, surface/identity/src/features/setup/Setup.tsx) runs after the configured administrator has already signed in at the issuer, whose account install bootstraps from --admin-email (crates/lys/src/identity/cli.rs, default admin@identity.test) and a generated password kept in the state folder. Change it so the person creates the administrator on the Lys setup page: --admin-email loses its default, and a first install with none creates no administrator in the issuer; it writes a one-time setup code to the state folder (owner-only) and prints and opens http://localhost:8490/setup. The setup screen, served only while no administrator exists and the code matches, asks name, email and password (entered twice, the issuer's password policy shown before submit); the service creates the account in the issuer through its API key, runs the existing setup act for it, deletes the code, and signs the person in. --admin-email stays for unattended installs and is validated as an email. No field is ever filled from git config, the environment or any other machine default, and no person is ever asked to read a password file.",
+      "acceptance": [
+        "A first install with no --admin-email creates no administrator, prints the setup address, and the setup route answers the setup screen.",
+        "The setup route refuses by name once an administrator exists, and with a wrong or used code.",
+        "Completing setup creates exactly one administrator with the entered email and leaves the person signed in to Lys.",
+        "A test sets git user.email and every EMAIL-like environment variable to a marker and proves the marker appears nowhere in state, deployment.toml or the issuer."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys/src/identity/cli.rs",
+          "crates/lys/src/identity/install.rs",
+          "crates/lys/src/identity/install/layout.rs",
+          "crates/lys-identity-server/src/setup.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "surface/identity/src/features/setup/Setup.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C355"
+      ],
+      "stories": [
+        "S149"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Password sign-in is a Lys page; the browser never reaches the issuer's pages",
+      "spec": "Behavioural. GET /login (crates/lys-identity-server/src/routes.rs:319) today redirects to the issuer's authorize page. It serves Lys's sign-in screen instead: email, password and one button per enabled provider. The password form posts to the service, which runs the issuer's authorization server-side for the lys-platform client (including its proof of work and PKCE), completes the code exchange as /callback does today, and sets the session. A refusal is worded by Lys: wrong email or password is one message that does not say which. Provider buttons start the provider flow through the service and return through /callback; a person passes through the provider's own consent page only.",
+      "acceptance": [
+        "An end-to-end test signs in with email and password and records every URL the browser is sent to: every one is on Lys's origin.",
+        "A wrong password and an unknown email give the same Lys refusal, and neither names the issuer.",
+        "A provider sign-in's recorded URLs are Lys's origin and the provider's, never the issuer's."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/sign_in.rs",
+          "surface/identity/src/features/sign-in/SignIn.tsx"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C356"
+      ],
+      "stories": [
+        "S149",
+        "S150"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Lys is the OpenID provider every product is registered with",
+      "spec": "Behavioural. Today crates/lys-identity-server/src/oidc.rs makes Lys a client of the issuer, and install registers Cambium as the issuer's client. Add the provider side: lys-identity-server serves /.well-known/openid-configuration, authorize, token, userinfo and jwks at its own origin under Lys's issuer URL, completing sign-in through R2's screens and signing ID tokens with a key the install keeps in the state folder. Install registers Cambium (and any later product) as a client of Lys, and the configuration it hands a product names only Lys's address. The issuer's ports are published only on the container network, not on the host.",
+      "acceptance": [
+        "Cambium configured from install's output signs in with every URL on Lys's origin or a provider's.",
+        "Discovery at Lys's origin answers Lys's issuer, and a token Lys issues verifies against Lys's jwks.",
+        "No port of the issuer answers from the host after install."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/provider.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/oidc.rs",
+          "crates/lys/src/identity/configure.rs",
+          "deploy/identity/compose.yaml"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C357"
+      ],
+      "stories": [
+        "S150"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Providers are set up inside Lys with every step shown",
+      "spec": "Behavioural. surface/identity/src/features/connections/SignInProviders.tsx: for Google, GitHub and Microsoft the screen shows the exact redirect address to paste (with a copy button), a link to the provider's page that creates a client, then the client id, secret and (Microsoft) tenant fields. Saving sets the provider through the service as today and then proves it by fetching the provider's discovery or authorize endpoint with the new client id; a failure names what the provider said.",
+      "acceptance": [
+        "The redirect address shown equals the one the service sends to the provider.",
+        "Saving a provider with a client id the provider rejects is refused with the provider's words.",
+        "A saved provider appears as a button on R2's sign-in screen."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/connections/SignInProviders.tsx",
+          "crates/lys-identity-server/src/sign_in_providers.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C358"
+      ],
+      "stories": [
+        "S149"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "A person's own account, and administration of accounts, are Lys screens",
+      "spec": "Behavioural. A You-screen section changes the signed-in person's email (confirmed by re-entering their password) and password; an administrator's screen changes any person's email, resets a password, and enables or disables a person. Each is carried out by the service against the issuer. The issuer's admin site is not reachable from a browser on the host.",
+      "acceptance": [
+        "Changing one's email on the You screen changes it in the issuer, and the person signs in with the new email.",
+        "An administrator's reset lets the person sign in with the new password and refuses the old one.",
+        "A browser request from the host to the issuer's admin path fails to connect."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/people/Account.tsx",
+          "crates/lys-identity-server/src/accounts.rs"
+        ],
+        "modify": [
+          "surface/identity/src/features/me/You.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C359"
+      ],
+      "stories": [
+        "S149"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Nothing a person reads names the issuer",
+      "spec": "Behavioural. Install output, every refusal returned to a browser, every served screen, page title and email use Lys's name. The issuer is named only in operator log files.",
+      "acceptance": [
+        "A test runs a first install and a sign-in and scans stdout, stderr, every served page and every refusal body for the issuer's name: none.",
+        "The built screens contain no occurrence of the issuer's name."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys/src/identity/install.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "surface/identity/src"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C360"
+      ],
+      "stories": [
+        "S149",
+        "S150"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT fill any field about a person from git config, environment variables or any machine default.",
+    "SHALL NOT send a person's browser to the issuer's pages on any path.",
+    "SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore] or any bypass.",
+    "SHALL NOT print or log a password, client secret, API key or setup code."
+  ],
+  "verification": [
+    "The full Lys gate and the surface checks exit 0 at the card's head, measured by the card round.",
+    "R2 and R6's end-to-end tests run a real install on a scratch estate and pass."
+  ]
+}

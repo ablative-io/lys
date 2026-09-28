@@ -1618,6 +1618,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-115",
+      "title": "Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom, 28 September 2026 about 19:10 Melbourne; recorded by Waffles with DIRECTORY-047",
+      "context": "On 28 September 2026 the live install sent Tom to the issuer's own sign-in page at localhost:18080 with the issuer's branding, kept the administrator in the issuer's admin site, took the administrator's email from a flag Archie filled from the machine's git user.email (an address Tom must never see), and asked him to read a password file in Terminal. Cambium was registered as a client of the issuer, not of Lys. Tom could not sign in for an hour.",
+      "decision": "Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.",
+      "quote": "Lys is meant to be the sign-in for everything. It's meant to be our only own single sign-on for absolutely everything. Cambium uses Lys, not Rauthy. / How is an average person supposed to do it?",
+      "consequences": [
+        "The service speaks to the issuer server-side for password sign-in, provider sign-in, account changes and administration.",
+        "The issuer's admin site is not reachable from a browser on the host.",
+        "Install output and every refusal a person reads name Lys, never the issuer.",
+        "Replacing the issuer later changes no product."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

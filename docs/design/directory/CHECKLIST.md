@@ -274,3 +274,12 @@
 - [ ] **C352** — A record is serialised without cloning it (DIRECTORY-046 R5).
 - [ ] **C353** — The grants screens ask for reach in one concurrent batch (DIRECTORY-046 R6).
 - [ ] **C354** — The screens choose the right route first and fetch independent reads together (DIRECTORY-046 R7).
+
+## Lys is the only sign-in anyone sees (DIRECTORY-047)
+
+- [ ] **C355** — First run asks the person for the administrator's name, email and password on a Lys setup page; install fills nothing from the machine and has no default administrator (DIRECTORY-047 R1).
+- [ ] **C356** — Password sign-in happens on a Lys page at Lys's origin; the browser never reaches the issuer's pages (DIRECTORY-047 R2).
+- [ ] **C357** — Every product, Cambium first, is a client of Lys at Lys's origin; no product configuration names the issuer (DIRECTORY-047 R3).
+- [ ] **C358** — Google, GitHub and Microsoft are set up inside Lys, which shows the exact address to paste and tests the provider on save (DIRECTORY-047 R4).
+- [ ] **C359** — A person changes their own email and password, and an administrator changes anyone's, on Lys screens; the issuer's admin site is not reachable from the host (DIRECTORY-047 R5).
+- [ ] **C360** — Nothing a person reads (screens, install output, refusals, page titles) names the issuer (DIRECTORY-047 R6).
