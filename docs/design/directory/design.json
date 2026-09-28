@@ -1999,7 +1999,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed.\nUnder the lead's ruling of 27 September 2026, CN1 binds only the documents-only planning briefs: from DIRECTORY-003 on, the directory's code briefs create and change code under crates/lys-identity and crates/lys-identity-server, and CN1 does not bind them."
+      "text": "Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. CN1 binds only the planning brief, DIRECTORY-001."
     },
     {
       "id": "CN2",
