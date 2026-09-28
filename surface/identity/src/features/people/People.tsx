@@ -1,4 +1,5 @@
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
+import { Teams } from '../teams/Teams';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { api, useLoad } from '../../api';
@@ -143,25 +144,15 @@ function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad;
   );
 }
 
-function Elsewhere({ which }: { which: 'teams' | 'found' }) {
-  return (
-    <div className="empty-note" style={{ marginBottom: 14 }}>
-      {NOT_YET}{' '}
-      {which === 'teams'
-        ? 'Teams have no server yet. A team can answer for an agent together, and can hold access that its members inherit.'
-        : 'Found agents need runtimes and connections that report sessions with no identity; none reports here yet.'}
-    </div>
-  );
-}
-
 export function People() {
   const shell = useShell();
   const load = useLoad(api.people, 'people');
-  if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
+  if (shell.filterKind === 'teams') return <Teams head={<PeopleHead />} />;
+  if (shell.filterKind === 'found') {
     return (
       <div className="page">
         <PeopleHead />
-        {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Elsewhere which="teams" />}
+        <RuntimeSessions found />
       </div>
     );
   }
