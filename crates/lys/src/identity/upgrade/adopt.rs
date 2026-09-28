@@ -112,17 +112,45 @@ fn adopt_running(
     Ok(program)
 }
 
-/// Each installed binary's commit. An install that records its build
-/// refuses a binary whose `--version` cannot be read; one made before
-/// builds were recorded names it [`UNSTAMPED`]. A binary `bin/` lacks is
-/// adopted from its running process first, and its build is read from the
-/// file that process runs, which the placed copy equals.
+/// The commit the build record names for each binary, empty when the
+/// install records no build.
+fn recorded_commits(layout: &Layout) -> IdentityResult<BTreeMap<String, String>> {
+    #[derive(serde::Deserialize)]
+    struct Recorded {
+        binaries: BTreeMap<String, String>,
+    }
+    let path = layout.build_record();
+    let text = match std::fs::read(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(BTreeMap::new());
+        }
+        Err(error) => {
+            return Err(
+                refuse(ErrorKind::PrivateFileIo, "build record", error.to_string()).at(&path),
+            );
+        }
+    };
+    serde_json::from_slice::<Recorded>(&text)
+        .map(|recorded| recorded.binaries)
+        .map_err(|error| {
+            refuse(ErrorKind::ConfigInvalid, "build record", error.to_string()).at(&path)
+        })
+}
+
+/// Each installed binary's commit. A binary the build record names by a
+/// commit must still answer `--version`; one the record names
+/// [`UNSTAMPED`], or does not name, was built before build stamps and is
+/// read as it is, so an install made or kept by an earlier build is
+/// upgraded like any other. A binary `bin/` lacks is adopted from its
+/// running process first, and its build is read from the file that process
+/// runs, which the placed copy equals.
 pub fn installed(
     layout: &Layout,
     units: &[Unit],
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BTreeMap<String, String>> {
-    let recorded = layout.build_record().is_file();
+    let recorded = recorded_commits(layout)?;
     let mut build = BTreeMap::new();
     for unit in units {
         let placed = layout.binary(unit.binary);
@@ -131,10 +159,9 @@ pub fn installed(
         } else {
             adopt_running(layout, unit, say)?
         };
-        let commit = if recorded {
-            version(&program, unit.binary)?
-        } else {
-            commit_or_unstamped(&program, unit.binary)?
+        let commit = match recorded.get(unit.binary) {
+            Some(commit) if commit != UNSTAMPED => version(&program, unit.binary)?,
+            _ => commit_or_unstamped(&program, unit.binary)?,
         };
         build.insert(unit.binary.to_string(), commit);
     }

@@ -127,19 +127,19 @@ pub fn units(layout: &Layout) -> Vec<Unit> {
 /// What an upgrade asks of the engine that runs the compose services.
 pub trait Engine {
     /// Brings the compose services to the definition now in place,
-    /// recreating those whose definition changed, and waits for them ready.
+    /// making every service again from it, and waits for them ready.
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
 }
 
-/// The compose services through `docker compose`, which recreates exactly
-/// the services whose rendered definition changed.
+/// The compose services through `docker compose`, every one made again from
+/// its rendered definition, so a changed network reaches each of them.
 #[derive(Debug)]
 pub struct Compose;
 
 impl Engine for Compose {
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
         let config = DeploymentConfig::load(&layout.deployment_config())?;
-        services::compose_up(layout, &config)?;
+        services::compose_recreate(layout, &config)?;
         services::wait_ready(layout, &config, say)?;
         say("compose services on their rendered definition and ready");
         Ok(())
