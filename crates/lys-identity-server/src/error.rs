@@ -39,6 +39,9 @@ pub enum ServerError {
         /// The refusal's name, as the whole refusal carries it.
         refusal: String,
     },
+    /// The session is not one the caller may end: it is not live, or it belongs to another person.
+    #[error("SessionUnknown: no live session by that id is visible to the signed-in caller")]
+    SessionUnknown,
     /// A sign-in answer names a state this service did not issue, or one already used.
     #[error("SignInStateUnknown: the sign-in answer does not match a sign-in this service began")]
     SignInStateUnknown,
@@ -97,7 +100,9 @@ impl ServerError {
             Self::NotAdmitted { .. } | Self::NoPerson | Self::Withheld { .. } => {
                 StatusCode::FORBIDDEN
             }
-            Self::AgentNotVisible | Self::GrantNotVisible => StatusCode::NOT_FOUND,
+            Self::AgentNotVisible | Self::GrantNotVisible | Self::SessionUnknown => {
+                StatusCode::NOT_FOUND
+            }
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {
