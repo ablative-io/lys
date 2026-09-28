@@ -25,6 +25,7 @@ pub mod provenance;
 pub mod receipt;
 pub mod restart;
 pub mod signer;
+pub mod start;
 mod state_value;
 
 pub use binding::LoginBinding;
