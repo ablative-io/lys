@@ -77,6 +77,8 @@ pub struct SessionView {
     pub what: String,
     /// Its confirmed stop, null until the runtime confirms one.
     pub stopped: Option<StopView>,
+    /// When this service asked the runtime to end it, null when it never did.
+    pub stop_asked_at: Option<u64>,
     /// The identity that delivered its first report.
     pub reported_by: String,
 }
@@ -175,6 +177,11 @@ fn report(
         .map_err(|_unread| malformed("a session is named `op-` and 32 hex digits"))?;
     let confirmation = words("confirmation", &body.confirmation)?;
     match body.state {
+        Reported::StopAsked => {
+            return Err(malformed(
+                "a stop is asked through the agent's emergency stop, never reported",
+            ));
+        }
         Reported::Stopped if confirmation.is_empty() => {
             return Err(malformed(
                 "a stop is kept only with the runtime's confirmation",
@@ -226,6 +233,7 @@ fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
             at: latest.at,
             confirmation: latest.confirmation.clone(),
         }),
+        stop_asked_at: tracked.stop_asked_at(),
         reported_by: first.reported_by.clone(),
     })
 }

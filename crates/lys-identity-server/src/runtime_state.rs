@@ -22,6 +22,9 @@ pub enum Reported {
     Running,
     /// The runtime confirms the session stopped.
     Stopped,
+    /// This service asked the runtime to end the session, on an emergency
+    /// stop; the session stays unconfirmed until the runtime reports.
+    StopAsked,
 }
 
 impl Reported {
@@ -31,6 +34,7 @@ impl Reported {
             Self::Starting => "starting",
             Self::Running => "running",
             Self::Stopped => "stopped",
+            Self::StopAsked => "stop_asked",
         }
     }
 }
@@ -96,8 +100,18 @@ impl Tracked {
         match self.latest().map(|report| report.state) {
             Some(Reported::Stopped) => "stopped",
             Some(Reported::Running) => "running",
-            Some(Reported::Starting) | None => "unconfirmed",
+            Some(Reported::Starting | Reported::StopAsked) | None => "unconfirmed",
         }
+    }
+
+    /// When this service last asked the runtime to end the session, null
+    /// when it never did.
+    pub fn stop_asked_at(&self) -> Option<u64> {
+        self.reports
+            .iter()
+            .rev()
+            .find(|report| report.state == Reported::StopAsked)
+            .map(|report| report.at)
     }
 
     /// Whether the runtime has confirmed the session stopped.
