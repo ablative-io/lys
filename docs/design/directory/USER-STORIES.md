@@ -215,3 +215,9 @@
 **S146.** As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.
 
 **S147.** As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in.
+
+## Person setting up Lys for the first time — Installs Lys on their own machine with no terminal knowledge and signs in
+
+**S149.** As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys.
+
+**S150.** As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's.
