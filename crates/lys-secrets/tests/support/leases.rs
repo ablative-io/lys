@@ -163,11 +163,12 @@ impl Leases {
     /// `POST /leases/{lease_id}/revoke` as `caller`.
     pub fn revoke(&mut self, caller: &str, lease: &IssuedHandle) -> (u16, Value) {
         let asked = &mut self.revoke_requests;
-        answered(self.broker.revoke_lease(
-            caller,
-            &lease.id,
-            &mut |ended: &str, _secret: &str| asked.push(ended.to_owned()),
-        ))
+        answered(
+            self.broker
+                .revoke_lease(caller, &lease.id, &mut |ended: &str, _secret: &str| {
+                    asked.push(ended.to_owned());
+                }),
+        )
     }
 
     /// `POST /leases/{lease_id}/relinquish` as `caller`.
@@ -213,18 +214,26 @@ impl Leases {
         assert_eq!(self.read(PERSON_A, lease).0, 200, "(2) the lease read");
         readings.push(self.upstream(lease)?);
 
-        let (again, other) = match first {
-            EndAct::Revoke => (self.revoke(PERSON_A, lease), self.relinquish(AGENT_A, lease)),
-            EndAct::Relinquish => (self.relinquish(AGENT_A, lease), self.revoke(PERSON_A, lease)),
+        let again = match first {
+            EndAct::Revoke => self.revoke(PERSON_A, lease),
+            EndAct::Relinquish => self.relinquish(AGENT_A, lease),
         };
         assert_eq!(again.0, 409, "(3) the same act again: {}", again.1);
         readings.push(self.upstream(lease)?);
+
+        let other = match first {
+            EndAct::Revoke => self.relinquish(AGENT_A, lease),
+            EndAct::Relinquish => self.revoke(PERSON_A, lease),
+        };
         assert_eq!(other.0, 409, "(4) the other act: {}", other.1);
         readings.push(self.upstream(lease)?);
 
         for scope in [None, Some("organisation"), Some("team"), Some("mine")] {
             let (status, body) = list(&self.broker, &person_a(), scope);
-            assert_eq!(status, 200, "(5 to 8) the list with scope {scope:?}: {body}");
+            assert_eq!(
+                status, 200,
+                "(5 to 8) the list with scope {scope:?}: {body}"
+            );
             let listed = names(&body);
             assert!(
                 listed.iter().all(|name| SEEN_BY_A.contains(&name.as_str())),

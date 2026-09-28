@@ -19,7 +19,10 @@ use lys_secrets::EndAct;
 fn conformance_7_6_a_relinquish_stops_issuing_at_once_and_reads_upstream_pending() -> TestResult {
     let mut world = Leases::new()?;
     let l1 = world.issue(AGENT_A, A_ORG)?;
-    assert!(world.use_lease(&l1)?, "the lease issues before the relinquish");
+    assert!(
+        world.use_lease(&l1)?,
+        "the lease issues before the relinquish"
+    );
     let forwarded = world.forwarded;
 
     let (status, body) = world.relinquish(AGENT_A, &l1);
@@ -34,7 +37,10 @@ fn conformance_7_6_a_relinquish_stops_issuing_at_once_and_reads_upstream_pending
     assert_eq!(world.lines(&l1, UNCONFIRMED)?, 1, "one line for the move");
     assert_eq!(world.revoke_requests, vec![l1.id.as_str().to_owned()]);
 
-    assert!(world.ack(&l1)?, "the double delivers its acknowledgement once");
+    assert!(
+        world.ack(&l1)?,
+        "the double delivers its acknowledgement once"
+    );
     assert_eq!(world.upstream(&l1)?, "confirmed");
     assert_eq!(world.lines(&l1, CONFIRMED)?, 1);
     Ok(())
