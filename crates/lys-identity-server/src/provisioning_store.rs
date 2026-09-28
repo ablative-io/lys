@@ -264,7 +264,7 @@ impl ProvisioningStore {
                     .iter_mut()
                     .find(|version| version.number == number)
             })
-            .ok_or(ServerError::LaunchRecordMissing)?;
+            .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
         if version.reviewed.is_some() {
             return Ok(());
         }
