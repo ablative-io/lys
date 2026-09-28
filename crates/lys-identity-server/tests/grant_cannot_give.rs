@@ -24,6 +24,9 @@ use lys_identity_server::routes::open_directory;
 use lys_identity_server::session::now;
 use serde_json::{Value, json};
 
+/// One item of a cannot-give answer: its subject, its reason and its source mark.
+type Item = (String, String, bool);
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BEA: &str = "bea-subject";
@@ -149,12 +152,12 @@ impl World {
     }
 
     /// The answer's items as `(subject, reason, source mark)`, a grant by its label.
-    fn items(&self, answer: &Value) -> Result<Vec<(String, String, bool)>, Box<dyn Error>> {
+    fn items(&self, answer: &Value) -> Result<Vec<Item>, Box<dyn Error>> {
         answer["items"]
             .as_array()
             .ok_or("no items")?
             .iter()
-            .map(|item| -> Result<(String, String, bool), Box<dyn Error>> {
+            .map(|item| -> Result<Item, Box<dyn Error>> {
                 assert!(
                     item.get("standing").is_none(),
                     "an item carries no standing: {item}"
@@ -176,15 +179,15 @@ impl World {
             .collect()
     }
 
-    /// R1's CANNOT_GIVE_FIXTURE list: G2 and G3 in the order of their ids,
+    /// R1's `CANNOT_GIVE_FIXTURE` list: G2 and G3 in the order of their ids,
     /// then damson, then the sign-in identity.
-    fn fixture_list(&self) -> Result<Vec<(String, String, bool)>, Box<dyn Error>> {
+    fn fixture_list(&self) -> Result<Vec<Item>, Box<dyn Error>> {
         let mut grants = vec![
             (self.grant("G2")?, "G2", "use_only"),
             (self.grant("G3")?, "G3", "lent_to_you"),
         ];
         grants.sort();
-        let mut list: Vec<(String, String, bool)> = grants
+        let mut list: Vec<Item> = grants
             .into_iter()
             .map(|(_, label, reason)| (label.to_owned(), reason.to_owned(), false))
             .collect();
@@ -331,7 +334,7 @@ async fn cannot_give_wire() -> TestResult {
             "{reason}: {answer}"
         );
     }
-    let g11: Vec<(String, String, bool)> = world
+    let g11: Vec<Item> = world
         .items(&answer)?
         .into_iter()
         .filter(|(subject, ..)| subject == "G11")
@@ -349,7 +352,7 @@ async fn cannot_give_wire() -> TestResult {
             .all(|(_, reason, _)| reason != "sign_in_identity"),
         "{answer}"
     );
-    let g10: Vec<&(String, String, bool)> = items
+    let g10: Vec<&Item> = items
         .iter()
         .filter(|(subject, ..)| subject == "G10")
         .collect();

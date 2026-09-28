@@ -714,8 +714,9 @@ mod receipts {
             )
             .await?;
         assert_eq!(status, 200, "{body}");
-        let reused = serde_json::json!({ "operation": op(1).to_string(), "display_name": "Grace" });
-        let (status, refusal) = service.post("/people", Some(&cookie), &reused).await?;
+        let second_use =
+            serde_json::json!({ "operation": op(1).to_string(), "display_name": "Grace" });
+        let (status, refusal) = service.post("/people", Some(&cookie), &second_use).await?;
         assert_ne!(status, 200, "{refusal}");
         assert_eq!(refusal["refusal"], "OperationReused", "{refusal}");
         let mut answers = vec![body, refusal];
