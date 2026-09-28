@@ -1,6 +1,7 @@
 //! The `resume-check` command: what a fork of a rendered transcript added,
 //! measured by record and by `tool_use` id.
 
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use serde_json::Value;
@@ -66,30 +67,31 @@ fn tool_uses(path: &Path) -> Result<Vec<(String, Vec<String>)>, HomeError> {
     Ok(out)
 }
 
-pub(crate) fn resume_check(rendered: &Path, forked: &Path) -> Result<ResumeReport, HomeError> {
+/// How many times each `tool_use` id appears across these records, counted
+/// in one pass.
+fn id_counts(records: &[(String, Vec<String>)]) -> HashMap<&str, u64> {
+    let mut counts: HashMap<&str, u64> = HashMap::new();
+    for id in records.iter().flat_map(|(_, ids)| ids.iter()) {
+        *counts.entry(id.as_str()).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Compare a rendered transcript with the fork a resume wrote: records, the
+/// fork's new records and their `tool_use` parts, and the `tool_use` ids the
+/// fork holds more times than the rendered file.
+pub fn resume_check(rendered: &Path, forked: &Path) -> Result<ResumeReport, HomeError> {
     let before = tool_uses(rendered)?;
     let after = tool_uses(forked)?;
-    let rendered_uuids: std::collections::BTreeSet<&str> =
-        before.iter().map(|(u, _)| u.as_str()).collect();
-    let count = |records: &[(String, Vec<String>)], id: &str| -> u64 {
-        u64::try_from(
-            records
-                .iter()
-                .flat_map(|(_, ids)| ids.iter())
-                .filter(|x| x.as_str() == id)
-                .count(),
-        )
-        .unwrap_or(u64::MAX)
-    };
+    let rendered_uuids: BTreeSet<&str> = before.iter().map(|(u, _)| u.as_str()).collect();
     // A tool action the fork *inherited* by copying the rendered records is not a repeat;
     // a repeat is an id that appears more times in the fork than in the rendered file.
+    let before_counts = id_counts(&before);
+    let after_counts = id_counts(&after);
     let mut repeated = 0u64;
-    for id in before
-        .iter()
-        .flat_map(|(_, ids)| ids.iter())
-        .collect::<std::collections::BTreeSet<_>>()
-    {
-        repeated += count(&after, id).saturating_sub(count(&before, id));
+    for (id, n) in &before_counts {
+        let forked = after_counts.get(id).copied().unwrap_or(0);
+        repeated += forked.saturating_sub(*n);
     }
     let new: Vec<&(String, Vec<String>)> = after
         .iter()

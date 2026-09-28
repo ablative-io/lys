@@ -176,7 +176,7 @@ pub fn render_claude_code(
                         for part in message
                             .get("content")
                             .and_then(Value::as_array)
-                            .cloned()
+                            .map(Vec::as_slice)
                             .unwrap_or_default()
                         {
                             match part.get("type").and_then(Value::as_str) {
@@ -195,10 +195,10 @@ pub fn render_claude_code(
                                         content.push(json!({"type": "text", "text": text}));
                                         as_text += 1;
                                         if sig.is_some() {
-                                            losses.push(loss(&part, "signed thinking rendered as text: different provider, api or model"));
+                                            losses.push(loss(part, "signed thinking rendered as text: different provider, api or model"));
                                         }
                                     } else {
-                                        losses.push(loss(&part, if redacted { "redacted thinking dropped: different provider, api or model" } else { "empty thinking dropped" }));
+                                        losses.push(loss(part, if redacted { "redacted thinking dropped: different provider, api or model" } else { "empty thinking dropped" }));
                                     }
                                 }
                                 Some("toolCall") => content.push(json!({

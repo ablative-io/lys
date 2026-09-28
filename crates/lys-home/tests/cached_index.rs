@@ -101,3 +101,28 @@ fn a_row_that_does_not_start_where_the_last_ended_is_rebuilt_from_the_file() {
     assert!(session.index_was_rebuilt());
     assert_eq!(session.path().unwrap().0.len(), 2);
 }
+
+#[test]
+fn a_last_row_one_byte_short_of_its_line_is_rebuilt_from_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path()).unwrap();
+    let mut session = home.create_session("s10", "/w", None).unwrap();
+    for n in 1..=10 {
+        session
+            .append(EntryBody::Message {
+                message: json!({"role": "user", "content": format!("entry {n}")}),
+            })
+            .unwrap();
+    }
+    let file = session.file().to_path_buf();
+    drop(session);
+    let index = Index::index_path(&file);
+    let mut cached = rows(&index);
+    assert_eq!(cached.len(), 10);
+    let last_len = cached[9]["len"].as_u64().unwrap();
+    cached[9]["len"] = json!(last_len - 1);
+    write_rows(&index, &cached);
+    let session = lys_home::Session::open(&file).unwrap();
+    assert!(session.index_was_rebuilt());
+    assert_eq!(session.path().unwrap().0.len(), 10);
+}

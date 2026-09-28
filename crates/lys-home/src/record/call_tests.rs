@@ -6,6 +6,9 @@
 use serde_json::json;
 
 use crate::record::Home;
+use crate::record::Session;
+use crate::record::blocks::BlockStore;
+use crate::record::call::IngestReport;
 use crate::record::call::{
     Api, CallMeta, CallStatus, OutcomeMeta, call_record, ingest_call, ingest_call_files,
     ingest_outcome,
@@ -365,4 +368,98 @@ fn a_call_is_found_after_a_crash_before_the_head_advanced_and_after_the_head_mov
     assert!(again.already_recorded);
     drop(s);
     dir.close().unwrap();
+}
+
+/// Ingest one complete call by id through `ingest_call`.
+fn ingest(s: &mut Session, blocks: &BlockStore, call_id: &str) -> IngestReport {
+    ingest_call(
+        s,
+        blocks,
+        &meta(Api::Messages, call_id),
+        b"{\"model\":\"m\",\"messages\":[]}",
+        b"{\"content\":[]}",
+        None,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_reopened_session_reads_each_call_once_and_no_call_on_any_later_ingest() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path()).unwrap();
+    let blocks = home.blocks().unwrap();
+    let mut s = home.create_session("map", "/w", None).unwrap();
+    let first: Vec<String> = (0..100)
+        .map(|n| ingest(&mut s, &blocks, &format!("c{n:03}")).entry_id)
+        .collect();
+    let file = s.file().to_path_buf();
+    drop(s);
+    let mut s = Session::open(&file).unwrap();
+    let before = s.io_counts().entries_read;
+    assert!(!ingest(&mut s, &blocks, "c100").already_recorded);
+    assert_eq!(s.io_counts().entries_read - before, 100);
+    let read = s.io_counts().entries_read;
+    for n in 101..=105 {
+        assert!(!ingest(&mut s, &blocks, &format!("c{n}")).already_recorded);
+        assert_eq!(s.io_counts().entries_read, read);
+    }
+    let size = std::fs::metadata(&file).unwrap().len();
+    let mut repeats = Vec::new();
+    for (n, want) in first.iter().enumerate().take(2) {
+        let r = ingest(&mut s, &blocks, &format!("c{n:03}"));
+        repeats.push((r, want));
+    }
+    let rf = dir.path().join("request.json");
+    let pf = dir.path().join("response.json");
+    std::fs::write(&rf, b"{\"model\":\"m\",\"messages\":[]}").unwrap();
+    std::fs::write(&pf, b"{\"content\":[]}").unwrap();
+    for (n, want) in first.iter().enumerate().skip(2).take(2) {
+        let call = meta(Api::Messages, &format!("c{n:03}"));
+        let r = ingest_call_files(&mut s, &blocks, &call, &rf, &pf, None).unwrap();
+        repeats.push((r, want));
+    }
+    let lost = OutcomeMeta {
+        call_id: "c004".into(),
+        provider: "anthropic".into(),
+        api: Api::Messages,
+        status: CallStatus::Lost,
+        started_at: "t".into(),
+        duration_ms: None,
+        stream: false,
+    };
+    let r = ingest_outcome(&mut s, &blocks, &lost, None, None).unwrap();
+    repeats.push((r, &first[4]));
+    assert_eq!(repeats.len(), 5);
+    for (r, want) in &repeats {
+        assert!(r.already_recorded);
+        assert_eq!(&r.entry_id, *want);
+    }
+    assert_eq!(s.io_counts().entries_read, read);
+    assert_eq!(std::fs::metadata(&file).unwrap().len(), size);
+}
+
+#[test]
+fn a_call_appended_beside_the_head_is_found_through_a_built_map() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path()).unwrap();
+    let blocks = home.blocks().unwrap();
+    let mut s = home.create_session("beside", "/w", None).unwrap();
+    assert!(!ingest(&mut s, &blocks, "first").already_recorded);
+    let body = EntryBody::Custom {
+        custom_type: CUSTOM_CALL.into(),
+        data: Some(json!({"call_id": "beside"})),
+    };
+    let beside = s.append_beside(body).unwrap();
+    let size = std::fs::metadata(s.file()).unwrap().len();
+    let r = ingest(&mut s, &blocks, "beside");
+    assert!(r.already_recorded);
+    assert_eq!(r.entry_id, beside);
+    assert_eq!(std::fs::metadata(s.file()).unwrap().len(), size);
+}
+
+fn shared<T: Send + Sync>() {}
+
+#[test]
+fn a_session_is_send_and_sync() {
+    shared::<Session>();
 }

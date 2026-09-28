@@ -42,6 +42,21 @@ Read from the Pi checkout at `3d5cbe98`
 - Durability order on append: entry line fsynced, then index row fsynced, then
   head renamed. A crash between any two leaves a file whose index is either
   complete or rebuildable, never one that claims an entry it does not hold.
+- Durability of the import command's new session (ADR-108): the session is
+  built under the staging name `<id>.jsonl.importing`, holding `<id>.lock`
+  throughout. The header and every entry line are written there with no sync,
+  and the index rows and the head are held in memory. It is then published
+  once, in this order: one sync of the staging file; the index written whole
+  to `<id>.index.jsonl` through a temporary file, synced and renamed; the head
+  written once to `<id>.head` the same way; one sync of the sessions
+  directory; the staging file renamed to `<id>.jsonl`; one more sync of the
+  sessions directory. Five syncs, whatever the record count. A crash before
+  the rename leaves no `<id>.jsonl`; the next import of that id and the next
+  open of that session file, each holding the lock, remove
+  `<id>.jsonl.importing` and, when `<id>.jsonl` is absent, `<id>.index.jsonl`
+  and `<id>.head`, and sync the sessions directory after any removal. A
+  staging file is never listed as a session. Every other append, an import
+  into a session already open among them, keeps the per-append order above.
 
 ## Blocks
 

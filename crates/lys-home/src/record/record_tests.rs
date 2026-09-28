@@ -3,10 +3,14 @@
 //! and the context path.
 
 use std::io::Write;
+use std::io::{Cursor, ErrorKind, Read, Seek, SeekFrom};
 
 use serde_json::json;
 
+use crate::error::HomeError;
+use crate::record::IoCounts;
 use crate::record::entries::{CUSTOM_AUTHORED, Entry, EntryBody};
+use crate::record::index::{Index, read_header};
 use crate::record::{Home, Session};
 
 fn message(role: &str, text: &str) -> EntryBody {
@@ -420,4 +424,167 @@ fn a_primary_write_fault_and_a_head_fault_each_leave_the_session_in_step_with_th
     assert!(!s.index_was_rebuilt());
     drop(s);
     dir.close().unwrap();
+}
+
+#[test]
+fn a_session_counts_the_entries_it_reads_and_the_syncs_its_writes_make() {
+    let (dir, home) = home();
+    let mut s = home.create_session("io", "/w", None).unwrap();
+    let created = IoCounts {
+        entries_read: 0,
+        syncs: 4,
+    };
+    assert_eq!(s.io_counts(), created);
+    let ids: Vec<String> = (0..3)
+        .map(|n| s.append(message("user", &n.to_string())).unwrap())
+        .collect();
+    assert_eq!(s.io_counts().syncs, 16);
+    assert_eq!(s.path().unwrap().0.len(), 3);
+    assert_eq!(s.io_counts().entries_read, 3);
+    s.entry(&ids[0]).unwrap();
+    assert_eq!(s.io_counts().entries_read, 4);
+    let file = s.file().to_path_buf();
+    drop(s);
+    let s = Session::open(&file).unwrap();
+    assert_eq!(s.io_counts(), IoCounts::default());
+    let (_empty_dir, empty) = home();
+    let blocks = empty.blocks().unwrap();
+    assert_eq!(blocks.syncs(), 0);
+    blocks.put(b"one").unwrap();
+    blocks.put(b"two").unwrap();
+    assert_eq!(blocks.syncs(), 4);
+    blocks.put(b"one").unwrap();
+    assert_eq!(blocks.syncs(), 4);
+    drop(s);
+    dir.close().unwrap();
+}
+
+#[test]
+fn customs_reads_only_the_custom_entries_of_the_path_root_first() {
+    let (_dir, home) = home();
+    let mut s = home.create_session("customs", "/w", None).unwrap();
+    let authored = || EntryBody::Custom {
+        custom_type: CUSTOM_AUTHORED.into(),
+        data: None,
+    };
+    s.append(message("user", "a")).unwrap();
+    let first = s.append(authored()).unwrap();
+    s.append(message("assistant", "b")).unwrap();
+    let second = s.append(authored()).unwrap();
+    s.append(message("user", "c")).unwrap();
+    let before = s.io_counts().entries_read;
+    let found = s.customs(CUSTOM_AUTHORED).unwrap();
+    assert_eq!(s.io_counts().entries_read - before, 2);
+    let ids: Vec<&str> = found.iter().map(Entry::id).collect();
+    assert_eq!(ids, [first.as_str(), second.as_str()]);
+}
+
+#[test]
+fn the_context_path_after_a_compaction_is_it_then_the_kept_entries_then_the_rest() {
+    let (_dir, home) = home();
+    let mut s = home.create_session("ctx", "/w", None).unwrap();
+    let e: Vec<String> = (1..=4)
+        .map(|n| s.append(message("user", &format!("e{n}"))).unwrap())
+        .collect();
+    let compaction = EntryBody::Compaction {
+        summary: "so far".into(),
+        first_kept_entry_id: e[2].clone(),
+        tokens_before: 10,
+        rest: serde_json::Map::new(),
+    };
+    let e5 = s.append(compaction).unwrap();
+    let e6 = s.append(message("user", "e6")).unwrap();
+    let ctx = s.context_path().unwrap();
+    let got: Vec<&str> = ctx.iter().map(Entry::id).collect();
+    let want = [e5.as_str(), e[2].as_str(), e[3].as_str(), e6.as_str()];
+    assert_eq!(got, want);
+}
+
+/// A reader over a session file's bytes that records every seek it is asked
+/// for, and fails every read or every seek with the kind given.
+struct Probe {
+    bytes: Cursor<Vec<u8>>,
+    seeks: Vec<u64>,
+    read: Option<ErrorKind>,
+    seek: Option<ErrorKind>,
+}
+
+impl Read for Probe {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.read {
+            Some(kind) => Err(kind.into()),
+            None => self.bytes.read(buf),
+        }
+    }
+}
+
+impl Seek for Probe {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        if let Some(kind) = self.seek {
+            return Err(kind.into());
+        }
+        if let SeekFrom::Start(at) = pos {
+            self.seeks.push(at);
+        }
+        self.bytes.seek(pos)
+    }
+}
+
+/// What `from_cached` answered, the seeks it made, and each row's last byte.
+type Probed = (Result<Option<Index>, HomeError>, Vec<u64>, Vec<u64>);
+
+/// `from_cached` over the cached rows of a session of `n` entries, through a
+/// probe over the session file's bytes.
+fn probed(n: usize, read: Option<ErrorKind>, seek: Option<ErrorKind>) -> Probed {
+    let (_dir, home) = home();
+    let mut s = home.create_session("cached", "/w", None).unwrap();
+    for i in 0..n {
+        s.append(message("user", &format!("entry {i}"))).unwrap();
+    }
+    let file = s.file().to_path_buf();
+    drop(s);
+    let index_file = Index::index_path(&file);
+    let rows = Index::read_rows(&index_file).unwrap();
+    let lasts = rows.iter().map(|r| r.offset + r.len - 1).collect();
+    let (_, header_len) = read_header(&file).unwrap();
+    let bytes = std::fs::read(&file).unwrap();
+    let len = bytes.len() as u64;
+    let mut probe = Probe {
+        bytes: Cursor::new(bytes),
+        seeks: Vec::new(),
+        read,
+        seek,
+    };
+    let got = Index::from_cached(&file, &mut probe, index_file, rows, header_len, len);
+    (got, probe.seeks, lasts)
+}
+
+#[test]
+fn an_open_from_the_cache_reads_the_last_byte_of_the_first_middle_and_last_rows_only() {
+    let (got, seeks, lasts) = probed(10, None, None);
+    assert_eq!(got.unwrap().unwrap().len(), 10);
+    assert_eq!(seeks, [lasts[0], lasts[5], lasts[9]]);
+    let (got, seeks, lasts) = probed(1, None, None);
+    assert!(got.unwrap().is_some());
+    assert_eq!(seeks, [lasts[0]]);
+    let (got, seeks, lasts) = probed(2, None, None);
+    assert!(got.unwrap().is_some());
+    assert_eq!(seeks, [lasts[0], lasts[1]]);
+}
+
+fn source_kind(got: Result<Option<Index>, HomeError>) -> ErrorKind {
+    match got {
+        Err(HomeError::Io { source, .. }) => source.kind(),
+        other => panic!("not an I/O error: {other:?}"),
+    }
+}
+
+#[test]
+fn a_failed_read_or_seek_is_that_error_and_an_early_end_is_a_stale_cache() {
+    let other = probed(10, Some(ErrorKind::Other), None).0;
+    assert_eq!(source_kind(other), ErrorKind::Other);
+    let denied = probed(10, None, Some(ErrorKind::PermissionDenied)).0;
+    assert_eq!(source_kind(denied), ErrorKind::PermissionDenied);
+    let early = probed(10, Some(ErrorKind::UnexpectedEof), None).0;
+    assert!(early.unwrap().is_none());
 }

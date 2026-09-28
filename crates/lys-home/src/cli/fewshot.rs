@@ -4,22 +4,24 @@
 use std::io::Write;
 use std::path::Path;
 
+use rand::RngCore;
 use serde_json::json;
 
 use crate::error::HomeError;
 use crate::harness::claude_code::AUTHORED;
+use crate::harness::claude_code::render::uuid_string;
 use crate::record::canon::Role;
-use crate::record::{fresh_id, now};
+use crate::record::now;
 
 /// Write the authored file: user records as plain strings, assistant records
 /// with model `authored`, the parent chain intact, a fresh session id.
 pub(crate) fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeError> {
     let turns = crate::record::canon::parse_turns(turns)?;
-    let session_id = uuid_shaped();
+    let session_id = random_uuid();
     let mut prev: Option<String> = None;
     let mut lines = Vec::new();
     for (n, (role, body)) in turns.into_iter().enumerate() {
-        let uuid = uuid_shaped();
+        let uuid = random_uuid();
         let (kind, message) = match role {
             Role::User => ("user", json!({"role": "user", "content": body})),
             Role::Assistant => (
@@ -74,15 +76,12 @@ pub(crate) fn fewshot(out: &Path, turns: &Path, cwd: &str) -> Result<u64, HomeEr
     Ok(lines.len() as u64)
 }
 
-/// A fresh id in Claude Code's uuid shape.
-fn uuid_shaped() -> String {
-    let h = fresh_id();
-    format!(
-        "{}-{}-4{}-8{}-{}",
-        &h[..8],
-        &h[8..12],
-        &h[13..16],
-        &h[17..20],
-        &h[20..32]
-    )
+/// A fresh id in Claude Code's uuid shape: 16 random bytes with the version
+/// nibble 4 and the variant nibble 8, written by [`uuid_string`].
+fn random_uuid() -> String {
+    let mut bytes = [0u8; 16];
+    rand::rng().fill_bytes(&mut bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x0f) | 0x80;
+    uuid_string(&bytes)
 }

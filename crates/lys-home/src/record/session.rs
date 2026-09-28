@@ -1,16 +1,21 @@
-//! One open session file: its lock, its index and head, the durable append
-//! and the reads of the path from the head to the root.
+//! One open session file: its lock, its index and head, and the durable
+//! append. The reads of the path from the head to the root are in `reads`,
+//! the call-id map in `call_map` and the staged import in `staged`.
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use crate::error::HomeError;
 use crate::record::blocks;
 use crate::record::entries::{Entry, EntryBase, EntryBody, SessionHeader};
-use crate::record::helpers::{custom_type_of, fresh_id, now, write_durable};
-use crate::record::index::{Index, IndexRow, read_head, write_head};
+use crate::record::helpers::{custom_type_of, fresh_id, now};
+use crate::record::index::{Index, IndexRow, read_head, write_head_counted};
+use crate::record::io_counts::IoCounter;
 use crate::record::lock::SessionLock;
+use crate::record::staged::{Staged, clear_remainder};
 
 /// One open session file.
 #[derive(Debug)]
@@ -28,6 +33,13 @@ pub struct Session {
     pub(super) stale: bool,
     /// How many times this owner reconciled from the file.
     pub(super) reconciliations: u64,
+    /// The entries this owner read and the syncs its writes made.
+    pub(super) io: IoCounter,
+    /// Call id to the first `lys.call` entry holding it; `None` until the
+    /// first lookup and after a reconcile.
+    pub(super) calls: Mutex<Option<HashMap<String, String>>>,
+    /// Set while a new session is built under its staging name.
+    pub(super) staged: Option<Staged>,
 }
 
 impl Session {
@@ -38,6 +50,7 @@ impl Session {
         if file.exists() {
             return Err(HomeError::Exists { path: file });
         }
+        let io = IoCounter::default();
         let line = to_line(&header, &file)?;
         let mut f = std::fs::OpenOptions::new()
             .create_new(true)
@@ -48,9 +61,11 @@ impl Session {
             .map_err(|e| HomeError::io("writing the header", &file, e))?;
         f.sync_all()
             .map_err(|e| HomeError::io("syncing the session file", &file, e))?;
+        io.synced();
         blocks::sync_dir(file.parent().unwrap_or_else(|| Path::new(".")))?;
+        io.synced();
         let index = Index::new(&file, line.len() as u64);
-        write_head(&file, None)?;
+        write_head_counted(&file, None, &io)?;
         Ok(Self {
             file,
             header,
@@ -60,6 +75,9 @@ impl Session {
             lock,
             stale: false,
             reconciliations: 0,
+            io,
+            calls: Mutex::new(None),
+            staged: None,
         })
     }
 
@@ -67,11 +85,14 @@ impl Session {
     /// reading its persisted head. A file with no head beside it (one Pi
     /// wrote) takes its last entry as the head, as Pi does on reopen, and
     /// that head is persisted here and now, so a side leaf appended later
-    /// ([`Session::append_beside`]) can never be taken for the head.
+    /// ([`Session::append_beside`]) can never be taken for the head. What a
+    /// part-way staged import of this id left beside it is removed first.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
         let lock = SessionLock::take(&file)?;
-        let (header, index, rebuilt) = load_checked(&file)?;
+        let io = IoCounter::default();
+        clear_remainder(&file, &io)?;
+        let (header, index, rebuilt) = Index::load_counted(&file, &io)?;
         let head = read_head(&file, &index)?;
         if let Some(id) = &head
             && index.row(id).is_none()
@@ -82,7 +103,7 @@ impl Session {
             });
         }
         if !Index::head_path(&file).is_file() {
-            write_head(&file, head.as_deref())?;
+            write_head_counted(&file, head.as_deref(), &io)?;
         }
         Ok(Self {
             file,
@@ -93,6 +114,9 @@ impl Session {
             lock,
             stale: false,
             reconciliations: 0,
+            io,
+            calls: Mutex::new(None),
+            staged: None,
         })
     }
 
@@ -103,7 +127,8 @@ impl Session {
         if !self.stale {
             return Ok(());
         }
-        let (header, index, _) = load_checked(&self.file)?;
+        self.refuse_staged()?;
+        let (header, index, _) = Index::load_counted(&self.file, &self.io)?;
         let head = read_head(&self.file, &index)?;
         if let Some(id) = &head
             && index.row(id).is_none()
@@ -116,6 +141,7 @@ impl Session {
         self.header = header;
         self.index = index;
         self.head = head;
+        self.forget_calls();
         self.stale = false;
         self.reconciliations += 1;
         Ok(())
@@ -211,7 +237,7 @@ impl Session {
     /// record or `None`.
     pub fn append_entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
         self.append_line(entry)?;
-        if let Err(e) = write_head(&self.file, Some(entry.id())) {
+        if let Err(e) = self.persist_head(Some(entry.id())) {
             self.stale = true;
             self.reconcile()?;
             return Err(e);
@@ -242,27 +268,15 @@ impl Session {
         }
         let line = to_line(entry, &self.file)?;
         let offset = self.index.end();
-        // A failure to open, write or sync may leave none, some or all of the
-        // line on disk: the session is stale until it has looked at the file.
-        if let Err(e) = write_durable(&self.file, &line) {
-            self.stale = true;
-            self.reconcile()?;
-            return Err(e);
-        }
-        // From here the line is durable. A failure below leaves the index or the
-        // head behind the file: mark stale and reconcile at once; if that fails
-        // too, the session stays stale until the next act reconciles it.
-        if let Err(e) = self.index.append(IndexRow {
+        self.write_line(&line)?;
+        self.record_row(IndexRow {
             id: entry.id().to_owned(),
             parent: entry.parent_id().map(str::to_owned),
             offset,
             len: line.len() as u64,
             custom: custom_type_of(entry),
-        }) {
-            self.stale = true;
-            self.reconcile()?;
-            drop(e);
-        }
+        })?;
+        self.note_call(entry);
         Ok(())
     }
 
@@ -280,50 +294,13 @@ impl Session {
         }
         // A head that could not be published (or whose directory sync failed)
         // may or may not stand on disk: reconcile from the file before answering.
-        if let Err(e) = write_head(&self.file, id) {
+        if let Err(e) = self.persist_head(id) {
             self.stale = true;
             self.reconcile()?;
             return Err(e);
         }
         self.head = id.map(str::to_owned);
         Ok(())
-    }
-
-    /// One entry by id, read by seeking to it.
-    pub fn entry(&self, id: &str) -> Result<Entry, HomeError> {
-        self.fresh()?;
-        let row = self.index.row(id).ok_or_else(|| HomeError::UnknownEntry {
-            session: self.header.id.clone(),
-            id: id.to_owned(),
-        })?;
-        let (mut entries, _) = self.index.read_rows_from(&self.file, &[row])?;
-        entries.pop().ok_or(HomeError::StaleIndex {
-            path: self.file.clone(),
-            reason: "a row read no entry",
-        })
-    }
-
-    /// The entries from the root to the head, root first, read by seeking to
-    /// each; the second value is how many bytes of the file were read.
-    pub fn path(&self) -> Result<(Vec<Entry>, u64), HomeError> {
-        self.fresh()?;
-        let Some(head) = &self.head else {
-            return Ok((Vec::new(), 0));
-        };
-        let rows = self.index.ancestry(head)?;
-        self.index.read_rows_from(&self.file, &rows)
-    }
-
-    /// The context path: what Pi's `buildSessionContext` feeds the model. With
-    /// a compaction on the path, the compaction entry first, then the kept
-    /// entries from `first_kept_entry_id` up to the compaction, then everything
-    /// after it; without one, the whole path.
-    pub fn context_path(&self) -> Result<Vec<Entry>, HomeError> {
-        let (path, _) = self.path()?;
-        Ok(match Self::context_positions(&path) {
-            None => path,
-            Some(positions) => positions.into_iter().map(|n| path[n].clone()).collect(),
-        })
     }
 
     /// The positions in a root-to-head path of its context path, in the
@@ -358,34 +335,12 @@ impl Session {
         self.fresh()?;
         let rows: Vec<&IndexRow> = self.index.rows().iter().collect();
         let (entries, _) = self.index.read_rows_from(&self.file, &rows)?;
-        Ok(entries)
-    }
-
-    /// The custom entries of a given custom type on the path, root first.
-    pub fn customs(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
-        let (path, _) = self.path()?;
-        Ok(path
-            .into_iter()
-            .filter(|e| e.is_custom(custom_type))
-            .collect())
-    }
-
-    /// Every durable custom entry of a given custom type in the file, on any
-    /// branch and whatever the head, in file order, read by seeking to each.
-    pub fn customs_everywhere(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
-        self.fresh()?;
-        let rows = self.index.rows_of_custom(custom_type);
-        let (entries, _) = self.index.read_rows_from(&self.file, &rows)?;
+        self.io.read(entries.len());
         Ok(entries)
     }
 }
 
-/// Load the index, rebuilding when it is missing or lags the file.
-fn load_checked(file: &Path) -> Result<(SessionHeader, Index, bool), HomeError> {
-    Index::load(file)
-}
-
-fn to_line<T: serde::Serialize>(value: &T, file: &Path) -> Result<String, HomeError> {
+pub(super) fn to_line<T: serde::Serialize>(value: &T, file: &Path) -> Result<String, HomeError> {
     let mut line = serde_json::to_string(value).map_err(|e| HomeError::Malformed {
         path: file.to_path_buf(),
         line: 0,
