@@ -433,6 +433,53 @@ pub enum HomeError {
         id: String,
     },
 
+    /// The Claude Code render met a field it cannot shape: absent, or
+    /// present with another type than the target takes. Names the entry,
+    /// the field and the type the render needed, never the value.
+    #[error("{}", render_field(session, entry, field, expected, *missing))]
+    RenderField {
+        /// The home session's header id.
+        session: String,
+        /// The id of the entry holding the field.
+        entry: String,
+        /// The field's name as the record spells it.
+        field: &'static str,
+        /// The type the render needed: `string`, `array`, `boolean`,
+        /// `object` or `array or string`.
+        expected: &'static str,
+        /// Whether the field was absent rather than of another type.
+        missing: bool,
+    },
+
+    /// The Claude Code render met an assistant stopReason that Claude Code's
+    /// files carry no value for; the one record value a refusal names.
+    #[error(
+        "render of session {session} refused entry {entry}: stopReason {value} has no Claude Code value"
+    )]
+    RenderStopReason {
+        /// The home session's header id.
+        session: String,
+        /// The id of the assistant entry.
+        entry: String,
+        /// The stopReason the record carries.
+        value: String,
+    },
+
+    /// Something the Claude Code render must write would not serialise, so
+    /// nothing was written.
+    #[error("{}", render_unserialisable(session, what, entry.as_deref()))]
+    RenderUnserialisable {
+        /// The home session's header id.
+        session: String,
+        /// What would not serialise: `record`, `loss account` or `dropped part`.
+        what: &'static str,
+        /// The entry the record or part was rendered from, when there is one.
+        entry: Option<String>,
+        /// The serialiser's own error.
+        #[source]
+        source: serde_json::Error,
+    },
+
     /// A refusal of ship or fetch.
     #[error(transparent)]
     Move(#[from] MoveError),
@@ -452,6 +499,29 @@ fn held_by(holder: Option<u32>) -> String {
         Some(pid) if pid == std::process::id() => format!("another owner in this process ({pid})"),
         Some(pid) => format!("process {pid}"),
         None => "another owner".to_owned(),
+    }
+}
+
+/// The words of a [`HomeError::RenderField`]; a missing provider or api
+/// names the record that answers the refusal.
+fn render_field(session: &str, entry: &str, field: &str, expected: &str, missing: bool) -> String {
+    let head = format!("render of session {session} refused entry {entry}: field {field}");
+    match (missing, field) {
+        (true, "provider" | "api") => format!(
+            "{head} is missing, expected {expected}; the render needs a record whose assistant messages carry provider and api"
+        ),
+        (true, _) => format!("{head} is missing, expected {expected}"),
+        (false, _) => format!("{head} is not {expected}"),
+    }
+}
+
+/// The words of a [`HomeError::RenderUnserialisable`].
+fn render_unserialisable(session: &str, what: &str, entry: Option<&str>) -> String {
+    match entry {
+        Some(entry) => format!(
+            "render of session {session} refused entry {entry}: the {what} could not be serialised"
+        ),
+        None => format!("render of session {session} refused: the {what} could not be serialised"),
     }
 }
 

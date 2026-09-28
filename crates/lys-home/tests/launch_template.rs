@@ -4,7 +4,8 @@
 //! the handle and never the value, the event beside the head, the kept
 //! template, and each refusal with nothing written.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -28,6 +29,8 @@ const SESSION: &str = concat!(
 const UUID: &str = "00000000-0000-4000-8000-000000000001";
 const SECRET_VALUE: &str = "fixture-secret-value-0001";
 const HANDLE: &str = "handle-fixture-0001";
+
+type Gate = Result<(), Box<dyn Error>>;
 
 /// The SHA-256 of each written file, recorded from the fixture session and
 /// template; a change to the render, the environment file or the fixtures
@@ -346,4 +349,57 @@ fn the_environment_file_holds_the_variables_and_the_handle_and_nothing_else_twic
     assert_eq!(value.as_object().unwrap().len(), 1);
     assert_eq!(value["env"].as_object().unwrap().len(), 2);
     assert!(!String::from_utf8_lossy(&first).contains(SECRET_VALUE));
+}
+
+/// Every file under `dir`, by its path relative to `dir`, with its SHA-256.
+fn hashed_files(dir: &Path) -> Result<BTreeMap<PathBuf, String>, Box<dyn Error>> {
+    let mut files = BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for item in std::fs::read_dir(&next)? {
+            let path = item?.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                let hash = sha256_hex(&std::fs::read(&path)?);
+                files.insert(path.strip_prefix(dir)?.to_path_buf(), hash);
+            }
+        }
+    }
+    Ok(files)
+}
+
+#[test]
+fn a_launch_whose_render_is_refused_stores_no_template_and_writes_nothing() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let home = fresh_home(dir.path());
+    let first = dir.path().join("first");
+    std::fs::create_dir(&first)?;
+    let output = launch(&home, Path::new(TEMPLATE), &first);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "{stderr}");
+    let templates = home.join("templates");
+    let before = hashed_files(&templates)?;
+    assert_eq!(before.len(), 1);
+    let session_file = home.join("sessions").join("fixture.jsonl");
+    let mut session = Session::open(&session_file)?;
+    let message = json!({"content": [{"type": "text", "text": "fixture"}], "timestamp": 0});
+    session.append(lys_home::EntryBody::Message { message })?;
+    drop(session);
+    let template = write_template(dir.path(), "other.json", |v| {
+        v["slots"]["instructions"] = json!("Fixture instructions that differ.\n");
+    });
+    let second = dir.path().join("second");
+    std::fs::create_dir(&second)?;
+    let output = launch(&home, &template, &second);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("field role"), "{stderr}");
+    assert!(output.stdout.is_empty());
+    assert_eq!(names_in(&second).len(), 0);
+    assert_eq!(hashed_files(&templates)?, before);
+    let session = Session::open(&session_file)?;
+    let events = session.customs_everywhere("lys.harness_event")?;
+    assert_eq!(events.len(), 1);
+    Ok(())
 }
