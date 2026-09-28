@@ -26,10 +26,11 @@ pub const PROVIDERS_KEY_FILE: &str = "sign-in-providers-api-key";
 /// How long a sign-in lasts, in seconds: one working day.
 pub const SESSION_SECONDS: u64 = 28_800;
 
-/// Rauthy's issuer for the deployment's public origin.
+/// Rauthy's issuer for the deployment's public origin: the origin, `/auth/v1`
+/// and a trailing slash, exactly as its discovery document states it.
 pub fn issuer(config: &DeploymentConfig) -> String {
     format!(
-        "{}/auth/v1",
+        "{}/auth/v1/",
         config.issuer.public_origin.trim_end_matches('/')
     )
 }
@@ -67,7 +68,7 @@ pub fn render(
         "grant_log_origin": GRANT_LOG_ORIGIN,
         "grant_model_file": layout.grant_model().display().to_string(),
         "spicedb": {
-            "endpoint": format!("http://127.0.0.1:{}", config.spicedb.http_port),
+            "endpoint": format!("127.0.0.1:{}", config.spicedb.http_port),
             "key_file": state.join("spicedb-preshared-key").display().to_string(),
         },
         "secrets": {
