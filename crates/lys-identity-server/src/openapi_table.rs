@@ -105,7 +105,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     GET "/budgets/{kind}/{id}" "A holder's budgets" S [SIGNED, &["not_permitted"]];
     PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid"], &["BudgetVersionConflict"]];
-    POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
+    POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     POST "/runtime/sessions/{id}/keys" "Send a session keys" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/read" "Read a session's screen" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/wait" "Wait for a session to show a pattern" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
@@ -120,6 +120,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale"]];
     POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
+    GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
+    POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, &["AgentNotVisible", "not_permitted"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [];
     POST "/oauth/token" "Exchange a code for tokens" P [];

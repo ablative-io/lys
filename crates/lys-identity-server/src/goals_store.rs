@@ -405,14 +405,7 @@ fn span(seconds: u64) -> String {
     }
 }
 
-/// Why a delivery was not answered.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Undelivered {
-    /// Refused, by name: it will not be delivered.
-    Refused(String),
-    /// Its answer was lost: it is asked again under the same operation id.
-    Unknown(String),
-}
+pub use crate::runner_operate::Undelivered;
 
 /// A runner's answer to one delivery, or why there is none.
 pub type Delivering<'a> =

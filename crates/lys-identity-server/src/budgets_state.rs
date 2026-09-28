@@ -17,6 +17,8 @@ use jiff::tz::TimeZone;
 use jiff::{Timestamp, ToSpan, Zoned};
 use serde::{Deserialize, Serialize};
 
+use crate::budgets_crossing::{Acted, Crossing, Crossings};
+
 /// The snapshot domain the budgets' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/budgets-state/v1";
 
@@ -68,6 +70,8 @@ pub enum Measure {
 pub enum Act {
     /// Ask the harness to compact at its next turn boundary.
     Compact,
+    /// Type a notice into the session at its next turn boundary.
+    Notice,
     /// End the session.
     Stop,
     /// Tell the responsible person.
@@ -117,7 +121,7 @@ pub struct Budget {
 }
 
 /// A measured use one agent made, as the runner's feed reported it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Usage {
     /// The feed event's stable id: an event seen again charges nothing.
@@ -130,6 +134,15 @@ pub struct Usage {
     pub tokens: u64,
     /// Running time, in milliseconds.
     pub running_ms: u64,
+    /// The session it was measured in, when one is named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+    /// The session's context, in percent of its window, when measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_percent: Option<u64>,
+    /// The budgets this use crossed, kept with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crossed: Vec<Crossing>,
 }
 
 /// One leaf of the budgets' log.
@@ -140,6 +153,8 @@ pub enum Leaf {
     Set(Budget),
     /// A use charged.
     Used(Usage),
+    /// What came of a crossing's act.
+    Acted(Acted),
 }
 
 /// Why a budget was refused, by name.
@@ -180,6 +195,9 @@ pub struct Held {
     pub charged: BTreeSet<String>,
     /// The uses charged, in the order kept.
     pub uses: Vec<Usage>,
+    /// The crossings and what came of their acts.
+    #[serde(default)]
+    pub crossings: Crossings,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -287,10 +305,19 @@ impl Held {
                     }
                 }
             }
-            Leaf::Used(usage) => {
+            Leaf::Used(mut usage) => {
                 if self.charged.insert(usage.event.clone()) {
+                    for crossing in std::mem::take(&mut usage.crossed) {
+                        self.crossings.hold(crossing);
+                    }
+                    if let (Some(session), Some(figure)) = (&usage.session, usage.context_percent) {
+                        self.crossings.context.insert(session.clone(), figure);
+                    }
                     self.uses.push(usage);
                 }
+            }
+            Leaf::Acted(acted) => {
+                self.crossings.acted.insert(acted.operation.clone(), acted);
             }
         }
         Ok(())

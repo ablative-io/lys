@@ -115,7 +115,7 @@ fn authorised(state: &AppState, actor: &Actor, holder: &Holder) -> Result<String
     }
 }
 
-fn with_budgets<T>(
+pub(crate) fn with_budgets<T>(
     state: &AppState,
     act: impl FnOnce(&mut BudgetStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {

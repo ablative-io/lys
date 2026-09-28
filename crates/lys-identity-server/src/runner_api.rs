@@ -353,7 +353,7 @@ async fn end(
 
 /// The sessions of `agent` not confirmed stopped, newest first, each on a
 /// machine that names a runner.
-fn open_sessions(state: &AppState, agent: &str) -> Result<Vec<Driven>, ServerError> {
+pub(crate) fn open_sessions(state: &AppState, agent: &str) -> Result<Vec<Driven>, ServerError> {
     if state.runtime.is_none() {
         return Ok(Vec::new());
     }

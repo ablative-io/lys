@@ -36,7 +36,7 @@ use crate::error::ServerError;
 use crate::goals_state::{
     EvidenceKind, Goal, GoalError, Holder, HolderKind, Item, Kind, Marked, Remind, Standing,
 };
-use crate::goals_store::{Deliver, Delivering, Goals, Undelivered};
+use crate::goals_store::{Deliver, Delivering, Goals};
 use crate::grants::{caller, with_grants};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -409,7 +409,7 @@ async fn mark(
 }
 
 /// Reminders delivered through the runners the service reaches.
-struct Live<'a>(&'a AppState);
+struct Live<'a>(&'a Arc<AppState>);
 
 impl Deliver for Live<'_> {
     fn sessions(&self, holder: &Holder) -> Result<Vec<String>, String> {
@@ -435,14 +435,7 @@ impl Deliver for Live<'_> {
     }
 
     fn operate(&self, operation: Operation) -> Delivering<'_> {
-        Box::pin(async move {
-            crate::runner_sessions::driven(self.0, &operation.session)
-                .map_err(|error| Undelivered::Refused(error.to_string()))?;
-            Err(Undelivered::Refused(format!(
-                "runner_operation_unsupported: the runner protocol carries no act for operation {}, so the reminder is not typed",
-                operation.operation
-            )))
-        })
+        Box::pin(crate::runner_operate::operate(self.0, operation))
     }
 }
 
@@ -482,7 +475,7 @@ pub fn remind_from(state: &Arc<AppState>) {
 }
 
 /// One pass, answering when the next reminder falls due.
-async fn pass(state: &AppState) -> Result<Option<u64>, ServerError> {
+async fn pass(state: &Arc<AppState>) -> Result<Option<u64>, ServerError> {
     let goals = goals(state)?;
     crate::goals_store::remind(goals, &Live(state), now()).await?;
     goals.with(|store| Ok(store.next_due()))

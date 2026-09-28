@@ -213,6 +213,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         say,
     });
     crate::goals_api::remind_from(&state);
+    crate::budgets_act::settle_at_start(&state);
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
@@ -294,6 +295,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
         .merge(crate::budgets_api::routes())
+        .merge(crate::budgets_act::routes())
         .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())

@@ -208,6 +208,12 @@ impl<S: LeafStore> BudgetStore<S> {
         Ok(budget)
     }
 
+    /// Keep what came of a crossing's act.
+    pub fn acted(&mut self, acted: crate::budgets_crossing::Acted) -> Result<(), ServerError> {
+        self.settle()?;
+        self.append(Leaf::Acted(acted))
+    }
+
     /// Charge `usage`; false when its event was charged before, and then
     /// nothing is written.
     pub fn charge(&mut self, usage: Usage) -> Result<bool, ServerError> {

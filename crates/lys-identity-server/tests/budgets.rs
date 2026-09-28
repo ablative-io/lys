@@ -43,7 +43,7 @@ fn used(event: &str, at_ms: i64, tokens: u64) -> Leaf {
         agent: "agent-scribe".to_owned(),
         at_ms,
         tokens,
-        running_ms: 0,
+        ..Usage::default()
     })
 }
 
