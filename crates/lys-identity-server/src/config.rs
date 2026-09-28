@@ -99,6 +99,10 @@ pub struct Config {
     /// `ServiceAccountsUnavailable` and `GET /me` lists none.
     #[serde(default)]
     pub service_accounts_dir: Option<PathBuf>,
+    /// The directory the teams are kept in, created when it does not exist.
+    /// Without it the team routes answer `TeamsUnavailable`.
+    #[serde(default)]
+    pub teams_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]

@@ -11,6 +11,8 @@ pub mod config;
 pub mod connections_api;
 pub mod dev_seed;
 pub mod error;
+mod error_status;
+pub mod file_stores;
 pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
@@ -52,6 +54,9 @@ pub mod sessions_api;
 pub mod setup;
 pub mod spicedb;
 mod spicedb_http;
+pub mod teams_api;
+pub mod teams_state;
+pub mod teams_store;
 
 pub use config::Config;
 pub use error::ServerError;
