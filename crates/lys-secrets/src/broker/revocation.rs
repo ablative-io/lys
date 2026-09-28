@@ -15,7 +15,7 @@ use crate::handle::HandleId;
 use crate::permission::PermissionCheck;
 
 use super::Broker;
-use super::folded::Handles;
+use super::Handles;
 
 const CONFIRMED: &str = "revoked_upstream";
 const UNCONFIRMED: &str = "revocation_unconfirmed";

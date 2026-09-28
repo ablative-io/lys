@@ -48,6 +48,27 @@ Behavioural. crates/lys-secrets/src/broker/admit.rs:37, using.rs:118. find() wal
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): test `a_presented_token_is_found_by_one_lookup_among_ten_thousand_handles` in crates/lys-secrets/src/broker/handles_tests.rs lays 10 000 records into a broker. One admitted presentation counts searches +1 and compared +1. A forged presentation (PresentationInvalid) counts searches +1, and its audit line names the handle that one search found. An unknown token counts searches +1 and compared +0. The work is in src/broker/admit.rs find(), which uses Handles::by_digest in src/broker/handles.rs, and in src/broker/using.rs admit_use_as, where one `find` result feeds both admission and the refusal line. At the base the test does not compile, because the counters do not exist. The base's find() walked every record, so the assertion `count(&broker.work.compared) - compared == 1` would read 10 000, and a refusal ran find() a second time (searches 2). Accept 2 (met): refusals and admissions are made by the same checks in the same order. The test asserts the refusal names, and that the refusal audit line carries the same subject the base's second search found. All existing tests are unchanged.
+- Deviation: The counts come from relaxed atomic counters on the broker (Work), not from a counting test double: nothing else can observe record comparisons. The index is a std HashMap keyed by the SHA-256 digest of a random token, and one ct_eq is still made against the found record.
+- Files changed:
+  - created: `crates/lys-secrets/src/broker/handles.rs` — Handles: the handle records plus indexes (digest→id, parent→children, endings and ending roots by (person, operation)), kept in step on insert, end and relay; Work: relaxed atomic counters (searches, compared, visited).
+  - created: `crates/lys-secrets/src/broker/handles_tests.rs` — Counting tests for R1 and R2, run over 10 000 handle records.
+  - modified: `crates/lys-secrets/src/broker.rs` — HandleRecord gains a serde(skip) `held: Option<[u8;32]>`, so the handles.json bytes are unchanged. Broker holds Handles and Work, adds append_unanchored, and registers the new modules and exports.
+  - modified: `crates/lys-secrets/src/broker/admit.rs` — find() is one index lookup plus one ct_eq against the record's decoded digest, and counts searches and comparisons. signed_for() takes the record already found; admit() takes that record and an optional Checked; permitted() takes the Checked.
+  - modified: `crates/lys-secrets/src/broker/using.rs` — admit_use searches once and records a refusal's subject from that search. Adds admit_use_checked, settle_checked and the Settled enum. The admitted use line is appended without moving the anchor.
+  - modified: `crates/lys-secrets/src/broker/restart.rs` — read_handles collects into Handles, which decodes each digest once at load; Broker is given its Work counters.
+  - modified: `crates/lys-secrets/src/broker/folded.rs` — The Handles alias is removed; lay_over goes through Handles::relay, which re-indexes endings.
+  - modified: `crates/lys-secrets/src/broker/accounts.rs` — permitted(record, None).
+- Checklist delivery:
+  - [x] C39 — A presented token is found by a hashed lookup (SECRETS-005 R1), proved by a counting test that fails at the base. — handles_tests.rs a_presented_token_is_found_by_one_lookup_among_ten_thousand_handles
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — A presentation no longer grows in cost with the number of handles ever issued.
+
 ### R2: Lineage and endings are indexed
 
 Behavioural. crates/lys-secrets/src/broker/ending.rs:210, :223, :241. standing_below() walks every handle and builds chain() twice per handle; ended_under and ended_with each scan every handle. Keep a parent to children index maintained on derive and walk down from the root; index endings by (person, operation) in fold; chain() yields borrowed ids.
@@ -64,6 +85,21 @@ Behavioural. crates/lys-secrets/src/broker/ending.rs:210, :223, :241. standing_b
 
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): test `lineage_and_endings_visit_only_the_handles_they_answer_with` in crates/lys-secrets/src/broker/handles_tests.rs has 10 000 handles, some of them chained, plus a root with three descendants. standing_below visits 4 handles. After 10 000 endings under other operations, ended_under visits 1 and ended_with visits 4. At the base those were whole-map walks: `count(&broker.work.visited) - visited == 4` would read 10 000, and the test does not compile there because the counters do not exist. Accept 2 (met): the same test compares each answer with the base's own walk over the same records (walked_below re-runs the base algorithm using chain and line_dropped; walked_under and walked_with are the base's filters). It also checks the expected literal paths, the order of ids with the root first, and None for an unknown operation.
+- Deviation: (none)
+- Files changed:
+  - modified: `crates/lys-secrets/src/broker/ending.rs` — fold() records an ending through Handles::end. standing_below walks down from the root through the children index, no deeper than MAX_DEPTH and cycle-safe. ended_under and ended_with read the endings indexes. Each counts the handles it visits. All three are now pub(super).
+  - modified: `crates/lys-secrets/src/broker/lineage.rs` — chain() returns borrowed &str ids; admitted/settled use an owned copy because they mutate; MAX_DEPTH is pub(super); derive inserts through Handles.
+- Checklist delivery:
+  - [x] C40 — Lineage and endings are indexed (SECRETS-005 R2), proved by a counting test that fails at the base. — handles_tests.rs lineage_and_endings_visit_only_the_handles_they_answer_with
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — The cost of ending a handle depends on the size of its line, not on every handle ever issued.
 
 ### R3: Broker work never blocks an async worker, and the permission check runs outside the lock
 
@@ -84,6 +120,34 @@ Behavioural. crates/lys-secrets/src/bin/lys-secrets/serve.rs:207-269, audit.rs:3
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): crates/lys-secrets/tests/anchor_once.rs `one_proxied_call_writes_the_anchor_once` runs one call (admit_use, at_forward_boundary, settle). Its two audit lines raise `audit().anchor_writes()` by 1. At the base, AuditLog::append wrote the anchor on every line, so the delta would be 2; the test does not compile there because anchor_writes does not exist. The test also reads the anchor file and checks it names the whole log. `a_call_admitted_and_never_settled_still_opens` shows the anchor lags by at most one line and that a restart verifies and settles the call. Accept 2 (met): crates/lys-secrets/src/bin/lys-secrets/serve_tests.rs `a_screen_route_answers_while_a_permission_check_is_held_open` uses a Gate permission source whose `use` check blocks until released. While a proxied call is held inside that check, view::audit (/_lys/audit) answers, and `!gate.released()` holds. After release the call completes with 502, since nothing listens upstream. At the base the broker lock was held across the check, so the screen route could never answer and the test would hang; no timeout was added, per CLAUDE.md. Accept 3 (met): main.rs enables clippy::await_holding_lock; no std MutexGuard is held across an .await in serve.rs. Every guard lives inside a spawn_blocking closure. The hook's clippy run with -D warnings is clean.
+- Deviation: 1) The anchor count comes from a counter on AuditLog (anchor_writes()), not from a counting filesystem double; the crate has no filesystem seam. 2) The held check goes through Shared.permissions, which is a Grants clone in production and the Gate double in the test, not a live SpiceDB. Standing up a fake SpiceDB gateway (schema writes, kinds reads) was out of scope. The code path through the lock is the same either way. 3) Beyond the brief, settlement's completed_after_drop check also uses a pre-asked answer (settle_checked), so a proxied call makes no permission-source call while holding the broker lock. A scoped secret's member check is pre-asked too. Checks outside the proxy path (views, issue, derive, next_account) still ask the permission source under the lock. 4) If a spawn_blocking task itself fails (a panic or runtime shutdown), a ticket can be lost. It is then settled at the next start as outcome_unknown, the existing path for calls never settled.
+- Files changed:
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/serve.rs` — on_broker/blocking run all broker work on spawn_blocking. Shared gains `permissions`, a clone of the broker's Grants. forward reads asks_for under the lock, has the permission source answer with no lock held, then calls admit_use_checked, asks again before at_forward_boundary_checked, and asks once more before settle_checked unless the upstream failed. next_account uses on_broker.
+  - modified: `crates/lys-secrets/src/audit.rs` — append = append_unanchored + write_anchor; adds append_unanchored and anchor_writes() (a count of anchor writes).
+  - created: `crates/lys-secrets/src/broker/checked.rs` — Ask/Checked: the questions admission will ask (use, and member of the scope when needed), answered by the permission source before the broker is taken. Broker::asks_for.
+  - modified: `crates/lys-secrets/src/broker/inflight.rs` — at_forward_boundary_checked; cut_off takes the pre-asked answers.
+  - modified: `crates/lys-secrets/src/broker/scope.rs` — within_scope_as takes a pre-asked member answer.
+  - modified: `crates/lys-secrets/src/broker/oauth_grants.rs` — The refresh line is appended unanchored; the settlement line that follows moves the anchor.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/oauth_proxy.rs` — live() takes the ticket by value and hands it back; the reseal runs through on_broker.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/callers.rs` — caller is async; the handle path runs broker.caller through on_broker.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/manage.rs` — Every handler's broker work runs through on_broker; the ending moves into fn ended.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/spice.rs` — Grants is Clone (Directory holds Arc<SpiceGrants>) and gains pinned().
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/args.rs` — Wraps SpiceGrants in Arc.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/main.rs` — #![warn(clippy::await_holding_lock)] (an error under -D warnings); registers the redact, watched and test modules.
+  - created: `crates/lys-secrets/src/bin/lys-secrets/serve_tests.rs` — Proxy tests for R3 (held permission check) and R4 (route reads).
+  - created: `crates/lys-secrets/tests/anchor_once.rs` — Anchor-write counting for R3.
+  - modified: `crates/lys-secrets/src/lib.rs` — Exports Ask, Checked, Discovery, Settled.
+- Checklist delivery:
+  - [x] C41 — Broker work never blocks an async worker, and the permission check runs outside the lock (SECRETS-005 R3), proved by a counting test that fails at the base. — anchor_once.rs and serve_tests.rs a_screen_route_answers_while_a_permission_check_is_held_open
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — A slow permission answer holds up only its own call.
+
 ### R4: Routes and services are loaded once
 
 Behavioural. crates/lys-secrets/src/bin/lys-secrets/serve.rs:177, view.rs:34, callers.rs:108. forward() reads and parses routes.json and clones one Route on every proxied request; the secrets listing and screen-service requests re-read routes.json and services.json. Load both at serve start into an ArcSwap-style snapshot (Arc replaced on add_route and trust_service), and hold an Arc<Route> across the upstream call instead of cloning.
@@ -103,6 +167,24 @@ Behavioural. crates/lys-secrets/src/bin/lys-secrets/serve.rs:177, view.rs:34, ca
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): serve_tests.rs `a_hundred_proxied_requests_read_routes_json_no_time_after_start` reads routes once at start (reads == 1), sends 100 proxied requests through forward(), and asserts `reads() - at_start == 0`. At the base forward() read and parsed routes.json per request, so it would be 100; the test does not compile there because the counter does not exist. A route then added through a separate Layout, as another `add-route` process would, turns the next request from 404 into a match (400, no handle), with exactly one read. Accept 2 (met): route lookup, listing fields and service admission read the same file contents. Missing-file and error behaviour are unchanged, and the written bytes are identical.
+- Deviation: The brief's own words are "Arc replaced on add_route and trust_service". add_route and trust_service are CLI commands, so they run in another process while the proxy serves, and an in-process swap would never see them. The held snapshot is therefore re-validated by modification time and length on each ask, one metadata call and no read, and is released on any in-process write. The remaining exposure: two same-length rewrites landing inside one timestamp tick of the filesystem, with the proxy reading between them, would leave a stale read.
+- Files changed:
+  - created: `crates/lys-secrets/src/bin/lys-secrets/watched.rs` — Watched<T>: a file read once and held, read again only when its modification time or length changes. A missing file reads as empty, as before. write() releases what was held. It counts reads.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/files.rs` — Layout holds Arc<Watched<Routes>> and Arc<Watched<Vec<ServiceKey>>>; routes() returns Arc<BTreeMap<String, Arc<Route>>>. add_route and trust_service write through Watched, with the same bytes as before.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/serve.rs` — forward holds an Arc<Route> from the cached routes; serve() reads routes and services at start.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/view.rs` — The secrets listing uses the cached routes.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/callers.rs` — The screen-service check uses the cached services.
+- Checklist delivery:
+  - [x] C42 — Routes and services are loaded once (SECRETS-005 R4), proved by a counting test that fails at the base. — serve_tests.rs a_hundred_proxied_requests_read_routes_json_no_time_after_start
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — Requests stop re-reading configuration.
+
 ### R5: Answers are capped and redacted in one pass
 
 Behavioural. crates/lys-secrets/src/bin/lys-secrets/serve.rs:300, :361, :379. The upstream answer is read whole with no cap, copied, then rebuilt once per hidden secret by a byte-at-a-time redact; header checks run a naive window scan per secret; route.header is lowercased per request header. Cap the upstream body as requests already are (MAX_BODY, refused by name when exceeded), redact every secret in one pass (memchr::memmem or aho-corasick), and lowercase route.header once. If the body is streamed, a secret split across chunks is still redacted by carrying the longest secret's length less one byte between chunks.
@@ -120,6 +202,24 @@ Behavioural. crates/lys-secrets/src/bin/lys-secrets/serve.rs:300, :361, :379. Th
 
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): redact_tests.rs `five_hidden_values_in_a_mebibyte_answer_are_hidden_in_one_pass` builds a 1 MiB answer holding five values many times, one of them placed across the 64 KiB boundary. It asserts the positions scanned are ≤ the answer length. It also asserts the output equals the base algorithm (one pass per secret, re-implemented in the test) and that this reference scanned more than 4 MiB. It then asserts the marker count equals the number placed and that no value survives. The answer is read whole, not streamed, so no secret can be split between pieces. The test does not compile at base (no redact module); base redaction made five passes. Accept 2 (met): `an_answer_past_the_cap_is_refused_by_name_and_never_cut_short` shows 1025 bytes against a 1024-byte limit refused as AnswerTooLarge, and exactly 1024 bytes returned whole. In forward, an answer over the cap returns 502 with that named error and settles the call as upstream_failed.
+- Deviation: No dependency was added and crates/lys-secrets/Cargo.toml is unchanged. aho-corasick is not in Cargo.lock, and memchr::memmem searches for one pattern, so a first-byte-gated single pass needed neither. Where secrets never overlap, output is identical to the base. Where secrets overlap, the longest match at the leftmost position is hidden whole, instead of whatever order-dependent fragment the per-secret passes left.
+- Files changed:
+  - created: `crates/lys-secrets/src/bin/lys-secrets/redact.rs` — Redactor: one left-to-right pass over the answer. A 256-entry table of first bytes gates the comparisons, secrets are compared longest first, and it counts the positions scanned. contains and redact_text use the same scan. capped() reads the upstream answer and refuses it as AnswerTooLarge past the limit (checked against Content-Length and while accumulating chunks), never truncating.
+  - created: `crates/lys-secrets/src/bin/lys-secrets/redact_tests.rs` — Tests for one-pass redaction and the cap.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/serve.rs` — call_upstream builds one Redactor, lowercases route.header once, and reads the answer through capped(MAX_BODY).
+  - modified: `crates/lys-secrets/src/error.rs` — New SecretsError::AnswerTooLarge { limit }.
+  - modified: `crates/lys-secrets/src/error/name.rs` — Adds the name for AnswerTooLarge.
+- Checklist delivery:
+  - [x] C43 — Answers are capped and redacted in one pass (SECRETS-005 R5), proved by a counting test that fails at the base. — redact_tests.rs, both tests
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — Answers are scanned once and bounded.
 
 ### R6: Views ask each permission once per request
 
@@ -140,6 +240,24 @@ Behavioural. crates/lys-secrets/src/bin/lys-secrets/view.rs:117, :167, held.rs:4
 
 **Stories:**
 - S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Accept 1 (met): view_tests.rs `a_two_hundred_line_audit_view_asks_each_permission_once` builds a 200-line log naming 3 secrets (3 seals, 3 issues, 194 refused uses). A viewer whose discovery takes use, read and lend checks gets exactly 9 checks and 1 grants.json parse from audit_window. At the base each of the 200 lines asked up to 3 checks, each check parsing the file: up to 600 of each. The test does not compile at base because the counters do not exist. Accept 2 (met): the shown line indexes equal the base filter, recomputed line by line with broker.discovers. This holds for a viewer who sees all 200 lines and for one who sees only one secret's lines (also 9 checks, 1 parse).
+- Deviation: The brief names crates/lys-secrets/src/files.rs:218 and held.rs:48. They live at crates/lys-secrets/src/bin/lys-secrets/files.rs (FileGrants) and crates/lys-secrets/src/broker/held.rs. The parse-once rule is a per-request pin, not a cache keyed on modification time and size, so a revocation is still seen by the next request's first check.
+- Files changed:
+  - modified: `crates/lys-secrets/src/broker/scope.rs` — Broker::discovery(identity) returns a Discovery that remembers discovers(identity, secret) for one request.
+  - modified: `crates/lys-secrets/src/broker/held.rs` — held_by filters through one Discovery.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/files.rs` — FileGrants::pinned reads grants.json at most once inside one request's span and reads afresh on every check outside it. It counts checks and parses and is Clone; a clone shares no pin.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/view.rs` — The secrets, handles, grants and audit views run pinned, through a Discovery. They are factored into grants_seen and audit_window, and all broker work goes through on_broker.
+  - created: `crates/lys-secrets/src/bin/lys-secrets/view_tests.rs` — Counting test for R6.
+- Checklist delivery:
+  - [x] C44 — Views ask each permission once per request (SECRETS-005 R6), proved by a counting test that fails at the base. — view_tests.rs a_two_hundred_line_audit_view_asks_each_permission_once
+- Story delivery:
+  - [x] S22 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows. — The cost of a view grows with the secrets it names, not with its rows.
 
 ## Boundaries
 
