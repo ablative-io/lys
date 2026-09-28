@@ -21,7 +21,7 @@ use crate::apps_error::AppError;
 use crate::apps_state::{App, By, Held, Standing};
 use crate::error::ServerError;
 use crate::read_api::login;
-use crate::routes::{AppState, cookie_header, hex};
+use crate::routes::{AppState, hex};
 
 /// The scheme word of an app's bearer credential.
 pub const APP_CREDENTIAL: &str = "lys-app";
@@ -181,7 +181,7 @@ fn bearer(headers: &HeaderMap) -> Result<Option<(String, String, String)>, AppEr
 /// the session.
 pub fn acting(state: &AppState, held: &Held, headers: &HeaderMap) -> Result<Acting, ServerError> {
     let Some((scheme, holder, secret)) = bearer(headers)? else {
-        let actor = state.sessions.actor(cookie_header(headers))?;
+        let actor = crate::routes::signed_in(state, headers)?;
         return Ok(if state.admission.administrator(&actor).is_ok() {
             Acting::Administrator(actor)
         } else {
