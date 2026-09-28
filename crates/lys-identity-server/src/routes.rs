@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, header};
-use axum::response::Response;
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::receipt::Receipt;
@@ -22,7 +22,7 @@ use serde_json::{Value, json};
 
 use lys_identity::signer::load_service_key;
 
-use crate::admission::{AUTHORITY, Admission};
+use crate::admission::Admission;
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
