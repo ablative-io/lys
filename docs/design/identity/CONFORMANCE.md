@@ -25,7 +25,7 @@ The mock-up's sample data, simulated confirmations and "not kept" edits are not 
 | 2.1 | A person can give an agent only a relation at or below one they hold. | test | DIRECTORY-001 R3 (amend) | Chippy |
 | 2.2 | Only a grant marked may-pass-on can be delegated; may-pass-on is an affirmative fact on the grant, never "no prohibition found". | test | DIRECTORY (amend) | Chippy |
 | 2.3 | The form shows the source grant, the actions it allows, may-pass-on, and that the new grant ends no later than its source. | test | DIRECTORY (amend) | Chippy |
-| 2.4 | Everything the person cannot give is listed with its reason (use-only, above what you hold, lent to you, sign-in identity). | test | DIRECTORY (new row) | Chippy |
+| 2.4 | Everything the person cannot give is listed with its reason (use-only, above what you hold, lent to you, sign-in identity). | test | DIRECTORY-024 | Chippy |
 | 2.5 | Withdrawing a grant withdraws everything derived from it. | test | DIRECTORY-001 R3 (exists) | Chippy |
 | 2.6 | Inherited expiry is enforced, not only displayed (leases, statement of 22 Sep). | test | DIRECTORY (new row) | Chippy |
 
