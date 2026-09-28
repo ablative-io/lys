@@ -55,6 +55,8 @@ pub struct AppState {
     pub certificates: Option<Mutex<crate::certificates_store::CertificateStore>>,
     /// The runtime reports, when the configuration names their directory.
     pub runtime: Option<Mutex<crate::runtime_store::RuntimeStore>>,
+    /// The service accounts, when the configuration names their directory.
+    pub service_accounts: Option<Mutex<crate::service_accounts_store::ServiceAccountStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -82,7 +84,9 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let certificates = config
         .certificates_dir
         .as_deref()
-        .map(|dir| crate::certificates_store::CertificateStore::opened(dir, key, &*say))
+        .map(|dir| {
+            crate::certificates_store::CertificateStore::opened(dir, Arc::clone(&key), &*say)
+        })
         .transpose()?;
     let network = config
         .network_file
@@ -118,6 +122,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         ));
     }
     let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
+    let service_accounts =
+        crate::service_accounts_store::ServiceAccountStore::configured(config, key, &say)?;
     Ok(router(Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -145,6 +151,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         provisioning: provisioning.map(Mutex::new),
         certificates: certificates.map(Mutex::new),
         runtime: runtime.map(Mutex::new),
+        service_accounts: service_accounts.map(Mutex::new),
         say,
     })))
 }
@@ -193,6 +200,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::provisioning_api::routes())
         .merge(crate::launch_api::routes())
         .merge(crate::runtime_api::routes())
+        .merge(crate::service_accounts_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

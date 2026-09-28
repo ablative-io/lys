@@ -286,6 +286,41 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
+    /// The service accounts are not configured, or their log could not be read or written.
+    #[error("ServiceAccountsUnavailable: {reason}")]
+    ServiceAccountsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No service account by that id is visible to the caller: none is kept, or it is another's.
+    #[error(
+        "ServiceAccountUnknown: no service account by that id is visible to the signed-in caller"
+    )]
+    ServiceAccountUnknown,
+    /// The operation id already names a service account act in other words.
+    #[error(
+        "ServiceAccountReused: operation `{operation}` already names a service account act in other words: send this act under a new operation id"
+    )]
+    ServiceAccountReused {
+        /// The operation id.
+        operation: String,
+    },
+    /// The service account was already retired, under another operation.
+    #[error(
+        "ServiceAccountRetired: service account `{account}` was already retired under another operation"
+    )]
+    ServiceAccountRetired {
+        /// The service account.
+        account: String,
+    },
+    /// The person named as owner is retired, so no service account is created for them.
+    #[error(
+        "ServiceAccountOwnerRetired: person `{owner}` is retired and owns no new service account"
+    )]
+    ServiceAccountOwnerRetired {
+        /// The person named.
+        owner: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -319,6 +354,7 @@ impl ServerError {
             | Self::RoleUnknown
             | Self::RoleVersionUnknown
             | Self::HolderUnknown
+            | Self::ServiceAccountUnknown
             | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
@@ -338,7 +374,10 @@ impl ServerError {
             | Self::LaunchUnrenderable { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }
-            | Self::RuntimeReportReused { .. } => StatusCode::CONFLICT,
+            | Self::RuntimeReportReused { .. }
+            | Self::ServiceAccountReused { .. }
+            | Self::ServiceAccountRetired { .. }
+            | Self::ServiceAccountOwnerRetired { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
@@ -348,7 +387,8 @@ impl ServerError {
             | Self::RolesUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
-            | Self::RuntimeUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::RuntimeUnavailable { .. }
+            | Self::ServiceAccountsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

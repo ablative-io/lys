@@ -9,8 +9,10 @@
 //! person's records: an agent that is not the caller's is refused exactly as
 //! an agent the directory does not hold.
 //!
-//! The directory records no service accounts, roles or role versions yet, so
-//! `service_accounts` answers an empty list and `role` and `version` answer
+//! `GET /me` lists the signed-in person's own service accounts that are not
+//! retired, read from the service accounts' log (`service_accounts_store`),
+//! and none when the configuration names no service accounts. The directory
+//! records no roles or role versions yet, so `role` and `version` answer
 //! null until it does. Each route answers its type from `read_views`.
 
 use std::collections::HashMap;
@@ -49,7 +51,7 @@ enum Scope {
     Directory,
 }
 
-fn login(binding: &LoginBinding) -> Login {
+pub(crate) fn login(binding: &LoginBinding) -> Login {
     Login {
         provider: binding.issuer().to_owned(),
         subject: binding.subject().to_owned(),
@@ -141,7 +143,7 @@ async fn me(
             person: person_summary(person, record),
             signed_in: login(actor.binding()),
             sign_in_identities: record.bindings().iter().map(login).collect(),
-            service_accounts: Vec::new(),
+            service_accounts: crate::service_accounts_api::owned_by(&state, person)?,
         }))
     })
 }
