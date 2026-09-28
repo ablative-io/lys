@@ -23,17 +23,17 @@ title: Provision a working team in one act: agents with memories, an opening con
 
 ## Purpose
 
-Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.' Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree.
+Tom, 28 September 2026 19:55, on Dot: 'I want you to be able to provision new agents so we can provision them off with the right memories, with the right few-shot kind of prompting to start it off, and to be able to send them off to do work without having to know that they've got a budget, know that they've got reminders, know that it's actually going to happen, know that things are actually being checked. So I could say, Waffles, we need a team to work on this. And you could provision them, give them a certain budget, and we can start to budget out things properly.' Tom, 19:56: 'So you would provision a few new agents in a hierarchy, set which of my permissions you're assigning, what their budget allowance is, what account they're going to be assigned to. Which also means the secrets need to be storable and accessible.' Amended 28 September 2026 21:05 by Waffles after Archie's read against the tree. Amended 29 September 2026 by Gypsy from the measured author blockers in af8e4bf3, sequence 58, to include the API registration, refusal, permission-model and surface type owners required by these same behaviours.
 
 ## Task
 
-Add team plans: a record that names a team's purpose, budget, deliverables and members; provision it in one all-or-nothing act that creates agents, grants, homes with their starting memories and opening conversation, budgets and goals, and starts them through the runner; hold deliverables to a checker's acceptance with evidence; build, provision and watch plans on a Teams screen and through the API.
+Add team plans: a record that names a team's purpose, budget, deliverables and members; provision it in one all-or-nothing act that creates agents, grants, homes with their starting memories and opening conversation, budgets and goals, and starts them through the runner; hold deliverables to a checker's acceptance with evidence; build, provision and watch plans on a Teams screen and through the API. DIRECTORY-051 is a code dependency. Its brief commit is not evidence of implementation. Integrate its actual implementation before measuring completion of these requirements. Preserve the one owner of budgets, goals and runner operations.
 
 ## Requirements
 
 ### R1: A team plan record
 
-Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence. A checker who reports, directly or up the chain, to the member it checks is refused checker_reports_to_member, and any cycle of checkers, of any length, is refused checkers_circular naming every member in the cycle: the judged party never holds the pen. A plan's account handle names its kind: a key (a value held by the secrets broker) or a login (a folder of credentials on the runner's machine that never travels and is never copied); rotation over logins is DIRECTORY-050 R5's. A plan is stored as log events with a projection (the checkpoint beside the log, so a start reads the checkpoint and the tail only). Creating, changing or provisioning a plan needs a grant of provision_team held by the person acting, who becomes its responsible person; a plan is read only by its responsible person, its members' checkers and administrators, and anyone else is refused not_your_plan.
+Behavioural. A plan names its purpose, its responsible person, its total budget (tokens and time), its deliverables (each with words, a deadline and the evidence that proves it), and its members; each member names a provisioning profile, the memories it starts with (lantern notes or a predecessor's letter from a named home), an opening conversation (turns authored as lys-home fewshot writes them), its share of the budget, its goals with reminders, and its checker (a person or another member), its place in the team's hierarchy (the member it reports to), the grants it is given (each delegated from the provisioning person's own grants, never beyond them, as the delegation form's cannot-give list says), and the account it runs on (a handle to an account in the secrets broker, or an ordered list of handles for rotation). A plan is refused plan_invalid naming the field when shares exceed the total, a member has no checker, or a deliverable names no evidence. A checker who reports, directly or up the chain, to the member it checks is refused checker_reports_to_member, and any cycle of checkers, of any length, is refused checkers_circular naming every member in the cycle: the judged party never holds the pen. A plan's account handle names its kind: a key (a value held by the secrets broker) or a login (a folder of credentials on the runner's machine that never travels and is never copied); rotation over logins is DIRECTORY-050 R5's. A plan is stored as log events with a projection (the checkpoint beside the log, so a start reads the checkpoint and the tail only). Creating, changing or provisioning a plan needs a grant of provision_team held by the person acting, who becomes its responsible person; a plan is read only by its responsible person, its members' checkers and administrators, and anyone else is refused not_your_plan. Register these routes, bodies, answers and named refusals in the existing OpenAPI tables and error owners. Include provision_team in the fresh-install permission model. For an established install, the apps log remains authoritative and the administrator uses the existing versioned schema-change route to add the permission. Neither service startup nor this card silently rewrites an established schema or grants the action to a caller. Exercise plan access through the existing grant authority.
 
 **Acceptance:**
 - A plan whose member shares exceed its total is refused naming the total.
@@ -45,6 +45,9 @@ Behavioural. A plan names its purpose, its responsible person, its total budget 
 - A plan is read back unchanged after the service restarts.
 - That restart reads no plan event from before the checkpoint.
 - A person who is not the plan's responsible person, one of its checkers or an administrator is refused not_your_plan when reading it.
+- The OpenAPI route coverage test includes every new team-plan route and its named refusals.
+- A fresh-install model can represent provision_team. An established schema without that action remains unchanged until an administrator records its versioned schema change.
+- After that explicit schema change and a valid grant, the granted caller can create a plan. An otherwise identical caller without the grant remains refused.
 
 **Files:**
 - create: crates/lys-identity-server/src/team_plans_api.rs
@@ -52,6 +55,15 @@ Behavioural. A plan names its purpose, its responsible person, its total budget 
 - create: crates/lys-identity-server/tests/team_plans.rs
 - modify: crates/lys-identity-server/src/routes.rs
 - modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/tests/openapi.rs
+- modify: crates/lys/src/identity/install/layout.rs
+- modify: crates/lys-identity-server/src/apps_schema_api.rs
+- modify: crates/lys-identity-server/tests/apps_schema.rs
 
 **Checklist:**
 - C387 — A team plan names its purpose, total budget, deliverables with their evidence, and each member's profile, memories, opening conversation, budget share, goals and checker (DIRECTORY-052 R1).
@@ -81,6 +93,12 @@ Behavioural. POST /team-plans/{id}/provision creates, under the responsible pers
 - modify: crates/lys-identity-server/src/team_plans_api.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/tests/team_plans.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/tests/openapi.rs
 
 **Checklist:**
 - C388 — Provisioning a plan creates every agent, grant, home, budget and goal in one all-or-nothing act and starts them (DIRECTORY-052 R2).
@@ -128,6 +146,13 @@ Behavioural. A member marks a deliverable ready with its evidence (a commit on a
 **Files:**
 - modify: crates/lys-identity-server/src/goals_api.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/tests/team_plans.rs
+- modify: crates/lys-identity-server/tests/openapi.rs
 
 **Checklist:**
 - C390 — A deliverable is met only when its checker accepts it with the named evidence; the team's spend is held to its total (DIRECTORY-052 R4).
@@ -156,6 +181,8 @@ Behavioural. A Teams screen builds a plan from a template (for example: a builde
 - create: surface/identity/tests/team-plans.test.tsx
 - modify: surface/identity/src/routes.tsx
 - modify: surface/identity/src/shell/railItems.ts
+- modify: surface/identity/src/api.ts
+- modify: surface/identity/src/generated/index.ts
 
 **Checklist:**
 - C391 — A Teams screen builds a plan from a template, provisions it, and shows each member's state, spend, goals and deliverables (DIRECTORY-052 R5).
@@ -175,6 +202,9 @@ Behavioural. The Teams screen and the API let the responsible person store a mod
 **Files:**
 - modify: surface/identity/src/features/team-plans/TeamPlans.tsx
 - modify: crates/lys-identity-server/src/secrets_api.rs
+- modify: surface/identity/src/api.ts
+- modify: surface/identity/src/generated/index.ts
+- modify: surface/identity/tests/team-plans.test.tsx
 
 **Checklist:**
 - C392 — Accounts and secrets are stored once in the broker and assigned to members by handle; values are never shown again (DIRECTORY-052 R6).

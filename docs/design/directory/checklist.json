@@ -1545,6 +1545,101 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Managed context and goal delivery (DIRECTORY-064)",
+      "items": [
+        {
+          "id": "C433",
+          "text": "One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1).",
+          "done": false
+        },
+        {
+          "id": "C434",
+          "text": "Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2).",
+          "done": false
+        },
+        {
+          "id": "C435",
+          "text": "Enforce context thresholds at the owned boundary (DIRECTORY-064 R3).",
+          "done": false
+        },
+        {
+          "id": "C436",
+          "text": "Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).",
+          "done": false
+        },
+        {
+          "id": "C437",
+          "text": "Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).",
+          "done": false
+        },
+        {
+          "id": "C438",
+          "text": "Plain controls and a real managed-session proof (DIRECTORY-064 R6).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Placed and running runner builds (DIRECTORY-066)",
+      "items": [
+        {
+          "id": "C445",
+          "text": "Place the runner binary without restarting a live runner (DIRECTORY-066 R1).",
+          "done": false
+        },
+        {
+          "id": "C446",
+          "text": "Record running and placed builds as different facts (DIRECTORY-066 R2).",
+          "done": false
+        },
+        {
+          "id": "C447",
+          "text": "Restart only through an explicit session-aware operation (DIRECTORY-066 R3).",
+          "done": false
+        },
+        {
+          "id": "C448",
+          "text": "Show the same pending restart on the page and CLI (DIRECTORY-066 R4).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Codex policy and refusal coverage (DIRECTORY-065)",
+      "items": [
+        {
+          "id": "C439",
+          "text": "Pin the actual Codex executable and its supported policy contract (DIRECTORY-065 R1).",
+          "done": false
+        },
+        {
+          "id": "C440",
+          "text": "Render native Codex permissions from the bound Lys policy (DIRECTORY-065 R2).",
+          "done": false
+        },
+        {
+          "id": "C441",
+          "text": "Bind Codex pre-tool policy checks to the existing Lys judge (DIRECTORY-065 R3).",
+          "done": false
+        },
+        {
+          "id": "C442",
+          "text": "Record native Codex rejections with honest provenance (DIRECTORY-065 R4).",
+          "done": false
+        },
+        {
+          "id": "C443",
+          "text": "The Codex agent page shows measured policy and refusal coverage (DIRECTORY-065 R5).",
+          "done": false
+        },
+        {
+          "id": "C444",
+          "text": "Prove config enforcement and denial delivery through the real harness (DIRECTORY-065 R6).",
+          "done": false
+        }
+      ]
     }
   ]
 }

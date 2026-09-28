@@ -78,6 +78,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-127 — A SpiceDB wait ends on its answer, its close or its caller, and grants sections run off the async workers — Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.
 - ADR-128 — The runner applies OS containment from the same Lys policy and reports native denials — Compile one Lys policy into Seatbelt on macOS and Landlock with a private network namespace on Linux. A policy-bound egress service enforces hostnames while OS rules prevent direct bypass. A runner applies containment before untrusted exec and records its policy digest and session incarnation. Native kernel events feed the same authenticated refusal stream as051, with distinct provenance from tool and proxy denials. Missing enforcement or required audit support refuses launch. gaps are visible and end affected sessions through the existing ownership mechanism. A writable outside-root fixture that succeeds without confinement is the filesystem control. Never infer sandbox enforcement from a failure to write /etc/x. Both native platforms require real tests and receipts.
 - ADR-129 — Paths under /api belong to the API and are refused when unknown, and paths outside it stay the page's — The API nested under /api has its own fallback answering 404 with a named JSON refusal. Paths outside /api stay the page's, so /health and /healthz at the root keep answering the page, and the page shows what it shows for a route it does not know. The one health answer is GET /api/health, which names the service and its build and asks no other service. Serving 404 for chosen root names was weighed and not taken, because the server would then guess at the page's routes.
+- ADR-131 — Codex policy comes from Lys and refusal provenance follows the real harness contract — Render the same Lys policy into isolated native Codex settings. Use064's one transport owner and051's one refusal store. Distinguish Codex-reported rejection, Lys judge denial and062 OS denial. Required unrepresentable policy refuses launch. Coverage is capability-derived, never a blanket claim.
 
 ## Goals
 
@@ -1043,6 +1044,49 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/containment_forwarder.rs` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
 | `docs/CONTAINMENT-PREPARATION.md` | Linux applies Landlock and a network namespace before exec. DIRECTORY-062 R3. | DIRECTORY-062 |
 | `scripts/identity-gates/containment-capabilities.sh` | A person watches real native denials and an allowed control. DIRECTORY-062 R6. | DIRECTORY-062 |
+| `crates/lys-runner/src/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/events.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/process.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_control.rs` | One managed harness channel, with proved turn boundaries (DIRECTORY-064 R1). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_claude.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/tests/harness_codex.rs` | Use Claude and Codex control protocols, never terminal typing (DIRECTORY-064 R2). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/context.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/tests/context_control.rs` | Enforce context thresholds at the owned boundary (DIRECTORY-064 R3). | DIRECTORY-064 |
+| `crates/lys-runner/src/harness_control/reminders.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/reminder_delivery.rs` | Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4). | DIRECTORY-064 |
+| `crates/lys-runner/tests/control_recovery.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `crates/lys-identity-server/tests/control_receipts.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
+| `surface/identity/tests/acceptance/agent-control.spec.ts` | Plain controls and a real managed-session proof (DIRECTORY-064 R6). | DIRECTORY-064 |
+| `crates/lys/src/identity/upgrade/runner.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/runner_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/scratch_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys-runner/tests/build_identity.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/commands/runner.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart_tests.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys-runner/tests/restart_fence.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/status.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys/src/identity/status_tests.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `surface/identity/tests/acceptance/runner-build.spec.ts` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys-runner/src/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_contract.rs` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `docs/design/directory/CODEX-POLICY-CONTRACT.md` | Pin the actual Codex executable and its supported policy contract. DIRECTORY-065 R1. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/policy_tests.rs` | Render native Codex permissions from the bound Lys policy. DIRECTORY-065 R2. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_judge.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-home/src/harness/codex/hooks_tests.rs` | Bind Codex pre-tool policy checks to the existing Lys judge. DIRECTORY-065 R3. | DIRECTORY-065 |
+| `crates/lys-runner/src/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_refusals.rs` | Record native Codex rejections with honest provenance. DIRECTORY-065 R4. | DIRECTORY-065 |
+| `surface/identity/tests/codex-policy.test.tsx` | The Codex agent page shows measured policy and refusal coverage. DIRECTORY-065 R5. | DIRECTORY-065 |
+| `scripts/identity-gates/codex-policy.sh` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/codex_policy_native.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys-runner/tests/support/codex_policy_fixture.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `surface/identity/tests/acceptance/codex-policy.spec.ts` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `docs/design/directory/PROOF-CODEX-POLICY.md` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 
 ## Inventory
 
@@ -1079,15 +1123,15 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 
 ## Constraints
 
-- **CN1** — Documents only: nothing outside docs/design/directory/ and docs/design/decisions.json is created or modified; the IDENTITY-001 files are not changed. DIRECTORY-054, under ADR-120, is implementation work within the exact requirement file walls of its reviewed brief; the documents-only boundary does not apply to those files. CN9 still requires a reviewed revision before any additional file is edited.
+- **CN1** — The documents-only boundary applies to the original directory planning task, not to published implementation briefs. A published DIRECTORY implementation brief authorises only its exact requirement file walls, including named source, tests, configuration and documentation files. No implementation author may widen those walls silently. The historical IDENTITY-001 record is not rewritten. Tom’s 29 September 07:51 direction, relayed by Waffles, removes lead brief sign-off as a prerequisite to dispatch; the design gate and automatic card review and full delivery gates remain required.
 - **CN2** — Development isolation: rows 02 to 05 use only disposable test identities and test provider registrations; no production tokens, real business sign-in or live Cambium participant migration.
 - **CN3** — Every path written in a document of this cluster is relative to the repository root, whatever directory a session starts in; a command runs from its own tree and spells its paths from there.
 - **CN4** — No structure row or files entry carries a root token; a file in another repository is named in a requirement's spec with its owner.
 - **CN5** — A live demonstration to Tom is never an acceptance criterion of a loop requirement; it is a verification step a person performs after the row lands.
 - **CN6** — The live demonstrations ID001_LINK_LIVE (after row 03) and ID001_DIRECTORY_LIVE (after row 05) are mandatory operator hold points: the brief that follows each is blocked by it until Tom's demonstration receipt is recorded; a loop completion never stands in for one.
 - **CN7** — Revision 5's ceiling stands: 48 focused implementer hours for IDENTITY-001 (row 01 1.5, closed; 02 8; 04 10; 03 10; 05 6; 06 4; 07 5; total 44.5, contingency 3.5), with IDENTITY-002's 4 hours outside it. An overrun is reported as soon as it is known, and Waffles takes any ceiling change to Tom (docs/design/identity/briefs/IDENTITY-001.json:24).
-- **CN8** — One implementer, one row in implementation and one gate invocation at a time in this lane; release builds, checks and tests run through the gate workflow at the venue, and a development exception never bypasses it (docs/design/identity/briefs/IDENTITY-001.json:25-27, docs/design/identity/briefs/IDENTITY-001.json:135).
-- **CN9** — A row that needs a file outside its wall stops and names it, and the reviewer approves a brief revision before that file is edited; a directory wall for a wholly new module allows only its named responsibility and needs an exact file manifest reviewed before its row starts (docs/design/identity/briefs/IDENTITY-001.json:28).
+- **CN8** — There is no one-build-per-lead rule: Tom withdrew that restriction on 29 September at 07:32, relayed by Waffles. Independent card builds may run concurrently. Heavy builds and full gates run at the declared venue. Concurrent dispatch does not supply missing prerequisite code: dependent changes need the actual prerequisite implementation in the integration tree, and the integrated commit passes the full delivery chain before landing.
+- **CN9** — A row that needs a file outside its wall stops and names it. The lead amends the handwritten brief on main and passes the design gate before that additional file is edited; a new module needs an exact file manifest within its named responsibility. Under Tom’s 29 September 07:51 direction, relayed by Waffles, no separate lead review or sign-off is required before dispatch. Automatic card review and full delivery gates remain required. An active run keeps its captured contract; changed words must be reconciled with its result before publication or landing.
 - **CN10** — Rows 02 to 05 run on Rauthy v0.36.2 under Waffles' ruling of 15:36:25; each development install checks current releases and advisories and records the accepted exception; IDENTITY-001-UPSTREAM-AUTH-STATE binds real sign-in and install, rows 06 and 07 (docs/design/identity/briefs/IDENTITY-001.json:18, docs/design/identity/briefs/IDENTITY-001.json:46).
 - **CN11** — Step 1 is directory records, sign-in and the minimum signed identity audit. SpiceDB is installed and checked in row 02 and enforces nothing in step 1; live capability policy and its enforcement are step 2's, and running SpiceDB is not permission enforcement (docs/design/identity/briefs/IDENTITY-001.json:29-30).
 - **CN12** — DIRECTORY-006 is implementation work after the frozen planning task: its source paths are only executable after the DIRECTORY-002/003 foundations are implemented and their integration manifests are reconciled. R6 also waits for the standalone surface foundation. Do not dispatch from a schema-valid but dependency-blocked brief.
