@@ -8,7 +8,10 @@ use super::team_ids;
 #[test]
 fn two_groups_name_exactly_two_teams() {
     let claims = json!({ "sub": "person-a", "groups": ["team_a", "team_b"] });
-    assert_eq!(team_ids(&claims), vec!["team_a".to_owned(), "team_b".to_owned()]);
+    assert_eq!(
+        team_ids(&claims),
+        vec!["team_a".to_owned(), "team_b".to_owned()]
+    );
 }
 
 #[test]

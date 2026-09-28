@@ -176,13 +176,14 @@ pub fn wait_ready(
             )
         })?;
     let outcome = match follower.stdout.take() {
-        Some(mut output) => ready_on_output(
-            &mut output,
-            waiting,
-            &mut || unready_services(config),
-            say,
-        ),
-        None => Err(refuse("follow", "compose", "docker compose logs gave no output")),
+        Some(mut output) => {
+            ready_on_output(&mut output, waiting, &mut || unready_services(config), say)
+        }
+        None => Err(refuse(
+            "follow",
+            "compose",
+            "docker compose logs gave no output",
+        )),
     };
     follower
         .kill()
@@ -402,12 +403,9 @@ pub fn answers(port: u16, path: &str) -> bool {
 /// Waits until the loopback service on `port` answers `path`, or the
 /// process behind the pid file exits, in which case the log is named.
 pub fn wait_answering(port: u16, path: &str, pid_file: &Path, log: &Path) -> IdentityResult<()> {
-    wait_until(
-        &format!("127.0.0.1:{port}"),
-        log,
-        pid_file,
-        &mut || answers(port, path),
-    )
+    wait_until(&format!("127.0.0.1:{port}"), log, pid_file, &mut || {
+        answers(port, path)
+    })
 }
 
 /// Runs `check` once now and once on each change to `log`, until it

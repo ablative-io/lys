@@ -116,7 +116,11 @@ impl ExitWatch {
 impl ExitWatch {
     /// Whether the service has exited; an exit lock needs a Unix host.
     pub fn exited(&self) -> IdentityResult<bool> {
-        Err(refuse("watch for exit", "an exit lock needs a Unix host", &self.path))
+        Err(refuse(
+            "watch for exit",
+            "an exit lock needs a Unix host",
+            &self.path,
+        ))
     }
 
     /// Blocks until the service has exited; an exit lock needs a Unix host.

@@ -58,7 +58,10 @@ fn conformance_7_8_no_scope_answers_every_secret_the_person_may_see() -> TestRes
     assert_eq!(lists.len(), 4);
     for listed in &lists {
         for hidden in HIDDEN_FROM_A {
-            assert!(!listed.contains(&hidden.to_owned()), "{hidden} in {listed:?}");
+            assert!(
+                !listed.contains(&hidden.to_owned()),
+                "{hidden} in {listed:?}"
+            );
         }
     }
     Ok(())
@@ -84,7 +87,11 @@ fn conformance_7_8_an_agents_team_membership_changes_no_list() -> TestResult {
     let before = lists_of_a(&broker);
 
     let agent = asker(AGENT_A, AskerKind::Agent, &[TEAM_B]);
-    assert_eq!(agent.teams().len(), 0, "an agent's group claims are not read");
+    assert_eq!(
+        agent.teams().len(),
+        0,
+        "an agent's group claims are not read"
+    );
     let (status, _body) = list(&broker, &agent, Some("team"));
     assert_eq!(status, 403);
 
@@ -109,7 +116,10 @@ fn conformance_7_8_an_agent_is_refused_the_list_by_name() -> TestResult {
             reason.contains("agents reach secrets only through their virtual credentials"),
             "{body}"
         );
-        assert!(body.get("secrets").is_none(), "no list, not even an empty one: {body}");
+        assert!(
+            body.get("secrets").is_none(),
+            "no list, not even an empty one: {body}"
+        );
     }
     assert_eq!(broker.audit().len(), lines, "nothing is recorded");
 

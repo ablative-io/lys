@@ -37,14 +37,20 @@ fn scratch(dir: &Path) -> TestResult<PathBuf> {
 fn a_stop_returns_on_the_exit_event_and_asks_nothing_after_the_kill() -> TestResult {
     let dir = tempfile::TempDir::new()?;
     let pid = scratch(dir.path())?;
-    assert!(!ExitWatch::open(&pid)?.exited()?, "a running service holds its lock");
+    assert!(
+        !ExitWatch::open(&pid)?.exited()?,
+        "a running service holds its lock"
+    );
     let mut asked = 0;
     let stopped = services::stop_with(&pid, &mut |pid_file| {
         asked += 1;
         services::alive(pid_file)
     })?;
     assert!(stopped);
-    assert_eq!(asked, 1, "alive is asked once, before the kill, and never polled");
+    assert_eq!(
+        asked, 1,
+        "alive is asked once, before the kill, and never polled"
+    );
     assert!(ExitWatch::open(&pid)?.exited()?, "the exit has happened");
     assert!(!services::alive(&pid));
     Ok(())

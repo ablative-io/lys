@@ -276,7 +276,10 @@ fn a_service_is_ready_within_the_log_event_that_says_so() -> Result<(), Box<dyn 
         text.contains("listening")
     })?;
     told.ok_or("the service was never told")??;
-    assert_eq!(checks, 2, "one check as the wait began and one on the event");
+    assert_eq!(
+        checks, 2,
+        "one check as the wait began and one on the event"
+    );
     assert!(services::stop(&pid)?);
     Ok(())
 }
@@ -329,7 +332,10 @@ fn the_compose_wait_checks_once_per_output_and_names_each_ready() -> Result<(), 
     );
     let refused = outcome.err().ok_or("ended output was ready")?;
     assert_eq!(refused.kind(), ErrorKind::Unready);
-    assert!(refused.to_string().contains("rauthy not ready"), "{refused}");
+    assert!(
+        refused.to_string().contains("rauthy not ready"),
+        "{refused}"
+    );
     assert_eq!(said.len(), 2, "nothing was said ready that was not");
     Ok(())
 }

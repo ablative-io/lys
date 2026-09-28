@@ -176,7 +176,9 @@ pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response
     let read = stream.read_to_end(&mut answer);
     let arrived = answer.len();
     read.map_err(|error| {
-        Failure::Uncertain(format!("reading the response after {arrived} bytes: {error}"))
+        Failure::Uncertain(format!(
+            "reading the response after {arrived} bytes: {error}"
+        ))
     })?;
     parse_response(&answer).map_err(|detail| {
         Failure::Malformed(format!("{detail}: the peer closed after {arrived} bytes"))

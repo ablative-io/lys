@@ -73,7 +73,10 @@ pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Res
         .into_iter()
         .map(|entry| {
             let route = routes.get(&entry.name);
-            let scope = broker.store().scope(&entry.name).map(|scope| scope.target());
+            let scope = broker
+                .store()
+                .scope(&entry.name)
+                .map(|scope| scope.target());
             json!({
                 "name": entry.name,
                 "class": entry.class,
