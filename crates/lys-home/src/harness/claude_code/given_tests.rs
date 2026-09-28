@@ -103,7 +103,8 @@ fn listing(dir: &Path) -> std::io::Result<Vec<(PathBuf, u64, SystemTime)>> {
 #[test]
 fn the_measured_order_appended_mcp_chain_memory_with_relative_and_absolute_paths() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     let documents = &resolution.documents;
     assert_eq!(documents.len(), 4);
@@ -150,7 +151,8 @@ fn the_measured_order_appended_mcp_chain_memory_with_relative_and_absolute_paths
 #[test]
 fn a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
     put(&c.join("CLAUDE.md"), b"user instructions\n")?;
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     assert_eq!(resolution.documents.len(), 5);
@@ -171,12 +173,13 @@ fn a_config_claude_md_is_listed_after_the_appended_instructions_and_mcp_config()
 #[test]
 fn an_ancestor_claude_md_is_listed_before_the_working_directory_s() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
-    put(&dir.path().join("CLAUDE.md"), b"ancestor instructions\n")?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
+    put(&base.join("CLAUDE.md"), b"ancestor instructions\n")?;
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     assert_eq!(resolution.documents.len(), 5);
     assert_eq!(resolution.documents[2].kind, DocumentKind::ClaudeMdChain);
-    assert_eq!(resolution.documents[2].path, dir.path().join("CLAUDE.md"));
+    assert_eq!(resolution.documents[2].path, base.join("CLAUDE.md"));
     assert_eq!(resolution.documents[3].kind, DocumentKind::ClaudeMdChain);
     assert_eq!(resolution.documents[3].path, w.join("CLAUDE.md"));
     Ok(())
@@ -186,9 +189,10 @@ fn an_ancestor_claude_md_is_listed_before_the_working_directory_s() -> Outcome {
 fn one_directory_lists_claude_md_then_dot_claude_then_local_whatever_the_creation_order() -> Outcome
 {
     let dir = tempfile::tempdir()?;
-    let w = dir.path().join("w");
-    let c = dir.path().join("c");
-    let o = dir.path().join("o");
+    let base = dir.path().canonicalize()?;
+    let w = base.join("w");
+    let c = base.join("c");
+    let o = base.join("o");
     put(&w.join("CLAUDE.local.md"), b"local\n")?;
     put(&w.join(".claude").join("CLAUDE.md"), b"dot claude\n")?;
     put(&w.join("CLAUDE.md"), b"claude\n")?;
@@ -209,7 +213,8 @@ fn one_directory_lists_claude_md_then_dot_claude_then_local_whatever_the_creatio
 #[test]
 fn no_memory_index_gives_no_memory_document_and_the_call_succeeds() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
     std::fs::remove_file(memory_index(&c, cwd(&w)?))?;
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     assert_eq!(resolution.documents.len(), 3);
@@ -226,8 +231,9 @@ fn no_memory_index_gives_no_memory_document_and_the_call_succeeds() -> Outcome {
 #[test]
 fn the_config_directory_is_the_template_s_or_else_home_dot_claude() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
-    let h = dir.path().join("h");
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
+    let h = base.join("h");
     put(
         &memory_index(&h.join(".claude"), cwd(&w)?),
         b"home memory\n",
@@ -323,9 +329,10 @@ fn a_config_dir_that_is_not_absolute_is_refused_naming_the_variable_and_its_shap
 #[test]
 fn home_dot_claude_claude_md_is_listed_once_as_the_user_file_when_home_is_the_config() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let h = dir.path().join("h");
+    let base = dir.path().canonicalize()?;
+    let h = base.join("h");
     let w = h.join("w");
-    let o = dir.path().join("o");
+    let o = base.join("o");
     put(&h.join(".claude").join("CLAUDE.md"), b"user and chain\n")?;
     put(&w.join("CLAUDE.md"), SENTENCE)?;
     let resolution = resolve_given(cwd(&w)?, ConfigDir::resolve(None, Some(h.as_path()))?, &o)?;
@@ -344,10 +351,11 @@ fn home_dot_claude_claude_md_is_listed_once_as_the_user_file_when_home_is_the_co
 fn home_dot_claude_claude_md_is_a_chain_position_when_the_template_names_another_config() -> Outcome
 {
     let dir = tempfile::tempdir()?;
-    let h = dir.path().join("h");
+    let base = dir.path().canonicalize()?;
+    let h = base.join("h");
     let w = h.join("w");
-    let c = dir.path().join("c");
-    let o = dir.path().join("o");
+    let c = base.join("c");
+    let o = base.join("o");
     std::fs::create_dir_all(&c)?;
     put(&h.join(".claude").join("CLAUDE.md"), b"chain only\n")?;
     put(&w.join("CLAUDE.md"), SENTENCE)?;
@@ -374,9 +382,10 @@ fn home_dot_claude_claude_md_is_a_chain_position_when_the_template_names_another
 #[test]
 fn a_memory_index_under_the_slash_only_slug_of_a_dotted_directory_is_not_listed() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let w = dir.path().join("dotted.dir").join("w");
-    let c = dir.path().join("c");
-    let o = dir.path().join("o");
+    let base = dir.path().canonicalize()?;
+    let w = base.join("dotted.dir").join("w");
+    let c = base.join("c");
+    let o = base.join("o");
     std::fs::create_dir_all(&w)?;
     let old_slug = cwd(&w)?.replace('/', "-");
     assert!(old_slug.contains('.'));
@@ -401,7 +410,8 @@ fn a_memory_index_under_the_slash_only_slug_of_a_dotted_directory_is_not_listed(
 fn an_unreadable_claude_md_fails_by_path_and_the_error_holds_no_line_of_it() -> Outcome {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
     let file = w.join("CLAUDE.md");
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o000))?;
     let refused = resolve_given(cwd(&w)?, template(&c), &o);
@@ -426,7 +436,8 @@ fn an_unreadable_claude_md_fails_by_path_and_the_error_holds_no_line_of_it() -> 
 #[test]
 fn a_relative_working_directory_is_refused_by_name() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (_, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (_, c, o) = fixture(&base)?;
     let refused = resolve_given("relative/w", template(&c), &o);
     assert!(matches!(
         refused,
@@ -441,11 +452,255 @@ fn a_relative_working_directory_is_refused_by_name() -> Outcome {
 #[test]
 fn resolution_writes_nothing_under_the_config_or_working_directory() -> Outcome {
     let dir = tempfile::tempdir()?;
-    let (w, c, o) = fixture(dir.path())?;
+    let base = dir.path().canonicalize()?;
+    let (w, c, o) = fixture(&base)?;
     put(&c.join("CLAUDE.md"), b"user instructions\n")?;
     let before = (listing(&c)?, listing(&w)?);
     let resolution = resolve_given(cwd(&w)?, template(&c), &o)?;
     assert_eq!(resolution.documents.len(), 5);
     assert_eq!(before, (listing(&c)?, listing(&w)?));
+    Ok(())
+}
+
+/// The canonical base `B` with `B/real/w` and `B/real/c` directories, an out
+/// directory `B/o` holding the two written files, and `B/link` a symlink to
+/// `B/real` made here. Returns `B/real`.
+#[cfg(unix)]
+fn linked(base: &Path) -> std::io::Result<PathBuf> {
+    let real = base.join("real");
+    let link = base.join("link");
+    std::fs::create_dir_all(real.join("w"))?;
+    std::fs::create_dir_all(real.join("c"))?;
+    put(&base.join("o").join("instructions.md"), INSTRUCTIONS)?;
+    put(&base.join("o").join("mcp.json"), MCP)?;
+    std::os::unix::fs::symlink(&real, &link)?;
+    Ok(real)
+}
+
+/// The documents whose path is absolute, in record order.
+#[cfg(unix)]
+fn absolutes(documents: &[GivenDocument]) -> Vec<&GivenDocument> {
+    documents.iter().filter(|d| d.path.is_absolute()).collect()
+}
+
+#[cfg(unix)]
+#[test]
+fn a_working_directory_through_a_symlink_records_the_chain_at_its_canonical_path() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    let link = base.join("link");
+    put(&real.join("w").join("CLAUDE.md"), SENTENCE)?;
+    let resolution = resolve_given(
+        cwd(&link.join("w"))?,
+        template(&real.join("c")),
+        &base.join("o"),
+    )?;
+    let chain: Vec<&GivenDocument> = resolution
+        .documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::ClaudeMdChain)
+        .collect();
+    assert_eq!(chain.len(), 1);
+    assert_eq!(chain[0].path, real.join("w").join("CLAUDE.md"));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_working_directory_with_dot_dot_walks_only_the_canonical_chain() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    put(&real.join("CLAUDE.md"), b"parent\n")?;
+    put(&real.join("w").join("CLAUDE.md"), SENTENCE)?;
+    let dotted = real.join("w").join("..").join("w");
+    let resolution = resolve_given(cwd(&dotted)?, template(&real.join("c")), &base.join("o"))?;
+    let chain: Vec<&Path> = resolution
+        .documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::ClaudeMdChain && d.path.starts_with(&base))
+        .map(|d| d.path.as_path())
+        .collect();
+    assert_eq!(chain.len(), 2);
+    assert_eq!(
+        chain,
+        [
+            real.join("CLAUDE.md").as_path(),
+            real.join("w").join("CLAUDE.md").as_path()
+        ]
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_config_directory_with_a_trailing_slash_records_without_it() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    put(&real.join("c").join("CLAUDE.md"), b"user\n")?;
+    let slashed = format!("{}/", cwd(&real.join("c"))?);
+    let resolution = resolve_given(
+        cwd(&real.join("w"))?,
+        template(Path::new(&slashed)),
+        &base.join("o"),
+    )?;
+    assert_eq!(
+        serde_json::to_string(&resolution.config_dir.path)?,
+        serde_json::to_string(cwd(&real.join("c"))?)?
+    );
+    let users: Vec<&GivenDocument> = resolution
+        .documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::UserClaudeMd)
+        .collect();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0].path, real.join("c").join("CLAUDE.md"));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_config_through_a_symlink_is_still_listed_once_as_the_user_file() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    let link = base.join("link");
+    put(&real.join(".claude").join("CLAUDE.md"), b"user and chain\n")?;
+    put(&real.join("w").join("CLAUDE.md"), SENTENCE)?;
+    let resolution = resolve_given(
+        cwd(&real.join("w"))?,
+        template(&link.join(".claude")),
+        &base.join("o"),
+    )?;
+    let documents = absolutes(&resolution.documents);
+    assert_eq!(documents.len(), 2);
+    assert_eq!(documents[0].kind, DocumentKind::UserClaudeMd);
+    assert_eq!(documents[0].path, real.join(".claude").join("CLAUDE.md"));
+    assert_eq!(documents[1].kind, DocumentKind::ClaudeMdChain);
+    assert_eq!(documents[1].path, real.join("w").join("CLAUDE.md"));
+    let user = real.join(".claude").join("CLAUDE.md");
+    let doubled = documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::ClaudeMdChain && d.path == user)
+        .count();
+    assert_eq!(doubled, 0);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_config_directory_that_does_not_exist_is_recorded_as_given() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    let gone = format!("{}/", cwd(&base.join("gone").join("c"))?);
+    let resolution = resolve_given(
+        cwd(&real.join("w"))?,
+        template(Path::new(&gone)),
+        &base.join("o"),
+    )?;
+    assert_eq!(
+        serde_json::to_string(&resolution.config_dir.path)?,
+        serde_json::to_string(&gone)?
+    );
+    let config_kinds = [DocumentKind::UserClaudeMd, DocumentKind::MemoryIndex];
+    let under_config = resolution
+        .documents
+        .iter()
+        .filter(|d| config_kinds.contains(&d.kind))
+        .count();
+    assert_eq!(under_config, 0);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn the_memory_index_slug_is_taken_from_the_working_directory_as_given() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    let link = base.join("link");
+    let c = real.join("c");
+    let given = link.join("w");
+    let canonical_only = memory_index(&c, cwd(&real.join("w"))?);
+    put(&canonical_only, b"canonical slug\n")?;
+    let resolution = resolve_given(cwd(&given)?, template(&c), &base.join("o"))?;
+    let unlisted = resolution
+        .documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::MemoryIndex)
+        .count();
+    assert_eq!(unlisted, 0);
+    let by_given = memory_index(&c, cwd(&given)?);
+    put(&by_given, b"given slug\n")?;
+    let resolution = resolve_given(cwd(&given)?, template(&c), &base.join("o"))?;
+    let memory: Vec<&GivenDocument> = resolution
+        .documents
+        .iter()
+        .filter(|d| d.kind == DocumentKind::MemoryIndex)
+        .collect();
+    assert_eq!(memory.len(), 1);
+    assert_eq!(memory[0].path, by_given);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_claude_md_is_named_at_its_link_and_written_files_stay_relative() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    put(&real.join("t").join("target.md"), SENTENCE)?;
+    std::os::unix::fs::symlink(
+        real.join("t").join("target.md"),
+        real.join("w").join("CLAUDE.md"),
+    )?;
+    let resolution = resolve_given(
+        cwd(&real.join("w"))?,
+        template(&real.join("c")),
+        &base.join("o"),
+    )?;
+    assert_eq!(resolution.documents.len(), 3);
+    assert_eq!(
+        paths(&resolution.documents),
+        [
+            Path::new("instructions.md"),
+            Path::new("mcp.json"),
+            real.join("w").join("CLAUDE.md").as_path()
+        ]
+    );
+    assert_eq!(resolution.documents[2].sha256, sha256_hex(SENTENCE));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_working_directory_that_cannot_be_searched_is_refused_by_operation_and_path() -> Outcome {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir()?;
+    let base = dir.path().canonicalize()?;
+    let real = linked(&base)?;
+    let locked = base.join("locked");
+    let w = locked.join("w");
+    put(&w.join("CLAUDE.md"), SENTENCE)?;
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000))?;
+    let refused = resolve_given(cwd(&w)?, template(&real.join("c")), &base.join("o"));
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755))?;
+    let Err(error) = refused else {
+        return Err("a working directory that cannot be searched is refused".into());
+    };
+    let text = error.to_string();
+    assert!(
+        matches!(&error, HomeError::Io { path, .. } if *path == w),
+        "{text}"
+    );
+    assert!(text.contains("canonicalising a given path"), "{text}");
+    assert!(text.contains(cwd(&w)?), "{text}");
+    assert!(
+        !text.contains(std::str::from_utf8(SENTENCE)?.trim()),
+        "{text}"
+    );
     Ok(())
 }
