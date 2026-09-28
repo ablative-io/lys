@@ -164,6 +164,7 @@ fn the_handles_route_lists_what_a_holder_holds_and_never_the_handle() -> TestRes
         shown,
         [
             "dropped",
+            "ended",
             "id",
             "max_uses",
             "not_after_ms",
@@ -171,6 +172,8 @@ fn the_handles_route_lists_what_a_holder_holds_and_never_the_handle() -> TestRes
             "secret",
             "settled",
             "spend_cap",
+            "upstream",
+            "upstream_reason",
             "used"
         ],
         "no token, digest or key is shown"
@@ -228,6 +231,55 @@ fn the_revocation_route_reads_a_percent_encoded_handle() -> TestResult {
     let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
     assert_eq!(status, 400, "{body}");
     assert!(body.starts_with("Encoding:"), "{body}");
+    Ok(())
+}
+
+const ENDING: &str = "screen-handle-ending-01";
+
+#[test]
+fn a_handle_is_ended_by_the_person_it_is_held_for_once_per_operation_id() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+    let owned = served.seeded.owned_handle.clone();
+
+    let ending = serde_json::to_vec(&json!({ "handle": owned, "operation": ENDING }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OTHER)?;
+    assert_eq!(status, 404, "{body}");
+    assert!(body.starts_with("HandleUnknown:"), "{body}");
+
+    let unmarked = serde_json::to_vec(&json!({ "handle": owned }))?;
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &unmarked, OWNER)?;
+    assert_eq!(status, 400, "{body}");
+    assert!(body.starts_with("OperationMissing:"), "{body}");
+
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let answered: Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        answered,
+        json!({
+            "handle": owned, "operation": ENDING, "outcome": "ended", "ended": [owned],
+            "stopped_here": true, "upstream": "not_asked", "upstream_reason": null,
+        })
+    );
+
+    let (status, body) = served.ask(&Method::POST, "/_lys/drop", &ending, OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let again: Value = serde_json::from_str(&body)?;
+    assert_eq!(again["outcome"], "repeated", "{body}");
+    assert_eq!(again["ended"], json!([owned]), "{body}");
+
+    let target = format!("/_lys/handles?holder={OWNER}");
+    let (status, body) = served.ask(&Method::GET, &target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    let listed: Value = serde_json::from_str(&body)?;
+    let held = &listed["handles"][0];
+    assert_eq!(held["dropped"], true, "{body}");
+    assert_eq!(
+        held["ended"],
+        json!({ "by": OWNER, "operation": ENDING, "root": owned }),
+        "{body}"
+    );
+    assert_eq!(held["upstream"], "not_asked", "{body}");
     Ok(())
 }
 

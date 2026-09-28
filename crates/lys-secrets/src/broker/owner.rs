@@ -87,7 +87,10 @@ pub(super) fn fold(owners: &mut Owners, line: &AuditLine) {
 }
 
 /// `operation` when it is an operation id of the right shape.
-fn checked<'a>(secret: &str, operation: Option<&'a str>) -> Result<&'a str, SecretsError> {
+pub(super) fn checked<'a>(
+    secret: &str,
+    operation: Option<&'a str>,
+) -> Result<&'a str, SecretsError> {
     let missing = |reason: String| {
         SecretsError::from(OwnerChangeRefusal::Missing {
             secret: secret.to_owned(),

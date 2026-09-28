@@ -24,6 +24,8 @@ use crate::store::{EntryClass, SecretStore};
 
 mod accounts;
 mod admit;
+mod ending;
+pub use ending::{Ended, HandleEnded};
 mod folded;
 mod held;
 pub use held::HeldHandle;
@@ -135,6 +137,13 @@ struct HandleRecord {
     /// The handle this one was derived from.
     #[serde(default)]
     parent: Option<String>,
+    /// Who ended it, under which operation, and the handle whose ending
+    /// ended it, when a person it acts for ended it.
+    #[serde(skip)]
+    ended: Option<Ended>,
+    /// Where the provider's part of its revocation stands.
+    #[serde(skip)]
+    upstream: UpstreamRevocation,
 }
 
 /// The secrets broker.
@@ -336,6 +345,8 @@ impl<P: PermissionCheck> Broker<P> {
             settled: 0,
             open: BTreeMap::new(),
             parent: None,
+            ended: None,
+            upstream: UpstreamRevocation::NotAsked,
         };
         self.record(
             AuditKind::Issue,

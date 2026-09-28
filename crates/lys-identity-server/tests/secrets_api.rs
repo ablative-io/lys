@@ -2,7 +2,8 @@
 //! reaches it: only a signed-in person is served, the person the broker is
 //! told of is the session's and never the browser's, the request the broker
 //! receives is the one the service signed, a body is forwarded unchanged, a
-//! secret's route is taken off before it leaves, and a broker refusal
+//! secret's route is taken off before it leaves, an ending of a handle is
+//! forwarded like any other change, and a broker refusal
 //! passes through by name and status.
 
 use std::error::Error;
@@ -248,6 +249,29 @@ async fn a_change_is_forwarded_unchanged_and_a_refusal_passes_through_by_name() 
     for request in &asked {
         signed_as_received(request, &setup.key)?;
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_ending_is_forwarded_unchanged_and_only_for_a_signed_in_person() -> TestResult {
+    let setup = setup().await?;
+    let ending = json!({ "handle": "h-1", "operation": "screen-handle-ending-01" });
+    let (status, body) = setup.service.post("/secrets/drop", None, &ending).await?;
+    assert_eq!(status, 401, "{body}");
+    assert!(received(&setup.log).is_empty());
+
+    let cookie = setup.service.sign_in(login(ADA)).await?;
+    let (status, body) = setup
+        .service
+        .post("/secrets/drop", Some(&cookie), &ending)
+        .await?;
+    assert_eq!(status, 200, "{body}");
+    let asked = received(&setup.log);
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0].method, "POST");
+    assert_eq!(asked[0].path, "/_lys/drop");
+    assert_eq!(asked[0].body, ending.to_string().into_bytes());
+    signed_as_received(&asked[0], &setup.key)?;
     Ok(())
 }
 

@@ -1,7 +1,8 @@
 //! What the broker folds from its audit log: each lease's use count, drop,
 //! operations and spend, who has read which sealed record, a rotation the
 //! log shows starting and not finishing, and each secret's owner changes
-//! applied under an operation id.
+//! applied under an operation id, who ended a handle and under which
+//! operation, and where the provider's part of each revocation stands.
 //!
 //! One function applies one line, and it is the only way a line reaches the
 //! state, at a start and when a snapshot is written alike. So the state a
@@ -19,10 +20,12 @@ use crate::audit::{AuditKind, AuditLine};
 use crate::encoding::{Canonical, Reader};
 use crate::error::SecretsError;
 
+use super::ending::{self, Ended};
 use super::owner::{self, Operations, Owners};
+use super::revocation::{self, UpstreamRevocation};
 use super::{HandleRecord, ROTATING, lineage, records};
 
-const STATE_FORMAT: &str = "lys-secrets/broker-folded/v2";
+const STATE_FORMAT: &str = "lys-secrets/broker-folded/v3";
 const CONTEXT: &str = "broker snapshot state";
 
 /// The handle records with what the log says of each.
@@ -36,6 +39,8 @@ struct Lease {
     settled: u64,
     operations: BTreeMap<String, (String, String)>,
     open: BTreeMap<String, u64>,
+    ended: Option<Ended>,
+    upstream: UpstreamRevocation,
 }
 
 /// The fold of the audit log's first lines.
@@ -79,6 +84,8 @@ impl Folded {
                     settled: record.settled,
                     operations: record.operations.clone(),
                     open: record.open.clone(),
+                    ended: record.ended.clone(),
+                    upstream: record.upstream.clone(),
                 };
                 (id.clone(), lease)
             })
@@ -106,6 +113,8 @@ impl Folded {
             record.settled = lease.settled;
             record.operations = lease.operations;
             record.open = lease.open;
+            record.ended = lease.ended;
+            record.upstream = lease.upstream;
         }
     }
 
@@ -135,6 +144,14 @@ impl Folded {
             AuditKind::Drop => {
                 if let Some(record) = handles.get_mut(&id) {
                     record.dropped = true;
+                }
+                ending::fold(handles, &line);
+            }
+            AuditKind::Refresh => {
+                if let (Some(record), Some(upstream)) =
+                    (handles.get_mut(&id), revocation::upstream_of(&line))
+                {
+                    record.upstream = upstream;
                 }
             }
             AuditKind::Use if line.outcome == "admitted" => {
@@ -179,6 +196,21 @@ impl Folded {
                 state.field(operation.as_bytes())?;
                 state.number(*reserved)?;
             }
+            match &lease.ended {
+                None => state.field(&[0])?,
+                Some(ended) => state
+                    .field(&[1])?
+                    .field(ended.by.as_bytes())?
+                    .field(ended.operation.as_bytes())?
+                    .field(ended.root.as_bytes())?,
+            };
+            match &lease.upstream {
+                UpstreamRevocation::NotAsked => state.field(&[0])?,
+                UpstreamRevocation::Unconfirmed(reason) => {
+                    state.field(&[1])?.field(reason.as_bytes())?
+                }
+                UpstreamRevocation::Confirmed => state.field(&[2])?,
+            };
         }
         state.number(count(self.readers.len())?)?;
         for (identity, record) in &self.readers {
@@ -209,8 +241,12 @@ impl Folded {
     /// Reads a state in its canonical encoding.
     pub(super) fn decode(bytes: &[u8]) -> Result<Self, SecretsError> {
         let mut reader = Reader::new(bytes, CONTEXT);
-        if reader.field()? != STATE_FORMAT.as_bytes() {
-            return Err(unreadable("the state does not open with its format"));
+        let format = reader.field()?;
+        if format != STATE_FORMAT.as_bytes() {
+            return Err(unreadable(format!(
+                "the state is of format {:?}, not {STATE_FORMAT}",
+                String::from_utf8_lossy(format)
+            )));
         }
         let mut leases = BTreeMap::new();
         for _lease in 0..reader.number()? {
@@ -233,12 +269,21 @@ impl Folded {
                 let operation = text(&mut reader)?;
                 open.insert(operation, reader.number()?);
             }
+            let ended = decode_ended(&mut reader)?;
+            let upstream = match reader.field()? {
+                [0] => UpstreamRevocation::NotAsked,
+                [1] => UpstreamRevocation::Unconfirmed(text(&mut reader)?),
+                [2] => UpstreamRevocation::Confirmed,
+                _ => return Err(unreadable("a provider revocation is none of its three")),
+            };
             let lease = Lease {
                 used,
                 dropped,
                 settled,
                 operations,
                 open,
+                ended,
+                upstream,
             };
             leases.insert(id, lease);
         }
@@ -262,6 +307,23 @@ impl Folded {
             rotating,
             owners,
         })
+    }
+}
+
+/// Who ended a lease, as the state encodes it.
+fn decode_ended(reader: &mut Reader<'_>) -> Result<Option<Ended>, SecretsError> {
+    match reader.field()? {
+        [0] => Ok(None),
+        [1] => {
+            let by = text(reader)?;
+            let operation = text(reader)?;
+            Ok(Some(Ended {
+                by,
+                operation,
+                root: text(reader)?,
+            }))
+        }
+        _ => Err(unreadable("an ending is neither absent nor present")),
     }
 }
 

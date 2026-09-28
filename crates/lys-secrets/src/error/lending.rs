@@ -15,6 +15,17 @@ pub enum LendingRefusal {
         /// The secret's name.
         secret: String,
     },
+    /// A handle asked to be ended by someone other than the person its
+    /// holder acts for.
+    #[error(
+        "LendingNotPermitted: {person} is not the person the holder of handle {handle} acts for (act: ask the person the holder acts for to end it)"
+    )]
+    NotActedFor {
+        /// The one asking to end it.
+        person: String,
+        /// The handle.
+        handle: String,
+    },
     /// A derived handle asked for with a bound past the handle above it.
     #[error(
         "BeyondAncestry: a handle derived from {handle} must stay within its uses, window and spend (act: ask for bounds within the handle it is derived from)"
@@ -50,7 +61,7 @@ impl LendingRefusal {
     /// The refusal's name.
     pub fn name(&self) -> &'static str {
         match self {
-            Self::NotPermitted { .. } => "LendingNotPermitted",
+            Self::NotPermitted { .. } | Self::NotActedFor { .. } => "LendingNotPermitted",
             Self::BeyondAncestry { .. } => "BeyondAncestry",
             Self::TooDeep { .. } => "LendingTooDeep",
             Self::RecipientRefused { .. } => "RecipientRefused",

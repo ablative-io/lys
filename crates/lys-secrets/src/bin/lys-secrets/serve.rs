@@ -74,6 +74,10 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
                 "/_lys/revocation",
                 axum::routing::get(crate::manage::revocation),
             )
+            .route(
+                "/_lys/drop",
+                axum::routing::post(crate::manage::drop_handle),
+            )
             .fallback(proxy)
             .with_state(shared);
         axum::serve(listener, app)
