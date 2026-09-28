@@ -704,6 +704,24 @@
           "text": "As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to."
         }
       ]
+    },
+    {
+      "name": "Grant conformance reader",
+      "role": "Reads the grant screens and the conformance table and verifies each row against a test",
+      "stories": [
+        {
+          "id": "S141",
+          "text": "As a signed-in person, I want You to show each grant I hold with its source and whether I may pass it on, and only my own agents and grants, while an administrator's People screen shows others, so what I see is what I hold."
+        },
+        {
+          "id": "S142",
+          "text": "As a person giving an agent part of a grant, I want the form to show the source grant, the actions it allows, whether I may pass it on and the end the new grant can last no later than, as the service judged them, so I give only what my chain allows."
+        },
+        {
+          "id": "S143",
+          "text": "As a stranger checking the conformance table, I want each grant row to name the test that passes it and the command that runs it, and each test to fail when its row's fact is taken away, so the row can be verified without trusting the author."
+        }
+      ]
     }
   ]
 }
