@@ -122,10 +122,41 @@ pub async fn grants(State(shared): State<Arc<Shared>>, request: Request) -> Answ
     Ok(Json(json!({ "grants": grants })))
 }
 
+/// The most lines one audit read answers.
+const AUDIT_WINDOW: u64 = 200;
+
+/// The query of an audit read: the index the window ends before. Without
+/// it the window is the last of the log.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuditAsked {
+    #[serde(default)]
+    before: Option<u64>,
+}
+
+/// A window of the checked audit log, oldest first: the last lines of the
+/// log, or the last before `before`. It reads that window only, so a read
+/// costs the same however long the log is. `size` is the length of the log,
+/// `from` the first index read, and `older` the `before` that reads the
+/// window before this one, null when this one starts the log.
 pub async fn audit(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let identity = caller(&shared, request)?;
+    let (parts, _body) = request.into_parts();
+    let Query(asked) = Query::<AuditAsked>::try_from_uri(&parts.uri).map_err(|error| {
+        failed(&lys_secrets::SecretsError::Encoding {
+            context: "query",
+            reason: error.body_text(),
+        })
+    })?;
+    let identity = callers::caller(&shared, &parts, &[])?.identity;
     let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    let lines = broker.audit().replay().map_err(|error| failed(&error))?;
+    let size = broker.audit().len();
+    let lines = broker
+        .audit()
+        .window(asked.before, AUDIT_WINDOW)
+        .map_err(|error| failed(&error))?;
+    let from = lines
+        .first()
+        .map_or(size.min(asked.before.unwrap_or(size)), |first| first.index);
     let lines: Vec<Value> = lines
         .into_iter()
         .filter(|recorded| {
@@ -150,7 +181,11 @@ pub async fn audit(State(shared): State<Arc<Shared>>, request: Request) -> Answe
             })
         })
         .collect();
-    Ok(Json(
-        json!({ "verified_by": lys_secrets::to_hex(&broker.audit().verifying_key()), "lines": lines }),
-    ))
+    Ok(Json(json!({
+        "verified_by": lys_secrets::to_hex(&broker.audit().verifying_key()),
+        "size": size,
+        "from": from,
+        "older": (from > 0).then_some(from),
+        "lines": lines,
+    })))
 }

@@ -298,3 +298,51 @@ fn a_replayed_service_request_is_refused_by_name() -> TestResult {
     assert!(body.starts_with("ServiceReplayed:"), "{body}");
     Ok(())
 }
+
+fn audit_asked(served: &Served, target: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let (status, body) = served.ask(&Method::GET, target, b"", OWNER)?;
+    assert_eq!(status, 200, "{body}");
+    Ok(serde_json::from_str(&body)?)
+}
+
+fn shown(answer: &Value) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
+    answer["lines"]
+        .as_array()
+        .ok_or("no lines")?
+        .iter()
+        .map(|line| line["index"].as_u64().ok_or_else(|| "no index".into()))
+        .collect()
+}
+
+#[test]
+fn the_audit_route_answers_a_window_and_where_it_stands() -> TestResult {
+    let served = Served::start(Seeded::new()?)?;
+
+    let last = audit_asked(&served, "/_lys/audit")?;
+    let size = last["size"].as_u64().ok_or("no size")?;
+    assert!(size >= 2, "the seeding wrote lines: {last}");
+    assert_eq!(
+        last["from"], 0,
+        "a log shorter than a window is read from 0"
+    );
+    assert_eq!(last["older"], Value::Null);
+    let every = shown(&last)?;
+    assert!(every.windows(2).all(|pair| pair[0] < pair[1]), "{last}");
+    assert!(every.iter().all(|index| *index < size), "{last}");
+
+    let before = audit_asked(&served, "/_lys/audit?before=1")?;
+    assert_eq!(before["size"], size);
+    assert_eq!(before["from"], 0);
+    assert!(shown(&before)?.iter().all(|index| *index < 1), "{before}");
+    let none = audit_asked(&served, "/_lys/audit?before=0")?;
+    assert_eq!(shown(&none)?, [0u64; 0]);
+    assert_eq!(none["from"], 0);
+    assert_eq!(none["older"], Value::Null);
+
+    for target in ["/_lys/audit?before=soon", "/_lys/audit?after=1"] {
+        let (status, body) = served.ask(&Method::GET, target, b"", OWNER)?;
+        assert_eq!(status, 400, "{body}");
+        assert!(body.starts_with("Encoding:"), "{body}");
+    }
+    Ok(())
+}

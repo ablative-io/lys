@@ -69,4 +69,17 @@ describe('Network', () => {
     await mount('#/network', { ...routes, '/network': refused(503, 'NetworkUnavailable', 'not configured') });
     expect(text()).toContain('NetworkUnavailable'); expect(button('Register machine')).toBeNull();
   });
+  it('records selected roles separately from individual agents and checks their receipt', async () => {
+    const role = { id: 'op-' + 'c'.repeat(32), name: 'Builder', holders: [], versions: [] };
+    const { posted } = await mount('#/network', { ...routes, '/roles': ok({ roles: [role] }), 'POST /network/machines': (body) => ok(recorded(body as NameMachine)) });
+    input('name', 'Lab'); input('kind', 'server'); await click($('form input[type="checkbox"]')); input('runtime', 'Norn'); input('slots', '2');
+    await click($('input[name="role"]')); await submit(); expect(posted[0].body).toMatchObject({ may_run: [], may_run_roles: [role.id] }); expect(text()).toContain('Machine recorded.');
+  });
+  it('retains registration when the receipt omits a selected role', async () => {
+    const role = { id: 'op-' + 'c'.repeat(32), name: 'Builder', holders: [], versions: [] };
+    await mount('#/network', { ...routes, '/roles': ok({ roles: [role] }), 'POST /network/machines': (body) => ok({ ...recorded(body as NameMachine), may_run_roles: [] }) });
+    input('name', 'Lab'); input('kind', 'server'); await click($('form input[type="checkbox"]')); input('runtime', 'Norn'); input('slots', '2'); await click($('input[name="role"]')); await submit();
+    expect(text()).toContain('original request is retained'); expect(sessionStorage.length).toBe(1);
+  });
+
 });

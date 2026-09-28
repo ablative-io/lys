@@ -346,6 +346,30 @@ async fn the_handles_an_identity_holds_are_asked_by_holder_and_the_query_is_sign
 }
 
 #[tokio::test]
+async fn an_audit_window_is_asked_with_its_query_or_with_none_and_the_query_is_signed() -> TestResult
+{
+    let setup = setup().await?;
+    let cookie = setup.service.sign_in(login(ADA)).await?;
+    let (status, body) = setup.service.get("/secrets/audit", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = setup
+        .service
+        .get("/secrets/audit?before=40", Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{body}");
+    let (status, body) = setup.service.get("/secrets/audit?before=40", None).await?;
+    assert_eq!(status, 401, "{body}");
+    let asked = received(&setup.log);
+    assert_eq!(asked.len(), 2);
+    assert_eq!(asked[0].path, "/_lys/audit");
+    assert_eq!(asked[1].path, "/_lys/audit?before=40");
+    for request in &asked {
+        signed_as_received(request, &setup.key)?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_login_bound_to_no_person_is_refused_by_name() -> TestResult {
     let setup = setup().await?;
     let cookie = setup.service.sign_in(login("nobody-subject")).await?;
