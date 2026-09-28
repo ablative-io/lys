@@ -17,6 +17,10 @@
 //! then that person, named by that login, by the method agent signature, and
 //! the event keeps the agent's id. No token of any other kind is taken.
 //!
+//! By either way, the person who holds the link-audit source login must not
+//! be suspended or retired: such a person answers for no request, their own
+//! or their agent's.
+//!
 //! A request carrying both a session cookie and the signature header is
 //! judged by the signature alone: the session neither admits it nor names
 //! its actor.
@@ -85,6 +89,9 @@ fn admitted(
     }
     let source = signed_in(state, headers)?;
     state.admission.link_audit_source(&source)?;
+    with_directory(state, |directory| {
+        state.admission.link_audit_holder(directory.projection()?)
+    })?;
     Ok(source)
 }
 
