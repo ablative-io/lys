@@ -35,8 +35,8 @@ Behavioural. The API router built in routes.rs carries its own fallback, set by 
 - In that test the 404 body is JSON whose error names the path.
 - In that test the 404 body does not contain the page's bytes.
 - A test serves the API with no screens directory and GET /health-unknown answers 404 with the same JSON error.
-- A test with a screens directory sees GET /people answered 200 with the page.
-- A test with a screens directory sees GET /assets/missing.js answered 404.
+- As a guard, a test with a screens directory sees GET /people answered 200 with the page.
+- As a guard, a test with a screens directory sees GET /assets/missing.js answered 404.
 
 **Files:**
 - modify: crates/lys-identity-server/src/surface.rs
@@ -54,11 +54,12 @@ Behavioural. The API router built in routes.rs carries its own fallback, set by 
 Behavioural. A new module crates/lys-identity-server/src/health_api.rs holds one route, GET /health on the API router, merged into it in routes.rs by one line, so it is reached at /api/health when the screens are served and at /health when they are not. It answers 200 with JSON naming the service as lys-identity-server and its build version as the crate version the binary reports for --version. It is answered only by a process that has opened its logs and bound its listener, because the router exists only after both. It needs no session and reveals no configuration, path, key, grant or person. It asks no other service anything, so it never waits on SpiceDB, Rauthy or the database. Those stay with lys identity health.
 
 **Acceptance:**
-- A test serving the screens sends GET /api/health with no session and it answers 200.
+- As a guard, a test serving the screens sends GET /api/health with no session and it answers 200.
 - In that test the body's service is lys-identity-server.
 - In that test the body's version equals env!("CARGO_PKG_VERSION") of lys-identity-server.
 - In that test the body has no member other than service and version.
-- A test with the SpiceDB endpoint at a listener that accepts and never answers still gets GET /api/health answered 200.
+- As a guard, a test with the SpiceDB endpoint at its own listener, which counts and at once closes each connection it accepts, gets GET /api/health answered 200.
+- In that test the listener's count of accepted connections is zero after the answer arrives.
 
 **Files:**
 - create: crates/lys-identity-server/src/health_api.rs

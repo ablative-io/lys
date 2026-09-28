@@ -1893,7 +1893,8 @@
       "consequences": [
         "A caller of a missing API gets 404 and a named reason.",
         "A check that asks /health or /healthz at the root still gets the page and must ask /api/health.",
-        "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports."
+        "GET /api/health says only that this process is serving, not that its dependencies are ready, which lys identity health reports.",
+        "A probe that asks /health, /healthz or /status at the root gets 200 with the page and never reaches the API, so a status-only monitor would report healthy wrongly. Every probe of this service asks /api/health."
       ],
       "supersedes": [],
       "superseded_by": ""
