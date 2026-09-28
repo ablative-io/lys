@@ -72,7 +72,48 @@
       ],
       "stories": [
         "S110"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/project.json",
+            "change": "modified",
+            "note": "Tree '.' gains one leg after 'design': identity-release, command 'sh scripts/identity-gates/release.sh', requires tool:sh, tool:git, tool:cargo, tool:rustfmt, rust-build, cadence demand. Every earlier leg is byte for byte unchanged and in its order."
+          },
+          {
+            "path": "docs/design/directory/design.json",
+            "change": "modified",
+            "note": "The gate array carries the same appended leg, so gate == project.json trees again. There is no 'docs' tree and no place:here leg."
+          },
+          {
+            "path": "CLAUDE.md",
+            "change": "modified",
+            "note": "One line added after 'All five clean. No exceptions.' It names the identity-release leg as a demand leg in docs/design/project.json that the identity release card runs, not every land."
+          },
+          {
+            "path": "scripts/identity-gates/release.sh",
+            "change": "created",
+            "note": "The release leg script. Four refusals are checked in order and each exits 1 with stdout empty. It then runs the six CLAUDE.md legs, every one even after a red one, sends leg output to stderr, prints one JSON line per leg with keys repository, ref, kind, command, exit_status, and exits 0 only when all legs pass."
+          }
+        ],
+        "how": "Row 1 (project.json leg appended, earlier content unchanged): met. The leg is at docs/design/project.json:48-53, after the unchanged 'design' leg at lines 42-47, and it is the tree's last leg. Row 2 (directory gate == project trees): met. I checked the Python equality myself before writing the script and it printed True; the leg is at docs/design/directory/design.json near the end of the 'gate' array. sh scripts/design/gate.sh is left to the workflow. Row 3 (tree '.', no 'docs' tree, 'design' present, last leg identity-release, no place:here): met by the structure; the gate holds one tree '.'. Row 4 (.land/gates.sh untouched, CLAUDE.md +1/-0, one identity-release mention): met. git diff --numstat showed 1 added and 0 deleted, grep -c printed 1, and the line is at CLAUDE.md:111. Row 5 (unclean tree): scripts/identity-gates/release.sh:29-31 checks git status --porcelain before any fetch and exits 1 with 'working tree is not clean', stdout empty. Row 6 (fetch failed): release.sh:33-41. Each fetch's output goes to stderr, and a non-zero fetch exits 1 with 'fetch failed: <command>'. A vendor/rauthy that is not its own git top level is also refused as a failed submodule fetch, so the script never fetches in the parent. Row 7 (not on ablative): release.sh:43-47 reads the pin with git ls-tree HEAD vendor/rauthy and checks it with merge-base --is-ancestor against refs/remotes/origin/ablative. It exits with 'vendor/rauthy pin <pin> is not on ablative' before the push check, so 'is not pushed' never appears. Row 8 (not pushed): release.sh:49-52 exits with 'HEAD <full sha> is not pushed' when git branch -r --contains HEAD is empty. Row 9 (six JSON lines on a clean pushed commit): release.sh:54-71 run the six legs in CLAUDE.md order with kinds gate, gate, gate, test, gate, gate. The commands are exactly CLAUDE.md's, output goes to stderr, the only writes are fetch refs and target/ (ignored by .gitignore), and the exit status is 0 only when every leg passed. Rows 5-9 are for the workflow to measure in scratch clones; I did not run the script.",
+        "deviation": "(1) docs/design/directory/DESIGN.md is listed as a modified file, but it has no diff. The cluster renderer does not render the gate array: I rendered the cluster into a temporary copy with scripts/design/render-cluster.py and every rendered .md was byte-identical to the committed one, so the re-render changes nothing. (2) The script refuses a vendor/rauthy that is not an initialised submodule, reporting it as 'fetch failed' for the submodule fetch. Otherwise git -C vendor/rauthy would resolve to the parent repository and fetch there, which the brief forbids. (3) CN1 says documents only, but R1's own file list names CLAUDE.md, docs/design/project.json and scripts/identity-gates/release.sh; I followed the requirement's file list. (4) As the brief asks, the dev record names two DIRECTORY-008 R3 acceptance checks that no longer hold: the intention no longer ends 'and this sentence promises neither row.', and rg -c 'Rows 06 \\(connect Cambium\\) and 07 \\(gate, install and demonstrate the release\\)' docs/design/directory/design.json now prints nothing. Both edits were already in design.json at the base commit. The reason is the lead's ruling to lift row 07 (ADR-092), and DIRECTORY-008 is not edited.",
+        "checklist": [
+          {
+            "id": "C242",
+            "done": true,
+            "note": "The leg is registered once in project.json as demand cadence, mirrored in the directory gate and named in one CLAUDE.md line; .land/gates.sh is unchanged."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S110",
+            "satisfied": false,
+            "note": "R1 supplies the per-leg JSON record for the lys legs, but the story also needs R2-R6's full release record, which is blocked."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -112,7 +153,27 @@
       ],
       "stories": [
         "S110"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: none of this requirement's acceptance rows can be met truthfully at this base. The release needs the landed blockers, and at base e295753 they are absent. There is no Rauthy venue leg registration from DIRECTORY-004 in docs/design/project.json, whose only legs are the six cargo legs, design and now identity-release. There are no id001_link_* regressions under vendor/rauthy/tests/identity_links: the submodule is uninitialised here and its pin is still the upstream baseline dd61ac3c. There is no identity or frontend leg from DIRECTORY-002 or DIRECTORY-005, no landed v0CuMstE commit on Cambium to check ancestry against, and no IDENTITY-002 rebase naming the upstream commit. The report also needs the exact pushed refs gated at the venue and an independent reviewer. Writing docs/design/identity/reports/IDENTITY-001-commands.jsonl or IDENTITY-001-release.md now would record commands that never ran, so neither file was created. Every one of these is a blocker for its owner row to land first; none is registered here.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C243",
+            "done": false,
+            "note": "Blocked until the blockers from rows 02-06 and IDENTITY-002 land and the venue legs run on the pushed refs."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S110",
+            "satisfied": false,
+            "note": "Blocked with R2."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -138,7 +199,27 @@
       ],
       "stories": [
         "S110"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: neither the ID001_LINK_LIVE receipt (after row 03) nor the ID001_DIRECTORY_LIVE receipt (after row 05) exists, and both are Tom's demonstration hold points (CN6). R2's Refs, which the ancestry checks run against, do not exist either. No receipt line or ancestry line was written.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C244",
+            "done": false,
+            "note": "Blocked on the two live demonstration receipts and on R2."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S110",
+            "satisfied": false,
+            "note": "Blocked with R3."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -170,7 +251,27 @@
       ],
       "stories": [
         "S111"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: R4 starts only after every gate and test line of R2 is recorded green, and R2 is blocked. It also needs deploy/identity/README.md, which DIRECTORY-002 creates and which does not exist at this base, so its '## Release rollback' section cannot be added without creating a file another row owns. It needs a node the operator names and a staged install to back up, stop, restore and restart, and none exists. Nothing was installed and no install section was written.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C245",
+            "done": false,
+            "note": "Blocked on R2, on DIRECTORY-002's deploy/identity/README.md and on the operator naming a node."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S111",
+            "satisfied": false,
+            "note": "Blocked with R4."
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -196,7 +297,27 @@
       ],
       "stories": [
         "S111"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: R5 records observations on R4's staged install (configuration hashes, the three-client list, the staging statement, the Google and GitHub resolution, the agent's creation receipt and the six screens), and that install does not exist. Nothing was recorded.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C246",
+            "done": false,
+            "note": "Blocked on R4."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S111",
+            "satisfied": false,
+            "note": "Blocked with R5."
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -227,7 +348,27 @@
       ],
       "stories": [
         "S110"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [],
+        "how": "Blocked: the '## Not met', '## Reserved acts' and '## Status' sections are part of docs/design/identity/reports/IDENTITY-001-release.md. That report cannot be created truthfully until R2-R5's evidence exists, so the sections were not written. docs/design/identity/briefs is untouched.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C247",
+            "done": false,
+            "note": "Blocked on the release report, R2-R5."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S110",
+            "satisfied": false,
+            "note": "Blocked with R6."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

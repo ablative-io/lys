@@ -120,6 +120,7 @@ cargo clippy -p lys --all-features --test 'identity_*' -- -D warnings && cargo t
 ```
 
 All five clean. No exceptions.
+The identity-release leg (`sh scripts/identity-gates/release.sh`) is a demand leg in `docs/design/project.json`: the identity release card runs it, not every land.
 
 **`--all-features` is not optional decoration.** The `unstable-anchor` feature is
 off by default, and **81 tests compile out without it** — a bare
