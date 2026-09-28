@@ -33,6 +33,7 @@
 
 pub mod client;
 pub mod codex_judge;
+pub mod codex_judge_client;
 pub mod codex_policy_contract;
 pub mod collector;
 pub mod dial;
