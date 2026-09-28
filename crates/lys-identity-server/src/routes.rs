@@ -47,6 +47,8 @@ pub struct AppState {
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
     /// The machines, when the configuration names their file.
     pub network: Option<Mutex<crate::network_store::NetworkStore>>,
+    /// The roles, when the configuration names their file.
+    pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
 }
 
 type Shared = Arc<AppState>;
@@ -88,6 +90,12 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             .map(crate::network_store::NetworkStore::open)
             .transpose()?
             .map(Mutex::new),
+        roles: config
+            .roles_file
+            .as_deref()
+            .map(crate::roles_store::RolesStore::open)
+            .transpose()?
+            .map(Mutex::new),
     })))
 }
 
@@ -127,6 +135,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
         .merge(crate::reviews_api::routes())
+        .merge(crate::roles_api::routes())
         .merge(crate::requests_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())

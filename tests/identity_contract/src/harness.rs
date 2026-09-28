@@ -282,6 +282,7 @@ impl Service {
             secrets,
             requests_dir: Some(dir.path().join("requests")),
             network_file: Some(dir.path().join("network.json")),
+            roles_file: Some(dir.path().join("roles.json")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

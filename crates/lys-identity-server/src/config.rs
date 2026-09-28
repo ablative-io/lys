@@ -76,6 +76,10 @@ pub struct Config {
     /// named. Without it the network routes answer `NetworkUnavailable`.
     #[serde(default)]
     pub network_file: Option<PathBuf>,
+    /// The file the roles are kept in, created at the first role made.
+    /// Without it the role routes answer `RolesUnavailable`.
+    #[serde(default)]
+    pub roles_file: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
