@@ -318,7 +318,7 @@ impl<P: PermissionCheck> Broker<P> {
             open: BTreeMap::new(),
             parent: Some(parent_id.clone()),
             ended: None,
-            upstream: super::UpstreamRevocation::NotAsked,
+            upstream: super::Upstream::default(),
         };
         let outcome = format!("derived from {parent_id}");
         self.record(

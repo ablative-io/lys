@@ -3,8 +3,14 @@
 //! grants exist. Knowing a secret's name grants nothing: outside its scope
 //! a secret answers exactly as one that is not there, and a secret is
 //! listed only to its owner and the identities it is granted to.
+//!
+//! The secrets list a person reads is the access seam's: [`Broker::sees`]
+//! answers from the secret's scope, team and owner and the asker's team ids,
+//! and [`Broker::secret_list`] applies one scope of three at the server, or
+//! none, and is refused to an agent.
 
-use crate::error::SecretsError;
+use crate::access::{Asker, AskerKind};
+use crate::error::{ListRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation};
 use crate::permission::PermissionCheck;
 use crate::store::{EntryView, Recipients, Scope};
@@ -24,7 +30,104 @@ pub struct SecretSettings {
     pub last_operation: Option<String>,
 }
 
+/// One scope of the secrets list, from a closed set of three, each keyed on
+/// the secret's own scope. The list asked with no scope is every secret the
+/// asker may see; it is not a fourth value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListScope {
+    /// The secrets whose scope is an organisation's.
+    Organisation,
+    /// The secrets whose scope is a team's.
+    Team,
+    /// The personal secrets.
+    Mine,
+}
+
+impl ListScope {
+    /// Reads `organisation`, `team` or `mine`.
+    ///
+    /// # Errors
+    ///
+    /// `UnknownScope`, naming the value given, for any other.
+    pub fn parse(text: &str) -> Result<Self, ListRefusal> {
+        match text {
+            "organisation" => Ok(Self::Organisation),
+            "team" => Ok(Self::Team),
+            "mine" => Ok(Self::Mine),
+            _ => Err(ListRefusal::UnknownScope {
+                given: text.to_owned(),
+            }),
+        }
+    }
+
+    /// The scope as it is written.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Organisation => "organisation",
+            Self::Team => "team",
+            Self::Mine => "mine",
+        }
+    }
+
+    /// Whether a secret whose own scope is `scope` falls within it.
+    fn holds(self, scope: Option<&Scope>) -> bool {
+        matches!(
+            (self, scope),
+            (Self::Organisation, Some(Scope::Organisation(_)))
+                | (Self::Team, Some(Scope::Team(_)))
+                | (Self::Mine, Some(Scope::Personal(_)))
+        )
+    }
+}
+
 impl<P: PermissionCheck> Broker<P> {
+    /// The seam's visibility: whether `asker` may see `secret` in the
+    /// secrets list. A secret whose scope is an organisation's, yes; a
+    /// team's, when the team is one of the asker's team ids; a personal
+    /// one, when the asker owns it; and one with no scope set, its owner
+    /// alone. A secret not sealed is seen by no one.
+    pub fn sees(&self, asker: &Asker, secret: &str) -> bool {
+        let Some(entry) = self.store.entry(secret) else {
+            return false;
+        };
+        match self.store.scope(secret) {
+            Some(Scope::Organisation(_)) => true,
+            Some(Scope::Team(team)) => asker.in_team(&team),
+            Some(Scope::Personal(_)) | None => entry.owner == asker.identity(),
+        }
+    }
+
+    /// The secrets list, applied at the server: with `scope` one of
+    /// `organisation`, `team` and `mine`, the secrets of that scope `asker`
+    /// may see; with none, every secret `asker` may see. No value.
+    ///
+    /// # Errors
+    ///
+    /// `AgentUsesVirtualCredentials` when `asker` is an agent, whatever the
+    /// scope; `UnknownScope` for a scope outside the three. Either answers
+    /// no list and records nothing.
+    pub fn secret_list(
+        &self,
+        asker: &Asker,
+        scope: Option<&str>,
+    ) -> Result<Vec<EntryView>, ListRefusal> {
+        if asker.kind() == AskerKind::Agent {
+            return Err(ListRefusal::AgentUsesVirtualCredentials {
+                agent: asker.identity().to_owned(),
+            });
+        }
+        let scope = scope.map(ListScope::parse).transpose()?;
+        Ok(self
+            .store
+            .entries()
+            .filter(|entry| {
+                scope.is_none_or(|scope| scope.holds(self.store.scope(&entry.name).as_ref()))
+            })
+            .filter(|entry| self.sees(asker, &entry.name))
+            .cloned()
+            .collect())
+    }
+
     /// Whether `identity` stands inside the scope of `secret`: its owner;
     /// for a personal secret, its person; or an identity the permission
     /// source makes a member of the scope (for a person, one acting for

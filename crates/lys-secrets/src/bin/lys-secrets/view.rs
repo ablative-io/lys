@@ -3,13 +3,15 @@
 //! byte, a handle or a digest. Each is asked by a handle's holder or by a
 //! trusted screen service for a person (see `callers`), and answers only
 //! with what that identity may discover; a secret outside its scope is left
-//! out, as one not sealed.
+//! out, as one not sealed. The secrets list is a person's view, answered
+//! through the broker's access seam, one scope at a time or none.
 
 use std::sync::{Arc, PoisonError};
 
 use axum::Json;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -29,26 +31,61 @@ fn caller(shared: &Shared, request: Request) -> Result<String, (StatusCode, Stri
     callers::caller(shared, &parts, &[]).map(|who| who.identity)
 }
 
-pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
-    let identity = caller(&shared, request)?;
-    let routes = shared.layout.routes().map_err(|error| failed(&error))?;
+/// The query of the secrets list: at most one scope, percent-decoded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ListAsked {
+    #[serde(default)]
+    scope: Option<String>,
+}
+
+/// The secrets list, a person's view: with `scope` one of `organisation`,
+/// `team` and `mine`, the secrets of that scope the caller may see, applied
+/// here; with none, every secret the caller may see. Any other scope is
+/// refused `unknown_scope` and an agent `agent_uses_virtual_credentials`,
+/// each with no list.
+pub async fn secrets(State(shared): State<Arc<Shared>>, request: Request) -> Response {
+    let (parts, _body) = request.into_parts();
+    let asked = match Query::<ListAsked>::try_from_uri(&parts.uri) {
+        Ok(Query(asked)) => asked,
+        Err(error) => {
+            return failed(&lys_secrets::SecretsError::Encoding {
+                context: "query",
+                reason: error.body_text(),
+            })
+            .into_response();
+        }
+    };
+    let who = match callers::caller(&shared, &parts, &[]) {
+        Ok(who) => who,
+        Err(refusal) => return refusal.into_response(),
+    };
+    let routes = match shared.layout.routes() {
+        Ok(routes) => routes,
+        Err(error) => return failed(&error).into_response(),
+    };
     let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-    let entries: Vec<Value> = broker
-        .listing(&identity)
+    let listed = match broker.secret_list(&who.asker(), asked.scope.as_deref()) {
+        Ok(listed) => listed,
+        Err(refusal) => return crate::manage::refused_json(refusal.status(), refusal.body()),
+    };
+    let entries: Vec<Value> = listed
         .into_iter()
         .map(|entry| {
             let route = routes.get(&entry.name);
+            let scope = broker.store().scope(&entry.name).map(|scope| scope.target());
             json!({
                 "name": entry.name,
                 "class": entry.class,
                 "owner": entry.owner,
                 "sequence": entry.sequence,
+                "scope": scope,
                 "upstream": route.map(|route| route.upstream.clone()),
                 "header": route.map(|route| route.header.clone()),
             })
         })
         .collect();
-    Ok(Json(json!({ "secrets": entries })))
+    Json(json!({ "scope": asked.scope, "secrets": entries })).into_response()
 }
 
 /// The query of a handles read: the holder, percent-decoded.

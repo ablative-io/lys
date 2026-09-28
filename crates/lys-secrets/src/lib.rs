@@ -9,7 +9,13 @@
 //!
 //! Permission is asked through the [`PermissionCheck`] trait. [`LocalGrants`]
 //! answers it in process; a `SpiceDB`-backed check plugs into the same trait.
+//!
+//! The secrets list and a lease's read, revoke and relinquish ask one seam
+//! ([`access`]): what an [`Asker`] may see, and who may discover and revoke
+//! a [`Lease`]. A person's team ids come from the group claims on their
+//! token, through [`team_ids`] alone.
 
+pub mod access;
 pub mod audit;
 pub mod broker;
 mod encoding;
@@ -23,14 +29,19 @@ pub mod permission;
 pub mod secret;
 pub mod service;
 pub mod store;
+pub mod teams;
 
+pub use access::{Asker, AskerKind};
 pub use audit::{AuditKind, AuditLine, AuditLog, Opened, RecordedLine, STATE_DOMAIN};
 pub use broker::{
-    Admitted, Broker, BrokerPaths, Clock, Ended, HandleEnded, HeldHandle, OwnerChanged,
-    PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome, SNAPSHOT_EVERY, SecretSettings,
-    SnapshotReport, Ticket, UpstreamRevocation, UseError, Used,
+    Admitted, Broker, BrokerPaths, Clock, EndAct, EndWay, Ended, HandleEnded, HandleRecord as Lease,
+    HeldHandle, LeaseEnd, LeaseView, ListScope, OwnerChanged, PRESENTATION_SKEW_MS, RevocationState,
+    RevokeOutcome, SNAPSHOT_EVERY, SecretSettings, SnapshotReport, SystemBehind, Ticket,
+    UpstreamRevocation, UseError, Used,
 };
-pub use error::{OwnerChangeRefusal, RevocationRefusal, SecretsError, ServiceRefusal};
+pub use error::{
+    LeaseRefusal, ListRefusal, OwnerChangeRefusal, RevocationRefusal, SecretsError, ServiceRefusal,
+};
 pub use handle::{
     HandleId, HandleToken, Holder, IssuedHandle, Presentation, new_operation_id, request_digest,
 };
@@ -42,6 +53,7 @@ pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
 pub use service::{OnBehalf, SERVICE_DOMAIN, ServiceKey, ServiceWindow};
 pub use store::{AccountView, EntryClass, EntryView, Recipients, Scope, SecretStore};
+pub use teams::team_ids;
 
 /// `bytes` as lowercase hex.
 pub fn to_hex(bytes: &[u8]) -> String {
