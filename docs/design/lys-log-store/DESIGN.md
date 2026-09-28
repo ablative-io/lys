@@ -191,6 +191,11 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 | `crates/lys/src/main.rs` | R5: Reading every leaf is the audit, by name, and the whole-tree Log is gone | LYSLOGSTORE-007 |
 | `crates/lys-anchor/tests/open_reads_no_leaf.rs` | R6: A gate test fails when an open reads a leaf under the pin | LYSLOGSTORE-007 |
 | `crates/lys-identity-server/tests/store_open_reads_the_tail.rs` | R6: A gate test fails when an open reads a leaf under the pin | LYSLOGSTORE-007 |
+| `crates/lys-secrets/src/audit.rs` | The broker's audit log, a frontier log that keeps tiles and logs their adoption. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/lib.rs` | Declares the lys-identity modules, without checkpoints after LYSLOGSTORE-006. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/grants/recovery.rs` | GrantLedger, whose entries is the audit read of every leaf. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/grants/authority.rs` | Grants, whose events is the audit read of every leaf. | LYSLOGSTORE-006 |
+| `crates/lys-identity/src/checkpoints.rs` | Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles. | LYSLOGSTORE-006 |
 
 ## Inventory
 

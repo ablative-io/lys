@@ -148,6 +148,11 @@
           "id": "C24",
           "text": "A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).",
           "done": false
+        },
+        {
+          "id": "C31",
+          "text": "A receipt's coordinate is read from the tiles and the growing checkpoints are removed (LYSLOGSTORE-006 R5).",
+          "done": false
         }
       ]
     },

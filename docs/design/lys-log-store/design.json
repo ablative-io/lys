@@ -619,6 +619,31 @@
       "path": "crates/lys-identity-server/tests/store_open_reads_the_tail.rs",
       "note": "R6: A gate test fails when an open reads a leaf under the pin",
       "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-secrets/src/audit.rs",
+      "note": "The broker's audit log, a frontier log that keeps tiles and logs their adoption.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/lib.rs",
+      "note": "Declares the lys-identity modules, without checkpoints after LYSLOGSTORE-006.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/recovery.rs",
+      "note": "GrantLedger, whose entries is the audit read of every leaf.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/authority.rs",
+      "note": "Grants, whose events is the audit read of every leaf.",
+      "brief": "LYSLOGSTORE-006"
+    },
+    {
+      "path": "crates/lys-identity/src/checkpoints.rs",
+      "note": "Removed by LYSLOGSTORE-006, as a receipt coordinate comes from the tiles.",
+      "brief": "LYSLOGSTORE-006"
     }
   ],
   "inventory": [

@@ -41,6 +41,7 @@
 - [ ] **C22** — Inclusion and consistency proofs read only the tiles they need, and the whole-log proof tree is gone (LYSLOGSTORE-006 R2).
 - [ ] **C23** — A log made before tiles gets them once, and never again (LYSLOGSTORE-006 R3).
 - [ ] **C24** — A gate test fails when a start or its first proof reads a leaf before the tail (LYSLOGSTORE-006 R4).
+- [ ] **C31** — A receipt's coordinate is read from the tiles and the growing checkpoints are removed (LYSLOGSTORE-006 R5).
 
 ## No open reads every leaf (LYSLOGSTORE-007)
 
