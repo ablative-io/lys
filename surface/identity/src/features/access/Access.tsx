@@ -128,7 +128,7 @@ function Body({ w, mode, arg }: { w: GrantWorld; mode: string; arg?: string }) {
             const up = g.source ? w.byId.get(g.source) : undefined;
             const open = () => navigate(`/file/${g.holder}/access`);
             return (
-              <tr key={g.id} data-href={`#/file/${g.holder}/access`} onClick={open} {...keyable(open)}>
+              <tr key={g.id} data-href={`#/file/${g.holder}/access`} {...keyable(open)}>
                 <td className="mono">{grantNo(g.id)}</td>
                 <td>{nameOf(w, g.holder)}</td>
                 <td className="mono">{g.relation}</td>
