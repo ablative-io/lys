@@ -1739,7 +1739,7 @@
     {
       "id": "RM-044",
       "title": "Sign what a session was given at render, checked offline with lys verify",
-      "status": "briefed",
+      "status": "landed",
       "kind": "feature",
       "summary": "The first of CONFORMANCE row 6.5's three signed statements: lys-home render-launch computes the SHA-256 of the lys.given entry's RFC 8785 data, reports it as given_sha256, and when given a key signs those bytes as a lys/attestation/v2 statement kept beside the lys.given entry and as the two files lys verify --attestation reads offline. A render with no key is unchanged and reports unsigned. Row 6.5 is partial until the start and role-move statements land with the START and ROLES cards.",
       "provenance": {
@@ -1760,7 +1760,10 @@
         "briefs": [
           "HOME-018"
         ],
-        "commits": []
+        "commits": [
+          "462ace810da668002e17955a3f8cd19a9cb1ee47",
+          "9091bf7be85cd91b62411132b6ca103b9971bc31"
+        ]
       },
       "depends_on": [
         "RM-007"
