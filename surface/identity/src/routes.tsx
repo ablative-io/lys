@@ -10,8 +10,7 @@ import { Route, Routes } from 'react-router';
 import { Access } from './features/access/Access';
 import { IdentityFile } from './features/file/IdentityFile';
 import { You } from './features/me/You';
-import { NotYet, SCREENS } from './features/notyet/NotYet';
-import { Settings } from './features/notyet/Settings';
+import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { Manage } from './features/people/Manage';
 import { IssueRoot } from './features/grants/IssueRoot';
@@ -42,9 +41,6 @@ export function AppRoutes() {
       <Route path="/me" element={<You />} />
       <Route path="/settings/:sec?" element={<Settings />} />
       <Route path="/access/:mode?/:arg?" element={<Access />} />
-      {[...Object.keys(SCREENS).filter((view) => view !== 'roles' && view !== 'network' && view !== 'connections' && view !== 'model' && view !== 'resources' && view !== 'graph' && view !== 'sessions' && view !== 'reviews' && view !== 'secrets' && view !== 'requests')].map((view) => (
-        <Route key={view} path={`/${view}/*`} element={<NotYet />} />
-      ))}
       <Route path="*" element={<People />} />
     </Routes>
   );
