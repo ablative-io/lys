@@ -2,19 +2,22 @@
 //! sign-in provider tests need no live Rauthy.
 //!
 //! It serves the provider lookup, the provider list, creation and
-//! replacement, admitting only the API key it was started with, and keeps
-//! every provider it was given so a test reads back what the service sent,
-//! secret included.
+//! replacement, and the user list and user creation, admitting only the API
+//! key it was started with. It keeps every provider and every user it was
+//! given, so a test reads back what the service sent, secret included, and
+//! counts every request that reached it, answered or not.
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Request, State};
 use axum::http::{HeaderMap, StatusCode, header};
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{Value, json};
 
@@ -24,6 +27,8 @@ pub const API_KEY: &str = "lys$contract-test-api-key";
 struct Inner {
     api: String,
     providers: Mutex<Vec<Value>>,
+    users: Mutex<Vec<Value>>,
+    requests: AtomicUsize,
     /// Holds the API key file, as the installation writes it, for the
     /// stand-in's life.
     keys: tempfile::TempDir,
@@ -49,6 +54,8 @@ impl FakeRauthy {
         let inner = Arc::new(Inner {
             api,
             providers: Mutex::new(Vec::new()),
+            users: Mutex::new(Vec::new()),
+            requests: AtomicUsize::new(0),
             keys,
         });
         let router = Router::new()
@@ -56,6 +63,8 @@ impl FakeRauthy {
             .route("/auth/v1/providers", post(list))
             .route("/auth/v1/providers/create", post(create))
             .route("/auth/v1/providers/{id}", axum::routing::put(replace))
+            .route("/auth/v1/users", get(users).post(create_user))
+            .layer(from_fn_with_state(Arc::clone(&inner), counted))
             .with_state(Arc::clone(&inner));
         tokio::spawn(async move { axum::serve(listener, router).await });
         Ok(Self { inner })
@@ -80,6 +89,27 @@ impl FakeRauthy {
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
+
+    /// How many users the stand-in holds.
+    pub fn user_count(&self) -> usize {
+        self.inner
+            .users
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
+    /// How many requests reached the stand-in, on any route, answered or refused.
+    pub fn request_count(&self) -> usize {
+        self.inner.requests.load(Ordering::SeqCst)
+    }
+}
+
+/// Count every request before it is routed, so one to a route the stand-in
+/// does not serve is counted too.
+async fn counted(State(inner): State<Shared>, request: Request, next: Next) -> Response {
+    inner.requests.fetch_add(1, Ordering::SeqCst);
+    next.run(request).await
 }
 
 /// The refusal for a request without the API key, none when it carries it.
@@ -187,5 +217,34 @@ async fn replace(
         fields.insert("id".to_owned(), Value::String(id));
     }
     *slot = body.clone();
+    Json(body).into_response()
+}
+
+async fn users(State(inner): State<Shared>, headers: HeaderMap) -> Response {
+    if let Some(refusal) = refused(&headers) {
+        return refusal;
+    }
+    let held = inner
+        .users
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    Json(Value::Array(held)).into_response()
+}
+
+async fn create_user(
+    State(inner): State<Shared>,
+    headers: HeaderMap,
+    Json(mut body): Json<Value>,
+) -> Response {
+    if let Some(refusal) = refused(&headers) {
+        return refusal;
+    }
+    let mut held = inner.users.lock().unwrap_or_else(PoisonError::into_inner);
+    let id = format!("user-{}", held.len() + 1);
+    if let Value::Object(fields) = &mut body {
+        fields.insert("id".to_owned(), Value::String(id));
+    }
+    held.push(body.clone());
     Json(body).into_response()
 }
