@@ -264,6 +264,78 @@ fn every_refusal_the_document_names_is_produced_by_a_test() -> TestResult {
 /// exact from both sides: a route named here that in fact names an answer
 /// fails, and a route that names none and is not here fails.
 const OPEN_ANSWERS: &[(&str, &str)] = &[
+    (
+        "get /.well-known/openid-configuration",
+        "the discovery document follows OpenID Connect, not a Lys type",
+    ),
+    (
+        "get /oauth/authorize",
+        "answers a redirect to the client or the sign-in page, with no body",
+    ),
+    (
+        "post /oauth/token",
+        "answers the OAuth token response, which follows RFC 6749, not a Lys type",
+    ),
+    (
+        "get /oauth/jwks",
+        "answers a JSON Web Key Set, which follows RFC 7517, not a Lys type",
+    ),
+    (
+        "get /oauth/userinfo",
+        "answers the OpenID Connect claims of the bearer's subject",
+    ),
+    (
+        "post /sign-in",
+        "answers through Response, since it must set the session cookie",
+    ),
+    (
+        "get /sign-in/providers",
+        "answers the offered providers as a JSON list built in place",
+    ),
+    (
+        "get /sign-in/providers/{id}",
+        "answers a redirect to the provider, with no body",
+    ),
+    (
+        "post /setup/open",
+        "answers the setup state as a JSON object built in place",
+    ),
+    (
+        "post /setup/administrator",
+        "answers through Response, since it must set the session cookie",
+    ),
+    (
+        "post /setup/password",
+        "answers through Response, since it must set the session cookie",
+    ),
+    (
+        "get /me/account",
+        "answers the caller's account as the issuer reports it",
+    ),
+    (
+        "post /me/account/email",
+        "answers the account as the issuer reports it after the change",
+    ),
+    (
+        "post /me/account/password",
+        "answers the account as the issuer reports it after the change",
+    ),
+    (
+        "get /directory/people/{id}/account",
+        "answers the person's account as the issuer reports it",
+    ),
+    (
+        "post /directory/people/{id}/account/email",
+        "answers the account as the issuer reports it after the change",
+    ),
+    (
+        "post /directory/people/{id}/account/enabled",
+        "answers the account as the issuer reports it after the change",
+    ),
+    (
+        "post /directory/people/{id}/account/password",
+        "answers the account as the issuer reports it after the change",
+    ),
     ("get /authority", "answers text/plain, not JSON"),
     ("get /login", "answers a 303 to the issuer, with no body"),
     (
@@ -335,6 +407,10 @@ const OPEN_ANSWERS: &[(&str, &str)] = &[
 /// Every POST or PUT route the document gives no request body schema, with
 /// why. Each either takes no body at all or takes one it does not own.
 const NO_BODY: &[(&str, &str)] = &[
+    (
+        "post /oauth/token",
+        "takes a form-encoded body, as RFC 6749 requires",
+    ),
     ("post /requests/{id}/reconcile", "takes no body"),
     ("post /network/machines/{id}/retire", "takes no body"),
     ("post /sessions/{id}/end", "takes no body"),
