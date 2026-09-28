@@ -243,6 +243,8 @@ impl Weighed {
                 .filter(|(holder, _)| IdentityId::Person(*holder) == caller)
                 .map(|(_, grant)| grant.to_string())
                 .collect(),
+            can_issue_root: is_root(caller, judged.root)
+                && matches!(self.seeker, IdentityId::Person(_)),
             decision: decided.map(DecisionView::from),
         })
     }

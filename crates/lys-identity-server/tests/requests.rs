@@ -370,3 +370,19 @@ async fn the_caller_is_shown_the_grants_it_could_lend_from() -> TestResult {
     assert_eq!(seen["requests"][0]["sources"], json!([source]));
     Ok(())
 }
+
+#[tokio::test]
+async fn only_the_root_authority_is_shown_that_it_could_issue_directly() -> TestResult {
+    let table = Table::set().await?;
+    table.lendable("1").await?;
+    let asked = table.ask(&table.bea, "1", "beta").await?;
+    assert_eq!(
+        asked["can_issue_root"], false,
+        "Bea holds a grant she could lend from, and is not the root authority: {asked}"
+    );
+    let (_, seen) = table.service.get("/requests", Some(&table.ada)).await?;
+    assert_eq!(seen["requests"][0]["id"], asked["id"]);
+    assert_eq!(seen["requests"][0]["can_issue_root"], true);
+    assert_eq!(seen["requests"][0]["sources"], json!([]));
+    Ok(())
+}

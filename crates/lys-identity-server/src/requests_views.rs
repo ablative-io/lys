@@ -59,6 +59,9 @@ pub struct RequestView {
     pub approvers: Vec<PersonSummary>,
     /// The grants the caller holds that the access could be lent from, as the grants stand now.
     pub sources: Vec<String>,
+    /// Whether the caller could approve it with no source, by issuing the access directly: the
+    /// caller is the root authority and a person asks.
+    pub can_issue_root: bool,
     /// The decision, null while it waits.
     pub decision: Option<DecisionView>,
 }
