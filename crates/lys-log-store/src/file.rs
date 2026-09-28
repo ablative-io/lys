@@ -354,12 +354,14 @@ impl LeafStore for FileLeafStore {
             return Ok(None);
         }
         let path = self.leaf_path(index);
-        std::fs::read(&path)
-            .map(Some)
-            .map_err(|source| StoreError::Io {
+        match std::fs::read(&path) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(StoreError::Io {
                 context: format!("failed to read leaf file {}", path.display()),
                 source,
-            })
+            }),
+        }
     }
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
