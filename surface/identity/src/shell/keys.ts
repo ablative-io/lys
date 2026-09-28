@@ -12,6 +12,17 @@ export const GO: Record<string, string> = {
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && /input|select|textarea/i.test(target.tagName);
 
+/** The rows the mock-up's KEYABLE rule names as rows (index.v5.html:1559). */
+const ROW = 'tr[data-href], tr[data-act]';
+
+/**
+ * The screen's row elements in cursor order: the rows whose address is in the
+ * cursor's list. The cursor moves focus to them where they stand, so the screen
+ * keeps its elements (conformance 9.3).
+ */
+const rowElements = (rows: string[]): HTMLElement[] =>
+  [...document.querySelectorAll<HTMLElement>('#screen tr[data-href]')].filter((row) => rows.includes(row.dataset.href ?? ''));
+
 /** One registry of keys for the whole shell, Command as the primary modifier. */
 export function useShellKeys(): void {
   const shell = useShell();
@@ -74,9 +85,13 @@ export function useShellKeys(): void {
       const [, view, id] = path.split('/');
       if (view === 'file' && id && /^[1-7]$/.test(e.key)) return go(`/file/${id}/${TABS[Number(e.key) - 1][0]}`);
       if (s.rows.length && (e.key === 'j' || e.key === 'k')) {
-        s.setCursor(Math.max(0, Math.min(s.rows.length - 1, s.cursor + (e.key === 'j' ? 1 : -1))));
+        const next = Math.max(0, Math.min(s.rows.length - 1, s.cursor + (e.key === 'j' ? 1 : -1)));
+        s.setCursor(next);
+        rowElements(s.rows)[next]?.focus();
         return;
       }
+      // A focused row opens itself; the cursor row opens only when no row has focus.
+      if (e.key === 'Enter' && e.target instanceof HTMLElement && e.target.closest(ROW)) return;
       if (s.rows.length && e.key === 'Enter') go(s.rows[s.cursor].slice(1));
     };
 
