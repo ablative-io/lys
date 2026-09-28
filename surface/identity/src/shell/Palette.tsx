@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { api } from '../api';
 import { entries } from '../features/people/directory';
 import type { Entry } from '../features/people/directory';
+import { keyable } from './keyable';
 import { useShell } from './ShellContext';
 
 interface Item {
@@ -80,6 +81,9 @@ export function Palette() {
     }
   };
 
+  // While open, each row is reachable by Tab from the input and answers Enter and
+  // Space for itself, never for the row the arrows mark; closed, it is out of the
+  // Tab order, as the input is.
   let group = '';
   const rows: ReactNode[] = [];
   items.forEach((item, n) => {
@@ -88,7 +92,7 @@ export function Palette() {
       rows.push(<div className="grp" key={'g' + n}>{group}</div>);
     }
     rows.push(
-      <div className={'it' + (n === at ? ' sel' : '')} data-n={n} key={n} onClick={() => choose(item)}>
+      <div className={'it' + (n === at ? ' sel' : '')} data-n={n} key={n} onClick={() => choose(item)} {...(open ? keyable(() => choose(item)) : {})}>
         <span>{item.t}</span>
         <span className="dim mono">{item.d}</span>
       </div>,

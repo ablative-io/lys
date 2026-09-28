@@ -2945,6 +2945,15 @@
             "place:here"
           ],
           "cadence": "round"
+        },
+        {
+          "name": "surface",
+          "command": "npm --prefix surface/identity install-ci-test",
+          "requires": [
+            "tool:node",
+            "tool:npm"
+          ],
+          "cadence": "round"
         }
       ]
     },
