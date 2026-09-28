@@ -139,3 +139,80 @@ export interface DirectoryRecord {
   logins: { issuer: string; subject: string }[];
   events: number[];
 }
+
+// The start route's JSON (DIRECTORY-029). The library writes every byte of
+// it, in crates/lys-identity/src/start/ (give.rs, error.rs, checks.rs and
+// state.rs), and crates/lys-identity-server/src/start.rs answers it as it
+// came. Change them together.
+
+/** `Check::name`, the five checks in the order a start runs them (`Check::ALL`). */
+export const START_CHECKS: readonly string[] = [
+  'the agent is active',
+  'its profile version is reviewed',
+  'the machine is allowed for the role',
+  'its virtual credentials are valid',
+  'the machine may reach what the profile needs',
+];
+
+/** One check as `checks_json` writes it: `passed`, or the refusal's name. */
+export interface StartCheck {
+  check: string;
+  result: string;
+  words: string;
+}
+
+/** `record_json`: a kept launch record. It holds ids, never a credential value. */
+export interface LaunchRecordView {
+  id: string;
+  agent: string;
+  machine: string;
+  executable: string;
+  working_directory: string;
+  profile_version: string;
+  given_by: string;
+  arguments: string[];
+  credential_ids: string[];
+  given_at: number;
+  copied_from: string | null;
+}
+
+/** `LaunchState::name`. */
+export type LaunchStateName = 'unconfirmed' | 'running' | 'withdrawn';
+
+/** `Given::to_json`: POST /agents/{id}/start and POST /launch-records/{id}/start-again. */
+export interface StartGiven {
+  command: string;
+  working_directory: string;
+  launch_record: LaunchRecordView;
+  state: LaunchStateName;
+  words: string;
+  checks: StartCheck[];
+}
+
+/** `Refusal::to_json`. */
+export interface StartRefusal {
+  refusal: string;
+  words: string;
+}
+
+/** `Refused::to_json`: a start refused, with every check that ran. */
+export interface StartRefused {
+  refused: StartRefusal[];
+  checks: StartCheck[];
+}
+
+/** `StartError::to_json` for a failure that is not a refusal. */
+export interface StartFailure {
+  error: string;
+  words: string;
+}
+
+/** `LaunchState::to_json`: GET /launch-records/{id}/state and POST /launch-records/{id}/withdraw. */
+export interface LaunchStateView {
+  launch_record: string;
+  agent: string;
+  state: LaunchStateName;
+  words: string;
+  session: string | null;
+  withdrawal: { by: string; at: number } | null;
+}

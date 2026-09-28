@@ -1,5 +1,7 @@
 //! The HTTP routes mapping requests to the directory, each mutation behind admission.
-//! The read-only views the identity screens draw are in `read_api`.
+//! The read-only views the identity screens draw are in `read_api`. The start
+//! route and the door's handle records it reads are declared here, in
+//! [`start`] and [`door_handles`].
 
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -79,6 +81,11 @@ pub type Say = Arc<dyn Fn(&str) + Send + Sync>;
 
 type Shared = Arc<AppState>;
 
+#[path = "door_handles.rs"]
+pub mod door_handles;
+#[path = "start.rs"]
+pub mod start;
+
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
@@ -150,11 +157,33 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let api = router(state).merge(configured);
+    let starts = start::routes(start_service(config, &state)?);
+    let api = router(state).merge(configured).merge(starts);
     Ok(match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
     })
+}
+
+/// The start route's service over the directory `state` holds. The route
+/// reads the handle record through the door's client, [`door_handles::DoorHandles`],
+/// as its `HandleRecords`. No configuration field names the door yet, so the
+/// client is built without an address and answers that no handle record
+/// exists, naming SECRETS-002, until one does. Launch records are kept in
+/// `launch-records` beside the directory log.
+fn start_service(
+    config: &Config,
+    state: &Shared,
+) -> Result<Arc<start::StartService>, ServerError> {
+    let handles = door_handles::DoorHandles::unconfigured();
+    let dir = config.log_dir.with_file_name("launch-records");
+    start::directory_service(
+        state,
+        Box::new(handles),
+        door_handles::credential_id,
+        &dir,
+        load_service_key(&config.event_key_file)?,
+    )
 }
 
 /// Open the directory `config` names, creating its log when the log's
