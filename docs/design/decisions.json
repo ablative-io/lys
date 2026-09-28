@@ -1849,13 +1849,14 @@
       "date": "2026-09-29",
       "decided_by": "Archie, lead of the Lys identity line, under Tom's rule that nothing waits on a clock",
       "context": "spicedb_http.rs bounds each SpiceDB connect, write and read by a five-second WAIT. The call is blocking and runs on a tokio worker inside with_grants while the std Mutex over GrantState is held. The RelationshipStore trait in lys-identity, which the SpiceDB store implements, is synchronous, and the grant authority calls it synchronously.",
-      "decision": "Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. post_json registers its live stream with the scope, and dropping the handler's future cancels the scope, which shuts the stream down so the blocking read returns. A section that gets the lock after its request left returns before calling SpiceDB. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.",
+      "decision": "Keep RelationshipStore synchronous. Run each grants section under spawn_blocking inside a cancel scope owned by the handler's future. Every SpiceDB exchange uses a non-blocking socket and waits in poll(2) on that socket and the scope's wake pipe, with no timeout, and dropping the handler's future cancels the scope, which wakes the poll so the call returns. A section that gets the grants lock after its request left returns before it opens GrantState or calls SpiceDB. The SpiceDB endpoint must be a socket address, so no name lookup is ever waited on. WAIT and the three socket timeouts go with no clock in their place. Making the SpiceDB store and the grant authority async with a tokio Mutex was weighed and not taken, because it changes the lys-identity core trait and every grant act for the same result.",
       "quote": "No timeouts, deadlines or watchdogs anywhere",
       "consequences": [
         "A connected SpiceDB that never answers holds a grants section only for as long as its request's caller waits.",
         "A request waiting for the grants lock holds one blocking thread until the lock is free.",
         "At start there is no request, so SpiceDb::open waits for SpiceDB's answer or close, and the start shows its named step until then.",
-        "A section cancelled part way takes the path it takes today when a SpiceDB call fails."
+        "A section cancelled part way takes the path it takes today when a SpiceDB call fails.",
+        "A configuration naming SpiceDB by host name, accepted before this decision, is refused at load with its reason. The install writes 127.0.0.1 (crates/lys/src/identity/install/server_config.rs), so a generated install is unaffected."
       ],
       "supersedes": [],
       "superseded_by": ""
