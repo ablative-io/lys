@@ -47,6 +47,23 @@ A read answers only once any uncertain append is resolved. While one is held, ev
 
 Activate is registered to active, suspend is active to suspended, reinstate is suspended to active, and retire is active or suspended to retired. Suspend and retire name a reason. Any other transition is refused `TransitionRefused` and records nothing. The state is recorded and never enforced (CN11).
 
+## The grant path, recorded open for Tom
+
+DIRECTORY-003 R5 records this question and decides nothing. The registration, profile, login and lifecycle calls above ask SpiceDB for no decision and write no grant.
+
+The path: a person signs in, creates an agent under themselves, grants it one project, the agent's action on that project is allowed, the grant is revoked or the agent suspended, and the same action is refused by name, with the audit record naming who made each change (docs/design/identity/STATEMENT-2026-09-22.md:183; docs/design/identity/PROVISIONING-2026-09-22.md:39-46).
+
+The question for Tom: does the grant path land in DIRECTORY-003, in a new row of the directory cluster before DIRECTORY-005, or in the first brief of road step 2? Revision 5 keeps arbitrary grants and live capability enforcement in road step 2 (docs/design/identity/briefs/IDENTITY-001.json:29-30), Chippy's first screen of 17:08 puts the path on step 1's screen (docs/design/identity/STATEMENT-2026-09-22.md:183), and PROVISIONING places the grant in steps 1 and 2 of the road without naming a row (docs/design/identity/PROVISIONING-2026-09-22.md:23-24).
+
+Whichever row the path lands in carries these criteria, drafted here so none is lost. None of them is an acceptance criterion of DIRECTORY-003.
+
+- (a) Allowed before revoke: with the agent active and one grant on project P, the agent's action on P is admitted.
+- (b) Refused after revoke: once the grant is revoked, the same action is refused by name at the next check and nothing on P changes.
+- (c) Refused after suspend: once the agent is suspended, the same action is refused by name while its grant stays recorded, under whatever suspension semantics Tom settles.
+- (d) Every grant, revoke and transition is one signed audit record naming the actor.
+
+A later brief carrying grants, such as the DIRECTORY-006 amendment (docs/design/directory/briefs/DIRECTORY-006.md:37), states its own authority for doing so; this contract records the question as DIRECTORY-003 left it and settles no row for it.
+
 ## Operation ids
 
 A caller names each change with an operation id (`op-` and 32 hex digits) and keeps it across retries. The same id with the same request answers the first receipt again and records nothing. The same id with a different request is refused `OperationReused`.

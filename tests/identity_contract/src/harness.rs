@@ -270,6 +270,20 @@ impl Service {
         sign_in_providers: Option<SignInProvidersSettings>,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
+        Self::start_adjusted(model, spicedb, secrets, sign_in_providers, |_| {}, prepare).await
+    }
+
+    /// Start the service as [`Service::start_setting`] does, after `adjust`
+    /// has changed the configuration the harness wrote, so a test can
+    /// configure an administrator the fake issuer never signs in.
+    pub async fn start_adjusted<T: Send>(
+        model: &str,
+        spicedb: Option<SpiceDbSettings>,
+        secrets: Option<SecretsSettings>,
+        sign_in_providers: Option<SignInProvidersSettings>,
+        adjust: impl FnOnce(&mut Config) + Send,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         secret_file(&dir.path().join("issuer.key"), &[3; 32])?;
         secret_file(&dir.path().join("service.key"), &[9; 32])?;
@@ -282,7 +296,7 @@ impl Service {
             issuer: issuer.issuer().to_owned(),
             subject: subject.to_owned(),
         };
-        let config = Config {
+        let mut config = Config {
             listen,
             log_dir: dir.path().join("log"),
             log_origin: ORIGIN.to_owned(),
@@ -314,6 +328,7 @@ impl Service {
             sign_in_providers,
             surface_dir: None,
         };
+        adjust(&mut config);
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
@@ -399,6 +414,20 @@ impl Service {
             request = request.header(reqwest::header::COOKIE, cookie);
         }
         answer(request.send().await?).await
+    }
+
+    /// The directory log's size as the public receipt route shows it: the
+    /// first index it holds no leaf at, so a test can prove a refused call
+    /// logged nothing without a session.
+    pub async fn log_size(&self) -> Result<u64, Box<dyn Error>> {
+        let mut size = 0;
+        loop {
+            let (status, _) = self.get(&format!("/receipts/{size}"), None).await?;
+            if status != 200 {
+                return Ok(size);
+            }
+            size += 1;
+        }
     }
 
     /// POST the JSON `body` bytes to `path` carrying the header `name: value`
