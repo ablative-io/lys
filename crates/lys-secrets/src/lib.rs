@@ -24,10 +24,10 @@ pub mod secret;
 pub mod service;
 pub mod store;
 
-pub use audit::{AuditKind, AuditLine, AuditLog, RecordedLine};
+pub use audit::{AuditKind, AuditLine, AuditLog, Opened, RecordedLine, STATE_DOMAIN};
 pub use broker::{
     Admitted, Broker, BrokerPaths, Clock, PRESENTATION_SKEW_MS, RevocationState, RevokeOutcome,
-    Ticket, UpstreamRevocation, UseError, Used,
+    SNAPSHOT_EVERY, SnapshotReport, Ticket, UpstreamRevocation, UseError, Used,
 };
 pub use error::{RevocationRefusal, SecretsError, ServiceRefusal};
 pub use handle::{
@@ -35,6 +35,7 @@ pub use handle::{
 };
 pub use keys::{KeyId, StoreKey};
 pub use local_grants::{LocalGrants, SecretRelation};
+pub use lys_log_store::{SnapshotRefusal, Start};
 pub use oauth::{OAuthGrant, Provenance, REFRESH_MARGIN_MS};
 pub use permission::{Denied, PermissionCheck, Permitted, Relation};
 pub use secret::Secret;
