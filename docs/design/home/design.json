@@ -1467,6 +1467,21 @@
       "path": "docs/design/home/design.json",
       "note": "the cluster design, rendered to DESIGN.md, CHECKLIST.md and USER-STORIES.md by the design gate",
       "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the rendered-uuid contract: the rule and its vector in RECORD.md pinned by a test, the launch card amended, ADR-016 decided",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/decisions.json",
+      "note": "the decision ledger; HOME-008 moves ADR-016 to decided",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
