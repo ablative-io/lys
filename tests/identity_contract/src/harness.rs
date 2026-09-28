@@ -265,6 +265,7 @@ impl Service {
             grant_model_file: dir.path().join("grant-model.json"),
             spicedb,
             secrets,
+            requests_file: Some(dir.path().join("requests.jsonl")),
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

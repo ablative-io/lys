@@ -43,6 +43,8 @@ pub struct AppState {
     pub grant_setup: GrantSetup,
     /// The secrets broker the secrets screens ask, when one is configured.
     pub secrets: Option<crate::secrets_api::SecretsBroker>,
+    /// The access requests, when the configuration names their file.
+    pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
 }
 
 type Shared = Arc<AppState>;
@@ -72,6 +74,12 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
             .as_ref()
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
+        requests: config
+            .requests_file
+            .as_deref()
+            .map(crate::requests_store::RequestStore::open)
+            .transpose()?
+            .map(Mutex::new),
     })))
 }
 
@@ -111,6 +119,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
         .merge(crate::reviews_api::routes())
+        .merge(crate::requests_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

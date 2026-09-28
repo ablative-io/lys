@@ -82,6 +82,29 @@ pub enum ServerError {
         /// The broker's words.
         reason: String,
     },
+    /// The access requests are not configured, or their file could not be read or written.
+    #[error("RequestsUnavailable: {reason}")]
+    RequestsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The request is not one the caller may see: none is kept by that id, or it is another's.
+    #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
+    RequestUnknown,
+    /// The request was already decided, another way.
+    #[error("RequestDecided: access request `{request}` is already decided")]
+    RequestDecided {
+        /// The request.
+        request: String,
+    },
+    /// The operation id already names a request asked in other words.
+    #[error(
+        "RequestReused: operation `{request}` already names an access request asked in other words"
+    )]
+    RequestReused {
+        /// The operation id.
+        request: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -104,14 +127,16 @@ impl ServerError {
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. } => StatusCode::FORBIDDEN,
-            Self::AgentNotVisible | Self::GrantNotVisible | Self::SessionUnknown => {
-                StatusCode::NOT_FOUND
-            }
+            Self::AgentNotVisible
+            | Self::GrantNotVisible
+            | Self::SessionUnknown
+            | Self::RequestUnknown => StatusCode::NOT_FOUND,
+            Self::RequestDecided { .. } | Self::RequestReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
-            Self::ConfigInvalid { .. } | Self::DirectoryUnavailable { .. } => {
-                StatusCode::SERVICE_UNAVAILABLE
-            }
+            Self::ConfigInvalid { .. }
+            | Self::DirectoryUnavailable { .. }
+            | Self::RequestsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),

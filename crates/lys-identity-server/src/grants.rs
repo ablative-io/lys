@@ -158,7 +158,7 @@ fn engine_permits(
 }
 
 /// The identity the signed-in caller's login is bound to, person or agent.
-fn caller(
+pub(crate) fn caller(
     state: &AppState,
     headers: &HeaderMap,
     directory: &Projection,
