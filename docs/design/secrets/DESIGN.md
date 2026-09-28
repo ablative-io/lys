@@ -142,6 +142,10 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/src/bin/lys-secrets/sign.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
 | `crates/lys-secrets/tests/signing.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
 | `crates/lys-secrets/src/bin/lys-secrets/main.rs` | R2: The broker builds what it signs and returns the signature only | SECRETS-006 |
+| `crates/lys-secrets/tests/log_window.rs` | R1: The log command pages from the tail | SECRETS-007 |
+| `crates/lys-secrets/src/bin/lys-secrets/args.rs` | R1: The log command pages from the tail | SECRETS-007 |
+| `crates/lys-secrets/src/broker/rotation.rs` | R2: The whole-log read is an audit, by name | SECRETS-007 |
+| `crates/lys-secrets/src/bin/lys-secrets-demo.rs` | R2: The whole-log read is an audit, by name | SECRETS-007 |
 
 ## Inventory
 

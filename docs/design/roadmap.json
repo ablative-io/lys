@@ -2412,6 +2412,29 @@
         "RM-096"
       ],
       "notes": "Written by hand."
+    },
+    {
+      "id": "RM-098",
+      "title": "The broker's log command reads a window from the tail, never the whole audit log",
+      "status": "briefed",
+      "kind": "feature",
+      "summary": "lys-secrets log reads a window from the tail through AuditLog::window; the whole-log read becomes lys-secrets audit, never on a start.",
+      "provenance": {
+        "requested_by": "archie",
+        "date": "2026-09-28T22:20:00+10:00",
+        "quote": "",
+        "context": "Found in the replay sweep Tom asked every lead for on 28 September."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [],
+        "briefs": [
+          "SECRETS-007"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand."
     }
   ]
 }

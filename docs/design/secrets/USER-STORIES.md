@@ -36,6 +36,8 @@
 
 **S9.** As an operator revoking access, I want each case to say what it reaches: a handle refuses new calls, a call already admitted follows the stated cancellation rule, a login token's seat is ended by its engine, and read knowledge stays read, so that I am never told revocation took back what it cannot.
 
+**S166.** As an operator, I want the broker's log command to show me the latest lines at once however long the log has grown, and a separate command when I want every line checked.
+
 ## Reviewer — Reads the audit of what the broker did
 
 **S10.** As a reviewer reading the audit, I want one line per use naming the seat, the handle, the real account and the time, and one per sealed read, so that every use is attributed to an identity in one place.
