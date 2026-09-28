@@ -1,8 +1,6 @@
 //! The mapping of every refusal to an HTTP answer, each by name.
 
-use axum::Json;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
@@ -241,6 +239,12 @@ pub enum ServerError {
         "LaunchRecordMissing: the agent has no provisioning profile to start it from: set its profile first"
     )]
     LaunchRecordMissing,
+    /// An agent's signed request was refused, naming the check that refused it.
+    #[error("AgentSignatureRefused: {reason}")]
+    AgentSignatureRefused {
+        /// Which check refused it.
+        reason: &'static str,
+    },
     /// The agent is not active, so it is not started.
     #[error("AgentNotActive: the agent is {state} and only an active agent is started")]
     AgentNotActive {
@@ -414,9 +418,9 @@ impl ServerError {
         text.split(':').next().unwrap_or_default().to_owned()
     }
 
-    fn status(&self) -> StatusCode {
+    pub(crate) fn status(&self) -> StatusCode {
         match self {
-            Self::NotSignedIn => StatusCode::UNAUTHORIZED,
+            Self::NotSignedIn | Self::AgentSignatureRefused { .. } => StatusCode::UNAUTHORIZED,
             Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
@@ -484,12 +488,5 @@ impl ServerError {
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
         }
-    }
-}
-
-impl IntoResponse for ServerError {
-    fn into_response(self) -> Response {
-        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
-        (self.status(), Json(body)).into_response()
     }
 }
