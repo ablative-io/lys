@@ -23,18 +23,17 @@ export function Connections() {
       <p className="sub">The services this Lys installation is configured to use.</p></div>
       <button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh</button>
     </div>
-    <Gate load={load} title="Connections" ok={(data) => <>
-      <p>Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>
-      <div className="grid2">{data.connections.map((connection) => <section className="card" key={connection.id}>
+    <Gate load={load} title="Connections" ok={(data) => <div className="stack">
+      <p className="note">Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>
+      {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : <div className="card-grid">{data.connections.map((connection) => <section className="card" key={connection.id}>
         <h2>{connection.name}</h2><p>{connection.purpose}</p>
-        <p><strong>{labels[connection.state]}</strong></p>
         {connection.endpoint ? <details><summary>Connection details</summary><p className="mono">{connection.endpoint}</p></details> : null}
-      </section>)}</div>
-      {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : null}
+        <span className={'pill' + (connection.state === 'unconfigured' ? '' : ' ok')}>{labels[connection.state]}</span>
+      </section>)}</div>}
       <SignInProviders issuer={data.connections.find((connection) => connection.id === 'sign_in')?.endpoint ?? null} />
       <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
-      <a className="btn" href="#/service-accounts">Manage service accounts</a>{' '}
-      <a className="btn" href="#/me">Your sign-in accounts</a>
-    </>} />
+      <div className="actions"><a className="btn" href="#/service-accounts">Manage service accounts</a>
+        <a className="btn" href="#/me">Your sign-in accounts</a></div>
+    </div>} />
   </div>;
 }
