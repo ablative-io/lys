@@ -14,7 +14,7 @@
 
 use crate::binding::{ISSUER_MAX_BYTES, LoginBinding};
 use crate::error::IdentityError;
-use crate::id::{IdentityId, PersonId};
+use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::{LifecycleState, Transition};
 use crate::operation::OperationId;
 use crate::profile::Profile;
@@ -261,7 +261,7 @@ impl IdentityEvent {
 /// The envelope's wire codes. Each closed set is read both ways here, next to
 /// its type, and docs/design/identity/IDENTITY-EVENTS.md gives the same table.
 pub(crate) mod wire {
-    use super::{AuthMethod, Change, LifecycleState, LinkChange, Transition};
+    use super::{AgentId, AuthMethod, Change, LifecycleState, LinkChange, Transition};
 
     /// An identity that is a person.
     pub(crate) const PERSON: u64 = 1;
@@ -295,16 +295,33 @@ pub(crate) mod wire {
         }
     }
 
+    /// The actor signed in through OIDC.
+    pub(crate) const OIDC: u64 = 1;
+    /// An agent the actor is responsible for signed the request.
+    pub(crate) const AGENT_SIGNATURE: u64 = 2;
+
     pub(crate) fn method(value: AuthMethod) -> u64 {
         match value {
-            AuthMethod::Oidc => 1,
+            AuthMethod::Oidc => OIDC,
+            AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
         }
     }
 
-    pub(crate) fn method_from(code: u64) -> Option<AuthMethod> {
-        match code {
-            1 => Some(AuthMethod::Oidc),
-            _ => None,
+    /// The method `code` names with the agent id the actor carried, or what
+    /// is wrong with the two: an agent signature names its agent, and an OIDC
+    /// sign-in names none.
+    pub(crate) fn method_from(
+        code: u64,
+        agent: Option<AgentId>,
+    ) -> Result<AuthMethod, &'static str> {
+        match (code, agent) {
+            (OIDC, None) => Ok(AuthMethod::Oidc),
+            (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
+            (OIDC, Some(_)) => Err("an OIDC actor carries no agent id under key 5"),
+            (AGENT_SIGNATURE, None) => {
+                Err("an agent-signature actor carries the agent's id under key 5")
+            }
+            _ => Err("an authentication method code is 1 or 2"),
         }
     }
 

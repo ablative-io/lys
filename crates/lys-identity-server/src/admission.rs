@@ -5,8 +5,19 @@
 //! Admission compares the login the service authenticated, issuer and subject
 //! exactly, with the configured one. An email is never compared, and a first
 //! visit admits nobody and registers nobody.
+//!
+//! The link-audit source may also be an agent whose signed request the
+//! service verified. The agent is admitted when the person responsible for it
+//! holds the configured link-audit source login, read from the directory's
+//! bindings, and the request is then recorded under that person's login.
+//!
+//! Whoever holds the link-audit source login answers for every link-audit
+//! request, their own and their agent's. A person who is suspended or retired
+//! answers for nothing, so neither their session nor their agent's signature
+//! is admitted as the link-audit source.
 
-use lys_identity::{Actor, LoginBinding};
+use lys_identity::projection::{Projection, Record};
+use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
 
 use crate::error::ServerError;
 
@@ -53,6 +64,48 @@ impl Admission {
             Err(ServerError::NotAdmitted {
                 reason: "only the configured link-audit source may deliver observations",
             })
+        }
+    }
+
+    /// Admit `agent`, whose signed request the service verified, as the
+    /// link-audit source, answering the login of the person responsible for
+    /// it that the request is recorded under, or refuse by name.
+    pub fn link_audit_agent(
+        &self,
+        directory: &Projection,
+        agent: AgentId,
+    ) -> Result<&LoginBinding, ServerError> {
+        let responsible = directory
+            .record(IdentityId::Agent(agent))
+            .and_then(Record::responsible)
+            .ok_or(ServerError::NotAdmitted {
+                reason: "the signing agent has no responsible person, so nobody answers for its link-audit requests (act: sign the request as an agent registered under the person who holds the configured link-audit source login)",
+            })?;
+        if directory.person_for(&self.link_audit_source) != Some(responsible) {
+            return Err(ServerError::NotAdmitted {
+                reason: "the signing agent's responsible person does not hold the configured link-audit source login (act: bind that login to the person responsible for the agent)",
+            });
+        }
+        self.link_audit_holder(directory)?;
+        Ok(&self.link_audit_source)
+    }
+
+    /// Refuse by name when the person who holds the link-audit source login
+    /// is suspended or retired. A login no person holds has no holder to
+    /// refuse.
+    pub fn link_audit_holder(&self, directory: &Projection) -> Result<(), ServerError> {
+        let state = directory
+            .person_for(&self.link_audit_source)
+            .and_then(|person| directory.record(IdentityId::Person(person)))
+            .map(Record::state);
+        match state {
+            Some(LifecycleState::Suspended) => Err(ServerError::NotAdmitted {
+                reason: "the person who holds the link-audit source login is suspended and answers for no link-audit request (act: reinstate that person)",
+            }),
+            Some(LifecycleState::Retired) => Err(ServerError::NotAdmitted {
+                reason: "the person who holds the link-audit source login is retired and answers for no link-audit request (act: bind that login to a person who may act)",
+            }),
+            Some(LifecycleState::Registered | LifecycleState::Active) | None => Ok(()),
         }
     }
 }

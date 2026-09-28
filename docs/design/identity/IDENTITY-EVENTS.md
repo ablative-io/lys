@@ -17,7 +17,7 @@ An event is a `COSE_Sign1` message (RFC 9052, tag 18) in the shape lys-core's at
 | Payload | The event body below. |
 | Signature | 64 bytes of Ed25519 over `["Signature1", protected, h'', payload]`. |
 
-The signature is the directory service's. It attests that the service authenticated the actor the event names, by the method and at the time the event gives. It is never a person's signature, and an agent registered by a person records that person, never an agent signature (P8).
+The signature is the directory service's. It attests that the service authenticated the actor the event names, by the method and at the time the event gives. It is never a person's signature. An agent registered by a person records that person. A request an agent signed is recorded under the person responsible for that agent, by the method agent signature, with the agent's id beside the person and never in their place (P8).
 
 The whole message is one leaf of the lys-log-store log. The log coordinate is not in the leaf. The receipt returns it, because the leaf's bytes are fixed before the log gives it a place.
 
@@ -29,7 +29,7 @@ A canonical CBOR map (RFC 8949 section 4.2: shortest heads, definite lengths, ke
 | --- | --- | --- |
 | 1 | version | `1` |
 | 2 | operation | the caller's operation id, 16 bytes |
-| 3 | actor | map: `1` issuer (text), `2` subject (text), `3` method (`1` OIDC), `4` authenticated-at (seconds since the Unix epoch) |
+| 3 | actor | map: `1` issuer (text), `2` subject (text), `3` method (`1` OIDC, `2` agent signature), `4` authenticated-at (seconds since the Unix epoch), `5` the signing agent's id (16 bytes), present when the method is `2` and never otherwise |
 | 4 | identity | map: `1` kind (`1` person, `2` agent), `2` id (16 bytes) |
 | 5 | recorded-at | seconds since the Unix epoch, by the service's clock |
 | 6 | change kind | a code from the table below |

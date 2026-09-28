@@ -16,7 +16,7 @@ A profile is a display name of 1 to 200 characters, with no surrounding whitespa
 
 ## Provenance
 
-Every change names its actor: the login the service authenticated, the method (OIDC) and when. The service signs the event. It attests the actor, and it never claims a person signed anything (P8).
+Every change names its actor: a login of the person the service authenticated, the method and when. The actor is always a person. The method is one of two: the person's own OIDC sign-in, or a request signed by an agent the person is responsible for, whose signature the service verified, in which case the event also keeps the agent's id. The service signs the event. It attests the actor, and it never claims a person signed anything (P8).
 
 ## Registration
 
