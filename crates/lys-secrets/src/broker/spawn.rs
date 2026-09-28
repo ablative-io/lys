@@ -19,7 +19,7 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `PermissionDenied`, `SecretUnknown`, `NoAccountAvailable`, the
+    /// `PermissionDenied`, `SecretUnknown`, `AccountsRested`, the
     /// store's opening refusals, and the audit log's.
     pub fn spawn_login(
         &mut self,

@@ -1,11 +1,13 @@
 //! OAuth service grants at the broker. A grant is sealed like any secret
 //! and used through a handle; the proxy refreshes its access token from the
 //! refresh token when it expires, and the broker reseals the refreshed
-//! grant and records the refresh. A drop may also revoke the grant upstream;
-//! the log says whether the provider confirmed it.
+//! grant and records the refresh. A refresh keeps the client the grant was
+//! consented to: a grant for a new client is a new consent, reconnected by
+//! name, and a refresh that names one is refused. A drop may also revoke the
+//! grant upstream; the log says whether the provider confirmed it.
 
 use crate::audit::AuditKind;
-use crate::error::SecretsError;
+use crate::error::{OAuthRefusal, SecretsError};
 use crate::handle::HandleId;
 use crate::oauth::OAuthGrant;
 use crate::permission::PermissionCheck;
@@ -57,21 +59,73 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     /// Reseals `grant`, refreshed for the call `ticket` admits, in place of
-    /// the ticket's entry, and records the refresh.
+    /// the ticket's entry, and records the refresh. A refresh keeps the
+    /// client the grant was consented to: one naming another client is
+    /// refused, recorded, and reseals nothing, until the grant is
+    /// reconnected by name with [`Broker::reconnect_oauth`].
     ///
     /// # Errors
     ///
-    /// The store's and the audit log's refusals.
+    /// `ReconnectRequired` for a grant naming another client, the store's
+    /// refusals and the audit log's.
     pub fn refreshed(&mut self, ticket: &Ticket, grant: &OAuthGrant) -> Result<(), SecretsError> {
-        self.store
-            .replace(&self.store_key, &ticket.entry, &grant.to_sealed()?)?;
         let subject = (
             Some(ticket.handle.as_str()),
             Some(ticket.identity.as_str()),
             Some(ticket.secret.as_str()),
         );
         let call = Some((ticket.operation.as_str(), ticket.mark.as_str()));
+        let consented = ticket
+            .oauth()?
+            .map(|held| held.provenance().client_id.clone());
+        if let Some(consented) = consented.filter(|client| *client != grant.provenance().client_id)
+        {
+            let refusal = SecretsError::from(OAuthRefusal::ReconnectRequired {
+                secret: ticket.secret.clone(),
+                consented,
+                presented: grant.provenance().client_id.clone(),
+            });
+            self.record(AuditKind::Refresh, subject, call, None, refusal.name())?;
+            return Err(refusal);
+        }
+        self.store
+            .replace(&self.store_key, &ticket.entry, &grant.to_sealed()?)?;
         self.record(AuditKind::Refresh, subject, call, None, "refreshed")?;
+        Ok(())
+    }
+
+    /// Reconnects the OAuth grant sealed as `name` with `grant`, a new
+    /// consent by its owner, for example to a new client: from here the
+    /// grant's client, subject and tokens are the new consent's. Recorded as
+    /// one refresh line naming the client.
+    ///
+    /// # Errors
+    ///
+    /// `LendingNotPermitted` when `owner` does not own it, `SecretUnknown`
+    /// when no OAuth grant is sealed as `name`, the store's refusals and
+    /// the audit log's.
+    pub fn reconnect_oauth(
+        &mut self,
+        name: &str,
+        owner: &str,
+        grant: &OAuthGrant,
+    ) -> Result<(), SecretsError> {
+        self.owns(owner, name)?;
+        if self.store.entry(name).map(|entry| entry.class) != Some(EntryClass::OAuth) {
+            return Err(SecretsError::SecretUnknown {
+                name: name.to_owned(),
+            });
+        }
+        self.store
+            .replace(&self.store_key, name, &grant.to_sealed()?)?;
+        let outcome = format!("reconnected to client {}", grant.provenance().client_id);
+        self.record(
+            AuditKind::Refresh,
+            (None, Some(owner), Some(name)),
+            None,
+            None,
+            &outcome,
+        )?;
         Ok(())
     }
 

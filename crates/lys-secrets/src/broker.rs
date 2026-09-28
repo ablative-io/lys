@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::audit::{AuditKind, AuditLine, AuditLog};
 use crate::encoding::hex;
-use crate::error::SecretsError;
+use crate::error::{LeaseRefusal, SecretsError};
 use crate::fsutil::{io, write_atomic};
 use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle};
 use crate::keys::StoreKey;
-use crate::permission::PermissionCheck;
+use crate::permission::{PermissionCheck, Permitted};
 use crate::secret::Secret;
 use crate::store::{EntryClass, SecretStore};
 
@@ -281,7 +281,9 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`.
+    /// `SecretUnknown`, `NoPersonRoot`, `PermissionDenied`, `InvalidLifetime`,
+    /// and `LeaseBeyondGrant` for a `not_after_ms` past the window of the
+    /// grant the lease counts against.
     pub fn issue_capped(
         &mut self,
         holder: &Holder,
@@ -314,7 +316,7 @@ impl<P: PermissionCheck> Broker<P> {
         }
         self.recipient_admitted(&holder.identity, secret)?;
         match self.permissions.may_use(&holder.identity, secret) {
-            Ok(_permit) => {}
+            Ok(permit) => within_grant(secret, not_after_ms, &permit)?,
             Err(denied) if denied.no_person_root => {
                 return Err(SecretsError::NoPersonRoot {
                     holder: holder.identity.clone(),
@@ -440,3 +442,16 @@ impl<P: PermissionCheck> Broker<P> {
 }
 
 type Subject<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+
+/// Whether a lease ending at `not_after_ms` stays within the window of the
+/// grant `permit` answers for; a grant with no end of its own bounds nothing.
+fn within_grant(secret: &str, not_after_ms: i64, permit: &Permitted) -> Result<(), SecretsError> {
+    if let Some(grant_ends_ms) = permit.ends_at_ms.filter(|ends| not_after_ms > *ends) {
+        return Err(SecretsError::from(LeaseRefusal::BeyondGrant {
+            secret: secret.to_owned(),
+            not_after_ms,
+            grant_ends_ms,
+        }));
+    }
+    Ok(())
+}
