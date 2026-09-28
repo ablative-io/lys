@@ -3486,6 +3486,21 @@
       "path": "crates/lys-secrets/src/service.rs",
       "note": "A start reads its credentials from Lys's own broker, and no route reaches an app for them",
       "brief": "DIRECTORY-059"
+    },
+    {
+      "path": "crates/lys-identity/tests/support/uncertain_store.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/tests/signed_head_settle.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
+    },
+    {
+      "path": "crates/lys-identity/tests/support/mod.rs",
+      "note": "The receipts route answers a signed checkpoint",
+      "brief": "DIRECTORY-058"
     }
   ],
   "inventory": [
