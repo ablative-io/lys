@@ -158,11 +158,17 @@ fn closing_the_connection_ends_the_spicedb_wait_and_lets_the_grants_lock_go() ->
     let first = started.ask()?;
     let mut waiting = started.next_call()?;
     drop(first);
-    assert!(ends(&mut waiting)?, "the call went on after its request left");
+    assert!(
+        ends(&mut waiting)?,
+        "the call went on after its request left"
+    );
     let second = started.ask()?;
     let mut again = started.next_call()?;
     drop(second);
-    assert!(ends(&mut again)?, "the second call went on after its request left");
+    assert!(
+        ends(&mut again)?,
+        "the second call went on after its request left"
+    );
     let spicedb = started.stopped();
     spicedb.set_nonblocking(true)?;
     match spicedb.accept() {
@@ -182,7 +188,10 @@ fn a_request_that_left_while_queued_behind_the_grants_lock_calls_no_spicedb() ->
     let answer = started.answered_after()?;
     assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
     drop(holding);
-    assert!(ends(&mut held)?, "the holding call went on after its request left");
+    assert!(
+        ends(&mut held)?,
+        "the holding call went on after its request left"
+    );
     let spicedb = started.stopped();
     spicedb.set_nonblocking(true)?;
     match spicedb.accept() {

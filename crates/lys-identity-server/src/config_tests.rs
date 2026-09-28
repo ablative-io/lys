@@ -59,7 +59,9 @@ fn an_endpoint_that_is_an_address_loads() -> Result<(), Box<dyn Error>> {
     let mut loaded = 0;
     for endpoint in ["127.0.0.1:58443", "[::1]:58443"] {
         let config = load(endpoint)??;
-        let settings = config.spicedb.ok_or("the loaded configuration lost its SpiceDB")?;
+        let settings = config
+            .spicedb
+            .ok_or("the loaded configuration lost its SpiceDB")?;
         assert_eq!(settings.endpoint, endpoint);
         loaded += 1;
     }

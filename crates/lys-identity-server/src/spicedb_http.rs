@@ -136,10 +136,16 @@ fn wait(socket: &impl AsFd, want: PollFlags, wake: Option<BorrowedFd<'_>>) -> Re
             Err(Errno::INTR) => continue,
             Err(error) => return Err(io::Error::from(error).into()),
         }
-        if watched.get(1).is_some_and(|woken| !woken.revents().is_empty()) {
+        if watched
+            .get(1)
+            .is_some_and(|woken| !woken.revents().is_empty())
+        {
             return Err(Ended::Left);
         }
-        if watched.first().is_some_and(|ready| !ready.revents().is_empty()) {
+        if watched
+            .first()
+            .is_some_and(|ready| !ready.revents().is_empty())
+        {
             return Ok(());
         }
     }

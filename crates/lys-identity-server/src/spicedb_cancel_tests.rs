@@ -59,7 +59,9 @@ fn read_request(stream: &mut TcpStream) -> Result<String, Box<dyn Error>> {
 /// A call to `authority` on its own thread, inside `cancel`'s scope.
 fn asking(authority: String, cancel: Arc<Cancel>) -> JoinHandle<Result<Answer, String>> {
     std::thread::spawn(move || {
-        scope(&cancel, || post_json(&authority, "/v1/schema/read", "key", "{}"))
+        scope(&cancel, || {
+            post_json(&authority, "/v1/schema/read", "key", "{}")
+        })
     })
 }
 
@@ -120,12 +122,19 @@ fn a_cancel_ends_a_call_spicedb_never_answers_and_closes_its_socket() -> TestRes
     let (mut accepted, peer) = listener.accept()?;
     assert!(peer.ip().is_loopback(), "{peer}");
     let request = read_request(&mut accepted)?;
-    assert!(request.starts_with("POST /v1/schema/read HTTP/1.1\r\n"), "{request}");
+    assert!(
+        request.starts_with("POST /v1/schema/read HTTP/1.1\r\n"),
+        "{request}"
+    );
     let canceller = Arc::clone(&cancel);
     joined(std::thread::spawn(move || canceller.cancel()))?;
     assert_eq!(joined(call)?, Err(LEFT.to_owned()));
     let mut after = [0; 16];
-    assert_eq!(accepted.read(&mut after)?, 0, "the call's socket was not closed");
+    assert_eq!(
+        accepted.read(&mut after)?,
+        0,
+        "the call's socket was not closed"
+    );
     Ok(())
 }
 
@@ -149,7 +158,10 @@ fn a_cancel_ends_a_connect_still_in_progress() -> TestResult {
         !writable_now(&behind)?,
         "the backlog is not full, so a connect is not held in progress"
     );
-    assert!(!call.is_finished(), "the call ended before it was cancelled");
+    assert!(
+        !call.is_finished(),
+        "the call ended before it was cancelled"
+    );
     cancel.cancel();
     assert_eq!(joined(call)?, Err(LEFT.to_owned()));
     assert_eq!(probes.len(), 16);
@@ -186,11 +198,15 @@ fn a_nested_scope_puts_back_the_outer_cancel_when_it_returns_and_when_it_unwinds
     let outer = Cancel::new()?;
     let inner = Cancel::new()?;
     let seen = scope(&outer, || -> Result<Answer, Box<dyn Error>> {
-        let answered = scope(&inner, || post_json(&authority, "/v1/schema/read", "key", "{}"))?;
+        let answered = scope(&inner, || {
+            post_json(&authority, "/v1/schema/read", "key", "{}")
+        })?;
         let restored = current().ok_or("the outer scope's cancel is gone")?;
         assert!(Arc::ptr_eq(&restored, &outer));
         let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            scope(&inner, || -> u8 { std::panic::resume_unwind(Box::new("unwinding")) })
+            scope(&inner, || -> u8 {
+                std::panic::resume_unwind(Box::new("unwinding"))
+            })
         }));
         assert!(unwound.is_err());
         let restored = current().ok_or("the outer scope's cancel is gone after an unwind")?;
@@ -210,7 +226,9 @@ fn a_call_after_its_request_left_opens_no_socket() -> TestResult {
     let authority = listener.local_addr()?.to_string();
     let cancel = Cancel::new()?;
     cancel.cancel();
-    let answered = scope(&cancel, || post_json(&authority, "/v1/schema/read", "key", "{}"));
+    let answered = scope(&cancel, || {
+        post_json(&authority, "/v1/schema/read", "key", "{}")
+    });
     assert_eq!(answered, Err(LEFT.to_owned()));
     match listener.accept() {
         Err(error) if error.kind() == ErrorKind::WouldBlock => Ok(()),
@@ -232,7 +250,10 @@ fn a_call_with_no_scope_reads_the_answer() -> TestResult {
         }
     );
     let request = joined(served)??;
-    assert!(request.contains("Authorization: Bearer key\r\n"), "{request}");
+    assert!(
+        request.contains("Authorization: Bearer key\r\n"),
+        "{request}"
+    );
     Ok(())
 }
 
