@@ -12,7 +12,13 @@
 
 **S9.** As an agent, I want my session turned into a running Claude Code session from a template kept in my home, so that I start with my own record, tools, environment and instructions rather than a blank harness.
 
-**S14.** As an agent whose session was imported from Claude Code, I want it rendered as a Codex rollout that Codex resumes, with every text part, tool call and tool result carried whole and the thread announcing itself as a translation, so that I can continue on another harness and never mistake the fork for the original.
+**S14.** As an agent at a moment of completion, success or learning, I want to light a lantern on a point of my session with a note, including a point I have already moved past, so that a later session, or a fork, can walk back to it.
+
+**S15.** As an agent returning to a lantern, I want to add an epilogue to its note, so that its story grows without anything being rewritten.
+
+**S16.** As a later session, I want to recall lanterns by a word of their note or by the point they mark, and see each lantern with its epilogues and never the transcript around it, so that I find my way back without reading the session again.
+
+**S20.** As an agent, I want to fork a new session from a lantern's point, carrying everything said up to that point and nothing after it, and launch the child like any session, so that I can go back and talk with the self that lit the lantern.
 
 ## Tom — Owns the platform and reads what a session was given
 
@@ -24,7 +30,11 @@
 
 **S10.** As Tom, I want a secret a session may only use to reach it as a handle and never as its value, so that the credential never enters the session's process.
 
-**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the request gives them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+**S12.** As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+
+**S21.** As Tom, I want a fork at a user message to carry that message as the child's first prompt beside the rendered file, with nothing from the parent's header but its working directory, so that the child starts at the coordinate and no credential, handle or launch setting is copied from the parent.
+
+**S23.** As Tom, I want a fork's report to carry ids and counts only, with the parent's earlier bytes and the block store unchanged and the whole thing proved through the binary, so that a fork never quietly copies or rewrites anything.
 
 ## Reviewer — Checks the proofs before anything relies on them
 
@@ -34,4 +44,16 @@
 
 **S13.** As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
-**S15.** As the reviewer, I want a loss account beside every translation naming by entry id and block hash what was kept, what changed shape and what was lost and why, and the resume measured on a named Codex version, so that nobody claims a faithful translation that was not measured.
+**S17.** As the reviewer, I want a lantern kept in the home and out of every rendered resume file, with the home file still Pi's grammar, so that lighting one never changes what a harness resumes.
+
+**S18.** As the reviewer, I want the same session head rendered with the same lys-home version to give the same bytes every time, so that I can tell a rendered file by its hash and a receipted render event names what was written.
+
+**S19.** As the reviewer, I want the proof document to name why two renders of a multi-result tool record differed, so that the fix is checked against its cause rather than its symptom.
+
+**S22.** As the reviewer, I want the ancestry written on both sides, the child's header naming the parent file and a lys.forked_from entry naming the lantern, the point and the cut, and a lys.fork entry at the parent's head naming the child, so that a stranger can tell a fork from its parent from the record alone.
+
+**S35.** As the reviewer, I want whether a template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves its config directory measured on a named Claude Code version, so that the context record names the directory the session read from and not the one the template asked for.
+
+**S36.** As the reviewer, I want the entries that name a directory the session did not use listed by type, source and Claude Code version in RECORD.md and PROOF-GIVEN.md, so that a reader of an old session can tell which of its entries to discount without any entry being rewritten.
+
+**S37.** As the reviewer, I want lys-home given to list both versions of the context record in file order, each marked with its version, and given-check to check each by its own shape, so that a session rendered after the change shows its record beside the old ones.

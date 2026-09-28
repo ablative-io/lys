@@ -92,7 +92,8 @@
     "A home ships as one pushed git ref to a named remote on this machine and is fetched into a second home whose tracked files match the source at the fetched commit, with an arrival on each session naming the source commit and a fresh execution id; the fetched home renders through the launch template and the printed launch line resumes it on the installed Claude Code version, measured.",
     "One home session imported from Claude Code translates into a Codex 0.156.0 rollout that Codex 0.156.0 resumes and answers from, with every text part, tool call and tool result carried whole, a loss account naming what was kept, changed and lost by entry id and block hash, and the Claude Code render of the same session unchanged by hash.",
     "One file reached through a symlinked directory, a `..` path or a trailing-slash config directory records as one path in lys.given and matches in given-check, proven by one fixture test that builds all three shapes under a temporary directory.",
-    "A Claude Code file holding a compact_boundary pair and a legacy summary record imports to a session where each compaction is followed by a lys.loss entry whose ids, counts and hashes match the file, the listing proves every summarised entry and block still held, and the render of the compaction resumes on Claude Code 2.1.283 answering from the summary."
+    "A Claude Code file holding a compact_boundary pair and a legacy summary record imports to a session where each compaction is followed by a lys.loss entry whose ids, counts and hashes match the file, the listing proves every summarised entry and block still held, and the render of the compaction resumes on Claude Code 2.1.283 answering from the summary.",
+    "Whether a launch template's CLAUDE_CONFIG_DIR, reaching the session through --settings, moves the session's config directory is measured on a named Claude Code version, and the context record names the directory the session reads from."
   ],
   "non_goals": [
     {
@@ -210,6 +211,14 @@
     {
       "text": "Removing the Claude Code importer's own defaults (model \"\", toolCallId \"\", isError false, a redacted_thinking signature of null, tool_use id and name \"\", tool_result content []) at import.rs:151, 213-215, 466-474 and 508-519.",
       "reason": "They are the other half of the file-looks-whole defect and belong to the importer card that records every field it drops; the render refuses what it is given, and the importer is not touched by HOME-008."
+    },
+    {
+      "text": "Per-document config directories in the given resolver.",
+      "reason": "A split answer is recorded and the card stops; resolving CLAUDE.md and the memory index from different directories is its own card, and no single applied directory is guessed for a split."
+    },
+    {
+      "text": "Any launch template slot other than the env slot's CLAUDE_CONFIG_DIR.",
+      "reason": "The config-directory follow-up examines one variable's delivery; other slots are out of its scope."
     }
   ],
   "structure": [
@@ -1652,6 +1661,26 @@
       "path": "crates/lys-home/src/harness/claude_code/render_refusal_tests.rs",
       "note": "one fixture per refusal of the render, the absent-redacted reading and the unknown role",
       "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the config-directory brief: measure whether --settings moves the session's config directory, and record the directory the session uses",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2.rs",
+      "note": "the lys.given.v2 record, on a no answer: lys.given's data with config_dir {path, source, given_not_applied}",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2_tests.rs",
+      "note": "lys.given.v2's key-set, null and round-trip tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/given_versions.rs",
+      "note": "given and given-check over a session holding one lys.given and one lys.given.v2 entry",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
@@ -1807,7 +1836,7 @@
     },
     {
       "id": "CN13",
-      "text": "The Claude Code render never writes a default in place of a value the record did not carry: a missing field, or a field of another type than the target takes, refuses the render by session, entry id, field and expected type before any directory or file is created, and so does a serialisation that fails. The only values written that no record carries are the format constants gitBranch \"\", usage {input_tokens 0, output_tokens 0} and stop_sequence null, and the only field read from its absence is `redacted`: absent means not redacted (ADR-031)."
+      "text": "The context record names as its config directory only the directory the session reads from on the measured Claude Code version; a template's CLAUDE_CONFIG_DIR that --settings does not apply is recorded as given and not applied in lys.given.v2, lys.given's shape is not changed, and lys.given entries already written are never rewritten or appended to."
     }
   ],
   "gate": [
