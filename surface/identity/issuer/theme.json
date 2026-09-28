@@ -1,0 +1,84 @@
+{
+  "client_id": "lys-directory",
+  "light": {
+    "text": [
+      240,
+      5,
+      65
+    ],
+    "text_high": [
+      240,
+      5,
+      96
+    ],
+    "bg": [
+      240,
+      14,
+      8
+    ],
+    "bg_high": [
+      240,
+      13,
+      12
+    ],
+    "action": [
+      30,
+      59,
+      59
+    ],
+    "accent": [
+      30,
+      59,
+      59
+    ],
+    "error": [
+      0,
+      91,
+      71
+    ],
+    "btn_text": "#121218",
+    "theme_sun": "#d4975a",
+    "theme_moon": "#d4975a"
+  },
+  "dark": {
+    "text": [
+      240,
+      5,
+      65
+    ],
+    "text_high": [
+      240,
+      5,
+      96
+    ],
+    "bg": [
+      240,
+      14,
+      8
+    ],
+    "bg_high": [
+      240,
+      13,
+      12
+    ],
+    "action": [
+      30,
+      59,
+      59
+    ],
+    "accent": [
+      30,
+      59,
+      59
+    ],
+    "error": [
+      0,
+      91,
+      71
+    ],
+    "btn_text": "#121218",
+    "theme_sun": "#d4975a",
+    "theme_moon": "#d4975a"
+  },
+  "border_radius": ".5rem"
+}

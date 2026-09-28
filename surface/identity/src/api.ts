@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AgentView, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
+import type { AgentView, DirectoryRecord, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
 import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
 
 /** The service is reached through the page's own origin, under /api. */
@@ -31,7 +31,7 @@ async function refusalOf(response: Response): Promise<Refused> {
   });
 }
 
-async function get<T>(path: string, body?: unknown): Promise<T> {
+export async function request<T>(path: string, body?: unknown): Promise<T> {
   let response: Response;
   const init: RequestInit =
     body === undefined
@@ -43,8 +43,17 @@ async function get<T>(path: string, body?: unknown): Promise<T> {
     throw new Refused(0, { refusal: 'ServiceUnreachable', reason: `the identity service could not be reached: ${String(error)}` });
   }
   if (!response.ok) throw await refusalOf(response);
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Refused(response.status, {
+      refusal: 'UnreadableResponse',
+      reason: `the identity service answered ${response.status}, but its result could not be read; do not repeat a change whose outcome is unknown`,
+    });
+  }
 }
+
+const get = request;
 
 /**
  * The administrator's wider view where the caller is admitted to it, and the
@@ -65,6 +74,7 @@ export const api = {
   people: () => widest<PeopleView>('/directory/people', '/people'),
   ownPeople: () => get<PeopleView>('/people'),
   agent: (id: string) => widest<AgentView>('/directory/agents/' + encodeURIComponent(id), '/agents/' + encodeURIComponent(id)),
+  identity: (id: string) => get<DirectoryRecord>('/identities/' + encodeURIComponent(id)),
   receipt: (index: number) => get<ReceiptAnswer>('/receipts/' + index),
   grants: () => get<GrantList>('/grants'),
   model: () => get<GrantModel>('/grants/model'),

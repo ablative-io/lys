@@ -191,6 +191,47 @@ impl<S: LeafStore> Directory<S> {
         )?)
     }
 
+    /// Create one active person bound to the authenticated actor in one signed leaf.
+    ///
+    /// The service must admit the configured administrator before calling this.
+    /// Retrying the same operation, login and profile returns its original receipt,
+    /// including after a new authenticated session or a reopen. It never reactivates
+    /// a person whose state was subsequently changed.
+    pub fn setup_person(
+        &mut self,
+        actor: Actor,
+        operation: OperationId,
+        profile: Profile,
+        recorded_at: u64,
+    ) -> Result<(PersonId, Receipt), IdentityError> {
+        self.settle()?;
+        let change = Change::SetupPerson { profile };
+        if let Some((event, receipt)) = self.answered.get(&operation) {
+            if event.actor().binding() == actor.binding() && event.change() == &change {
+                if let IdentityId::Person(person) = event.identity() {
+                    return Ok((person, receipt.clone()));
+                }
+            }
+            return Err(IdentityError::OperationReused {
+                operation: operation.to_string(),
+            });
+        }
+        if let Some(person) = self.projection.person_for(actor.binding()) {
+            return Err(IdentityError::AlreadyBootstrapped {
+                person: person.to_string(),
+            });
+        }
+        let person = PersonId::generate()?;
+        let event = IdentityEvent::new(
+            operation,
+            actor,
+            IdentityId::Person(person),
+            recorded_at,
+            change,
+        )?;
+        Ok((person, self.commit(event)?))
+    }
+
     /// Register a person, answered with their new enduring id.
     pub fn register_person(
         &mut self,

@@ -130,7 +130,12 @@ async fn me(
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
-        let person = own_person(projection, &actor)?;
+        let person = match own_person(projection, &actor) {
+            Err(ServerError::NoPerson) if state.admission.administrator(&actor).is_ok() => {
+                return Err(ServerError::SetupRequired);
+            }
+            answer => answer?,
+        };
         let record = person_record(projection, person)?;
         Ok(Json(MeView {
             person: person_summary(person, record),

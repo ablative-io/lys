@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { API, api } from '../../api';
 import type { Load, Refused } from '../../api';
@@ -48,6 +48,7 @@ export function RefusedPage({ refused, title }: { refused: Refused; title: strin
     <div className="page">
       <div className="eyebrow">{title}</div>
       <h1>Refused</h1>
+      {refused.refusal.refusal === 'NoPerson' ? <p>A directory administrator must bind this sign-in to a person. <a href="#/directory/manage?action=login">Manage directory</a></p> : null}
       <div className="why-not">
         <b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span>
       </div>
@@ -65,11 +66,17 @@ export function Gate<T>({ load, title, ok }: { load: Load<T>; title: string; ok:
 /** The issuer sends the browser back here; the service finishes sign-in and sets its cookie. */
 export function Callback() {
   const [refused, setRefused] = useState<Refused | null>(null);
+  const exchange = useRef<ReturnType<typeof api.callback> | null>(null);
   useEffect(() => {
-    api.callback(location.search).then(
-      () => location.replace('/#/me'),
-      (error: Refused) => setRefused(error),
+    // The code and state are single-use. StrictMode may replay this effect;
+    // keep the same exchange, with only the current effect observing its result.
+    let live = true;
+    exchange.current ??= api.callback(location.search);
+    exchange.current.then(
+      () => { if (live) location.replace('/#/me'); },
+      (error: Refused) => { if (live) setRefused(error); },
     );
+    return () => { live = false; };
   }, []);
   if (refused) return <RefusedPage refused={refused} title="Sign in" />;
   return <Loading />;

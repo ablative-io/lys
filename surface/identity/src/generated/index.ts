@@ -122,3 +122,13 @@ export interface SignedIn {
 export type IdentityKind = 'person' | 'agent';
 
 export const kindOf = (id: IdentityId): IdentityKind => (id.startsWith('agent-') ? 'agent' : 'person');
+
+/** GET /identities/{id}: record_json in crates/lys-identity-server/src/routes.rs. Administrator only. */
+export interface DirectoryRecord {
+  id: IdentityId;
+  display_name: string;
+  state: LifecycleState;
+  responsible: IdentityId | null;
+  logins: { issuer: string; subject: string }[];
+  events: number[];
+}

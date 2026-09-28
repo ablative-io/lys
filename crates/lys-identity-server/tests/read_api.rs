@@ -210,7 +210,7 @@ async fn the_administrators_wider_view_is_its_own_route() -> TestResult {
     let (status, body) = service.get("/me", Some(&cookie)).await?;
     assert_eq!(status, 403, "{body}");
     assert_eq!(
-        body["refusal"], "NoPerson",
+        body["refusal"], "SetupRequired",
         "the administrator's login is bound to no seeded person"
     );
     Ok(())

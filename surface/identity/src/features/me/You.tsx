@@ -84,7 +84,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
           </table>
           <div className="section-h">
             <span>Your agents</span>
-            <button className="btn primary" data-act="commission" onClick={() => shell.toast('Registering an agent from this screen is not built yet')}>
+            <button className="btn primary" data-act="commission" onClick={() => navigate('/directory/manage?action=agent')}>
               Register an agent
             </button>
           </div>

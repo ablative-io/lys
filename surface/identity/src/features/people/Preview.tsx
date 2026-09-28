@@ -1,9 +1,12 @@
 import { useShell } from '../../shell/ShellContext';
 import type { Entry } from './directory';
+import type { Load } from '../../api';
+import { Reach } from './reach';
+import type { DirectoryReach } from './reach';
 import { Pill } from './Pill';
 
 /** The selected row, without leaving the list. */
-export function Preview({ x }: { x: Entry }) {
+export function Preview({ x, reach }: { x: Entry; reach: Load<DirectoryReach> }) {
   const shell = useShell();
   const person = x.person;
   const agent = x.kind === 'agent';
@@ -24,7 +27,7 @@ export function Preview({ x }: { x: Entry }) {
       </div>
       <div className="section-h" style={{ marginTop: 6 }}>Reaches</div>
       <div className="note">
-        <span className="open-q">not built yet</span> reach comes from grants (DIRECTORY-006).
+        <Reach load={reach} id={x.id} />
       </div>
       {agent ? (
         <>

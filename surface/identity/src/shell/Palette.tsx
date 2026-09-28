@@ -49,7 +49,7 @@ export function Palette() {
   const source: Item[] = [
     ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
-    { g: 'Acts', t: 'Register an agent', d: 'from a description', go: () => shell.toast('Registering an agent from this screen is not built yet') },
+    { g: 'Acts', t: 'Register an agent', d: 'directory registration', go: () => go('#/directory/manage?action=agent') },
     { g: 'Acts', t: 'Toggle dock side', d: '\\', go: shell.toggleDockSide },
     { g: 'Acts', t: 'Toggle rail labels', d: '[', go: shell.toggleLabels },
     ...PAGES.map(([t, h]) => ({ g: 'Go to', t, d: h, go: () => go(h) })),

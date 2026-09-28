@@ -52,10 +52,20 @@ export async function ask(caller: string, who: string, whoName: string, resource
 export async function whoAll(resource: ResourceRef, action: string): Promise<(Permit & { holder: string })[]> {
   const out: (Permit & { holder: string })[] = [];
   let after: string | null = null;
-  for (let page = 0; page < 1000; page += 1) {
+  const cursors = new Set<string>();
+  let revision: number | null = null;
+  while (true) {
     const answer = await api.who({ route: 'browser', resource, action, page_size: PAGE_MAX, after });
+    if (revision !== null && answer.revision !== revision) {
+      throw new Refused(409, { refusal: 'GrantRevisionChanged', reason: `Permissions changed while reading ${resourceText(resource)}; refresh to read them again.` });
+    }
+    revision = answer.revision;
     out.push(...answer.holders);
-    if (answer.complete || !answer.next) break;
+    if (answer.complete) break;
+    if (!answer.next || cursors.has(answer.next)) {
+      throw new Refused(502, { refusal: 'PermissionPageIncomplete', reason: `The permission service did not advance its page for ${resourceText(resource)} (${action}).` });
+    }
+    cursors.add(answer.next);
     after = answer.next;
   }
   return out;

@@ -92,6 +92,7 @@ pub fn router(state: Shared) -> Router {
         .route("/authority", get(authority))
         .route("/login", get(login))
         .route("/callback", get(callback))
+        .route("/setup", post(crate::setup::finish))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identities", get(list))

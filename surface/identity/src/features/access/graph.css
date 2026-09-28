@@ -1,0 +1,7 @@
+/* Directory responsibility and permission connections use the shared surface typography and borders. */
+.identity-graph { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr); gap: 24px; margin: 20px 0; }
+.graph-identity { display: flex; flex-direction: column; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--border-default); }
+.graph-identity [aria-current="page"] { color: var(--accent); }
+.graph-connection { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(120px, 1fr); gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--border-default); overflow-wrap: anywhere; }
+.graph-connection .note { grid-column: 3; }
+@media (max-width: 720px) { .identity-graph { grid-template-columns: 1fr; } }

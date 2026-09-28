@@ -5,7 +5,7 @@ import { Shell } from './shell/Shell';
 import { ShellProvider } from './shell/ShellContext';
 
 export function App() {
-  if (location.pathname === '/callback') return <Callback />;
+  if (location.pathname === '/callback' || location.pathname === '/auth/callback') return <Callback />;
   return (
     <HashRouter>
       <ShellProvider>

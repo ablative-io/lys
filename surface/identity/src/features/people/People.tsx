@@ -8,6 +8,9 @@ import type { KindFilter } from '../../shell/ShellContext';
 import { Gate } from '../signin/Gate';
 import { entries, needsNewPerson } from './directory';
 import type { Entry } from './directory';
+import { Reach, readDirectoryReach } from './reach';
+import type { DirectoryReach } from './reach';
+import type { Load } from '../../api';
 import { Preview } from './Preview';
 
 const NOT_YET = (
@@ -34,7 +37,8 @@ function PeopleHead() {
             </button>
           ))}
         </div>
-        <button className="btn primary" data-act="commission" onClick={() => shell.toast('Registering an agent from this screen is not built yet')}>
+        <a className="btn" href="#/directory/manage">Manage directory</a>
+        <button className="btn primary" data-act="commission" onClick={() => { location.hash = '/directory/manage?action=agent'; }}>
           Register an agent
         </button>
       </div>
@@ -57,6 +61,7 @@ function Stat({ n, l, warn }: { n: number | null; l: string; warn?: boolean }) {
 }
 
 function List({ all, scope }: { all: Entry[]; scope: Scope }) {
+  const reach = useLoad(readDirectoryReach, 'directory-reach');
   const shell = useShell();
   const navigate = useNavigate();
   const list = all.filter((x) => shell.filterKind === 'all' || x.kind === shell.filterKind);
@@ -86,24 +91,24 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
             </thead>
             <tbody>
               {list.map((x, i) => (
-                <Row key={x.id} x={x} i={i} cursor={cursor} open={() => navigate('/file/' + x.id)} />
+                <Row key={x.id} x={x} reach={reach} i={i} cursor={cursor} open={() => navigate('/file/' + x.id)} />
               ))}
             </tbody>
           </table>
           {list.length ? null : <div className="dim" style={{ marginTop: 10 }}>No one here yet.</div>}
           <p className="note" style={{ marginTop: 8 }}>j and k move, Enter opens. Hover a row to preview it.</p>
-          <p className="note">Role and Reaches are {NOT_YET}: the directory records no roles yet, and reach comes from grants (DIRECTORY-006).</p>
+          <p className="note">Reach is checked by the permission service for visible resources. Role is not recorded by the directory yet.</p>
           {scope === 'personal' ? (
             <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>
           ) : null}
         </div>
-        <div className="preview">{sel ? <Preview x={sel} /> : null}</div>
+        <div className="preview">{sel ? <Preview x={sel} reach={reach} /> : null}</div>
       </div>
     </>
   );
 }
 
-function Row({ x, i, cursor, open }: { x: Entry; i: number; cursor: number; open: () => void }) {
+function Row({ x, reach, i, cursor, open }: { x: Entry; reach: Load<DirectoryReach>; i: number; cursor: number; open: () => void }) {
   const shell = useShell();
   return (
     <tr
@@ -129,7 +134,7 @@ function Row({ x, i, cursor, open }: { x: Entry; i: number; cursor: number; open
           <span className="dim">—</span>
         )}
       </td>
-      <td className="mono"><span className="dim">—</span></td>
+      <td><Reach load={reach} id={x.id} compact /></td>
     </tr>
   );
 }
