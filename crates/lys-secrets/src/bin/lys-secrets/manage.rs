@@ -8,7 +8,7 @@ use std::sync::{Arc, PoisonError};
 
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use lys_secrets::{HandleId, Recipients, Scope, SecretsError, UpstreamRevocation};
 use serde::Deserialize;
@@ -84,21 +84,23 @@ pub async fn recipients(State(shared): State<Arc<Shared>>, request: Request) -> 
     ))
 }
 
+/// The query of a revocation read: the handle, percent-decoded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevocationAsked {
+    handle: String,
+}
+
 /// Where the revocation of the handle named by the `handle` query member
 /// stands, when the caller may discover its secret.
 pub async fn revocation(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (parts, _body) = request.into_parts();
-    let handle = parts
-        .uri
-        .query()
-        .and_then(|query| {
-            query
-                .split('&')
-                .find_map(|pair| pair.strip_prefix("handle="))
-        })
-        .filter(|handle| !handle.is_empty())
-        .ok_or_else(|| malformed("query", "no handle named".to_owned()))?
-        .to_owned();
+    let Query(asked) = Query::<RevocationAsked>::try_from_uri(&parts.uri)
+        .map_err(|error| malformed("query", error.body_text()))?;
+    let handle = asked.handle;
+    if handle.is_empty() {
+        return Err(malformed("query", "no handle named".to_owned()));
+    }
     let who = caller(&shared, &parts, &[])?;
     let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
     let state = broker
