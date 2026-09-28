@@ -227,3 +227,19 @@ fn the_install_names_the_fix_when_docker_is_missing_or_not_running() {
     assert!(failing.to_string().contains("without its compose plugin"));
     assert!(services::require_docker(Path::new("/usr/bin/true")).is_ok());
 }
+
+#[test]
+fn the_written_deployment_publishes_no_port_another_service_defaults_to()
+-> Result<(), Box<dyn Error>> {
+    let config = DeploymentConfig::parse(
+        &render_deployment("owner@example.test"),
+        PathBuf::from("/srv/lys"),
+    )?;
+    assert_eq!(config.spicedb.grpc_port, 58051);
+    assert_eq!(config.spicedb.http_port, 58443);
+    assert_ne!(
+        config.spicedb.grpc_port, 50051,
+        "50051 is the default gRPC port: a loopback publish there takes it from any service bound to every address"
+    );
+    Ok(())
+}
