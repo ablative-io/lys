@@ -2685,6 +2685,14 @@
             "rust-build"
           ],
           "cadence": "demand"
+        },
+        {
+          "name": "ast-grep",
+          "command": "ast-grep scan --config sgconfig.yml",
+          "requires": [
+            "tool:ast-grep"
+          ],
+          "cadence": "round"
         }
       ],
       "shorthand": {
