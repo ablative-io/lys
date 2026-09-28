@@ -1,3 +1,4 @@
+import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, useLoad } from '../../api';
 import type { ReceiptAnswer } from '../../generated';
 import { Gate } from '../signin/Gate';
@@ -27,22 +28,13 @@ function Profile({ data }: { data: FileData }) {
   return (
     <div className="grid2">
       <div>
-        <div className="card">
-          <h2>Responsibilities</h2>
-          <NotBuilt>The directory records no role for {x.display_name}. Responsibilities, goals and professional practice come from the role, which waits on its ADR (conformance 4.1).</NotBuilt>
-        </div>
+        <AssignedRoles id={x.id} />
       </div>
       <div>
         <div className="card">
           <dl className="facts">
             <dt>Kind</dt>
             <dd><span className={'kind ' + x.kind}>{x.kind}</span></dd>
-            <dt>Role</dt>
-            <dd>
-              {agent?.role ?? <span className="dim">—</span>}
-              {agent?.version != null ? <span className="ver">v{agent.version}</span> : null}{' '}
-              {agent?.role ? null : <span className="note">not recorded yet</span>}
-            </dd>
             <dt>Answers to</dt>
             <dd>
               {x.person ? (

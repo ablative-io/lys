@@ -25,7 +25,7 @@ describe("An agent's file", () => {
   it('shows role and version as not recorded, never a sample role', async () => {
     await mount('#/file/' + SCRIBE);
     const facts = $('.facts')?.textContent ?? '';
-    expect(facts).toContain('not recorded yet');
+    expect(text()).toContain('No role is currently assigned');
     expect(facts).toContain('Ada (test person)');
     expect(text()).not.toContain('Identity lead');
   });

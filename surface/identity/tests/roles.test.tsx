@@ -87,3 +87,33 @@ describe('Roles', () => {
     expect(button('New version')).toBeNull(); expect(button('Assign role')).toBeNull(); expect(button('End assignment')).toBeNull();
   });
 });
+
+
+describe('Roles on identity screens', () => {
+  it('renders the held version in the identity file, not the latest role words', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE, routes);
+    expect(text()).toContain('Review changes');
+    expect(text()).not.toContain('Review code and docs');
+    expect(text()).toContain('Version 2 is available; this assignment has not moved.');
+    expect(text()).toContain('Correct releases');
+    expect(text()).toContain('Check receipts');
+    expect(posted).toEqual([]);
+  });
+  it('shows current role versions in directory rows and their preview', async () => {
+    const { posted } = await mount('#/people', routes);
+    const row = document.querySelector('[data-href="#/file/' + SCRIBE + '"]');
+    expect(row?.textContent).toContain('Reviewer · v1');
+    expect(posted.every((call) => call.path === '/grants/who')).toBe(true);
+  });
+  it('keeps ended assignments in history without representing them as current', async () => {
+    await mount('#/file/' + SCRIBE, { ...routes, '/roles': ok({ roles: [{ ...role, holders: [{ ...holder, state: 'ended', ended_at: 1790000099 }] }] }) });
+    expect(text()).toContain('No role is currently assigned');
+    expect(text()).toContain('Past role assignments (1)');
+    expect(text()).not.toContain('Review changes');
+  });
+  it('names unreadable role state instead of claiming there are no assignments', async () => {
+    await mount('#/file/' + SCRIBE, { ...routes, '/roles': refused(503, 'RolesUnavailable', 'Could not read role records') });
+    expect(text()).toContain('RolesUnavailable');
+    expect(text()).not.toContain('No role is currently assigned');
+  });
+});

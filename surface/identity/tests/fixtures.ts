@@ -140,6 +140,7 @@ export const SERVICE: Record<string, Route> = {
   '/receipts/4': ok(RECEIPTS[4]),
   '/receipts/5': ok(RECEIPTS[5]),
   '/me': ok(ME),
+  '/roles': ok({ roles: [] }),
   '/authority': ok('Step 1 of the directory has one administrator.'),
   '/grants': ok({ grants: GRANTS, revision: 7 }),
   '/grants/model': ok(MODEL),
