@@ -47,6 +47,7 @@ pub mod network_store;
 pub mod oidc;
 pub mod openapi;
 mod openapi_refusals;
+mod openapi_runner_types;
 mod openapi_table;
 mod openapi_typed;
 mod openapi_types;

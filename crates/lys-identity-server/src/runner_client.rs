@@ -30,7 +30,7 @@ use tokio::sync::Notify;
 use crate::error::ServerError;
 
 /// A machine's runner, as the machine's record names it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RunnerRecord {
     /// This install's own runner, at the socket the configuration names.
