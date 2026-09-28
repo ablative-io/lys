@@ -58,6 +58,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/requests/{id}/decline",
             post(crate::requests_decide::decline),
         )
+        .route(
+            "/requests/{id}/reconcile",
+            post(crate::requests_decide::settle),
+        )
 }
 
 pub(crate) fn malformed(reason: impl Into<String>) -> ServerError {

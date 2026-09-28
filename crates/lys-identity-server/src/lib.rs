@@ -7,6 +7,7 @@
 
 pub mod admission;
 pub mod config;
+pub mod connections_api;
 pub mod dev_seed;
 pub mod error;
 pub mod grant_contract;

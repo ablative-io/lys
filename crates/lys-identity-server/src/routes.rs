@@ -128,6 +128,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::receipts_api::routes())
         .merge(crate::reviews_api::routes())
         .merge(crate::requests_api::routes())
+        .merge(crate::connections_api::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())
         .merge(crate::resources_api::routes())

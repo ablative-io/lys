@@ -1,25 +1,31 @@
-/** Resources named by the grants the caller may see, never an invented global registry. */
-import { api, useLoad } from '../../api';
-import { resourceText } from '../../generated/grants';
+/** Resources and grant counts judged by the server within the caller's visibility. */
+import { useState } from 'react';
+import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 
+interface ResourceSummary { kind: string; id: string; standing: number; ended: number; holders: number }
+interface ResourcesView { kinds: string[]; resources: ResourceSummary[]; revision: number; judged_at: number }
+const readResources = () => request<ResourcesView>('/resources');
+
 export function Resources() {
-  const load = useLoad(api.grants, 'grant-resources');
+  const [kind, setKind] = useState('');
+  const load = useLoad(readResources, 'resources');
   return <div className="page"><div className="eyebrow">Access</div><h1>Resources</h1>
-    <Gate load={load} title="Resources" ok={(list) => {
-      const resources = new Map(list.grants.map((grant) => [resourceText(grant.resource), grant.resource]));
-      return <>
-        <p className="sub">Resources named in the grants you may see, at grant revision {list.revision}. This includes historical grants; check access for a current decision.</p>
-        <table><thead><tr><th>Kind</th><th>Resource</th><th>Recorded grants</th><th>Access</th></tr></thead><tbody>
-          {[...resources].map(([key, resource]) => <tr key={key}>
-            <td>{resource.kind}</td><td>{resource.id}</td>
-            <td>{list.grants.filter((grant) => resourceText(grant.resource) === key).length}</td>
-            <td><a href={'#/access/who/' + encodeURIComponent(key)}>Who can reach this?</a></td>
-          </tr>)}
-        </tbody></table>
-        {resources.size === 0 ? <p>No resources appear in your visible grants yet.</p> : null}
-        <a className="btn" href="#/access/issue">Issue root grant</a>
-      </>;
-    }} />
+    <Gate load={load} title="Resources" ok={(list) => <>
+      <p className="sub">Resources named in grants you may see. Counts were checked at {new Date(list.judged_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })} Melbourne time, grant revision {list.revision}.</p>
+      <label>Resource kind <select value={kind} onChange={(event) => setKind(event.target.value)}>
+        <option value="">All kinds</option>{list.kinds.map((value) => <option key={value} value={value}>{value}</option>)}
+      </select></label>
+      <table><thead><tr><th>Kind</th><th>Resource</th><th>Standing grants</th><th>Ended grants</th><th>Current holders</th><th>Access</th></tr></thead><tbody>
+        {list.resources.filter((resource) => !kind || resource.kind === kind).map((resource) => {
+          const key = resource.kind + ':' + resource.id;
+          return <tr key={key}><td>{resource.kind}</td><td>{resource.id}</td><td>{resource.standing}</td><td>{resource.ended}</td><td>{resource.holders}</td>
+            <td><a href={'#/access/who/' + encodeURIComponent(key)}>Who can reach this?</a></td></tr>;
+        })}
+      </tbody></table>
+      {list.resources.length === 0 ? <p>No resources appear in your visible grants yet.</p> : null}
+      <p className="note">Grant counts describe recorded grants. Check access for the permission engine's current decision.</p>
+      <a className="btn" href="#/access/issue">Issue root grant</a>
+    </>} />
   </div>;
 }

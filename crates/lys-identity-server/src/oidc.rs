@@ -61,6 +61,11 @@ impl Oidc {
         })
     }
 
+    /// The configured issuer; no client credential is included.
+    pub(crate) fn issuer(&self) -> &str {
+        self.metadata.issuer().as_str()
+    }
+
     /// Begin a sign-in, answering the issuer URL to send the browser to.
     pub fn begin(&self) -> Result<String, ServerError> {
         let client = CoreClient::from_provider_metadata(

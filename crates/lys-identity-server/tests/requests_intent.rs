@@ -175,3 +175,65 @@ async fn an_intent_the_grants_hold_nothing_for_is_withdrawn_at_the_next_decision
     assert_eq!(held["grants"], json!([]), "{held}");
     Ok(())
 }
+
+#[tokio::test]
+async fn anyone_the_request_is_shown_to_settles_the_approval_without_deciding() -> TestResult {
+    let (table, request, approving) = interrupted().await?;
+    let path = format!("/requests/{request}/reconcile");
+    let stranger = table.service.sign_in(login("stranger-subject")).await?;
+    let hidden = table
+        .service
+        .post(&path, Some(&stranger), &json!({}))
+        .await?;
+    assert_ne!(hidden.0, 200, "{}", hidden.1);
+
+    let bea = table.seeded.people[1].id.to_string();
+    let root = json!({
+        "operation": approving,
+        "route": "api",
+        "holder": bea,
+        "resource": { "kind": "doc", "id": "1" },
+        "relation": "beta",
+        "pass_on": { "kind": "use_only" },
+        "window": { "starts_at": 5, "ends_at": FAR },
+    });
+    let (status, issued) = table
+        .service
+        .post("/grants/roots", Some(&table.ada), &root)
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let (status, settled) = table
+        .service
+        .post(&path, Some(&table.bea), &json!({}))
+        .await?;
+    assert_eq!(status, 200, "{settled}");
+    assert_eq!(settled["state"], "approved");
+    assert_eq!(settled["decision"]["grant"], issued["grant"]);
+    assert_eq!(
+        settled["decision"]["by"],
+        table.seeded.people[0].id.to_string()
+    );
+    assert_eq!(settled["held_by"], Value::Null);
+    Ok(())
+}
+
+#[tokio::test]
+async fn settling_an_approval_the_grants_hold_nothing_for_leaves_the_request_waiting() -> TestResult
+{
+    let (table, request, _) = interrupted().await?;
+    let (status, settled) = table
+        .service
+        .post(
+            &format!("/requests/{request}/reconcile"),
+            Some(&table.bea),
+            &json!({}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{settled}");
+    assert_eq!(settled["state"], "waiting");
+    assert_eq!(settled["held_by"], Value::Null);
+    assert_eq!(settled["decision"], Value::Null);
+    let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
+    assert_eq!(held["grants"], json!([]), "{held}");
+    Ok(())
+}

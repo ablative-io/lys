@@ -43,6 +43,11 @@ pub struct SecretsBroker {
 }
 
 impl SecretsBroker {
+    /// The configured broker endpoint, for the administrator inventory.
+    pub(crate) fn endpoint(&self) -> &str {
+        &self.base
+    }
+
     /// The broker `settings` names, with the service's key read from its
     /// file.
     ///

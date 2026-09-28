@@ -229,6 +229,31 @@ pub(crate) async fn approve(
     })
 }
 
+/// Settle the approval being settled on a request, for anyone the request
+/// is shown to. It settles an intent that stands and does nothing else: it
+/// issues no grant and makes no decision of its own.
+pub(crate) async fn settle(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<RequestView>, ServerError> {
+    with_grants(&state, |judged| {
+        let caller = caller(&state, &headers, judged.directory)?;
+        let at = now();
+        with_requests(&state, |store| {
+            let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
+            let decided = reconcile(&judged, store, &asked, &weighed, at)?;
+            Ok(Json(weighed.view(
+                &judged,
+                caller,
+                &asked,
+                decided.as_ref(),
+                None,
+            )?))
+        })
+    })
+}
+
 pub(crate) async fn decline(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
