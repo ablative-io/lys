@@ -2,7 +2,8 @@ import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { Teams } from '../teams/Teams';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { api, useLoad } from '../../api';
+import { api, request, useLoad } from '../../api';
+import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { Scope } from '../../generated';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -17,11 +18,23 @@ import { Preview } from './Preview';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 import type { RolesLoad } from '../roles/AssignedRoles';
 
-const NOT_YET = (
-  <span className="open-q" title="Its server does not exist yet">
-    not built yet
-  </span>
-);
+/** What the runtimes report across the directory, counted for the administrator; anyone else sees why not. */
+function RuntimeStats({ scope }: { scope: Scope }) {
+  const load = useLoad(async () => {
+    if (scope !== 'directory') return null;
+    const found = await request<{ sessions: RuntimeSession[] }>('/runtime/found');
+    const running = await request<{ sessions: RuntimeSession[] }>('/runtime/sessions');
+    return { found: found.sessions.filter((session) => session.shown !== 'stopped').length, running: running.sessions.filter((session) => session.shown === 'running').length };
+  }, 'people-runtime:' + scope);
+  const why = load.status === 'loading' ? '…' : load.status === 'refused' ? load.refused.refusal.refusal : load.data === null ? 'administrator only' : undefined;
+  const counts = load.status === 'ok' ? load.data : null;
+  return (
+    <>
+      <Stat n={counts?.found ?? null} l="found, not registered" why={why} />
+      <Stat n={counts?.running ?? null} l="sessions running" why={why} />
+    </>
+  );
+}
 
 function PeopleHead() {
   const shell = useShell();
@@ -50,7 +63,7 @@ function PeopleHead() {
   );
 }
 
-function Stat({ n, l, warn }: { n: number | null; l: string; warn?: boolean }) {
+function Stat({ n, l, warn, why }: { n: number | null; l: string; warn?: boolean; why?: string }) {
   return (
     <div className="stat">
       <div className="n" style={warn && n ? { color: 'var(--warn)' } : undefined}>
@@ -58,7 +71,7 @@ function Stat({ n, l, warn }: { n: number | null; l: string; warn?: boolean }) {
       </div>
       <div className="l">
         {l}
-        {n === null ? <> · {NOT_YET}</> : null}
+        {n === null ? <> · <span className="open-q">{why ?? 'not visible'}</span></> : null}
       </div>
     </div>
   );
@@ -85,8 +98,7 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
         <Stat n={active('person')} l="people active" />
         <Stat n={active('agent')} l="agents active" />
         <Stat n={all.filter(needsNewPerson).length} l="with no one answering" warn />
-        <Stat n={null} l="found, not registered" />
-        <Stat n={null} l="sessions running" />
+        <RuntimeStats scope={scope} />
       </div>
       <div className="split">
         <div>

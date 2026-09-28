@@ -108,6 +108,10 @@ pub struct Config {
     /// Without it the team routes answer `TeamsUnavailable`.
     #[serde(default)]
     pub teams_dir: Option<PathBuf>,
+    /// The directory the emergency stops are kept in, created when it does
+    /// not exist. Without it the stop route answers `StopsUnavailable`.
+    #[serde(default)]
+    pub stops_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]

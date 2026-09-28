@@ -121,6 +121,7 @@ impl ServerError {
             | Self::ServiceAccountRetired { .. }
             | Self::ServiceAccountOwnerRetired { .. }
             | Self::TeamReused { .. }
+            | Self::StopReused { .. }
             | Self::TeamRetired { .. }
             | Self::TeamMemberHeld
             | Self::TeamMemberAbsent
@@ -139,6 +140,7 @@ impl ServerError {
             | Self::RuntimeUnavailable { .. }
             | Self::ServiceAccountsUnavailable { .. }
             | Self::TeamsUnavailable { .. }
+            | Self::StopsUnavailable { .. }
             | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),

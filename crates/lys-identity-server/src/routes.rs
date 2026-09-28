@@ -63,6 +63,8 @@ pub struct AppState {
     pub reviews: Option<Mutex<ReviewStore>>,
     /// The teams, when the configuration names their directory.
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
+    /// The emergency stops, when the configuration names their directory.
+    pub stops: Option<Mutex<crate::stops_store::StopStore>>,
     /// The nonces agents' signed requests carried within the last minute.
     pub agent_nonces: crate::agent_signature::Nonces,
     /// Where the service says how a thing it keeps was started.
@@ -100,7 +102,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
     let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
-    let teams = crate::teams_store::TeamStore::configured(config, key, &say)?;
+    let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
+    let stops = crate::stops_store::StopStore::configured(config, key, &say)?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -131,6 +134,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         service_accounts: service_accounts.map(Mutex::new),
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
+        stops: stops.map(Mutex::new),
         agent_nonces: Mutex::default(),
         say,
     });

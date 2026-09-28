@@ -32,10 +32,12 @@ describe('People and agents', () => {
     expect($$('.stat .n')[2].textContent).toBe('4');
   });
 
-  it('shows no sample data and marks what has no server', async () => {
+  it('shows no sample data and counts sessions from the runtimes, never a placeholder', async () => {
     await mount('#/people');
     for (const sample of ['Tom Whiting', 'Dana Reyes', 'Night builder', 'mock-up · sample data']) expect(text()).not.toContain(sample);
-    expect(text()).toContain('not built yet');
+    expect(text()).not.toContain('not built yet');
+    expect($$('.stat .n')[3].textContent).toBe('0');
+    expect($$('.stat .n')[4].textContent).toBe('0');
   });
 
   it('moves with j and k, previews the row, and opens it with Enter', async () => {
@@ -68,7 +70,8 @@ describe('People and agents', () => {
     await click($('[data-kind="person"]'));
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)']);
     await click($('[data-kind="teams"]'));
-    expect($('.empty-note')?.textContent).toContain('not built yet');
+    expect(text()).toContain('No teams yet');
+    expect(text()).toContain('Being in a team gives no access');
   });
 
   it('falls back to the personal view when not admitted to the directory', async () => {

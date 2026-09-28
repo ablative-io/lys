@@ -1,4 +1,5 @@
 import { AgentCertificates } from './AgentCertificates';
+import { TeamsOf } from './TeamsOf';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { AgentMemory } from './AgentMemory';
 import { AgentCredentials } from './AgentCredentials';
@@ -52,7 +53,7 @@ function Profile({ data }: { data: FileData }) {
               )}
             </dd>
             <dt>Teams</dt>
-            <dd><span className="dim">—</span> <span className="note">not built yet</span></dd>
+            <dd><TeamsOf id={x.id} /></dd>
             <dt>State</dt>
             <dd>{x.state} <span className="note">· authority only; it does not say anything is running</span></dd>
             {agent ? (
