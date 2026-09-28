@@ -28,7 +28,7 @@ fn inclusion_artifact_refuses_an_index_the_log_does_not_have() {
         assert!(
             matches!(
                 err,
-                AnchorError::NoSuchLeaf { leaf_index, tree_size, ref origin }
+                AnchorError::Proof(ProofError::NoSuchLeaf { leaf_index, tree_size, ref origin })
                     if leaf_index == index && tree_size == 2 && origin == ORIGIN
             ),
             "an absent index must be refused by name, got: {err}"

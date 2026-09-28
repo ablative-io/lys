@@ -103,7 +103,7 @@ use lys_log_store::{LeafStore, Log};
 
 use crate::admission::AdmissionPolicy;
 use crate::config::AnchorConfig;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, GenesisError};
 use crate::keys::InProcessSigner;
 
 /// A transparency anchor: one append-only log, with a genesis leaf.
@@ -168,7 +168,7 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// [`AnchorError::GenesisAlreadyWritten`] if the store already holds
+    /// [`GenesisError::GenesisAlreadyWritten`] if the store already holds
     /// leaves, and [`AnchorError::Store`] for anything the log or its storage
     /// refuses — including an integrity failure found while opening.
     pub fn create(
@@ -181,10 +181,10 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         let mut log = Log::open(store)?;
         let tree_size = log.tree().len();
         if tree_size != 0 {
-            return Err(AnchorError::GenesisAlreadyWritten {
+            return Err(AnchorError::Genesis(GenesisError::GenesisAlreadyWritten {
                 origin: log.origin().to_string(),
                 tree_size,
-            });
+            }));
         }
         log.append(genesis)?;
         Ok(Self {
@@ -211,16 +211,16 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// [`AnchorError::NoGenesisLeaf`] if the log has no leaves, and
+    /// [`GenesisError::NoGenesisLeaf`] if the log has no leaves, and
     /// [`AnchorError::Store`] for anything the log or its storage refuses —
     /// notably `StoreError::PinMismatch` when the stored leaves no longer
     /// rebuild to the pinned root.
     pub fn open(store: S, signer: K, policy: P, config: AnchorConfig) -> AnchorResult<Self> {
         let log = Log::open(store)?;
         if log.tree().is_empty() {
-            return Err(AnchorError::NoGenesisLeaf {
+            return Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf {
                 origin: log.origin().to_string(),
-            });
+            }));
         }
         Ok(Self {
             log,

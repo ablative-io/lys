@@ -167,13 +167,17 @@ use tempfile::TempDir;
 use crate::AnchorConfig;
 use crate::admission::{AcceptAll, AdmissionPolicy, MaxSize, NotAdmitted, SubmitterContext};
 use crate::anchor::Anchor;
+use crate::error::SigningError;
 use crate::keys::{FileSigner, Signer};
 use crate::wire::Submission;
 
 use super::*;
 
+#[path = "genesis_tests/delegation.rs"]
 mod delegation;
+#[path = "genesis_tests/refusals.rs"]
 mod refusals;
+#[path = "genesis_tests/strict_open.rs"]
 mod strict_open;
 
 const ORIGIN: &str = "example.com/lys/genesis-delegation-test";
@@ -241,14 +245,14 @@ fn leaf_zero_from_disk(dir: &Path) -> Vec<u8> {
 
 /// A [`Signer`] that advertises a key and declines to sign with it.
 ///
-/// It returns [`AnchorError::SignerDeclined`] carrying a sentinel string this
+/// It returns [`SigningError::SignerDeclined`] carrying a sentinel string this
 /// file chose. **The sentinel is the point, not the variant:** matching it proves
 /// the signer's own error reached the caller *unchanged* rather than being
 /// replaced by one of this crate's, which is the property that would break
 /// silently if the genesis path ever started mapping signer failures into its
 /// own vocabulary.
 ///
-/// An earlier version of this fixture borrowed `AnchorError::SignerKey` and said
+/// An earlier version of this fixture borrowed `SigningError::SignerKey` and said
 /// so in a comment, because no variant meant "a remote signer declined". Writing
 /// that comment is what surfaced the gap: the [`Signer`] contract documents a
 /// failure the error type could not express, and `#[non_exhaustive]` meant no
@@ -268,9 +272,9 @@ impl Signer for DecliningSigner {
     }
 
     fn sign(&self, _message: &[u8]) -> AnchorResult<[u8; 64]> {
-        Err(AnchorError::SignerDeclined {
+        Err(AnchorError::Signing(SigningError::SignerDeclined {
             reason: DECLINED_REASON.to_string(),
-        })
+        }))
     }
 }
 

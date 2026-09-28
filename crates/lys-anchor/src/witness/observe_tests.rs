@@ -68,7 +68,9 @@ use super::super::report::fixture::{
 };
 use super::*;
 
+#[path = "observe_tests/receipt.rs"]
 mod receipt;
+#[path = "observe_tests/relations.rs"]
 mod relations;
 
 /// A witness anchor over a fresh temp directory, with the directory returned so

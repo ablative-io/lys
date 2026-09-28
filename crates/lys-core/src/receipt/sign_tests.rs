@@ -13,9 +13,13 @@ use crate::attestation;
 use crate::error::TrustError;
 use crate::merkle::tree::{AppendOnlyTree, RawLeaf};
 
+#[path = "sign_tests/families.rs"]
 mod families;
+#[path = "sign_tests/issuance.rs"]
 mod issuance;
+#[path = "sign_tests/uniform_failure.rs"]
 mod uniform_failure;
+#[path = "sign_tests/verification.rs"]
 mod verification;
 
 fn leaf_bytes(index: u64) -> Vec<u8> {

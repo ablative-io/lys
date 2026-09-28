@@ -73,7 +73,7 @@ fn a_root_signer_that_is_also_the_operational_signer_is_refused_without_writing(
             AcceptAll,
             AnchorConfig::unconfigured(),
         ) {
-            Err(AnchorError::GenesisRootKeyIsOperationalKey { origin }) => {
+            Err(AnchorError::Genesis(GenesisError::GenesisRootKeyIsOperationalKey { origin })) => {
                 assert_eq!(origin, ORIGIN, "{label}");
             }
             other => panic!("{label}: expected GenesisRootKeyIsOperationalKey, got {other:?}"),
@@ -140,7 +140,7 @@ fn delegated_genesis_over_a_log_that_already_has_leaves_is_refused_without_writi
         AcceptAll,
         AnchorConfig::unconfigured(),
     ) {
-        Err(AnchorError::GenesisAlreadyWritten { origin, tree_size }) => {
+        Err(AnchorError::Genesis(GenesisError::GenesisAlreadyWritten { origin, tree_size })) => {
             assert_eq!(origin, ORIGIN);
             assert_eq!(tree_size, 1);
         }
@@ -177,7 +177,9 @@ fn a_root_signer_that_declines_leaves_a_log_that_can_still_be_given_genesis() {
     ) {
         // Keyed on the sentinel this file put in the signer: the signer's own
         // error reached the caller, rather than being replaced.
-        Err(AnchorError::SignerDeclined { reason }) => assert_eq!(reason, DECLINED_REASON),
+        Err(AnchorError::Signing(SigningError::SignerDeclined { reason })) => {
+            assert_eq!(reason, DECLINED_REASON);
+        }
         other => panic!("expected the root signer's own error to propagate, got {other:?}"),
     }
 
@@ -239,7 +241,7 @@ fn a_root_signer_whose_advertised_key_is_not_the_one_it_signs_with_is_refused_be
         AcceptAll,
         AnchorConfig::unconfigured(),
     ) {
-        Err(AnchorError::GenesisDelegation { origin, source }) => {
+        Err(AnchorError::Genesis(GenesisError::GenesisDelegation { origin, source })) => {
             assert_eq!(origin, ORIGIN);
             assert!(
                 matches!(source, TrustError::DelegationVerification),

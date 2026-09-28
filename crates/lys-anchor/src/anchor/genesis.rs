@@ -282,7 +282,7 @@
 
 use lys_core::delegation::{Delegation, DelegationSubjectKind, verify_delegation};
 
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, GenesisError};
 
 mod constructors;
 
@@ -330,15 +330,15 @@ pub const GENESIS_SEQUENCE: u64 = 0;
 ///
 /// # Errors
 ///
-/// - [`AnchorError::GenesisNotADelegation`] if the bytes are not a canonical
+/// - [`GenesisError::GenesisNotADelegation`] if the bytes are not a canonical
 ///   `lys/delegation/v1` artifact, or do not verify under
 ///   `expected_root_public_key`, or name a different subject or subject kind.
 ///   `lys-core` collapses all of those into one value on purpose, and this
 ///   variant carries it rather than re-deriving a reason it was not given.
-/// - [`AnchorError::GenesisDelegatesToTheRootKey`] if the delegated key equals
+/// - [`GenesisError::GenesisDelegatesToTheRootKey`] if the delegated key equals
 ///   the signing root key — the open-time arm of the rule
-///   [`AnchorError::GenesisRootKeyIsOperationalKey`] enforces at creation.
-/// - [`AnchorError::GenesisSequenceIsNotGenesis`] if `sequence` is not
+///   [`GenesisError::GenesisRootKeyIsOperationalKey`] enforces at creation.
+/// - [`GenesisError::GenesisSequenceIsNotGenesis`] if `sequence` is not
 ///   [`GENESIS_SEQUENCE`].
 ///
 /// [`Anchor::create_with_delegated_genesis`]: crate::anchor::Anchor::create_with_delegated_genesis
@@ -357,9 +357,11 @@ pub fn verify_genesis_delegation(
         DelegationSubjectKind::Domain,
         origin,
     )
-    .map_err(|source| AnchorError::GenesisNotADelegation {
-        origin: origin.to_string(),
-        source,
+    .map_err(|source| {
+        AnchorError::Genesis(GenesisError::GenesisNotADelegation {
+            origin: origin.to_string(),
+            source,
+        })
     })?;
 
     // DP16's two-key model, checked against the artifact rather than against two
@@ -368,21 +370,25 @@ pub fn verify_genesis_delegation(
     // on — so a store whose leaf 0 was written by anything other than this
     // crate's constructor can carry one, and nothing else would flag it.
     if delegation.claim.delegated_public_key == delegation.root_public_key {
-        return Err(AnchorError::GenesisDelegatesToTheRootKey {
-            origin: origin.to_string(),
-        });
+        return Err(AnchorError::Genesis(
+            GenesisError::GenesisDelegatesToTheRootKey {
+                origin: origin.to_string(),
+            },
+        ));
     }
 
     if delegation.claim.sequence != GENESIS_SEQUENCE {
-        return Err(AnchorError::GenesisSequenceIsNotGenesis {
-            origin: origin.to_string(),
-            sequence: delegation.claim.sequence,
-        });
+        return Err(AnchorError::Genesis(
+            GenesisError::GenesisSequenceIsNotGenesis {
+                origin: origin.to_string(),
+                sequence: delegation.claim.sequence,
+            },
+        ));
     }
 
     Ok(delegation)
 }
 
 #[cfg(test)]
-#[path = "genesis_tests/mod.rs"]
+#[path = "genesis_tests.rs"]
 mod tests;

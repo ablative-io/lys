@@ -33,7 +33,9 @@ use super::*;
 use crate::delegation::artifact::DelegationSubjectKind;
 use crate::delegation::encoding::{CONTENT_TYPE, MAX_ARTIFACT_LEN, MAX_SEQUENCE, PROTECTED_LEN};
 
+#[path = "artifact_tests/refusals.rs"]
 mod refusals;
+#[path = "artifact_tests/round_trip.rs"]
 mod round_trip;
 
 const ROOT_KEY: [u8; KEY_LEN] = [0xa1; KEY_LEN];

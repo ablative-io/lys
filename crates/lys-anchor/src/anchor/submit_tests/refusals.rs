@@ -36,7 +36,7 @@ fn receipt_for_refuses_an_index_the_log_does_not_have() {
         assert!(
             matches!(
                 err,
-                AnchorError::NoSuchLeaf { leaf_index, tree_size, ref origin }
+                AnchorError::Proof(ProofError::NoSuchLeaf { leaf_index, tree_size, ref origin })
                     if leaf_index == index && tree_size == 2 && origin == ORIGIN
             ),
             "an absent index must be refused by name, got: {err}"
@@ -63,7 +63,7 @@ fn receipt_for_refuses_a_log_that_holds_only_its_genesis_leaf() {
     assert!(
         matches!(
             err,
-            AnchorError::TreeTooSmallForReceipt { tree_size, ref origin }
+            AnchorError::Proof(ProofError::TreeTooSmallForReceipt { tree_size, ref origin })
                 if tree_size == 1 && origin == ORIGIN
         ),
         "a one-leaf log must be refused by name, got: {err}"

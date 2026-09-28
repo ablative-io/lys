@@ -71,7 +71,9 @@ use crate::keys::{FileSigner, Signer};
 
 use super::*;
 
+#[path = "submit_tests/receipts.rs"]
 mod receipts;
+#[path = "submit_tests/refusals.rs"]
 mod refusals;
 
 /// The origin this test supplies to the store. Verifiers are built from *this*

@@ -14,9 +14,13 @@
 use super::*;
 use crate::delegation::artifact::{DelegationRole, DelegationSubjectKind};
 
+#[path = "encoding_tests/decode_envelope.rs"]
 mod decode_envelope;
+#[path = "encoding_tests/decode_payload.rs"]
 mod decode_payload;
+#[path = "encoding_tests/encodable.rs"]
 mod encodable;
+#[path = "encoding_tests/layout.rs"]
 mod layout;
 
 /// A fixed root key. It occupies `kid`, which is length-pinned but not

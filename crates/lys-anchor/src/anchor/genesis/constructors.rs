@@ -12,7 +12,7 @@ use super::{GENESIS_SEQUENCE, verify_genesis_delegation};
 use crate::admission::AdmissionPolicy;
 use crate::anchor::Anchor;
 use crate::config::AnchorConfig;
-use crate::error::{AnchorError, AnchorResult};
+use crate::error::{AnchorError, AnchorResult, GenesisError, ProofError};
 use crate::keys::{InProcessSigner, Signer};
 
 impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
@@ -49,9 +49,9 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// - [`AnchorError::GenesisAlreadyWritten`] if the store already holds
+    /// - [`GenesisError::GenesisAlreadyWritten`] if the store already holds
     ///   leaves.
-    /// - [`AnchorError::GenesisRootKeyIsOperationalKey`] if `root_signer` and
+    /// - [`GenesisError::GenesisRootKeyIsOperationalKey`] if `root_signer` and
     ///   `signer` advertise the same public key. Checked before anything is
     ///   built or signed; see the [module docs](super) for why a valid-looking
     ///   artifact is the worst possible outcome here.
@@ -60,7 +60,7 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///   wrapped: a remote signer's reason for refusing is the only account of
     ///   that refusal in existence, and re-describing it here would replace it
     ///   with a guess.
-    /// - [`AnchorError::GenesisDelegation`] if `lys-core` refused to assemble
+    /// - [`GenesisError::GenesisDelegation`] if `lys-core` refused to assemble
     ///   the artifact — a claim its own decoder would reject, or a signature
     ///   that does not verify against the key going into the protected `kid`.
     ///   The latter means `root_signer` broke [`Signer`]'s contract.
@@ -77,10 +77,10 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         let mut log = Log::open(store)?;
         let tree_size = log.tree().len();
         if tree_size != 0 {
-            return Err(AnchorError::GenesisAlreadyWritten {
+            return Err(AnchorError::Genesis(GenesisError::GenesisAlreadyWritten {
                 origin: log.origin().to_string(),
                 tree_size,
-            });
+            }));
         }
 
         // ⛔ The two keys must differ, and this is the last moment anyone can
@@ -94,9 +94,11 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         // pass by comparing something other than what gets signed.
         let root_public_key = root_signer.public_key();
         if root_public_key == signer.public_key() {
-            return Err(AnchorError::GenesisRootKeyIsOperationalKey {
-                origin: log.origin().to_string(),
-            });
+            return Err(AnchorError::Genesis(
+                GenesisError::GenesisRootKeyIsOperationalKey {
+                    origin: log.origin().to_string(),
+                },
+            ));
         }
 
         // The subject VALUE comes from storage and from nowhere else. There is
@@ -119,10 +121,10 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         // discovered by a stranger years later.
         let genesis =
             assemble_delegation(&root_public_key, &claim, &signature).map_err(|source| {
-                AnchorError::GenesisDelegation {
+                AnchorError::Genesis(GenesisError::GenesisDelegation {
                     origin: log.origin().to_string(),
                     source,
-                }
+                })
             })?;
 
         // Only now. Everything above can fail without touching the log.
@@ -163,8 +165,8 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
     ///
     /// # Errors
     ///
-    /// - [`AnchorError::NoGenesisLeaf`] if the log has no leaves.
-    /// - [`AnchorError::NoSuchLeaf`] if the tree is non-empty and index 0 is
+    /// - [`GenesisError::NoGenesisLeaf`] if the log has no leaves.
+    /// - [`ProofError::NoSuchLeaf`] if the tree is non-empty and index 0 is
     ///   nonetheless absent from storage. Not reachable through a `LeafStore`
     ///   honouring its contract, and named rather than assumed away because the
     ///   alternative is an `unwrap` on somebody else's invariant.
@@ -182,15 +184,17 @@ impl<S: LeafStore, K: InProcessSigner, P: AdmissionPolicy> Anchor<S, K, P> {
         let log = Log::open(store)?;
         let tree_size = log.tree().len();
         if tree_size == 0 {
-            return Err(AnchorError::NoGenesisLeaf {
+            return Err(AnchorError::Genesis(GenesisError::NoGenesisLeaf {
                 origin: log.origin().to_string(),
-            });
+            }));
         }
 
-        let leaf_zero = log.leaf_bytes(0).ok_or_else(|| AnchorError::NoSuchLeaf {
-            origin: log.origin().to_string(),
-            leaf_index: 0,
-            tree_size,
+        let leaf_zero = log.leaf_bytes(0).ok_or_else(|| {
+            AnchorError::Proof(ProofError::NoSuchLeaf {
+                origin: log.origin().to_string(),
+                leaf_index: 0,
+                tree_size,
+            })
         })?;
 
         // The origin comes from storage on this path exactly as it does on the

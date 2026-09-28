@@ -370,5 +370,5 @@ impl Delegation {
 }
 
 #[cfg(test)]
-#[path = "artifact_tests/mod.rs"]
+#[path = "artifact_tests.rs"]
 mod tests;

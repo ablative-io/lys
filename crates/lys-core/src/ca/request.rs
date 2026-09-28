@@ -402,5 +402,5 @@ fn single_common_name(
 }
 
 #[cfg(test)]
-#[path = "request_tests/mod.rs"]
+#[path = "request_tests.rs"]
 mod tests;

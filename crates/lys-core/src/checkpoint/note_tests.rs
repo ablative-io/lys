@@ -8,8 +8,11 @@ use super::*;
 use crate::error::TrustError;
 use crate::keys::Ed25519Identity;
 
+#[path = "note_tests/golden.rs"]
 mod golden;
+#[path = "note_tests/malformed.rs"]
 mod malformed;
+#[path = "note_tests/signature_lines.rs"]
 mod signature_lines;
 
 /// Fixed test seed: the 32 ASCII bytes `"lys-go-conformance-test-seed-01!"`.

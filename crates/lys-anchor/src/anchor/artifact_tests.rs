@@ -33,7 +33,7 @@
 //!   change to this workspace can move them. They were produced by `openssl
 //!   dgst -sha256` pipelines and independently reproduced with Python's
 //!   `hashlib`, which agreed — the provenance recorded alongside the same three
-//!   constants in `submit_tests/`, whose fixture bytes this file reuses
+//!   constants in `submit_tests.rs`, whose fixture bytes this file reuses
 //!   deliberately so the external computation is not re-derived here. They were
 //!   re-measured with `openssl` while this file was written, under a control
 //!   that was demonstrated to fire: the control digests each **non-empty**
@@ -68,7 +68,9 @@ use crate::keys::{FileSigner, Signer};
 
 use super::*;
 
+#[path = "artifact_tests/shape.rs"]
 mod shape;
+#[path = "artifact_tests/walk.rs"]
 mod walk;
 
 /// The origin this test supplies to the store. Verifiers are built from *this*
@@ -85,7 +87,7 @@ const INCLUSION_FORMAT: &str = "lys/log-inclusion-proof/v1";
 
 /// The genesis bytes for every anchor built here.
 ///
-/// Deliberately the same bytes `submit_tests/` uses, and named for the
+/// Deliberately the same bytes `submit_tests.rs` uses, and named for the
 /// increment that first computed their digests outside Rust: the golden
 /// constants below are values *of these bytes*, and changing the fixture would
 /// mean re-deriving them rather than reusing an external computation that has

@@ -355,5 +355,5 @@ fn check_signature(delegation: &Delegation) -> bool {
 // copies is precisely when such a caveat gets dropped as boilerplate.
 
 #[cfg(test)]
-#[path = "sign_tests/mod.rs"]
+#[path = "sign_tests.rs"]
 mod tests;

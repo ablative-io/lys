@@ -13,7 +13,9 @@ use ciborium::value::Value;
 
 use super::*;
 
+#[path = "encoding_tests/layout.rs"]
 mod layout;
+#[path = "encoding_tests/refusals.rs"]
 mod refusals;
 
 /// A fixed anchor key. Value is irrelevant to encoding; only its length is.

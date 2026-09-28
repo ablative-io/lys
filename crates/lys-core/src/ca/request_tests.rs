@@ -12,7 +12,9 @@ use crate::ca::{CertificateAuthority, verify_certificate_chain};
 use crate::error::TrustError;
 use crate::keys::Ed25519Identity;
 
+#[path = "request_tests/issuance.rs"]
 mod issuance;
+#[path = "request_tests/requests.rs"]
 mod requests;
 
 /// DER encoding of the Ed25519 algorithm OID 1.3.101.112, as it appears in

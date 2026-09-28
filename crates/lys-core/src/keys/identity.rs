@@ -414,5 +414,5 @@ pub(crate) fn is_usable_ed25519_public_key(bytes: &[u8; 32]) -> bool {
 }
 
 #[cfg(test)]
-#[path = "identity_tests/mod.rs"]
+#[path = "identity_tests.rs"]
 mod tests;

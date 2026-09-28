@@ -16,8 +16,11 @@ use crate::receipt::{sign_receipt, verify_receipt_bytes};
 use crate::tlog::{build_inclusion_artifact, verify_inclusion_artifact};
 use crate::{Ed25519Identity, TrustError};
 
+#[path = "verify_tests/chain.rs"]
 mod chain;
+#[path = "verify_tests/refusals.rs"]
 mod refusals;
+#[path = "verify_tests/wire.rs"]
 mod wire;
 
 // ------------------------------------------------------------------ fixtures

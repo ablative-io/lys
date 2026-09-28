@@ -133,7 +133,7 @@ fn an_uninterpreted_genesis_opens_under_open_and_is_refused_by_the_strict_open()
     // And the strict open is where it stops.
     assert!(matches!(
         open_strict(dir),
-        Err(AnchorError::GenesisNotADelegation { ref origin, .. }) if origin == ORIGIN
+        Err(AnchorError::Genesis(GenesisError::GenesisNotADelegation { ref origin, .. })) if origin == ORIGIN
     ));
 }
 
@@ -156,7 +156,9 @@ fn the_strict_open_refuses_a_genesis_delegation_from_a_root_key_the_caller_did_n
             AcceptAll,
             AnchorConfig::unconfigured(),
         ),
-        Err(AnchorError::GenesisNotADelegation { .. })
+        Err(AnchorError::Genesis(
+            GenesisError::GenesisNotADelegation { .. }
+        ))
     ));
 }
 
@@ -199,7 +201,7 @@ fn the_strict_open_refuses_a_genesis_delegation_issued_for_a_different_origin() 
             AcceptAll,
             AnchorConfig::unconfigured(),
         ),
-        Err(AnchorError::GenesisNotADelegation { ref origin, .. }) if origin == ORIGIN
+        Err(AnchorError::Genesis(GenesisError::GenesisNotADelegation { ref origin, .. })) if origin == ORIGIN
     ));
 }
 
@@ -237,7 +239,9 @@ fn the_strict_open_refuses_a_seat_delegation_whose_identifier_is_this_stores_ori
             AcceptAll,
             AnchorConfig::unconfigured(),
         ),
-        Err(AnchorError::GenesisNotADelegation { .. })
+        Err(AnchorError::Genesis(
+            GenesisError::GenesisNotADelegation { .. }
+        ))
     ));
 }
 
@@ -271,7 +275,7 @@ fn the_strict_open_refuses_a_genesis_that_delegates_the_operational_role_to_the_
             AcceptAll,
             AnchorConfig::unconfigured(),
         ),
-        Err(AnchorError::GenesisDelegatesToTheRootKey { ref origin }) if origin == ORIGIN
+        Err(AnchorError::Genesis(GenesisError::GenesisDelegatesToTheRootKey { ref origin })) if origin == ORIGIN
     ));
 }
 
@@ -307,7 +311,9 @@ fn the_strict_open_refuses_a_genesis_whose_sequence_is_not_the_genesis_sequence(
         // The value is asserted as well as the variant: a message reporting what
         // was expected rather than what was found would pass on the variant
         // alone.
-        Err(AnchorError::GenesisSequenceIsNotGenesis { sequence: 1, .. })
+        Err(AnchorError::Genesis(
+            GenesisError::GenesisSequenceIsNotGenesis { sequence: 1, .. }
+        ))
     ));
 }
 

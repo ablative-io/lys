@@ -456,5 +456,5 @@ pub(crate) fn artifact_bytes(
 }
 
 #[cfg(test)]
-#[path = "encoding_tests/mod.rs"]
+#[path = "encoding_tests.rs"]
 mod tests;

@@ -16,10 +16,15 @@ use crate::delegation::artifact::{DelegationRole, DelegationSubjectKind};
 use crate::merkle::tree::{AppendOnlyTree, RawLeaf};
 use crate::receipt;
 
+#[path = "sign_tests/envelope.rs"]
 mod envelope;
+#[path = "sign_tests/issuance.rs"]
 mod issuance;
+#[path = "sign_tests/sequence.rs"]
 mod sequence;
+#[path = "sign_tests/subject.rs"]
 mod subject;
+#[path = "sign_tests/uniform_failure.rs"]
 mod uniform_failure;
 
 /// The subject kind every case below expects unless it is testing the kind
