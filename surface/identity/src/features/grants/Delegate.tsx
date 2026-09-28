@@ -156,7 +156,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {onText(source)}</span></div>
         <div className="row"><span className="sec">Actions it allows</span><span className="mono">{source.actions.join(', ')}</span></div>
         <div className="row"><span className="sec">You may pass it on</span><span className="pass">{passText(source.pass_on)}</span></div>
-        <div className="row"><span className="sec">Ends no later than <span className="open-q">illustrative</span></span><span>{ends !== null ? day(ends) + ', when yours does' : 'when yours ends or is revoked'}</span></div>
+        <div className="row"><span className="sec">Ends no later than</span><span>{source.effective_ends_at !== null ? day(source.effective_ends_at) : 'no end'}</span></div>
       </div>
       <div className="card"><h2>What you can&apos;t give</h2><CannotGive w={w} source={source} /></div>
       {outcome.at === 'refused' ? (

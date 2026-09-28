@@ -295,6 +295,21 @@
           "cadence": "demand"
         }
       ]
+    },
+    {
+      "tree": "surface/identity",
+      "legs": [
+        {
+          "name": "surface",
+          "command": "npm cit",
+          "requires": [
+            "tool:node",
+            "tool:npm",
+            "lockfile:package-lock.json"
+          ],
+          "cadence": "round"
+        }
+      ]
     }
   ],
   "roots": {

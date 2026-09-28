@@ -4,7 +4,7 @@ import { keyable } from '../../shell/keyable';
 import { Gate } from '../signin/Gate';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
-import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, standing } from '../grants/model';
+import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { Pill } from '../people/Pill';
 
@@ -124,7 +124,7 @@ function Body({ w, mode, arg }: { w: GrantWorld; mode: string; arg?: string }) {
         <thead><tr><th>Grant</th><th>Holder</th><th>Relation</th><th>On</th><th>Derives from</th><th>May pass on</th><th>Lasts</th><th>Last used</th><th>Stands</th></tr></thead>
         <tbody>
           {w.list.grants.map((g) => {
-            const s = standing(w, g);
+            const v = voidOf(w, g);
             const up = g.source ? w.byId.get(g.source) : undefined;
             const open = () => navigate(`/file/${g.holder}/access`);
             return (
@@ -137,7 +137,7 @@ function Body({ w, mode, arg }: { w: GrantWorld; mode: string; arg?: string }) {
                 <td className="sec">{passText(g.pass_on)}</td>
                 <td className="sec">{lastsText(g)}</td>
                 <td className="sec">{g.last_use.seen ? lastUsedText(g) : <span className="dim">{lastUsedText(g)}</span>}</td>
-                <td>{s.ok ? <><span className="dot s-active" />yes</> : <span style={{ color: 'var(--danger)' }} title={s.why}>no</span>}</td>
+                <td>{v === null ? <><span className="dot s-active" />yes</> : <span style={{ color: 'var(--danger)' }} title={v.why}>no</span>}</td>
               </tr>
             );
           })}

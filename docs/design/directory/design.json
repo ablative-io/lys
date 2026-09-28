@@ -730,27 +730,7 @@
       "brief": "DIRECTORY-006"
     },
     {
-      "path": "surface/identity/src/features/grants/YouGrants.tsx",
-      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
-      "brief": "DIRECTORY-006"
-    },
-    {
-      "path": "surface/identity/src/features/grants/DelegateGrant.tsx",
-      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
-      "brief": "DIRECTORY-006"
-    },
-    {
-      "path": "surface/identity/src/features/grants/GrantExplanation.tsx",
-      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
-      "brief": "DIRECTORY-006"
-    },
-    {
       "path": "surface/identity/tests/grants.test.tsx",
-      "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
-      "brief": "DIRECTORY-006"
-    },
-    {
-      "path": "surface/identity/tests/acceptance/grants.spec.ts",
       "note": "Implement the You and delegation screens from the server contract; planned grant wall, reconcile dependency-owned integration files before dispatch",
       "brief": "DIRECTORY-006"
     },
@@ -843,11 +823,6 @@
       "path": "docs/design/identity/reports/DIRECTORY-007-receipts.md",
       "note": "the development-install proof: commands, exit codes, leaf indices, operation IDs, key fingerprints and counts; never a private key",
       "brief": "DIRECTORY-007"
-    },
-    {
-      "path": "crates/lys/Cargo.toml",
-      "note": "the CLI crate's manifest; gains the identity subcommand's dependencies and the test = false [[test]] entries of the identity targets",
-      "brief": "DIRECTORY-002"
     },
     {
       "path": ".land/gates.sh",
@@ -975,11 +950,6 @@
       "brief": "DIRECTORY-009"
     },
     {
-      "path": "crates/lys-identity-server/tests/sign_in_receipts.rs",
-      "note": "signin_ok, signin_refused, signin_first, signin_refused_reason",
-      "brief": "DIRECTORY-007"
-    },
-    {
       "path": "docs/design/directory/briefs/DIRECTORY-008.json",
       "note": "the grant brief residue after PR 6: DIRECTORY-005's verification line, three inventory rows and the intention sentence, as requirements on the documents",
       "brief": "DIRECTORY-008"
@@ -1090,36 +1060,6 @@
       "brief": "DIRECTORY-011"
     },
     {
-      "path": "docs/design/identity/LIFECYCLE-CONTRACT.md",
-      "note": "the lifecycle contract, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R1 adds its conformance section for rows 3.1 and 3.2",
-      "brief": "DIRECTORY-019"
-    },
-    {
-      "path": "crates/lys-identity/src/lifecycle/mod.rs",
-      "note": "the lifecycle module list, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds the responsible module",
-      "brief": "DIRECTORY-019"
-    },
-    {
-      "path": "crates/lys-identity/src/lifecycle/error.rs",
-      "note": "the lifecycle refusal names, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds lifecycle_agent_without_person",
-      "brief": "DIRECTORY-019"
-    },
-    {
-      "path": "crates/lys-identity/src/lifecycle/causes.rs",
-      "note": "who may cause each transition, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R2 adds one line calling the no-person check",
-      "brief": "DIRECTORY-019"
-    },
-    {
-      "path": "crates/lys-identity/tests/lifecycle_support/mod.rs",
-      "note": "the lifecycle test support, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 adds persons with agents to its fixtures",
-      "brief": "DIRECTORY-019"
-    },
-    {
-      "path": "crates/lys-identity-server/src/lifecycle_read.rs",
-      "note": "the typed lifecycle read, created by the lifecycle-hand brief DIRECTORY-009 (RM-017); DIRECTORY-019 R3 adds the needs_a_new_person field",
-      "brief": "DIRECTORY-019"
-    },
-    {
       "path": "crates/lys-identity/src/lifecycle/responsible.rs",
       "note": "the no-person refusal and the needs-a-new-person flag worked out on read (DIRECTORY-019 R2, R3)",
       "brief": "DIRECTORY-019"
@@ -1145,11 +1085,6 @@
       "brief": "DIRECTORY-019"
     },
     {
-      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
-      "note": "the Rauthy readiness leg brief",
-      "brief": "DIRECTORY-009"
-    },
-    {
       "path": "docs/design/project.json",
       "note": "the lys design project file; gains the rauthy-ready demand leg",
       "brief": "DIRECTORY-009"
@@ -1162,11 +1097,6 @@
     {
       "path": "crates/lys/tests/rauthy_ready_leg.rs",
       "note": "runs the rauthy-ready script against a stub runtime; counts refusals, cleanup and searched secrets",
-      "brief": "DIRECTORY-009"
-    },
-    {
-      "path": "docs/design/directory/briefs/DIRECTORY-009.json",
-      "note": "conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent",
       "brief": "DIRECTORY-009"
     },
     {
@@ -1237,11 +1167,6 @@
     {
       "path": "crates/lys-identity/tests/grant_cannot_give.rs",
       "note": "the cannot-give fixture, precedence, in-force, source-mark, service-account and no-rank cases",
-      "brief": "DIRECTORY-024"
-    },
-    {
-      "path": "crates/lys-identity-server/tests/grant_cannot_give.rs",
-      "note": "the cannot-give operation across routes, its wire values and its refusals",
       "brief": "DIRECTORY-024"
     },
     {
@@ -1407,11 +1332,6 @@
     {
       "path": "crates/lys-identity/Cargo.toml",
       "note": "the session module's dependencies (DIRECTORY-026 R5)",
-      "brief": "DIRECTORY-026"
-    },
-    {
-      "path": "crates/lys-identity-server/src/lib.rs",
-      "note": "declares the session routes module (DIRECTORY-026 R8)",
       "brief": "DIRECTORY-026"
     },
     {
@@ -1612,11 +1532,6 @@
     {
       "path": "crates/lys-identity-server/Cargo.toml",
       "note": "the server crate's manifest inside DIRECTORY-003's wall; DIRECTORY-025 adds the SpiceDB client dependencies (tonic, prost, protox)",
-      "brief": "DIRECTORY-003"
-    },
-    {
-      "path": "crates/lys-identity-server/src/lib.rs",
-      "note": "the server crate's root inside DIRECTORY-003's wall; DIRECTORY-025 declares the spicedb module",
       "brief": "DIRECTORY-003"
     },
     {
@@ -1955,16 +1870,6 @@
       "brief": "DIRECTORY-030"
     },
     {
-      "path": "docs/design/project.json",
-      "note": "the project's gate trees; gains the demand-cadence identity-release leg",
-      "brief": "DIRECTORY-030"
-    },
-    {
-      "path": "CLAUDE.md",
-      "note": "the repository's standing instructions; its gate list gains one line naming the identity-release demand leg",
-      "brief": "DIRECTORY-030"
-    },
-    {
       "path": "scripts/identity-gates/release.sh",
       "note": "the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg",
       "brief": "DIRECTORY-030"
@@ -2000,18 +1905,8 @@
       "brief": "DIRECTORY-031"
     },
     {
-      "path": "docs/design/WIRE-FORMATS.md",
-      "note": "the wire-format register; gains one line pointing at the capability-claim proposal and its PROPOSED decision-log row, which reads RATIFIED once the ratification is recorded on the card (R3), and both of its ratification sentences name the owning lead with a second reader; D1 to D6 and every other existing line unchanged",
-      "brief": "DIRECTORY-031"
-    },
-    {
       "path": "docs/PEN-REGISTRATION.md",
       "note": "the sub-arc register under 1.3.6.1.4.1.66364; its .2 row keeps .2 a family arc for agent-certificate extensions, names .2.1 for the typed capability claim lys/agent-capability/v1 and keeps the rest of its stated purpose; its status cell stays Reserved until the ratification is recorded and then reads In use (.2.1) (R3); the .1 and .3+ rows unchanged",
-      "brief": "DIRECTORY-031"
-    },
-    {
-      "path": "crates/lys-identity/Cargo.toml",
-      "note": "the directory crate's manifest; gains the capability claim's encoding dependency from the workspace lockfile",
       "brief": "DIRECTORY-031"
     },
     {
@@ -2070,11 +1965,6 @@
       "brief": "DIRECTORY-031"
     },
     {
-      "path": "crates/lys-identity-server/src/lib.rs",
-      "note": "the directory service's crate root; declares the issuer key, key enrolment, key replacement and issuance route modules",
-      "brief": "DIRECTORY-031"
-    },
-    {
       "path": "crates/lys-identity-server/src/issuer_key.rs",
       "note": "custody of the directory's issuer key: restricted private file, Zeroizing seed, redacted Debug",
       "brief": "DIRECTORY-031"
@@ -2122,11 +2012,6 @@
     {
       "path": "crates/lys-identity-server/tests/agent_key_replacement_route.rs",
       "note": "the replacement route's acceptance and counted refusals",
-      "brief": "DIRECTORY-031"
-    },
-    {
-      "path": "docs/design/directory/briefs/DIRECTORY-031.json",
-      "note": "row 6.4: issuance entered in the lys-log-store log, the issuer certificate command and the stranger's proof",
       "brief": "DIRECTORY-031"
     },
     {
@@ -2285,76 +2170,6 @@
       "brief": "DIRECTORY-034"
     },
     {
-      "path": "crates/lys-identity-server/src/grant_contract/views.rs",
-      "note": "the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end",
-      "brief": ""
-    },
-    {
-      "path": "crates/lys-identity/tests/grant_last_used.rs",
-      "note": "the last-used tests of conformance 8.4, named by their row under DIRECTORY-035",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/generated/grants.ts",
-      "note": "the grant wire types the screens compile against, mirroring views.rs; gains the two effective fields",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/grants/model.ts",
-      "note": "the grant screens' reading of the service's answers; loses the client standing walk",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/grants/GrantCard.tsx",
-      "note": "one grant with its chain, window, last use and standing (conformance 8.4)",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/grants/Delegate.tsx",
-      "note": "the delegation form (conformance 2.3): source grant, actions, may-pass-on and the end bound",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/me/You.tsx",
-      "note": "the You page: What you hold (conformance 1.4) and the personal scope of conformance 1.5",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/access/Access.tsx",
-      "note": "the access screens that list grants with their standing and last use",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/src/features/file/sections.tsx",
-      "note": "an identity file's sections that read which grants stand",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/tests/fixtures.ts",
-      "note": "the vitests' fixture service answers",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/tests/me.test.tsx",
-      "note": "the You vitests, carrying row 1.5's test",
-      "brief": ""
-    },
-    {
-      "path": "surface/identity/tests/revoke.test.tsx",
-      "note": "the Revoke vitests, carrying row 2.5's screen test",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/project.json",
-      "note": "the project's trees and legs; DIRECTORY-035 registers the surface leg",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/identity/CONFORMANCE.md",
-      "note": "the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4",
-      "brief": ""
-    },
-    {
       "path": "docs/design/directory/briefs/DIRECTORY-037.json",
       "note": "the identity surface shell brief: the route table, the two keyboard gaps closed in the shell and the mock-up, and the gate leg",
       "brief": "DIRECTORY-037"
@@ -2363,16 +2178,6 @@
       "path": "docs/design/directory/briefs/DIRECTORY-037.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-037"
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "the repository gate; DIRECTORY-037 adds the surface's test leg",
-      "brief": ""
-    },
-    {
-      "path": "docs/design/project.json",
-      "note": "the project setup the design's gate array copies; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test",
-      "brief": ""
     },
     {
       "path": "surface/identity/package.json",
@@ -2450,11 +2255,6 @@
       "brief": "DIRECTORY-037"
     },
     {
-      "path": "docs/design/identity/CONFORMANCE.md",
-      "note": "the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html",
-      "brief": ""
-    },
-    {
       "path": "docs/design/directory/briefs/DIRECTORY-038.json",
       "note": "conformance row 1.2: sign-in identities belong to people only, refused by name at every directory act that would give one to an agent",
       "brief": "DIRECTORY-038"
@@ -2465,53 +2265,8 @@
       "brief": "DIRECTORY-038"
     },
     {
-      "path": "crates/lys-identity/src/sign_in_identity.rs",
-      "note": "classifies an issuer-subject pair as a sign-in identity, an agent's own account, unbound or unreconciled, from the signed history",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity/src/sign_in_refusal.rs",
-      "note": "the sign-in identity refusal and its owner-and-administrator view and its view for anyone else",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity/tests/sign_in_classification.rs",
-      "note": "the four classes of an issuer-subject pair, through reopen",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity/tests/sign_in_refusal_views.rs",
-      "note": "the two views of the refusal, and the absence of provider and subject from the view for anyone else",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity/tests/sign_in_agent_binding.rs",
-      "note": "a person's provider account refused as an agent's binding, an agent's own machine account accepted",
-      "brief": "DIRECTORY-038"
-    },
-    {
       "path": "crates/lys-identity/src/bindings.rs",
       "note": "DIRECTORY-003 R1's binding module, reconciled against its reviewed manifest before dispatch: gains the refusal of a person's provider account as an agent's binding",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity-server/src/sign_in_link_check.rs",
-      "note": "the directory's side of the link path: a person's link of an account bound to an agent refused by name and recorded in the history, the agent withheld from the person linking",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity-server/tests/sign_in_link_check.rs",
-      "note": "the reverse-order refusal, its history entry naming the agent to the responsible person and the administrator and never to the person linking, the unbound answer and the two refused callers",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity/tests/grant_sign_in_identity.rs",
-      "note": "delegating from a sign-in identity refused for agent and person recipients; a service-access grant on the same account admitted",
-      "brief": "DIRECTORY-038"
-    },
-    {
-      "path": "crates/lys-identity-server/tests/grant_cannot_give.rs",
-      "note": "the reason 'sign-in identity' on the cannot-give list, and the two views at the grant seam",
       "brief": "DIRECTORY-038"
     },
     {
@@ -2527,11 +2282,6 @@
     {
       "path": "docs/design/directory/briefs/DIRECTORY-035.md",
       "note": "rendered markdown",
-      "brief": "DIRECTORY-035"
-    },
-    {
-      "path": "crates/lys-identity-server/src/grant_contract/views.rs",
-      "note": "the grant view the screens read; DIRECTORY-035 adds each grant's effective standing and effective end",
       "brief": "DIRECTORY-035"
     },
     {
@@ -2590,34 +2340,9 @@
       "brief": "DIRECTORY-035"
     },
     {
-      "path": "docs/design/project.json",
-      "note": "the project's trees and legs; DIRECTORY-035 registers the surface leg",
+      "path": "surface/identity/src/features/grants/Answer.tsx",
+      "note": "the answer to why an identity may act: its permitted path or the service's named refusal (DIRECTORY-006 R6's explanation, landed from hand/identity-surface-land)",
       "brief": "DIRECTORY-035"
-    },
-    {
-      "path": "docs/design/identity/CONFORMANCE.md",
-      "note": "the identity conformance table; DIRECTORY-035 amends the Brief cell of rows 1.4, 1.5, 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4",
-      "brief": "DIRECTORY-035"
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "the repository gate; DIRECTORY-037 adds the surface's test leg",
-      "brief": "DIRECTORY-037"
-    },
-    {
-      "path": "docs/design/project.json",
-      "note": "the project setup; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test",
-      "brief": "DIRECTORY-037"
-    },
-    {
-      "path": "docs/design/identity/CONFORMANCE.md",
-      "note": "the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html, with its sha256, as the reference and v5 as the prior",
-      "brief": "DIRECTORY-037"
-    },
-    {
-      "path": ".land/gates.sh",
-      "note": "the repository gate; DIRECTORY-037 adds the surface's test leg, surface_leg",
-      "brief": "DIRECTORY-037"
     },
     {
       "path": "docs/design/directory/briefs/DIRECTORY-039.json",
