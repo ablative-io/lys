@@ -31,5 +31,9 @@ thiserror.workspace = true
 tokio.workspace = true
 zeroize.workspace = true
 
+# The build stamp `--version` prints, computed in one shared crate.
+[build-dependencies]
+lys-build-stamp.workspace = true
+
 [lints]
 workspace = true

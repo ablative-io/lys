@@ -62,6 +62,12 @@ pub enum ErrorKind {
     VersionUnreadable,
     /// A new build did not start; the previous one was put back.
     UpgradeFailed,
+    /// `--back` was asked for and no build is kept to return to.
+    NothingToReturnTo,
+    /// The kept build does not know an event kind the data may hold.
+    BackWouldNotRead,
+    /// An earlier upgrade left its work unfinished.
+    UpgradeUnfinished,
 }
 
 impl ErrorKind {
@@ -93,6 +99,9 @@ impl ErrorKind {
             Self::BinaryMissing => "binary_missing",
             Self::VersionUnreadable => "version_unreadable",
             Self::UpgradeFailed => "upgrade_failed",
+            Self::NothingToReturnTo => "nothing_to_return_to",
+            Self::BackWouldNotRead => "back_would_not_read",
+            Self::UpgradeUnfinished => "upgrade_unfinished",
         }
     }
 }

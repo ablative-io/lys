@@ -1425,6 +1425,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "lys-build-stamp",
  "lys-core",
  "lys-log-store",
  "mio",
@@ -1469,6 +1470,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lys-build-stamp"
+version = "0.2.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "lys-core"
 version = "0.2.0"
 dependencies = [
@@ -1506,6 +1514,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "jiff",
+ "lys-build-stamp",
  "lys-core",
  "rand 0.9.5",
  "rustix",
@@ -1544,6 +1553,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "identity-contract",
+ "lys-build-stamp",
  "lys-core",
  "lys-home",
  "lys-identity",
@@ -1579,6 +1589,7 @@ version = "0.2.0"
 dependencies = [
  "axum",
  "clap",
+ "lys-build-stamp",
  "lys-core",
  "lys-identity",
  "lys-identity-server",

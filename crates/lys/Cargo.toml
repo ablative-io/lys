@@ -40,6 +40,10 @@ zeroize.workspace = true
 mio.workspace = true
 rustix.workspace = true
 
+# The build stamp `--version` prints, computed in one shared crate.
+[build-dependencies]
+lys-build-stamp.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 
