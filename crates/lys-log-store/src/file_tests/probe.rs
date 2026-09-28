@@ -37,16 +37,24 @@ fn open_counts_the_leaves_past_the_pin() {
 }
 
 #[test]
-fn open_refuses_a_pin_whose_last_leaf_is_gone() {
+fn a_pin_whose_last_leaf_is_gone_opens_to_the_leaves_that_are_there() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     store_with(&dir, 5, 5);
     std::fs::remove_file(leaf_path(&dir, 4)).unwrap();
+    let store = FileLeafStore::open(&dir).unwrap();
+    assert_eq!(store.extent(), 4, "the log refuses the pin, not the store");
+}
+
+#[test]
+fn a_pin_ahead_of_a_gap_is_refused_by_the_listing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    store_with(&dir, 5, 5);
+    std::fs::remove_file(leaf_path(&dir, 4)).unwrap();
+    std::fs::remove_file(leaf_path(&dir, 1)).unwrap();
     let err = FileLeafStore::open(&dir).unwrap_err();
-    assert!(
-        matches!(&err, StoreError::Corrupt { reason, .. } if reason.contains("leaf index 4")),
-        "{err}"
-    );
+    assert!(matches!(err, StoreError::Corrupt { .. }), "{err}");
 }
 
 #[test]

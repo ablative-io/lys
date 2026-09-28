@@ -185,22 +185,22 @@ pub(super) fn remove_file(path: &Path) -> std::io::Result<()> {
 /// does not cover.
 ///
 /// The pin is written after the leaves it covers are durable, so the leaf
-/// just below it must be a file, and the extent is the first index at or past
-/// the pin with no file. A name one past that is a gap and is refused. A leaf
-/// removed from below the pin is refused when it is read. Costs one lookup
-/// per unpinned leaf plus two, whatever the log's size.
+/// just below it is a file in a sound store, and the extent is the first index
+/// at or past the pin with no file. A name one past that is a gap and is
+/// refused. A leaf removed from below the pin is refused when it is read.
+/// Costs one lookup per unpinned leaf plus two, whatever the log's size.
+///
+/// When the leaf just below the pin is not a file, the pin is ahead of the
+/// leaves: the full listing is taken so that the log rebuilds what is there
+/// and refuses the pin as [`StoreError::PinMismatch`], the one name a pin ahead
+/// of its leaves carries.
 pub(super) fn probed_extent(dir: &Path, pinned: u64) -> StoreResult<u64> {
     let leaves_dir = dir.join("leaves");
     let named = |index: u64| leaves_dir.join(format!("{index:0LEAF_NAME_WIDTH$}"));
     if let Some(last_pinned) = pinned.checked_sub(1)
         && !named(last_pinned).is_file()
     {
-        return Err(StoreError::Corrupt {
-            path: dir.to_path_buf(),
-            reason: format!(
-                "the pin covers {pinned} leaves but leaf index {last_pinned} is not a file"
-            ),
-        });
+        return contiguous_extent(dir);
     }
     let mut extent = pinned;
     while named(extent).is_file() {
