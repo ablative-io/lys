@@ -7,7 +7,7 @@ import type { ProvisioningAnswer, ProvisioningProfile } from '../src/features/pr
 
 beforeEach(() => sessionStorage.clear());
 const path = '/agents/' + SCRIBE + '/provisioning';
-const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat(32), instructions: 'Check every receipt', note: 'Initial profile', model_access: ['model-one'], tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010' }], set_by: ADA, set_at: 1790000000 };
+const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat(32), instructions: 'Check every receipt', note: 'Initial profile', model_access: ['model-one'], tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010' }], set_by: ADA, set_at: 1790000000, reviewed_by: null, reviewed_at: null, self_reviewed: false };
 const answer: ProvisioningAnswer = { agent: SCRIBE, profile, versions: [{ version: 1, set_by: ADA, set_at: 1790000000, note: 'Initial profile' }], enforced: false };
 const routes = { ...SERVICE, [path]: ok(answer) };
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
@@ -79,5 +79,12 @@ describe('Agent provisioning', () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
     expect($('form[aria-label="Record provisioning profile"]')).toBeNull();
     expect(text()).toContain('Check every receipt');
+  });
+  it('reviews an unreviewed version under one operation and then shows who reviewed it', async () => {
+    const reviewed = { ...answer, recorded: { operation: 'op-' + 'c'.repeat(32), version: 1 }, profile: { ...profile, reviewed_by: ADA, reviewed_at: 1790000100, self_reviewed: true } };
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path + '/1/review']: ok(reviewed) });
+    expect(text()).toContain('Not reviewed');
+    await click(button('Review version 1'));
+    expect(posted).toEqual([{ path: path + '/1/review', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
   });
 });
