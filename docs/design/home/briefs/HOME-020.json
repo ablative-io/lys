@@ -60,7 +60,73 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/io_counts.rs",
+            "change": "created",
+            "note": "IoCounts (public Copy value, entries_read and syncs), the crate-private IoCounter of two atomics, SyncCount (an atomic count whose clone copies the value), and Session::io_counts()"
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "declares io_counts (pub), call_map, reads, staged and staged_tests, and re-exports IoCounts; no fn added"
+          },
+          {
+            "path": "crates/lys-home/src/record/session.rs",
+            "change": "modified",
+            "note": "Session gains the io, calls and staged fields. create counts its file sync, its directory sync and its head's two syncs. open counts through Index::load_counted and write_head_counted. entries() counts what it reads"
+          },
+          {
+            "path": "crates/lys-home/src/record/index.rs",
+            "change": "modified",
+            "note": "load_counted, write_all and append take the counter and count each sync_all and directory sync"
+          },
+          {
+            "path": "crates/lys-home/src/record/index/head.rs",
+            "change": "modified",
+            "note": "write_head keeps its signature and delegates to write_head_counted, which counts the head file sync and the directory sync; place_head writes without the directory sync"
+          },
+          {
+            "path": "crates/lys-home/src/record/helpers.rs",
+            "change": "modified",
+            "note": "write_durable counts its sync of the session file"
+          },
+          {
+            "path": "crates/lys-home/src/record/blocks.rs",
+            "change": "modified",
+            "note": "BlockStore holds a SyncCount and exposes syncs(); put and put_file count each block-file sync_all and each directory sync, with nothing else changed"
+          },
+          {
+            "path": "crates/lys-home/src/record/fork.rs",
+            "change": "modified",
+            "note": "append_copied goes through the same counted write_line, record_row and persist_head steps, with the same failure handling, and updates the call map"
+          },
+          {
+            "path": "crates/lys-home/src/record/record_tests.rs",
+            "change": "modified",
+            "note": "adds a_session_counts_the_entries_it_reads_and_the_syncs_its_writes_make (lines appended; original use lines kept)"
+          }
+        ],
+        "how": "Row 1 (create reports {0,4}): session.rs create counts f.sync_all, the sessions-directory sync and write_head_counted's two syncs; record_tests.rs a_session_counts_the_entries_it_reads_and_the_syncs_its_writes_make asserts IoCounts { entries_read: 0, syncs: 4 }. Row 2 (16 after three appends): each append counts write_durable (helpers.rs), Index::append (index.rs) and write_head_counted (head.rs), 4 syncs each; asserted in the same test. Row 3 (path gives 3, then entry gives 4): reads.rs path and entry call io.read(entries.len()); asserted. Row 4 (open reports {0,0}): Session::open counts only a rebuild, a head write or a remainder removal, none of which happen with a current index and head; asserted with IoCounts::default(). Row 5 (BlockStore 0, 4, 4): blocks.rs counts in put and put_file; a put of held bytes returns before any write; asserted in the same test. The counts are atomics held by the owning value; there is no process-wide count, no clock, and no change to what is written or synced; SessionReader is untouched. Nothing was run; the workflow measures these.",
+        "deviation": "Session now lives in record/session.rs (HOME-013 landed), so its new fields and calls went there, not into record/mod.rs; mod.rs gained only module lines and one re-export. index/head.rs, helpers.rs and fork.rs are modified though R1 does not list them, because the syncs the session's own writes make happen in those functions (the copied-line append in fork.rs is one of the session's own writes). record_tests.rs now has 544 non-blank, non-comment lines: CLAUDE.md exempts test files from the 500-line rule, but it is over 500.",
+        "checklist": [
+          {
+            "id": "C46",
+            "done": true,
+            "note": "Session::io_counts() and BlockStore::syncs(); asserted in record_tests.rs; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The bounds are proved by counters (R1, R2, R4) and the record by a masked hash (R9); no timing anywhere"
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -92,7 +158,58 @@
       "stories": [
         "S24",
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/call_map.rs",
+            "change": "created",
+            "note": "Session::call_entry builds, on the first lookup, a map from call id to the first lys.call entry in file order and answers from it; note_call adds an appended call id unless already held; forget_calls drops the map"
+          },
+          {
+            "path": "crates/lys-home/src/record/call.rs",
+            "change": "modified",
+            "note": "find_call keeps its signature and answers through session.call_entry; all three ingest paths already look up through find_call"
+          },
+          {
+            "path": "crates/lys-home/src/record/session.rs",
+            "change": "modified",
+            "note": "calls: Mutex<Option<HashMap<String, String>>> field; append_line calls note_call; reconcile calls forget_calls"
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "mod call_map"
+          },
+          {
+            "path": "crates/lys-home/src/record/call_tests.rs",
+            "change": "modified",
+            "note": "adds the reopen, beside and Send + Sync tests; the original use lines are kept and IngestReport, Session and BlockStore are imported on new lines"
+          }
+        ],
+        "how": "Row 1 (reopen, then c100 reads exactly 100): call_map.rs build_calls reads the index's lys.call rows once and counts them. call_tests.rs a_reopened_session_reads_each_call_once_and_no_call_on_any_later_ingest asserts entries_read - before == 100. Row 2 (ten further ingests read nothing): the same test asserts entries_read is unchanged after c101 to c105 and after the repeats of c000 and c001 through ingest_call, c002 and c003 through ingest_call_files, and c004 through ingest_outcome (Lost). Row 3 (each repeat returns the first entry id and the file length is unchanged): each repeat asserts already_recorded and the id collected at first ingest, and the final file length equals the length before the repeats. Row 4 (a call appended beside the head is found): a_call_appended_beside_the_head_is_found_through_a_built_map; append_line calls note_call for every append path, append_beside included. Row 5: the seven existing tests are untouched. Row 6 (Send + Sync): call_tests.rs has fn shared<T: Send + Sync>() {} and a_session_is_send_and_sync calls shared::<Session>(); it uses nothing new, so it also compiles at the parent. Row 7 (no Cell or Rc): grep -cE 'Cell<|\\bRc<' on call_map.rs, mod.rs and io_counts.rs prints :0 for each (checked).",
+        "deviation": "The calls field went into record/session.rs, where Session now lives, not record/mod.rs. The copied-line append in fork.rs also calls note_call, so a lys.call line copied into a session whose map is built is found.",
+        "checklist": [
+          {
+            "id": "C45",
+            "done": true,
+            "note": "The map is built once per open, updated on every append, dropped by reconcile; tested; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": true,
+            "note": "record/mod.rs holds only docs, mod lines and re-exports; the map is in call_map.rs"
+          },
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The ingest bound is proved by entries_read"
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -122,7 +239,58 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/reads.rs",
+            "change": "created",
+            "note": "entry, path, context_path, customs and customs_everywhere as an impl of Session, with the same names, receivers and return types, each counting what it reads; context_path moves entries out of the path it read; customs reads only the path's rows of the asked custom type, root first"
+          },
+          {
+            "path": "crates/lys-home/src/record/session.rs",
+            "change": "modified",
+            "note": "the five reads are removed; context_positions stays"
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "mod reads"
+          },
+          {
+            "path": "crates/lys-home/src/harness/claude_code/render.rs",
+            "change": "modified",
+            "note": "the assistant arm iterates the content array as a slice (map(Vec::as_slice)), cloning a part only where the output holds it; the toolResult arm is unchanged"
+          },
+          {
+            "path": "crates/lys-home/src/harness/claude_code/import/content.rs",
+            "change": "modified",
+            "note": "assistant_content iterates the message's content array by reference; a string body is wrapped in a one-element array held locally"
+          },
+          {
+            "path": "crates/lys-home/src/record/record_tests.rs",
+            "change": "modified",
+            "note": "adds the customs test and the context-path test"
+          }
+        ],
+        "how": "Row 1 (customs gives both lys.authored entries root first and reads exactly 2): record_tests.rs customs_reads_only_the_custom_entries_of_the_path_root_first; reads.rs customs filters ancestry rows by row.custom before reading. Row 2 (context path is [e5, e3, e4, e6]): the_context_path_after_a_compaction_is_it_then_the_kept_entries_then_the_rest. Row 3: sed -n '/pub fn context_path/,/^    }/p' reads.rs | grep -c clone prints 0 (checked); positions are taken out of a Vec<Option<Entry>>. Row 4: assistant_content lives in harness/claude_code/import/content.rs, and it has no a.clone(); the grep over import.rs also prints 0. Row 5: the render output is byte-for-byte the same, since the same parts are emitted in the same order; render_tests and claude_code_round_trip are unchanged.",
+        "deviation": "assistant_content is in harness/claude_code/import/content.rs (moved there by an earlier commit), so that file was changed rather than import.rs.",
+        "checklist": [
+          {
+            "id": "C52",
+            "done": true,
+            "note": "No Entry clone in context_path; customs reads only matching rows; both content loops iterate by reference; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": true,
+            "note": "The reads are in reads.rs; mod.rs holds only declarations and re-exports"
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -158,7 +326,73 @@
       "stories": [
         "S25",
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/staged.rs",
+            "change": "created",
+            "note": "Home::stage_session and Session::stage (take the lock, refuse Exists, clear the remainder, write the header to <id>.jsonl.importing); Session::publish (stage-file sync, index placed, head placed, directory sync, rename, directory sync = 5); the write_line, record_row and persist_head steps that pick staged or per-append durability; refuse_staged; clear_remainder; staging_path"
+          },
+          {
+            "path": "crates/lys-home/src/record/staged_tests.rs",
+            "change": "created",
+            "note": "five syncs for the fixture and for 300 records, block syncs equal 2 × blocks_new (printed), a dropped import then a re-import, an open removing a remainder, and the report's file path"
+          },
+          {
+            "path": "crates/lys-home/src/record/session.rs",
+            "change": "modified",
+            "note": "append_line, append_entry and move_head go through write_line, record_row and persist_head; open clears the remainder after taking the lock; reconcile refuses a stale staged session"
+          },
+          {
+            "path": "crates/lys-home/src/record/index.rs",
+            "change": "modified",
+            "note": "place_all (the index written whole through a temporary file, synced, no directory sync), push_row pub(crate); the layout is unchanged"
+          },
+          {
+            "path": "crates/lys-home/src/record/mod.rs",
+            "change": "modified",
+            "note": "mod staged and mod staged_tests"
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "the import command stages its session, imports into it and publishes it"
+          },
+          {
+            "path": "docs/design/home/RECORD.md",
+            "change": "modified",
+            "note": "the staged-import durability rule (ADR-108) beside the per-append order"
+          }
+        ],
+        "how": "Row 1 (fixture gives syncs 5 and block syncs = 2 × blocks_new, both printed): staged_tests.rs the_fixture_publishes_with_five_syncs_and_two_store_syncs_per_new_block. Row 2 (300 records give 5): three_hundred_records_publish_with_five_syncs writes 150 user and 150 assistant records in one chain. Row 3 (dropped before publish, then re-imported): an_import_dropped_before_publish_leaves_no_session_and_the_next_import_removes_it checks .jsonl absent, .importing present, the id not listed, then runs the Import command and checks Ok, no .importing, and that Session::open's len equals report.entries. Row 4 (open of an absent session removes the three files and returns Io): an_open_of_an_absent_session_removes_the_staging_file_index_and_head. Row 5 (report names sessions/multi.jsonl): the_import_command_reports_the_published_file. Row 6: import_claude_code itself is unchanged; a session made by create or open is not staged, so its durability is the same. Row 7: grep -q 'jsonl.importing' RECORD.md prints stated (checked).",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C47",
+            "done": true,
+            "note": "Staged build and a five-sync publish; a crash before the rename leaves no .jsonl; the next import or open removes the remainder; tested; not run here"
+          },
+          {
+            "id": "C48",
+            "done": true,
+            "note": "RECORD.md states the rule beside the per-append order"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S25",
+            "satisfied": true,
+            "note": "Every public path is unchanged; existing tests only gained lines (the removed-line diff check prints nothing)"
+          },
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The five-sync bound is proved by the counters"
+          }
+        ]
+      }
     },
     {
       "id": "R5",
@@ -181,7 +415,43 @@
       ],
       "stories": [
         "S24"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/cli/resume.rs",
+            "change": "modified",
+            "note": "id_counts counts each transcript's tool_use ids in one pass; repeated is the sum over the rendered ids of the fork's count less the rendered count, floored at 0; resume_check is pub"
+          },
+          {
+            "path": "crates/lys-home/src/cli.rs",
+            "change": "modified",
+            "note": "pub use resume::{ResumeReport, resume_check}"
+          },
+          {
+            "path": "crates/lys-home/tests/claude_code_round_trip.rs",
+            "change": "modified",
+            "note": "adds tool_calls and resume_check_counts_each_transcripts_tool_use_ids_once_and_reports_the_same_values; the original use line is kept"
+          }
+        ],
+        "how": "Row 1: resume_check_refuses_a_fork_that_repeats_a_tool_action is unchanged and the values are the same (a HashMap count and a floored subtraction). Row 2: the new test runs the ResumeCheck command, which returns RepeatedToolActions { count: 2 }, and then calls resume_check on the same files, getting ResumeReport {2, 4, 2, 2, 3}.",
+        "deviation": "resume_check was pub(crate) in a private module and is now public, re-exported from lys_home::cli. The ResumeCheck command returns an error whenever repeated_tool_use_ids is not zero, so the five values the brief names can't be read through the command; the test asserts the command's count of 2 and reads the full report from resume_check.",
+        "checklist": [
+          {
+            "id": "C49",
+            "done": true,
+            "note": "One pass per transcript; same values; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": true,
+            "note": "No record/mod.rs change for this requirement"
+          }
+        ]
+      }
     },
     {
       "id": "R6",
@@ -212,7 +482,48 @@
       "stories": [
         "S24",
         "S26"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/index.rs",
+            "change": "modified",
+            "note": "from_cached<R: Read + Seek> returns Result<Option<Index>>: it checks every row in memory (offset, non-zero len, no overflow, new id, known parent) and the end, then seeks to and reads the last byte of rows 0, n/2 and n-1, each distinct position once in ascending order. UnexpectedEof means stale; any other seek or read error is HomeError::Io. read and cached_only open one BufReader over the session file. read_rows is pub(crate). No .ok()? remains"
+          },
+          {
+            "path": "crates/lys-home/src/record/record_tests.rs",
+            "change": "modified",
+            "note": "adds Probe (records seeks, fails reads or seeks on demand), probed, the seek-position test and the error test"
+          },
+          {
+            "path": "crates/lys-home/tests/cached_index.rs",
+            "change": "modified",
+            "note": "adds a_last_row_one_byte_short_of_its_line_is_rebuilt_from_the_file"
+          }
+        ],
+        "how": "Rows 1 and 2 (seeks for 10, 1 and 2 entries): record_tests.rs an_open_from_the_cache_reads_the_last_byte_of_the_first_middle_and_last_rows_only asserts the seeks are exactly the last-byte offsets of rows [0,5,9], [0] and [0,1], and that 10 rows come back. Rows 3 to 5 (Other gives Io, PermissionDenied on seek gives Io, UnexpectedEof gives Ok(None)): a_failed_read_or_seek_is_that_error_and_an_early_end_is_a_stale_cache. Row 6: the four cached_index tests are unchanged, and the in-memory checks plus the row-0 byte catch the self-parent, unknown-parent and shifted cases. Row 7: the new cached_index test shortens the last row, so the end no longer matches the file and the index is rebuilt with a path of 10. Row 8: grep -n 'ok()?' index.rs prints nothing (checked). Session, Session::entry and Session::path signatures are unchanged, and this requirement adds no Session field.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C51",
+            "done": true,
+            "note": "Every row checked in memory, at most three one-byte reads, real I/O errors returned; tested; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S24",
+            "satisfied": true,
+            "note": "The check is in index.rs; mod.rs is untouched"
+          },
+          {
+            "id": "S26",
+            "satisfied": true,
+            "note": "A failing disk surfaces as HomeError::Io from Index::read, and so from Session::open and SessionReader::open, and is never rebuilt"
+          }
+        ]
+      }
     },
     {
       "id": "R7",
@@ -237,7 +548,38 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/canon.rs",
+            "change": "modified",
+            "note": "Canon has a private ids: HashSet<String>, the set load builds; Canon::contains; append_example refuses a repeat by canon.contains, never by walking the loaded entries"
+          },
+          {
+            "path": "crates/lys-home/src/record/canon_tests.rs",
+            "change": "modified",
+            "note": "adds the_canon_keeps_its_ids_and_a_repeated_id_is_refused_by_them_with_no_byte_written"
+          }
+        ],
+        "how": "Row 1: grep -n 'entries.iter().any' canon.rs prints nothing (checked). Rows 2 and 3: the new test loads a canon of three entries, checks contains is true for each id and false for 'absent', then adds an example repeating ids[0] and gets DuplicateEntry { session: \"canon\", id: ids[0] } with the canon file's bytes unchanged. Row 4: the existing four tests are unchanged. load's refusals and the canon's public fields are the same.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C50",
+            "done": true,
+            "note": "The id set is kept from load and repeats are refused by it; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The refusal is proved by an unchanged file hash-equivalent (bytes equal)"
+          }
+        ]
+      }
     },
     {
       "id": "R8",
@@ -263,7 +605,43 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/cli/fewshot.rs",
+            "change": "modified",
+            "note": "uuid_shaped is removed; random_uuid draws 16 random bytes, sets byte 6 to (b & 0x0f) | 0x40 and byte 8 to (b & 0x0f) | 0x80, and formats them with render::uuid_string"
+          },
+          {
+            "path": "crates/lys-home/src/harness/claude_code/render.rs",
+            "change": "modified",
+            "note": "uuid_string is unchanged and is the only 8-4-4-4-12 formatter (the only render.rs change is R3's)"
+          },
+          {
+            "path": "crates/lys-home/tests/claude_code_round_trip.rs",
+            "change": "modified",
+            "note": "adds version_four and every_fewshot_uuid_and_session_id_is_version_four_variant_eight"
+          }
+        ],
+        "how": "Row 1: grep -n 'fn uuid_shaped' prints nothing (it lived in cli/fewshot.rs and is gone). Row 2: grep -rn '\"{}-{}-' over src/*.rs outside *_tests.rs prints exactly one line, render.rs:327 (checked). Row 3: the new test runs Fewshot over six turns and checks every uuid and sessionId is 36 characters, with dashes at 8, 13, 18 and 23, '4' at 14, '8' at 19, and 32 lowercase hex digits. Row 4: uuid_string and the pinned render hash are untouched.",
+        "deviation": "The uuid formatter was in cli/fewshot.rs, not cli.rs, so that file was changed.",
+        "checklist": [
+          {
+            "id": "C53",
+            "done": true,
+            "note": "One formatter; version and variant nibbles set; render hashes untouched; not run here"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The pinned render hash in claude_code_round_trip.rs and PROOF-RESUME.md is unchanged"
+          }
+        ]
+      }
     },
     {
       "id": "R9",
@@ -288,7 +666,33 @@
       ],
       "stories": [
         "S27"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/tests/import_bytes.rs",
+            "change": "created",
+            "note": "imports the multi_result fixture through cli::run(Command::Import), masks the header timestamp to T and each maximal run of exactly 32 lowercase hex digits to #n by first appearance, and asserts SHA-256 b99cb81a1e46f881b9228cb449347f59dc428560b955b3513816f91313e699dd; also tests the mask on the brief's sample, on a 64-hex hash and a hyphenated uuid, and across two imports"
+          }
+        ],
+        "how": "Row 1 (passes at head): the staged import writes the same lines as before, so the masked hash should match. Row 2 (passes at the parent): the file uses only cli::{Cli, Command, run}, which exist at the parent. The pinned value was derived by rebuilding every line the parent's importer writes for the fixture, working from its source (serde_json without preserve_order, so object keys are sorted; the Entry flatten order; usage, stopReason, the toolResult split and the tool_completed events), then applying a direct Python port of the Rust mask. It was not measured by running the test, which the brief forbids. Row 3: the_mask_numbers_each_fresh_id_by_its_first_appearance asserts the brief's example gives {\"id\":\"#0\",\"parentId\":\"#0\",\"x\":\"#1\"} (the Python port gave the same). Row 4: the_mask_leaves_a_block_hash_and_a_hyphenated_uuid_unchanged. Row 5: two_imports_differ_in_their_raw_bytes_and_agree_once_masked.",
+        "deviation": "The pin is a derived value, not a measured one: nothing may be run in this stage. If the rebuilt output differs from the real importer, this test fails at both commits and the pin needs the measured value.",
+        "checklist": [
+          {
+            "id": "C54",
+            "done": true,
+            "note": "The masked hash is pinned; the value comes from a Python rebuild of the importer's output, and the workflow's run at the parent is the real check"
+          }
+        ],
+        "stories": [
+          {
+            "id": "S27",
+            "satisfied": true,
+            "note": "The unchanged record is proved by a masked hash pinned against the parent"
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

@@ -60,12 +60,16 @@ pub(super) fn assistant_content(
     report: &mut ImportReport,
 ) -> Result<Vec<Value>, HomeError> {
     let mut out = Vec::new();
-    let parts: Vec<Value> = match message.get("content") {
-        Some(Value::Array(a)) => a.clone(),
-        Some(Value::String(s)) => vec![json!({"type": "text", "text": s})],
-        _ => Vec::new(),
+    let text;
+    let parts: &[Value] = match message.get("content") {
+        Some(Value::Array(a)) => a,
+        Some(Value::String(s)) => {
+            text = [json!({"type": "text", "text": s})];
+            &text
+        }
+        _ => &[],
     };
-    for part in &parts {
+    for part in parts {
         store_part(part, blocks, report)?;
         let kind = part.get("type").and_then(Value::as_str).unwrap_or("");
         let mapped = match kind {

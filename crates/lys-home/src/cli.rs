@@ -13,7 +13,7 @@ mod fewshot;
 pub mod given;
 mod resume;
 
-pub use resume::ResumeReport;
+pub use resume::{ResumeReport, resume_check};
 
 use std::path::PathBuf;
 
@@ -261,8 +261,9 @@ fn report(command: Command) -> Result<Value, HomeError> {
         } => {
             let home = Home::open(home)?;
             let blocks = home.blocks()?;
-            let mut s = home.create_session(&session, "", None)?;
+            let mut s = home.stage_session(&session, "")?;
             let report = import_claude_code(&claude_code, &mut s, &blocks)?;
+            s.publish()?;
             Ok(json!({"command": "import", "session": session, "file": s.file(), "report": report}))
         }
         Command::Render {

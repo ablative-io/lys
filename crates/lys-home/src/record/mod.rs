@@ -27,6 +27,7 @@ pub mod blocks;
 #[cfg(test)]
 mod blocks_tests;
 pub mod call;
+mod call_map;
 #[cfg(test)]
 mod call_tests;
 pub mod canon;
@@ -57,6 +58,7 @@ mod helpers;
 pub mod hold;
 mod home;
 pub mod index;
+pub mod io_counts;
 pub mod lantern;
 #[cfg(test)]
 mod lantern_tests;
@@ -66,12 +68,16 @@ mod lock_tests;
 pub mod reader;
 #[cfg(test)]
 pub(crate) mod reader_tests;
+mod reads;
 pub mod recall;
 #[cfg(test)]
 mod recall_tests;
 #[cfg(test)]
 mod record_tests;
 mod session;
+mod staged;
+#[cfg(test)]
+mod staged_tests;
 pub mod templates;
 #[cfg(test)]
 mod templates_tests;
@@ -84,4 +90,5 @@ mod verify_tests;
 
 pub use helpers::{MAX_NAME_BYTES, PI_FORMAT_VERSION, fresh_id, json_len, now, safe_component};
 pub use home::Home;
+pub use io_counts::IoCounts;
 pub use session::Session;

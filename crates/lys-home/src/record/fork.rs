@@ -32,8 +32,8 @@ use crate::error::HomeError;
 use crate::record::entries::{CUSTOM_FORK, CUSTOM_FORKED_FROM, Entry, EntryBody};
 use crate::record::fork_cut::{Cut, resolve_and_cut};
 use crate::record::fork_report::{ForkReport, candidate_hashes, count_held};
-use crate::record::helpers::{custom_type_of, write_durable};
-use crate::record::index::{Index, IndexRow, write_head};
+use crate::record::helpers::custom_type_of;
+use crate::record::index::{Index, IndexRow};
 use crate::record::lantern::own;
 use crate::record::{Home, Session, fresh_id};
 
@@ -194,23 +194,16 @@ impl Session {
             reason: e.to_string(),
         })?;
         let offset = self.index.end();
-        if let Err(e) = write_durable(&self.file, text) {
-            self.stale = true;
-            self.reconcile()?;
-            return Err(e);
-        }
-        if let Err(e) = self.index.append(IndexRow {
+        self.write_line(text)?;
+        self.record_row(IndexRow {
             id: entry.id().to_owned(),
             parent: entry.parent_id().map(str::to_owned),
             offset,
             len: line.len() as u64,
             custom: custom_type_of(entry),
-        }) {
-            self.stale = true;
-            self.reconcile()?;
-            drop(e);
-        }
-        if let Err(e) = write_head(&self.file, Some(entry.id())) {
+        })?;
+        self.note_call(entry);
+        if let Err(e) = self.persist_head(Some(entry.id())) {
             self.stale = true;
             self.reconcile()?;
             return Err(e);

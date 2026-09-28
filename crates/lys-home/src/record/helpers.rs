@@ -10,6 +10,7 @@ use serde_json::Value;
 use crate::error::HomeError;
 use crate::record::blocks;
 use crate::record::entries::{Entry, EntryBody};
+use crate::record::io_counts::IoCounter;
 
 /// The most bytes a session or block name may have.
 pub const MAX_NAME_BYTES: usize = 200;
@@ -38,8 +39,8 @@ pub fn safe_component(what: &'static str, name: &str) -> Result<(), HomeError> {
 /// The version of Pi's file format this crate writes: the tree format.
 pub const PI_FORMAT_VERSION: u32 = 2;
 
-/// Append a line to the session file and sync it.
-pub(super) fn write_durable(file: &Path, line: &str) -> Result<(), HomeError> {
+/// Append a line to the session file and sync it, counting the sync.
+pub(super) fn write_durable(file: &Path, line: &str, counts: &IoCounter) -> Result<(), HomeError> {
     let mut f = std::fs::OpenOptions::new()
         .append(true)
         .open(file)
@@ -47,7 +48,9 @@ pub(super) fn write_durable(file: &Path, line: &str) -> Result<(), HomeError> {
     f.write_all(line.as_bytes())
         .map_err(|e| HomeError::io("appending an entry", file, e))?;
     f.sync_all()
-        .map_err(|e| HomeError::io("syncing the session file", file, e))
+        .map_err(|e| HomeError::io("syncing the session file", file, e))?;
+    counts.synced();
+    Ok(())
 }
 
 pub(super) fn custom_type_of(entry: &Entry) -> Option<String> {

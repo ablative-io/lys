@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use lys_home::cli::ResumeReport;
+use lys_home::cli::resume_check;
 use lys_home::cli::{Cli, Command, run};
 use lys_home::harness::claude_code::import::import_claude_code;
 use lys_home::harness::claude_code::render::{RenderTarget, render_claude_code};
@@ -409,5 +411,97 @@ fn the_fixture_rendered_through_run_hashes_to_the_constant_pinned_here_and_in_pr
         1,
         "PROOF-RESUME.md records the pinned constant once"
     );
+    dir.close().unwrap();
+}
+
+/// An assistant record whose parts are `tool_use` calls with these ids.
+fn tool_calls(uuid: &str, parent: Option<&str>, ids: &[&str]) -> Value {
+    let parts: Vec<Value> = ids
+        .iter()
+        .map(|id| json!({"type": "tool_use", "id": id, "name": "Read", "input": {}}))
+        .collect();
+    let message = assistant("claude-opus-5-5", "msg", &json!(parts), "tool_use");
+    rec(uuid, parent, "assistant", &message)
+}
+
+#[test]
+fn resume_check_counts_each_transcripts_tool_use_ids_once_and_reports_the_same_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let rendered = vec![
+        tool_calls(U[0], None, &["a", "b"]),
+        tool_calls(U[1], Some(U[0]), &["a"]),
+    ];
+    let mut forked = rendered.clone();
+    forked.push(tool_calls(U[2], Some(U[1]), &["a", "b"]));
+    forked.push(tool_calls(U[3], Some(U[2]), &["c"]));
+    let rendered_file = dir.path().join("rendered.jsonl");
+    let forked_file = dir.path().join("forked.jsonl");
+    write_jsonl(&rendered_file, &rendered);
+    write_jsonl(&forked_file, &forked);
+    let err = run(Cli {
+        command: Command::ResumeCheck {
+            rendered: rendered_file.clone(),
+            forked: forked_file.clone(),
+        },
+    })
+    .unwrap_err();
+    assert!(
+        matches!(err, HomeError::RepeatedToolActions { count: 2 }),
+        "{err}"
+    );
+    let report = resume_check(&rendered_file, &forked_file).unwrap();
+    assert_eq!(
+        report,
+        ResumeReport {
+            rendered_records: 2,
+            forked_records: 4,
+            forked_new_records: 2,
+            repeated_tool_use_ids: 2,
+            new_tool_uses: 3,
+        }
+    );
+    dir.close().unwrap();
+}
+
+/// Whether an id is 36 characters with `-` at 8, 13, 18 and 23, `4` at 14,
+/// `8` at 19, and 32 lowercase hex digits once the dashes are removed.
+fn version_four(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    let hex: String = id.chars().filter(|c| *c != '-').collect();
+    id.len() == 36
+        && [8, 13, 18, 23].iter().all(|&i| bytes[i] == b'-')
+        && bytes[14] == b'4'
+        && bytes[19] == b'8'
+        && hex.len() == 32
+        && hex.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f'))
+}
+
+#[test]
+fn every_fewshot_uuid_and_session_id_is_version_four_variant_eight() {
+    let dir = tempfile::tempdir().unwrap();
+    let turns = dir.path().join("turns.txt");
+    std::fs::write(
+        &turns,
+        "user: one\nassistant: two\nuser: three\nassistant: four\nuser: five\nassistant: six\n",
+    )
+    .unwrap();
+    let out = dir.path().join("fewshot.jsonl");
+    let report = run(Cli {
+        command: Command::Fewshot {
+            out: out.clone(),
+            turns,
+            cwd: "/authored".into(),
+        },
+    })
+    .unwrap();
+    assert_eq!(report["records"], 6);
+    let records = read_jsonl(&out);
+    assert_eq!(records.len(), 6);
+    for record in &records {
+        for key in ["uuid", "sessionId"] {
+            let id = record[key].as_str().unwrap();
+            assert!(version_four(id), "{key} {id}");
+        }
+    }
     dir.close().unwrap();
 }
