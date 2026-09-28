@@ -6,13 +6,18 @@
 //! the child holds it, so the runner reads the end of output when the child
 //! and everything it started have closed the terminal. A process is ended
 //! with its whole process group, through `rustix`'s safe signal call.
+//!
+//! A process group is known by its leader's id and the instant that leader
+//! started, as the operating system reports it ([`leader_started`]); a
+//! restart that finds a group recorded without an end signals it only when
+//! both still match, never on the group's number alone.
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::{Read, Write};
 
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
-use rustix::process::{Pid, Signal, kill_process_group, test_kill_process_group};
+use rustix::process::{Pid, Signal, kill_process_group};
 
 use crate::error::RunnerError;
 
@@ -116,33 +121,44 @@ pub fn resize(master: &dyn MasterPty, columns: u16, rows: u16) -> Result<(), Run
         .map_err(|error| RunnerError::refused("resize_failed", error.to_string()))
 }
 
-/// What a restart found of a process group its last run recorded and never
-/// saw end.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Left {
-    /// No process is in the group: it is gone.
-    Gone,
-    /// Processes were still in it, and were ended with it.
-    Ended,
-}
-
-/// End what is left of process group `pid`, which a runner started and a
-/// restart found recorded without an end. A process that ignored the
-/// hang-up its terminal closing sent is still in the group, and is ended
-/// with it by a signal no process can ignore. A group that answers but may
-/// not be signalled is not this user's, so not the runner's: it is refused
-/// `end_failed` by name, and the caller reports the runner's own as gone.
-pub fn end_left_group(pid: u32) -> Result<Left, RunnerError> {
-    let group = group(pid)?;
-    match test_kill_process_group(group) {
-        Err(rustix::io::Errno::SRCH) => Ok(Left::Gone),
-        Err(error) => Err(RunnerError::refused(
-            "end_failed",
-            format!("process group {pid} answers but is not this runner's to end: {error}"),
-        )),
-        Ok(()) => end_group(pid).map(|()| Left::Ended),
+/// The instant process `pid` started, as the operating system reports it:
+/// `ps`'s `lstart`, read in the C locale and in UTC so the same process
+/// reads the same whoever asks. It is to the second, the finest `ps`
+/// reports on macOS and Linux alike: a process id is taken again within the
+/// second its last holder started only after the ids wrap round. `None`
+/// when no process has that id: `ps` then fails and says nothing. The text
+/// is kept as it was reported and compared exactly; it is never parsed, so
+/// no reading of it can make two different reports agree. A `ps` that
+/// cannot be run, or answers in any other way, is refused
+/// `leader_unreadable` by name.
+pub fn leader_started(pid: u32) -> Result<Option<String>, RunnerError> {
+    let unreadable = |why: String| {
+        RunnerError::refused(
+            "leader_unreadable",
+            format!("the start of process {pid} could not be read: {why}"),
+        )
+    };
+    let output = std::process::Command::new(PS)
+        .args(["-o", "lstart=", "-p", &pid.to_string()])
+        .env("LC_ALL", "C")
+        .env("TZ", "UTC")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|error| unreadable(format!("{PS} could not be run: {error}")))?;
+    let started = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    let said = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    match (output.status.success(), started.is_empty(), said.is_empty()) {
+        (true, false, _) => Ok(Some(started)),
+        (false, true, true) => Ok(None),
+        _ => Err(unreadable(format!(
+            "{PS} ended {} and answered '{started}', saying '{said}'",
+            output.status
+        ))),
     }
 }
+
+/// The program that reports a process's start.
+const PS: &str = "/bin/ps";
 
 fn group(pid: u32) -> Result<Pid, RunnerError> {
     i32::try_from(pid)

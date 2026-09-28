@@ -16,8 +16,11 @@
 //! holds with no end was lost with the runner that held it: it is reported
 //! `ended_by_runner_restart`, at the instant the restart found it gone and
 //! with no exit status, since none was seen. Before it is reported gone its
-//! recorded process group is made gone: anything left in it, a process that
-//! ignored the hang-up, is ended then, and the end names that signal.
+//! recorded process group is made gone when it is proved the runner's: its
+//! leader still runs at the recorded id and started at the recorded
+//! instant. Anything left in it, a process that ignored the hang-up, is
+//! ended then, and the end names that signal. A group not so proved is
+//! never signalled, and the log says so.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -71,6 +74,7 @@ impl Live {
 pub(crate) struct Session {
     started_at: u64,
     pid: Option<u32>,
+    leader_started: Option<String>,
     columns: u16,
     rows: u16,
     scrollback: Scrollback,
@@ -150,22 +154,38 @@ fn unknown(id: &str) -> RunnerError {
     RunnerError::refused("session_unknown", format!("no session {id} is held"))
 }
 
-/// End what is left of session `id`'s process group `pid`, which the last
-/// run recorded and never saw end, answering the signal that ended it when
-/// anything was left; a group that cannot be ended is named in the log.
-fn left_behind(id: &str, pid: u32) -> Option<String> {
-    match crate::pty::end_left_group(pid) {
-        Ok(crate::pty::Left::Gone) => None,
-        Ok(crate::pty::Left::Ended) => {
-            crate::error::said(&format!(
-                "session {id}: process group {pid} outlived the last runner and was ended"
-            ));
-            Some("SIGKILL".to_owned())
-        }
-        Err(error) => {
-            crate::error::said(&format!("session {id}: {error}"));
-            None
-        }
+/// End what is left of session `id`'s process group, led by `pid` as the
+/// last run recorded it and never saw end, answering the signal that ended
+/// it. The group is signalled only when the process at `pid` started at the
+/// `recorded` instant, compared exactly: a process there with another start
+/// is a stranger, a group whose leader is gone cannot be proved the
+/// runner's, and a record that holds no start proves nothing, so none of
+/// those is signalled, and the log names the process id and says so.
+/// Nothing is ever signalled on the group's number alone.
+fn left_behind(id: &str, pid: Option<u32>, recorded: Option<&str>) -> Option<String> {
+    let pid = pid?;
+    let not_signalled = |why: &str| {
+        crate::error::said(&format!("session {id}: process {pid} was not signalled: {why}"));
+        None
+    };
+    let Some(recorded) = recorded else {
+        return not_signalled("its record holds no start instant");
+    };
+    match crate::pty::leader_started(pid) {
+        Ok(None) => not_signalled("its leader is gone, so its group is not proved ours"),
+        Ok(Some(started)) if started != recorded => not_signalled(&format!(
+            "it started at {started}, not at {recorded}, so it is a stranger"
+        )),
+        Ok(Some(_)) => match crate::pty::end_group(pid) {
+            Ok(()) => {
+                crate::error::said(&format!(
+                    "session {id}: process group {pid} outlived the last runner and was ended"
+                ));
+                Some("SIGKILL".to_owned())
+            }
+            Err(error) => not_signalled(&error.to_string()),
+        },
+        Err(error) => not_signalled(&error.to_string()),
     }
 }
 
@@ -198,7 +218,7 @@ impl Sessions {
                     how: EndedHow::EndedByRunnerRestart,
                     at: found_at,
                     status: None,
-                    signal: kept.pid.and_then(|pid| left_behind(&kept.session, pid)),
+                    signal: left_behind(&kept.session, kept.pid, kept.leader_started.as_deref()),
                 },
             };
             table.sessions.insert(
@@ -206,6 +226,7 @@ impl Sessions {
                 Session {
                     started_at: kept.started_at,
                     pid: kept.pid,
+                    leader_started: kept.leader_started,
                     columns: kept.columns,
                     rows: kept.rows,
                     scrollback: Scrollback::new(scrollback),
@@ -257,6 +278,7 @@ impl Sessions {
             .map(|(id, session)| KeptSession {
                 session: id.clone(),
                 pid: session.pid,
+                leader_started: session.leader_started.clone(),
                 started_at: session.started_at,
                 columns: session.columns,
                 rows: session.rows,
@@ -305,6 +327,7 @@ impl Sessions {
         let mut session = Session {
             started_at: now_ms(),
             pid: None,
+            leader_started: None,
             columns: launch.columns,
             rows: launch.rows,
             scrollback: Scrollback::new(self.scrollback),

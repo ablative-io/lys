@@ -42,6 +42,16 @@ impl Sessions {
         })?;
         session.generation += 1;
         session.pid = Some(spawned.pid);
+        session.leader_started = match crate::pty::leader_started(spawned.pid) {
+            Ok(started) => started,
+            Err(error) => {
+                crate::error::said(&format!(
+                    "session {id}: process {pid} will not be signalled by a restart: {error}",
+                    pid = spawned.pid
+                ));
+                None
+            }
+        };
         session.live = Some(Live {
             writer: spawned.writer,
             master: spawned.master,

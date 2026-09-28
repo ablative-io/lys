@@ -2,7 +2,8 @@
 //!
 //! The record is one file, replaced whole and atomically at each start and
 //! each end, and made durable before the change is answered. It holds each
-//! session's id, process id, size, start and end; never output, never input,
+//! session's id, the id of its process group's leader and the instant that
+//! leader started, its size, start and end; never output, never input,
 //! never an account. It is not a log: a restart reads one file of the
 //! sessions held, however long the runner has run.
 //!
@@ -35,8 +36,14 @@ pub const FORMAT: &str = "lys-runner-sessions/v1";
 pub struct KeptSession {
     /// The session.
     pub session: String,
-    /// Its process id, while one was known.
+    /// Its process id, while one was known: the leader of its process group.
     pub pid: Option<u32>,
+    /// The instant that leader started, as the operating system reported
+    /// it when the runner started it ([`crate::pty::leader_started`]). A
+    /// record written before the runner kept it holds none, and a group
+    /// recorded with none is never signalled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leader_started: Option<String>,
     /// When it started, in milliseconds since the Unix epoch.
     pub started_at: u64,
     /// Width in columns.

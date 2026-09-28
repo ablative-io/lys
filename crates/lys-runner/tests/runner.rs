@@ -3,24 +3,29 @@
 //! pseudo-terminal, keeps it running whoever connects, records its end, and
 //! reports every session it held when it is started again: ended with its
 //! exit and instant after a clean stop, and `ended_by_runner_restart` with
-//! no exit status after one it lost. It answers only the server's signed
-//! requests, on a socket only its owner may open. R5: a session at a usage
-//! limit moves to its next account, and stops `accounts_exhausted` at the
-//! list's end. Every wait below ends on the runner's answer, never a clock.
+//! no exit status after one it lost. A group a lost runner left is ended
+//! only when its leader still runs at the recorded id and started at the
+//! recorded instant; a stranger, a group with no leader and a record with
+//! no start are never signalled, and the log says so. It answers only the
+//! server's signed requests, on a socket only its owner may open. R5: a
+//! session at a usage limit moves to its next account, and stops
+//! `accounts_exhausted` at the list's end. Every wait below ends on the runner's answer, never a clock.
 
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use lys_core::Ed25519Identity;
 use lys_runner::protocol::{Greeting, Output, Request, StatusView, hex, signed_bytes};
 use lys_runner::state::{Kept, KeptSession};
 use lys_runner::{
-    Act, Answer, Client, EndedHow, Launch, Limit, Options, Rotation, Runner, RunnerError, Serving,
+    Act, Answer, Client, Ended, EndedHow, Launch, Limit, Options, Rotation, Runner, RunnerError,
+    Serving,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -208,11 +213,13 @@ fn a_clean_restart_reports_each_session_ended_with_its_instant() -> TestResult {
     Ok(())
 }
 
-/// One session as a lost runner's record keeps it: started, never ended.
-fn unended(session: &str, pid: u32) -> KeptSession {
+/// One session as a lost runner's record keeps it: started, never ended,
+/// its group's leader at `pid`, recorded as started at `leader_started`.
+fn unended(session: &str, pid: u32, leader_started: Option<&str>) -> KeptSession {
     KeptSession {
         session: session.to_owned(),
         pid: Some(pid),
+        leader_started: leader_started.map(str::to_owned),
         started_at: 1,
         columns: 80,
         rows: 24,
@@ -220,61 +227,239 @@ fn unended(session: &str, pid: u32) -> KeptSession {
     }
 }
 
-#[test]
-fn a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status() -> TestResult {
+/// Every line a runner in this test binary said: one sink for the whole
+/// binary, given once, so tests running beside each other never replace
+/// each other's.
+fn log() -> Arc<Mutex<Vec<String>>> {
+    static LINES: OnceLock<Arc<Mutex<Vec<String>>>> = OnceLock::new();
+    Arc::clone(LINES.get_or_init(|| {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let kept = Arc::clone(&lines);
+        lys_runner::error::also_to(Box::new(move |line| {
+            kept.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(line.to_owned());
+        }));
+        lines
+    }))
+}
+
+/// The lines a runner said about process `pid`.
+fn said_of(pid: u32) -> Vec<String> {
+    let named = format!("process {pid} ");
+    log()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .filter(|line| line.contains(&named))
+        .cloned()
+        .collect()
+}
+
+/// What a lost runner leaves of one session: a shell leading its own
+/// process group, as a session's process does, and a `cat` it started in
+/// that group that ignores the hang-up. The `cat` reads the input the test
+/// holds and answers each line with the same line, so it proves it still
+/// runs, and it runs until that input closes.
+struct Group {
+    leader: Child,
+    input: Option<ChildStdin>,
+    output: BufReader<ChildStdout>,
+    member: u32,
+}
+
+impl Group {
+    fn start() -> Result<Self, Box<dyn Error>> {
+        let mut leader = Command::new("/bin/sh")
+            .args([
+                "-c",
+                "trap '' HUP; exec 3<&0; /bin/cat <&3 & echo $!; wait",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .process_group(0)
+            .spawn()?;
+        let input = Some(leader.stdin.take().ok_or("the group has no input")?);
+        let mut output = BufReader::new(leader.stdout.take().ok_or("the group has no output")?);
+        let mut line = String::new();
+        output.read_line(&mut line)?;
+        let member = line.trim().parse()?;
+        Ok(Self {
+            leader,
+            input,
+            output,
+            member,
+        })
+    }
+
+    fn pid(&self) -> u32 {
+        self.leader.id()
+    }
+
+    /// Whether the group's `cat` answers `line`: it still runs.
+    fn answers(&mut self, line: &str) -> Result<bool, Box<dyn Error>> {
+        let input = self.input.as_mut().ok_or("the group's input is closed")?;
+        writeln!(input, "{line}")?;
+        let mut heard = String::new();
+        self.output.read_line(&mut heard)?;
+        Ok(heard.trim_end() == line)
+    }
+
+    /// Close the group's input and read its output to its end, which comes
+    /// once every process that held it is gone; answer what was left.
+    fn close(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+        self.input = None;
+        let mut rest = Vec::new();
+        self.output.read_to_end(&mut rest)?;
+        Ok(rest)
+    }
+}
+
+/// Start a runner on a record that holds `kept`, as a lost runner left it,
+/// and answer how it reports that session.
+fn restart_ends(kept: KeptSession) -> Result<Ended, Box<dyn Error>> {
+    log();
     let dir = tempfile::tempdir()?;
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
-    // What a runner that was lost leaves: its record, naming one process
-    // group that is gone and one whose process ignored the hang-up and
-    // still runs. Each leads its own group, as a session's process does.
-    let mut gone = Command::new("/bin/sh")
-        .args(["-c", "exit 0"])
-        .process_group(0)
-        .spawn()?;
-    let gone_pid = gone.id();
-    gone.wait()?;
-    let mut left = Command::new("/bin/cat")
-        .stdin(Stdio::piped())
-        .process_group(0)
-        .spawn()?;
     let state = dir.path().join("state");
     std::fs::create_dir_all(&state)?;
-    let record = Kept::new(vec![unended("gone", gone_pid), unended("left", left.id())]);
-    std::fs::write(state.join("sessions.json"), serde_json::to_vec(&record)?)?;
-
+    let id = kept.session.clone();
+    std::fs::write(
+        state.join("sessions.json"),
+        serde_json::to_vec(&Kept::new(vec![kept]))?,
+    )?;
     let restarted = Runner::open(&Options {
         socket: dir.path().join("runner.sock"),
         state,
         server_key: key.public_key_bytes(),
         scrollback: 1 << 16,
     })?;
-    let seen = restarted.sessions().status(None)?;
-    let end = |id: &str| {
-        seen.sessions
-            .iter()
-            .find(|session| session.session == id)
-            .and_then(|session| session.ended.clone())
-            .ok_or(format!("{id} reads unended"))
-    };
-    let (gone_end, left_end) = (end("gone")?, end("left")?);
-    for ended in [&gone_end, &left_end] {
-        assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
-        assert_eq!(ended.status, None, "no exit status is invented");
-        assert!(ended.at >= 1);
-    }
-    assert_eq!(gone_end.signal, None, "nothing was left to end");
+    let seen = restarted.sessions().status(Some(&id))?;
+    let ended = seen
+        .sessions
+        .first()
+        .and_then(|session| session.ended.clone())
+        .ok_or(format!("{id} reads unended"))?;
+    assert_eq!(ended.how, EndedHow::EndedByRunnerRestart, "{id}");
+    assert_eq!(ended.status, None, "{id}: no exit status is invented");
+    assert!(ended.at >= 1, "{id}");
+    Ok(ended)
+}
+
+/// Whether a runner said process `pid` was not signalled.
+fn said_not_signalled(pid: u32) -> bool {
+    said_of(pid)
+        .iter()
+        .any(|line| line.contains("was not signalled"))
+}
+
+#[test]
+fn a_lost_group_whose_leader_started_as_recorded_is_ended_whole() -> TestResult {
+    let mut group = Group::start()?;
+    let pid = group.pid();
+    assert!(group.answers("before")?, "the group runs before the restart");
+    let recorded = lys_runner::pty::leader_started(pid)?.ok_or("the leader has no start")?;
+    let ended = restart_ends(unended("proved", pid, Some(&recorded)))?;
     assert_eq!(
-        left_end.signal.as_deref(),
+        ended.signal.as_deref(),
         Some("SIGKILL"),
         "what the lost runner left running is ended before it is reported gone"
     );
-    let exit = left.wait()?;
+    assert!(!said_not_signalled(pid), "{:?}", said_of(pid));
+    let exit = group.leader.wait()?;
+    assert_eq!(exit.signal(), Some(9), "the leader really ended: {exit:?}");
+    let member = group.member;
     assert_eq!(
-        exit.signal(),
-        Some(9),
-        "the left process really ended: {exit:?}"
+        group.close()?,
+        b"",
+        "the output reaches its end, so the cat {member} that ignored the hang-up is gone"
     );
     Ok(())
+}
+
+#[test]
+fn a_recorded_id_now_held_by_a_stranger_is_not_signalled() -> TestResult {
+    let mut group = Group::start()?;
+    let pid = group.pid();
+    let now = lys_runner::pty::leader_started(pid)?.ok_or("the leader has no start")?;
+    let other = "Thu Jan  1 00:00:00 1970";
+    assert_ne!(now, other);
+    let ended = restart_ends(unended("stranger", pid, Some(other)))?;
+    assert_eq!(ended.signal, None, "a stranger is never signalled");
+    assert!(group.answers("after")?, "the stranger still runs");
+    assert!(said_not_signalled(pid), "{:?}", said_of(pid));
+    assert_eq!(group.close()?, b"");
+    let exit = group.leader.wait()?;
+    assert!(exit.success(), "the stranger ended on its own: {exit:?}");
+    Ok(())
+}
+
+#[test]
+fn a_group_whose_leader_is_gone_is_not_signalled() -> TestResult {
+    let mut group = Group::start()?;
+    let pid = group.pid();
+    let recorded = lys_runner::pty::leader_started(pid)?.ok_or("the leader has no start")?;
+    group.leader.kill()?;
+    let exit = group.leader.wait()?;
+    assert_eq!(exit.signal(), Some(9), "the leader alone is gone: {exit:?}");
+    assert_eq!(lys_runner::pty::leader_started(pid)?, None);
+    let ended = restart_ends(unended("leaderless", pid, Some(&recorded)))?;
+    assert_eq!(ended.signal, None, "a group with no leader is never signalled");
+    assert!(group.answers("after")?, "what the group still holds runs");
+    assert!(said_not_signalled(pid), "{:?}", said_of(pid));
+    assert_eq!(group.close()?, b"");
+    Ok(())
+}
+
+#[test]
+fn a_record_that_holds_no_start_instant_is_not_signalled() -> TestResult {
+    let mut group = Group::start()?;
+    let pid = group.pid();
+    let ended = restart_ends(unended("unproved", pid, None))?;
+    assert_eq!(ended.signal, None, "a group not proved the runner's is never signalled");
+    assert!(group.answers("after")?, "the group still runs");
+    assert!(said_not_signalled(pid), "{:?}", said_of(pid));
+    assert_eq!(group.close()?, b"");
+    let exit = group.leader.wait()?;
+    assert!(exit.success(), "no signal reached the leader: {exit:?}");
+    Ok(())
+}
+
+#[test]
+fn a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status() -> TestResult {
+    // A process group that is gone entirely, as most are after a crash.
+    let mut gone = Command::new("/bin/sh")
+        .args(["-c", "exit 0"])
+        .process_group(0)
+        .spawn()?;
+    let pid = gone.id();
+    gone.wait()?;
+    let ended = restart_ends(unended("gone", pid, Some("Thu Jan  1 00:00:00 1970")))?;
+    assert_eq!(ended.signal, None, "nothing was left to end");
+    assert!(said_not_signalled(pid), "{:?}", said_of(pid));
+    Ok(())
+}
+
+#[test]
+fn a_session_the_runner_starts_records_its_leaders_start() -> TestResult {
+    let mut held = Held::start(1 << 16)?;
+    let client = held.client();
+    started(&client, shell("recorded", "echo recorded-$((1+1)); exec cat"))?;
+    assert_eq!(waited(&client, "recorded", "recorded-2")?, "recorded-2");
+    let Kept { sessions, .. } =
+        serde_json::from_slice(&std::fs::read(held.state().join("sessions.json"))?)?;
+    let kept = sessions
+        .iter()
+        .find(|kept| kept.session == "recorded")
+        .ok_or("recorded is not kept")?;
+    let pid = kept.pid.ok_or("no leader is recorded")?;
+    assert_eq!(
+        kept.leader_started,
+        lys_runner::pty::leader_started(pid)?,
+        "the record holds the leader's start as the system reports it"
+    );
+    assert!(kept.leader_started.is_some());
+    held.stop()
 }
 
 #[test]
