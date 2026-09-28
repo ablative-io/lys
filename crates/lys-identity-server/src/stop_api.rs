@@ -217,9 +217,6 @@ async fn stop(
         credentials_refused: None,
         done: false,
     };
-    if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
-        return Ok(Json(kept.into()));
-    }
     let suspended = with_directory(&state, |directory| {
         Ok(directory.transition(
             actor.clone(),
@@ -247,6 +244,11 @@ async fn stop(
             });
         }
         (Err(other), _) => return Err(other.into()),
+    }
+    // Asked only once the directory holds this operation's suspension, so a
+    // refused stop leaves no asked line in other words behind it.
+    if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
+        return Ok(Json(kept.into()));
     }
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;

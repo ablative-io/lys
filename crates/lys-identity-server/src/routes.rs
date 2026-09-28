@@ -150,7 +150,11 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    Ok(router(state).merge(configured))
+    let api = router(state).merge(configured);
+    Ok(match &config.surface_dir {
+        Some(dir) => crate::surface::serving(dir.clone(), api),
+        None => api,
+    })
 }
 
 /// Open the directory `config` names, creating its log when the log's

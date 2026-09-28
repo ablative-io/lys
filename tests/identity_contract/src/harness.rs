@@ -312,6 +312,7 @@ impl Service {
             stops_dir: Some(dir.path().join("stops")),
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
+            surface_dir: None,
         };
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;

@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, press, text, unreachable } from './harness';
-import { ADA, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { $, $$, click, mount, press, text, unreachable, unmountAll } from './harness';
+import { ADA, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 
 describe("An agent's file", () => {
   it('shows its person, state and registration from the service', async () => {
@@ -29,13 +29,33 @@ describe("An agent's file", () => {
     expect(posted).toEqual([]);
     const reason = $('form[aria-label="Confirm emergency stop"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
-    await act(async () => { reason.value = 'leaked its key'; reason.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
     expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
     expect(text()).toContain('the agent is suspended');
     expect(text()).toContain('Credential handles were not ended: SecretsUnavailable');
     expect(text()).toContain('stays unconfirmed until its runtime reports it stopped');
     expect(text()).toContain('Refresh file');
+  });
+
+  it('recovers an unanswered stop after the next read shows the agent suspended', async () => {
+    sessionStorage.clear();
+    const path = '/agents/' + SCRIBE + '/stop';
+    const first = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST ' + path]: refused(503, 'StopsUnavailable', 'Outcome unknown') });
+    await click($('[data-act="stop"]'));
+    const reason = $('form[aria-label="Confirm emergency stop"] input');
+    if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'Key exposed'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
+    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
+    expect(first.posted).toHaveLength(1);
+    unmountAll(); document.body.innerHTML = '';
+    const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
+    expect($('[data-act="stop"]')).toBeNull();
+    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check original change') ?? null);
+    expect(later.posted).toEqual(first.posted);
+    expect(text()).toContain('Credential handles were not ended: Broker unavailable');
+    expect(text()).toContain('Refresh file');
+    expect(sessionStorage.getItem('lys.pending.stop.' + SCRIBE)).toBeNull();
   });
 
   it('shows role and version as not recorded, never a sample role', async () => {

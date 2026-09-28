@@ -36,10 +36,12 @@ export function SignIn() {
 /** A refusal shown with the service's own name and reason. */
 export function RefusedPage({ refused, title }: { refused: Refused; title: string }) {
   if (refused.status === 401) return <SignIn />;
+  const serviceFailure = refused.status === 0 || refused.status >= 500;
   return (
     <div className="page">
       <div className="eyebrow">{title}</div>
-      <h1>{refused.refusal.refusal === 'NoPerson' ? 'Your account needs access' : 'Refused'}</h1>
+      <h1>{serviceFailure ? 'The service could not complete this request' : refused.refusal.refusal === 'NoPerson' ? 'Your account needs access' : 'Refused'}</h1>
+      {serviceFailure ? <p>If you were making a change, keep its original request until its outcome is confirmed. Do not submit it again as a new change.</p> : null}
       {refused.refusal.refusal === 'NoPerson' ? <p>Your sign-in worked, but your account has not been connected to the directory yet. Ask your administrator to connect it. <a href="#/directory/manage?action=login">Administrator controls</a></p> : null}
       <div className="why-not">
         <b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span>

@@ -13,7 +13,7 @@ describe('People and agents', () => {
     expect(scribe?.textContent).toContain('agent');
     expect(scribe?.textContent).toContain('active');
     expect(scribe?.textContent).toContain('Ada (test person)');
-    expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '—', '—']);
+    expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
   });
 
   it('flags an agent whose person is retired (conformance 3.1)', async () => {

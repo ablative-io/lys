@@ -142,8 +142,10 @@ fn materialise(
     Ok((credential, outcome))
 }
 
-/// The base64 JSON Rauthy reads as its one bootstrap API key: read access to
-/// clients and secrets, create and update on clients, nothing else.
+/// The base64 JSON Rauthy reads as its one bootstrap API key: read, create
+/// and update on clients and sign-in providers, read on secrets and users,
+/// nothing else. Users are read to find the administrator's id; providers
+/// are what the sign-in providers route manages.
 pub fn bootstrap_api_key() -> String {
     let request = serde_json::json!({
         "name": API_KEY_NAME,
@@ -151,6 +153,8 @@ pub fn bootstrap_api_key() -> String {
         "access": [
             {"group": "Clients", "access_rights": ["read", "create", "update"]},
             {"group": "Secrets", "access_rights": ["read"]},
+            {"group": "Users", "access_rights": ["read"]},
+            {"group": "AuthProviders", "access_rights": ["read", "create", "update"]},
         ],
     });
     base64::engine::general_purpose::STANDARD.encode(request.to_string())

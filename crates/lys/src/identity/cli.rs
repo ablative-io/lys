@@ -27,6 +27,24 @@ pub enum IdentityCommand {
         config: PathBuf,
     },
 
+    /// Install the whole identity product for this user: a data folder under
+    /// the application data path, generated keys and configuration, the
+    /// compose services, both clients, the secrets broker and the directory
+    /// service with its screens. Running it again changes only what is
+    /// missing; nothing is rotated or restarted.
+    Install {
+        /// The data root; the platform's application data path when absent.
+        #[arg(long)]
+        root: Option<PathBuf>,
+        /// The administrator's email: the identity Rauthy bootstraps and the
+        /// first sign-in.
+        #[arg(long, default_value = "admin@identity.test")]
+        admin_email: String,
+        /// A compiled screens package to verify, place and serve.
+        #[arg(long)]
+        surface: Option<PathBuf>,
+    },
+
     /// Check that `PostgreSQL`, Rauthy and `SpiceDB` are ready, naming each one
     /// that is not. Prints no credential.
     Health {

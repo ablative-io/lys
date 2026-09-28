@@ -194,6 +194,18 @@ impl RauthyApi {
         Self::json(&answer, "rauthy")
     }
 
+    /// `GET /auth/v1/users`: the id of the user whose email is `email`,
+    /// when Rauthy holds one.
+    pub fn user_id(&self, email: &str) -> IdentityResult<Option<String>> {
+        let answer = self.call("GET", "/auth/v1/users", None, "users")?;
+        let users: Vec<Value> = Self::json(&answer, "users")?;
+        Ok(users
+            .iter()
+            .find(|user| user.get("email").and_then(Value::as_str) == Some(email))
+            .and_then(|user| user.get("id").and_then(Value::as_str))
+            .map(str::to_owned))
+    }
+
     /// `GET /auth/v1/clients`.
     pub fn list_clients(&self) -> IdentityResult<Vec<Value>> {
         let answer = self.call("GET", "/auth/v1/clients", None, "clients")?;
