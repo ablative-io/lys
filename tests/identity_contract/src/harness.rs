@@ -231,6 +231,15 @@ pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<
         .to_owned())
 }
 
+fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
+    Ok(answer
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .ok_or_else(|| format!("{} answered no redirect", answer.url()))?
+        .to_str()?
+        .to_owned())
+}
+
 /// The service `config` describes, answering on `listener`, and a client
 /// that follows no redirect.
 async fn serve(

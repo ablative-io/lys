@@ -5,11 +5,13 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use lys_identity::grants::admission::effective;
 use lys_identity::grants::lineage::MAX_DEPTH;
 use lys_identity::grants::{GrantError, GrantId, GrantRecord, Source};
 use lys_identity::{IdentityError, IdentityId, PersonId};
 
 use crate::error::ServerError;
+use crate::grant_contract::{GrantView, RefusedView, StandingView};
 use crate::grants::Judged;
 
 pub(crate) fn is_root(caller: IdentityId, root: PersonId) -> bool {
@@ -151,4 +153,61 @@ pub(crate) fn as_seen_by(
     } else {
         error.into()
     }
+}
+
+/// The grant a refusal names on the chain it was judged over, if any.
+fn named_grant(error: &GrantError) -> Option<String> {
+    match error {
+        GrantError::Revoked { grant }
+        | GrantError::Expired { grant, .. }
+        | GrantError::NotStarted { grant, .. }
+        | GrantError::OperationUnresolved { grant, .. } => Some(grant.clone()),
+        _ => None,
+    }
+}
+
+/// `record` as `caller` reads it at `at`: whether it stands, judged by
+/// admission over its whole chain, and the earliest end on that chain.
+pub(crate) fn grant_view(
+    judged: &Judged<'_>,
+    caller: IdentityId,
+    record: &GrantRecord,
+    at: u64,
+) -> GrantView {
+    let id = record.grant().id();
+    let book = judged.grants.book();
+    let effective_ends_at = book
+        .lineage(id)
+        .ok()
+        .and_then(|lineage| lineage.ends)
+        .map(|(ends, _)| ends);
+    let standing = match effective(book, judged.directory, id, at) {
+        Ok(_) => StandingView {
+            stands: true,
+            refused: None,
+        },
+        Err(error) => {
+            let named = named_grant(&error);
+            let seen = as_seen_by(judged, caller, error);
+            let grant = if matches!(seen, ServerError::Withheld { .. }) {
+                None
+            } else {
+                named
+            };
+            StandingView {
+                stands: false,
+                refused: Some(RefusedView {
+                    refusal: seen.name(),
+                    grant,
+                    reason: seen.to_string(),
+                }),
+            }
+        }
+    };
+    GrantView::new(
+        record,
+        judged.grants.unreported(id),
+        standing,
+        effective_ends_at,
+    )
 }

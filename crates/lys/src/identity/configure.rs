@@ -1,4 +1,4 @@
-//! `lys identity configure`: reconcile exactly the platform and, where named, Cambium
+//! `lys identity configure`: reconcile exactly the platform and, where named, app
 //! clients and their themes in Rauthy, idempotently.
 //!
 //! Every change has a stable operation identifier derived from what it
