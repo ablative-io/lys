@@ -115,3 +115,7 @@
 ## Lead — Owns the cards of a board and sets them done
 
 **S37.** As the lead who owns the step 5 board, I want a card set done only when the chain has judged its rows' files and no open finding touches them, so that done means judged by the chain and never just merged.
+
+## Estate operator — Runs Lys behind every agent and session
+
+**S76.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.

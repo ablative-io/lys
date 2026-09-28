@@ -33,7 +33,8 @@
     "ADR-101",
     "ADR-004",
     "ADR-106",
-    "ADR-108"
+    "ADR-108",
+    "ADR-112"
   ],
   "goals": [
     "After a put_leaf that fails before its link, no file exists under that leaf's 20-digit name, no temporary file of this writer's remains in leaves/, and a reopen reports the same extent as before the write.",
@@ -298,6 +299,16 @@
       "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-004.json",
       "note": "the read-only open, its two refusals, the repair rule and the file store's module doc",
       "brief": ""
+    },
+    {
+      "path": "crates/lys-log-store/src/frontier_log.rs",
+      "note": "touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming",
+      "brief": "LYSLOGSTORE-005"
+    },
+    {
+      "path": "crates/lys-core/src/merkle/tree.rs",
+      "note": "touched by LYSLOGSTORE-005 R1: A hash-only proof tree built by streaming",
+      "brief": "LYSLOGSTORE-005"
     }
   ],
   "inventory": [

@@ -69,6 +69,7 @@ Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in thi
 - ADR-104 — The shell and its mock-up change together, and a corrected mock-up is a new version beside the prior — A change to the shell's behaviour is made in the built shell and in the mock-up in the same change, and the corrected mock-up is written as a new file, index.v6.html, beside the prior, the way v4 was kept beside v5. CONFORMANCE.md's reference line moves to the new file in that change and carries its path and sha256; DIRECTORY-006 pins no file and no hash, so DIRECTORY-037 is the first brief to pin one, and DIRECTORY-006 does not change. Rejected: fixing only the build, which lets the definition drift from what is built; and editing index.v5.html in place, which changes the file the conformance table was written against.
 - ADR-105 — Sign-in identities belong to people only; the harness login token is the one named exception — A sign-in identity, a provider account linked to a person in the directory, belongs to that person only: lys never links, delegates or issues from it to an agent, and refuses each such act of its own by name. An agent's own machine account, bound to no person, is a service account and stays allowed. An issuer and subject is bound to one holder, whichever came first. The harness login token recorded at docs/design/identity/STATEMENT-2026-09-22.md:43 and :167 and docs/design/identity/PROVISIONING-2026-09-22.md:18 is the one named exception; it never passes through anything lys issues, links or delegates, and it is not redefined. Rejected: letting a person lend a sign-in identity to their own agent, and redefining the login token so the rule could be claimed without an exception.
 - ADR-109 — The server judges a grant's standing and effective end over its chain; the screens render them and walk nothing — GrantView carries each grant's effective standing ({stands: true}, or {stands: false, refusal, grant, reason} read through the service's sight rules, so a withheld refusal names no grant or identity the caller may not see) and its effective end, both worked out on the server by the same judgement a check makes, and every screen renders those two members and walks no chain, compares no window with the clock and reads no holder's lifecycle state to decide standing. Rejected: keeping the client chain walk beside the server's judgement, and a screen-side derivation of the effective end.
+- ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 
 ## Goals
 
@@ -568,6 +569,26 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `docs/design/home/briefs/HOME-003.md` | rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-039) | DIRECTORY-039 |
 | `docs/design/home/briefs/HOME-006.md` | rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-039) | DIRECTORY-039 |
 | `docs/design/secrets/briefs/SECRETS-002.md` | rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-039) | DIRECTORY-039 |
+| `crates/lys-identity/src/grants/commit.rs` | touched by DIRECTORY-042 R4: Use events do not round-trip the mirror one by one | DIRECTORY-042 |
+| `crates/lys-identity-server/src/spicedb.rs` | touched by DIRECTORY-042 R7: The SpiceDB schema is read when it can have changed, not before every call | DIRECTORY-042 |
+| `crates/lys-identity-server/src/spicedb_http.rs` | touched by DIRECTORY-042 R8: SpiceDB calls use a pooled async client, outside the directory lock, with no timeout | DIRECTORY-042 |
+| `crates/lys-identity-server/src/runtime_state.rs` | touched by DIRECTORY-043 R1: Runtime state is indexed | DIRECTORY-043 |
+| `crates/lys-identity-server/src/runtime_store.rs` | touched by DIRECTORY-043 R1: Runtime state is indexed | DIRECTORY-043 |
+| `crates/lys-identity-server/src/requests_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/certificates_store.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/teams_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/stops_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/service_accounts_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/reviews_state.rs` | touched by DIRECTORY-043 R2: Snapshots serialise by reference | DIRECTORY-043 |
+| `crates/lys-identity-server/src/runtime_api.rs` | touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return | DIRECTORY-043 |
+| `crates/lys-identity-server/src/network_store.rs` | touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return | DIRECTORY-043 |
+| `crates/lys-identity-server/src/launch_api.rs` | touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return | DIRECTORY-043 |
+| `crates/lys-identity-server/src/memory_api.rs` | touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker | DIRECTORY-043 |
+| `crates/lys-home/src/recall.rs` | touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker | DIRECTORY-043 |
+| `crates/lys-home/src/given.rs` | touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker | DIRECTORY-043 |
+| `crates/lys-identity/src/restart.rs` | touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves | DIRECTORY-043 |
+| `crates/lys-identity-server/src/read_api.rs` | touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves | DIRECTORY-043 |
+| `crates/lys-identity/src/directory.rs` | touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves | DIRECTORY-043 |
 
 ## Inventory
 

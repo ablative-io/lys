@@ -61,3 +61,7 @@
 ## Implementer — Is dispatched one SECRETS-003 code row at a time
 
 **S17.** As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
+
+## Estate operator — Runs Lys behind every agent and session
+
+**S22.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.

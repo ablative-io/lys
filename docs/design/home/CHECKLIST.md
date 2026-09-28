@@ -195,3 +195,11 @@
 - [ ] **C52** — context_path moves entries out of the path it read, customs reads only the path's entries of the custom type asked for, and the render's assistant arm and the importer's assistant content iterate a content array by reference, with no rendered or recorded byte changed.
 - [ ] **C53** — One function, uuid_string, writes every uuid's 8-4-4-4-12 form: the fewshot's ids are 16 random bytes with the version nibble 4 and the variant nibble 8 set, formatted by it, and every render hash pinned in the tree is unchanged.
 - [ ] **C54** — The line bytes of the multi_result fixture imported through the import command hash, under SHA-256 after each fresh 32-hex id is replaced by its order of first appearance and the header timestamp by a fixed token, to the value the same test gives at the parent commit.
+
+## Record hot paths do each piece of work once
+
+- [ ] **C181** — Call idempotency is a lookup, not a replay (HOME-035 R1), proved by a counting test that fails at the base.
+- [ ] **C182** — Opening a session checks the index without a syscall per row (HOME-035 R2), proved by a counting test that fails at the base.
+- [ ] **C183** — Bulk writers append in batches with one fsync per file (HOME-035 R3), proved by a counting test that fails at the base.
+- [ ] **C184** — Rendering a launch moves data once and hashes what it writes as it writes (HOME-035 R4), proved by a counting test that fails at the base.
+- [ ] **C185** — Call parts are borrowed and each body file read once (HOME-035 R5), proved by a counting test that fails at the base.

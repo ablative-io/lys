@@ -230,3 +230,23 @@
 - [ ] **C33** — A list field whose entries are all bare ids (ADR-, RM-, C, S and brief ids) renders on one ', '-joined line exactly as before, and render-brief.py states the rule that tells the two kinds of list apart in the docstring of is_bare_id, which render_list_field applies to every list field.
 - [ ] **C34** — Every brief markdown that render-brief.py produces from a brief JSON in a cluster with a design.json is re-rendered in the same change, sh scripts/design/gate.sh exits 0, and docs/design/identity/briefs/IDENTITY-001.md and CONTEXT-001.md are unchanged.
 - [ ] **C35** — scripts/design/tests/test_render_brief.py proves a two-entry prose blocked_by renders two list items byte-equal to their entries and a bare-id list renders on one line, and scripts/design/gate.sh runs it so the design leg fails when it fails.
+
+## Grant decisions do the work once
+
+- [ ] **C326** — One decision per check (DIRECTORY-042 R1), proved by a counting test that fails at the base.
+- [ ] **C327** — A decision reads only the relationships of the grants on its path (DIRECTORY-042 R2), proved by a counting test that fails at the base.
+- [ ] **C328** — Holders and changes are indexed, not rebuilt (DIRECTORY-042 R3), proved by a counting test that fails at the base.
+- [ ] **C329** — Use events do not round-trip the mirror one by one (DIRECTORY-042 R4), proved by a counting test that fails at the base.
+- [ ] **C330** — Revocation derives its deletions from the book (DIRECTORY-042 R5), proved by a counting test that fails at the base.
+- [ ] **C331** — Who-holds answers from one snapshot (DIRECTORY-042 R6), proved by a counting test that fails at the base.
+- [ ] **C332** — The SpiceDB schema is read when it can have changed, not before every call (DIRECTORY-042 R7), proved by a counting test that fails at the base.
+- [ ] **C333** — SpiceDB calls use a pooled async client, outside the directory lock, with no timeout (DIRECTORY-042 R8), proved by a counting test that fails at the base.
+
+## The identity server's hot paths do each piece of work once
+
+- [ ] **C334** — Runtime state is indexed (DIRECTORY-043 R1), proved by a counting test that fails at the base.
+- [ ] **C335** — Snapshots serialise by reference (DIRECTORY-043 R2), proved by a counting test that fails at the base.
+- [ ] **C336** — Directory writes never block an async worker (DIRECTORY-043 R3), proved by a counting test that fails at the base.
+- [ ] **C337** — A session listing locks once and clones nothing it does not return (DIRECTORY-043 R4), proved by a counting test that fails at the base.
+- [ ] **C338** — A memory view reads each session once, off the async worker (DIRECTORY-043 R5), proved by a counting test that fails at the base.
+- [ ] **C339** — A receipt is rebuilt from the stored coordinate, not by re-reading leaves (DIRECTORY-043 R6), proved by a counting test that fails at the base.

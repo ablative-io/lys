@@ -77,7 +77,8 @@
     "ADR-098",
     "ADR-104",
     "ADR-105",
-    "ADR-109"
+    "ADR-109",
+    "ADR-112"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -2396,6 +2397,106 @@
       "path": "docs/design/secrets/briefs/SECRETS-002.md",
       "note": "rendered markdown; re-rendered with blocked_by as a list (DIRECTORY-039)",
       "brief": "DIRECTORY-039"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/commit.rs",
+      "note": "touched by DIRECTORY-042 R4: Use events do not round-trip the mirror one by one",
+      "brief": "DIRECTORY-042"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb.rs",
+      "note": "touched by DIRECTORY-042 R7: The SpiceDB schema is read when it can have changed, not before every call",
+      "brief": "DIRECTORY-042"
+    },
+    {
+      "path": "crates/lys-identity-server/src/spicedb_http.rs",
+      "note": "touched by DIRECTORY-042 R8: SpiceDB calls use a pooled async client, outside the directory lock, with no timeout",
+      "brief": "DIRECTORY-042"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runtime_state.rs",
+      "note": "touched by DIRECTORY-043 R1: Runtime state is indexed",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runtime_store.rs",
+      "note": "touched by DIRECTORY-043 R1: Runtime state is indexed",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/requests_state.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificates_store.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_state.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stops_state.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/service_accounts_state.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/reviews_state.rs",
+      "note": "touched by DIRECTORY-043 R2: Snapshots serialise by reference",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runtime_api.rs",
+      "note": "touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/network_store.rs",
+      "note": "touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_api.rs",
+      "note": "touched by DIRECTORY-043 R4: A session listing locks once and clones nothing it does not return",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/memory_api.rs",
+      "note": "touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-home/src/recall.rs",
+      "note": "touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-home/src/given.rs",
+      "note": "touched by DIRECTORY-043 R5: A memory view reads each session once, off the async worker",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity/src/restart.rs",
+      "note": "touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity-server/src/read_api.rs",
+      "note": "touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves",
+      "brief": "DIRECTORY-043"
+    },
+    {
+      "path": "crates/lys-identity/src/directory.rs",
+      "note": "touched by DIRECTORY-043 R6: A receipt is rebuilt from the stored coordinate, not by re-reading leaves",
+      "brief": "DIRECTORY-043"
     }
   ],
   "inventory": [

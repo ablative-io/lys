@@ -1566,6 +1566,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-112",
+      "title": "Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker",
+      "status": "decided",
+      "scope": "project",
+      "date": "2026-09-28",
+      "decided_by": "Tom's word in the terminal on 28 September 2026; recorded by Waffles with HOME-035, DIRECTORY-042, DIRECTORY-043, SECRETS-005 and LYSLOGSTORE-005",
+      "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line. 26 findings were confirmed across lys-home, lys-identity, lys-identity-server, lys-secrets and lys-log-store.",
+      "decision": "Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.",
+      "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+      "consequences": [
+        "A finding of this kind is a defect with a card, not a follow-up.",
+        "Tests that count work (reads, parses, scans, fsyncs, lock acquisitions) become the regression guard, since a clock is not allowed in a test.",
+        "The 5 second timeouts in the SpiceDB client are removed with its rewrite."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

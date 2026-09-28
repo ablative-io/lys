@@ -115,6 +115,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Proofs never hold the whole log",
+      "items": [
+        {
+          "id": "C20",
+          "text": "A hash-only proof tree built by streaming (LYSLOGSTORE-005 R1), proved by a counting test that fails at the base.",
+          "done": false
+        }
+      ]
     }
   ]
 }

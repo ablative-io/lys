@@ -79,7 +79,8 @@
     "ADR-107",
     "ADR-108",
     "ADR-110",
-    "ADR-072"
+    "ADR-072",
+    "ADR-112"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -1582,6 +1583,26 @@
       "path": "docs/design/home/briefs/HOME-018.md",
       "note": "its rendered markdown",
       "brief": "HOME-018"
+    },
+    {
+      "path": "crates/lys-home/src/record/index/head.rs",
+      "note": "touched by HOME-035 R3: Bulk writers append in batches with one fsync per file",
+      "brief": "HOME-035"
+    },
+    {
+      "path": "crates/lys-home/src/launch.rs",
+      "note": "touched by HOME-035 R4: Rendering a launch moves data once and hashes what it writes as it writes",
+      "brief": "HOME-035"
+    },
+    {
+      "path": "crates/lys-home/src/given.rs",
+      "note": "touched by HOME-035 R4: Rendering a launch moves data once and hashes what it writes as it writes",
+      "brief": "HOME-035"
+    },
+    {
+      "path": "crates/lys-home/src/record/call/parts.rs",
+      "note": "touched by HOME-035 R5: Call parts are borrowed and each body file read once",
+      "brief": "HOME-035"
     }
   ],
   "inventory": [

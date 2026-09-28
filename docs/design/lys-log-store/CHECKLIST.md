@@ -30,3 +30,7 @@
 
 - [ ] **C11** — file.rs's module doc has a section stating what open and open_read_only do and never do, including that neither deletes a leftover temporary file.
 - [ ] **C12** — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
+
+## Proofs never hold the whole log
+
+- [ ] **C20** — A hash-only proof tree built by streaming (LYSLOGSTORE-005 R1), proved by a counting test that fails at the base.

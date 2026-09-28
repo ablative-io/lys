@@ -40,6 +40,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - ADR-020 — A lease is a broker record under the audit log, not a signed format — The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.
 - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
 - ADR-095 — Ownership of a secret alone confers no revoke over the leases derived from it — The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.
+- ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
 
 ## Goals
 
@@ -126,6 +127,15 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/tests/secret_list.rs` | the CONFORMANCE 7.8 legs (SECRETS-004 R4) | SECRETS-004 |
 | `crates/lys-secrets/tests/lease_revoke.rs` | the CONFORMANCE 7.6 revoke legs (SECRETS-004 R5) and the revoke leg against an always-no PermissionCheck double (SECRETS-004 R7) | SECRETS-004 |
 | `crates/lys-secrets/tests/lease_relinquish.rs` | the CONFORMANCE 7.6 relinquish legs (SECRETS-004 R6) | SECRETS-004 |
+| `crates/lys-secrets/src/broker/admit.rs` | touched by SECRETS-005 R1: A presented token is found by a hashed lookup | SECRETS-005 |
+| `crates/lys-secrets/src/broker/using.rs` | touched by SECRETS-005 R1: A presented token is found by a hashed lookup | SECRETS-005 |
+| `crates/lys-secrets/src/broker/ending.rs` | touched by SECRETS-005 R2: Lineage and endings are indexed | SECRETS-005 |
+| `crates/lys-secrets/src/bin/lys-secrets/serve.rs` | touched by SECRETS-005 R3: Broker work never blocks an async worker, and the permission check runs outside the lock | SECRETS-005 |
+| `crates/lys-secrets/src/bin/lys-secrets/view.rs` | touched by SECRETS-005 R4: Routes and services are loaded once | SECRETS-005 |
+| `crates/lys-secrets/src/bin/lys-secrets/callers.rs` | touched by SECRETS-005 R4: Routes and services are loaded once | SECRETS-005 |
+| `crates/lys-secrets/src/bin/lys-secrets/held.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
+| `crates/lys-secrets/src/broker/scope.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
+| `crates/lys-secrets/src/files.rs` | touched by SECRETS-005 R6: Views ask each permission once per request | SECRETS-005 |
 
 ## Inventory
 

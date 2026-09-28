@@ -52,3 +52,12 @@
 - [ ] **C36** — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does.
 - [ ] **C37** — A revoke by the person acted for, or a relinquish by the holder, of a lease that has already ended is refused by name as already ended, carrying how, when and by whom it first ended, and records nothing; the first end record stays the only one (CONFORMANCE 7.6).
 - [ ] **C38** — The secrets list is a person's view: an agent that asks for it is refused by name, the refusal naming the agent and saying that agents reach secrets only through their virtual credentials, with no list, not even an empty one, and nothing recorded (CONFORMANCE 7.8).
+
+## The broker's request path does each piece of work once
+
+- [ ] **C39** — A presented token is found by a hashed lookup (SECRETS-005 R1), proved by a counting test that fails at the base.
+- [ ] **C40** — Lineage and endings are indexed (SECRETS-005 R2), proved by a counting test that fails at the base.
+- [ ] **C41** — Broker work never blocks an async worker, and the permission check runs outside the lock (SECRETS-005 R3), proved by a counting test that fails at the base.
+- [ ] **C42** — Routes and services are loaded once (SECRETS-005 R4), proved by a counting test that fails at the base.
+- [ ] **C43** — Answers are capped and redacted in one pass (SECRETS-005 R5), proved by a counting test that fails at the base.
+- [ ] **C44** — Views ask each permission once per request (SECRETS-005 R6), proved by a counting test that fails at the base.

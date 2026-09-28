@@ -760,6 +760,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Record hot paths do each piece of work once",
+      "items": [
+        {
+          "id": "C181",
+          "text": "Call idempotency is a lookup, not a replay (HOME-035 R1), proved by a counting test that fails at the base.",
+          "done": false
+        },
+        {
+          "id": "C182",
+          "text": "Opening a session checks the index without a syscall per row (HOME-035 R2), proved by a counting test that fails at the base.",
+          "done": false
+        },
+        {
+          "id": "C183",
+          "text": "Bulk writers append in batches with one fsync per file (HOME-035 R3), proved by a counting test that fails at the base.",
+          "done": false
+        },
+        {
+          "id": "C184",
+          "text": "Rendering a launch moves data once and hashes what it writes as it writes (HOME-035 R4), proved by a counting test that fails at the base.",
+          "done": false
+        },
+        {
+          "id": "C185",
+          "text": "Call parts are borrowed and each body file read once (HOME-035 R5), proved by a counting test that fails at the base.",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -1797,6 +1797,131 @@
       },
       "depends_on": [],
       "notes": "Written by hand straight to main (Tom, 28 September: briefs are never written by a workflow). Ids are the next free on main 6194599: ADR-111, RM-073, C10 to C16, S4 and S5."
+    },
+    {
+      "id": "RM-074",
+      "title": "Stop the record replaying and re-reading: indexed call lookup, one open check, batched durable appends, streamed rendering",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Every model call and every session open in lys-home repeats work it has already done: the call idempotency check re-reads every call entry in the session, opening a session reads one byte per index row, bulk writers fsync three files per entry, and a launch renders through double clones and then re-reads what it wrote. Lys runs behind every agent session, so this cost is paid everywhere, all the time.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:55:00+10:00",
+        "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line."
+      },
+      "links": {
+        "cluster": "home",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "HOME-035"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main at writing."
+    },
+    {
+      "id": "RM-075",
+      "title": "Decide a grant once per request: one decision per check, a filtered relationship read, indexes for holders and changes, a pooled SpiceDB client with a cached schema",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "POST /grants/check is the enforcement point for every action in the estate. Today it makes the whole decision twice, each decision reads every relationship the engine holds, every permitted check writes and re-reads the mirror, and every SpiceDB call opens a fresh blocking connection, reads the schema first, and carries a 5 second timeout, all while holding the directory and grants mutexes. The cost grows with every grant anyone ever holds.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:55:00+10:00",
+        "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "DIRECTORY-042"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main at writing."
+    },
+    {
+      "id": "RM-076",
+      "title": "Identity server hot paths: indexed runtime state, no snapshot clones, no blocking I/O on async workers, one pass per memory view, receipts without re-reading the log",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "The identity server answers every agent's runtime reports, directory writes, memory views and agent views. It scans every session ever reported on each report, deep-copies whole stores to snapshot them, runs fsync on async workers under a mutex every route waits on, reads every session twice per memory view, and re-reads up to 1 024 leaf files to rebuild one receipt.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:55:00+10:00",
+        "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "DIRECTORY-043"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main at writing."
+    },
+    {
+      "id": "RM-077",
+      "title": "The secrets proxy's request path: hashed handle lookup, indexed lineage, broker work off the async workers, cached routes, one-pass redaction, memoised views",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "lys-secrets sits in front of every use of a credential. Every presentation scans every handle ever issued, every proxied call takes the broker mutex three times inside async handlers and fsyncs audit lines and an anchor under it while a blocking SpiceDB call waits, routes.json is re-read per request, answers are buffered without a cap and redacted once per secret, and the audit and grants views repeat the same permission checks per row.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:55:00+10:00",
+        "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line."
+      },
+      "links": {
+        "cluster": "secrets",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "SECRETS-005"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main at writing."
+    },
+    {
+      "id": "RM-078",
+      "title": "The proof tree keeps hashes only, is built by streaming, and never hashes a leaf twice",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "The first proof after every start reads every leaf of the log into memory, copies each again into the tree, keeps every leaf's bytes resident for good although proofs need only hashes, and every later append hashes each leaf twice. It grows with the log, and the certificate and identity ledgers serve proofs from it.",
+      "provenance": {
+        "requested_by": "tom",
+        "date": "2026-09-28T16:55:00+10:00",
+        "quote": "Make sure there's no lazy code in there. Nothing replaying, nothing taking extra time, no unnecessary clones. It all has to work as efficiently as possible because this is going to be running in the background of absolutely everything.",
+        "context": "Read-only efficiency audit of main 9712505 on 28 September 2026, each finding confirmed by an independent reviewer that tried to refute it; findings kept in the brief's requirements with their file and line."
+      },
+      "links": {
+        "cluster": "lys-log-store",
+        "decisions": [
+          "ADR-112"
+        ],
+        "briefs": [
+          "LYSLOGSTORE-005"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Written by hand straight to main; ids the next free on main at writing."
     }
   ]
 }

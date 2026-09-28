@@ -43,3 +43,7 @@
 ## Leaf store maintainer — Reads the file store's contract before relying on it or changing it
 
 **S7.** As a leaf store maintainer, I want the file store's module doc to say what opening a store does and never does, so that I can rely on open never deleting a leftover temporary file.
+
+## Estate operator — Runs Lys behind every agent and session
+
+**S8.** As the operator of an estate where Lys runs behind every agent, I want each request, append and open to do its work once and scale with what it touches, so that Lys costs nothing it does not need to as history grows.
