@@ -480,3 +480,377 @@ mod directory_events {
         Ok(())
     }
 }
+
+mod receipts {
+    use std::error::Error;
+    use std::os::unix::fs::PermissionsExt;
+
+    use coset::{CoseSign1, TaggedCborSerializable};
+    use identity_contract::fake_issuer::{CLIENT_SECRET, Login};
+    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::harness::{ADMINISTRATOR, Harness, Service};
+    use lys_core::Ed25519Identity;
+    use lys_identity::log::Coordinate;
+    use lys_identity::receipt::{Receipt, verify_receipt};
+    use lys_identity::signer::load_service_key;
+    use lys_identity::{
+        Actor, AuthMethod, Change, IdentityEvent, LoginBinding, Profile, Provenance, sign_event,
+        verify_event,
+    };
+    use sha2::{Digest, Sha256};
+
+    type TestResult = Result<(), Box<dyn Error>>;
+
+    fn node(left: &[u8], right: &[u8]) -> [u8; 32] {
+        let mut hash = Sha256::new();
+        hash.update([1]);
+        hash.update(left);
+        hash.update(right);
+        hash.finalize().into()
+    }
+
+    /// RFC 9162 section 2.1.3.2, written from the RFC and not from
+    /// lys-core, so the inclusion check has a second author.
+    fn rfc_inclusion(
+        index: u64,
+        tree_size: u64,
+        leaf: &[u8],
+        proof: &[u8],
+        root: [u8; 32],
+    ) -> bool {
+        let siblings = proof.chunks_exact(32);
+        if index >= tree_size || !siblings.remainder().is_empty() {
+            return false;
+        }
+        let mut hash = Sha256::new();
+        hash.update([0]);
+        hash.update(leaf);
+        let mut climbed: [u8; 32] = hash.finalize().into();
+        let (mut at, mut last) = (index, tree_size - 1);
+        for sibling in siblings {
+            if last == 0 {
+                return false;
+            }
+            if at & 1 == 1 || at == last {
+                climbed = node(sibling, &climbed);
+                while at & 1 == 0 && at != 0 {
+                    at >>= 1;
+                    last >>= 1;
+                }
+            } else {
+                climbed = node(&climbed, sibling);
+            }
+            at >>= 1;
+            last >>= 1;
+        }
+        last == 0 && climbed == root
+    }
+
+    /// Check a receipt the way a stranger would: parse the leaf with
+    /// standard COSE tooling, verify its Ed25519 signature under the service
+    /// key it was handed, recompute the SHA-256 payload commitment and the
+    /// RFC 6962 leaf hash, and walk the inclusion proof by the RFC.
+    fn independently(
+        receipt: &Receipt,
+        leaf: &[u8],
+        key: &[u8; 32],
+        (tree_size, root): (u64, [u8; 32]),
+        proof: &[u8],
+    ) -> Result<bool, Box<dyn Error>> {
+        let Ok(sign1) = CoseSign1::from_tagged_slice(leaf) else {
+            return Ok(false);
+        };
+        let verify = |signature: &[u8], data: &[u8]| Ed25519Identity::verify(key, data, signature);
+        if sign1.verify_signature(b"", verify).is_err() {
+            return Ok(false);
+        }
+        let payload = sign1.payload.ok_or("the signed event carries no payload")?;
+        let commitment: [u8; 32] = Sha256::digest(&payload).into();
+        let mut leaf_hash = Sha256::new();
+        leaf_hash.update([0]);
+        leaf_hash.update(leaf);
+        let leaf_hash: [u8; 32] = leaf_hash.finalize().into();
+        let committed = commitment == receipt.payload_commitment();
+        let hashed = leaf_hash == receipt.coordinate().leaf_hash;
+        let placed = rfc_inclusion(receipt.coordinate().index, tree_size, leaf, proof, root);
+        Ok(committed && hashed && placed)
+    }
+
+    /// `ID001_RECEIPT`: a recorded change verifies independently against a
+    /// checkpoint and the service key, and a receipt whose actor, payload,
+    /// sequence or signature was changed fails, both by the crate's verifier
+    /// and by the independent check. Every tampered case is counted.
+    #[test]
+    fn a_receipt_verifies_independently_and_each_changed_field_fails() -> TestResult {
+        let harness = Harness::new(9)?;
+        let signing = Ed25519Identity::load(&harness.dir.path().join("service.key"))?;
+        let mut directory = harness.open()?;
+        let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let index = receipt.coordinate().index;
+        let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
+        let checkpoint = directory.log()?.head()?;
+        let proof = directory.log()?.inclusion_proof(index)?;
+        let key = directory.service_key();
+
+        verify_receipt(&receipt, &leaf, &key, checkpoint, &proof)?;
+        assert!(
+            independently(&receipt, &leaf, &key, checkpoint, proof.as_bytes())?,
+            "the genuine receipt verifies with standard tooling"
+        );
+
+        let original = verify_event(&leaf, &key)?;
+        let event = original.event();
+        let remade = |actor: Actor, change: Change| {
+            IdentityEvent::new(
+                event.operation(),
+                actor,
+                event.identity(),
+                event.recorded_at(),
+                change,
+            )
+            .and_then(|made| sign_event(made, &signing))
+        };
+        let other_actor = Actor::new(
+            LoginBinding::new("https://issuer.test", "someone-else")?,
+            Provenance::new(AuthMethod::Oidc, 1_790_000_000),
+        );
+        let changed_actor = Receipt::of(
+            &remade(other_actor, event.change().clone())?,
+            receipt.coordinate(),
+        );
+        let changed_payload = Receipt::of(
+            &remade(
+                event.actor().clone(),
+                Change::RegisterPerson {
+                    profile: Profile::new("Mallory")?,
+                },
+            )?,
+            receipt.coordinate(),
+        );
+        let changed_sequence = Receipt::of(
+            &original,
+            Coordinate {
+                index: index + 1,
+                ..receipt.coordinate()
+            },
+        );
+        let mut signature_changed = leaf.clone();
+        let last = signature_changed.len() - 1;
+        signature_changed[last] ^= 1;
+
+        let cases: [(&str, &Receipt, &[u8]); 4] = [
+            ("actor", &changed_actor, &leaf),
+            ("payload", &changed_payload, &leaf),
+            ("sequence", &changed_sequence, &leaf),
+            ("signature", &receipt, &signature_changed),
+        ];
+        let mut failed = 0;
+        for (field, tampered, message) in cases {
+            assert!(
+                verify_receipt(tampered, message, &key, checkpoint, &proof).is_err(),
+                "a changed {field} fails the verifier"
+            );
+            assert!(
+                !independently(tampered, message, &key, checkpoint, proof.as_bytes())?,
+                "a changed {field} fails the independent check"
+            );
+            failed += 1;
+        }
+        assert_eq!(failed, 4, "one failure per changed field");
+        Ok(())
+    }
+
+    fn login(subject: &str) -> Login {
+        Login {
+            subject: subject.to_owned(),
+            email: "shared@example.test".to_owned(),
+        }
+    }
+
+    fn hex(bytes: &[u8]) -> String {
+        const DIGITS: &[u8; 16] = b"0123456789abcdef";
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            out.push(char::from(DIGITS[usize::from(byte >> 4)]));
+            out.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+        }
+        out
+    }
+
+    /// `ID001_RECEIPT`: no secret reaches a debug form, an error or a public
+    /// response. The secrets are the service's signing seed, the OIDC
+    /// client secret and the session cookie's value; the service key's
+    /// public half is shown to prove the answers were read at all.
+    #[tokio::test]
+    async fn no_secret_reaches_a_debug_form_an_error_or_a_public_response() -> TestResult {
+        let service = Service::start().await?;
+        let seed = std::fs::read(service.dir.path().join("service.key"))?;
+        let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+        let session = cookie
+            .split_once('=')
+            .map(|(_, value)| value.to_owned())
+            .ok_or("the cookie has no value")?;
+        let secrets = [hex(&seed), CLIENT_SECRET.to_owned(), session];
+        let carries_none = |text: &str| secrets.iter().all(|secret| !text.contains(secret));
+
+        let key = load_service_key(&service.dir.path().join("service.key"))?;
+        let debug = format!("{key:?}");
+        assert!(carries_none(&debug), "the key's debug form: {debug}");
+        assert!(!debug.contains(&format!("{:?}", seed.as_slice())));
+        let short = service.dir.path().join("short.key");
+        std::fs::write(&short, &seed[..31])?;
+        std::fs::set_permissions(&short, std::fs::Permissions::from_mode(0o600))?;
+        let refused = load_service_key(&short).err().ok_or("a short key loaded")?;
+        let shown = format!("{refused} {refused:?}");
+        assert!(carries_none(&shown), "the key error: {shown}");
+        assert!(!shown.contains(&hex(&seed[..31])));
+
+        let (status, body) = service
+            .post(
+                "/people",
+                Some(&cookie),
+                &serde_json::json!({ "operation": op(1).to_string(), "display_name": "Ada" }),
+            )
+            .await?;
+        assert_eq!(status, 200, "{body}");
+        let reused = serde_json::json!({ "operation": op(1).to_string(), "display_name": "Grace" });
+        let (status, refusal) = service.post("/people", Some(&cookie), &reused).await?;
+        assert_ne!(status, 200, "{refusal}");
+        assert_eq!(refusal["refusal"], "OperationReused", "{refusal}");
+        let mut answers = vec![body, refusal];
+        for path in ["/service-key", "/receipts/0"] {
+            let (status, answer) = service.get(path, None).await?;
+            assert_eq!(status, 200, "{path}: {answer}");
+            answers.push(answer);
+        }
+        let (_, listed) = service.get("/identities", Some(&cookie)).await?;
+        answers.push(listed);
+        let public = hex(&key.public_key_bytes());
+        assert_eq!(answers[2]["ed25519"], public, "the public key is answered");
+        let mut read = 0;
+        for answer in &answers {
+            assert!(carries_none(&answer.to_string()), "{answer}");
+            read += 1;
+        }
+        assert_eq!(read, 5, "every answer was searched");
+        Ok(())
+    }
+}
+
+mod faults {
+    use std::error::Error;
+
+    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::harness::{Fault, Harness};
+    use lys_identity::{IdentityError, IdentityId};
+
+    type TestResult = Result<(), Box<dyn Error>>;
+
+    /// The boundary after `fault`, walked by an exhaustive match so a new
+    /// crash boundary in the harness cannot be left out of the enumeration.
+    fn after(fault: Fault) -> Option<Fault> {
+        match fault {
+            Fault::None => Some(Fault::BeforeLeaf),
+            Fault::BeforeLeaf => Some(Fault::LeafStoredWriteFailed),
+            Fault::LeafStoredWriteFailed => Some(Fault::AfterLeaf),
+            Fault::AfterLeaf => Some(Fault::AfterLeafUnreadable),
+            Fault::AfterLeafUnreadable => None,
+        }
+    }
+
+    /// How an interrupted operation is recovered: by the same process
+    /// retrying it, or by a restart that reopens the log and then retries.
+    #[derive(Debug, Clone, Copy)]
+    enum Recovery {
+        Retry,
+        Restart,
+    }
+
+    /// Drive one boundary: Ada is registered, Grace's registration is cut at
+    /// `fault`, and then recovered as `recovery` says. Every projection the
+    /// directory answers along the way equals a fresh replay of the log, and
+    /// Grace ends up registered exactly once under one enduring id.
+    fn exercise(fault: Fault, recovery: Recovery) -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        harness.fail(fault);
+        let first = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        if matches!(first, Err(IdentityError::LogUnavailable { .. })) {
+            assert!(
+                directory.projection().is_err(),
+                "{fault:?}: no projection is answered while the append is uncertain"
+            );
+        }
+        harness.fail(Fault::None);
+        if matches!(recovery, Recovery::Restart) {
+            drop(directory);
+            directory = harness.open()?;
+        }
+        let (grace, _) = directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        if let Ok((answered, _)) = &first {
+            assert_eq!(*answered, grace, "{fault:?}: the first answer's id is kept");
+        }
+        let (again, _) = directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        assert_eq!(again, grace, "{fault:?}: resolved once, answered the same");
+        assert_eq!(directory.log()?.len()?, 2, "{fault:?}: no loss, no double");
+        let graces = directory
+            .projection()?
+            .records()
+            .filter(|(_, record)| record.profile().display_name() == "Grace")
+            .count();
+        assert_eq!(graces, 1, "{fault:?}: Grace is one identity");
+        let answered = directory.projection()?.clone();
+        drop(directory);
+        assert_eq!(
+            harness.open()?.projection()?,
+            &answered,
+            "{fault:?} {recovery:?}: the answered projection equals replay"
+        );
+        Ok(())
+    }
+
+    /// `ID001_AUDIT_FAULTS`: every append, pin and projection crash boundary
+    /// the harness can cut (none, meaning the process stops after the
+    /// commit and before its answer; before the leaf; the leaf stored
+    /// behind a failed write; after the leaf with the pin lost; and after
+    /// the leaf with the store unreadable) is exercised under both
+    /// recoveries, and the exercised cases are counted.
+    #[test]
+    fn every_crash_boundary_resolves_once_and_answers_equal_replay() -> TestResult {
+        let mut boundaries = vec![Fault::None];
+        while let Some(next) = boundaries.last().copied().and_then(after) {
+            boundaries.push(next);
+        }
+        let mut exercised = 0;
+        for fault in &boundaries {
+            for recovery in [Recovery::Retry, Recovery::Restart] {
+                exercise(*fault, recovery)?;
+                exercised += 1;
+            }
+        }
+        assert_eq!(boundaries.len(), 5, "five boundaries enumerated");
+        assert_eq!(exercised, 10, "each boundary under both recoveries");
+        Ok(())
+    }
+
+    /// The projection boundary on its own: an operation whose leaf is
+    /// committed but whose answer never reached the caller is found by the
+    /// same operation id after a restart, and keeps its identity.
+    #[test]
+    fn an_answer_lost_after_the_commit_is_found_by_its_operation_after_a_restart() -> TestResult {
+        let harness = Harness::new(9)?;
+        let mut directory = harness.open()?;
+        let (lost, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        drop(directory);
+        let mut restarted = harness.open()?;
+        let (found, again) = restarted.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        assert_eq!(found, lost);
+        assert_eq!(again, receipt);
+        assert_eq!(restarted.log()?.len()?, 1);
+        assert!(restarted.record(IdentityId::Person(found))?.is_some());
+        Ok(())
+    }
+}

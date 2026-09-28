@@ -23,5 +23,9 @@ sha2.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 
+[dev-dependencies]
+# The receipt test parses the signed event with standard COSE tooling, not the crate's own reader.
+coset.workspace = true
+
 [lints]
 workspace = true

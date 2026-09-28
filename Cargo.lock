@@ -1216,6 +1216,7 @@ version = "0.2.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "coset",
  "lys-core",
  "lys-identity",
  "lys-identity-server",
