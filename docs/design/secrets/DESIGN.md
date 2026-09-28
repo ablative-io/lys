@@ -159,6 +159,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-core/src/keys/identity.rs` | the Ed25519 identity and its seed constructor | SECRETS-006 |
 | `crates/lys-identity-server/src/agent_signature.rs` | the agent request signature check | SECRETS-006 |
 | `crates/lys-secrets/tests/support/served.rs` | the served broker of the tests | SECRETS-006 |
+| `crates/lys-secrets/tests/support/leases.rs` | the leases fixture with its clock | SECRETS-006 |
 
 ## Inventory
 

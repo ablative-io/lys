@@ -1797,7 +1797,7 @@
       "consequences": [
         "A signing key has no value-bearing use, and every value route and command refuses it by name.",
         "The bytes of an agent request are built by one function in lys-core, shared by the signer and the verifier.",
-        "Every signature is on the broker's audit record, in the audit line's existing fields, with no digest and no key.",
+        "Every signature is on the broker's audit record as an ordinary use line, with no digest and no key, and counts against its lease after a reopen.",
         "lys-core's rule that no constructor takes private key material is lifted for Ed25519Identity::from_seed alone, which takes the seed wrapped in Zeroizing."
       ],
       "supersedes": [],
