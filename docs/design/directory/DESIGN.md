@@ -614,7 +614,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/surface.rs` | DIRECTORY-046 R4: Served screens never block an async worker and index.html is read once | DIRECTORY-046 |
 | `surface/identity/src/features/grants/check.ts` | DIRECTORY-046 R6: The grants screens ask for reach in one concurrent batch | DIRECTORY-046 |
 | `surface/identity/src/api.ts` | DIRECTORY-046 R7: The screens choose the right route first and fetch independent reads together | DIRECTORY-046 |
-| `rules/no-app-names.yml` | DIRECTORY-048 R7: the ast-grep rule that refuses an app named in Lys code | DIRECTORY-048 |
 | `sgconfig.yml` | DIRECTORY-048 R7: the ast-grep configuration; gains the rule that refuses an app named in Lys code | DIRECTORY-048 |
 | `crates/lys/src/cli/mcp.rs` | DIRECTORY-049 R7: the Lys MCP server over standard input and output: three tools over the published registration API | DIRECTORY-049 |
 | `crates/lys/tests/mcp_stdio.rs` | DIRECTORY-049 R7: the MCP server driven over standard input and output, each tool call carrying the caller's own token or agent signature | DIRECTORY-049 |
@@ -689,6 +688,32 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/intent.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/intent_tests.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
 | `crates/lys/src/identity/upgrade/swap.rs` | R7: An upgrade stopped part-way is finished or put back | DIRECTORY-045 |
+| `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/Apps.tsx` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `surface/identity/src/features/apps/apps.css` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/schema_tests.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_binding.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity/src/grants/model.rs` | R2: An app's schema: its own kinds, actions, relations and parents, checked on entry | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/apps_schema.rs` | R3: Schema changes are versioned, dry-run first, and never strand a grant | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/grants_batch.rs` | R5: Apps check many permissions at once and list what a subject may act on | DIRECTORY-048 |
+| `crates/lys-identity-server/src/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/tests/openapi.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/Cargo.toml` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-openapi/src/lib.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `crates/lys-identity-server/src/error_status.rs` | R6: One OpenAPI document, generated, describes every route | DIRECTORY-048 |
+| `rules/ast-grep/no-app-names.yml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-core/src/attestation/mod.rs` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys/src/identity/install/deployment.template.toml` | R7: Lys depends on no app | DIRECTORY-048 |
+| `surface/styles/tokens.css` | R7: Lys depends on no app | DIRECTORY-048 |
+| `crates/lys-identity-server/src/receipts_api.rs` | R4: Type, keys, read, wait, resize and compact through Lys | DIRECTORY-050 |
+| `crates/lys-identity/src/provisioning.rs` | R5: Account rotation on usage limit | DIRECTORY-050 |
+| `crates/lys-identity-server/src/stop_api.rs` | R6: Wake with a message; stop through the runner | DIRECTORY-050 |
+| `surface/identity/src/features/runtime/Sessions.tsx` | R7: Sessions screen: see, type to and stop every agent | DIRECTORY-050 |
+| `rules/ast-grep/no-poll.yml` | R1: Usage measured from the transcript, per turn | DIRECTORY-051 |
 
 ## Inventory
 
