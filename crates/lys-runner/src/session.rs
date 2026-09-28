@@ -49,7 +49,7 @@ mod lifecycle;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
-pub(crate) use lifecycle::Wake;
+pub(crate) use lifecycle::{Wake, accounts, append};
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";

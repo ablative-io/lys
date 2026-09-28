@@ -32,16 +32,24 @@
 //! against any runner given its socket.
 
 pub mod client;
+pub mod collector;
 pub mod dial;
 pub mod error;
+pub mod judge;
+pub mod operations;
+pub mod peer;
 pub mod protocol;
 pub mod pty;
 pub mod published;
+pub mod refusal_log;
+pub mod refusals;
 pub mod rotation;
 pub mod scrollback;
 pub mod session;
 pub mod socket;
 pub mod state;
+pub mod tracking;
+pub mod tracking_store;
 
 pub use client::{Client, Closer, Connection, connect};
 pub use error::RunnerError;

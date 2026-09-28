@@ -219,7 +219,11 @@ impl Sessions {
     /// Follow session `id`'s bound stream on a thread of its own, stopping
     /// any follower it had.
     pub(crate) fn follow(self: &Arc<Self>, table: &mut Table, id: &str) {
-        let Some(path) = table.feed.source(id).map(|source| PathBuf::from(&source.path)) else {
+        let Some(path) = table
+            .feed
+            .source(id)
+            .map(|source| PathBuf::from(&source.path))
+        else {
             return;
         };
         let Some(session) = table.sessions.get_mut(id) else {
@@ -230,7 +234,7 @@ impl Sessions {
         }
         let (wake, woken) = mpsc::channel();
         let notices = wake.clone();
-        let watched = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        let notifier = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
             let next = match event {
                 Ok(event) if event.need_rescan() => {
                     Wake::Lost("the notifier asked for a rescan".to_owned())
@@ -243,11 +247,11 @@ impl Sessions {
             }
         });
         let dir = path.parent().unwrap_or_else(|| Path::new("/")).to_owned();
-        let watcher = watched.and_then(|mut watcher| {
-            notify::Watcher::watch(&mut watcher, &dir, notify::RecursiveMode::NonRecursive)
-                .map(|()| watcher)
+        let watching = notifier.and_then(|mut each| {
+            notify::Watcher::watch(&mut each, &dir, notify::RecursiveMode::NonRecursive)
+                .map(|()| each)
         });
-        let watcher = match watcher {
+        let watcher = match watching {
             Ok(watcher) => watcher,
             Err(error) => {
                 let words = format!("{} cannot be watched: {error}", dir.display());
@@ -325,7 +329,9 @@ impl Sessions {
 /// Stop the follower `follower` of session `id`.
 fn stop_follower(id: &str, follower: &mpsc::Sender<Wake>) {
     if follower.send(Wake::Stop).is_err() {
-        crate::error::said(&format!("session {id}: its stream follower had already ended"));
+        crate::error::said(&format!(
+            "session {id}: its stream follower had already ended"
+        ));
     }
 }
 
@@ -343,7 +349,10 @@ pub(crate) fn append(table: &mut Table, id: &str, bodies: Vec<Body>, source: Opt
 /// The rotation evidence of `session`.
 pub(crate) fn accounts<'a>(session: &'a Session, tracking: &'a Tracking) -> Accounts<'a> {
     Accounts {
-        current: session.rotation.as_ref().map(crate::rotation::RotationState::account),
+        current: session
+            .rotation
+            .as_ref()
+            .map(crate::rotation::RotationState::account),
         moves: session
             .rotation
             .as_ref()
@@ -373,7 +382,10 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         }
     };
     let identity = format!("{}:{}", metadata.dev(), metadata.ino());
-    let replaced = source.identity.as_ref().is_some_and(|held| *held != identity);
+    let replaced = source
+        .identity
+        .as_ref()
+        .is_some_and(|held| *held != identity);
     if replaced || metadata.len() < source.offset {
         let words = if replaced {
             "the stream's file was replaced"
@@ -388,7 +400,10 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
             "source_generation",
             source,
             Some(0),
-            format!("{words}: generation {} is read from its start", source.generation),
+            format!(
+                "{words}: generation {} is read from its start",
+                source.generation
+            ),
         )));
     }
     source.identity = Some(identity);
@@ -431,14 +446,19 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
 /// when it cannot be.
 pub(crate) fn bound_directory(directory: &str) -> String {
     let given = if directory.is_empty() { "." } else { directory };
-    std::fs::canonicalize(given)
-        .map_or_else(|_unresolved| given.to_owned(), |path| path.display().to_string())
+    std::fs::canonicalize(given).map_or_else(
+        |_unresolved| given.to_owned(),
+        |path| path.display().to_string(),
+    )
 }
 
 /// The executable `launch` runs, found as its environment's `PATH` finds
 /// it, and the version it reports, refused `tracking_contract_unsupported`
 /// unless it is the version `tracking` declares.
-pub(crate) fn launched(launch: &Launch, tracking: &Tracking) -> Result<(String, String), RunnerError> {
+pub(crate) fn launched(
+    launch: &Launch,
+    tracking: &Tracking,
+) -> Result<(String, String), RunnerError> {
     let unsupported = |words: String| RunnerError::refused("tracking_contract_unsupported", words);
     let program = Path::new(&launch.program);
     let found = if launch.program.contains('/') {
@@ -456,11 +476,21 @@ pub(crate) fn launched(launch: &Launch, tracking: &Tracking) -> Result<(String, 
     };
     let executable = found
         .and_then(|found| std::fs::canonicalize(found).ok())
-        .ok_or_else(|| unsupported(format!("{} is not found to ask its version", launch.program)))?;
+        .ok_or_else(|| {
+            unsupported(format!(
+                "{} is not found to ask its version",
+                launch.program
+            ))
+        })?;
     let output = std::process::Command::new(&executable)
         .arg("--version")
         .output()
-        .map_err(|error| unsupported(format!("{} did not say its version: {error}", executable.display())))?;
+        .map_err(|error| {
+            unsupported(format!(
+                "{} did not say its version: {error}",
+                executable.display()
+            ))
+        })?;
     let said = String::from_utf8_lossy(&output.stdout);
     let version = version_in(&said)
         .ok_or_else(|| unsupported(format!("{} names no version", executable.display())))?;

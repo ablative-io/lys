@@ -498,7 +498,10 @@ impl Feed {
             return Ok(0);
         };
         let (feed, offset) = cursor.split_once(':').ok_or_else(|| {
-            RunnerError::refused("cursor_invalid", "a feed cursor is the feed's id and an offset")
+            RunnerError::refused(
+                "cursor_invalid",
+                "a feed cursor is the feed's id and an offset",
+            )
         })?;
         if feed != self.index.feed {
             return Err(RunnerError::refused(

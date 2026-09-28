@@ -210,7 +210,10 @@ pub(crate) struct Desk {
 }
 
 fn key(question: &GrantQuestion) -> String {
-    format!("{}\n{}\n{}", question.session, question.attempt, question.rule)
+    format!(
+        "{}\n{}\n{}",
+        question.session, question.attempt, question.rule
+    )
 }
 
 /// Build the question for `needed` on the proved session.

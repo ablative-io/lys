@@ -262,7 +262,10 @@ fn feed(table: &mut Table, outcome: &OperationOutcome) {
 }
 
 /// Accept `operation` on the table, answering how it stands.
-pub(crate) fn accept(table: &mut Table, operation: Operation) -> Result<OperationOutcome, RunnerError> {
+pub(crate) fn accept(
+    table: &mut Table,
+    operation: Operation,
+) -> Result<OperationOutcome, RunnerError> {
     if let Some(held) = table.operations.get(&operation.operation) {
         let same = held.session == operation.session
             && held.request == operation.request.name()
@@ -334,7 +337,10 @@ pub(crate) fn accept(table: &mut Table, operation: Operation) -> Result<Operatio
 
 fn stop(table: &mut Table, id: &str, operation: &str) -> Result<OperationOutcome, RunnerError> {
     let Some(session) = table.sessions.get_mut(id) else {
-        return Err(RunnerError::refused("session_unknown", format!("no session {id} is held")));
+        return Err(RunnerError::refused(
+            "session_unknown",
+            format!("no session {id} is held"),
+        ));
     };
     session.ending = true;
     if let Some(live) = &session.live {
@@ -356,12 +362,18 @@ pub(crate) fn deliver(table: &mut Table, id: &str) {
         .operations
         .held
         .iter()
-        .find(|held| held.session == id && held.state == OperationState::Accepted && held.request != "stop")
+        .find(|held| {
+            held.session == id && held.state == OperationState::Accepted && held.request != "stop"
+        })
         .map(|held| held.operation.clone());
     let Some(operation) = next else {
         return;
     };
-    let text = table.operations.texts.remove(&operation).unwrap_or_default();
+    let text = table
+        .operations
+        .texts
+        .remove(&operation)
+        .unwrap_or_default();
     let marked = table.operations.set(
         &operation,
         OperationState::Delivering,
@@ -379,7 +391,10 @@ pub(crate) fn deliver(table: &mut Table, id: &str) {
         .ok_or_else(|| RunnerError::refused("session_unknown", format!("no session {id}")))
         .and_then(|session| type_text(session, id, &text));
     let (state, words) = match typed {
-        Ok(()) => (OperationState::Delivered, "typed into the session".to_owned()),
+        Ok(()) => (
+            OperationState::Delivered,
+            "typed into the session".to_owned(),
+        ),
         Err(error) => (OperationState::Refused, error.to_string()),
     };
     if let Some(session) = table.sessions.get_mut(id) {
@@ -409,7 +424,11 @@ pub(crate) fn compacting(table: &mut Table, id: &str) {
         .operations
         .held
         .iter()
-        .filter(|held| held.session == id && held.request == "compact" && held.state == OperationState::Delivered)
+        .filter(|held| {
+            held.session == id
+                && held.request == "compact"
+                && held.state == OperationState::Delivered
+        })
         .map(|held| held.operation.clone())
         .collect();
     for operation in delivered {
@@ -451,12 +470,15 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
             _ => continue,
         };
         table.operations.texts.remove(&operation);
-        let changed = table.operations.set(&operation, next, words).map(|mut outcome| {
-            if next == OperationState::Confirmed {
-                outcome.ended = Some(ended.clone());
-            }
-            outcome
-        });
+        let changed = table
+            .operations
+            .set(&operation, next, words)
+            .map(|mut outcome| {
+                if next == OperationState::Confirmed {
+                    outcome.ended = Some(ended.clone());
+                }
+                outcome
+            });
         match changed {
             Ok(outcome) => {
                 if let Some(held) = table

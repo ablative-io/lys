@@ -351,6 +351,16 @@ pub enum Answer {
         /// The status.
         status: StatusView,
     },
+    /// The judge's verdict on a tool call a harness asked about.
+    Judged {
+        /// The verdict.
+        verdict: crate::refusals::Verdict,
+    },
+    /// A hook, status line or notice from a harness was recorded.
+    Collected {
+        /// What was recorded, in words.
+        words: String,
+    },
     /// The act was refused, by name.
     Refused {
         /// The refusal's name.

@@ -76,7 +76,11 @@ pub fn answer(
         return Verdict::pass(None);
     };
     let attempt = attempt_of(&session, asked);
-    match sessions.lock().feed.attempt(&attempt_key(&session, &attempt)) {
+    match sessions
+        .lock()
+        .feed
+        .attempt(&attempt_key(&session, &attempt))
+    {
         Ok(Some(record)) => return Verdict::of(&record, "reused"),
         Ok(None) => {}
         Err(unread) => crate::error::said(&format!(
@@ -132,7 +136,7 @@ pub fn answer(
         grantor: denial.grantor,
         words: denial.words,
     };
-    keep(sessions, &session, &attempt, record)
+    keep(sessions, &session, &attempt, &record)
 }
 
 /// Ask each permission in turn; answer `None` when every one is given now,
@@ -178,7 +182,7 @@ fn lifted(
 
 /// Append `record` before answering; a failed append denies all the same,
 /// and holds the gap for the page to show.
-fn keep(sessions: &Sessions, session: &str, attempt: &str, record: RefusalRecord) -> Verdict {
+fn keep(sessions: &Sessions, session: &str, attempt: &str, record: &RefusalRecord) -> Verdict {
     let mut table = sessions.lock();
     let commit = Commit {
         source: None,
@@ -194,7 +198,7 @@ fn keep(sessions: &Sessions, session: &str, attempt: &str, record: RefusalRecord
         Ok(_) => {
             drop(table);
             sessions.wake();
-            Verdict::of(&record, "recorded")
+            Verdict::of(record, "recorded")
         }
         Err(error) => {
             let gap = table.gaps.entry(session.to_owned()).or_default();
@@ -205,8 +209,11 @@ fn keep(sessions: &Sessions, session: &str, attempt: &str, record: RefusalRecord
             crate::error::said(&format!(
                 "session {session}: audit_incomplete: the refusal of attempt {attempt} was not appended: {error}"
             ));
-            let mut verdict = Verdict::of(&record, "incomplete");
-            verdict.reason = format!("{} (audit_incomplete: the refusal could not be recorded)", verdict.reason);
+            let mut verdict = Verdict::of(record, "incomplete");
+            verdict.reason = format!(
+                "{} (audit_incomplete: the refusal could not be recorded)",
+                verdict.reason
+            );
             verdict
         }
     }

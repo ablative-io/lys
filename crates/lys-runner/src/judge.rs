@@ -11,7 +11,7 @@
 //! earlier answer is kept to stand in for a later one.
 //!
 //! Only structured fields are read: `file_path` of Read, Write and Edit,
-//! `path` of Glob and Grep, and the initial URL of WebFetch, whose hostname
+//! `path` of Glob and Grep, and the initial URL of `WebFetch`, whose hostname
 //! is read with the URL parser. A relative path is resolved against the
 //! session's bound working directory, dot segments are removed and every
 //! existing component is resolved through its symbolic links before the
@@ -340,7 +340,9 @@ enum Target {
 fn target_of(asked: &Asked<'_>) -> Target {
     if let Some(field) = path_field(asked.tool) {
         let given = match asked.input.get(field) {
-            None | Some(Value::Null) if field == "path" => return Target::Path(asked.cwd.to_owned()),
+            None | Some(Value::Null) if field == "path" => {
+                return Target::Path(asked.cwd.to_owned());
+            }
             Some(Value::String(given)) => given,
             _ => return Target::Unresolved(format!("{} carries no {field}", asked.tool)),
         };
@@ -354,13 +356,12 @@ fn target_of(asked: &Asked<'_>) -> Target {
             return Target::Unresolved(format!("{HOST_TOOL} carries no url"));
         };
         return match url::Url::parse(given) {
-            Ok(parsed) if matches!(parsed.scheme(), "http" | "https") => parsed
-                .host_str()
-                .and_then(canonical_host)
-                .map_or_else(
+            Ok(parsed) if matches!(parsed.scheme(), "http" | "https") => {
+                parsed.host_str().and_then(canonical_host).map_or_else(
                     || Target::Unresolved("the url names no host".to_owned()),
                     Target::Host,
-                ),
+                )
+            }
             Ok(_) => Target::Unresolved("the url is not http or https".to_owned()),
             Err(error) => Target::Unresolved(format!("the url does not parse: {error}")),
         };
@@ -429,8 +430,9 @@ fn covers(rule: &Rule, tool: &str, target: &Target) -> bool {
     }
     match (rule.kind, rule.target.as_deref(), target) {
         (RuleKind::Tool, _, _) => true,
-        (RuleKind::PathPrefix, Some(prefix), Target::Path(path)) => resolve(Path::new("/"), prefix)
-            .is_ok_and(|prefix| path.starts_with(prefix)),
+        (RuleKind::PathPrefix, Some(prefix), Target::Path(path)) => {
+            resolve(Path::new("/"), prefix).is_ok_and(|prefix| path.starts_with(prefix))
+        }
         (RuleKind::Host, Some(host), Target::Host(named)) => host == named,
         _ => false,
     }

@@ -341,24 +341,23 @@ pub fn status_figures(input: &Value) -> (Figures, Vec<Unavailable>) {
         .get("cost")
         .and_then(|cost| count(cost, "total_duration_ms"));
     let mut notes = Vec::new();
-    let figures = match usage {
-        Some(usage) => Figures {
+    let figures = if let Some(usage) = usage {
+        Figures {
             input_tokens: None,
             output_tokens: None,
             cache_creation_tokens: None,
             cache_read_tokens: None,
             context_tokens: context_of(usage),
             running_ms,
-        },
-        None => {
-            notes.push(Unavailable {
-                figure: "context_tokens".to_owned(),
-                reason: "status_current_usage_null".to_owned(),
-            });
-            Figures {
-                running_ms,
-                ..Figures::default()
-            }
+        }
+    } else {
+        notes.push(Unavailable {
+            figure: "context_tokens".to_owned(),
+            reason: "status_current_usage_null".to_owned(),
+        });
+        Figures {
+            running_ms,
+            ..Figures::default()
         }
     };
     if usage.is_some() {
@@ -390,7 +389,10 @@ pub fn is_prompt(record: &Value) -> bool {
     if record.get("isMeta").and_then(Value::as_bool) == Some(true) {
         return false;
     }
-    match record.get("message").and_then(|message| message.get("content")) {
+    match record
+        .get("message")
+        .and_then(|message| message.get("content"))
+    {
         Some(Value::String(_)) => true,
         Some(Value::Array(blocks)) => blocks
             .iter()
@@ -509,7 +511,10 @@ impl Reading<'_> {
             return bodies;
         }
         let id = message.get("id").and_then(Value::as_str).unwrap_or("");
-        let request = record.get("requestId").and_then(Value::as_str).unwrap_or("");
+        let request = record
+            .get("requestId")
+            .and_then(Value::as_str)
+            .unwrap_or("");
         let key = format!("{id}|{request}");
         if let Some(pending) = source.pending.as_mut().filter(|held| held.key == key) {
             pending.usage = usage.to_string();
@@ -577,13 +582,7 @@ impl Reading<'_> {
             turn: source.turn.clone(),
             observed_at: instant(record),
         };
-        vec![self.record(
-            source,
-            origin,
-            Measure::Spend,
-            rise.figures(context),
-            None,
-        )]
+        vec![self.record(source, origin, Measure::Spend, rise.figures(context), None)]
     }
 
     /// A status line's snapshot, kept as record `id`; none when it repeats
