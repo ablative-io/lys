@@ -186,7 +186,7 @@
     {
       "id": "R7",
       "title": "Agents reach it with 'lys mcp', signing with their own key",
-      "spec": "Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the request's signing digest and the agent's key handle to lys-secrets, which signs under its ordinary admission (SECRETS-006) and returns the signature only. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.",
+      "spec": "Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the agent's key handle and the request's typed members (method, path, the body's digest, the signing instant and the nonce) to lys-secrets under the agent_request purpose; the broker builds the bytes to sign itself, signs under its ordinary admission (SECRETS-006) and returns the signature only. No digest or bytes composed by 'lys mcp' are ever signed. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.",
       "acceptance": [
         "An agent launched from a profile asking for it lists the three tools and reads its own identity.",
         "The 'lys mcp' process never receives key material: the broker call answers a signature, and a test on the process's memory-held values and its arguments finds no key.",

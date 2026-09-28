@@ -158,7 +158,7 @@ Behavioural. Every lys_write that applies leaves a receipt (receipts_api.rs) nam
 
 ### R7: Agents reach it with 'lys mcp', signing with their own key
 
-Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the request's signing digest and the agent's key handle to lys-secrets, which signs under its ordinary admission (SECRETS-006) and returns the signature only. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
+Behavioural. 'lys mcp --agent ID' serves MCP over stdio and forwards each call to the server as a request signed for the agent. It never holds the agent's private key: it sends the agent's key handle and the request's typed members (method, path, the body's digest, the signing instant and the nonce) to lys-secrets under the agent_request purpose; the broker builds the bytes to sign itself, signs under its ordinary admission (SECRETS-006) and returns the signature only. No digest or bytes composed by 'lys mcp' are ever signed. Nothing is written to a file, an argument or the environment. The launch template (launch_template.rs) renders it into an agent's MCP configuration as 'identity (this service)' when its profile asks for it.
 
 **Acceptance:**
 - An agent launched from a profile asking for it lists the three tools and reads its own identity.
