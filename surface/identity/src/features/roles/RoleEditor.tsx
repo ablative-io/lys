@@ -4,8 +4,8 @@ import type { FormEvent } from 'react';
 import { operationId } from '../../api';
 import type { GrantModel } from '../../generated/grants';
 import { field } from '../people/RecordedForm';
-import { sameWords } from './contract';
-import type { GrantTemplate, Role, RoleWords } from './contract';
+import { roleWordsOf, sameWords } from './contract';
+import type { GrantTemplate, Role } from './contract';
 import { useRoleChange } from './useRoleChange';
 import { ChangeStatus } from './ChangeStatus';
 
@@ -15,8 +15,8 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
   const [failure, setFailure] = useState('');
   const path = role ? '/roles/' + encodeURIComponent(role.id) + '/versions' : '/roles';
   const change = useRoleChange<Role>('lys.pending.role.' + person + '.' + (role?.id ?? 'new'), path, (answer, body) => {
-    const words = body as unknown as RoleWords;
-    return answer.id === (role?.id ?? body.operation) && answer.versions.some((version) => version.made_by === person && sameWords(version, words));
+    const words = roleWordsOf(body);
+    return words !== null && answer.id === (role?.id ?? body.operation) && answer.versions.some((version) => version.made_by === person && sameWords(version, words));
   }, changed);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (change.blocked) return; setFailure('');
