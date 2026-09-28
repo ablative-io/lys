@@ -92,7 +92,7 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
               {agents.length ? agents.map((a) => {
                 const open = () => navigate('/file/' + a.id);
                 return (
-                  <tr key={a.id} data-href={'#/file/' + a.id} onClick={open} {...keyable(open)}>
+                  <tr key={a.id} data-href={'#/file/' + a.id} {...keyable(open)}>
                     <td>{a.display_name}</td>
                     <td><span className={'dot s-' + a.state} />{a.state}</td>
                     <td className="sec">{held(a.id) || 'no access'}</td>

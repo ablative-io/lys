@@ -25,8 +25,12 @@ afterEach(() => {
   for (const win of opened.splice(0)) win.close();
 });
 
+// The mock-up lives in the design folder, outside this package. Vite takes
+// `new URL(…, import.meta.url)` written out as an asset import and refuses one
+// outside the package root, so the base is held in a name first.
+const HERE = import.meta.url;
 const file = (version: Version) =>
-  decodeURIComponent(new URL(`../../../docs/design/identity/mockup/index.${version}.html`, import.meta.url).pathname);
+  decodeURIComponent(new URL(`../../../docs/design/identity/mockup/index.${version}.html`, HERE).pathname);
 
 // jsdom lays nothing out: every element gets a box on screen, so explain mode
 // places its numbers, and scrollIntoView is a no-op.

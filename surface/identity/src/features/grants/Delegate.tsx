@@ -132,7 +132,7 @@ export function Delegate({ w, source, to, done }: { w: GrantWorld; source: Grant
         <div>
           {relations.map(([r, acts]) =>
             withinPassOn(source, acts) ? (
-              <span key={r} className={'chk' + (r === relation ? ' on' : '')} data-pickrel={r} title={acts.join(', ')} aria-disabled={locked} onClick={() => { if (!locked) setRelation(r); }} {...keyable(() => { if (!locked) setRelation(r); })}>
+              <span key={r} className={'chk' + (r === relation ? ' on' : '')} data-pickrel={r} title={acts.join(', ')} aria-disabled={locked} {...keyable(() => { if (!locked) setRelation(r); })}>
                 {r}
               </span>
             ) : (

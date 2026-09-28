@@ -7,7 +7,7 @@ import { useShell } from './ShellContext';
 function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
   const shell = useShell();
   return (
-    <div className="concept" data-help={concept.id} onClick={() => shell.showHelp(concept.id)} {...keyable(() => shell.showHelp(concept.id))}>
+    <div className="concept" data-help={concept.id} {...keyable(() => shell.showHelp(concept.id))}>
       <div className="t">{concept.t}</div>
       {brief ? null : <div className="s">{concept.s}</div>}
     </div>
