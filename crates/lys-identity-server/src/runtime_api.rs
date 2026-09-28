@@ -116,7 +116,7 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn with_runtime<T>(
+pub(crate) fn with_runtime<T>(
     state: &AppState,
     act: impl FnOnce(&mut RuntimeStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {

@@ -7,6 +7,12 @@
 //! the handles it holds. A credential's value never reaches it: the broker
 //! lists handles without their token, and only their ids are named.
 //!
+//! A start is admitted once, under the caller's operation id, and kept in
+//! the runtime reports' log as the session's `starting` report before the
+//! command is answered; the session is that operation id. The same request
+//! sent again answers the same session and keeps nothing more, and the same
+//! operation id with other words is refused.
+//!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
 //! hold, a caller who does not answer for it, an agent with no profile, and
@@ -17,20 +23,25 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::{Path, Query, State};
+use axum::extract::rejection::JsonRejection;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method};
-use axum::routing::get;
+use axum::routing::post;
 use axum::{Json, Router};
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::ServerError;
+use crate::grants::caller;
 use crate::launch_template::{HandleName, Start, handle_variable, render};
 use crate::network_api::with_network;
 use crate::network_store::{Machine, NetworkStore};
 use crate::provisioning_api::with_provisioning;
 use crate::routes::{AppState, signed_in, with_directory};
+use crate::runtime_api::with_runtime;
+use crate::runtime_state::{Report, Reported};
+use crate::session::now;
 
 /// The answer of the start-command route.
 #[derive(Debug, Clone, Serialize)]
@@ -62,13 +73,15 @@ pub struct StartCommandView {
 }
 
 #[derive(Deserialize)]
-struct At {
-    machine: Option<String>,
+#[serde(deny_unknown_fields)]
+struct Launch {
+    machine: String,
+    operation: String,
 }
 
 /// The start-command route.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/start-command", get(start_command))
+    Router::new().route("/agents/{id}/start-command", post(start_command))
 }
 
 /// The machine `id`, when it takes `agent`: known, in use, with a runtime,
@@ -141,16 +154,19 @@ async fn start_command(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
-    Query(at): Query<At>,
+    body: Result<Json<Launch>, JsonRejection>,
 ) -> Result<Json<StartCommandView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let machine = at.machine.ok_or_else(|| ServerError::RequestMalformed {
-        reason: "name the machine as ?machine=<id>".to_owned(),
-    })?;
+    let Json(Launch { machine, operation }) =
+        body.map_err(|refused| ServerError::RequestMalformed {
+            reason: refused.body_text(),
+        })?;
+    let session = OperationId::from_str(&operation)?.to_string();
     let agent = agent.to_string();
-    let (version, runtime) = with_directory(&state, |directory| {
+    let (version, runtime, admitted_by) = with_directory(&state, |directory| {
         let directory = directory.projection()?;
+        let admitted_by = caller(&state, &headers, directory)?.to_string();
         let parsed = AgentId::from_str(&agent)?;
         let record = directory
             .record(IdentityId::Agent(parsed))
@@ -177,10 +193,9 @@ async fn start_command(
                 .clone()
                 .ok_or(ServerError::MachineWithoutRuntime)
         })?;
-        Ok((version, runtime))
+        Ok((version, runtime, admitted_by))
     })?;
     let handles = handles(&state, &headers, &agent).await?;
-    let session = OperationId::generate()?.to_string();
     let rendered = render(
         &Start {
             agent: &agent,
@@ -191,6 +206,19 @@ async fn start_command(
         },
         &handles,
     )?;
+    with_runtime(&state, |store| {
+        store.report(Report {
+            operation: session.clone(),
+            session: session.clone(),
+            agent: Some(agent.clone()),
+            machine: machine.clone(),
+            state: Reported::Starting,
+            what: format!("start admitted, template {}", rendered.template_sha256),
+            confirmation: String::new(),
+            reported_by: admitted_by,
+            at: now(),
+        })
+    })?;
     Ok(Json(StartCommandView {
         agent,
         machine,
