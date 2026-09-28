@@ -73,7 +73,48 @@
       "stories": [
         "S1",
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/decisions.json",
+            "change": "modified",
+            "note": "The quote of ADR-001 to ADR-008 and ADR-011 is now the exact declarative sentence the brief's acceptance gives; every other quote is unchanged."
+          }
+        ],
+        "how": "Each of the nine acceptance-given sentences is now the quote of its row in docs/design/decisions.json (one quote line per row in the ADR-001 to ADR-008 and ADR-011 objects), set by exact string, not paraphrase. I searched the file for each of the nine quote values held at 7b53625: every search finds 0 occurrences. Counting '…' and '...' across the quotes of ADR-001 to ADR-018 gives 0, and so does the count across all 78 decisions. Comparing field by field against HEAD, the quote of every other decision is unchanged. ADR-001 to ADR-011 are identical at HEAD and at 7b53625. ADR-012 to ADR-015 were changed between 7b53625 and HEAD, but only in their consequences, so their quotes still equal their values at 7b53625.",
+        "deviation": "The ledger has grown since the brief was written: it now holds 78 decisions (up to ADR-111), not 18. The comparison of the other decisions' quotes was therefore run over all 78 against HEAD. The quotes of ADR-001 to ADR-018 were also checked against 7b53625.",
+        "checklist": [
+          {
+            "id": "C1",
+            "done": true,
+            "note": "The quotes of ADR-001 to ADR-008 are the acceptance's exact sentences: one declarative sentence each, with no speaker, time of day, first person or ellipsis."
+          },
+          {
+            "id": "C2",
+            "done": true,
+            "note": "ADR-011's quote is the exact acceptance sentence."
+          },
+          {
+            "id": "C3",
+            "done": true,
+            "note": "Searching the file for each of the nine old quotes finds 0 occurrences."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S1",
+            "satisfied": true,
+            "note": "None of the nine quotes carries anyone's spoken words any more."
+          },
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "Only quote fields changed under R1; decision, context and consequences are untouched by it."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -108,7 +149,53 @@
       "stories": [
         "S2",
         "S3"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/decisions.json",
+            "change": "modified",
+            "note": "The context, decision and consequences of ADR-005 to ADR-008 now name the operator and the operator's workstation in place of a person, times of day and a personal machine."
+          }
+        ],
+        "how": "ADR-005's context, decision and second consequence were set to the exact strings the acceptance gives, and its first consequence is unchanged. ADR-006's context was produced by the acceptance's own transform: re.sub('At \\d{1,2}:\\d{2} on ', 'On ') and then replace(decided_by, 'the operator'). ADR-007 used re.sub(' at \\d{1,2}:\\d{2}', ''), replace(decided_by, 'the operator') and replace(' he asked', ' the operator asked'). ADR-008 used re.sub(' at \\d{1,2}:\\d{2}', '') and replace(decided_by, 'the operator'), and its third consequence was set to the acceptance string. The field-by-field diff against HEAD shows changes only in: ADR-005 context, decision, consequences[1] and quote; ADR-006 context and quote; ADR-007 context and quote; ADR-008 context, consequences[2] and quote. The number of consequences in each row is unchanged. In the new text, the decided_by name 'Tom', the time-of-day matches and the matches of \\bhe\\b all count 0, as the git diff shows.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C4",
+            "done": true,
+            "note": "'Tom' no longer appears in the context, decision or consequences of ADR-005 to ADR-008."
+          },
+          {
+            "id": "C5",
+            "done": true,
+            "note": "The times 14:08, 18:54, 18:56 and 18:55 were removed; their dates are kept."
+          },
+          {
+            "id": "C6",
+            "done": true,
+            "note": "ADR-005's context now reads 'the operator stated a need to get rid of PostgreSQL'."
+          },
+          {
+            "id": "C7",
+            "done": true,
+            "note": "ADR-005's decision and its second consequence now say 'the operator's workstation'."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S2",
+            "satisfied": true,
+            "note": "These fields now name roles instead of a person, times of day or a personal machine."
+          },
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "What each decision rules is unchanged; only who was named and the times of day are replaced."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -144,7 +231,63 @@
       "stories": [
         "S3",
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/decisions.json",
+            "change": "modified",
+            "note": "updated is now 2026-09-28. The file is serialised as json.dumps(indent=2, ensure_ascii=False) plus a newline, and every field R1 and R2 do not name is unchanged."
+          }
+        ],
+        "how": "Before writing, I asserted that the file equalled json.dumps(parsed, indent=2, ensure_ascii=False) + '\\n', then wrote it back in the same form. git diff --numstat against HEAD, the build's parent, gives 17 added and 17 removed lines: nine quotes, three ADR-005 lines, three context lines, ADR-008's consequence and the updated line. Decision ids and their order are the same as at HEAD. id, title, status, scope, date, decided_by, supersedes and superseded_by are unchanged for every decision. project is unchanged. updated is 2026-09-28, today's date, which the landing commit is expected to carry. scripts/design/schemas/decisions.schema.json was not touched. I did not run gate.sh or validate.py myself because the brief reserves them for the workflow. I did render every cluster into a temp copy, the same way gate.sh does, and every committed markdown file matched.",
+        "deviation": "Several acceptance rows say 18 decisions and compare against 7b53625, but main has moved on. The ledger now holds 78 decisions, and ADR-012 to ADR-015 had their consequences changed by other cards after 7b53625. The brief's own verification steps say 17/17 lines against 7b53625; that count holds only against HEAD. Reverting other cards' landed work would break their rows and the boundary against changing other fields. So I kept HEAD's content and applied only this brief's changes: the diff against the parent commit is exactly 17/17, and ADR-001 to ADR-011 were identical at 7b53625 and HEAD. Also, updated was set to 2026-09-28 on the assumption that the landing commit carries today's date.",
+        "checklist": [
+          {
+            "id": "C8",
+            "done": true,
+            "note": "Compared against HEAD, the only fields that differ are the ones C1 to C7 name."
+          },
+          {
+            "id": "C9",
+            "done": true,
+            "note": "ADR-001 to ADR-018 are still the first 18 decisions, in order. The ledger now holds 78 decisions in total, added by other cards."
+          },
+          {
+            "id": "C10",
+            "done": true,
+            "note": "updated is 2026-09-28, the expected commit date."
+          },
+          {
+            "id": "C11",
+            "done": true,
+            "note": "The file was written with json.dumps(indent=2, ensure_ascii=False) plus a newline, and the round-trip is byte-identical."
+          },
+          {
+            "id": "C12",
+            "done": true,
+            "note": "The schema file is untouched."
+          },
+          {
+            "id": "C13",
+            "done": true,
+            "note": "I expect gate.sh to pass: the temp-copy render of every cluster matches the committed markdown, and the schema and serialisation are unchanged. I did not run gate.sh itself."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S3",
+            "satisfied": true,
+            "note": "The meaning of every decision is preserved."
+          },
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "The schema is untouched, and every rendered cluster matches its committed markdown."
+          }
+        ]
+      }
     },
     {
       "id": "R4",
@@ -174,7 +317,93 @@
       ],
       "stories": [
         "S4"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "docs/design/directory/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered; its ADR-005 decision line now names the operator's workstation."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-001.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-002.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-006.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-021.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this brief postdates the one I was given."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-025.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this brief postdates the one I was given."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-030.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this brief postdates the one I was given."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-031.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this brief postdates the one I was given."
+          },
+          {
+            "path": "docs/design/directory/briefs/DIRECTORY-041.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this brief postdates the one I was given."
+          },
+          {
+            "path": "docs/design/decisions-words/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          },
+          {
+            "path": "docs/design/decisions-words/briefs/DECISIONSWORDS-001.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          },
+          {
+            "path": "docs/design/rauthy-rebase/DESIGN.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line; this cluster also cites ADR-005."
+          },
+          {
+            "path": "docs/design/rauthy-rebase/briefs/RAUTHYREBASE-001.md",
+            "change": "modified",
+            "note": "Re-rendered ADR-005 line."
+          }
+        ],
+        "how": "I ran python3 scripts/design/render-cluster.py on docs/design/directory, docs/design/decisions-words and docs/design/rauthy-rebase; no markdown was edited by hand. Each changed markdown file differs from HEAD by exactly one line added and one removed. That line is the ADR-005 entry in the '- ADR-005 — The identity database is PostgreSQL, possibly on a network device — …' form, which now ends '…rather than on the operator's workstation.' No cluster's JSON changed. I then rendered every cluster that has a design.json into a temp copy, the way gate.sh does, and found no differing markdown, so no 'rendered markdown differs' line is expected.",
+        "deviation": "The brief names six rendered files, but on the current main, five newer directory briefs (DIRECTORY-021, 025, 030, 031, 041) and two rauthy-rebase files (DESIGN.md and RAUTHYREBASE-001.md) also render ADR-005's decision. Leaving them stale would make gate.sh report 'rendered markdown differs', which would break CN5 and R4's gate acceptance. So they were regenerated by the renderer, one line each, and the landing's file list is thirteen markdown files plus decisions.json, not six plus one. The PAGE.md files of directory, roots, rauthy-rebase and decisions-words still mention the old machine name, but render-cluster.py does not produce them and the boundary forbids editing them, so they were left unchanged.",
+        "checklist": [
+          {
+            "id": "C14",
+            "done": true,
+            "note": "Every committed markdown file that renders ADR-005's decision is now the renderer's output over the changed ledger, confirmed by a render of every cluster into a temp copy."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S4",
+            "satisfied": true,
+            "note": "No rendered markdown differs from what its JSON renders to, and the schema is untouched."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [
