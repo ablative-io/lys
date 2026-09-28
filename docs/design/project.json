@@ -65,6 +65,12 @@
           "command": "python3 scripts/identity-gates/rauthy_ready.py",
           "requires": ["tool:python3", "tool:docker", "tool:git"],
           "cadence": "demand"
+        },
+        {
+          "name": "identity-release",
+          "command": "sh scripts/identity-gates/release.sh",
+          "requires": ["tool:sh", "tool:git", "tool:cargo", "tool:rustfmt", "rust-build"],
+          "cadence": "demand"
         }
       ]
     },
