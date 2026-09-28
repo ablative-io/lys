@@ -1270,6 +1270,51 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The chain's judgement of HOME-001",
+      "items": [
+        {
+          "id": "C83",
+          "text": "docs/design/home/PROOF-CHAIN.md names commit 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff and toolchain 1.97.1, maps every HOME-001 row to its files present or absent at that commit, names R7, R10 and R12 unbuilt, and maps the seven step 5 cards to their rows.",
+          "done": false
+        },
+        {
+          "id": "C84",
+          "text": "The proof holds one Jev line per file of crates/lys-home at 0073b966, 25 in all, each with model, run id and verdict.",
+          "done": false
+        },
+        {
+          "id": "C85",
+          "text": "The proof records the seven commands .land/gates.sh runs at 0073b966 with each exit status and outcome, and the ast-grep leg as not measured naming ngzIkkpd.",
+          "done": false
+        },
+        {
+          "id": "C86",
+          "text": "Every finding is its own proof line marked still true at a named main head or answered by a named commit, and only still-true findings in crates/lys-home or docs/design/home are listed for the step 5 board.",
+          "done": false
+        },
+        {
+          "id": "C87",
+          "text": "The proof records the missing LOSS-ACCOUNT.md, record/mod.rs's functions and claude_code/mod.rs's consts and fn as findings with their citations and counts.",
+          "done": false
+        },
+        {
+          "id": "C88",
+          "text": "The proof gives each of the seven step 5 cards the verdict done or in review by row, and never done to 0BgjD59r or qY9mBz-y.",
+          "done": false
+        },
+        {
+          "id": "C89",
+          "text": "The landing changes nothing under crates/lys-home and passes src_pr, src_land and sh scripts/design/gate.sh.",
+          "done": false
+        },
+        {
+          "id": "C90",
+          "text": "After the green landing the step 5 board matches the proof: done cards point at the landing, in-review cards at their finding cards.",
+          "done": false
+        }
+      ]
     }
   ]
 }

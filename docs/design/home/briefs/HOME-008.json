@@ -1,438 +1,261 @@
 {
   "id": "HOME-008",
   "cluster": "home",
-  "title": "Sign each call, harness event and home-recorded open of a home into a lys log under the agent's identity, and verify a session against it",
-  "depends_on": [
-    "HOME-001",
-    "HOME-002",
-    "HOME-003",
-    "HOME-004",
-    "HOME-006"
-  ],
+  "title": "Judge the hand-built HOME-001 code in crates/lys-home at 0073b966 through the chain's whole judgement and record each check's outcome in a proof, without changing the crate",
+  "depends_on": [],
   "blocked_by": [
-    "DIRECTORY-003 R2 landed, with the home-entry, home-entry-copy and home checkpoint payloads reviewed with its envelope before any durable byte is signed: checked by `git cat-file -e main:docs/design/identity/IDENTITY-EVENTS.md` and `git cat-file -e main:crates/lys-identity/src/lib.rs` both succeeding on lys main.",
-    "F-BV2vqP landed: the Lys card for lys-log-store's change that stores subtree hashes instead of holding every leaf in memory (today at crates/lys-log-store/src/log.rs:53-60), released as lys-log-store 0.3.0; checked on lys main by `cargo metadata --format-version 1 --no-deps` reporting version 0.3.0 for the package named lys-log-store (its Cargo.toml takes its version from the workspace, so the version is read as cargo resolves it)."
+    "A worktree of lys at 0073b966 on the build host with toolchain 1.97.1 installed",
+    "A working jev_ask.awl route (Jev key and ledger) able to judge a file against the empty tree",
+    "Read access to the step 5 board for the map of its seven cards to HOME-001 rows"
   ],
   "checklist": [
-    "C45",
-    "C46",
-    "C47",
-    "C48",
-    "C49",
-    "C50",
-    "C51",
-    "C52",
-    "C53",
-    "C54",
-    "C55",
-    "C56",
-    "C57"
+    "C83",
+    "C84",
+    "C85",
+    "C86",
+    "C87",
+    "C88",
+    "C89",
+    "C90"
   ],
   "stories": [
-    "S24",
-    "S25",
-    "S26",
-    "S27",
-    "S28"
+    "S35",
+    "S36",
+    "S37"
   ],
   "design_anchor": [
-    "ADR-003",
+    "ADR-031",
     "ADR-012",
-    "ADR-019",
-    "ADR-020"
+    "ADR-016"
   ],
-  "purpose": "A home's lys.call and lys.harness_event entries today are lines in a file: nothing signs them and none reaches a lys log, so a stranger cannot tell an honest history from an edited one, and opening a sealed record leaves no record at all. This brief gives each such entry, each line a fork copies of those kinds (one written before the log included), and each sealed record opened through the home, one signed leaf in a lys log the home keeps under its agent's identity, carrying ids, the kind and the line's hash and never content. Logging is enabled on a home by one act that names the home's agent, records it in the home and writes a signed checkpoint covering what the home held before it; a home never enabled appends as today. A failed append is refused by entry without removing the line and holds the session pending under a named marker, an append to a logging home whose agent key is absent is refused before its line is written, and lys-home gains open and verify commands. The design's signed entry log paragraph, CN11, CN12 and ADR-019 carry the architecture.",
-  "task": "Build after both blockers land, on the lys main they land on. Add lys-core, lys-log-store and lys-identity to lys-home; define the three payloads in the identity event envelope (R1); keep one log for the home at log/, naming its agent in log/agent, and sign with that agent identity's own key as the identity crate holds it (R2); enable logging on a home by lys-home log-enable --agent, which writes log/agent and the checkpoint and is refused without the agent's key (R3); hook the leaf append into the end of Session::append_entry, Session::append_beside, Session::append_under and Session::append_copied for lys.call, lys.harness_event and lys.open only, on a logging home only, with a copy leaf for a line a fork copies, naming the parent entry's leaf, or the checkpoint leaf when the parent entry predates it (R4), which covers ingest_call, ingest_call_files, ingest_outcome, the Claude Code importer, render-launch's template_render, lys-home open and lys-home fork; refuse an append to a logging home whose agent key is absent before its line is written (R5); refuse a failed append by entry, mark the session pending at log/pending/<session id>.json and write the pending leaf first at the session's next open (R6); reconcile a missing leaf on re-ingest (R7); open a sealed record through lys-home open, checking the session, its pending state and the agent key before anything is opened, and record it as a lys.open entry (R8); verify a session, a forked child included (R9), through a new lys-home verify subcommand (R10); run the words' tests through the binary (R11); record the formats and their adversarial review (R12). record/mod.rs, record/call.rs and harness/claude_code/import.rs are each within about 40 lines of the 500-line limit: new logic goes in the named new files and those files gain only the calls into them. crates/lys-identity/src/lib.rs and docs/design/identity/IDENTITY-EVENTS.md are not in the tree today; the DIRECTORY-003 R2 blocker brings them, and this brief changes them only after it lands. Out of scope: putting a sealed record into a session (no entry kind holds one, and none is added); the verifier command line crates/lys, whose lys open writes nothing and keeps its single OpenFailed; the door's proxy and the runtime; anchoring; encryption at rest; Haematite as the store; any entry kind but lys.call, lys.harness_event and lys.open; a per-entry backfill of entries written before the checkpoint.",
+  "purpose": "HOME-001's built rows reached main by hand before every carded row had to go through its board's chain, so nothing on main says the chain has judged that code and the cards carrying those rows cannot honestly be done. This brief runs the chain's whole judgement over crates/lys-home as it stands at 0073b966 (Jev per file, fmt, clippy pedantic, tests, the gate's other legs, and ast-grep recorded as not measured), records every outcome and every finding in one proof document against that commit and toolchain, and lands it without changing a byte of the crate, so a card is done only when the chain has judged its row's files and no open finding touches them (ADR-031).",
+  "task": "Measure, do not change. Every compile, test battery and gate of this card runs on Dean's laptop, never on the Mac the card is written on; the words' sentence about the one-build queue on this Mac is dropped. Make a worktree of lys at 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff there with toolchain 1.97.1 (rust-toolchain.toml at that commit) and run the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide as the gate runs them; fmt is measured by `cargo fmt --check`, the gate's own form, never the rewriting `cargo fmt --all`. Clippy pedantic is the workspace lint table's `pedantic = warn` under `-D warnings`, measured through the two clippy legs. Ask Jev about each of the crate's 25 files at that commit through jev_ask.awl, against the empty tree, cut per part as the chain cuts a new file, with no new src_land mode; Jev's lines are evidence (model, run id, verdict), not a rerunnable command, so the rerun promise of the acceptance covers the seven deterministic legs at the named commit and toolchain only. ast-grep is recorded as not measured, naming card ngzIkkpd, which writes lys's first rule set; no borrowed rule set is run. Only rows whose files are on main at 0073b966 are judged: R7, R10 and R12 are unbuilt and named so, and their cards (0BgjD59r for R7, qY9mBz-y for R10) are never set done here. Each finding is its own line, checked against the current main head: a finding answered there names its fixing commit and gets no card; one still true in crates/lys-home or docs/design/home becomes one card on the step 5 board; one outside them is shown whole and named for its own board. Three findings stand on the repository's rules whatever Jev says: the missing docs/design/home/LOSS-ACCOUNT.md (R4), record/mod.rs carrying functions (R1, R2), and claude_code/mod.rs carrying consts and a fn (R3, R4). A card is done only if no finding still true touches its rows' files; green means the landing passed src_pr and src_land, never that the crate is clean. The measurement at 0073b966 and src_land's gate on the landing head are recorded apart, each with its sha. Out of scope: any new capability in lys-home, any change to a HOME-001 row, writing LOSS-ACCOUNT.md, moving any function, and any card other than the seven. Every requirement writes into the one proof document, so the primary-file rule is met by the proof's sections rather than by separate files.",
   "requirements": [
     {
       "id": "R1",
-      "title": "Add the three home payloads to the identity event envelope",
-      "spec": "Structural. crates/lys-home/Cargo.toml gains lys-core, lys-log-store and lys-identity as path dependencies of the workspace, and nothing else. The identity event envelope that DIRECTORY-003 R2 lands carries three typed payloads for the home, and no second envelope: the home-entry payload, tagged lys/home-entry/v1, with exactly four fields in this order: session (the session id, UTF-8), entry (the entry id, UTF-8), kind (the entry's customType, UTF-8: lys.call, lys.harness_event or lys.open) and line_sha256 (the 32-byte SHA-256 of the entry's line as written, excluding its terminating newline); the home-entry-copy payload, tagged lys/home-entry-copy/v1, for a line a fork copies into a child session, with exactly seven fields in this order: session (the child session id), entry, kind, line_sha256 as the home-entry payload has them, then parent_session (the parent session id, UTF-8), parent_leaf (the unsigned 64-bit index in the home's log of the parent entry's leaf, or of the log's checkpoint leaf when the parent entry has no leaf because it was written before the checkpoint) and parent_position (the unsigned 64-bit position of the parent entry among the entry lines of the parent session file, counted from 1, header excluded, present on every copy leaf whichever parent leaf it names, never optional and never a byte offset); and the home checkpoint payload, tagged lys/home-checkpoint/v1, holding one row per session of the home, sorted by session id bytewise, each with exactly session (UTF-8), entries (the count of entry lines, header excluded) and file_sha256 (the 32-byte SHA-256 of the file's bytes). crates/lys-home/src/record/leaf.rs encodes and decodes a leaf: its bytes are one encoding, the envelope's own serialised form carrying the tagged payload and the COSE_Sign1 bytes that lys_core::attestation::sign_attestation produces over that payload's encoded bytes. crates/lys-identity/src/lib.rs and docs/design/identity/IDENTITY-EVENTS.md are not in the tree today: the DIRECTORY-003 R2 blocker brings them, and this requirement modifies them only after it lands. WHERE the envelope as landed carries none of these payloads, THE SYSTEM SHALL add them as typed payloads of that same envelope in crates/lys-identity/src/home_payloads.rs, declared from crates/lys-identity/src/lib.rs, and name them in docs/design/identity/IDENTITY-EVENTS.md; WHERE the envelope as landed already carries them under these tags and fields, THE SYSTEM SHALL use them as landed and SHALL NOT create home_payloads.rs. THE SYSTEM SHALL NOT define a second envelope, SHALL NOT put any field in any of the three payloads beyond those named, SHALL NOT carry a message, tool, compaction, plaintext or envelope byte in any, SHALL NOT mutate lys/attestation/v2 or any other format lys-core publishes, and SHALL NOT sign any durable byte under any of the three tags before R12's review is recorded. record/mod.rs declares leaf and, under cfg(test), leaf_tests in this requirement.",
+      "title": "Frame the proof: the measured commit, the toolchain, the row map and the card map",
+      "spec": "THE SYSTEM SHALL create docs/design/home/PROOF-CHAIN.md whose first section names the commit every leg of this judgement was measured on as 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff, the toolchain as the channel 1.97.1 that rust-toolchain.toml pins at that commit together with the `rustc --version` and `cargo --version` lines printed where the legs ran, and states that the legs ran from the root of a worktree checked out at that commit on the build host that runs every compile, test battery and gate. It SHALL hold one table row per HOME-001 requirement, R1 to R12, listing every path of that row's files.create and files.modify with `present` or `absent` as `git cat-file -e 0073b966:<path>` reports it, and SHALL name R7, R10 and R12 as unbuilt rows that are not judged and need their own words and briefs. It SHALL hold the map of the seven step 5 cards that carry R1 to R11 to the HOME-001 rows each carries, by card id, as the step 5 board holds it, with 0BgjD59r carrying R7 and qY9mBz-y carrying R10. THE SYSTEM SHALL NOT judge a row any of whose code files is absent at that commit, SHALL NOT edit, reword or renumber any HOME-001 row, and SHALL NOT record as this judgement anything measured on a checkout of another commit.",
       "acceptance": [
-        "A unit test encodes a home-entry payload for session `s1`, entry `e1`, kind `lys.call` and line_sha256 of the bytes `abc`, decodes it, and gets back exactly those four values with line_sha256 equal to ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad.",
-        "A unit test encodes a home-entry-copy payload for session `child`, entry `e1`, kind `lys.call`, line_sha256 of `abc`, parent_session `parent`, parent_leaf 7 and parent_position 3, decodes it, and gets back exactly those seven values.",
-        "A unit test signs a home-entry leaf with one Ed25519 identity and verifies its attestation with lys_core::attestation::verify_attestation_bytes_by_signer under that identity's public key: Ok.",
-        "The same leaf verified under a second identity's public key is refused.",
-        "A checkpoint payload built from sessions `b` then `a` encodes its rows in the order `a`, `b`.",
-        "Each of the six pairs of a leaf of one of the three tags decoded as a payload of another of the three is refused: the test asserts 6 refusals.",
-        "`cargo tree -p lys-home --depth 1` lists lys-core, lys-log-store and lys-identity.",
-        "docs/design/identity/IDENTITY-EVENTS.md names the three tags and the fields of each payload in the order above."
+        "`grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints a number of 1 or more, and the frame section names the toolchain channel `1.97.1`.",
+        "The row table holds exactly 12 rows, R1 to R12, and its present and absent marks equal what `git cat-file -e 0073b966:<path>` reports for each listed path.",
+        "The row table marks docs/design/home/LOSS-ACCOUNT.md absent in R4's row; crates/lys-home/examples/passthrough.rs and docs/design/home/PROOF-PROXY.md absent in R7's row; 17 paths absent in R10's row; crates/lys-home/src/record/handover.rs and docs/design/home/PROOF-HANDOVER.md absent in R12's row; and every listed path of R1, R2, R3, R5, R6, R8, R9 and R11 present.",
+        "R7, R10 and R12 are each named as unbuilt, needing their own words and brief, and no Jev line, leg outcome or card verdict of this proof is attributed to them as judged.",
+        "The card map lists exactly seven card ids, every row R1 to R11 appears under a card, 0BgjD59r lists R7 and qY9mBz-y lists R10."
       ],
       "files": {
         "create": [
-          "crates/lys-home/src/record/leaf.rs",
-          "crates/lys-home/src/record/leaf_tests.rs",
-          "crates/lys-identity/src/home_payloads.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/Cargo.toml",
-          "Cargo.lock",
-          "crates/lys-identity/src/lib.rs",
-          "docs/design/identity/IDENTITY-EVENTS.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C45"
-      ],
-      "stories": [
-        "S24"
-      ]
-    },
-    {
-      "id": "R2",
-      "title": "Keep one signed log for the home, name its agent, and append a leaf to it",
-      "spec": "crates/lys-home/src/record/entry_log.rs holds the home's log at log/ under the home root, a lys-log-store FileLeafStore behind lys-log-store's Log, one log for every session of the home. The home's agent is named by the file log/agent under the home root, which holds the agent identity as given to log-enable (R3) followed by one newline and nothing else; a session finds its home, and so its log, from its own file's place in the home (sessions/<id>.jsonl under the home root). WHEN a leaf is appended, THE SYSTEM SHALL read the agent from log/agent, sign the payload with the Ed25519 key the identity crate (DIRECTORY-003 R2) holds for that agent identity, through lys_core::attestation::sign_attestation, and append the leaf as one log leaf. IF log/ exists and log/agent does not, THEN THE SYSTEM SHALL refuse with a message beginning `home <home> logs its entries and names no agent in log/agent`, and write no leaf. WHEN asked whether the log holds a leaf for a session and entry id, THE SYSTEM SHALL answer from the leaves in the log alone, with that leaf's index when it does. THE SYSTEM SHALL NOT sign with any key but the named agent identity's, SHALL NOT infer the agent from the home's path, SHALL NOT make, generate or store a key of its own, SHALL NOT write a leaf's coordinate into any session file, SHALL NOT hold the log's leaves in memory beyond what lys-log-store's Log holds, and SHALL NOT put key material in any Debug output, error or report. record/mod.rs declares entry_log and, under cfg(test), entry_log_tests in this requirement.",
-      "acceptance": [
-        "A unit test on a fresh home whose log/agent names agent `agent-fixture`, whose key the identity crate holds, appends a home-entry leaf for session `s1` entry `e1`: the home then holds log/log.json and log/leaves/00000000000000000000, and the log's size is 1.",
-        "After that append, asking the log for session `s1` entry `e1` answers present at index 0, and for session `s1` entry `e2` answers absent.",
-        "The leaf read back from log/leaves/00000000000000000000 verifies under the public key of `agent-fixture`, and is refused under the public key of a second identity the identity crate holds.",
-        "A unit test on a home whose log/ exists and whose log/agent was removed appends a leaf: refused with a message beginning `home ` and holding `names no agent in log/agent`, and the log's size is unchanged.",
-        "`grep -rn 'generate\\|from_seed\\|SigningKey::' crates/lys-home/src/record/entry_log.rs` prints nothing.",
-        "The Debug output of the entry log's value, formatted with {:?} in a test, does not contain the hex of the identity's seed."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/src/record/entry_log.rs",
-          "crates/lys-home/src/record/entry_log_tests.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C46"
-      ],
-      "stories": [
-        "S24"
-      ]
-    },
-    {
-      "id": "R3",
-      "title": "Enable logging on a home, writing the checkpoint leaf",
-      "spec": "lys-home log-enable --home <dir> --agent <agent identity>. A home logs its entries when its log/ directory holds a log; a home whose log/ does not exist has never had logging enabled. WHEN log-enable runs on a home that does not log and the identity crate holds a key for the agent named by --agent, THE SYSTEM SHALL write log/agent naming that agent (R2), create the log and append as its leaf 0 one lys/home-checkpoint/v1 leaf naming every session of the home with its entry count and the SHA-256 of its file as they stand, signed with that agent's key, print one JSON object with exactly the fields command (`log-enable`), agent, sessions (the number of rows in the checkpoint), log_size and log_root (lowercase hex), and exit 0. IF --agent is not given, THEN THE SYSTEM SHALL exit 2 with the argument parser's message naming `--agent` on stderr and create nothing. IF the identity crate holds no key for the named agent (an agent it does not know included), THEN THE SYSTEM SHALL exit 1 with a message on stderr beginning `log-enable refused: the identity crate holds no key for agent ` followed by the agent, then ` of home ` and the home, and create nothing. THE SYSTEM SHALL NOT write a leaf for any entry on record before the checkpoint, SHALL NOT write a second checkpoint to a log that holds one, SHALL NOT enable logging by any act but log-enable, SHALL NOT take the agent from anything but --agent, and SHALL NOT read any line's content into the checkpoint beyond hashing the file's bytes. record/mod.rs declares log_checkpoint and, under cfg(test), log_checkpoint_tests, and lib.rs declares cli_entry_log, in this requirement.",
-      "acceptance": [
-        "A unit test on a home holding session `pre` with 2 entries and session `other` with 3 entries runs log-enable with agent `agent-fixture`: log/agent holds exactly the bytes `agent-fixture` and one newline, the log holds 1 leaf, a checkpoint with rows (`other`, 3, SHA-256 of other's file) then (`pre`, 2, SHA-256 of pre's file) that verifies under the public key of `agent-fixture`, and the report carries agent `agent-fixture`, sessions 2 and log_size 1.",
-        "Appending one lys.call to `pre` after that adds exactly one leaf, a home-entry leaf, and the log holds 2 leaves of which exactly 1 is a checkpoint.",
-        "Running log-enable a second time on that home leaves the log holding exactly 1 checkpoint leaf.",
-        "On a fresh home holding no session, log-enable writes a checkpoint with 0 rows and a log of size 1.",
-        "lys-home log-enable --home H without --agent exits 2 with stderr holding `--agent`, and H has no log/ directory afterwards.",
-        "On a home, lys-home log-enable --agent `agent-unheld`, an agent whose key the identity crate does not hold, exits 1 with stderr beginning `log-enable refused: the identity crate holds no key for agent agent-unheld of home `, and the home has no log/ directory afterwards."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/src/record/log_checkpoint.rs",
-          "crates/lys-home/src/record/log_checkpoint_tests.rs",
-          "crates/lys-home/src/cli_entry_log.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/lib.rs",
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/src/cli.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C48",
-        "C54"
-      ],
-      "stories": [
-        "S25"
-      ]
-    },
-    {
-      "id": "R4",
-      "title": "Append one leaf for every lys.call, lys.harness_event and lys.open line of a logging home",
-      "spec": "The hook is one call into the entry log made at the end of each of the four writers of a session line, after the last step each makes durable: Session::append_entry (which Session::append calls, and through which ingest_call, ingest_call_files, ingest_outcome and the Claude Code importer write) after the head; Session::append_beside (template_render's side leaf) after the index row; Session::append_under after the index row; and Session::append_copied (a fork's copy of a parent line) after the head. WHEN any of the four writes an entry whose customType is lys.call, lys.harness_event or lys.open to a session of a home that logs its entries, THE SYSTEM SHALL append that entry's one leaf, taking the line's bytes from what was written: a home-entry leaf for append_entry, append_beside and append_under, and for append_copied a home-entry-copy leaf naming the parent session id, the parent entry's position in the parent session file and, as parent_leaf, the index of the parent entry's leaf in the home's log. WHEN append_copied copies a lys.call, lys.harness_event or lys.open line whose parent entry has no leaf in the log because it is among the entries the checkpoint counts for the parent session, THE SYSTEM SHALL name as parent_leaf the index of the log's checkpoint leaf, with the parent entry's position, and SHALL NOT refuse the fork for it. WHEN the home has never had logging enabled, THE SYSTEM SHALL append the entry as it did before this brief, with no leaf and no log. THE SYSTEM SHALL NOT append a leaf for any other entry kind (message, lys.given, lys.lantern, lys.lantern_epilogue, lys.fork, lys.forked_from, lys.authored, lys.inherited, compaction and the rest), SHALL NOT append a leaf before the line is durable, SHALL NOT write a line of a logged kind by any path but these four, SHALL NOT create a log for a home that does not log, SHALL NOT move the head or change the session head hash because of a leaf, and SHALL NOT change any byte a session file held before. Logic beyond the call into the entry log stays out of record/mod.rs, which stays under 500 lines of code.",
-      "acceptance": [
-        "A unit test appends one message entry, one lys.given entry and one lys.lantern entry to a session of a logging home: the log's size does not change.",
-        "Session::append of one lys.call entry to a session of a logging home grows the log by exactly 1 leaf, a home-entry leaf of kind lys.call naming that entry, and the head is that entry afterwards.",
-        "Importing a Claude Code transcript of one `permission-mode` record into a logging home, which writes through Session::append_entry, grows the log by exactly 1 leaf, whose kind is lys.harness_event.",
-        "Session::append_beside of one lys.harness_event entry to a session of a logging home grows the log by exactly 1 leaf of kind lys.harness_event, and the session's head before and after is the same entry id.",
-        "Session::append_under of one lys.open entry under a named entry of a session of a logging home grows the log by exactly 1 leaf of kind lys.open, and the session's head before and after is the same entry id.",
-        "A unit test on a logging home appends to session `parent` a user message, a lys.call and an assistant message, lights a lantern at the assistant message and forks it: the log grows by exactly 1 leaf for the child, a home-entry-copy leaf of kind lys.call whose session is the child's id, whose entry is the lys.call's id, whose parent_session is `parent`, whose parent_position is 2 and whose parent_leaf is the index of the parent's lys.call leaf; the copied messages, lys.forked_from and lys.fork add no leaf.",
-        "A unit test writes to session `early` of a home a user message, a lys.call and an assistant message, runs log-enable, then lights a lantern at the assistant message and forks it: the fork succeeds, and the log grows by exactly 1 leaf for the child, a home-entry-copy leaf of kind lys.call whose parent_session is `early`, whose parent_leaf is 0 (the checkpoint leaf) and whose parent_position is 2.",
-        "The leaf of an appended lys.call has line_sha256 equal to the SHA-256 of that entry's line in the session file, read back from the file, excluding its newline.",
-        "The bytes of the session file before an append are a prefix of its bytes after it.",
-        "On a home that never ran log-enable, appending one lys.call writes its line, and the home has no log/ directory afterwards."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/src/record/beside.rs",
-          "crates/lys-home/src/record/fork.rs",
-          "crates/lys-home/src/record/entry_log_tests.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C46",
-        "C54",
-        "C57"
-      ],
-      "stories": [
-        "S24"
-      ]
-    },
-    {
-      "id": "R5",
-      "title": "Refuse an append to a logging home whose agent key is absent, before its line is written",
-      "spec": "IF an entry whose customType is lys.call, lys.harness_event or lys.open is to be appended to a session of a home that logs its entries and the identity crate holds no key for the agent log/agent names (an agent it does not know included), THEN THE SYSTEM SHALL refuse before the line is written with a message beginning `home <home> logs its entries and the identity crate holds no key for its agent: refused <kind>` and ending `hold the agent's key in the identity crate for this home`, and write no line, no index row, no head and no leaf. IF log/agent is missing, THEN THE SYSTEM SHALL refuse the same append before its line with R2's message and write nothing. THE SYSTEM SHALL NOT write an unlogged lys.call, lys.harness_event or lys.open line to a session of a logging home, SHALL NOT sign with any other key in its place, and SHALL NOT carry content in the refusal.",
-      "acceptance": [
-        "In the end-to-end test, on a logging home whose agent's key the identity crate no longer holds, lys-home ingest-call for call id `k1` exits 1 with stderr beginning `home ` and holding `refused lys.call`, and the bytes of the session file and every file under log/ are the same before and after.",
-        "With the key held again, lys-home ingest-call for call id `k1` exits 0, the session file holds one lys.call line for `k1`, and the log holds exactly one home-entry leaf for that entry.",
-        "A unit test on a logging home whose log/agent was removed appends one lys.call: refused with a message holding `names no agent in log/agent`, and the session file's bytes are unchanged."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/src/error.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C55"
-      ],
-      "stories": [
-        "S27"
-      ]
-    },
-    {
-      "id": "R6",
-      "title": "Refuse a failed append by entry and hold the session until its leaf is written",
-      "spec": "The pending marker of a session is the file log/pending/<session id>.json under the home root, holding one JSON object with exactly two fields, session (the session id) and entry (the entry id whose leaf is pending), and nothing else. IF the leaf append for an entry fails after its line is durable, THEN THE SYSTEM SHALL write that session's pending marker naming the entry, and return a refusal whose message begins `leaf append failed for entry <entry id> of session <session id>`. WHEN a session with a pending marker is opened for writing (Home::open_session, Session::open), THE SYSTEM SHALL first append the pending entry's leaf, unless the log already holds a leaf for it, and remove the marker, before the open returns; IF that fails, THEN THE SYSTEM SHALL leave the marker as it is and the open returns. WHILE a session has a pending marker, WHEN any entry is to be appended to it, THE SYSTEM SHALL first try the pending leaf in the same way; IF that fails, THEN THE SYSTEM SHALL refuse the append with a message beginning `session <session id> is pending the leaf of entry <entry id>` and write no line. THE SYSTEM SHALL NOT retry a pending leaf when a session is only read (SessionReader, and verify without --repair), SHALL NOT remove or rewrite the pending entry's line, SHALL NOT report the entry as recorded in any report, SHALL NOT append a second leaf for an entry the log already holds, and SHALL NOT carry content in the marker or either refusal. record/mod.rs declares pending and, under cfg(test), pending_tests in this requirement, and calls into pending from Home::open_session, Session::open and the append path.",
-      "acceptance": [
-        "In the end-to-end test, with the home's log/leaves directory made read-only, lys-home ingest-call for call id `c3` exits 1, prints nothing on stdout, and prints on stderr a line beginning `leaf append failed for entry ` followed by the entry id of the lys.call holding `c3` in the session file.",
-        "Directly after, the session file holds that lys.call line, the log's size is unchanged, and log/pending/logged.json holds exactly the JSON object with session `logged` and entry the id of that lys.call.",
-        "Still read-only, lys-home ingest-call for call id `c4` exits 1, prints on stderr a line beginning `session logged is pending the leaf of entry ` followed by the same entry id, and the session file holds no entry for `c4`.",
-        "A unit test leaves session `s1` pending the leaf of entry `e1` with log/leaves read-only, makes log/leaves writable, and calls Home::open_session on `s1` and appends nothing: the log then holds exactly one leaf for `e1` and log/pending/s1.json does not exist.",
-        "With log/leaves writable again, lys-home ingest-call for call id `c4` exits 0, and the log then holds exactly one leaf for the `c3` entry and exactly one for the `c4` entry, and log/pending/logged.json does not exist.",
-        "A unit test that finds the log already holding the pending entry's leaf removes the marker and appends no leaf."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/src/record/pending.rs",
-          "crates/lys-home/src/record/pending_tests.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/src/error.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C49"
-      ],
-      "stories": [
-        "S27"
-      ]
-    },
-    {
-      "id": "R7",
-      "title": "Keep re-ingest idempotent and reconcile a missing leaf",
-      "spec": "WHEN ingest_call, ingest_call_files or ingest_outcome finds its call id already recorded, THE SYSTEM SHALL check the log for that entry's leaf, append it if the log holds none, and report already_recorded as today. THE SYSTEM SHALL NOT append a second leaf for an entry the log already holds and SHALL NOT write a second lys.call line.",
-      "acceptance": [
-        "In the end-to-end test, a second lys-home ingest-call with call id `c1` exits 0 with already_recorded true and the log's size unchanged.",
-        "A unit test that appends a lys.call line with its leaf failing, then ingests the same call id with the log writable, leaves the log holding exactly one leaf for that entry and the session holding exactly one lys.call line for that call id."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "crates/lys-home/src/record/call.rs",
-          "crates/lys-home/src/record/call_tests.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C50"
-      ],
-      "stories": [
-        "S24"
-      ]
-    },
-    {
-      "id": "R8",
-      "title": "Open a sealed record through the home and record the open",
-      "spec": "lys-home open --home <dir> --session <id> --key <recipient key file> --sender-public-key <hex> --envelope <file> --attestation <file> --out <file>, taking the recipient key file, the sender's Ed25519 public key, the sealed envelope and its attestation as lys open takes them, since lys_core::seal::open_and_verify needs them. Before open_and_verify runs and before any plaintext is written, THE SYSTEM SHALL check in this order: IF --out names an existing path, THEN refuse with a message beginning `open refused: --out ` naming that path; IF the named session is not in the home, THEN refuse with the error opening that session gives, naming the session; IF the session is pending and its pending leaf cannot be written (R6), THEN refuse with R6's pending message; IF the home logs its entries and the identity crate holds no key for its agent, or log/agent is missing, THEN refuse with R5's message for kind lys.open; each such refusal exits 1 and writes nothing. WHEN those checks pass and open_and_verify succeeds, THE SYSTEM SHALL write the plaintext to --out in a file it creates new with mode 0600 on Unix in the same call that creates it, as lys open does, then append to the named session one lys.open custom entry whose data holds exactly envelope_sha256 (the lowercase hex SHA-256 of the sealed envelope file's bytes), sender_public_key (lowercase hex) and out (the --out path as given), and that entry's leaf by R4; the report on stdout names the entry id, the envelope_sha256 and the payload byte count. IF open_and_verify fails for any reason, THEN THE SYSTEM SHALL refuse with the one message lys open gives for every such failure, `sealed envelope open failed: invalid attestation or undecryptable envelope`, exit 1, write no plaintext, append no entry and append no leaf. THE SYSTEM SHALL NOT put a byte of the plaintext or of the envelope in the entry, the leaf, the report or any error, SHALL NOT record a refused open in the session or the log, SHALL NOT tell one cryptographic failure from another, SHALL NOT run open_and_verify before the checks above pass, SHALL NOT create the --out file with any wider mode, even for a moment before narrowing it, and SHALL NOT change crates/lys. record/mod.rs declares open and, under cfg(test), open_tests, and lib.rs declares cli_open, in this requirement.",
-      "acceptance": [
-        "In the end-to-end test, a record sealed with lys-core to a recipient key and opened by lys-home open into session `opened` of a logging home exits 0, the --out file's bytes equal the sealed plaintext, the session gains exactly one lys.open entry whose envelope_sha256 equals the SHA-256 of the envelope file, and the log grows by exactly 1 leaf, of kind lys.open.",
-        "The same open with a second recipient key exits 1 with stderr holding `sealed envelope open failed: invalid attestation or undecryptable envelope`, the --out path does not exist afterwards, the session file's bytes are unchanged, and the log's size is unchanged.",
-        "The same open with --out naming an existing file exits 1 with stderr beginning `open refused: --out `, that file's bytes are unchanged, and the session file's bytes and the log's size are unchanged.",
-        "The same open with --session `absent`, a session the home does not hold, exits 1 with stderr holding `absent`, and the --out path does not exist afterwards.",
-        "The same open on the logging home after the identity crate no longer holds its agent's key exits 1 with stderr beginning `home ` and holding `refused lys.open`, the session file's bytes are unchanged, and the --out path does not exist afterwards.",
-        "The same open into session `opened` while it is pending the leaf of an entry and log/leaves is read-only exits 1 with stderr beginning `session opened is pending the leaf of entry `, the session file's bytes are unchanged, and the --out path does not exist afterwards.",
-        "On Unix, after the successful open, the --out file's permission bits read 0600.",
-        "A byte scan of the session file and every file under log/ for the sealed plaintext's text finds 0 matches after the successful open."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/src/record/open.rs",
-          "crates/lys-home/src/record/open_tests.rs",
-          "crates/lys-home/src/cli_open.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs",
-          "crates/lys-home/src/cli.rs",
-          "crates/lys-home/src/lib.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C56"
-      ],
-      "stories": [
-        "S28"
-      ]
-    },
-    {
-      "id": "R9",
-      "title": "Verify a session against the log and the checkpoint",
-      "spec": "Verify reads the session through SessionReader and the log, and writes nothing. WHEN a session is verified, THE SYSTEM SHALL check, over the leaves of the home's log for that session and the checkpoint: every leaf's attestation verifies over its payload and its signer is the public key of the agent log/agent names; each lys.call, lys.harness_event and lys.open entry after the checkpoint's count has exactly one leaf (home-entry or home-entry-copy) whose kind equals the entry's customType and whose line_sha256 equals the SHA-256 of its line as the file holds it; every such leaf names an entry the session holds; for each home-entry-copy leaf whose parent_leaf is not the checkpoint's index, the log's leaf at its parent_leaf index exists and is a home-entry or home-entry-copy leaf whose session is its parent_session and whose entry and line_sha256 equal the copy's; for each home-entry-copy leaf whose parent_leaf is the checkpoint's index, the checkpoint leaf exists in the log and names parent_session with an entry count of at least parent_position, and the entry line at parent_position in the parent session file is byte-equal to the copied line; and the SHA-256 of the file's bytes through the end of the checkpoint's counted entry lines equals the checkpoint's file_sha256. IF a home-entry-copy leaf's parent_position is 0, or is greater than the number of entry lines in the parent session file (header excluded) whenever that file is in the home, THEN THE SYSTEM SHALL refuse naming the copied entry as for any failing entry. THE SYSTEM SHALL check a copy that names a parent entry's leaf against that leaf in the log without requiring any file of the parent session, and SHALL require the parent session file only for a copy that names the checkpoint leaf. WHEN every check passes, THE SYSTEM SHALL return a result carrying exactly session (the session id), entries (the entry lines in the session file, header excluded), logged (the lys.call, lys.harness_event and lys.open entries after the checkpoint's count), leaves (the number of home-entry and home-entry-copy leaves in the log whose session is this session), checkpoint (the checkpoint's entries and file_sha256 for this session, entries 0 and no file hash when the checkpoint does not name it), log_size and log_root. IF an entry fails, THEN THE SYSTEM SHALL refuse naming the first such entry in file order with a message beginning `verify refused: entry <entry id> of session <session id>`; IF the pre-log history fails, THEN THE SYSTEM SHALL refuse with a message beginning `verify refused: session <session id> does not match the checkpoint`. THE SYSTEM SHALL NOT accept a leaf signed by any other key, SHALL NOT pass a logged entry that has no leaf or two leaves, SHALL NOT pass a copy whose parent leaf is absent or differs, SHALL NOT pass a copy naming the checkpoint leaf whose parent entry line is absent or differs from the copied line, SHALL NOT pass a copy whose parent_position is 0 or past the parent file's last entry line, SHALL NOT print any line content, and SHALL NOT write any file unless asked to repair. record/mod.rs declares verify and, under cfg(test), verify_tests in this requirement.",
-      "acceptance": [
-        "A unit test signs one leaf of a logged session with a second Ed25519 identity: verify refuses with a message beginning `verify refused: entry ` and naming that entry's id.",
-        "A unit test appends a duplicate leaf for one entry: verify refuses naming that entry.",
-        "A unit test with a leaf naming entry `ghost`, which the session does not hold, refuses naming `ghost`.",
-        "A unit test whose logged entry has no leaf and no pending marker refuses naming that entry.",
-        "On R4's forked home, verifying the child with the parent's files sessions/parent.jsonl, sessions/parent.index.jsonl and sessions/parent.head removed returns a passing result whose leaves is 1 and whose logged is 1.",
-        "On R4's forked home with the parent's files in place, verifying the child returns a passing result whose leaves is 1; with the copy leaf re-signed to name as parent_leaf the index of the checkpoint leaf, keeping parent_position 2, verify refuses naming the copied lys.call's entry id, since the checkpoint counts 0 entries of `parent`.",
-        "On R4's home forked from `early`, with the parent's files in place, verify of the child returns a passing result whose leaves is 1, whose logged is 1 and whose checkpoint entries is 0.",
-        "On that home, with the `m` of the model in the lys.call line of sessions/early.jsonl changed to `n` in place, verify of the child refuses with a message beginning `verify refused: entry ` and naming the copied lys.call's entry id.",
-        "On that home, with sessions/early.jsonl, sessions/early.index.jsonl and sessions/early.head removed, verify of the child refuses with a message beginning `verify refused: entry ` and naming the copied lys.call's entry id.",
-        "A unit test on a home holding session `edge` of exactly three entry lines, a lys.call, a user message and a lys.call, written before log-enable, runs log-enable, then copies all three entry lines, in file order, into a new session `edge-child` through Session::append_copied, so that each copied line's parent is already in `edge-child` and no copy is refused with UnknownParent: the copied user message adds no leaf, and the log grows by exactly 2 home-entry-copy leaves with parent_leaf 0 and parent_position 1 and 3, and verify of `edge-child` returns a passing result whose leaves is 2.",
-        "On that home, with the copy leaf of the third line re-signed to name parent_position 4, verify of `edge-child` refuses with a message beginning `verify refused: entry ` and naming that copied entry's id.",
-        "On that home, with the copy leaf of the first line re-signed to name parent_position 0, verify of `edge-child` refuses with a message beginning `verify refused: entry ` and naming that copied entry's id."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/src/record/verify.rs",
-          "crates/lys-home/src/record/verify_tests.rs"
-        ],
-        "modify": [
-          "crates/lys-home/src/record/mod.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C51"
-      ],
-      "stories": [
-        "S26"
-      ]
-    },
-    {
-      "id": "R10",
-      "title": "Give lys-home a verify subcommand",
-      "spec": "lys-home verify --home <dir> --session <id> [--repair]. WHEN every check of R9 passes, THE SYSTEM SHALL print one JSON object on stdout with exactly the fields command (`verify`), then session, entries, logged, leaves (home-entry and home-entry-copy leaves whose session is this session), checkpoint (an object of entries and file_sha256), log_size and log_root (lowercase hex) as R9's result carries them, and exit 0. WHEN --repair is given and the session is pending, THE SYSTEM SHALL write the pending leaf first, then verify, and the report SHALL carry repaired with the count of leaves it wrote. IF verification refuses, THEN THE SYSTEM SHALL exit 1 with R9's message on stderr and print nothing on stdout. THE SYSTEM SHALL NOT write any file without --repair and SHALL NOT print any line content.",
-      "acceptance": [
-        "lys-home verify --home H --session logged, on the end-to-end test's home after two calls and one event, prints a report with entries 3, logged 3, leaves 3, checkpoint entries 0, log_size 4, and exits 0.",
-        "Without --repair, the bytes of every file under H are the same before and after the command, a pending marker included.",
-        "On a home pending the leaf of one entry, lys-home verify --repair with the log writable prints a report with repaired 1 and exits 0, and log/pending/<session id>.json is gone."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "crates/lys-home/src/cli_entry_log.rs",
-          "crates/lys-home/src/cli.rs"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C51"
-      ],
-      "stories": [
-        "S26"
-      ]
-    },
-    {
-      "id": "R11",
-      "title": "Run the words' tests through the command line",
-      "spec": "crates/lys-home/tests/entry_log.rs drives the lys-home binary on a fresh temporary home whose agent identity `agent-fixture` has its key held by the identity crate. It runs lys-home log-enable --agent agent-fixture on it, imports crates/lys-home/tests/fixtures/entry_log/one_event.jsonl, a Claude Code transcript of one `permission-mode` record and no message, as session `logged`, then ingests two calls with call ids `c1` and `c2`, each with model `m-fixture`, whose request bodies each carry one user message holding the text `lys-fixture-sentinel-4f1c`. crates/lys-home/tests/fixtures/entry_log/prelog/ is a home written by lys-home at the base commit, before logging, of exactly three files: sessions/pre.jsonl, holding session `pre` with one lys.call entry of model `m-fixture` and one lys.harness_event entry, its index sessions/pre.index.jsonl and its head sessions/pre.head. THE SYSTEM SHALL pass each check below and SHALL NOT pass a check by running zero cases: each asserts the count it ran over.",
-      "acceptance": [
-        "After log-enable, the import and the two ingests, the log holds exactly 4 leaves: 1 checkpoint of 0 rows and 3 home-entry leaves (two of kind lys.call, one of kind lys.harness_event), and lys-home verify exits 0 with leaves 3.",
-        "Changing the `m` of `m-fixture` in the `c2` entry's line in the session file to `n`, in place, makes lys-home verify exit 1 with stderr beginning `verify refused: entry <id of the c2 entry> of session logged`, and names no other entry.",
-        "Ingesting `c1` a second time leaves the log at 4 leaves.",
-        "A byte scan of every file under the home's log/ directory for `lys-fixture-sentinel-4f1c` scans at least 6 files (log.json, agent and 4 leaves) and finds 0 matches, while the same scan of the home's blocks/ directory finds at least 1.",
-        "On a copy of the prelog fixture, lys-home ingest-call into `pre` without log-enable exits 0, writes its line, and leaves the home with no log/ directory.",
-        "On a second copy of the prelog fixture, lys-home log-enable --agent agent-fixture then one lys-home ingest-call into `pre` gives a log of 2 leaves whose leaf 0 is a checkpoint naming `pre` with 2 entries, and lys-home verify --session pre exits 0 with checkpoint entries 2.",
-        "On that second copy, changing the `m` of `m-fixture` in the pre-log lys.call line to `n`, in place, makes lys-home verify --session pre exit 1 with stderr beginning `verify refused: session pre does not match the checkpoint`."
-      ],
-      "files": {
-        "create": [
-          "crates/lys-home/tests/entry_log.rs",
-          "crates/lys-home/tests/fixtures/entry_log/one_event.jsonl",
-          "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.jsonl",
-          "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.index.jsonl",
-          "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.head"
+          "docs/design/home/PROOF-CHAIN.md"
         ],
         "modify": [],
         "delete": []
       },
       "checklist": [
-        "C46",
-        "C47",
-        "C48",
-        "C50",
-        "C51",
-        "C54"
+        "C83"
       ],
       "stories": [
-        "S24",
-        "S25",
-        "S26"
+        "S35"
       ]
     },
     {
-      "id": "R12",
-      "title": "Record the formats and their adversarial review",
-      "spec": "docs/design/home/RECORD.md gains a section on the signed entry log: the log at log/ under the home and log/agent naming its agent, the three tags and their fields, which entry kinds are logged (lys.call, lys.harness_event and lys.open) and what a lys.open entry's data holds, a fork's copy leaf, naming the parent entry's leaf or, for a parent entry from before the checkpoint, the checkpoint leaf and the entry's position, log-enable and what a home that never ran it does, the line-then-leaf order, the pending marker at log/pending/<session id>.json and its retry, the checkpoint, and how verify reads them; its opening sentence that nothing is signed is corrected to name what is. docs/design/identity/IDENTITY-EVENTS.md, which the DIRECTORY-003 R2 blocker brings and which this requirement modifies only after it lands, records the adversarial review of the three payloads, held jointly with the review of the envelope DIRECTORY-003 R2 lands, covering a forged leaf, a leaf signed by another key, cross-protocol confusion among the three tags and with the envelope's other payloads, a replayed leaf for another entry or session (a copy leaf offered for its parent's entry included), and guessing a short line from its SHA-256, each with the attack tried and why it fails. THE SYSTEM SHALL NOT sign a durable byte under any of the three tags before that review is recorded, and SHALL NOT change the rules those documents already state for other formats.",
+      "id": "R2",
+      "title": "Record Jev's verdict on each file of the crate at the measured commit",
+      "spec": "WHEN the build judges crates/lys-home at 0073b966, THE SYSTEM SHALL ask Jev through jev_ask.awl about each of the 25 paths `git ls-tree -r --name-only 0073b966 crates/lys-home` prints, the change being that file added against the empty tree and cut per part as the chain cuts a new file, and SHALL record in docs/design/home/PROOF-CHAIN.md one line per path with the parts asked, the model, the run id, the verdict (`patched`, `solved`, `unsure` or `not_asked`), the patched value when Jev gives one, held, and Jev's reason. IF a file's verdict is `unsure`, THEN THE SYSTEM SHALL ask once more with the whole file as one part and record both asks, and the line SHALL read `unsure` when the second ask is also unsure. IF the verdict is `not_asked`, THEN the line SHALL record the file as not measured with Jev's reason, and IF that reason is that the chain skipped a file it should have read, THEN THE SYSTEM SHALL record a finding against the chain, for the chain's board. THE SYSTEM SHALL record the Jev lines as evidence, SHALL NOT present them as a command a reader can rerun, SHALL NOT ask Jev about any path outside crates/lys-home, SHALL NOT add a src_land mode, and SHALL NOT let a `solved` verdict close a finding another leg holds.",
       "acceptance": [
-        "`grep -c 'lys/home-entry/v1\\|lys/home-entry-copy/v1\\|lys/home-checkpoint/v1' docs/design/home/RECORD.md` prints a number of at least 3.",
-        "RECORD.md no longer says nothing is signed without naming lys.call, lys.harness_event and lys.open as signed on a logging home.",
-        "IDENTITY-EVENTS.md holds a review record naming the five attacks above, each with its outcome."
+        "The Jev section holds exactly 25 file lines, and their paths equal, as a set, the 25 lines `git ls-tree -r --name-only 0073b966 crates/lys-home` prints.",
+        "Every Jev line carries a non-empty model, a non-empty run id, and a verdict that is exactly one of `patched`, `solved`, `unsure` and `not_asked`.",
+        "Every Jev line whose first ask was `unsure` carries a second ask whose part is the whole file.",
+        "Every Jev line reading `not_asked` reads not measured and carries Jev's reason.",
+        "No Jev line names a path outside crates/lys-home: docs/design/home/RECORD.md, PROOF-RESUME.md, PROOF-FEWSHOT.md, PROOF-CANON.md and canon/canon.jsonl have no Jev line.",
+        "The Jev section states that its lines are evidence and not a rerunnable command."
       ],
       "files": {
         "create": [],
         "modify": [
-          "docs/design/home/RECORD.md",
-          "docs/design/identity/IDENTITY-EVENTS.md"
+          "docs/design/home/PROOF-CHAIN.md"
         ],
         "delete": []
       },
       "checklist": [
-        "C52",
-        "C53"
+        "C84"
       ],
       "stories": [
-        "S24"
+        "S35"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Run the gate's seven deterministic legs at the measured commit and record the ast-grep leg as not measured",
+      "spec": "THE SYSTEM SHALL run, from the root of the worktree at 0073b966 with toolchain 1.97.1, each of the seven commands .land/gates.sh runs at that commit, verbatim, workspace-wide and in its order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`; and SHALL record in docs/design/home/PROOF-CHAIN.md for each leg the exact command, the commit, its exit status and its outcome, `pass` for exit status 0 and `fail` for any other, and for a failing leg the failing crate or design cluster, the command and the first error it printed. Clippy pedantic SHALL be measured by the two clippy legs through the workspace lint table's `pedantic` at `warn` under `-D warnings`, with no flag added. THE SYSTEM SHALL record the ast-grep leg as not measured, naming card ngzIkkpd as the reason: lys has no ast-grep rule set until that card lands. THE SYSTEM SHALL state that the rerun promise covers these seven deterministic legs at that commit and toolchain only, and not Jev. THE SYSTEM SHALL NOT run fmt in its rewriting form, SHALL NOT borrow an ast-grep rule set, SHALL NOT change a byte of the worktree before a leg runs, and SHALL NOT record the landing head's gate as this measurement, nor this measurement as the landing's gate.",
+      "acceptance": [
+        "The legs section holds exactly seven leg lines, whose commands are, verbatim and in order: `sh scripts/design/gate.sh`, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features`, `cargo doc --no-deps`.",
+        "Every leg line names 0073b966, an integer exit status, and `pass` when the exit status is 0 and `fail` when it is not.",
+        "Every leg line reading `fail` names the failing crate or design cluster, the command and the first error line.",
+        "The proof holds an ast-grep line that reads not measured and names ngzIkkpd.",
+        "The rerun statement names the seven commands, 0073b966 and toolchain 1.97.1, and says that Jev's lines are not covered by it.",
+        "Running each recorded command from the root of a worktree made by `git worktree add <dir> 0073b966`, with toolchain 1.97.1, gives the exit status the proof records for it."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-CHAIN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C85"
+      ],
+      "stories": [
+        "S35"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Record each finding as its own line, checked against the current main head",
+      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md every finding of every leg as its own line: each `patched` and each `unsure` Jev line, each diagnostic of a failing deterministic leg, each finding against the chain, and each repository-rule finding of R5. Each line SHALL carry a finding id, the leg, the path and line it concerns, what was found (for a `patched` line, what Jev found), the HOME-001 rows whose files include that path, and exactly one status against the main head the proof names by full sha: `still true at <sha>`, or `answered by <sha>` naming the commit that fixed it. WHEN a finding still true lies in crates/lys-home or docs/design/home, THE SYSTEM SHALL list it under findings for the step 5 board, one card each, worded from its line, with the act that answers it; for an `unsure` line that act is a person's read of that file, recorded as a card. WHEN a finding lies outside crates/lys-home and docs/design/home, THE SYSTEM SHALL list it under findings outside this card's scope with the board it belongs to, a lys-core finding on the Lys root board and a design cluster's finding on that cluster's board, and it SHALL hold no HOME-001 row. WHEN a finding is against the chain, THE SYSTEM SHALL list it for the chain's board, holding no row. THE SYSTEM SHALL NOT give an answered finding a card, SHALL NOT put two findings on one line, and SHALL NOT put a finding outside crates/lys-home and docs/design/home on the step 5 board.",
+      "acceptance": [
+        "Every finding line carries exactly one of `still true at <sha>` and `answered by <sha>`, and `git cat-file -t <sha>` prints `commit` for every sha named.",
+        "Every Jev line reading `patched` or `unsure` is cited by exactly one finding line, and every failing leg line is cited by one finding line or more.",
+        "Every finding line under findings for the step 5 board reads still true and names a path under crates/lys-home or docs/design/home.",
+        "Every finding line under findings outside this card's scope names its board and holds no HOME-001 row.",
+        "No finding line reading answered appears under findings for the step 5 board."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-CHAIN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C86"
+      ],
+      "stories": [
+        "S36"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Record the three findings against the repository's own rules",
+      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md, whether or not Jev or a leg raises them, three findings against the repository's own rules, each as its own line under R4's form. (a) docs/design/home/LOSS-ACCOUNT.md, which HOME-001 R4 lists in files.create, does not exist at 0073b966 nor at the main head the proof names by `git cat-file -e`; the line cites docs/design/home/briefs/HOME-001.json line 148, docs/design/home/briefs/HOME-001.md line 137, docs/design/home/DESIGN.md line 84 and docs/design/home/design.json line 135 as they stand at 7b53625, holds R4, and names as the act that answers it a card that writes LOSS-ACCOUNT.md from render.rs as it stands on main. (b) crates/lys-home/src/record/mod.rs carries functions against the rule that a mod.rs carries only pub mod, pub use and module docs; the line records its line count and fn count at 0073b966 and at the main head, holds every row whose files include that path (R1 and R2), and names as the answering act a card that moves those functions into named modules under record/ so mod.rs carries only pub mod, pub use and docs. (c) crates/lys-home/src/harness/claude_code/mod.rs carries pub consts and a fn beside its pub mods under the same rule; the line records what the file carries at 0073b966 and at the main head, records the fn projects_slug as answered by ca7b462 where the head carries it as `pub use paths::projects_slug`, holds R3 and R4 while any pub const or fn remains in the file at the head, and names as the answering act a card that moves what remains into a named module. THE SYSTEM SHALL NOT write LOSS-ACCOUNT.md, SHALL NOT move any function or const, and SHALL NOT give R4 the verdict done on the strength of render.rs.",
+      "acceptance": [
+        "The LOSS-ACCOUNT finding names docs/design/home/LOSS-ACCOUNT.md and the four citations HOME-001.json:148, HOME-001.md:137, DESIGN.md:84 and design.json:135, and holds R4.",
+        "The record/mod.rs finding records 552 lines and 36 fn items at 0073b966, the values `git show 0073b966:crates/lys-home/src/record/mod.rs | wc -l` and `git show 0073b966:crates/lys-home/src/record/mod.rs | grep -cE '\\bfn [a-z_0-9]+'` print, records the values the same two commands print at the main head it names, and holds R1 and R2.",
+        "The claude_code/mod.rs finding records the four pub consts HARNESS, PROVIDER, API and AUTHORED and the fn projects_slug at 0073b966, and records projects_slug as answered by ca7b462.",
+        "Read at head 7b53625, crates/lys-home/src/harness/claude_code/mod.rs carries the four pub consts and `pub use paths::projects_slug`, so the claude_code/mod.rs finding measured against that head reads still true for the consts and holds R3 and R4.",
+        "`git diff --stat <landing base>..<landing head> -- docs/design/home/LOSS-ACCOUNT.md crates/lys-home` prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-CHAIN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C87"
+      ],
+      "stories": [
+        "S36"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Give each of the seven cards its verdict by row",
+      "spec": "THE SYSTEM SHALL record in docs/design/home/PROOF-CHAIN.md one verdict for each of the seven step 5 cards of R1's map: `done` when every row the card carries is built and no finding still true at the main head touches any file of those rows, and `in review` otherwise, naming each finding id that holds it. WHILE the finding line citing a `patched` or `unsure` Jev line on a row's file reads `still true at <sha>`, that sha being the main head the proof names, THE SYSTEM SHALL hold the row on it. THE SYSTEM SHALL NOT hold a row on a `patched` or `unsure` Jev line whose finding line reads `answered by <sha>`, nor on a `solved` or `not_asked` line. Cards 0BgjD59r and qY9mBz-y SHALL be recorded as not set done by this card, their rows unbuilt. THE SYSTEM SHALL state that green means the landing passed src_pr and src_land and never that the crate is clean. THE SYSTEM SHALL NOT give `done` to a card any of whose rows is held or unbuilt, and SHALL NOT give a verdict to any card other than the seven.",
+      "acceptance": [
+        "The verdict table holds exactly seven lines, one per card id of R1's card map.",
+        "Each card carrying a row whose files include a path named by an R5 finding line recorded as `still true at <sha>`, that sha being the main head the proof names, reads `in review` and names that finding id.",
+        "0BgjD59r and qY9mBz-y read not set done.",
+        "A card whose only `patched` or `unsure` Jev line is cited by a finding line reading `answered by <sha>` reads `done`, provided every row it carries is built and no finding line reading `still true at <sha>` at the main head the proof names touches a file of those rows.",
+        "No card reading `done` carries a row whose files include a path named by a finding line reading still true.",
+        "The proof holds the statement that green means the landing passed src_pr and src_land and does not mean the crate is clean."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/home/PROOF-CHAIN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C88"
+      ],
+      "stories": [
+        "S37"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Land the proof through src_pr and src_land without changing the crate",
+      "spec": "WHEN the build lands, THE SYSTEM SHALL land through src_pr and src_land, with src_land's Jev reading the landing diff and src_land's gate running on the landing head, and that gate's outcome SHALL be recorded as the landing's own gate with the landing head's sha, apart from the 0073b966 measurement. The landing diff SHALL hold docs/design/home/PROOF-CHAIN.md, this card's brief and design rows in docs/design/home and the markdown rendered from them, and the roadmap and decision rows written with this brief. THE SYSTEM SHALL NOT change any path under crates/lys-home, SHALL NOT change any HOME-001 row, and SHALL NOT land any other file.",
+      "acceptance": [
+        "`git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.",
+        "`git diff --name-only <landing base>..<landing head>` lists only paths under docs/design.",
+        "`git diff <landing base>..<landing head> -- docs/design/home/briefs/HOME-001.json` prints nothing.",
+        "`sh scripts/design/gate.sh` exits 0 at the landing head.",
+        "src_pr and src_land each record a pass for this card, and src_land's record names the landing head's sha and its gate outcome."
+      ],
+      "files": {
+        "create": [
+          "docs/design/home/briefs/HOME-008.md"
+        ],
+        "modify": [
+          "docs/design/home/DESIGN.md",
+          "docs/design/home/CHECKLIST.md",
+          "docs/design/home/USER-STORIES.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C89"
+      ],
+      "stories": [
+        "S37"
+      ]
+    },
+    {
+      "id": "R8",
+      "title": "After a green landing, set the board from the proof",
+      "spec": "WHEN the landing is green through src_pr and src_land, THE SYSTEM SHALL file one card on the step 5 board for each finding the proof lists under findings for the step 5 board, worded from its proof line; SHALL set each of the seven cards whose verdict reads `done` to done with a pointer to the landing commit; and SHALL keep each card whose verdict reads `in review` in review with a pointer to each finding card that holds it. THE SYSTEM SHALL NOT set 0BgjD59r or qY9mBz-y done, SHALL NOT file a finding outside crates/lys-home and docs/design/home on the step 5 board, and SHALL NOT change any card other than the seven beyond filing finding cards.",
+      "acceptance": [
+        "Every card whose verdict in the proof reads `done` reads done on the step 5 board and names the landing commit's sha.",
+        "Every card whose verdict reads `in review` reads in review on the step 5 board and names one finding card for each finding id the proof lists against it.",
+        "The step 5 board gains exactly one new card per finding line under findings for the step 5 board, and each new card names its finding id.",
+        "0BgjD59r and qY9mBz-y hold the same state after the board acts as before them."
+      ],
+      "files": {
+        "create": [],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C90"
+      ],
+      "stories": [
+        "S37"
       ]
     }
   ],
   "boundaries": [
-    "No change to crates/lys: lys open writes to no log and keeps its single non-oracle OpenFailed.",
-    "No second envelope: the three payloads are typed payloads of the identity event envelope DIRECTORY-003 R2 lands, and no field beyond those R1 names.",
-    "No key but the agent identity's own as the identity crate holds it, for the agent log/agent names: no home key, no person's key, no generated or stand-in key, and no agent inferred from the home's path.",
-    "No durable byte signed under any of the three tags before R12's review is recorded.",
-    "No change to crates/lys-identity/src/lib.rs or docs/design/identity/IDENTITY-EVENTS.md before the DIRECTORY-003 R2 blocker brings them.",
-    "No existing session byte removed or rewritten, and no leaf coordinate written into a session file; the head and the session head hash never move because of a leaf.",
-    "No leaf for any entry kind but lys.call, lys.harness_event and lys.open, no per-entry backfill, no log created but by log-enable, and no unlogged line of those kinds in a logging home.",
-    "No entry kind that holds a sealed record, no refused open recorded anywhere, and no open_and_verify run before the session, pending and key checks pass.",
-    "No transcript content, plaintext or envelope byte in any leaf, log file, pending marker, entry, error, report or test name.",
-    "No change to lys-log-store's LeafStore: no fork, merge, delete or rewrite.",
-    "No anchoring, no encryption at rest, no Haematite, and nothing of the door's proxy or the runtime.",
+    "No byte under crates/lys-home changes: the landing diff under that path is empty.",
+    "No HOME-001 row (R1 to R12) is edited, reworded or renumbered.",
+    "docs/design/home/LOSS-ACCOUNT.md is not written by this card, and no function or const is moved out of record/mod.rs or claude_code/mod.rs.",
+    "No compile, test battery or gate of this card runs anywhere but the build host that runs every compile; the measurement is taken on a worktree at 0073b966, never on the landing head.",
+    "fmt is measured only in its check form; the rewriting form is never run on the worktree.",
+    "No ast-grep rule set is borrowed, and no src_land mode is added.",
+    "Jev reads only the 25 files of crates/lys-home at 0073b966; the rows' documents are not asked.",
+    "No card other than the seven step 5 cards is set done or changed, beyond filing the finding cards the proof lists; 0BgjD59r and qY9mBz-y are never set done.",
+    "A finding outside crates/lys-home and docs/design/home is recorded in the proof and never filed on the step 5 board.",
     "The design's structure array is the whole file list; a path outside it is not created."
   ],
   "verification": [
-    "From the repository root: cargo fmt --all leaves the tree unchanged.",
-    "cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.",
-    "cargo test --workspace --all-features exits 0 and lists R1 to R11's tests as passed.",
-    "cargo doc --no-deps --all-features and cargo doc --no-deps exit 0 with no warnings.",
-    "sh scripts/design/gate.sh exits 0.",
-    "git diff <base> -- crates/lys prints nothing.",
-    "Replacing the leaf append in record/mod.rs with nothing makes R11's first test fail on the leaf count, and only tests that count leaves fail, recorded as a drift injection in the dev record.",
-    "Each of record/mod.rs, record/call.rs and harness/claude_code/import.rs has under 500 lines of code."
+    "`git diff --stat <landing base>..<landing head> -- crates/lys-home` prints nothing.",
+    "`grep -c 0073b9660f00ecd3ca6f13ffd3a9e59aabd8e6ff docs/design/home/PROOF-CHAIN.md` prints 1 or more.",
+    "The proof's Jev section has 25 lines whose paths equal the output of `git ls-tree -r --name-only 0073b966 crates/lys-home`.",
+    "The proof's legs section has seven lines naming the seven commands .land/gates.sh runs at 0073b966, and one ast-grep line naming ngzIkkpd.",
+    "Rerun `sh .land/gates.sh` from the root of `git worktree add <dir> 0073b966` with toolchain 1.97.1: each leg's exit status equals the one the proof records.",
+    "The proof holds the three repository-rule findings, and the verdict table gives `in review`, naming the finding id, to each card carrying a row whose files include a path named by a finding recorded as still true at the main head the proof names.",
+    "`sh scripts/design/gate.sh` exits 0 at the landing head.",
+    "The step 5 board, read after the board acts, matches the proof's verdict table card for card."
   ]
 }

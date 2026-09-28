@@ -1853,6 +1853,16 @@
       "path": "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.head",
       "note": "the prelog home's head of session pre",
       "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the chain's judgement of HOME-001's hand-built code at 0073b966: Jev per file, the gate's legs, findings and card verdicts",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/PROOF-CHAIN.md",
+      "note": "the measured judgement of crates/lys-home at 0073b966: commit and toolchain, row and card maps, Jev lines, leg outcomes, findings and each card's verdict",
+      "brief": "HOME-008"
     }
   ],
   "inventory": [
