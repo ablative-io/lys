@@ -200,6 +200,22 @@ impl CertificateStore<FileLeafStore> {
         let dir = dir.to_owned();
         Self::over(Box::new(move || FileLeafStore::open(&dir)), key)
     }
+
+    /// As `open`, saying through `say` how the log was started and how many
+    /// certificates it holds.
+    pub fn opened(
+        dir: &Path,
+        key: Arc<Ed25519Identity>,
+        say: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<Self, ServerError> {
+        let store = Self::open(dir, key)?;
+        say(&format!(
+            "certificate log {}, holding {} certificates",
+            store.start(),
+            store.certificates().count()
+        ));
+        Ok(store)
+    }
 }
 
 impl<S: LeafStore> CertificateStore<S> {

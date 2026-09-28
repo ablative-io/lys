@@ -51,6 +51,8 @@ pub struct AppState {
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
     /// The provisioning profiles, when the configuration names their file.
     pub provisioning: Option<Mutex<crate::provisioning_store::ProvisioningStore>>,
+    /// The certificate log, when the configuration names its directory.
+    pub certificates: Option<Mutex<crate::certificates_store::CertificateStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -73,13 +75,19 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
+    let key = Arc::new(load_service_key(&config.event_key_file)?);
     let requests = match config.requests_dir.as_deref() {
         Some(dir) => Some(crate::requests_store::RequestStore::open(
             dir,
-            Arc::new(load_service_key(&config.event_key_file)?),
+            Arc::clone(&key),
         )?),
         None => None,
     };
+    let certificates = config
+        .certificates_dir
+        .as_deref()
+        .map(|dir| crate::certificates_store::CertificateStore::opened(dir, key, &*say))
+        .transpose()?;
     if let Some(store) = &requests {
         if store.adopted() > 0 {
             say(&format!(
@@ -151,6 +159,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         network: network.map(Mutex::new),
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),
+        certificates: certificates.map(Mutex::new),
         say,
     })))
 }
