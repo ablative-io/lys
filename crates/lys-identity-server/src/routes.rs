@@ -25,6 +25,8 @@ use crate::config::Config;
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
+use crate::reviews_store::ReviewStore;
+use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
 
 /// Everything a request is served from.
@@ -56,7 +58,9 @@ pub struct AppState {
     /// The runtime reports, when the configuration names their directory.
     pub runtime: Option<Mutex<crate::runtime_store::RuntimeStore>>,
     /// The service accounts, when the configuration names their directory.
-    pub service_accounts: Option<Mutex<crate::service_accounts_store::ServiceAccountStore>>,
+    pub service_accounts: Option<Mutex<ServiceAccountStore>>,
+    /// The review decisions, when the configuration names their directory.
+    pub reviews: Option<Mutex<ReviewStore>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -122,8 +126,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         ));
     }
     let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
-    let service_accounts =
-        crate::service_accounts_store::ServiceAccountStore::configured(config, key, &say)?;
+    let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
+    let reviews = ReviewStore::configured(config, key, &*say)?;
     Ok(router(Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
@@ -152,6 +156,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         certificates: certificates.map(Mutex::new),
         runtime: runtime.map(Mutex::new),
         service_accounts: service_accounts.map(Mutex::new),
+        reviews: reviews.map(Mutex::new),
         say,
     })))
 }

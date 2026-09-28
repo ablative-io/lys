@@ -99,6 +99,10 @@ pub struct Config {
     /// `ServiceAccountsUnavailable` and `GET /me` lists none.
     #[serde(default)]
     pub service_accounts_dir: Option<PathBuf>,
+    /// The directory the review decisions are kept in, created when it does
+    /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
+    #[serde(default)]
+    pub reviews_dir: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation

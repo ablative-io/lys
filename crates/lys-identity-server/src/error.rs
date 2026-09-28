@@ -327,6 +327,33 @@ pub enum ServerError {
         /// The person named.
         owner: String,
     },
+    /// The review decisions are not configured, or their log could not be read or written.
+    #[error("ReviewsUnavailable: {reason}")]
+    ReviewsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// The caller may see the grant but is not the one who reviews it.
+    #[error(
+        "ReviewerOnly: only the person the holding agent answers to, or the root authority, keeps this grant"
+    )]
+    ReviewerOnly,
+    /// The grant is not due for review, so there is nothing to keep.
+    #[error("GrantNotDue: grant `{grant}` is not due for review: {why}")]
+    GrantNotDue {
+        /// The grant.
+        grant: String,
+        /// Why it is not due.
+        why: &'static str,
+    },
+    /// The operation id already names a review decision made in other words.
+    #[error(
+        "ReviewReused: operation `{operation}` already names a review decision made in other words: keep this grant under a new operation id"
+    )]
+    ReviewReused {
+        /// The operation id.
+        operation: String,
+    },
     /// The directory's worker could not be reached.
     #[error("DirectoryUnavailable: {reason}")]
     DirectoryUnavailable {
@@ -349,7 +376,8 @@ impl ServerError {
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }
-            | Self::MachineNotForAgent => StatusCode::FORBIDDEN,
+            | Self::MachineNotForAgent
+            | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
             | Self::GrantNotVisible
             | Self::SessionUnknown
@@ -384,7 +412,9 @@ impl ServerError {
             | Self::RuntimeReportReused { .. }
             | Self::ServiceAccountReused { .. }
             | Self::ServiceAccountRetired { .. }
-            | Self::ServiceAccountOwnerRetired { .. } => StatusCode::CONFLICT,
+            | Self::ServiceAccountOwnerRetired { .. }
+            | Self::GrantNotDue { .. }
+            | Self::ReviewReused { .. } => StatusCode::CONFLICT,
             Self::SignInStateUnknown | Self::RequestMalformed { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. } | Self::SecretsUnavailable { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
@@ -395,7 +425,8 @@ impl ServerError {
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }
-            | Self::ServiceAccountsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            | Self::ServiceAccountsUnavailable { .. }
+            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
