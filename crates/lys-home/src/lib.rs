@@ -45,6 +45,7 @@ pub use record::given::{GivenLast, GivenRecord, GivenSeen, last_given};
 pub use record::lantern::{Lit, light};
 pub use record::reader::SessionReader;
 pub use record::recall::{
-    Epilogue, LanternRow, RecallReport, Skipped, recall_all, recall_by_note, recall_by_point,
+    Epilogue, LanternRow, RecallReport, Skipped, recall_all, recall_all_and_last_given,
+    recall_by_note, recall_by_point,
 };
 pub use record::{Home, Session};

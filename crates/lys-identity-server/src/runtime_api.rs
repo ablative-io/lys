@@ -16,7 +16,7 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -35,6 +35,7 @@ use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_api::placed;
 use crate::network_api::with_network;
+use crate::network_store::{Named, NetworkLock};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_state::{Report, Reported, Tracked};
 use crate::runtime_store::RuntimeStore;
@@ -206,18 +207,47 @@ fn report(
     })
 }
 
-fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
+/// Every session of `sessions` that `keep` keeps, as the runtimes reported
+/// it, each machine's name and runtime read under one lock of the machines
+/// however many sessions are listed.
+fn listing(
+    network: Option<&NetworkLock>,
+    sessions: &[Tracked],
+    keep: impl Fn(&Tracked) -> bool,
+) -> SessionsView {
+    let names: Option<HashMap<String, Named>> = network.map(|store| store.lock().names());
+    SessionsView {
+        sessions: sessions
+            .iter()
+            .filter(|tracked| keep(tracked))
+            .filter_map(|tracked| {
+                let machine = names.as_ref().and_then(|names| names.get(&tracked.machine));
+                view(machine, tracked)
+            })
+            .collect(),
+    }
+}
+
+/// The session a report was kept on, as the runtimes reported it, its
+/// machine read under one lock.
+fn reported(network: Option<&NetworkLock>, tracked: &Tracked) -> Result<SessionView, ServerError> {
+    let named = network.and_then(|store| store.lock().named(&tracked.machine));
+    let Some(answer) = view(named.as_ref(), tracked) else {
+        return Err(ServerError::RuntimeSessionUnknown);
+    };
+    Ok(answer)
+}
+
+/// One session as the runtimes reported it, on the machine `machine` names,
+/// none when the machines are not kept here or hold none under its id.
+fn view(machine: Option<&Named>, tracked: &Tracked) -> Option<SessionView> {
     let (first, latest) = (tracked.first()?, tracked.latest()?);
-    let machine = state.network.as_ref().and_then(|store| {
-        let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-        store.machine(&tracked.machine).cloned()
-    });
     Some(SessionView {
         session: tracked.session.clone(),
         agent: tracked.agent.clone(),
         machine: tracked.machine.clone(),
-        machine_name: machine.as_ref().map(|machine| machine.name.clone()),
-        runtime: machine.and_then(|machine| machine.runtime),
+        machine_name: machine.map(|machine| machine.name.clone()),
+        runtime: machine.and_then(|machine| machine.runtime.clone()),
         shown: tracked.shown(),
         last_reported: latest.state.name(),
         first_report_at: first.at,
@@ -296,8 +326,7 @@ async fn report_agent(
                 placed(store, &report.machine, (&agent, &held)).map(drop)
             })?;
         }
-        let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        with_runtime(&state, |store| reported(state.network.as_ref(), store.report(report)?))
     })
     .map(Json)
 }
@@ -324,8 +353,9 @@ async fn report_found(
                 .map(drop)
                 .ok_or(ServerError::MachineUnknown)
         })?;
-        let tracked = with_runtime(&state, |store| store.report(report))?;
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        with_runtime(&state, |store| {
+            reported(state.network.as_ref(), store.report(report)?)
+        })
     })
     .map(Json)
 }
@@ -349,14 +379,8 @@ async fn agent_sessions(
             return Err(ServerError::AgentNotVisible);
         }
         with_runtime(&state, |store| {
-            Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str()))
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
-            })
+            let own = |tracked: &Tracked| tracked.agent.as_deref() == Some(agent.as_str());
+            Ok(listing(state.network.as_ref(), store.sessions(), own))
         })
     })
     .map(Json)
@@ -372,19 +396,13 @@ async fn sessions(
         let asker = caller(&state, &headers, directory)?;
         let administrator = state.admission.administrator(&actor).is_ok();
         with_runtime(&state, |store| {
-            Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| {
-                        tracked
-                            .agent
-                            .as_deref()
-                            .is_some_and(|agent| sees(directory, administrator, asker, agent))
-                    })
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
-            })
+            let seen = |tracked: &Tracked| {
+                tracked
+                    .agent
+                    .as_deref()
+                    .is_some_and(|agent| sees(directory, administrator, asker, agent))
+            };
+            Ok(listing(state.network.as_ref(), store.sessions(), seen))
         })
     })
     .map(Json)
@@ -397,14 +415,12 @@ async fn found(
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     with_runtime(&state, |store| {
-        Ok(SessionsView {
-            sessions: store
-                .sessions()
-                .iter()
-                .filter(|tracked| tracked.agent.is_none())
-                .filter_map(|tracked| view(&state, tracked))
-                .collect(),
-        })
+        let found = |tracked: &Tracked| tracked.agent.is_none();
+        Ok(listing(state.network.as_ref(), store.sessions(), found))
     })
     .map(Json)
 }
+
+#[cfg(test)]
+#[path = "runtime_api_tests.rs"]
+mod tests;

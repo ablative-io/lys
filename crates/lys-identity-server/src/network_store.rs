@@ -10,9 +10,12 @@
 //! again in the same words answers the machine already kept, and the same
 //! operation in other words is refused.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +64,44 @@ pub struct Machine {
 #[serde(deny_unknown_fields)]
 struct Kept {
     machines: Vec<Machine>,
+}
+
+/// A machine as a session answer names it: its name and its runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Named {
+    /// The machine's name, as people call it.
+    pub name: String,
+    /// The runtime installed on it, null for none.
+    pub runtime: Option<String>,
+}
+
+/// The machines behind one lock, counting each time it is taken, so a test
+/// counts how often a route locks the machines rather than timing it.
+pub struct NetworkLock {
+    store: Mutex<NetworkStore>,
+    taken: AtomicU64,
+}
+
+impl NetworkLock {
+    /// The machines of `store`, behind their lock.
+    pub fn new(store: NetworkStore) -> Self {
+        Self {
+            store: Mutex::new(store),
+            taken: AtomicU64::new(0),
+        }
+    }
+
+    /// Take the lock, counting it. A lock a panicking holder poisoned is
+    /// taken as it stands, as every store's lock is.
+    pub fn lock(&self) -> MutexGuard<'_, NetworkStore> {
+        self.taken.fetch_add(1, Ordering::Relaxed);
+        self.store.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// How many times the lock was taken.
+    pub fn taken(&self) -> u64 {
+        self.taken.load(Ordering::Relaxed)
+    }
 }
 
 /// The machines, read from their file and written to it.
@@ -144,6 +185,28 @@ impl NetworkStore {
     /// The machine named `id`.
     pub fn machine(&self, id: &str) -> Option<&Machine> {
         self.kept.machines.iter().find(|machine| machine.id == id)
+    }
+
+    /// The name of the machine named `id` and the runtime installed on it.
+    pub fn named(&self, id: &str) -> Option<Named> {
+        self.machine(id).map(|machine| Named {
+            name: machine.name.clone(),
+            runtime: machine.runtime.clone(),
+        })
+    }
+
+    /// Each machine's name and the runtime installed on it, by id, read in
+    /// one pass; the first machine kept under an id answers for it, as it
+    /// does for [`NetworkStore::machine`].
+    pub fn names(&self) -> HashMap<String, Named> {
+        let mut names = HashMap::with_capacity(self.kept.machines.len());
+        for machine in &self.kept.machines {
+            names.entry(machine.id.clone()).or_insert_with(|| Named {
+                name: machine.name.clone(),
+                runtime: machine.runtime.clone(),
+            });
+        }
+        names
     }
 
     /// Keep `machine`. Named again in the same words it is kept once; the

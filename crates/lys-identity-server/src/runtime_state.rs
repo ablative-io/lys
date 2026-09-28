@@ -5,6 +5,9 @@
 //! seen by a runtime and carrying no identity. A found session is never
 //! given an identity here; it stays found.
 
+use std::cell::Cell;
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// The snapshot domain the reports' folded state is sealed under.
@@ -122,46 +125,153 @@ impl Tracked {
 }
 
 /// The sessions as their log folds them, in the order first reported.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Beside the sessions are two indexes, never sealed: each session's slot by
+/// its id, and each report's slot and place by its operation id. They are
+/// rebuilt once when a state is decoded and kept as each report is folded,
+/// so a report finds the one session it is about without passing over any
+/// other. Two states are equal when their sessions are.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Held {
-    /// The sessions.
-    pub sessions: Vec<Tracked>,
+    sessions: Vec<Tracked>,
+    #[serde(skip)]
+    by_session: HashMap<String, usize>,
+    #[serde(skip)]
+    by_operation: HashMap<String, (usize, usize)>,
+    #[serde(skip)]
+    visited: Cell<u64>,
 }
 
-#[derive(Serialize, Deserialize)]
+impl PartialEq for Held {
+    fn eq(&self, other: &Self) -> bool {
+        self.sessions == other.sessions
+    }
+}
+
+impl Eq for Held {}
+
+/// The sealed state as it is read back: owned, since decoding makes it.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
 }
 
+/// The sealed state as it is written: the format and a borrow of what is
+/// held, so sealing serialises the state where it lies and copies none of it.
+/// Its fields and their order are `Sealed`'s, so the bytes are the same.
+#[derive(Serialize)]
+struct SealedRef<'a> {
+    format: &'a str,
+    held: &'a Held,
+}
+
+/// Where a report lands among the sessions, found through the indexes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Found {
+    /// Its operation id is already kept: the session's slot, and the kept
+    /// report's place in it.
+    Kept(usize, usize),
+    /// Its session is kept, at this slot, and its operation id is not.
+    Session(usize),
+    /// Neither its operation id nor its session is kept.
+    Neither,
+}
+
 impl Held {
+    /// Every session, in the order first reported.
+    pub fn sessions(&self) -> &[Tracked] {
+        &self.sessions
+    }
+
+    /// How many kept sessions lookups by id have visited, so a test counts
+    /// what a report costs rather than timing it.
+    pub fn visited(&self) -> u64 {
+        self.visited.get()
+    }
+
+    fn visit(&self) {
+        self.visited.set(self.visited.get().saturating_add(1));
+    }
+
+    /// The session at `slot`, reached directly, visiting nothing.
+    pub fn at(&self, slot: usize) -> Option<&Tracked> {
+        self.sessions.get(slot)
+    }
+
+    /// The slot of the session named `session`, visiting only it.
+    pub fn slot(&self, session: &str) -> Option<usize> {
+        let slot = self.by_session.get(session).copied()?;
+        self.visit();
+        Some(slot)
+    }
+
     /// The session named `session`.
     pub fn session(&self, session: &str) -> Option<&Tracked> {
-        self.sessions
-            .iter()
-            .find(|tracked| tracked.session == session)
+        self.slot(session).and_then(|slot| self.sessions.get(slot))
     }
 
     /// The report kept under `operation`, with its session.
     pub fn operation(&self, operation: &str) -> Option<&Report> {
-        self.sessions
-            .iter()
-            .flat_map(|tracked| tracked.reports.iter())
-            .find(|report| report.operation == operation)
+        let (slot, place) = self.by_operation.get(operation).copied()?;
+        self.visit();
+        self.sessions.get(slot)?.reports.get(place)
+    }
+
+    /// Where a report under `operation` on `session` lands, visiting at most
+    /// the one session it is about.
+    pub fn find(&self, operation: &str, session: &str) -> Found {
+        if let Some((slot, place)) = self.by_operation.get(operation).copied() {
+            self.visit();
+            return Found::Kept(slot, place);
+        }
+        self.slot(session).map_or(Found::Neither, Found::Session)
+    }
+
+    /// Rebuild both indexes from the sessions, keeping for each id the
+    /// first session or report that carries it.
+    fn index(&mut self) {
+        self.by_session.clear();
+        self.by_operation.clear();
+        for (slot, tracked) in self.sessions.iter().enumerate() {
+            self.by_session
+                .entry(tracked.session.clone())
+                .or_insert(slot);
+            for (place, report) in tracked.reports.iter().enumerate() {
+                self.by_operation
+                    .entry(report.operation.clone())
+                    .or_insert((slot, place));
+            }
+        }
     }
 
     /// Fold one report. A report on a session never begun is refused by
     /// reason, since every kept report was checked against what came before.
     pub fn hold(&mut self, report: Report) -> Result<(), String> {
-        if let Some(tracked) = self
-            .sessions
-            .iter_mut()
-            .find(|tracked| tracked.session == report.session)
-        {
+        let slot = self.slot(&report.session);
+        self.keep(slot, report).map(drop)
+    }
+
+    /// Fold one report into the session at `slot`, found beforehand, or as
+    /// the first of a new session when `slot` is none, and answer the slot
+    /// it landed in. A first report that does not begin its session is
+    /// refused by reason.
+    pub fn keep(&mut self, slot: Option<usize>, report: Report) -> Result<usize, String> {
+        if let Some(slot) = slot {
+            let tracked = self.sessions.get_mut(slot).ok_or_else(|| {
+                format!(
+                    "report `{}` names slot {slot}, which holds no session",
+                    report.operation
+                )
+            })?;
+            let place = tracked.reports.len();
+            self.by_operation
+                .entry(report.operation.clone())
+                .or_insert((slot, place));
             tracked.reports.push(report);
-            return Ok(());
+            return Ok(slot);
         }
         let begins = match report.agent {
             Some(_) => report.state == Reported::Starting,
@@ -173,13 +283,20 @@ impl Held {
                 report.operation, report.session
             ));
         }
+        let slot = self.sessions.len();
+        self.by_session
+            .entry(report.session.clone())
+            .or_insert(slot);
+        self.by_operation
+            .entry(report.operation.clone())
+            .or_insert((slot, 0));
         self.sessions.push(Tracked {
             session: report.session.clone(),
             agent: report.agent.clone(),
             machine: report.machine.clone(),
             reports: vec![report],
         });
-        Ok(())
+        Ok(slot)
     }
 
     /// Fold every leaf of `tail`, in order.
@@ -195,9 +312,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&SealedRef {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("runtime state: {error}"))
     }
@@ -213,6 +330,12 @@ impl Held {
                 sealed.format
             ));
         }
-        Ok(sealed.held)
+        let mut held = sealed.held;
+        held.index();
+        Ok(held)
     }
 }
+
+#[cfg(test)]
+#[path = "runtime_state_tests.rs"]
+mod tests;

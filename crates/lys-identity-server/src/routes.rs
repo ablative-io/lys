@@ -2,17 +2,18 @@
 //! The read-only views the identity screens draw are in `read_api`.
 
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use lys_identity::projection::Projection;
 use lys_identity::receipt::Receipt;
 use lys_identity::{
     Actor, AgentId, Directory, IdentityId, LifecycleState, LoginBinding, OperationId, PersonId,
-    Profile, Transition,
+    Profile, SNAPSHOT_EVERY, Transition,
 };
 use lys_log_store::FileLeafStore;
 use serde::Deserialize;
@@ -22,6 +23,7 @@ use lys_identity::signer::load_service_key;
 
 use crate::admission::{AUTHORITY, Admission};
 use crate::config::Config;
+use crate::directory_cell::DirectoryCell;
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
@@ -31,8 +33,9 @@ use crate::session::{Sessions, now};
 
 /// Everything a request is served from.
 pub struct AppState {
-    /// The directory, one caller at a time.
-    pub directory: Mutex<Directory<FileLeafStore>>,
+    /// The directory, one writer at a time, and the projection a read
+    /// answers from without waiting on a write in progress.
+    pub directory: DirectoryCell<FileLeafStore>,
     /// Sign-in.
     pub oidc: Oidc,
     /// Live sessions.
@@ -48,7 +51,7 @@ pub struct AppState {
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
     /// The machines, when the configuration names their file.
-    pub network: Option<Mutex<crate::network_store::NetworkStore>>,
+    pub network: Option<crate::network_store::NetworkLock>,
     /// The roles, when the configuration names their file.
     pub roles: Option<Mutex<crate::roles_store::RolesStore>>,
     /// The provisioning profiles, when the configuration names their file.
@@ -108,7 +111,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, key, &say)?;
     let state = Arc::new(AppState {
-        directory: Mutex::new(directory),
+        directory: DirectoryCell::new(directory),
         oidc: Oidc::discover(config).await?,
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
         admission: Admission::new(
@@ -129,7 +132,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
         requests: requests.map(Mutex::new),
-        network: network.map(Mutex::new),
+        network: network.map(crate::network_store::NetworkLock::new),
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),
         certificates: certificates.map(Mutex::new),
@@ -157,8 +160,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     })
 }
 
+/// The file beside the directory's log that keeps the root each leaf
+/// completed, so a receipt is rebuilt from one leaf.
+pub const LEAF_ROOTS: &str = "leaf-roots.bin";
+
 /// Open the directory `config` names, creating its log when the log's
-/// directory does not exist.
+/// directory does not exist, and keeping each leaf's root beside it.
 pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, ServerError> {
     if !config.log_dir.exists() {
         FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {
@@ -169,9 +176,11 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
     }
     let log_dir = config.log_dir.clone();
     let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    Ok(Directory::open(
+    Ok(Directory::open_beside(
         reopen,
         load_service_key(&config.event_key_file)?,
+        SNAPSHOT_EVERY,
+        Some(config.log_dir.join(LEAF_ROOTS)),
     )?)
 }
 
@@ -227,16 +236,21 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
     state.sessions.actor(cookie_header(headers))
 }
 
-/// Run `act` on the directory, one caller at a time.
+/// Run `act` on the directory, one caller at a time, off the async worker.
 pub(crate) fn with_directory<T>(
     state: &AppState,
     act: impl FnOnce(&mut Directory<FileLeafStore>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let mut directory = state
-        .directory
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    act(&mut directory)
+    state.directory.write(act)
+}
+
+/// Run `act` on the directory's projection as it last stood settled,
+/// without waiting on a write in progress.
+pub(crate) fn read_directory<T>(
+    state: &AppState,
+    act: impl FnOnce(&Projection) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    state.directory.read(act)
 }
 
 /// A receipt as JSON.
@@ -391,9 +405,8 @@ fn record_json(id: IdentityId, record: &lys_identity::projection::Record) -> Val
 async fn list(State(state): State<Shared>, headers: HeaderMap) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
-    with_directory(&state, |directory| {
-        let records = directory
-            .projection()?
+    read_directory(&state, |projection| {
+        let records = projection
             .records()
             .map(|(id, record)| record_json(*id, record))
             .collect::<Vec<_>>();
@@ -409,14 +422,14 @@ async fn read(
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let id = identity_id(&id)?;
-    with_directory(&state, |directory| {
-        let record =
-            directory
-                .record(id)?
-                .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
-                    identity: id.to_string(),
-                })?;
-        Ok(Json(record_json(id, &record)))
+    read_directory(&state, |projection| {
+        let Some(record) = projection.record(id) else {
+            let unknown = lys_identity::IdentityError::IdentityUnknown {
+                identity: id.to_string(),
+            };
+            return Err(unknown.into());
+        };
+        Ok(Json(record_json(id, record)))
     })
 }
 

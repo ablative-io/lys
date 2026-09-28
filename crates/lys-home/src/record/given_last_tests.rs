@@ -2,15 +2,20 @@
 //! Gates on the given entry appended last: none while nothing was given,
 //! the greatest timestamp across every session whatever order the sessions
 //! list in, and a session that cannot be read skipped and named while the
-//! rest are still read.
+//! rest are still read. Read beside recall for a memory view, each session
+//! is opened once and both answers are the ones each reading gives alone.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 
 use crate::harness::claude_code::given::ConfigSource;
 use crate::record::entries::{CUSTOM_GIVEN, Entry, EntryBase, EntryBody};
 use crate::record::given::{GivenRecord, last_given};
 use crate::record::given_tests::resolution;
+use crate::record::lantern::light;
+use crate::record::lantern_tests::LIGHTER;
 use crate::record::reader_tests::message;
+use crate::record::recall::{recall_all, recall_and_given_with};
 use crate::record::{Home, Session};
 
 type Gate = Result<(), Box<dyn Error>>;
@@ -94,5 +99,35 @@ fn a_session_that_cannot_be_read_is_skipped_and_named() -> Gate {
     assert_eq!(seen.last.ok_or("nothing given")?.entry, "g1");
     assert_eq!(seen.skipped.len(), 1);
     assert_eq!(seen.skipped[0].session, "broken");
+    Ok(())
+}
+
+#[test]
+fn one_pass_opens_each_session_once_and_answers_as_the_two_readings() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let home = Home::open(dir.path().join("home"))?;
+    for n in 0..20 {
+        let id = format!("s{n:02}");
+        {
+            let mut kept = session(&home, &id)?;
+            let at = format!("2026-01-{:02}T00:00:00.000Z", n + 1);
+            give(&mut kept, &format!("g{n}"), &at, &record(&["HOME"]))?;
+        }
+        light(&home, &id, "m1", "kept across the fold", LIGHTER)?;
+    }
+    std::fs::write(home.session_path("broken")?, "not json\n")?;
+    let mut opened: BTreeMap<String, u32> = BTreeMap::new();
+    let (recalled, last) = recall_and_given_with(&home, |id| {
+        *opened.entry(id.to_owned()).or_default() += 1;
+        home.read_session(id)
+    })?;
+    assert_eq!(opened.len(), 21, "{opened:?}");
+    assert!(opened.values().all(|opens| *opens == 1), "{opened:?}");
+    assert_eq!(recalled, recall_all(&home)?);
+    assert_eq!(last, last_given(&home)?);
+    assert_eq!(recalled.lanterns.len(), 20);
+    assert_eq!(recalled.skipped.len(), 1);
+    assert_eq!(last.skipped.len(), 1);
+    assert_eq!(last.last.ok_or("nothing given")?.entry, "g19");
     Ok(())
 }

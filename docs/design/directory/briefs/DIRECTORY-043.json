@@ -42,7 +42,71 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/runtime_state.rs",
+            "change": "modified",
+            "note": "Held keeps two indexes that are rebuilt on load and skipped by serde, so the stored bytes do not change: by_session and by_operation. It also has a visited counter and find/keep lookups, so a session is found without scanning every session."
+          },
+          {
+            "path": "crates/lys-identity-server/src/runtime_store.rs",
+            "change": "modified",
+            "note": "report finds the session once through the index."
+          },
+          {
+            "path": "crates/lys-identity-server/src/runtime_store_tests.rs",
+            "change": "created",
+            "note": "With 10 000 sessions, a lookup visits exactly 1 entry. This is counted, not timed."
+          },
+          {
+            "path": "crates/lys-identity-server/src/runtime_state_tests.rs",
+            "change": "created",
+            "note": "Checks the sealed shape byte for byte against a mirror of the base shape, and that the indexes agree after reload."
+          }
+        ],
+        "how": "The runtime state's session and operation lookups go through indexes built from the serialized list when it loads. The serialized form is unchanged, so every stored byte and answer stays the same. A visit counter proves each lookup visits one entry, whatever the population.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C334",
+            "done": true,
+            "note": "Indexed lookup, counted by visits == 1 at 10 000 sessions."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test with 10 000 kept sessions shows one report visits 1 session, where the base visits all 10 000.",
+            "met": true,
+            "evidence": "crates/lys-identity-server/src/runtime_store_tests.rs one_report_among_ten_thousand_sessions_visits_one asserts visited()-before == 1 for a report among KEPT=10_000. It passed in my cargo test --workspace --all-features run (exit 0). Round 1 recorded the base failure: 'left: 10000, right: 1'. Held::slot/find (runtime_state.rs) look up by HashMap, and RuntimeStore::report finds the slot once and appends into it."
+          },
+          {
+            "criterion": "The stored snapshot bytes equal the base's.",
+            "met": true,
+            "evidence": "runtime_state_tests.rs a_state_read_back_is_indexed_and_seals_the_same_bytes asserts encode() == BaseSealed{format, BaseHeld{sessions}}, a mirror of the base's declared shape, and that no index field appears in the JSON. The indexes are #[serde(skip)], and Held::decode rebuilds them via index()."
+          }
+        ],
+        "checklist": [
+          "C334"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R2",
@@ -70,7 +134,116 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/runtime_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef instead of cloning the snapshot."
+          },
+          {
+            "path": "crates/lys-identity-server/src/requests_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/certificates_store.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/teams_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/stops_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/service_accounts_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/reviews_state.rs",
+            "change": "modified",
+            "note": "Seals through a borrowed SealedRef."
+          },
+          {
+            "path": "crates/lys-identity-server/src/requests_state_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          },
+          {
+            "path": "crates/lys-identity-server/src/certificates_store_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          },
+          {
+            "path": "crates/lys-identity-server/src/teams_state_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          },
+          {
+            "path": "crates/lys-identity-server/src/stops_state_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          },
+          {
+            "path": "crates/lys-identity-server/src/service_accounts_state_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          },
+          {
+            "path": "crates/lys-identity-server/src/reviews_state_tests.rs",
+            "change": "created",
+            "note": "The borrowed seal serializes to the same bytes as the owned shape."
+          }
+        ],
+        "how": "Each state now seals a serde struct that borrows its fields, so it no longer clones the whole snapshot. The field order and names are those of the owned struct, so the sealed bytes are identical. Each sibling test checks this against the base shape.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C335",
+            "done": true,
+            "note": "No snapshot clone on seal in all seven states, with byte equality tested."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "For each of the seven stores a test shows the encoded bytes are identical to the base's for its existing fixture.",
+            "met": true,
+            "evidence": "a_snapshot_seals_the_bytes_an_owned_copy_sealed is in certificates_store_tests.rs, requests_state_tests.rs, teams_state_tests.rs, stops_state_tests.rs, service_accounts_state_tests.rs and reviews_state_tests.rs. Those Held types are unchanged from base, so the owned Copied{format, held} is the base's Sealed serialisation. The runtime store is covered by runtime_state_tests.rs against the base-shape mirror. All pass in the workspace run (exit 0)."
+          },
+          {
+            "criterion": "grep over the seven files for 'held: self.clone()' prints nothing.",
+            "met": true,
+            "evidence": "grep -n \"held: self.clone()\" over runtime_state.rs, requests_state.rs, certificates_store.rs, teams_state.rs, stops_state.rs, service_accounts_state.rs and reviews_state.rs printed nothing (exit 1)."
+          }
+        ],
+        "checklist": [
+          "C335"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R3",
@@ -92,7 +265,71 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/directory_cell.rs",
+            "change": "created",
+            "note": "DirectoryCell runs file-backed directory work off the async workers, so no lock is held across an await."
+          },
+          {
+            "path": "crates/lys-identity-server/src/directory_cell_tests.rs",
+            "change": "created",
+            "note": "Counts that reads go through the cell and give the same answers."
+          },
+          {
+            "path": "crates/lys-identity-server/src/routes.rs",
+            "change": "modified",
+            "note": "AppState holds DirectoryCell<FileLeafStore>. The list and read routes use read_directory, and the leaf-roots file is opened beside the log."
+          },
+          {
+            "path": "crates/lys-identity-server/src/lib.rs",
+            "change": "modified",
+            "note": "Adds #![deny(clippy::await_holding_lock)], so a lock held across an await fails the build."
+          }
+        ],
+        "how": "Blocking directory I/O moved behind a cell that runs it on the blocking pool. The crate denies await_holding_lock, so clippy enforces the rule from now on.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C336",
+            "done": true,
+            "note": "No blocking I/O on the async workers; the lint makes this a build rule."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test holds a directory write inside a blocked counting filesystem and shows a concurrent directory read route answers before the write is released.",
+            "met": true,
+            "evidence": "directory_cell_tests.rs a_read_answers_while_a_write_is_held_on_the_disk holds register_person inside Gated::put_leaf (asserts puts == 1). It reads 0 identities while !gate.released(), then reads 1 after the write returns. The list and read routes (routes.rs list/read) call read_directory → DirectoryCell::read, the function under test. It passed in the workspace run. Round 1 recorded that with the base behaviour (read through the writer lock) the test never completes."
+          },
+          {
+            "criterion": "No std::sync::MutexGuard is held across an .await in routes.rs, shown by clippy's await_holding_lock lint enabled for the crate and green.",
+            "met": true,
+            "evidence": "crates/lys-identity-server/src/lib.rs has #![deny(clippy::await_holding_lock)]. The round's clippy and clippy-all-features legs exited 0 with -D warnings."
+          }
+        ],
+        "checklist": [
+          "C336"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R4",
@@ -117,7 +354,81 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity-server/src/network_store.rs",
+            "change": "modified",
+            "note": "NetworkLock counts how many times it is taken. Named and names() resolve a whole listing under one acquisition."
+          },
+          {
+            "path": "crates/lys-identity-server/src/network_api.rs",
+            "change": "modified",
+            "note": "A listing takes the lock once."
+          },
+          {
+            "path": "crates/lys-identity-server/src/runtime_api.rs",
+            "change": "modified",
+            "note": "A listing takes the lock once, not once per session."
+          },
+          {
+            "path": "crates/lys-identity-server/src/runtime_api_tests.rs",
+            "change": "created",
+            "note": "With 500 sessions, a listing gives taken == 1."
+          },
+          {
+            "path": "crates/lys-identity-server/src/launch_api.rs",
+            "change": "modified",
+            "note": "Adapted to the new signatures, with unchanged behaviour."
+          },
+          {
+            "path": "crates/lys-identity-server/src/stop_api.rs",
+            "change": "modified",
+            "note": "Adapted to the new signatures, with unchanged behaviour."
+          }
+        ],
+        "how": "Name resolution for a listing is batched under one lock acquisition. A counting lock proves it is taken once, whatever the size of the listing.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C337",
+            "done": true,
+            "note": "One lock acquisition per listing, counted."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test listing 500 sessions shows 1 network lock acquisition, where the base takes 500.",
+            "met": true,
+            "evidence": "runtime_api_tests.rs a_listing_of_five_hundred_sessions_takes_the_machines_lock_once asserts network.taken() == 1 after listing 501 sessions, and 2 after one report answer. NetworkLock::lock (network_store.rs) counts each acquisition. Round 1 recorded the base-shaped failure 'left: 501, right: 1'. It passed in the workspace run."
+          },
+          {
+            "criterion": "Listing and report answers equal the base's.",
+            "met": true,
+            "evidence": "The same test compares a whole SessionView JSON to the base-shaped object, with null machine_name/runtime for an unknown machine. names() keeps the first machine per id via or_insert, as machine()'s find did. The existing HTTP suites (runtime_reports, start_command, emergency_stop) pass unchanged in cargo test -p lys-identity-server --all-features (exit 0)."
+          }
+        ],
+        "checklist": [
+          "C337"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R5",
@@ -141,7 +452,76 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-home/src/record/recall.rs",
+            "change": "modified",
+            "note": "recall_all_and_last_given and recall_and_given_with read each session once and gather both views."
+          },
+          {
+            "path": "crates/lys-home/src/record/given.rs",
+            "change": "modified",
+            "note": "Adds keep_last, which folds the last given in the same pass."
+          },
+          {
+            "path": "crates/lys-home/src/lib.rs",
+            "change": "modified",
+            "note": "Re-exports the one-pass reader."
+          },
+          {
+            "path": "crates/lys-home/src/record/given_last_tests.rs",
+            "change": "modified",
+            "note": "With 21 sessions, each is opened exactly once. This is counted."
+          },
+          {
+            "path": "crates/lys-identity-server/src/memory_api.rs",
+            "change": "modified",
+            "note": "Runs the one-pass reader on spawn_blocking."
+          }
+        ],
+        "how": "The memory view reads each session file once and builds both the recall and the last-given result from that pass. The server runs it on the blocking pool.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C338",
+            "done": true,
+            "note": "One pass per memory view, counted by opens."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test with a home of 20 sessions shows the route opens each session file once, where the base opens each twice.",
+            "met": true,
+            "evidence": "crates/lys-home/src/record/given_last_tests.rs one_pass_opens_each_session_once_and_answers_as_the_two_readings counts 21 sessions (20 plus one broken), each opened once. memory_api.rs runs recall_all_and_last_given, which is recall_and_given_with over home.read_session, inside tokio::task::spawn_blocking. Round 1 recorded the injected-second-open failure at given_last_tests.rs:125."
+          },
+          {
+            "criterion": "The view's answer equals the base's.",
+            "met": true,
+            "evidence": "The same test asserts recalled == recall_all(&home) and last == last_given(&home), including the broken session skipped by both. tests/memory.rs passes in the workspace run."
+          }
+        ],
+        "checklist": [
+          "C338"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     },
     {
       "id": "R6",
@@ -165,7 +545,81 @@
       ],
       "stories": [
         "S145"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "crates/lys-identity/src/roots.rs",
+            "change": "created",
+            "note": "Roots and Beside: a leaf-roots file of 32-byte records beside the log. It is checked against the last checkpoint and the snapshot root. A missing, short or refused file is named and rebuilt from the log."
+          },
+          {
+            "path": "crates/lys-identity/src/restart.rs",
+            "change": "modified",
+            "note": "Opens or rebuilds the roots on restart."
+          },
+          {
+            "path": "crates/lys-identity/src/log.rs",
+            "change": "modified",
+            "note": "Appends each leaf's root and serves receipts from the roots file."
+          },
+          {
+            "path": "crates/lys-identity/src/directory.rs",
+            "change": "modified",
+            "note": "Wires in the roots."
+          },
+          {
+            "path": "crates/lys-identity/src/lib.rs",
+            "change": "modified",
+            "note": "Declares the module."
+          },
+          {
+            "path": "crates/lys-identity/tests/receipt_roots.rs",
+            "change": "created",
+            "note": "A receipt reads 1 leaf with the roots file and 929 without it. The counted rebuild reads are 4096+904, 4096+904 and 3072+904, against 904 when the file is intact."
+          }
+        ],
+        "how": "Receipts no longer re-read the log. They read the stored roots, which are checked against the signed checkpoint and the snapshot root. A file that fails a check is refused by name and rebuilt from the log, never silently trusted.",
+        "deviation": "",
+        "checklist": [
+          {
+            "id": "C339",
+            "done": true,
+            "note": "Receipts are served without re-reading the log, with reads counted."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S145",
+            "satisfied": true,
+            "note": ""
+          }
+        ]
+      },
+      "review": {
+        "alignment": "aligned",
+        "acceptance": [
+          {
+            "criterion": "A test with a 5 000-leaf ledger shows entry() for leaf 4 000 reads 1 leaf file, where the base reads up to 1 024.",
+            "met": true,
+            "evidence": "crates/lys-identity/tests/receipt_roots.rs a_receipt_reads_one_leaf_and_a_removed_roots_file_is_rebuilt asserts 1 leaf read with roots, and 929 on the base checkpoint path opened without roots. Ledger::entry (restart.rs) goes to entry_at when Beside::root(index) is held. It passed in the workspace run."
+          },
+          {
+            "criterion": "The receipts equal the base's byte for byte, and a coordinate store removed from disk is rebuilt from the log on open and gives the same receipts.",
+            "met": true,
+            "evidence": "Each receipt is compared == with the Receipt the append returned, and after remove_file the roots file is rebuilt to 5000*32 bytes. a_refused_or_short_roots_file_is_rebuilt_from_the_log counts the rebuild reads for a tampered checkpoint record, a tampered snapshot record and a short file, and checks the receipts equal after each. roots.rs logs RootsRefused/RootsRebuilt/RootsNotKept by name. Both tests passed."
+          }
+        ],
+        "checklist": [
+          "C339"
+        ],
+        "stories": [
+          "S145"
+        ],
+        "issues": [],
+        "fixes": []
+      }
     }
   ],
   "boundaries": [
