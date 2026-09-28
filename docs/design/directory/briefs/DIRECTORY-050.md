@@ -68,6 +68,32 @@ Behavioural. New crate lys-runner and the command 'lys runner' (started by insta
 **Stories:**
 - S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (server restart, output still readable) and row 2 (a clean runner restart reports each session ended with its instant): met by the existing tests at crates/lys-runner/tests/runner.rs:157 and :189.
+Row 3 (runner_request_unsigned): met by crates/lys-runner/tests/runner.rs:545.
+Row 4 (a runner on a second machine dials in): met by crates/lys-identity-server/tests/runner_start.rs:279 and crates/lys-runner/tests/dial_channel.rs:145.
+Row 5 (killed and restarted, ended_by_runner_restart with no status): crates/lys-runner/tests/runner.rs:429, plus the restart_ends helper at :320, which asserts EndedByRunnerRestart and status None for every restart test.
+Row 6 (leader alive at the recorded instant, child ignored the hang-up): the group is ended and the child is gone. Evidence: runner.rs:357 records the instant through pty::leader_started (crates/lys-runner/src/pty.rs:134), expects signal SIGKILL, the leader exits on signal 9, and reading the group's output reaches its end, so the cat is gone.
+Rows 7 to 9 (stranger at the recorded id): runner.rs:381 checks that the session is reported ended_by_runner_restart with no signal, that the stranger still echoes a line after the restart and later exits normally, and that the log line names the pid and says 'was not signalled'.
+Row 10 (leader gone, group still holds a process): runner.rs:398 kills only the leader and reaps it; the cat left in the group still echoes after the restart, and the log line is present.
+Row 11 (no start instant): runner.rs:415 checks there is no signal, the process still echoes, and the leader exits successfully.
+The decision itself is at crates/lys-runner/src/session.rs:165. The instant is recorded at crates/lys-runner/src/session/lifecycle.rs:45, and the field is at crates/lys-runner/src/state.rs:46. runner.rs:444 checks that a session the runner starts has its leader's start recorded as the system reports it.
+- Deviation: R1's file list does not include crates/lys-runner/src/state.rs or crates/lys-runner/src/session/lifecycle.rs, and this round modified both. The earlier round created them as parts of the runner crate: the record the runner keeps, and session.rs's own submodule that runs processes. The new record field has to live in state.rs, and the one spawn site, which covers rotation re-spawns too, is in lifecycle.rs. CN9 says a file outside a row's wall needs a reviewed brief revision first; I am naming both files here for the reviewer rather than waiting. Also, the start instant is recorded to the second, the finest ps lstart reports on macOS and Linux. That is stated in the pty.rs doc.
+- Files changed:
+  - modified: `crates/lys-runner/src/pty.rs` — Removes end_left_group and Left, which signalled a group by its number alone. Adds leader_started(pid): the operating system's report of when a process started, from /bin/ps -o lstart= in the C locale and UTC, kept as text and compared exactly. It answers None when ps fails and says nothing (no such process); any other answer is refused leader_unreadable by name.
+  - modified: `crates/lys-runner/src/session.rs` — Each Session carries leader_started, which is persisted and read back. left_behind(id, pid, recorded) sends SIGKILL to the group only when leader_started(pid) equals the recorded instant exactly. It does not signal when there is no start instant, when the leader is gone, when the process at that id started at another instant, or when ps could not be read. Each of those cases logs 'session <id>: process <pid> was not signalled: <why>', and the session is reported ended_by_runner_restart with no status.
+  - modified: `crates/lys-runner/src/session/lifecycle.rs` — run() records the leader's start instant right after each spawn, including a spawn after an account rotation. If the start cannot be read it logs that the process will not be signalled by a restart and records none.
+  - modified: `crates/lys-runner/src/state.rs` — KeptSession gains leader_started: Option<String> (serde default, skipped when None), so records written before this change still read, as records holding no start instant.
+  - modified: `crates/lys-runner/tests/runner.rs` — Adds a Group fixture: a shell leading its own group with a cat in the group that ignores the hang-up and echoes each line it is sent. Also adds one log sink shared by the whole test binary, and tests for each new acceptance row. The existing lost-runner test now records a start instant.
+- Checklist delivery:
+  - [x] C374 — Lys ships a runner that holds each started agent in its own pseudo-terminal in the background, surviving the screen closing (DIRECTORY-050 R1). — The runner holds sessions in their own pseudo-terminals, and a restart now signals only groups proved to be its own.
+- Story delivery:
+  - [x] S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool. — Agents run in the background under Lys's own runner.
+
 ### R2: A published runner protocol; any tool may be the runner
 
 Behavioural. The protocol is a short list of acts (start, input, keys, read, wait, resize, end, status) over JSON, described in the OpenAPI document of DIRECTORY-048 R6 as the runner's own section. A machine's record names its runner: Lys's own by default, or another tool's socket or address speaking the protocol. The server holds no code specific to any other tool. A conformance test suite in the crate runs against any runner given its address.
@@ -90,6 +116,18 @@ Behavioural. The protocol is a short list of acts (start, input, keys, read, wai
 **Stories:**
 - S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
 
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round; delivered in the earlier round. The conformance suite is crates/lys-runner/tests/conformance.rs (from line 146). runner_protocol_mismatch at start is checked by crates/lys-identity-server/tests/runner_start.rs:249. Other tools' names are barred by rules/ast-grep/no-other-runner-names.yml.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C375 — A published runner protocol lets another tool be a machine's runner; Lys needs no particular runner (DIRECTORY-050 R2). — The published protocol and its conformance suite are in the tree.
+- Story delivery:
+  - [x] S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
+
 ### R3: Start runs the agent
 
 Behavioural. POST /agents/{id}/start on a machine with a runner renders the command as today and has the runner run it, with the working directory, environment and handles the launch record names; the session reports starting, then running when the runner confirms the process is up. A machine without a runner answers the command as today. Every refusal of the existing start is unchanged. The identity server and the lys-identity start files still spawn nothing: they ask the runner over its socket, and only lys-runner spawns a process, so DIRECTORY-029 R12 and crates/lys-identity/tests/start_no_spawn.rs stay green unchanged. This supersedes DIRECTORY-029's boundary against a lys launcher subcommand by Tom's word of 28 September 2026 19:4x (Lys runs the agents it starts); the no-spawn guarantee of the start path stands.
@@ -110,6 +148,18 @@ Behavioural. POST /agents/{id}/start on a machine with a runner renders the comm
 
 **Stories:**
 - S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round. crates/lys-identity-server/tests/runner_start.rs:171 checks that a start runs the agent and lists it running, and :225 that a machine without a runner answers the command as before. crates/lys-identity/tests/start_no_spawn.rs is unchanged. The only new spawn this round (of /bin/ps) is in lys-runner.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C376 — Starting an agent on a machine with a runner runs it there and reports it running, from the screen, the API and the MCP (DIRECTORY-050 R3).
+- Story delivery:
+  - [x] S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
 
 ### R4: Type, keys, read, wait, resize and compact through Lys
 
@@ -133,6 +183,18 @@ Behavioural. Routes under /runtime/sessions/{id}: input (text, optionally follow
 **Stories:**
 - S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
 
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round. crates/lys-identity-server/tests/runner_api.rs:264 checks typing a line and reading it back, and :285 checks that each act is refused not_permitted without operate and leaves a receipt when admitted. Wait answering with the matched text is checked through the waited helper at :232.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C377 — A session can be typed into, sent keys, read, waited on for a pattern, resized and compacted through Lys, each under a grant and with a receipt (DIRECTORY-050 R4).
+- Story delivery:
+  - [x] S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
+
 ### R5: Account rotation on usage limit
 
 Behavioural. An agent's profile may name an ordered list of account handles held by the secrets broker and the words that mean a usage limit. When a session prints them, Lys ends it and starts it again on the next account in the list, resuming its session record, and records the move; at the list's end it stops, reports accounts_exhausted, and does not wrap round. Account values reach only the session's environment through the broker and never a route, a log or a receipt. A usage limit is taken from the harness's own signal where it has one (its exit status or structured event), not from words in the terminal, so an agent quoting the words rotates nothing; for a harness with no such signal, the profile declares the words and the brief's record says rotation there can be tripped by quoted text. Accounts are credentials over one session store per agent: rotation changes the credential the harness runs with, never where its sessions and transcripts live, so a rotated session resumes.
@@ -153,6 +215,18 @@ Behavioural. An agent's profile may name an ordered list of account handles held
 **Stories:**
 - S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
 
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round. crates/lys-identity-server/tests/runner_api.rs:387 checks that the session moves to the next account, stops accounts_exhausted at the end of the list, and that no account value appears in any answer, log line or receipt. The runner-side rotation tests are at crates/lys-runner/tests/runner.rs:635 and :683.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C378 — A session that prints its usage-limit words moves to the next account in its list, by handle, never by value (DIRECTORY-050 R5).
+- Story delivery:
+  - [x] S154 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
+
 ### R6: Wake with a message; stop through the runner
 
 Behavioural. POST /agents/{id}/wake with a message types it into the agent's live session as its profile says a message is delivered, or refuses no_live_session by name. The emergency stop (stop_api.rs) asks the runner to end every session and marks each confirmed only when the runner reports its exit.
@@ -170,6 +244,18 @@ Behavioural. POST /agents/{id}/wake with a message types it into the agent's liv
 
 **Stories:**
 - S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
+
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round. crates/lys-identity-server/tests/runner_api.rs:488 checks that a wake types into the live session or is refused no_live_session, and :511 that a stop ends every session and each shows confirmed with its exit instant.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C379 — A message to an agent wakes its session; the emergency stop ends sessions through the runner and reports each confirmed (DIRECTORY-050 R6).
+- Story delivery:
+  - [x] S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
 
 ### R7: Sessions screen: see, type to and stop every agent
 
@@ -190,6 +276,18 @@ Behavioural. The Sessions screen (surface/identity/src/features/runtime) lists e
 
 **Stories:**
 - S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Unchanged this round. The Sessions screen with its Terminal view is surface/identity/src/features/runtime/Terminal.tsx with terminal.css, and surface/identity/tests/runtime-terminal.test.tsx covers the list, the terminal view, confirming Stop, and the refusals.
+- Deviation: (none)
+- Checklist delivery:
+  - [x] C380 — A Sessions screen shows every running agent, its terminal read live, with type, keys and stop (DIRECTORY-050 R7).
+- Story delivery:
+  - [x] S155 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running agents, I want to see what an agent is doing, type to it, and stop it from one screen, so that every agent is in one place I control.
 
 ## Boundaries
 

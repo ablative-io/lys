@@ -271,10 +271,7 @@ struct Group {
 impl Group {
     fn start() -> Result<Self, Box<dyn Error>> {
         let mut leader = Command::new("/bin/sh")
-            .args([
-                "-c",
-                "trap '' HUP; exec 3<&0; /bin/cat <&3 & echo $!; wait",
-            ])
+            .args(["-c", "trap '' HUP; exec 3<&0; /bin/cat <&3 & echo $!; wait"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .process_group(0)
@@ -357,7 +354,10 @@ fn said_not_signalled(pid: u32) -> bool {
 fn a_lost_group_whose_leader_started_as_recorded_is_ended_whole() -> TestResult {
     let mut group = Group::start()?;
     let pid = group.pid();
-    assert!(group.answers("before")?, "the group runs before the restart");
+    assert!(
+        group.answers("before")?,
+        "the group runs before the restart"
+    );
     let recorded = lys_runner::pty::leader_started(pid)?.ok_or("the leader has no start")?;
     let ended = restart_ends(unended("proved", pid, Some(&recorded)))?;
     assert_eq!(
@@ -404,7 +404,10 @@ fn a_group_whose_leader_is_gone_is_not_signalled() -> TestResult {
     assert_eq!(exit.signal(), Some(9), "the leader alone is gone: {exit:?}");
     assert_eq!(lys_runner::pty::leader_started(pid)?, None);
     let ended = restart_ends(unended("leaderless", pid, Some(&recorded)))?;
-    assert_eq!(ended.signal, None, "a group with no leader is never signalled");
+    assert_eq!(
+        ended.signal, None,
+        "a group with no leader is never signalled"
+    );
     assert!(group.answers("after")?, "what the group still holds runs");
     assert!(said_not_signalled(pid), "{:?}", said_of(pid));
     assert_eq!(group.close()?, b"");
@@ -416,7 +419,10 @@ fn a_record_that_holds_no_start_instant_is_not_signalled() -> TestResult {
     let mut group = Group::start()?;
     let pid = group.pid();
     let ended = restart_ends(unended("unproved", pid, None))?;
-    assert_eq!(ended.signal, None, "a group not proved the runner's is never signalled");
+    assert_eq!(
+        ended.signal, None,
+        "a group not proved the runner's is never signalled"
+    );
     assert!(group.answers("after")?, "the group still runs");
     assert!(said_not_signalled(pid), "{:?}", said_of(pid));
     assert_eq!(group.close()?, b"");
@@ -444,7 +450,10 @@ fn a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status() -> Te
 fn a_session_the_runner_starts_records_its_leaders_start() -> TestResult {
     let mut held = Held::start(1 << 16)?;
     let client = held.client();
-    started(&client, shell("recorded", "echo recorded-$((1+1)); exec cat"))?;
+    started(
+        &client,
+        shell("recorded", "echo recorded-$((1+1)); exec cat"),
+    )?;
     assert_eq!(waited(&client, "recorded", "recorded-2")?, "recorded-2");
     let Kept { sessions, .. } =
         serde_json::from_slice(&std::fs::read(held.state().join("sessions.json"))?)?;

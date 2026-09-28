@@ -165,7 +165,9 @@ fn unknown(id: &str) -> RunnerError {
 fn left_behind(id: &str, pid: Option<u32>, recorded: Option<&str>) -> Option<String> {
     let pid = pid?;
     let not_signalled = |why: &str| {
-        crate::error::said(&format!("session {id}: process {pid} was not signalled: {why}"));
+        crate::error::said(&format!(
+            "session {id}: process {pid} was not signalled: {why}"
+        ));
         None
     };
     let Some(recorded) = recorded else {
