@@ -11,5 +11,6 @@ pub use requests::{
 pub use views::{
     CannotGiveAnswer, CannotGiveItemView, CannotGiveReasonView, CannotGiveSubjectView, GrantList,
     GrantView, HolderView, LastUseView, LogView, ModelView, PassOnView, PermitView, ReceiptView,
-    RecordedView, ResourceView, UnknownCannotGiveReason, UseEventView, WhoPage, WindowView,
+    RecordedView, ResourceView, UnknownCannotGiveReason, UnreportedView, UseEventView, WhoPage,
+    WindowView,
 };

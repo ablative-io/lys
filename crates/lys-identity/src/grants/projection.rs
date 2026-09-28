@@ -58,6 +58,7 @@ pub struct GrantRecord {
     index: u64,
     revoked: Option<Revocation>,
     last_use: LastUse,
+    uses: u64,
 }
 
 impl GrantRecord {
@@ -74,6 +75,14 @@ impl GrantRecord {
     /// When it was last seen exercised.
     pub fn last_use(&self) -> LastUse {
         self.last_use
+    }
+
+    /// How many use events the grant log records for it. Zero is a count of
+    /// recorded uses, not a claim that it was never exercised: an exercise
+    /// whose use event could not be recorded is not in this count, and is
+    /// named by [`Usage::unreported`](super::usage::Usage::unreported).
+    pub fn uses(&self) -> u64 {
+        self.uses
     }
 
     /// Its own revocation, if it was revoked directly.
@@ -244,6 +253,7 @@ impl GrantBook {
                         index,
                         revoked: None,
                         last_use: LastUse::NotSeen,
+                        uses: 0,
                     },
                 );
             }
@@ -264,6 +274,7 @@ impl GrantBook {
                         route: *route,
                         index,
                     };
+                    record.uses = record.uses.saturating_add(1);
                 }
             }
         }

@@ -210,7 +210,7 @@ async fn reviews(
             .filter_map(|record| {
                 let held = answering(judged.directory, record.grant().holder(), viewer)?;
                 Some(DueView {
-                    grant: GrantView::from(record),
+                    grant: GrantView::new(record, judged.grants.unreported(record.grant().id())),
                     agent: held.agent_summary(),
                     reviewer: held.person_summary(),
                     last_kept: kept.as_ref().and_then(|store| {

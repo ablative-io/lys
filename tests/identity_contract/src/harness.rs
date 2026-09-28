@@ -195,6 +195,8 @@ pub struct Service {
     client: reqwest::Client,
     /// Holds the log, keys and secret file for the service's life.
     pub dir: tempfile::TempDir,
+    config: Config,
+    server: tokio::task::JoinHandle<std::io::Result<()>>,
 }
 
 fn secret_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
@@ -210,6 +212,26 @@ fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
         .ok_or_else(|| format!("{} answered no redirect", answer.url()))?
         .to_str()?
         .to_owned())
+}
+
+/// The service `config` describes, answering on `listener`, and a client
+/// that follows no redirect.
+async fn serve(
+    listener: tokio::net::TcpListener,
+    config: &Config,
+) -> Result<
+    (
+        tokio::task::JoinHandle<std::io::Result<()>>,
+        reqwest::Client,
+    ),
+    Box<dyn Error>,
+> {
+    let app = service(config).await?;
+    let server = tokio::spawn(async move { axum::serve(listener, app).await });
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    Ok((server, client))
 }
 
 /// A status and a JSON body.
@@ -332,20 +354,34 @@ impl Service {
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
-        let app = service(&config).await?;
-        tokio::spawn(async move { axum::serve(listener, app).await });
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
+        let (server, client) = serve(listener, &config).await?;
         Ok((
             Self {
                 base,
                 issuer,
                 client,
                 dir,
+                config,
+                server,
             },
             prepared,
         ))
+    }
+
+    /// Stop the service and start it again over the same directory, on a new
+    /// address with a new client, so every store is opened from disk and no
+    /// session or connection of the stopped service carries over.
+    pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
+        self.server.abort();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let listen = listener.local_addr()?;
+        self.base = format!("http://{listen}");
+        self.config.listen = listen;
+        self.config.redirect_url = format!("{}/callback", self.base);
+        let (server, client) = serve(listener, &self.config).await?;
+        self.server = server;
+        self.client = client;
+        Ok(())
     }
 
     /// Begin a sign-in and let the issuer answer it as `login`, answering the
