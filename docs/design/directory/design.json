@@ -3331,6 +3331,11 @@
       "path": "crates/lys/tests/identity_support/link_audit_install.rs",
       "note": "Prove provisioning through a scratch installation and upgrade",
       "brief": "DIRECTORY-055"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/back.rs",
+      "note": "`lys identity upgrade --back`: the exchange of bin/, configuration, compose and surface with the kept build, atomic where both folders exist, undoing its own finished renames on failure, and finishing an interrupted exchange from the intent record.",
+      "brief": "DIRECTORY-053"
     }
   ],
   "inventory": [

@@ -759,6 +759,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/setup.rs` | Browser setup completes the sender enrolment under the new person |  |
 | `crates/lys/tests/identity_link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
 | `crates/lys/tests/identity_support/link_audit_install.rs` | Prove provisioning through a scratch installation and upgrade | DIRECTORY-055 |
+| `crates/lys/src/identity/upgrade/back.rs` | `lys identity upgrade --back`: the exchange of bin/, configuration, compose and surface with the kept build, atomic where both folders exist, undoing its own finished renames on failure, and finishing an interrupted exchange from the intent record. | DIRECTORY-053 |
 
 ## Inventory
 
