@@ -1,302 +1,237 @@
 {
   "id": "LYSCORE-001",
   "cluster": "lys-core",
-  "title": "Carry the hand-written lys-core design into its three JSON documents",
-  "depends_on": [],
-  "blocked_by": [],
+  "title": "Judge a certificate self-signed by its keys, and say what verify_certificate_chain leaves to the caller",
+  "depends_on": [
+    "DIRECTORY-013"
+  ],
+  "blocked_by": [
+    "DIRECTORY-013 landed on main: the build starts only when this command prints landed: git fetch -q origin main && git show origin/main:docs/design/roadmap.json | python3 -c \"import json,sys; rows=[i for i in json.load(sys.stdin)['items'] if 'DIRECTORY-013' in i['links']['briefs']]; print(rows[0]['status'] if len(rows)==1 else 'absent')\"",
+    "The lys-core carry card landed on main (it carries every item of the hand-written docs/design/lys-core DESIGN.md, CHECKLIST.md and USER-STORIES.md into design.json, checklist.json and stories.json, keeping each C and S id and its text): the build starts only when this command prints carried: git fetch -q origin main && git show origin/main:docs/design/lys-core/checklist.json | python3 -c \"import json,sys; ids={i['id'] for s in json.load(sys.stdin)['sections'] for i in s['items']}; print('carried' if all('C%d' % n in ids for n in range(1, 66)) else 'absent')\"",
+    "crates/lys-identity/tests/revocation_fold.rs exists on main, created by DIRECTORY-013 (R6 adds to it and does not create it): the build starts only when this command exits 0: git fetch -q origin main && git cat-file -e origin/main:crates/lys-identity/tests/revocation_fold.rs"
+  ],
   "checklist": [
-    "C1",
-    "C2",
-    "C3",
-    "C4",
-    "C5",
-    "C6",
-    "C7",
-    "C8",
-    "C9",
-    "C10",
-    "C11",
-    "C12",
-    "C13",
-    "C14",
-    "C15",
-    "C16",
-    "C17",
-    "C18",
-    "C19",
-    "C20",
-    "C21",
-    "C22",
     "C23",
-    "C24",
-    "C25",
-    "C26",
-    "C27",
-    "C28",
-    "C29",
-    "C30",
-    "C31",
-    "C32",
-    "C33",
-    "C34",
-    "C35",
-    "C36",
-    "C37",
-    "C38",
-    "C39",
-    "C40",
-    "C41",
-    "C42",
-    "C43",
-    "C44",
-    "C45",
-    "C46",
-    "C47",
-    "C48",
-    "C49",
-    "C50",
-    "C51",
-    "C52",
-    "C53",
-    "C54",
-    "C55",
-    "C56",
-    "C57",
-    "C58",
-    "C59",
-    "C60",
-    "C61",
-    "C62",
-    "C63",
-    "C64",
-    "C65"
+    "C66",
+    "C67",
+    "C68",
+    "C69",
+    "C70",
+    "C71",
+    "C72",
+    "C73",
+    "C74"
   ],
   "stories": [
-    "S1",
-    "S2",
-    "S3",
-    "S4",
     "S5",
-    "S6",
-    "S7",
-    "S8",
-    "S9",
-    "S10",
-    "S11",
-    "S12",
-    "S13",
-    "S14",
-    "S15",
-    "S16",
-    "S17",
-    "S18",
-    "S19",
-    "S20",
-    "S21",
-    "S22",
-    "S23"
+    "S11"
   ],
-  "design_anchor": [],
-  "purpose": "The lys-core design on main is three hand-written documents, DESIGN.md, CHECKLIST.md and USER-STORIES.md, with no JSON sources. The design gate renders every cluster that has a design.json and compares the render with the committed markdown, so the first lys-core brief to add a design.json would replace the hand-written documents with whatever that JSON holds and the older design would leave the record. This brief carries the whole hand-written design into design.json, checklist.json and stories.json first, so that the render reproduces it: every C id and text, every S id and text, and every section of DESIGN.md in the field the design schema gives it. Nothing new is designed and no code changes.",
-  "task": "Carry main's docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md at 7b536253 into docs/design/lys-core/design.json, checklist.json and stories.json (R1 to R3), render the cluster with python3 scripts/design/render-cluster.py docs/design/lys-core, commit the rendered DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md from that render (R4), and pass sh scripts/design/gate.sh. Every path is relative to the repository root.\n\nThe three JSON documents are written on the brief branch with this brief, as the method writes a cluster's design beside its first brief. The build starts from them: it runs the measurements in R1 to R3 against main's bytes at 7b536253, corrects any carried text the measurements show differs from main so that it matches main exactly, and renders. Write each JSON document with json.dumps(doc, indent=2, ensure_ascii=False) and one trailing newline, so an en dash stays an en dash and a backtick stays a backtick.\n\nWhat is carried, and where. Nothing is reworded, merged, dropped, renumbered or reordered, and stale text is carried as it stands (S12's stdin, S14's root parts, and the structure tree's missing delegation/, receipt/, bundle/, ca/request.rs and keys/ssh.rs are corrected by a later unit, not here). The constraints take ids CN1 to CN9 in main's order because the schema requires an id; the goals render as bullets in main's order because the renderer writes goals that way; the fenced structure tree becomes one structure row per entry, 75 rows (73 entries under the two roots crates/lys-core/ and crates/lys/, and the two roots), with each path spelled as the tree spells it (directory entries keep their trailing slash, *_tests.rs globs stay globs), continuation lines joined into the note with one space, and every brief field empty because every one of those paths exists on main; the D1 to D8 subsections stay inside the solution text, not in decisions, because they are not ledger ADRs.\n\nSentences with no field of their own, named: (a) the paragraph under main's structure tree that begins 'Tests live in sibling' has no field after a structure table, so it goes into the solution text, as its own paragraph after the last D8 paragraph; (b) CHECKLIST.md's three-paragraph intro blockquote and its two italic annotations, the one above C38 that covers C38 to C43 and the one above C58 that covers C58 to C59, have no field in checklist.json, so they go into design.json as one section at the end of the solution text headed '### Checklist notes', carried verbatim, each annotation opening with the ids it covers as main's does; they do not go into any checklist section name, and the eight checklist headings stay exactly as main has them; (c) three persona headings have no ' — ' between a name and a role, and the renderer always writes one, so each is split into name and role at the point given in R2. The dev record says each of these, where it went, and why.\n\nDifferences the render makes against main, which the R3 dev record lists by name with its reason. Layout: the frontmatter title loses its quotes; the renderer adds the '> **Cluster:** lys-core' line under the heading; the 'Tests live in sibling' paragraph moves from under the structure tree to the end of the D8 text; goals change from '1.' to '6.' numbering to bullets; the structure tree becomes a Path, Note, Brief table; each constraint gains its '**CNn** —' prefix. Content, the two the card's lead allows: the '### Checklist notes' section in the solution (carrying (b) above, so the rendered DESIGN.md holds it and the rendered CHECKLIST.md does not), and the eight structure rows for the cluster's own documents and this brief's own files, listed as the directory cluster lists its own, so that check-coverage.py passes and R1 to R4 name real files. Every other difference between the rendered DESIGN.md and main's is layout only. The dev record also lists the rendered CHECKLIST.md's eleven missing lines and the rendered USER-STORIES.md's three changed headings.\n\nCoverage. This brief claims C1 to C65 and S1 to S23 because check-coverage.py fails every checklist item and story that no brief in the cluster claims. It carries them; it did not build them. The done flags record main's ticks unchanged: C1 to C60 and C65 true, C61 to C64 false. The later lys-core card that waits on this one adds its own brief, items and stories after the carried ones; none of them is added here.\n\nOut of scope: any new checklist item, user story, principle, ADR, goal, non-goal or constraint; any change to code, to crates/, to scripts/design/ (renderer, validator, schemas) or to any other cluster; a note field for checklists and personas in the method's renderer and schemas.",
+  "design_anchor": [
+    "ADR-003",
+    "ADR-008",
+    "ADR-044",
+    "ADR-045"
+  ],
+  "purpose": "lys-core's chain verifier decides self-signed by comparing names, so it refuses a certificate the authority legitimately issued to a subject carrying the authority's hex-key name, and accepts a certificate whose subject key is the issuer's own key when the names differ. This brief makes the judgement one of keys and signature (ADR-044), shows it through the published CLI and through DIRECTORY-013's fold, and writes the caveat on verify_certificate_chain that tells a caller what is proven and what is still theirs. It lands on main with no crates.io release (ADR-045).",
+  "task": "Seven rows, in order. R1 replaces the distinguished-name screen in verify_certificate_chain_at with the key-based self-signed rule, placed after strict signature verification, and adds the tests that show it: the hex-common-name certificate judged on its real issuer, the rebuilt self-signed test that makes the self-signed branch fire and asserts its reason, the certificate whose subject key is not a readable Ed25519 key, the two kinds of certificate this reclassifies from verifying to refused (one issued by issue_certificate_for_request over a request made with the authority's own key, and one signed by a key over that same key as subject key under differing names), and the decoded-point comparison. R2 rewrites the rustdoc of verify_certificate_chain, verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain. R3 adds two CLI tests. R4 corrects lys-anchor's admission module doc. R5 adds the CHANGELOG entry. R6 adds one test to DIRECTORY-013's fold tests, calling the fold by the names its landed interface carries. R7 adds this brief's checklist rows to the carried lys-core checklist, restates the carried design's self-signed sentence, appends this brief's principles, constraints, goals, non-goals and inventory rows after the carried ones under the next free P and CN numbers, and commits the render, which keeps the older text. This is a behaviour change in both directions and is intended: a hex-common-name certificate refused today verifies, and a certificate self-signed by keys that verifies today when its names differ is refused. Every certificate that verifies today and is not self-signed by keys still verifies. C23 keeps its promise under the key-based definition of self-signed; its earlier ticked state rested on the name comparison, so it is restated here and ticks again only on review. The build is blocked until DIRECTORY-013 has landed on main with its fold tests file crates/lys-identity/tests/revocation_fold.rs, and until the lys-core carry card has landed on main (blocked_by, one command each); DIRECTORY-013's brief is not amended. In acceptance lines, <base> is the main commit the build branched from, after both have landed. Out of scope, each a later unit: publishing a lys-core release to crates.io; amending DIRECTORY-013. Out of scope entirely: a revocation check in lys-core, chain walking, a distinct CLI message for the self-signed refusal, carrying the older lys-core design into JSON (the carry card's work), and any hand edit of docs/design/lys-core's markdown files.",
   "requirements": [
     {
       "id": "R1",
-      "title": "Carry CHECKLIST.md into checklist.json and render it",
-      "spec": "docs/design/lys-core/checklist.json holds cluster 'lys-core' and main's eight CHECKLIST.md sections at 7b536253, each named exactly as main names it and in main's order: Crate Setup, Key Management, Certificate Authority, Merkle Transparency Log, Signed Attestations, Sealed Envelope, CLI Surface, Integration Verification. Each of main's item lines '- [x] **Cn** — text' and '- [ ] **Cn** — text' becomes one item {id, text, done} in its section and in main's order, where text is every character after the first ' — ' byte for byte (C61 to C64 keep their italic tails inside the text) and done is true for '[x]' and false for '[ ]'. The document SHALL NOT reword, merge, drop, renumber, reorder or add any item, SHALL NOT change any section name, and SHALL NOT hold the intro blockquote and the two italic annotations in any section name or item text. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/CHECKLIST.md whose eight headings and 65 item lines equal main's byte for byte, and SHALL NOT write any line main's CHECKLIST.md does not hold.",
+      "title": "Judge a certificate self-signed by its keys and signature, never by its names",
+      "spec": "In crates/lys-core/src/ca/authority.rs, verify_certificate_chain_at SHALL check, in this order: the DER parses as an X.509 certificate; its signature algorithm is Ed25519; its signature is 64 bytes; the supplied issuer key decodes to an Ed25519 point; the signature verifies under the supplied issuer key with ed25519-dalek verify_strict; the certificate is not self-signed; the instant lies inside notBefore and notAfter, both inclusive. WHEN the signature has verified under the supplied issuer key AND the certificate's subject public key is the same Ed25519 key as the supplied issuer key, THE SYSTEM SHALL refuse the certificate with TrustError::CertificateVerification whose reason is exactly 'self-signed certificate rejected (subject key is the issuer key)'. Two keys are the same key when both decode to Ed25519 points and the decoded points are equal, so a non-canonical encoding of the issuer's point is the issuer's key; the comparison is made by a private function of authority.rs over two 32-byte keys. The subject key is read as certificate_subject_public_key reads it (Ed25519 algorithm, no parameters, no unused bits, exactly 32 bytes). IF the subject key cannot be read that way, or does not decode to an Ed25519 point, THEN THE SYSTEM SHALL treat it as not the issuer's key and SHALL NOT refuse the certificate as self-signed for that reason. THE SYSTEM SHALL NOT compare the subject and issuer distinguished names, or any name, to decide whether a certificate is self-signed, and a name match SHALL NOT refuse or accept a certificate. IF the signature does not verify under the supplied issuer key, THEN THE SYSTEM SHALL refuse with the reason 'certificate signature did not verify against the issuer public key' whatever the subject key is, and SHALL NOT report the certificate as self-signed. THE SYSTEM SHALL NOT call x509-parser's verify_signature, SHALL NOT change the signature of verify_certificate_chain, verify_certificate_chain_at or CertificateAuthority::verify_certificate_chain, SHALL NOT change either issuance path or the issuer DN they write, and SHALL NOT use unwrap, expect or panic in library code. This is a behaviour change on both sides: a certificate the authority legitimately issues to the subject named by its own lowercase-hex public key, refused today, verifies; a certificate whose subject key is the issuer key and whose signature verifies under it, accepted today when its names differ, is refused. The certificates reclassified from verifying to refused are of two kinds, each with its own acceptance line: one issued by issue_certificate_for_request over a request made with the authority's own key, and one any other tool signs with a key over that same key as subject key under a subject name that differs from its issuer name. issue_certificate generates a fresh subject key, so it produces neither. Every certificate that verifies today and is not self-signed by keys SHALL still verify.",
       "acceptance": [
-        "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/lys-core/checklist.json')); ids=[i['id'] for s in d['sections'] for i in s['items']]; print(len(ids), len(set(ids)), ids==['C%d' % n for n in range(1, 66)])\" prints 65 65 True.",
-        "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/lys-core/checklist.json')); print([i['id'] for s in d['sections'] for i in s['items'] if not i['done']])\" prints ['C61', 'C62', 'C63', 'C64'].",
-        "From the repository root: python3 -c \"import json; print([s['name'] for s in json.load(open('docs/design/lys-core/checklist.json'))['sections']])\" prints ['Crate Setup', 'Key Management', 'Certificate Authority', 'Merkle Transparency Log', 'Signed Attestations', 'Sealed Envelope', 'CLI Surface', 'Integration Verification'].",
-        "From the repository root: the C and S text comparison in this brief's verification prints 'compared 88 differences 0' as its last line.",
-        "From the repository root: git show 7b536253:docs/design/lys-core/CHECKLIST.md | diff - docs/design/lys-core/CHECKLIST.md | grep -c '^<' prints 11 (the five intro blockquote lines, their following blank line, and the two annotations with their three blank lines), and the same pipeline with grep -c '^>' prints 0."
+        "rg -n '\\.subject\\(\\)|\\.issuer\\(\\)' crates/lys-core/src/ca/authority.rs prints nothing.",
+        "Test hex_common_name_certificate_is_judged_on_its_real_issuer in crates/lys-core/src/ca/authority_tests.rs: authority A issues a certificate with issue_certificate to the subject hex_lower(&A.public_key_bytes()) with a 1-hour TTL; the test asserts the parsed certificate's raw subject DN equals its raw issuer DN; verify_certificate_chain(der, &A.public_key_bytes()) returns Ok(()); verify_certificate_chain(der, &B.public_key_bytes()) for a second authority B returns Err(TrustError::CertificateVerification) whose reason equals 'certificate signature did not verify against the issuer public key'; cargo test -p lys-core --lib hex_common_name_certificate_is_judged_on_its_real_issuer prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test self_signed_certificate_is_rejected in crates/lys-core/src/ca/authority_tests.rs, rebuilt: an rcgen certificate self-signed by Ed25519 key K, checked with verify_certificate_chain under K's 32-byte public key, returns Err(TrustError::CertificateVerification) whose reason equals 'self-signed certificate rejected (subject key is the issuer key)'; the same certificate checked under a second key's public key returns Err(TrustError::CertificateVerification) whose reason equals 'certificate signature did not verify against the issuer public key'; cargo test -p lys-core --lib self_signed_certificate_is_rejected prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test ca_own_key_certificate_is_refused_as_self_signed in crates/lys-core/src/ca/authority_tests.rs: authority A issues with issue_certificate_for_request over create_certificate_request(A's own identity, \"agent-self\") with a 1-hour TTL; the test asserts the parsed certificate's raw subject DN differs from its raw issuer DN; verify_certificate_chain(der, &A.public_key_bytes()) returns Err(TrustError::CertificateVerification) whose reason equals 'self-signed certificate rejected (subject key is the issuer key)'; cargo test -p lys-core --lib ca_own_key_certificate_is_refused_as_self_signed prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test key_self_signed_certificate_with_differing_names_is_refused in crates/lys-core/src/ca/authority_tests.rs: an rcgen issuer certificate with common name issuer-x self-signed by Ed25519 key K, and a leaf with common name leaf-y and subject key K signed by K under that issuer; the test asserts the leaf's raw subject DN differs from its raw issuer DN; verify_certificate_chain(leaf der, K's 32-byte public key) returns Err(TrustError::CertificateVerification) whose reason equals 'self-signed certificate rejected (subject key is the issuer key)'; cargo test -p lys-core --lib key_self_signed_certificate_with_differing_names_is_refused prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test subject_key_as_supplied_key_without_its_signature_fails_the_signature in crates/lys-core/src/ca/authority_tests.rs: authority A issues with issue_certificate_for_request over a request from identity K; verify_certificate_chain(der, &K.public_key_bytes()) returns Err(TrustError::CertificateVerification) whose reason equals 'certificate signature did not verify against the issuer public key'; cargo test -p lys-core --lib subject_key_as_supplied_key_without_its_signature_fails_the_signature prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test self_signed_judgement_compares_decoded_points in crates/lys-core/src/ca/authority_tests.rs, calling the private same-key function of authority.rs: the 32 bytes 0x03 followed by 31 bytes 0x00 and the 32 bytes 0xf0 followed by 30 bytes 0xff and one byte 0x7f (the canonical and a non-canonical encoding of the point with y = 3) are judged the same key; 0x03 followed by 31 bytes 0x00 and 0x04 followed by 31 bytes 0x00 are judged different keys; 0x02 followed by 31 bytes 0x00 (no point has y = 2) compared with itself is judged not the same key; the test asserts 1 same and 2 not-same; cargo test -p lys-core --lib self_signed_judgement_compares_decoded_points prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test unreadable_subject_key_is_not_judged_self_signed in crates/lys-core/src/ca/authority_tests.rs: an rcgen issuer certificate with common name issuer-x self-signed by Ed25519 key K, and a leaf with common name leaf-y whose subject public key is an ECDSA P-256 key (SubjectPublicKeyInfo algorithm 1.2.840.10045.2.1, not Ed25519) signed by K under that issuer, with rcgen's default validity; the test asserts certificate_subject_public_key(leaf der) returns Err(TrustError::CertificateParsing); verify_certificate_chain(leaf der, K's 32-byte public key) returns Ok(()), the result the tree at the base commit gives for this input, and so is not refused with the reason 'self-signed certificate rejected (subject key is the issuer key)'; cargo test -p lys-core --lib unreadable_subject_key_is_not_judged_self_signed prints 'test result: ok. 1 passed; 0 failed'.",
+        "rg -c 'fn (hex_common_name_certificate_is_judged_on_its_real_issuer|self_signed_certificate_is_rejected|ca_own_key_certificate_is_refused_as_self_signed|key_self_signed_certificate_with_differing_names_is_refused|subject_key_as_supplied_key_without_its_signature_fails_the_signature|self_signed_judgement_compares_decoded_points|unreadable_subject_key_is_not_judged_self_signed)\\(' crates/lys-core/src/ca/authority_tests.rs prints 7.",
+        "cargo test -p lys-core --all-features --test openssl_csr_interop exits 0, and a_request_is_not_accepted_as_a_certificate in crates/lys-core/src/ca/request_tests.rs passes unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-core/src/ca/authority.rs",
+          "crates/lys-core/src/ca/authority_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C23",
+        "C66",
+        "C67",
+        "C68"
+      ],
+      "stories": [
+        "S5"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Say in verify_certificate_chain's rustdoc what it checks and what it leaves to the caller",
+      "spec": "Documentation only, in crates/lys-core/src/ca/authority.rs. The doc comment of the free verify_certificate_chain SHALL carry two sections. '# What this checks' lists, one bullet each: the bytes parse as an X.509 certificate; its signature algorithm is Ed25519; its signature verifies with strict Ed25519 verification under the issuer key the caller supplies; its subject key is not that issuer key (a certificate whose subject key is the issuer key and whose signature verifies under it is self-signed and refused, whatever its names); the current instant lies inside notBefore and notAfter, both inclusive. '# What this leaves to the caller' lists five bullets, in this order, each beginning with the words given here: 'Revocation' (lys-core has no revocation check); 'Trust in the supplied issuer key' (the function believes whatever key it is given); 'Possession of the subject key' (proven only at issuance, by CertificateAuthority::issue_certificate_for_request); 'Anything beyond one level' (it verifies one signature under one key, walks no chain, and checks no issuer certificate, basic constraints or key usage); 'The meaning of any extension or capability claim' (none is read). The doc comment of verify_certificate_chain_at SHALL state the key-based rule and link to verify_certificate_chain for what is left to the caller; the doc comment of CertificateAuthority::verify_certificate_chain SHALL link to the same caveat. THE SYSTEM SHALL NOT keep any sentence describing a distinguished-name comparison, a heuristic screen or its false positive. The documentation SHALL NOT link any item gated by unstable-anchor, and SHALL NOT change any function signature or body.",
+      "acceptance": [
+        "rg -n '^/// # What this checks$|^/// # What this leaves to the caller$' crates/lys-core/src/ca/authority.rs prints exactly 2 lines, both inside the doc comment directly above the line beginning 'pub fn verify_certificate_chain(cert_der'.",
+        "The '# What this leaves to the caller' section of verify_certificate_chain's doc comment holds exactly 5 bullets, whose first words are, in order: 'Revocation', 'Trust in the supplied issuer key', 'Possession of the subject key', 'Anything beyond one level', 'The meaning of any extension or capability claim'.",
+        "The doc comment of verify_certificate_chain_at contains the sentence 'A certificate is self-signed when its subject public key is the supplied issuer key and its signature verifies under that key.' and the intra-doc link [`verify_certificate_chain`].",
+        "rg -in 'heuristic|false positive|issuer equal to subject|issuer equals subject' crates/lys-core/src/ca/authority.rs prints nothing.",
+        "cargo doc -p lys-core --no-deps and cargo doc -p lys-core --no-deps --all-features each exit 0 and print no line containing 'warning'."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-core/src/ca/authority.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C69",
+        "C70"
+      ],
+      "stories": [
+        "S5"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Show lys ca verify and lys verify --cert judging both cases on keys",
+      "spec": "Tests only, in crates/lys/tests/certified_attestation_tests.rs, using its Fixture. WHEN lys ca verify or lys verify --cert is given a certificate the fixture's CA issued over a holder's request to the subject named by the CA's lowercase-hex public key, THE SYSTEM SHALL exit 0. WHEN either is given a certificate the fixture's CA issued over a request made with the CA's own key, THE SYSTEM SHALL exit 1 with the existing single refusal message, and SHALL NOT print any text naming the self-signed check. No file under crates/lys/src changes.",
+      "acceptance": [
+        "Test hex_common_name_certificate_verifies_through_both_commands: holder key holder.key is certified by certify_presented with the subject equal to the fixture's ca_public_key (64 lowercase hex characters) into hexcn.pem; lys --json ca verify --cert hexcn.pem --issuer-public-key <ca_public_key> exits 0; after holder.key attests the payload, verify_certified on that attestation and hexcn.pem exits 0 with verified true; cargo test -p lys --test certified_attestation_tests hex_common_name_certificate_verifies_through_both_commands prints 'test result: ok. 1 passed; 0 failed'.",
+        "Test authority_own_key_certificate_is_refused_by_both_commands: certify_presented with holder ca.key and subject agent-self into self.pem; lys ca verify --cert self.pem --issuer-public-key <ca_public_key> exits 1 and its stderr contains 'certificate verification failed' and does not contain 'self-signed'; after ca.key attests the payload, verify_certified on that attestation and self.pem exits 1; cargo test -p lys --test certified_attestation_tests authority_own_key_certificate_is_refused_by_both_commands prints 'test result: ok. 1 passed; 0 failed'.",
+        "cargo test -p lys --bin lys certificate_verification_failed_display_is_single_and_generic prints 'test result: ok. 1 passed; 0 failed', and git diff --stat <base>..HEAD -- crates/lys/src prints nothing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys/tests/certified_attestation_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C71"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Keep lys-anchor's admission doc true under the key-based rule",
+      "spec": "Documentation only, in the module doc of crates/lys-anchor/src/admission/certificate.rs. The sentence naming what verify_certificate_chain rejects SHALL say it rejects a certificate whose subject key is the issuer key, and SHALL NOT describe self-signed by names. No code in lys-anchor changes.",
+      "acceptance": [
+        "rg -n 'rejects self-signed certificates' crates/lys-anchor/src/admission/certificate.rs prints nothing.",
+        "rg -c 'whose subject key is the issuer key' crates/lys-anchor/src/admission/certificate.rs prints 1.",
+        "cargo test -p lys-anchor --all-features exits 0."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-anchor/src/admission/certificate.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C72"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R5",
+      "title": "Record the change in CHANGELOG's Unreleased section",
+      "spec": "Documentation only. Under ## [Unreleased] in CHANGELOG.md, a subsection headed '### Changed — `lys-core` certificate verification' SHALL hold three bullets: a certificate issued to the subject named by the issuer's lowercase-hex public key now verifies, where it was refused; a certificate whose subject key is the issuer key and whose signature verifies under it is now refused as self-signed, whatever its names, where it verified when its names differed; the rustdoc of verify_certificate_chain now states what it checks and what it leaves to the caller. The entry SHALL NOT name a version number or a release date, and no other section of CHANGELOG.md changes.",
+      "acceptance": [
+        "rg -n '^### Changed — `lys-core` certificate verification$' CHANGELOG.md prints exactly 1 line, and that line sits after the line '## [Unreleased]' and before the next line beginning '## ['.",
+        "That subsection holds exactly 3 bullets, and they contain, in order, the phrases 'now verifies', 'now refused as self-signed' and 'what it leaves to the caller'.",
+        "git diff <base>..HEAD -- CHANGELOG.md removes no line and adds lines only inside that subsection."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "CHANGELOG.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C73"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R6",
+      "title": "Show DIRECTORY-013's fold issuing a hex-common-name leaf and refusing a leaf self-signed by keys",
+      "spec": "Tests only, one test added to crates/lys-identity/tests/revocation_fold.rs, which DIRECTORY-013 creates and this row adds to; this row starts only once DIRECTORY-013 has landed and that file exists on origin/main (blocked_by). The fold's public entry point, how an issuance leaf and a revocation leaf are built, and the accessors for the folded size, the issued set, the revoked certificates and the refused leaves with their reason cannot be read from any tree reachable when this brief was written, because DIRECTORY-013 has not landed; this row invents none of them. The test calls them by the names DIRECTORY-013's landed interface gives them on origin/main when the row is started. WHEN the fold reads an issuance leaf whose certificate the issuing authority issued to the subject named by its own lowercase-hex public key, THE SYSTEM SHALL count it issued. WHEN the fold reads an issuance leaf whose certificate's subject key is the issuing authority's key, THE SYSTEM SHALL record certificate_chain_invalid at its index and SHALL NOT count it issued. WHEN the fold reads a revocation leaf for the issued hex-common-name certificate, THE SYSTEM SHALL count that certificate revoked. No file under crates/lys-identity/src changes and no other test of revocation_fold.rs changes.",
+      "acceptance": [
+        "Test lyscore001_fold_judges_self_signed_by_keys in crates/lys-identity/tests/revocation_fold.rs, calling DIRECTORY-013's landed fold interface by the names it carries on origin/main: a fixture log of 3 leaves, at index 0 the issuance leaf of certificate H issued by the issuing authority with issue_certificate to the subject hex_lower of the issuing authority's public key, at index 1 the issuance leaf of certificate K issued by the issuing authority with issue_certificate_for_request over a request made with the issuing authority's own identity, at index 2 the revocation leaf of H, folded with the issuing authority's public key, shows exactly 1 issuance (H), exactly 1 revocation (H), and exactly 1 refused leaf, certificate_chain_invalid at index 1; cargo test -p lys-identity --test revocation_fold lyscore001_fold_judges_self_signed_by_keys prints 'test result: ok. 1 passed; 0 failed'.",
+        "git diff --stat <base>..HEAD -- crates/lys-identity/src prints nothing, and git diff <base>..HEAD -- crates/lys-identity/tests/revocation_fold.rs removes no line."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/tests/revocation_fold.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C74"
+      ],
+      "stories": []
+    },
+    {
+      "id": "R7",
+      "title": "Append this brief's rows to the carried lys-core record and commit the render that keeps the older text",
+      "spec": "Structural, in docs/design/lys-core, on the files the carry card landed. The carried files are the cluster's record of what main already says: this row appends to them and removes or rewords nothing in them except C23 and the one design sentence named below. In checklist.json: C23 keeps its section and position, its text becomes this brief's C23 text and its done becomes false; C66 to C74 are added after C65, in id order, each under the section name this brief's checklist gives it (Certificate Authority for C66 to C70, CLI Surface for C71, Consumers and Records for C72 to C74), a section the carried file lacks being appended after its last section. In stories.json nothing changes: S5 and S11, the stories this brief serves, are already carried with the same text, and this brief adds no story. In design.json the carried title, intention, problem and solution stay the carried ones, apart from one sentence: the carried sentence 'Self-signed certificates are rejected.' becomes 'A certificate whose subject public key is the supplied issuer key and whose signature verifies under that key is self-signed and is rejected, whatever its names.' This brief's own title, intention, problem and solution stay in its cluster record and are not written into the carried design. This brief's design rows are appended after the carried rows of the same field, in the order this brief's record gives them, and each keeps its text: its 4 principles after the carried principles; its 8 constraints after the carried constraints; its 6 goals after the carried goals; its 5 non-goals after the carried non-goals; its 13 inventory rows after the carried inventory; and, so that the design gate's coverage check finds them, each decision id ADR-003, ADR-044 and ADR-045 and each path R1 to R7 name that the carried decisions and structure lack. Immediately before writing, the highest P number and the highest CN number in the carried design.json are read (0 where it has none), and the appended rows take the next free numbers in order: the record's P1, P2, P3 and P4 become P(p+1) to P(p+4), and its CN1 to CN8 become CN(c+1) to CN(c+8), where p and c are those highest numbers. Every reference to one of these ids in an appended row, and in the review record of this brief, follows the new number, so the non-goal whose reason cites P4 cites P(p+4). DESIGN.md, CHECKLIST.md and USER-STORIES.md are then written by scripts/design/render-cluster.py docs/design/lys-core and committed as rendered. The build SHALL NOT remove, reorder or reword any carried checklist item other than C23, any carried story, or any carried design row or text other than that one sentence, SHALL NOT replace the carried title, intention, problem or solution, SHALL NOT reuse a P or CN number the carried design already holds, and SHALL NOT edit any of the three markdown files by hand.",
+      "acceptance": [
+        "python3 -c \"import json; ids=[i['id'] for s in json.load(open('docs/design/lys-core/checklist.json'))['sections'] for i in s['items']]; print(ids==['C%d' % n for n in range(1, 75)])\" prints True.",
+        "For every checklist id from C1 to C65 other than C23, its text and done in docs/design/lys-core/checklist.json equal those in git show <base>:docs/design/lys-core/checklist.json, and git diff <base>..HEAD -- docs/design/lys-core/stories.json prints nothing.",
+        "Every carried design row is present and unchanged apart from the one sentence: with O the design.json of git show <base>:docs/design/lys-core/design.json and N the committed docs/design/lys-core/design.json, N's title, intention and problem equal O's; N's solution equals O's solution with 'Self-signed certificates are rejected.' replaced by the new sentence; and for each of principles, constraints, goals, non_goals, inventory, structure and decisions, N's list begins with O's list, element for element.",
+        "The appended rows carry the new numbers: with p and c the highest P and CN numbers in O (0 where it has none), N's principles after O's are exactly 4 rows with ids P(p+1) to P(p+4), N's constraints after O's are exactly 8 rows with ids CN(c+1) to CN(c+8), N's goals after O's are exactly 6, N's non_goals after O's are exactly 5 and the last of them cites P(p+4), N's inventory after O's is exactly 13 rows, and python3 scripts/design/check-coverage.py docs/design/lys-core prints 'Coverage clean'.",
+        "rg -c 'C23\\*\\* — Self-signed certificates are rejected by verify_certificate_chain, where a certificate is self-signed when its subject public key is the supplied issuer key' docs/design/lys-core/CHECKLIST.md prints 1, and rg -c '^- \\[ \\] \\*\\*C74\\*\\*' docs/design/lys-core/CHECKLIST.md prints 1.",
+        "rg -c 'is self-signed and is rejected, whatever its names' docs/design/lys-core/DESIGN.md prints 1, and rg -c 'Self-signed certificates are rejected\\.' docs/design/lys-core/DESIGN.md prints 0.",
+        "Rendering a fresh copy of docs/design/lys-core with python3 scripts/design/render-cluster.py leaves DESIGN.md, CHECKLIST.md and USER-STORIES.md byte-identical to the committed files, and sh scripts/design/gate.sh exits 0."
       ],
       "files": {
         "create": [],
         "modify": [
           "docs/design/lys-core/checklist.json",
-          "docs/design/lys-core/CHECKLIST.md"
-        ],
-        "delete": []
-      },
-      "checklist": [
-        "C1",
-        "C2",
-        "C3",
-        "C4",
-        "C5",
-        "C6",
-        "C7",
-        "C8",
-        "C9",
-        "C10",
-        "C11",
-        "C12",
-        "C13",
-        "C14",
-        "C15",
-        "C16",
-        "C17",
-        "C18",
-        "C19",
-        "C20",
-        "C21",
-        "C22",
-        "C23",
-        "C24",
-        "C25",
-        "C26",
-        "C27",
-        "C28",
-        "C29",
-        "C30",
-        "C31",
-        "C32",
-        "C33",
-        "C34",
-        "C35",
-        "C36",
-        "C37",
-        "C38",
-        "C39",
-        "C40",
-        "C41",
-        "C42",
-        "C43",
-        "C44",
-        "C45",
-        "C46",
-        "C47",
-        "C48",
-        "C49",
-        "C50",
-        "C51",
-        "C52",
-        "C53",
-        "C54",
-        "C55",
-        "C56",
-        "C57",
-        "C58",
-        "C59",
-        "C60",
-        "C61",
-        "C62",
-        "C63",
-        "C64",
-        "C65"
-      ],
-      "stories": []
-    },
-    {
-      "id": "R2",
-      "title": "Carry USER-STORIES.md into stories.json and render it",
-      "spec": "docs/design/lys-core/stories.json holds cluster 'lys-core' and main's four USER-STORIES.md persona headings at 7b536253 as four personas in main's order, each split into name and role: 'Norn Agent Runtime — Signing Session History (primary consumer)' at its ' — ' into name 'Norn Agent Runtime' and role 'Signing Session History (primary consumer)'; 'Lys CLI Operator and Auditor' into name 'Lys CLI' and role 'Operator and Auditor'; 'Lys-Anchor Service (future notary)' into name 'Lys-Anchor Service' and role '(future notary)'; 'Haematite Commit Attestation' into name 'Haematite' and role 'Commit Attestation'. Each of main's story lines '**Sn.** text' becomes one story {id, text} under its persona and in main's order, where text is every character after '**Sn.** ' byte for byte. The document SHALL NOT reword, merge, drop, renumber, reorder or add any story, and SHALL NOT drop or add any word of a persona heading. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/USER-STORIES.md whose 23 story lines equal main's byte for byte and whose only changed lines are the three headings that gain ' — '.",
-      "acceptance": [
-        "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/lys-core/stories.json')); ids=[s['id'] for p in d['personas'] for s in p['stories']]; print(len(ids), len(set(ids)), ids==['S%d' % n for n in range(1, 24)])\" prints 23 23 True.",
-        "From the repository root: python3 -c \"import json; print([(p['name'], p['role']) for p in json.load(open('docs/design/lys-core/stories.json'))['personas']])\" prints [('Norn Agent Runtime', 'Signing Session History (primary consumer)'), ('Lys CLI', 'Operator and Auditor'), ('Lys-Anchor Service', '(future notary)'), ('Haematite', 'Commit Attestation')].",
-        "From the repository root: the C and S text comparison in this brief's verification prints 'compared 88 differences 0' as its last line.",
-        "From the repository root: git show 7b536253:docs/design/lys-core/USER-STORIES.md | diff - docs/design/lys-core/USER-STORIES.md | grep '^>' prints exactly the three lines '> ## Lys CLI — Operator and Auditor', '> ## Lys-Anchor Service — (future notary)' and '> ## Haematite — Commit Attestation', and the same pipeline with grep -c '^<' prints 3."
-      ],
-      "files": {
-        "create": [],
-        "modify": [
-          "docs/design/lys-core/stories.json",
+          "docs/design/lys-core/design.json",
+          "docs/design/lys-core/DESIGN.md",
+          "docs/design/lys-core/CHECKLIST.md",
           "docs/design/lys-core/USER-STORIES.md"
         ],
         "delete": []
       },
-      "checklist": [],
-      "stories": [
-        "S1",
-        "S2",
-        "S3",
-        "S4",
-        "S5",
-        "S6",
-        "S7",
-        "S8",
-        "S9",
-        "S10",
-        "S11",
-        "S12",
-        "S13",
-        "S14",
-        "S15",
-        "S16",
-        "S17",
-        "S18",
-        "S19",
-        "S20",
-        "S21",
-        "S22",
-        "S23"
-      ]
-    },
-    {
-      "id": "R3",
-      "title": "Carry DESIGN.md into design.json and render it",
-      "spec": "docs/design/lys-core/design.json holds cluster 'lys-core' and main's DESIGN.md at 7b536253 in the fields the design schema gives it: title 'Lys Core — Trust Primitives and CLI Surface' (the frontmatter title without its quotes); intention, the two Intention paragraphs; problem, the whole Problem section (opening paragraph, four bullets, closing paragraph); solution, the whole Solution section from '### D1: Domain-agnostic boundary' to the paragraph beginning 'The phase proof', then the paragraph under main's structure tree beginning 'Tests live in sibling', then a section headed '### Checklist notes' holding main's CHECKLIST.md intro blockquote (its five lines as main writes them) and its two italic annotations, the C38 to C43 one first, each carried verbatim and separated by one blank line; goals, the six goals in main's order without their '1. ' to '6. ' numbering; non_goals, the seven bullets in main's order, each whole bullet after '- ' as text and reason empty; structure, 75 rows for the fenced tree's two roots and 73 entries in the tree's order, each path the entry's full repository-relative path as the tree spells it, each note the entry's comment after '— ' with continuation lines joined by one space (empty when the entry has none), each brief empty, followed by eight rows, in this order and exactly as written here (path 'docs/design/lys-core/design.json' with note 'the lys-core design, carried from main's DESIGN.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/DESIGN.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/checklist.json' with note 'the lys-core checklist, carried from main's CHECKLIST.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/CHECKLIST.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/stories.json' with note 'the lys-core user stories, carried from main's USER-STORIES.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/USER-STORIES.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/briefs/LYSCORE-001.json' with note 'the brief that carries the hand-written lys-core design into the three JSON documents' and brief 'LYSCORE-001'; path 'docs/design/lys-core/briefs/LYSCORE-001.md' with note 'rendered markdown' and brief 'LYSCORE-001'); constraints, the nine bullets in main's order as CN1 to CN9, each whole bullet after '- ' as text; principles, decisions and inventory empty; and gate, the project's one tree entry for '.' with its shorthand and its seven legs fmt, clippy-all-features, clippy, tests, doc-all-features, doc and design. It SHALL NOT reword, merge, drop, reorder or add any sentence of main's DESIGN.md, SHALL NOT correct stale carried text, SHALL NOT change any relative link (../../ROADMAP.md, ../WIRE-FORMATS.md, ../../PEN-REGISTRATION.md, ../../REVIEW-23-07.md, DESIGN.md), and SHALL NOT add any principle, ADR, goal, non-goal, constraint, inventory row, structure row beyond the eight named, and SHALL NOT add any word beyond the '### Checklist notes' heading and the eight rows' paths, notes and brief values as stated here. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/DESIGN.md, and the build's dev record SHALL list every difference between it and main's DESIGN.md with its reason: six of layout (unquoted title, the added '> **Cluster:** lys-core' line, the moved 'Tests live in sibling' paragraph, goals as bullets, the structure tree as a table, the CN prefixes) and two of content that the card's lead allows (the '### Checklist notes' section, the eight rows for the cluster's own documents and this brief's own files).",
-      "acceptance": [
-        "From the repository root: the field comparison in this brief's verification prints 'carried fields 7 differences []'.",
-        "From the repository root: the structure tree comparison in this brief's verification prints '75 75 True True'.",
-        "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/lys-core/design.json')); s=d['structure']; print(len(s), [r['brief'] for r in s[:75]] == [''] * 75)\" prints 83 True.",
-        "From the repository root: python3 -c \"import json; print([(r['path'], r['note'], r['brief']) for r in json.load(open('docs/design/lys-core/design.json'))['structure'][75:]] == [('docs/design/lys-core/design.json', \\\"the lys-core design, carried from main's DESIGN.md\\\", 'LYSCORE-001'), ('docs/design/lys-core/DESIGN.md', 'rendered markdown', ''), ('docs/design/lys-core/checklist.json', \\\"the lys-core checklist, carried from main's CHECKLIST.md\\\", 'LYSCORE-001'), ('docs/design/lys-core/CHECKLIST.md', 'rendered markdown', ''), ('docs/design/lys-core/stories.json', \\\"the lys-core user stories, carried from main's USER-STORIES.md\\\", 'LYSCORE-001'), ('docs/design/lys-core/USER-STORIES.md', 'rendered markdown', ''), ('docs/design/lys-core/briefs/LYSCORE-001.json', 'the brief that carries the hand-written lys-core design into the three JSON documents', 'LYSCORE-001'), ('docs/design/lys-core/briefs/LYSCORE-001.md', 'rendered markdown', 'LYSCORE-001')])\" prints True, the eight rows' paths, notes and brief values being exactly those stated in the spec, in its order.",
-        "From the repository root: python3 -c \"import json; d=json.load(open('docs/design/lys-core/design.json')); print(d['principles'], d['decisions'], d['inventory'], [l['name'] for g in d['gate'] for l in g['legs']])\" prints [] [] [] ['fmt', 'clippy-all-features', 'clippy', 'tests', 'doc-all-features', 'doc', 'design'].",
-        "From the repository root: rg -c '^### Checklist notes$' docs/design/lys-core/DESIGN.md prints 1, and rg -c '^\\*\\(C38–C43 amended|^\\*\\(C58–C59 superseded' docs/design/lys-core/DESIGN.md prints 2.",
-        "From the repository root: git show 7b536253:docs/design/lys-core/DESIGN.md | diff - docs/design/lys-core/DESIGN.md | grep -c '^<' prints 104, and the same pipeline with grep -c '^>' prints 117.",
-        "The R3 dev record names each of the eight differences listed in the spec, one entry each, with its reason, and names no other difference."
+      "checklist": [
+        "C23"
       ],
-      "files": {
-        "create": [],
-        "modify": [
-          "docs/design/lys-core/design.json",
-          "docs/design/lys-core/DESIGN.md"
-        ],
-        "delete": []
-      },
-      "checklist": [],
-      "stories": []
-    },
-    {
-      "id": "R4",
-      "title": "Render the brief's own markdown and pass the design gate",
-      "spec": "WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs after R1 to R3, THE SYSTEM SHALL write docs/design/lys-core/briefs/LYSCORE-001.md from docs/design/lys-core/briefs/LYSCORE-001.json, and the committed DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md SHALL each be byte-identical to that render. WHEN sh scripts/design/gate.sh runs on the card's final tree, THE SYSTEM SHALL exit 0 with lys-core among the measured clusters. The build SHALL NOT change any file outside docs/design/lys-core, SHALL NOT hand-edit any rendered markdown, and SHALL NOT change the authored fields of briefs/LYSCORE-001.json.",
-      "acceptance": [
-        "From the repository root: sh scripts/design/gate.sh exits 0 and prints no line containing 'differs'.",
-        "From the repository root: python3 scripts/design/render-cluster.py docs/design/lys-core prints 'Done. 4 file(s) rendered.', and git status --porcelain docs/design/lys-core prints nothing after it.",
-        "From the repository root: python3 scripts/design/check-coverage.py docs/design/lys-core exits 0 and reports 65 checklist items, 23 user stories and 1 brief.",
-        "From the repository root, on the build branch: git diff --no-ext-diff --name-only <base>..HEAD -- . ':!docs/design/lys-core' prints nothing, where <base> is the commit the build started from."
-      ],
-      "files": {
-        "create": [
-          "docs/design/lys-core/briefs/LYSCORE-001.md"
-        ],
-        "modify": [],
-        "delete": []
-      },
-      "checklist": [],
       "stories": []
     }
   ],
   "boundaries": [
-    "No change to code: no file under crates/ and no file under scripts/ changes, including scripts/design/render-cluster.py, scripts/design/validate.py, scripts/design/check-coverage.py and scripts/design/schemas/.",
-    "No new checklist item, user story, principle, ADR, goal, non-goal or constraint: the checklist holds C1 to C65 and the stories S1 to S23 and nothing else; the CN ids name the nine constraints main already has.",
-    "No carried text is reworded, merged, dropped, renumbered, reordered or corrected, even where it is stale; reconciling the design with the tree as built is a later unit.",
-    "No done flag changes: C1 to C60 and C65 stay true and C61 to C64 stay false, exactly as main ticks them.",
-    "The eight checklist section names stay exactly as main has them; no checklist note is placed in a section name.",
-    "The directory, home, secrets, identity, lys-anchor and lys-log-store clusters, docs/design/decisions.json, docs/design/project.json and docs/design/WIRE-FORMATS.md are not touched.",
-    "No note slot is added to the renderer and the schemas; that is a change to the shared design tooling and a later unit.",
-    "The later lys-core card's brief, items and stories are not added here; they come after the carried ones once this brief lands.",
-    "Claiming C1 to C65 and S1 to S23 records that this brief carries them into JSON; it does not claim to have built them."
+    "Only the files the requirements name change; a row that needs any other file stops and names it.",
+    "No published wire format or domain tag changes: lys/attestation/v2, lys/sealed-envelope/v1, lys/anchor-receipt/v1, lys/verification-bundle/v1, lys/consistency-receipt/v1 and lys/delegation/v1 stay byte-identical.",
+    "No lys-core version bump, no crates.io publish and no release tag; the workspace version stays 0.2.0.",
+    "Signature verification stays ed25519-dalek verify_strict; x509-parser's verify_signature is never called.",
+    "The signatures of verify_certificate_chain, verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain do not change; neither issuance path and neither DN they write changes.",
+    "lys-core gains no revocation check, and no chain walking.",
+    "The CLI's refusal message and exit codes do not change; no file under crates/lys/src changes.",
+    "DIRECTORY-013's brief and every DIRECTORY-013 file other than one added test in crates/lys-identity/tests/revocation_fold.rs are untouched.",
+    "No intra-doc link from ungated documentation to an item gated by unstable-anchor.",
+    "No unwrap, expect, panic, todo, unimplemented or unreachable in library code; no #[allow], #[ignore], _-prefixed unused binding or #[cfg(any())] bypass.",
+    "docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md change only through R7's render; no carried item other than C23 and the one design sentence R7 names is removed, reordered or reworded, and this brief's design rows are only appended after the carried ones."
   ],
   "verification": [
-    "From the repository root: sh scripts/design/gate.sh exits 0.",
-    "From the repository root: python3 scripts/design/validate.py docs/design/lys-core and python3 scripts/design/check-coverage.py docs/design/lys-core both exit 0.",
-    "C and S text comparison, keyed on main's bytes at 7b536253 and counting every id either side holds; from the repository root run the following, which prints 'compared 88 differences 0' as its last line:\npython3 - <<'EOF'\nimport re, subprocess\nbase = '7b536253'\npats = {'CHECKLIST.md': r'^- \\[[ x]\\] \\*\\*(C\\d+)\\*\\* — (.*)$', 'USER-STORIES.md': r'^\\*\\*(S\\d+)\\.\\*\\* (.*)$'}\ncompared = differences = 0\nfor name, pat in pats.items():\n    old = re.findall(pat, subprocess.run(['git', 'show', base + ':docs/design/lys-core/' + name], capture_output=True, text=True, check=True).stdout, re.M)\n    new = re.findall(pat, open('docs/design/lys-core/' + name).read(), re.M)\n    old_d, new_d = dict(old), dict(new)\n    if len(old_d) != len(old) or len(new_d) != len(new):\n        differences += 1\n        print('duplicate id in', name)\n    for i in sorted(set(old_d) | set(new_d), key=lambda s: int(s[1:])):\n        compared += 1\n        if old_d.get(i) != new_d.get(i):\n            differences += 1\n            print('differs:', i)\nprint('compared', compared, 'differences', differences)\nEOF",
-    "Field comparison of design.json against main's DESIGN.md and CHECKLIST.md at 7b536253; from the repository root run the following, which prints 'carried fields 7 differences []':\npython3 - <<'EOF'\nimport json, subprocess\ndef main_lines(name):\n    return subprocess.run(['git', 'show', '7b536253:docs/design/lys-core/' + name], capture_output=True, text=True, check=True).stdout.split('\\n')\nD, C = main_lines('DESIGN.md'), main_lines('CHECKLIST.md')\nd = json.load(open('docs/design/lys-core/design.json'))\nnotes = '\\n'.join(C[2:7]) + '\\n\\n' + C[59] + '\\n\\n' + C[88]\nchecks = {\n    'title': d['title'] == D[3][len('title: \"'):-1],\n    'intention': d['intention'] == '\\n'.join(D[10:13]),\n    'problem': d['problem'] == '\\n'.join(D[16:24]),\n    'solution': d['solution'] == '\\n'.join(D[27:133]) + '\\n\\n' + D[242] + '\\n\\n### Checklist notes\\n\\n' + notes,\n    'goals': d['goals'] == [l.split('. ', 1)[1] for l in D[136:142]],\n    'non_goals': d['non_goals'] == [{'text': l[2:], 'reason': ''} for l in D[145:152]],\n    'constraints': d['constraints'] == [{'id': 'CN%d' % i, 'text': l[2:]} for i, l in enumerate(D[246:255], 1)],\n}\nprint('carried fields', len(checks), 'differences', [k for k, v in checks.items() if not v])\nEOF",
-    "Structure tree comparison, the entry names and every word of the tree's notes against the first 75 structure rows; from the repository root run the following, which prints '75 75 True True':\npython3 - <<'EOF'\nimport json, re, subprocess\nt = subprocess.run(['git', 'show', '7b536253:docs/design/lys-core/DESIGN.md'], capture_output=True, text=True, check=True).stdout\nfence = t.split('## Structure\\n\\n```\\n')[1].split('\\n```\\n')[0]\nnames, words = [], []\nfor line in fence.split('\\n'):\n    m = re.match(r'^(crates/\\S+)|^[│ ]*[├└]── (\\S+)', line)\n    if m:\n        names.append(m.group(1) or m.group(2))\n        words += line.split('— ', 1)[1].split() if '— ' in line else []\n    else:\n        words += line.replace('│', ' ').split()\nrows = json.load(open('docs/design/lys-core/design.json'))['structure'][:75]\nprint(len(names), len(rows), all(r['path'].endswith(n) for r, n in zip(rows, names)), ' '.join(words) == ' '.join(w for r in rows for w in r['note'].split()))\nEOF",
-    "From the repository root: git diff --no-ext-diff --name-only <base>..HEAD -- crates scripts prints nothing, where <base> is the commit the build started from.",
-    "From the repository root: python3 scripts/design/render-cluster.py docs/design/lys-core run a second time changes no file (git status --porcelain docs/design/lys-core prints nothing after it)."
+    "Before the first row: git fetch -q origin main && git show origin/main:docs/design/roadmap.json | python3 -c \"import json,sys; rows=[i for i in json.load(sys.stdin)['items'] if 'DIRECTORY-013' in i['links']['briefs']]; print(rows[0]['status'] if len(rows)==1 else 'absent')\" prints landed, the lys-core carry command in blocked_by prints carried, and git cat-file -e origin/main:crates/lys-identity/tests/revocation_fold.rs exits 0.",
+    "cargo fmt --all leaves git diff empty.",
+    "cargo clippy --all-targets --all-features -- -D warnings exits 0.",
+    "cargo clippy --all-targets -- -D warnings exits 0.",
+    "cargo test --workspace --all-features exits 0, and git diff --stat <base>..HEAD lists only the files R1 to R7 name; of existing test functions only self_signed_certificate_is_rejected changes.",
+    "cargo doc --no-deps --all-features and cargo doc --no-deps each exit 0 with no line containing 'warning'.",
+    "sh scripts/design/gate.sh exits 0 and prints no 'rendered markdown differs' line.",
+    "git diff <base>..HEAD -- Cargo.toml crates/lys-core/Cargo.toml prints nothing.",
+    "The brief's review record carries a constructed-attack review of R1, one entry per attack with the result observed: a subject named by the authority's hex key (verifies under the authority, refused under another key); the authority's own key certified over a request (refused as self-signed); a certificate signed by a key over that same key as subject key under differing names (refused as self-signed); a non-canonical encoding of the issuer's point as subject key (judged the issuer's key); a subject key equal to the supplied key with a signature by another key (refused on the signature); a small-order issuer key (refused, small_order_issuer_key_forgery_is_rejected unchanged); a subject key that is not a readable Ed25519 key under a valid signature (an ECDSA P-256 subject key: verifies, Ok(()), not refused as self-signed)."
   ]
 }

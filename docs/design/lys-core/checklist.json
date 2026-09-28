@@ -435,6 +435,71 @@
           "done": true
         }
       ]
+    },
+    {
+      "name": "Certificate Authority",
+      "items": [
+        {
+          "id": "C23",
+          "text": "Self-signed certificates are rejected by verify_certificate_chain, where a certificate is self-signed when its subject public key is the supplied issuer key, compared as decoded Ed25519 points, and its signature verifies under that key.",
+          "done": false
+        },
+        {
+          "id": "C66",
+          "text": "verify_certificate_chain_at compares no subject or issuer distinguished-name bytes: crates/lys-core/src/ca/authority.rs calls neither .subject() nor .issuer() on a parsed certificate.",
+          "done": false
+        },
+        {
+          "id": "C67",
+          "text": "A certificate issued by CertificateAuthority::issue_certificate to the subject named by the authority's lowercase-hex public key verifies under the authority's key and is refused under any other key.",
+          "done": false
+        },
+        {
+          "id": "C68",
+          "text": "A certificate issued by issue_certificate_for_request over a request made with the authority's own key is refused by verify_certificate_chain as self-signed.",
+          "done": false
+        },
+        {
+          "id": "C69",
+          "text": "The rustdoc of verify_certificate_chain states what it checks and what it leaves to the caller.",
+          "done": false
+        },
+        {
+          "id": "C70",
+          "text": "The rustdoc of verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain states the key-based self-signed rule and mentions no distinguished-name heuristic.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "CLI Surface",
+      "items": [
+        {
+          "id": "C71",
+          "text": "lys ca verify and lys verify --cert exit 0 for a certificate issued to the subject named by the issuer's lowercase-hex public key, and exit 1 for a certificate self-signed by keys.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Consumers and Records",
+      "items": [
+        {
+          "id": "C72",
+          "text": "lys-anchor's admission module doc says verify_certificate_chain rejects certificates whose subject key is the issuer key.",
+          "done": false
+        },
+        {
+          "id": "C73",
+          "text": "CHANGELOG.md's Unreleased section records that a hex-common-name certificate now verifies, that a certificate self-signed by keys is now refused, and the new rustdoc caveat on verify_certificate_chain.",
+          "done": false
+        },
+        {
+          "id": "C74",
+          "text": "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys.",
+          "done": false
+        }
+      ]
     }
   ]
 }
