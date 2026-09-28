@@ -490,6 +490,20 @@
           "text": "As the person running the identity product, I want to see which build is running and take a newer one with one command that puts the old one back if the new one fails, so that each landing reaches me and a bad build never leaves me without sign-in."
         }
       ]
+    },
+    {
+      "name": "Person setting up Lys for the first time",
+      "role": "Installs Lys on their own machine with no terminal knowledge and signs in",
+      "stories": [
+        {
+          "id": "S149",
+          "text": "As an ordinary person setting up Lys, I want one installer, then a Lys page that asks my name, email and password and lets me connect Google, GitHub or Microsoft, so that I am signed in without a terminal, a password file or any page that is not Lys."
+        },
+        {
+          "id": "S150",
+          "text": "As someone using any of our products, I want to sign in with Lys everywhere, so that there is one account and one sign-in page, and it is always Lys's."
+        }
+      ]
     }
   ]
 }
