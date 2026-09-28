@@ -63,43 +63,33 @@
           {
             "path": "crates/lys-log-store/src/log_tests.rs",
             "change": "modified",
-            "note": "Tests through Log::open. A torn leaf inside the pinned prefix and a one-byte change inside it are each refused with PinMismatch and no leaf index. A torn leaf just past the pin is adopted and reported through recovered_to."
-          },
-          {
-            "path": "docs/design/lys-log-store/briefs/LYSLOGSTORE-002.md",
-            "change": "modified",
-            "note": "Re-rendered from the JSON after the workflow wrote the round-2 blocks, so the design gate's cmp matches."
-          },
-          {
-            "path": "crates/lys-home/tests/given_record.rs",
-            "change": "modified",
-            "note": "Round-3 gate fix: a static SERIAL mutex held for each test's whole body, so no sibling thread forks while a session lock is dropped and retaken. This stops the flaky SessionHeld failure."
+            "note": "Adds three_leaf_store, rebuilt_root_b64 and refusal_over_planted_leaf_1, plus three tests: a torn leaf and a one-byte change inside the pin are refused with the full PinMismatch content and state.json is left unchanged; a torn leaf just past the pin is adopted and reported through recovered_to."
           }
         ],
-        "how": "Log::open already folds the whole pinned prefix and compares it with the pin. These tests prove it through the public open for a torn leaf and for a one-byte change, and check that the refusal names no leaf. The case just past the pin is shown to be the one-leaf repair, not a refusal.",
-        "deviation": "The files list also carries two round-3 gate fixes that belong to no requirement: the re-rendered brief markdown, and the serialisation of lys-home given_record tests. The lys-home change is outside the card's code diff, but its test leg failed in this round's gate, so its cause is fixed here.",
+        "how": "Only tests are added; git diff 99b4d0a on log.rs, error.rs and store.rs is empty. Row 1 is met: refusal_over_planted_leaf_1 in log_tests.rs writes `lea` to leaf 1 of the leaf-0/leaf-1/leaf-2 store and matches StoreError::PinMismatch. It asserts pinned_size 3 and rebuilt_size 3, pinned_root equal to STANDARD.encode of the root after the third append, and rebuilt_root equal to rebuilt_root_b64([leaf-0, planted, leaf-2]), which calls AppendOnlyTree::reconstruct_from_raw_leaves on the planted bytes. Row 2 is met: a_torn_leaf_inside_the_pinned_prefix_is_refused_with_the_pin_and_the_rebuilt_root asserts the exact Display text. Row 3 is met: the helper asserts state.json is byte-equal before and after the failed open. Row 4 is met: a_one_byte_change_inside_the_pinned_prefix_is_refused_with_the_pin_and_the_rebuilt_root runs the same helper with `leaf-X` and asserts rebuilt_root differs from pinned_root. Row 5 is met: a_torn_leaf_just_past_the_pin_is_adopted_pinned_and_reported asserts recovered_to Some(3) and len 3, then None and len 3 on the second open.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C8",
             "done": true,
-            "note": "Torn leaf inside the pin is refused with PinMismatch."
+            "note": "Torn-leaf refusal test in log_tests.rs."
           },
           {
             "id": "C9",
             "done": true,
-            "note": "A one-byte change inside the pin is refused and no index is named."
+            "note": "One-byte-change refusal test in log_tests.rs."
           },
           {
             "id": "C10",
             "done": true,
-            "note": "A torn leaf past the pin is adopted and reported."
+            "note": "One-leaf repair test in log_tests.rs."
           }
         ],
         "stories": [
           {
             "id": "S4",
             "satisfied": true,
-            "note": "The operator gets a refusal, not silent adoption, for a damaged pinned prefix."
+            "note": "The refusal states the pin and the rebuilt root, names no leaf, and leaves the pin unwritten."
           }
         ]
       },
@@ -178,28 +168,28 @@
           {
             "path": "crates/lys-log-store/src/file.rs",
             "change": "modified",
-            "note": "FileLeafStore::open records leftover temporary leaf names (sorted) and exposes them through leftover_temporaries(). It never errors on them and never deletes them."
+            "note": "scan_leaves now collects names that match is_leaf_temp_name, sorts them and does not count them in the extent. They are kept in FileLeafStore.leftover_temporaries and returned by the new leftover_temporaries() accessor. The leaf write path and the LeafStore trait are unchanged."
           },
           {
             "path": "crates/lys-log-store/src/file_tests.rs",
             "change": "modified",
-            "note": "Tests: leftover temporaries are listed in sorted order, not deleted and not errors; non-temporary names are ignored; an empty list when there are none."
+            "note": "Adds tests: a leftover is reported and not counted; nothing is reported when there is none; leftovers come back in lexical order; .DS_Store is not reported; and the recogniser accepts every name leaf_temp_name writes and rejects 12 near misses."
           }
         ],
-        "how": "The directory scan that finds the contiguous leaf extent now also collects names matching the temporary-leaf form. Those names are kept on the store and exposed read-only. The leaf write path is untouched.",
-        "deviation": "The private contiguous_extent was renamed to scan_leaves because it now returns the extent and the leftover names.",
+        "how": "Row 1 is met by open_reports_a_leftover_temporary_file_and_does_not_count_it in file_tests.rs: extent is 1 and the list is [.4242-00000000000000000001-0.tmp]. Row 2 is met by the same test, which asserts the file still holds `partial`; scan_leaves in file.rs only reads the directory. Row 3 is met by open_reports_no_leftover_temporary_file_when_there_is_none. Row 4 is met by open_reports_leftover_temporary_files_in_lexical_order, which plants the files in reverse lexical order. Row 5 is met by open_does_not_report_a_dotfile_outside_the_temporary_form. Row 6 is met: file.rs has 457 lines that are neither blank nor comment before its #[cfg(test)] module, counted with awk. The form is checked by is_leaf_temp_name in file.rs: a dot, then pid digits, a dash, 20 index digits, a dash, sequence digits, and .tmp.",
+        "deviation": "",
         "checklist": [
           {
             "id": "C1",
             "done": true,
-            "note": "leftover_temporaries() lists them; no error and no deletion."
+            "note": "The names are sorted and not counted, and the files are left byte-identical."
           }
         ],
         "stories": [
           {
             "id": "S1",
             "satisfied": true,
-            "note": "Leftover temporaries are visible to callers."
+            "note": "The store returns the names to the caller."
           }
         ]
       },
@@ -281,48 +271,48 @@
           {
             "path": "crates/lys/src/commands/log/store.rs",
             "change": "modified",
-            "note": "After opening, prints 'ignored leftover temporary leaf files: <names>' to stderr when any exist."
+            "note": "open() prints one stderr line, `ignored leftover temporary leaf files: a, b`, straight after FileLeafStore::open and before Log::open, and only when the list is not empty. The PinMismatch path through integrity_failure is unchanged."
           },
           {
             "path": "crates/lys/tests/log_tests.rs",
             "change": "modified",
-            "note": "CLI tests: the line is on stderr only, and stdout still verifies with scripts/verify_inclusion.py. A torn pinned prefix is refused with exit 1."
+            "note": "Adds tests: log status reports a planted temporary file on stderr only; says nothing when there is none; an inclusion artifact and leaf verify with scripts/verify_inclusion.py; and a torn leaf in the pinned prefix exits 1 with one refusal line and state.json unchanged."
           }
         ],
-        "how": "The lys log commands open through one helper, which reports leftover temporaries on stderr and leaves stdout and exit codes unchanged.",
+        "how": "Every lys log command opens its store through store::open, which prints the line once per open. Row 1 is met by log_status_names_a_leftover_temporary_leaf_file_on_stderr in crates/lys/tests/log_tests.rs: exit 0, exactly the expected line on stderr, and the text absent from stdout. Row 2 is met by log_status_says_nothing_about_temporaries_when_there_are_none. Row 3 is met by a_leaf_from_a_store_written_now_verifies_with_the_standalone_python_verifier, which runs key generate, log init, log append and log prove inclusion, then python3 scripts/verify_inclusion.py, and asserts exit 0. Row 4 is met by log_status_refuses_a_torn_leaf_inside_the_pinned_prefix: exit 1, exactly one `error: ` line with the required start and substring, and state.json byte-equal before and after.",
         "deviation": "",
         "checklist": [
           {
             "id": "C2",
             "done": true,
-            "note": "The stderr line is printed."
+            "note": "The line is printed from store::open, which every log command uses."
           },
           {
             "id": "C4",
             "done": true,
-            "note": "stdout is unchanged and verifies independently."
+            "note": "The Python verifier test in crates/lys/tests/log_tests.rs."
           },
           {
             "id": "C11",
             "done": true,
-            "note": "A damaged prefix exits 1 through the CLI."
+            "note": "The torn-prefix status test in crates/lys/tests/log_tests.rs."
           }
         ],
         "stories": [
           {
             "id": "S1",
             "satisfied": true,
-            "note": ""
+            "note": "Leftover names are printed on stderr."
           },
           {
             "id": "S2",
             "satisfied": true,
-            "note": ""
+            "note": "The standalone Python verifier accepts a leaf from a store written now."
           },
           {
             "id": "S4",
             "satisfied": true,
-            "note": ""
+            "note": "The CLI exits 1 and prints the refusal."
           }
         ]
       },
@@ -396,38 +386,38 @@
           {
             "path": "crates/lys-anchor-cli/src/commands/anchor/open.rs",
             "change": "modified",
-            "note": "Prints the same stderr line after FileLeafStore::open."
+            "note": "open() prints the same stderr line straight after FileLeafStore::open and before the signer and anchor are opened. No --json field is added, and the module docs say why."
           },
           {
             "path": "crates/lys-anchor-cli/tests/anchor_cli.rs",
             "change": "modified",
-            "note": "Tests: the line is on stderr only, and a torn genesis leaf is refused with exit 1."
+            "note": "Adds an example_anchor fixture using a key from Ed25519Identity::load_or_generate and genesis `genesis`. Adds tests that status reports a planted temporary file on stderr only with the same JSON keys, and that a torn genesis leaf exits 1 with one refusal line and state.json unchanged."
           }
         ],
-        "how": "The anchor CLI reads leftover_temporaries from the store it opens and reports them the same way.",
+        "how": "Rows 1, 2 and 3 are met by status_names_a_leftover_temporary_leaf_file_on_stderr_only in anchor_cli.rs. Without the planted file there is no line. With it, status exits 0 and prints exactly the expected line, nothing goes to stdout, and the --json output is one object with ok true whose sorted keys equal the clean run's. Row 4 is met by status_refuses_a_torn_genesis_leaf_inside_the_pinned_prefix: after `gen` is written to leaf 0, status exits 1 and prints exactly one `error: anchor directory invalid: D: stored leaves rebuild to tree size 1 with root ` line containing the pinned-state text, and state.json is byte-equal before and after.",
         "deviation": "",
         "checklist": [
           {
             "id": "C3",
             "done": true,
-            "note": ""
+            "note": "The line is printed from anchor::open::open, which the commands use."
           },
           {
             "id": "C12",
             "done": true,
-            "note": ""
+            "note": "The torn-genesis status test."
           }
         ],
         "stories": [
           {
             "id": "S1",
             "satisfied": true,
-            "note": ""
+            "note": "Leftover names are printed on stderr."
           },
           {
             "id": "S4",
             "satisfied": true,
-            "note": ""
+            "note": "The CLI exits 1 and prints the refusal."
           }
         ]
       },
@@ -499,28 +489,28 @@
           {
             "path": "crates/lys-anchor/src/witness/projection.rs",
             "change": "modified",
-            "note": "WitnessProjection keeps a folded count and adds fold_to, fold_parsed, remember and folded(). rebuild_prefix is default followed by fold_to. A cfg(test) parse counter is added. The projection lives only in memory."
+            "note": "WitnessProjection gains a folded field and a folded() accessor, and derives PartialEq and Eq. fold_to(&anchor, leaves) folds forward from folded to min(leaves, tree_size), and discards and folds from index 0 when folded is past that bound; rebuild_prefix now goes through fold_to. fold_parsed(index, body) is pub(super) and folds an already-parsed leaf only when index == folded. A #[cfg(test)] thread-local PARSES counter is incremented in checkpoint_in_leaf, and parse_count() reads it."
           },
           {
             "path": "crates/lys-anchor/src/witness/projection_tests.rs",
             "change": "modified",
-            "note": "Tests: folding forward equals a full rebuild, and only new leaves are parsed."
+            "note": "Adds a seven_leaves fixture and tests: forward fold parse count, rebuild parse count, discard when folding to fewer leaves, and last-recorded-wins across successive folds."
           }
         ],
-        "how": "The projection folds forward from its folded count with last-recorded-wins, so each observe parses only the leaves recorded since the previous one.",
-        "deviation": "Added a PartialEq and Eq derive so tests can compare a projection folded forward with a full rebuild.",
+        "how": "Row 1 is met by folding_forward_parses_only_the_leaves_past_the_fold_position: rebuild_prefix(4) gives folded 4, then fold_to(7) gives folded 7 with exactly 3 parses. Row 2 is met by the same test: latest(CHILD_ORIGIN) equals the rebuild's, with tree_size 3. Row 3 is met by a_rebuild_parses_every_leaf_once: exactly 7 parses. Row 4 is met by folding_to_fewer_leaves_than_folded_starts_again_from_index_zero: folded 2, is_empty, and equal to rebuild_prefix(&anchor, 2). Row 5 is met by successive_forward_folds_keep_the_last_recorded_not_the_largest, which folds size 5 and then size 3 and ends with 3. Row 6 is met: the existing projection_tests cases are unchanged, since the diff only appends. fold_to takes &Anchor and writes nothing to storage. The counter exists only under #[cfg(test)].",
+        "deviation": "",
         "checklist": [
           {
             "id": "C5",
             "done": true,
-            "note": ""
+            "note": "folded() and fold_to in projection.rs."
           }
         ],
         "stories": [
           {
             "id": "S3",
             "satisfied": true,
-            "note": ""
+            "note": "A fold parses only the leaves after its current position."
           }
         ]
       },
@@ -603,33 +593,33 @@
           {
             "path": "crates/lys-anchor/src/witness/observe.rs",
             "change": "modified",
-            "note": "observe takes &mut WitnessProjection. After submit it folds up to the recorded leaf, relates the checkpoint to the latest one, then folds the new leaf."
+            "note": "observe takes `projection: &mut WitnessProjection` after the anchor. After Anchor::submit it calls fold_to(anchor, leaf_index), compares the note against the projection, then calls fold_parsed(leaf_index, body) so the note is parsed once and folded becomes leaf_index + 1. If submit fails, `?` returns before the projection is touched. It never calls rebuild or rebuild_prefix."
           },
           {
             "path": "crates/lys-anchor/src/witness/observe_tests.rs",
             "change": "modified",
-            "note": "Tests: a kept projection parses only new leaves (deltas 1, 1, 4). Rollback is still refused. A non-checkpoint note is handled. A refused observe leaves the projection unchanged."
+            "note": "The see and see_with helpers and the receipt case's loop now build a projection with WitnessProjection::rebuild before each call, and their assertions are unchanged. Adds tests for the 256-leaf kept projection, rollback through a kept projection, a note that is not a checkpoint, and a refused observe under MaxSize."
           }
         ],
-        "how": "The caller keeps the projection across observes, so each observe does work bounded by the leaves recorded since the previous one. Everything stays behind the federation feature.",
+        "how": "Rows 1–4 are met by a_kept_projection_parses_only_what_was_recorded_since_the_last_observe. The rebuild over 256 leaves costs 256 parses. Observing the child at size 3 costs 1 parse and reports previous size 2. The OTHER_CHILD note costs 1 parse and reports previous None. After three submits, the child at size 4 costs 4 parses. After each observe, assert_matches_a_rebuild checks folded == tree_size and that both origins' latest states equal the rebuild's. Row 5 is met by a_kept_projection_follows_a_rollback: size 5 then size 3 is reported as Relation::Rollback, and latest ends at 3. Row 6 is met by a_kept_projection_folds_past_a_note_that_is_not_a_checkpoint: 1 parse, previous None, and folded == tree_size. Row 7 is met by a_refused_observe_leaves_the_kept_projection_unchanged: under MaxSize(8) observe returns NotAdmitted and folded is unchanged, with a positive control that the projection was behind the log. Row 8 is met: existing assertions are unchanged, including the_receipt_is_byte_identical_whatever_the_relation. The receipt is still Anchor::submit's own. `git grep rebuild_prefix|WitnessProjection::rebuild` on observe.rs prints nothing.",
         "deviation": "",
         "checklist": [
           {
             "id": "C6",
             "done": true,
-            "note": ""
+            "note": "The parse counts in observe_tests are at most the new leaves plus one."
           },
           {
             "id": "C7",
             "done": true,
-            "note": ""
+            "note": "assert_matches_a_rebuild runs after each observe, including after the rollback."
           }
         ],
         "stories": [
           {
             "id": "S3",
             "satisfied": true,
-            "note": ""
+            "note": "An observe costs only the leaves recorded since the previous one."
           }
         ]
       },
