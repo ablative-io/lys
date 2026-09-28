@@ -20,7 +20,6 @@
 //! written does not undo the line it follows, which is already durable: the
 //! failure is reported by name and kept until a later snapshot succeeds.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::num::NonZeroU64;
 use std::path::Path;
@@ -34,8 +33,8 @@ use crate::keys::StoreKey;
 use crate::permission::PermissionCheck;
 use crate::store::SecretStore;
 
-use super::folded::{Folded, Handles};
-use super::{Broker, BrokerPaths, Clock, HANDLES, HandleRecord};
+use super::folded::Folded;
+use super::{Broker, BrokerPaths, Clock, HANDLES, HandleRecord, Handles, Work};
 
 /// How many lines the audit log grows by between snapshots, unless the
 /// broker is opened with another count.
@@ -57,10 +56,7 @@ fn read_handles(path: &Path) -> Result<Handles, SecretsError> {
         serde_json::from_slice(&bytes).map_err(|error| SecretsError::StoreCorrupt {
             reason: format!("{HANDLES} does not read: {error}"),
         })?;
-    Ok(records
-        .into_iter()
-        .map(|record| (record.id.clone(), record))
-        .collect::<BTreeMap<_, _>>())
+    Ok(records.into_iter().collect())
 }
 
 impl<P: PermissionCheck> Broker<P> {
@@ -127,6 +123,7 @@ impl<P: PermissionCheck> Broker<P> {
             audit_key,
             audit,
             handles,
+            work: Work::default(),
             permissions,
             clock,
             handles_path,

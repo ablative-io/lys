@@ -41,11 +41,14 @@ impl<P: PermissionCheck> Broker<P> {
     /// The handles `holder` holds, in order of id, to `identity`: each only
     /// when `identity` may discover its secret. A handle on a secret it may
     /// not discover is left out, as one never issued.
+    /// Each secret is asked of the permission source once, however many of
+    /// the handles stand for it.
     pub fn held_by(&self, identity: &str, holder: &str) -> Vec<HeldHandle> {
+        let mut discovery = self.discovery(identity);
         self.handles
             .values()
             .filter(|record| record.identity == holder)
-            .filter(|record| self.discovers(identity, &record.secret))
+            .filter(|record| discovery.discovers(&record.secret))
             .map(|record| HeldHandle {
                 id: record.id.clone(),
                 secret: record.secret.clone(),

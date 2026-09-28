@@ -17,35 +17,41 @@ use crate::permission::PermissionCheck;
 
 use super::inflight::CANCELLED_AT_BOUNDARY;
 use super::owner::{Admission, Call, OwnerChanged, RECIPIENTS};
-use super::{Broker, HandleRecord};
+use super::{Broker, HandleRecord, Handles};
 
 /// The deepest a line of derived handles goes.
-const MAX_DEPTH: usize = 16;
+pub(super) const MAX_DEPTH: usize = 16;
 
-/// `id` and every handle above it, nearest first.
-pub(super) fn chain(handles: &BTreeMap<String, HandleRecord>, id: &str) -> Vec<String> {
-    let mut line = Vec::new();
-    let mut at = Some(id.to_owned());
+/// `id` and every handle above it, nearest first, borrowed.
+pub(super) fn chain<'a>(handles: &'a Handles, id: &'a str) -> Vec<&'a str> {
+    let mut line: Vec<&'a str> = Vec::new();
+    let mut at = Some(id);
     while let Some(current) = at {
         if line.len() >= MAX_DEPTH || line.contains(&current) {
             break;
         }
         at = handles
-            .get(&current)
-            .and_then(|record| record.parent.clone());
+            .get(current)
+            .and_then(|record| record.parent.as_deref());
         line.push(current);
     }
     line
 }
 
+/// `id` and every handle above it, nearest first, owned, for a caller that
+/// changes the records along it.
+fn owned_chain(handles: &Handles, id: &str) -> Vec<String> {
+    chain(handles, id).into_iter().map(str::to_owned).collect()
+}
+
 /// Counts an admitted use of `id` on it and on every handle above it.
 pub(super) fn admitted(
-    handles: &mut BTreeMap<String, HandleRecord>,
+    handles: &mut Handles,
     id: &str,
     (operation, mark): (&str, &str),
     reserved: u64,
 ) {
-    for at in chain(handles, id) {
+    for at in owned_chain(handles, id) {
         if let Some(record) = handles.get_mut(&at) {
             record.used = record.used.saturating_add(1);
             record.open.insert(operation.to_owned(), reserved);
@@ -62,13 +68,13 @@ pub(super) fn admitted(
 /// Settles `operation` of `id` on it and on every handle above it; a call
 /// cancelled at the forward boundary gives its use back.
 pub(super) fn settled(
-    handles: &mut BTreeMap<String, HandleRecord>,
+    handles: &mut Handles,
     id: &str,
     operation: &str,
     outcome: &str,
     spend: u64,
 ) {
-    for at in chain(handles, id) {
+    for at in owned_chain(handles, id) {
         if let Some(record) = handles.get_mut(&at) {
             record.open.remove(operation);
             record.settled = record.settled.saturating_add(spend);
@@ -94,24 +100,25 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<(), SecretsError> {
         let now = (self.clock)();
         for at in chain(&self.handles, &record.id).into_iter().skip(1) {
-            let Some(above) = self.handles.get(&at) else {
-                return Err(SecretsError::HandleDropped { handle: at });
+            let handle = || at.to_owned();
+            let Some(above) = self.handles.get(at) else {
+                return Err(SecretsError::HandleDropped { handle: handle() });
             };
             if above.dropped {
-                return Err(SecretsError::HandleDropped { handle: at });
+                return Err(SecretsError::HandleDropped { handle: handle() });
             }
             if now > above.not_after_ms {
-                return Err(SecretsError::LeaseWindowClosed { handle: at });
+                return Err(SecretsError::LeaseWindowClosed { handle: handle() });
             }
             let Some(reserve) = reserve else {
                 continue;
             };
             if above.used >= above.max_uses {
-                return Err(SecretsError::LeaseExhausted { handle: at });
+                return Err(SecretsError::LeaseExhausted { handle: handle() });
             }
             if let Some(cap) = above.spend_cap {
                 if reserve == 0 {
-                    return Err(SecretsError::ReservationMissing { handle: at });
+                    return Err(SecretsError::ReservationMissing { handle: handle() });
                 }
                 let held = above
                     .open
@@ -120,7 +127,7 @@ impl<P: PermissionCheck> Broker<P> {
                 let left = cap.saturating_sub(held);
                 if reserve > left {
                     return Err(SecretsError::SpendCapReached {
-                        handle: at,
+                        handle: handle(),
                         cap,
                         left,
                         asked: reserve,
@@ -212,7 +219,7 @@ impl<P: PermissionCheck> Broker<P> {
         line.is_empty()
             || line
                 .iter()
-                .any(|at| self.handles.get(at).is_none_or(|record| record.dropped))
+                .any(|at| self.handles.get(*at).is_none_or(|record| record.dropped))
     }
 
     /// Derives a handle on the same secret for `child` from the handle
@@ -236,7 +243,7 @@ impl<P: PermissionCheck> Broker<P> {
     ) -> Result<IssuedHandle, SecretsError> {
         let parent = self.presented(token, presentation)?;
         self.live(parent, presentation)?;
-        self.permitted(parent)?;
+        self.permitted(parent, None)?;
         self.ancestry_admits(parent, None)?;
         let depth = chain(&self.handles, &parent.id).len();
         if depth >= MAX_DEPTH {
@@ -319,6 +326,7 @@ impl<P: PermissionCheck> Broker<P> {
             parent: Some(parent_id.clone()),
             ended: None,
             upstream: super::UpstreamRevocation::NotAsked,
+            held: None,
         };
         let outcome = format!("derived from {parent_id}");
         self.record(
@@ -328,7 +336,7 @@ impl<P: PermissionCheck> Broker<P> {
             Some(0),
             &outcome,
         )?;
-        self.handles.insert(record.id.clone(), record);
+        self.handles.insert(record);
         self.write_handles()?;
         Ok(IssuedHandle {
             id,

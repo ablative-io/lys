@@ -153,6 +153,8 @@ pub struct AuditLog {
     /// The digest of the last line, zero for a log that holds none.
     head: [u8; 32],
     start: Start,
+    /// How many times the anchor was written by this log.
+    anchor_writes: u64,
 }
 
 impl std::fmt::Debug for AuditLog {
@@ -181,7 +183,7 @@ impl AuditLog {
         fs::create_dir_all(dir).map_err(io(format!("creating {}", dir.display())))?;
         ensure_outside(anchor, guarded)?;
         let (log, _tail) = FrontierLog::open(FileLeafStore::create(dir, origin)?)?;
-        let audit = Self {
+        let mut audit = Self {
             log,
             dir: dir.to_path_buf(),
             anchor: anchor.to_path_buf(),
@@ -191,6 +193,7 @@ impl AuditLog {
                 refusal: SnapshotRefusal::Missing,
                 replayed: 0,
             },
+            anchor_writes: 0,
         };
         audit.write_anchor(key.identity())?;
         Ok(audit)
@@ -224,6 +227,7 @@ impl AuditLog {
             verifying_key: key.verifying_key(),
             head: [0u8; 32],
             start: started.start,
+            anchor_writes: 0,
         };
         audit.opened(started.state, &started.tail)
     }
@@ -254,6 +258,7 @@ impl AuditLog {
                 refusal: SnapshotRefusal::StateUnreadable { reason },
                 replayed: u64::try_from(tail.leaves.len()).unwrap_or(u64::MAX),
             },
+            anchor_writes: 0,
         };
         audit.opened(None, &tail)
     }
@@ -316,6 +321,24 @@ impl AuditLog {
     ///
     /// `Encoding`, `Log` and `Io`.
     pub fn append(&mut self, line: &AuditLine, key: &Ed25519Identity) -> Result<u64, SecretsError> {
+        let index = self.append_unanchored(line, key)?;
+        self.write_anchor(key)?;
+        Ok(index)
+    }
+
+    /// Signs and appends `line` and leaves the anchor where it is, for a
+    /// line another line of the same act follows at once: that line's
+    /// [`AuditLog::append`] moves the anchor past both. The anchor may lag
+    /// the log, never lead it, so a start between the two still verifies.
+    ///
+    /// # Errors
+    ///
+    /// `Encoding` and `Log`.
+    pub fn append_unanchored(
+        &mut self,
+        line: &AuditLine,
+        key: &Ed25519Identity,
+    ) -> Result<u64, SecretsError> {
         let body = encode_line(line)?;
         let signature = key.sign(&body);
         let mut signed = Canonical::new(SIGNED_DOMAIN)?;
@@ -323,8 +346,13 @@ impl AuditLog {
         let bytes = signed.into_bytes();
         let (index, _leaf_hash) = self.log.append(&bytes)?;
         self.head = sha256(&bytes);
-        self.write_anchor(key)?;
         Ok(index)
+    }
+
+    /// How many times this log has written its anchor since it was made or
+    /// opened.
+    pub fn anchor_writes(&self) -> u64 {
+        self.anchor_writes
     }
 
     /// Every line, each signature verified against the audit key. This reads
@@ -396,7 +424,8 @@ impl AuditLog {
         Ok(body.into_bytes())
     }
 
-    fn write_anchor(&self, key: &Ed25519Identity) -> Result<(), SecretsError> {
+    fn write_anchor(&mut self, key: &Ed25519Identity) -> Result<(), SecretsError> {
+        self.anchor_writes = self.anchor_writes.saturating_add(1);
         let digest = self.head;
         let body = Self::anchor_body(self.len(), &digest)?;
         let anchor = Anchor {

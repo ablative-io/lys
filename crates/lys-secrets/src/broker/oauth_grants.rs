@@ -57,7 +57,8 @@ impl<P: PermissionCheck> Broker<P> {
     }
 
     /// Reseals `grant`, refreshed for the call `ticket` admits, in place of
-    /// the ticket's entry, and records the refresh.
+    /// the ticket's entry, and records the refresh. The anchor moves at the
+    /// call's settlement, the line that follows.
     ///
     /// # Errors
     ///
@@ -71,7 +72,8 @@ impl<P: PermissionCheck> Broker<P> {
             Some(ticket.secret.as_str()),
         );
         let call = Some((ticket.operation.as_str(), ticket.mark.as_str()));
-        self.record(AuditKind::Refresh, subject, call, None, "refreshed")?;
+        let line = self.line(AuditKind::Refresh, subject, call, None, "refreshed");
+        self.append_unanchored(&line)?;
         Ok(())
     }
 

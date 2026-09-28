@@ -432,6 +432,15 @@ pub enum SecretsError {
         /// Its report.
         reason: String,
     },
+    /// An upstream answered more than the proxy carries back. Nothing of
+    /// it is returned: an answer is never cut short.
+    #[error(
+        "AnswerTooLarge: the upstream answered more than {limit} bytes (act: ask the upstream for less, or page the answer)"
+    )]
+    AnswerTooLarge {
+        /// The most the proxy carries back, in bytes.
+        limit: usize,
+    },
     /// Bytes could not be encoded or decoded.
     #[error("Encoding: {context}: {reason}")]
     Encoding {

@@ -3,13 +3,13 @@
 //! the refreshed grant is resealed in the store. The holder sees neither
 //! token. A drop may also revoke the grant with the provider.
 
-use std::sync::PoisonError;
+use std::sync::Arc;
 
 use axum::http::StatusCode;
 use lys_secrets::{Broker, HandleId, OAuthGrant, Secret, SecretsError, Ticket};
 
 use crate::files::{Layout, Route, now_ms};
-use crate::serve::Shared;
+use crate::serve::{Shared, on_broker};
 use crate::spice::Grants;
 
 type Failed = (StatusCode, SecretsError);
@@ -71,21 +71,47 @@ fn scrub(text: &str, hidden: &[&Secret]) -> String {
 }
 
 /// The grant with a live access token, refreshing it first when it needs
-/// it, and every token it held before, for redaction.
+/// it, and every token it held before, for redaction. The ticket is handed
+/// back to be settled; it is lost only when the broker's work could not
+/// run at all, and then the start after settles it as `outcome_unknown`.
 pub async fn live(
-    shared: &Shared,
-    ticket: &Ticket,
+    shared: &Arc<Shared>,
+    ticket: Ticket,
     mut grant: OAuthGrant,
-) -> Result<(OAuthGrant, Vec<Secret>), Failed> {
+) -> (Option<Ticket>, Result<(OAuthGrant, Vec<Secret>), Failed>) {
     let now = now_ms();
     if !grant.needs_refresh(now) {
-        return Ok((grant, Vec::new()));
+        return (Some(ticket), Ok((grant, Vec::new())));
     }
     let retired: Vec<Secret> = grant
         .tokens()
         .into_iter()
         .map(|token| Secret::from_slice(token.expose()))
         .collect();
+    if let Err(failed) = refresh(shared, &mut grant, &retired, now).await {
+        return (Some(ticket), Err(failed));
+    }
+    let resealed = on_broker(shared, move |broker| {
+        let resealed = broker.refreshed(&ticket, &grant);
+        (ticket, grant, resealed)
+    })
+    .await;
+    let internal = |error: SecretsError| (StatusCode::INTERNAL_SERVER_ERROR, error);
+    match resealed {
+        Err(error) => (None, Err(internal(error))),
+        Ok((ticket, _, Err(error))) => (Some(ticket), Err(internal(error))),
+        Ok((ticket, grant, Ok(()))) => (Some(ticket), Ok((grant, retired))),
+    }
+}
+
+/// Refreshes `grant` from its refresh token at the provider's token
+/// endpoint.
+async fn refresh(
+    shared: &Shared,
+    grant: &mut OAuthGrant,
+    retired: &[Secret],
+    now: i64,
+) -> Result<(), Failed> {
     let hidden: Vec<&Secret> = retired.iter().collect();
     let endpoint = grant.provenance().token_endpoint.clone();
     let (status, answer) = post_form(shared, &endpoint, &grant.refresh_form(), &hidden).await?;
@@ -97,13 +123,7 @@ pub async fn live(
     }
     grant
         .apply_refresh(&answer, now)
-        .map_err(|error| (StatusCode::BAD_GATEWAY, error))?;
-    {
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        broker.refreshed(ticket, &grant)
-    }
-    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
-    Ok((grant, retired))
+        .map_err(|error| (StatusCode::BAD_GATEWAY, error))
 }
 
 /// Asks the provider to revoke `grant`. Answers `Ok` when it confirmed,
