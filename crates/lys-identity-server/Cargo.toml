@@ -25,6 +25,7 @@ tokio.workspace = true
 
 [dev-dependencies]
 identity-contract = { path = "../../tests/identity_contract" }
+tempfile.workspace = true
 
 # The target that needs a running permission database runs only when it is
 # named, never under `cargo test --workspace --all-features`.
