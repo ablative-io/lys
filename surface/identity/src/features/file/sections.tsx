@@ -1,4 +1,5 @@
 import { AgentCertificates } from './AgentCertificates';
+import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { AgentMemory } from './AgentMemory';
@@ -201,7 +202,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
         <AgentCertificates id={data.x.id} />
       );
     case 'record':
-      return <Record data={data} />;
+      return <><Record data={data} />{person ? null : <StopHistory key={data.x.id} id={data.x.id} />}</>;
     default:
       return <Profile data={data} />;
   }
