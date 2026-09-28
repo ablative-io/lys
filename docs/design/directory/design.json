@@ -2760,6 +2760,21 @@
       "path": "surface/identity/src/features/usage/usage.css",
       "note": "DIRECTORY-051 R5: Usage screen",
       "brief": "DIRECTORY-051"
+    },
+    {
+      "path": "surface/identity/src/features/apps/SchemaBuilder.tsx",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/src/features/apps/schema-builder.css",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
+    },
+    {
+      "path": "surface/identity/tests/schema-builder.test.tsx",
+      "note": "DIRECTORY-048 R8: the permission schema builder",
+      "brief": "DIRECTORY-048"
     }
   ],
   "inventory": [

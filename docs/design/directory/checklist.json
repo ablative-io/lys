@@ -1163,6 +1163,11 @@
           "id": "C368",
           "text": "Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).",
           "done": false
+        },
+        {
+          "id": "C386",
+          "text": "A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).",
+          "done": false
         }
       ]
     },

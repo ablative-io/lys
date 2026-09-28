@@ -644,6 +644,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/goals.rs` | DIRECTORY-051 R4: Goals with deadlines and reminders | DIRECTORY-051 |
 | `surface/identity/src/features/usage/Usage.tsx` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
 | `surface/identity/src/features/usage/usage.css` | DIRECTORY-051 R5: Usage screen | DIRECTORY-051 |
+| `surface/identity/src/features/apps/SchemaBuilder.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/src/features/apps/schema-builder.css` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
+| `surface/identity/tests/schema-builder.test.tsx` | DIRECTORY-048 R8: the permission schema builder | DIRECTORY-048 |
 
 ## Inventory
 

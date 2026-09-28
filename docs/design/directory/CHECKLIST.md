@@ -294,6 +294,7 @@
 - [ ] **C366** — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
 - [ ] **C367** — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 - [ ] **C368** — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+- [ ] **C386** — A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).
 
 ## Lys MCP server, secure and compact (DIRECTORY-049)
 

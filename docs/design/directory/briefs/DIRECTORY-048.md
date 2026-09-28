@@ -20,13 +20,14 @@ title: Every app registers its sign-in and permission schema with Lys through on
 > - C366 — Apps check many permissions in one call and list the resources a subject may act on (DIRECTORY-048 R5).
 > - C367 — One OpenAPI document, generated from the routes and types, describes every route; a route without an entry fails the build (DIRECTORY-048 R6).
 > - C368 — Lys holds no app's name or schema in code or configuration and makes no call to any app (DIRECTORY-048 R7).
+> - C386 — A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).
 > **Stories:**
 > - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 > - S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
 
 ## Purpose
 
-Tom, 28 September 2026 evening: 'a quality API as well, because we're going to need a way of getting in the permission schema and everything for every one of the apps that it covers', and 'this has to be able to handle sign in and authentication and permissions for every single one of our apps, but not depend on them.' Lys must be the sign-in, authentication and permissions for every product we make, and for products we do not make, without any of them being built into it. Today the permission model is one file read at start, any grant may name any kind, apps are not records, and there is no description of the API an app would code against.
+Tom, 28 September 2026 evening: 'a quality API as well, because we're going to need a way of getting in the permission schema and everything for every one of the apps that it covers', and 'this has to be able to handle sign in and authentication and permissions for every single one of our apps, but not depend on them.' Lys must be the sign-in, authentication and permissions for every product we make, and for products we do not make, without any of them being built into it. Today the permission model is one file read at start, any grant may name any kind, apps are not records, and there is no description of the API an app would code against. Tom, 19:53: 'I want a nice builder for designing the permissions. Both: for you guys to upload them, but the permission schema, however that's done, needs to be done properly.'
 
 ## Task
 
@@ -188,6 +189,29 @@ Structural. Lys depends on no app. It holds no app's name, kind, schema or code;
 
 **Stories:**
 - S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+
+### R8: A permission schema builder on a Lys screen
+
+Behavioural. The Apps screen gains a builder for an app's permission schema, for a person who has never seen a schema language: add kinds under the app's prefix, give each its actions, make relations by ticking which actions each carries, and set a kind's parent by choosing it from a list; the builder draws the kinds as a tree with their relations, shows in plain words what each relation lets a holder do (for example 'a member of a workspace may read and post in its channels'), and before saving runs the same dry run as R3, listing what would be added, removed and any grants a change would strand. It saves through the same routes as an upload, so a schema built on the screen and one uploaded through the API are the same record and each can be edited by the other. Controls are styled from the design tokens, never default ones.
+
+**Acceptance:**
+- Building a two-kind schema with a parent on the screen and saving it yields the same record as uploading the same schema through the API.
+- An uploaded schema opens in the builder and edits there.
+- The plain-words line for each relation is shown and tested.
+- A change that would strand grants shows the stranded count before saving and cannot be saved.
+
+**Files:**
+- create: surface/identity/src/features/apps/SchemaBuilder.tsx
+- create: surface/identity/src/features/apps/schema-builder.css
+- create: surface/identity/tests/schema-builder.test.tsx
+- modify: surface/identity/src/features/apps/Apps.tsx
+
+**Checklist:**
+- C386 — A permission schema builder on the Apps screen makes, explains in plain words and dry-runs an app's schema; built and uploaded schemas are the same record (DIRECTORY-048 R8).
+
+**Stories:**
+- S151 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
+- S152 (Developer of an app that signs in with Lys, Builds a product that uses Lys for sign-in and permissions without Lys knowing about it) — As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
 
 ## Boundaries
 
