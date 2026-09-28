@@ -803,6 +803,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/present_client.rs` | the runner's session holder key | DIRECTORY-060 |
 | `docs/design/directory/briefs/DIRECTORY-060.json` | the runner's session holder key brief | DIRECTORY-060 |
 | `docs/design/directory/briefs/DIRECTORY-060.md` | the runner's session holder key brief | DIRECTORY-060 |
+| `crates/lys/src/identity/upgrade/exchange.rs` | The exchange of bin/, the configuration and the screens with what is kept, undoing its own renames on a failure. | DIRECTORY-053 |
+| `crates/lys/src/identity/upgrade/exchange_tests.rs` | Tests of the exchange with a rename step that fails on a chosen call. | DIRECTORY-053 |
+| `crates/lys-identity-server/src/kinds.rs` | The registry of every signed log kind lys-identity-server folds. | DIRECTORY-053 |
+| `crates/lys-secrets/src/bin/lys-secrets/kinds.rs` | The registry of every audit log kind lys-secrets folds. | DIRECTORY-053 |
 
 ## Inventory
 

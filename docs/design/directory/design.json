@@ -3551,6 +3551,26 @@
       "path": "docs/design/directory/briefs/DIRECTORY-060.md",
       "note": "the runner's session holder key brief",
       "brief": "DIRECTORY-060"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange.rs",
+      "note": "The exchange of bin/, the configuration and the screens with what is kept, undoing its own renames on a failure.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/exchange_tests.rs",
+      "note": "Tests of the exchange with a rename step that fails on a chosen call.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-identity-server/src/kinds.rs",
+      "note": "The registry of every signed log kind lys-identity-server folds.",
+      "brief": "DIRECTORY-053"
+    },
+    {
+      "path": "crates/lys-secrets/src/bin/lys-secrets/kinds.rs",
+      "note": "The registry of every audit log kind lys-secrets folds.",
+      "brief": "DIRECTORY-053"
     }
   ],
   "inventory": [
