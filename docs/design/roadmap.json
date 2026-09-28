@@ -638,7 +638,7 @@
     {
       "id": "RM-024",
       "title": "Run every test binary in the gate's test leg with --no-fail-fast",
-      "status": "briefed",
+      "status": "idea",
       "kind": "fix",
       "summary": "The gate's test leg stops at the first failing test binary, so a red round hides every failure after the first. One commit changes it to `cargo test --workspace --all-features --no-fail-fast` in docs/design/project.json, the directory, home, secrets and lys-gate design.json gate arrays and .land/gates.sh, and, by the lead's rulings, in CLAUDE.md's 'Gates before any commit' block (so .land/gates.sh still matches it exactly) and CI's test step (which gains the one flag only; its missing --all-features is a finding left unchanged). Nothing else in any gate moves. Proved by a grep over the declared legs that prints 0, the green gate round's '$ command' line for the tests leg, one gate round over a local scratch branch with a planted failing test in crates/lys that never reaches origin, and a proof document that names that round's log by path, SHA-256 and counts.",
       "provenance": {
