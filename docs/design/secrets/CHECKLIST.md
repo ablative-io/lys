@@ -3,7 +3,7 @@
 ## The implementation brief
 
 - [ ] **C1** — SECRETS-002 is a design-system brief with one numbered requirement, carrying acceptance criteria and file paths, for each part of the temporary key model: the handle and the proxy swap with its audit line; rotation under one handle; the token revolver as the first consumer; OAuth refresh at the proxy; the seat's own login put into its environment at spawn; sealed knowledge tagged in SpiceDB; the three revocation cases, including the cancellation rule for calls in flight; and leases counted by uses, time window and spend.
-- [ ] **C2** — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a SECRETS-002 requirement.
+- [ ] **C2** — Every checklist item and user story the broker's implementation needs is recorded in this cluster and covered by a requirement of a SECRETS brief.
 - [ ] **C3** — The rendered markdown of this cluster matches its JSON.
 
 ## The broker's implementation
@@ -27,16 +27,14 @@
 - [ ] **C17** — Every derived handle stays inside its live ancestry, including shared use/spend budgets and expiry; revoking its source does not revoke an independently authorised sibling.
 - [ ] **C18** — Issuance, account selection, retry and revocation preserve exact provenance and current authority; the screen distinguishes local refusal from unconfirmed provider action.
 
-## The broker's build rows, SECRETS-003
+## Who may revoke a lease, and the scoped secrets list: CONFORMANCE rows 7.6 and 7.8
 
-- [ ] **C19** — docs/design/secrets/BASELINE.md records, by repository, pinned commit, file and line, the revolver's next-account call site and every consumer of the account pool file.
-- [ ] **C20** — docs/design/secrets/BASELINE.md records every credential path into a seat today, by file and line, each classed as exactly one of: the login exception, a proxied credential, or neither.
-- [ ] **C21** — docs/design/secrets/BASELINE.md records, by file and line, what lys/delegation/v1 and lys/sealed-envelope/v1 can and cannot carry for a handle, a lease and a sealed record.
-- [ ] **C22** — docs/design/secrets/CONTRACT.md states the invariant, the key custody, the handle with how it is stored and how its presenter is authenticated, the lease with its atomic use step and retry outcome, the cancellation rule, the SpiceDB relations, the sealed-record binding and the audit line fields, and is accepted before any code row starts.
-- [ ] **C23** — docs/design/secrets/reports/SECRETS-003-adversarial-review.md records every attack tried in the six named classes, by a reviewer who did not write the contract and is a different commit author, and the contract clause defeating each.
-- [ ] **C24** — The store, the redacting type, handles and leases in crates/lys-secrets deliver SECRETS-002 R9 and the issuance criteria of R1, with the store key kept out of the store directory, opening without it refused by name, the store key rotated with every entry readable under the new key and none under the old, swapped ciphertext refused, an older ciphertext of the same entry refused, and every counted leg of their row passing; for SEC_USE_NOT_LEND and SEC_PEOPLE_ONLY they deliver the library-level decision, and the screen and API legs are recorded as not delivered here.
-- [ ] **C25** — The proxy in crates/lys-secrets delivers SECRETS-002 R1's proxy criteria, R2, R8 and R7's handle case, with every counted leg of its row passing; for SEC_REVOKE_STATES it delivers the library-level decision, and the API and screen legs are recorded as not delivered here.
-- [ ] **C26** — OAuth refresh at the proxy in crates/lys-secrets delivers SECRETS-002 R4, with every counted leg of its row passing.
-- [ ] **C27** — The seat's own login at spawn from crates/lys-secrets delivers SECRETS-002 R5 and R7's login-token case, with every counted leg of its row passing.
-- [ ] **C28** — Sealed records in crates/lys-secrets deliver SECRETS-002 R6 and R7's sealed-knowledge case, with every counted leg of their row passing.
-- [ ] **C29** — The broker's next-account answer in crates/lys-secrets delivers SECRETS-002 R3's broker side, with every counted leg of its row passing, and names no engine file.
+- [ ] **C30** — The person acted for under a lease may revoke it at any time: the revoke stops issuing at once, and GET /leases/{lease_id} reads upstream pending until the system behind confirms, with no timer confirming it (CONFORMANCE 7.6).
+- [ ] **C31** — A revoke by anyone but the person acted for is refused: with the not-found refusal naming nothing when the caller cannot discover the lease, which only its person acted for and its holder can; for the lease's holder with a refusal naming the lease and relinquish; and with a refusal naming the lease for any other caller the seam lets discover it.
+- [ ] **C32** — A lease's holder may relinquish it, recorded as a relinquish and not as a revoke, which stops issuing at once and reads upstream pending until the system behind confirms.
+- [ ] **C33** — Whether a secret's owner may revoke every credential derived from it is recorded as a proposed ADR cited from this cluster's decisions, and no code and no test grants it.
+- [ ] **C34** — The secrets list takes one scope from organisation, team and mine, applied at the server; with no scope it answers every secret the caller may see; any other scope is refused by name (CONFORMANCE 7.8).
+- [ ] **C35** — The signed-in person's team ids are read from the group claims on their token, one group per team, through one function.
+- [ ] **C36** — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does.
+- [ ] **C37** — A revoke by the person acted for, or a relinquish by the holder, of a lease that has already ended is refused by name as already ended, carrying how, when and by whom it first ended, and records nothing; the first end record stays the only one (CONFORMANCE 7.6).
+- [ ] **C38** — The secrets list is a person's view: an agent that asks for it is refused by name, the refusal naming the agent and saying that agents reach secrets only through their virtual credentials, with no list, not even an empty one, and nothing recorded (CONFORMANCE 7.8).

@@ -10,11 +10,15 @@
 
 **S3.** As a person, I want to drop an agent's handle and have every new call on it refused at once, so that taking access back does not wait on rotating the real key.
 
+**S19.** As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
+
 ## AI Agent — Uses a handle for its outbound calls and reads its sealed records
 
 **S4.** As an agent, I want to make my call with my handle and have the proxy swap in the credential, refreshing an expired OAuth token itself, so that I can do my work without ever seeing a credential.
 
 **S5.** As an agent, I want to ask for one of my sealed memories by name and get back only the piece I am permitted, so that a secret never sits in plain text in my memory files.
+
+**S20.** As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for.
 
 ## Token revolver — The worker that runs Claude sessions and builders and turns to the next account on usage-limit words
 
@@ -44,16 +48,4 @@
 
 **S14.** As a person reviewing a grant or revocation, I want its source, selected service account and confirmed or unconfirmed outcome shown, so I know exactly what authority changed.
 
-## Lead — Reviews SECRETS-003's rows before any is dispatched
-
-**S15.** As the lead, I want the revolver's call site, the pool file's consumers, every credential path into a seat and what the lys formats can carry recorded from source by file and line, so that the contract rests on what the code does today rather than on memory.
-
-**S16.** As the lead, I want the broker's contract and an adversarial review by someone other than its author before any code, so that every named attack has a clause defeating it before it can be built in.
-
-## Implementer — Is dispatched one SECRETS-003 code row at a time
-
-**S17.** As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-
-## Person — Keeps credentials with the standalone identity platform
-
-**S18.** As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+**S21.** As a person looking at the secrets list, I want to choose organisation, team or mine and have the server answer only what I may see within that scope, so that no filter ever shows me a secret I may not see.

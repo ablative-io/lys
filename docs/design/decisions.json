@@ -1316,6 +1316,25 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-095",
+      "title": "Ownership of a secret alone confers no revoke over the leases derived from it",
+      "status": "proposed",
+      "scope": "secrets",
+      "date": "2026-09-27",
+      "decided_by": "Not ruled; proposed by SECRETS-004 for the lead who owns its card to rule",
+      "context": "CONFORMANCE row 7.6 (docs/design/identity/CONFORMANCE.md) says the person acted for may revoke a lease, and leaves open whether a secret's owner may revoke every credential derived from it: a policy choice, not conferred by ownership alone. The mock-up's lease table lets the source secret's owner revoke as well as the person acted for (docs/design/identity/mockup/index.v5.html, the revlease control), so a screen built from it would grant the owner route before anyone ruled it. SECRETS-004 builds the revoke and needs the set of who may revoke written down before it is built.",
+      "decision": "The person acted for under a lease revokes it, and ownership of the secret the lease was issued from confers no revoke, over the owner revoking every credential derived from the secret, because who may revoke is a policy choice that ownership alone does not confer. Rejected: the owner revokes every credential derived from the secret.",
+      "quote": "",
+      "consequences": [
+        "Until this entry is ruled, the set of who may revoke a lease beyond the person acted for is empty: SECRETS-004 refuses a revoke by the secret's owner as it refuses any other third person's, and no code and no test grants the owner a revoke.",
+        "The mock-up's owner route to revoke is built by no brief while this entry is proposed.",
+        "Withdrawal of an upstream grant (ADR-003) and emergency stop (CONFORMANCE row 3.4) end leases as their own acts and are not touched by this entry.",
+        "Ruling this entry decided flips its status; ruling the rejected road instead is a new entry that supersedes this one."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }
