@@ -2464,7 +2464,7 @@
       "title": "The broker issues a handle bound to a public key a service names, for a person's agent",
       "status": "briefed",
       "kind": "feature",
-      "summary": "POST /_lys/handles/issue for a holder that acts for the person acted for, so an agent session's handles are bound to the runner's per-session key.",
+      "summary": "POST /_lys/handles/issue derives a handle under one the agent holds, for a holder that acts for the person acted for, so an agent session's handles are bound to the runner's per-session key.",
       "provenance": {
         "requested_by": "waffles",
         "date": "2026-09-28T23:28:00+10:00",

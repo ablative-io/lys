@@ -167,6 +167,7 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 | `crates/lys-secrets/tests/issue_route.rs` | the issue route tests | SECRETS-008 |
 | `docs/design/secrets/briefs/SECRETS-008.json` | a service issues a handle to a named key | SECRETS-008 |
 | `docs/design/secrets/briefs/SECRETS-008.md` | its rendered markdown | SECRETS-008 |
+| `crates/lys-secrets/src/broker/lineage.rs` | Derived handles, their line and the lend rules, with derive's checks shared with the issue route's derive. | SECRETS-008 |
 
 ## Inventory
 
