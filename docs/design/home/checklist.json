@@ -960,6 +960,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The request's order",
+      "items": [
+        {
+          "id": "C78",
+          "text": "resolve_given lists a session's documents in the request's order, appended_instructions, mcp_config, user_claude_md, claude_md_chain, memory_index, with one directory's CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md in that order and D/.claude/CLAUDE.md listed once, as user_claude_md, when D/.claude is the config directory.",
+          "done": false
+        },
+        {
+          "id": "C79",
+          "text": "The given_tests.rs unit test and the fixture test in tests/given_record.rs, whose config directory now holds a user CLAUDE.md, each assert that appended_instructions and mcp_config precede user_claude_md.",
+          "done": false
+        },
+        {
+          "id": "C80",
+          "text": "RECORD.md states one rule, that the request's order wins wherever it and the read order differ with the MCP configuration straight after the appended instructions, and names the old order as superseded by the commit that lands HOME-011, told from an entry by its recorded time and never by its harness_version.",
+          "done": false
+        },
+        {
+          "id": "C81",
+          "text": "PROOF-GIVEN.md keeps its earlier text unchanged and appends a re-measurement of the request's order by the committed, unchanged measure.py on the installed Claude Code, with the version `claude --version` printed, naming the old order as superseded.",
+          "done": false
+        },
+        {
+          "id": "C82",
+          "text": "S12 reads `in the order the request gives them`, HOME-003 carries an amendment naming its R2 cross-kind order as superseded, and every rendered markdown file of the home cluster is what its JSON renders to.",
+          "done": false
+        }
+      ]
     }
   ]
 }
