@@ -37,7 +37,7 @@ use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, BROKER_PORT, Layout, SERVICE_PORT};
 use super::install::log_wait::{self, LogCursor};
-use super::install::{services, surface};
+use super::install::{self, services, surface};
 use super::private_files;
 use crate::commands::output::Emitter;
 
@@ -426,6 +426,9 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let mut emitter = Emitter::new(json);
     emitter.field("root", "root", layout.root.display().to_string());
     let units = units(&layout);
+    require_install(&layout)?;
+    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    install::server_state(&layout, &config)?;
     let mut parts = Parts {
         units: &units,
         engine: &mut Compose,
