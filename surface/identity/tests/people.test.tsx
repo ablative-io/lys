@@ -61,14 +61,14 @@ describe('People and agents', () => {
     expect(location.hash).toBe('#/file/' + SCRIBE);
   });
 
-  it('filters people and agents, and says teams are not built', async () => {
-    await mount('#/people');
+  it('filters people and agents, and reads the teams registry', async () => {
+    await mount('#/people', { ...SERVICE, '/teams': ok({ teams: [] }) });
     await click($('[data-kind="agent"]'));
     expect(names()).toHaveLength(5);
     await click($('[data-kind="person"]'));
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)']);
     await click($('[data-kind="teams"]'));
-    expect($('.empty-note')?.textContent).toContain('not built yet');
+    expect(text()).toContain('No teams have been recorded.');
   });
 
   it('falls back to the personal view when not admitted to the directory', async () => {

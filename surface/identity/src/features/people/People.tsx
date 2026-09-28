@@ -1,5 +1,5 @@
-import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { Teams } from '../teams/Teams';
+import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { api, useLoad } from '../../api';
@@ -147,12 +147,11 @@ function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad;
 export function People() {
   const shell = useShell();
   const load = useLoad(api.people, 'people');
-  if (shell.filterKind === 'teams') return <Teams head={<PeopleHead />} />;
-  if (shell.filterKind === 'found') {
+  if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
       <div className="page">
         <PeopleHead />
-        <RuntimeSessions found />
+        {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Teams />}
       </div>
     );
   }
