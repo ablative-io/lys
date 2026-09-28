@@ -7,14 +7,14 @@
 //! are never the grants as they stand now, and the answer says so in
 //! `claims_are_live`.
 //!
-//! This route reads what the log holds. It issues nothing and withdraws
-//! nothing.
+//! Issuing and withdrawing are in `certificates_issue`; their answers are
+//! this same view, with the serial the act was recorded under.
 
 use std::sync::{Arc, PoisonError};
 
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Serialize;
 use serde_json::Value;
@@ -68,11 +68,21 @@ pub struct CertificatesView {
     /// Whether the claims are the grants as they stand now. They never
     /// are: the current answer comes from enforcement.
     pub claims_are_live: bool,
+    /// The serial this act was recorded under, null on a read.
+    pub recorded: Option<String>,
 }
 
 /// The certificate route.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/certificates", get(read))
+    Router::new()
+        .route(
+            "/agents/{id}/certificates",
+            get(read).post(crate::certificates_issue::issue),
+        )
+        .route(
+            "/agents/{id}/certificates/{serial}/withdrawal",
+            post(crate::certificates_issue::withdraw),
+        )
 }
 
 fn with_certificates<T>(
@@ -110,22 +120,30 @@ fn view(proven: Proven) -> CertificateView {
     }
 }
 
+/// The certificates of `agent` as they stand, with what `recorded` names.
+pub(crate) fn answer(
+    store: &CertificateStore,
+    agent: &str,
+    recorded: Option<String>,
+) -> Result<Json<CertificatesView>, ServerError> {
+    let certificates = store
+        .certificates()
+        .filter(|entered| entered.issued.agent == agent)
+        .map(|entered| store.prove(&entered.issued.serial).map(view))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Json(CertificatesView {
+        agent: agent.to_owned(),
+        certificates,
+        claims_are_live: false,
+        recorded,
+    }))
+}
+
 async fn read(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<CertificatesView>, ServerError> {
     let agent = seen_agent(&state, &headers, &id)?.agent.to_string();
-    with_certificates(&state, |store| {
-        let certificates = store
-            .certificates()
-            .filter(|entered| entered.issued.agent == agent)
-            .map(|entered| store.prove(&entered.issued.serial).map(view))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Json(CertificatesView {
-            agent: agent.clone(),
-            certificates,
-            claims_are_live: false,
-        }))
-    })
+    with_certificates(&state, |store| answer(store, &agent, None))
 }
