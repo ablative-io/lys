@@ -1315,7 +1315,7 @@
         },
         {
           "name": "tests",
-          "command": "cargo test --workspace --all-features",
+          "command": "cargo test --workspace --all-features --no-fail-fast",
           "requires": [
             "rust-build"
           ],
