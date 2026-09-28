@@ -1,5 +1,4 @@
-//! How every refusal is answered over HTTP: the service's own by name, and
-//! the directory's and the grants' as they class them.
+//! How the directory's and the grants' own refusals are answered over HTTP.
 
 use axum::Json;
 use axum::http::StatusCode;
@@ -59,7 +58,20 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
     }
 }
 
+impl IntoResponse for ServerError {
+    fn into_response(self) -> Response {
+        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
+        (self.status(), Json(body)).into_response()
+    }
+}
+
 impl ServerError {
+    /// The refusal's name: the first word of its message.
+    pub fn name(&self) -> String {
+        let text = self.to_string();
+        text.split(':').next().unwrap_or_default().to_owned()
+    }
+
     pub(crate) fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn | Self::AgentSignatureRefused { .. } => StatusCode::UNAUTHORIZED,
@@ -132,12 +144,5 @@ impl ServerError {
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
         }
-    }
-}
-
-impl IntoResponse for ServerError {
-    fn into_response(self) -> Response {
-        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
-        (self.status(), Json(body)).into_response()
     }
 }

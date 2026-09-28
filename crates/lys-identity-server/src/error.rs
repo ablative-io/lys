@@ -1,7 +1,7 @@
-//! The mapping of every refusal to an HTTP answer, each by name.
+//! Everything the service refuses, each by name; `error_status` maps each
+//! to its HTTP answer.
 
 use axum::http::StatusCode;
-
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
 
@@ -419,12 +419,4 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
-}
-
-impl ServerError {
-    /// The refusal's name: the first word of its message.
-    pub fn name(&self) -> String {
-        let text = self.to_string();
-        text.split(':').next().unwrap_or_default().to_owned()
-    }
 }
