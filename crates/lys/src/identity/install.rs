@@ -160,6 +160,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
         None => Layout::discover()?,
     };
     let mut emitter = Emitter::new(json);
+    services::require_docker(Path::new("docker"))?;
     private_files::ensure_dir(&layout.root)?;
     for dir in [
         layout.deploy_dir(),

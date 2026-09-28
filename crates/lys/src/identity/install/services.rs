@@ -51,6 +51,58 @@ pub fn run_to_end(program: &Path, args: &[String], resource: &str) -> IdentityRe
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+/// Refuses, naming the fix, unless Docker with its compose plugin is
+/// installed and its engine is running. `docker` names the program to ask.
+pub fn require_docker(docker: &Path) -> IdentityResult<()> {
+    let version = Command::new(docker)
+        .args(["compose", "version"])
+        .stdin(Stdio::null())
+        .output();
+    match version {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(refuse(
+                "start",
+                "docker",
+                "Docker is not installed; install Docker Desktop, open it once, then run this install again",
+            ));
+        }
+        Err(error) => {
+            return Err(refuse(
+                "start",
+                "docker",
+                format!("{} could not start: {error}", docker.display()),
+            ));
+        }
+        Ok(output) if !output.status.success() => {
+            return Err(refuse(
+                "start",
+                "docker",
+                "Docker is installed without its compose plugin; install Docker Desktop, which carries it, then run this install again",
+            ));
+        }
+        Ok(_) => {}
+    }
+    let engine = Command::new(docker)
+        .arg("info")
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| {
+            refuse(
+                "start",
+                "docker",
+                format!("{} could not start: {error}", docker.display()),
+            )
+        })?;
+    if engine.status.success() {
+        return Ok(());
+    }
+    Err(refuse(
+        "start",
+        "docker",
+        "Docker is installed but its engine is not running; open Docker Desktop, wait for it to say it is running, then run this install again",
+    ))
+}
+
 /// `docker compose up -d --wait` for the deployment under `layout`.
 pub fn compose_up(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     let mut args = vec![
