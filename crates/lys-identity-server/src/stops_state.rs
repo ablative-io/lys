@@ -70,6 +70,11 @@ impl Held {
         self.stops.iter().find(|stop| stop.operation == operation)
     }
 
+    /// Every stop kept on `agent`, in the order kept.
+    pub fn of_agent<'a>(&'a self, agent: &'a str) -> impl Iterator<Item = &'a Stop> + 'a {
+        self.stops.iter().filter(move |stop| stop.agent == agent)
+    }
+
     /// Fold one stop. A second stop under an operation already kept is
     /// refused, since every kept stop was checked against what came before.
     pub fn hold(&mut self, stop: Stop) -> Result<(), String> {
