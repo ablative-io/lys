@@ -12,7 +12,9 @@
 //! command is answered; the session is that operation id. The same request
 //! sent again answers the start exactly as it was first answered, kept whole
 //! in that report, whatever has changed since; the same operation id naming
-//! any other report is refused. Only an active agent is started.
+//! any other report is refused. Only an active agent is started, and only on
+//! a machine whose egress list names every host its profile's servers are
+//! reached at.
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
@@ -199,6 +201,7 @@ async fn start_command(
         })?;
         let runtime = with_network(&state, |store| {
             let machine = placed(store, &machine, &agent)?;
+            reaches(machine, &version)?;
             machine
                 .runtime
                 .clone()
@@ -256,6 +259,34 @@ async fn start_command(
         .and_then(|first| first.launch.clone())
         .map(Json)
         .ok_or(ServerError::RuntimeReportReused { operation: session })
+}
+
+/// Refuse by name the first host a server of `version` is reached at that
+/// `machine`'s egress list does not name.
+fn reaches(machine: &Machine, version: &Version) -> Result<(), ServerError> {
+    for server in &version.settings.mcp_servers {
+        let host = url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
+            reason: format!(
+                "server `{}` is reached at `{}`, which names no host",
+                server.name, server.url
+            ),
+        })?;
+        if !machine.may_reach.contains(&host) {
+            return Err(ServerError::MachineCannotReach { host });
+        }
+    }
+    Ok(())
+}
+
+/// The host of `url`, lower-cased, without scheme, credentials, port or path.
+fn url_host(url: &str) -> Option<String> {
+    let (_scheme, rest) = url.split_once("://")?;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let located = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_user, host)| host);
+    let host = located.split(':').next()?.to_ascii_lowercase();
+    (!host.is_empty()).then_some(host)
 }
 
 /// A start already admitted, or what a new one is rendered from.

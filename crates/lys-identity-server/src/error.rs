@@ -236,6 +236,12 @@ pub enum ServerError {
         /// The agent's lifecycle state.
         state: String,
     },
+    /// The machine may not reach a host the agent's profile needs.
+    #[error("MachineCannotReach: the machine may not reach `{host}`, which the profile needs")]
+    MachineCannotReach {
+        /// The host.
+        host: String,
+    },
     /// The machine is retired, so nothing is started on it.
     #[error("MachineRetired: the machine is retired and nothing is started on it")]
     MachineRetired,
@@ -370,6 +376,7 @@ impl ServerError {
             | Self::CertificateWithdrawn { .. }
             | Self::MachineRetired
             | Self::AgentNotActive { .. }
+            | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
             | Self::RuntimeSessionStarted { .. }
