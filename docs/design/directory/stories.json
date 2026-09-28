@@ -548,6 +548,34 @@
           "text": "As an owner of a project, I want to make and edit its roles and assign them to agents without any existing holder changing so that a role can improve without silently changing what its holders may do."
         }
       ]
+    },
+    {
+      "name": "Operator",
+      "role": "Installs and runs the standalone identity product",
+      "stories": [
+        {
+          "id": "S3",
+          "text": "As the operator, I want to install the identity product's dependencies on one PostgreSQL database whose host I choose, and restart or restore it without losing anyone, so that the product stands alone without Cambium or Manifold."
+        },
+        {
+          "id": "S6",
+          "text": "As the operator, I want the directory's screens to show every refusal, pending audit and outage as it is, so that I never act on a completed state that did not happen."
+        },
+        {
+          "id": "S111",
+          "text": "As the operator, I want the exact release installed on a node I name and shown to me as a staging install, so that I can accept the product standalone before anything is cut over."
+        }
+      ]
+    },
+    {
+      "name": "Release reviewer",
+      "role": "Decides from the record whether the release proof is complete",
+      "stories": [
+        {
+          "id": "S110",
+          "text": "As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check."
+        }
+      ]
     }
   ]
 }

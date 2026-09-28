@@ -1,7 +1,7 @@
 {
   "cluster": "directory",
   "title": "The standalone identity directory, with every grant rooted in a person",
-  "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (rows 06 and 07); that direction is recorded here while rows 06 and 07 stay the non-goal recorded below, and this sentence promises neither row.",
+  "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands.",
   "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5. Row 6.4 of docs/design/identity/CONFORMANCE.md, issuance entered in a transparency log and verified offline by anyone, is carried by DIRECTORY-031 on the lys-log-store log that `lys log` keeps (ADR-081): `lys ca issue` enters every certificate it produces as one leaf holding its DER before anything is written, the issuer holds only the CA key, the log's operator makes the inclusion artifact with `lys log prove inclusion`, and `lys ca issuer-cert` gives the stranger the issuer certificate `openssl verify` needs.",
   "principles": [
@@ -68,7 +68,8 @@
     "ADR-080",
     "ADR-081",
     "ADR-077",
-    "ADR-089"
+    "ADR-089",
+    "ADR-092"
   ],
   "goals": [
     "Every open row of IDENTITY-001 (02, 04, 03, 05) exists as a valid design-system brief in this cluster, DIRECTORY-002 to DIRECTORY-005, in its dependency order, every ID001 acceptance identifier kept.",
@@ -209,6 +210,10 @@
     {
       "text": "Road step 2 onward: capability certificates, arbitrary grants and their enforcement, session launch and stop, credential handles, memory, context assembly, lanterns and anchoring in production\nBrought forward as step-2 work under the lead's ruling of 27 September 2026: DIRECTORY-026's session record and session credential.",
       "reason": "Revision 5 keeps them out of step 1 (docs/design/identity/briefs/IDENTITY-001.json:29-30); ADR-007 (the start command) and ADR-008 (the certificate on an agent's file) govern what the step-1 screens do not present as working."
+    },
+    {
+      "text": "Row 06 (connect Cambium)",
+      "reason": "It changes the Cambium repository and depends on IDENTITY-002, the upstream release rebase; it needs a Cambium cluster or an agreed cross-repository arrangement first. Row 07 left this non-goal with DIRECTORY-030 (ADR-092)."
     }
   ],
   "structure": [
@@ -1856,6 +1861,41 @@
       "path": "surface/identity/tests/acceptance/roles.spec.ts",
       "note": "R11: Show versions, holders, move dates and the move preview on the role screen from the server's answers",
       "brief": "DIRECTORY-021"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-030.json",
+      "note": "row 07 of IDENTITY-001: gate, install and demonstrate the exact release, up to a staged, test-keyed install",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-030.md",
+      "note": "rendered markdown",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the project's gate trees; gains the demand-cadence identity-release leg",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "CLAUDE.md",
+      "note": "the repository's standing instructions; its gate list gains one line naming the identity-release demand leg",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "scripts/identity-gates/release.sh",
+      "note": "the identity-release leg: refuses an unclean tree, a vendor/rauthy pin off ablative and an unpushed HEAD, then runs the six lys legs and prints one JSON line per leg",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-release.md",
+      "note": "row 07's release report: refs, venue legs, review, install, receipts, standalone acceptance, not met, reserved acts, status",
+      "brief": "DIRECTORY-030"
+    },
+    {
+      "path": "docs/design/identity/reports/IDENTITY-001-commands.jsonl",
+      "note": "row 07's command record: one JSON line per command run for the release",
+      "brief": "DIRECTORY-030"
     }
   ],
   "inventory": [
