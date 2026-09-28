@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 mod accounts;
+mod bounds;
 mod lease;
 mod lending;
 mod name;
@@ -13,7 +14,8 @@ mod revocation;
 mod service;
 
 pub use accounts::AccountsRefusal;
-pub use lease::LeaseRefusal;
+pub use bounds::BoundsRefusal;
+pub use lease::{LeaseRefusal, ListRefusal};
 pub use lending::LendingRefusal;
 pub use oauth::OAuthRefusal;
 pub use owner::OwnerChangeRefusal;
@@ -376,7 +378,7 @@ pub enum SecretsError {
     Lending(#[from] LendingRefusal),
     /// A lease refused for its bounds.
     #[error(transparent)]
-    Lease(#[from] LeaseRefusal),
+    Lease(#[from] BoundsRefusal),
     /// An OAuth grant's refresh refused.
     #[error(transparent)]
     OAuth(#[from] OAuthRefusal),

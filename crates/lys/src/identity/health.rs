@@ -9,7 +9,6 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
-use std::time::Duration;
 
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
@@ -19,8 +18,6 @@ use crate::commands::output::Emitter;
 
 /// The services a deployment declares, in the order they are checked.
 pub const DECLARED_SERVICES: [&str; 3] = ["postgres", "rauthy", "spicedb"];
-
-const TIMEOUT: Duration = Duration::from_secs(3);
 
 /// The `PostgreSQL` `SSLRequest` message: any `PostgreSQL` server answers it
 /// with one byte before authentication is involved.
@@ -41,7 +38,7 @@ pub struct Check {
 pub fn check_postgres(target: &str) -> Check {
     let connected = Authority::parse(target, None)
         .map_err(str::to_string)
-        .and_then(|authority| authority.connect(TIMEOUT));
+        .and_then(|authority| authority.connect());
     let failure = match connected {
         Err(detail) => Some(("database_unreachable", detail)),
         Ok(mut stream) => {
@@ -102,13 +99,13 @@ pub fn check_spicedb(port: u16) -> Check {
         headers: &[],
         body: &[],
     };
-    let failure = match loopback_http::exchange(&authority, TIMEOUT, &request) {
+    let failure = match loopback_http::exchange(&authority, &request) {
         Ok(response) if response.status == 200 => None,
         Ok(response) => Some(("spicedb_unready", format!("status {}", response.status))),
         Err(Failure::Unreachable(detail) | Failure::Uncertain(detail)) => {
             Some(("spicedb_unreachable", detail))
         }
-        Err(Failure::Malformed(detail)) => Some(("spicedb_unready", detail.to_string())),
+        Err(Failure::Malformed(detail)) => Some(("spicedb_unready", detail)),
     };
     Check {
         service: "spicedb",

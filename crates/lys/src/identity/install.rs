@@ -21,6 +21,7 @@ use super::rauthy::RauthyApi;
 use super::{configure, prepare, private_files};
 use crate::commands::output::Emitter;
 
+pub mod exit_wait;
 pub mod layout;
 pub mod server_config;
 pub mod services;
@@ -190,7 +191,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     prepare::run(&config_path, json)?;
     services::compose_up(&layout, &config)?;
     emitter.note("compose services up");
-    services::wait_ready(&config, &mut |line| println!("{line}"));
+    services::wait_ready(&layout, &config, &mut |line| println!("{line}"))?;
     emitter.note("postgres, rauthy and spicedb ready");
     configure::run(&config_path, json)?;
     let key = service_key(&layout)?;

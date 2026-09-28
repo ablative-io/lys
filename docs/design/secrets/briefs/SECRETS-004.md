@@ -64,6 +64,16 @@ Extends SECRETS-002 R7, for the open part of CONFORMANCE row 7.6. The decision l
 **Checklist:**
 - C33 — Whether a secret's owner may revoke every credential derived from it is recorded as a proposed ADR cited from this cluster's decisions, and no code and no test grants it.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 met by what is already on main, and this brief changes nothing to meet it: docs/design/decisions.json holds exactly one ADR-095 entry. Its status is `proposed` and its decision ends 'Rejected: the owner revokes every credential derived from the secret.' Row 2 met: docs/design/secrets/design.json's decisions array contains ADR-095. Row 3 met: this brief's diff does not touch docs/design/decisions.json, so no ledger entry changes. The seam grants the owner nothing: `revokes_lease` in crates/lys-secrets/src/broker/ending.rs (about line 269) answers only for the person acted for. The test `conformance_7_6_the_secrets_owner_may_not_revoke_as_owner` in crates/lys-secrets/tests/lease_revoke.rs asserts the owner gets 404.
+- Deviation: No file changed for this row: the entry landed on main before this build, as the amendment 'What main already does' records.
+- Checklist delivery:
+  - [x] C33 — Whether a secret's owner may revoke every credential derived from it is recorded as a proposed ADR cited from this cluster's decisions, and no code and no test grants it. — ADR-095 is proposed and cited from the secrets design. No code or test grants the owner a revoke; the owner test asserts 404 and that nothing is ended.
+
 ### R2: Read the signed-in person's team ids from the group claims on their token, through one function
 
 Extends SECRETS-002 R6. Blocked by: `git cat-file -e origin/main:crates/lys-secrets/Cargo.toml` exits 0. THE SYSTEM SHALL read the team ids of the signed-in person from the identity provider's group claims on their token (ADR-009), one group per team, through the one function `team_ids` in crates/lys-secrets/src/teams.rs, which takes the claims as its argument so that tests inject them. A directory brief that models teams replaces this source inside `team_ids` and nowhere else. THE SYSTEM SHALL NOT read the group claims anywhere but `team_ids`, SHALL NOT take a team id from a request's path, query or body, and SHALL NOT read an agent's team membership for any list: agents never use the secrets list, so an agent's team membership changes no list.
@@ -83,6 +93,23 @@ Extends SECRETS-002 R6. Blocked by: `git cat-file -e origin/main:crates/lys-secr
 
 **Stories:**
 - S21 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person looking at the secrets list, I want to choose organisation, team or mine and have the server answer only what I may see within that scope, so that no filter ever shows me a secret I may not see.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 met: `two_groups_name_exactly_two_teams` in crates/lys-secrets/src/teams_tests.rs asserts exactly [team_a, team_b]. Row 2 met: `an_empty_groups_claim_names_no_team` asserts 0 ids. Row 3 met: the only `pub fn team_ids(` under crates/lys-secrets/src is crates/lys-secrets/src/teams.rs:21. `Asker::new` in crates/lys-secrets/src/access.rs is the only caller, and for `AskerKind::Agent` it reads no claims. No route takes a team id from a request's path, query or body.
+- Deviation: The served broker's callers (crates/lys-secrets/src/bin/lys-secrets/callers.rs, `Caller::asker`) pass no claims. The screen service's on-behalf signature (lys-secrets/on-behalf/v1) carries no group claims, so a person asking through the served broker belongs to no team there. This never widens a list, but through the served broker team-scoped secrets are not listed until a signature carrying the claims is specified. Recorded as open in CONTRACT.md A10.
+- Files changed:
+  - created: `crates/lys-secrets/src/teams.rs` — The one function `team_ids(claims)`. It reads the `groups` claim, one team per group, with duplicates and blanks dropped.
+  - created: `crates/lys-secrets/src/teams_tests.rs` — Tests: two groups give exactly team_a and team_b; an empty groups claim gives 0 ids; missing or malformed claims give none.
+  - modified: `crates/lys-secrets/src/lib.rs` — Declares `pub mod teams` and `pub mod access` and re-exports `team_ids`, `Asker`, `AskerKind`, the list and lease types, and `HandleRecord as Lease`.
+  - created: `crates/lys-secrets/src/access.rs` — `Asker`, built with `Asker::new(identity, kind, claims)`. A person's team ids come only from `team_ids`; an agent's claims are never read.
+- Checklist delivery:
+  - [x] C35 — The signed-in person's team ids are read from the group claims on their token, one group per team, through one function. — One function, claims passed in as its argument, one group per team.
+- Story delivery:
+  - [x] S21 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person looking at the secrets list, I want to choose organisation, team or mine and have the server answer only what I may see within that scope, so that no filter ever shows me a secret I may not see. — Team membership comes from the person's own claims and never from the request.
 
 ### R3: Answer every visibility and revoke check through one seam, from the record's scope, team and owner fields
 
@@ -106,6 +133,28 @@ Extends SECRETS-002 R6 and R7. Blocked by: `git cat-file -e origin/main:crates/l
 
 **Checklist:**
 - C36 — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 met: `the_see_check_answers_from_the_scope_the_team_and_the_owner` in crates/lys-secrets/src/access_tests.rs gets yes for exactly a_personal, a_team, a_org and b_org, and asserts 6 asks. Row 2 met: `only_the_holder_and_the_person_acted_for_discover_a_lease_and_only_the_person_revokes` gets discover=[person_a, agent_a] and revoke=[person_a], and asserts 8 asks; person_b is shown to see b_org first. Row 3 met: crates/lys-secrets/src/secret_tests.rs `secret_fields_unchanged` destructures the one field `Secret` has had since b95089f, with no `..`. Row 4 met: `a_team_secrets_record_carries_its_scope_and_its_team` reads back `team` and `team_b` from the store index. Row 5 met: nothing under crates/lys/src/identity/ is touched. `Broker::sees` is at crates/lys-secrets/src/broker/scope.rs, about line 99. `discovers_lease` and `revokes_lease` are at crates/lys-secrets/src/broker/ending.rs, lines 262-289. Neither reads the owner field or the secret's visibility.
+- Deviation: Where the seam lives follows the amendment 'The files of rows R2 to R7 as landed'. `sees` is in crates/lys-secrets/src/broker/scope.rs, and the lease checks and acted-for rule are in crates/lys-secrets/src/broker/ending.rs. crates/lys-secrets/src/access.rs still exists: it holds `Asker`, the seam's docs and the test module the row names. The lease record is `HandleRecord` in crates/lys-secrets/src/broker.rs, not a new lease.rs. It stores no person-acted-for field: that person is derived by ending.rs's existing member-relation rule, which I extended to follow a lent handle's line so the person a lent-on lease traces to can still end it, as the existing ending tests require. A secret with no scope set is visible only to its owner. Beyond this brief's additions, two landed lease reads now use the seam instead of the secret's visibility, as the row's 'anywhere but through this seam' requires: `held_by` (GET /_lys/handles) and `revocation_state_as` (GET /_lys/revocation). `end_handle` (POST /_lys/drop) is also gated by the seam. Its refusal to a discoverer who is not acted for now names nothing (HandleUnknown, was LendingNotPermitted naming the person and handle); two assertions in tests/ending.rs change to the stricter answer.
+- Files changed:
+  - created: `crates/lys-secrets/src/access.rs` — The seam's module: the `Asker` type and the invariant docs for the three checks it answers.
+  - created: `crates/lys-secrets/src/access_tests.rs` — In-file fixture: the see check asked 6 times, the discover and revoke checks asked 8 times, and the b_team scope and team read back.
+  - created: `crates/lys-secrets/src/secret_tests.rs` — `secret_fields_unchanged` destructures `Secret(buffer)` with no rest pattern.
+  - modified: `crates/lys-secrets/src/secret.rs` — Gains only the declaration of its test module.
+  - modified: `crates/lys-secrets/src/broker/scope.rs` — `Broker::sees`, the seam's visibility check, answered from the store's scope, team and owner fields and the asker's team ids.
+  - modified: `crates/lys-secrets/src/broker/ending.rs` — The seam's `discovers_lease` and `revokes_lease`: holder or person acted for, following a lent handle's line. `end_handle` is now gated by the seam.
+  - modified: `crates/lys-secrets/src/broker/held.rs` — `held_by` filters by the seam's lease discovery instead of the secret's visibility.
+  - modified: `crates/lys-secrets/src/broker/revocation.rs` — `revocation_state_as` asks the seam's lease discovery.
+  - modified: `crates/lys-secrets/src/store/scope.rs` — `Scope::kind()` and `Scope::name()` read a record's scope and its team back.
+  - modified: `crates/lys-secrets/src/broker.rs` — The lease record `HandleRecord` is now public, with all fields private; `upstream` holds the `Upstream` wrapper.
+  - modified: `crates/lys-secrets/tests/ending.rs` — A discoverer who is not acted for, and the owner, are now refused HandleUnknown (were LendingNotPermitted). New assertion: a holder not acted for is refused LendingNotPermitted. `Ended` gains act and at_ms. The snapshot test swaps v4 for v3.
+- Checklist delivery:
+  - [x] C36 — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does. — R3's part is met: every check this brief adds is a call on the seam, answered from the scope, team and owner fields. The SpiceDB half is R7, which is blocked.
 
 ### R4: Answer the secrets list for one scope from organisation, team and mine, applied at the server, to people only (CONFORMANCE 7.8)
 
@@ -134,6 +183,28 @@ Extends SECRETS-002 R6. Blocked by: `git cat-file -e origin/main:crates/lys-secr
 
 **Stories:**
 - S21 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person looking at the secrets list, I want to choose organisation, team or mine and have the server answer only what I may see within that scope, so that no filter ever shows me a secret I may not see.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: All in crates/lys-secrets/tests/secret_list.rs. Row 1 met: `conformance_7_8_each_scope_answers_only_what_the_person_may_see_within_it` gets mine=[a_personal], team=[a_team], organisation=[a_org, b_org]. Row 2 met: `conformance_7_8_no_scope_answers_every_secret_the_person_may_see` gets the 4, and b_personal and b_team appear in none of the 4 lists. Row 3 met: `conformance_7_8_a_scope_outside_the_three_is_refused_by_name` gets 400 unknown_scope naming `all` and `user`, with no secrets field. Row 4 met: `conformance_7_8_an_agents_team_membership_changes_no_list` gives agent_a the team_b group; its teams stay empty and person_a's 4 lists are unchanged. Row 5 met: `conformance_7_8_an_agent_is_refused_the_list_by_name` gets 403 agent_uses_virtual_credentials with and without scope=team, the agent and the virtual-credentials sentence in the body, no list field, an unchanged audit length, and person_a still gets 4.
+- Deviation: Status and JSON body come from the library (`ListRefusal::status/body`). The tests drive `Broker::secret_list` in process with an injected clock and claims; there is no in-process HTTP router in src/api/. The served route is GET /_lys/secrets in the binary's view.rs, following the amendment's mapping of api/secrets.rs to view.rs. The /_lys namespace is needed because the broker's fallback is the proxy. Cargo.toml and Cargo.lock are unchanged: no new dependency was needed. The fixture lives in tests/support/fixture.rs, reached by #[path], so each test crate compiles only support it fully uses; mod.rs only gains a doc. The identity server's GET /secrets still forwards without the scope query and was not changed (neighbour and serving-process work). /_lys/secrets now lists by the seam, so a grantee no longer sees an unscoped secret someone else owns in the list.
+- Files changed:
+  - modified: `crates/lys-secrets/src/broker/scope.rs` — `ListScope` (organisation, team, mine; parse refuses anything else) and `Broker::secret_list`: agents refused first, then the scope applied, keyed on each secret's own scope, filtered by `sees`.
+  - created: `crates/lys-secrets/src/error/lease.rs` — `ListRefusal`: unknown_scope (400, names the value) and agent_uses_virtual_credentials (403, names the agent). Each has status() and a JSON body() with no list field.
+  - modified: `crates/lys-secrets/src/error.rs` — Declares and re-exports `LeaseRefusal` and `ListRefusal`.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/view.rs` — GET /_lys/secrets takes `?scope=` and answers the seam's list, or the refusal's status and JSON body.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/callers.rs` — `Caller::asker`: a vouched-for person, or a handle held by a person, is a person; any other holder is an agent.
+  - created: `crates/lys-secrets/tests/secret_list.rs` — conformance_7_8 tests for every row.
+  - created: `crates/lys-secrets/tests/support/fixture.rs` — The 7.6/7.8 world: six scoped secrets, askers with injected group claims, the list as status and body, and an injected clock.
+  - modified: `crates/lys-secrets/tests/support/mod.rs` — Doc names fixture.rs and leases.rs, which tests reach by path.
+- Checklist delivery:
+  - [x] C34 — The secrets list takes one scope from organisation, team and mine, applied at the server; with no scope it answers every secret the caller may see; any other scope is refused by name (CONFORMANCE 7.8). — Three scopes applied at the server, no scope gives every visible secret, anything else refused by name.
+  - [x] C38 — The secrets list is a person's view: an agent that asks for it is refused by name, the refusal naming the agent and saying that agents reach secrets only through their virtual credentials, with no list, not even an empty one, and nothing recorded (CONFORMANCE 7.8). — Agent refused by name with no list and nothing recorded.
+- Story delivery:
+  - [x] S21 (Account holder, Uses and deliberately delegates scoped access without exposing credentials) — As a person looking at the secrets list, I want to choose organisation, team or mine and have the server answer only what I may see within that scope, so that no filter ever shows me a secret I may not see. — No scope ever answers a secret the person may not see.
 
 ### R5: Revoke a lease as the person acted for, and refuse the revoke to everyone else (CONFORMANCE 7.6)
 
@@ -165,6 +236,34 @@ Extends SECRETS-002 R7: the two facts of a revoke are SEC_REVOKE_STATES of SECRE
 
 **Stories:**
 - S19 (Person, Grants an agent provisioned under them access to an account) — As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
+
+#### R5 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: All tests are in crates/lys-secrets/tests/lease_revoke.rs. Row 1 met: `conformance_7_6_a_revoke_stops_issuing_at_once_and_reads_upstream_pending`. The next use is refused and the forwarded count is unchanged; exactly 1 revocation_unconfirmed line is added; GET reads revoke/stopped/pending. Then `deliver_upstream_ack` gives confirmed with exactly 1 revoked_upstream line. Row 2 met: the compile_fail,E0616 doctest on `Upstream` in crates/lys-secrets/src/broker/revocation.rs assigns `lease.upstream` through `&mut lys_secrets::Lease`; the field is private and the path is public. Row 3 met: `conformance_7_6_a_caller_who_cannot_discover_the_lease_learns_nothing`. person_b, who is shown to see a_org, and person_c get 404. The body is byte-identical to that for a never-issued id, names no id, secret, holder or person, and GET answers the same. The use succeeds with +1 and there are 0 revoke requests. Row 4 met: `conformance_7_6_the_holder_is_told_to_relinquish` gets 403 holder_relinquishes naming L1 and relinquish, no end, the use succeeds with +1, and 0 requests. Row 5 met: `conformance_7_6_the_secrets_owner_may_not_revoke_as_owner` gets 404 on L2 naming nothing and L2 keeps issuing. Row 6 met: `conformance_7_6_a_holder_who_is_the_person_acted_for_revokes` reads L4 ended_by revoke. Row 7 met: `conformance_7_6_a_second_revoke_is_refused_and_records_nothing` gets 409 with revoke, the first instant and person_a; the audit length is unchanged, there is 1 end record and 1 revoke request in all. Row 8 met: `conformance_7_6_a_lease_past_its_window_is_refused_as_expired` gets 409 expired at the window's end, with 0 revoke and 0 relinquish records.
+- Deviation: File placement follows the amendment: revoke.rs becomes ending.rs plus revocation.rs, lease.rs becomes the record in broker.rs, and api/leases.rs becomes the binary's manage.rs. Routes are served at /_lys/leases/... because the broker's fallback is the proxy. The system behind is the library trait `SystemBehind`, which the lease acts call once after ending a lease; tests count its calls. The served broker's implementation asks no provider, so a lease ended there stays pending until the provider's answer is recorded. A second writer of unconfirmed remains: SECRETS-003's `record_upstream_revocation(Err)`, which records a provider's negative answer. The confirmed writers (`record_upstream_revocation(Ok)` and `confirm_upstream_revocation`) now go through `deliver_upstream_ack`. POST /_lys/drop (`end_handle`, SECRETS-003's operation-id ending) keeps its 200 already_ended and not_asked upstream. The command line's drop stays outside the rule, as CONTRACT A10 records; a lease so dropped reads ended_by `dropped`. The snapshot state format moves from v3 to v4; a v3 snapshot is refused by name and the whole log is folded. Through the served broker, an agent that has relinquished can no longer authenticate with that dropped handle. Lys pull request 91, which the sign-off orders first, is still open; this is built on main.
+- Files changed:
+  - modified: `crates/lys-secrets/src/broker/ending.rs` — `EndAct`, `EndWay`, `LeaseEnd`, `SystemBehind`. `revoke_lease` refuses in the brief's order: 404, 403 holder_relinquishes, 403 revoke_not_permitted, 409. `end_with_upstream_pending` writes drop lines and moves upstream to unconfirmed. `lease_end` covers revoke, relinquish, expired and dropped. `Ended` carries act and at_ms.
+  - modified: `crates/lys-secrets/src/broker/revocation.rs` — The `Upstream` wrapper (field private to the file) with the compile_fail,E0616 doctest; `deliver_upstream_ack`, the one writer of confirmed; `upstream_pending`; fold. The provider-confirm paths go through the ack.
+  - modified: `crates/lys-secrets/src/broker/held.rs` — `LeaseView` (issuing, ended_by, ended_at_ms, ended_by_identity, upstream not_asked/pending/confirmed) and `lease_view`, which answers 404 to non-discoverers.
+  - modified: `crates/lys-secrets/src/broker/folded.rs` — Snapshot state v4 carries an ending's act and instant. The upstream fold goes through revocation.rs.
+  - modified: `crates/lys-secrets/src/broker/lineage.rs` — A derived record starts with `Upstream::default()`.
+  - modified: `crates/lys-secrets/src/broker.rs` — Re-exports the new types; `HandleRecord` is public with private fields.
+  - modified: `crates/lys-secrets/src/lib.rs` — `pub use broker::{HandleRecord as Lease, ...}` gives the public path `lys_secrets::Lease`.
+  - created: `crates/lys-secrets/src/error/lease.rs` — `LeaseRefusal`: lease_not_found (one constant body), lease_already_ended, holder_relinquishes, revoke_not_permitted, relinquish_not_permitted and Failed, each with status() and body().
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/manage.rs` — GET /_lys/leases/{lease_id} and POST .../revoke answered by the library. The served broker's system-behind hook asks no provider and says so.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/serve.rs` — Mounts the three lease routes.
+  - created: `crates/lys-secrets/tests/lease_revoke.rs` — conformance_7_6 revoke tests for every row, plus the 9-step test on revoked L1.
+  - created: `crates/lys-secrets/tests/support/leases.rs` — Leases with a counting upstream double on the proxy path, a counting system-behind double, the injected clock and the 9-step driver.
+  - modified: `docs/design/secrets/CONTRACT.md` — Amendment A10 records the seam, the routes and bodies, the pending/confirmed writers, the claims gap and snapshot v4. It records why the command line's drop stands outside the rule, as the lead's amendment asked.
+- Checklist delivery:
+  - [x] C30 — The person acted for under a lease may revoke it at any time: the revoke stops issuing at once, and GET /leases/{lease_id} reads upstream pending until the system behind confirms, with no timer confirming it (CONFORMANCE 7.6). — Issuing stops at once and upstream stays pending until the ack. The 9-step test (R6) shows no other operation confirms it.
+  - [x] C31 — A revoke by anyone but the person acted for is refused: with the not-found refusal naming nothing when the caller cannot discover the lease, which only its person acted for and its holder can; for the lease's holder with a refusal naming the lease and relinquish; and with a refusal naming the lease for any other caller the seam lets discover it. — Non-discoverers get 404 naming nothing, the holder 403 holder_relinquishes, other discoverers 403 revoke_not_permitted.
+  - [x] C37 — A revoke by the person acted for, or a relinquish by the holder, of a lease that has already ended is refused by name as already ended, carrying how, when and by whom it first ended, and records nothing; the first end record stays the only one (CONFORMANCE 7.6). — 409 with how, when and by whom from the first end record; nothing is recorded.
+- Story delivery:
+  - [x] S19 (Person, Grants an agent provisioned under them access to an account) — As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed. — Stopped at once, and pending shown until confirmed.
 
 ### R6: Let a lease's holder relinquish it, recorded as its own act (CONFORMANCE 7.6)
 
@@ -198,6 +297,26 @@ Extends SECRETS-002 R7. Builds on SECRETS-003 R4, as R5 does. Blocked by: `git c
 - S19 (Person, Grants an agent provisioned under them access to an account) — As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
 - S20 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for.
 
+#### R6 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Tests are in crates/lys-secrets/tests/lease_relinquish.rs unless named otherwise. Row 1 met: `conformance_7_6_a_relinquish_stops_issuing_at_once_and_reads_upstream_pending` gets the use refused with the forwarded count unchanged, reads relinquish/stopped/pending, then confirmed after one ack. Row 2 met: `conformance_7_6_nothing_but_the_acknowledgement_confirms_a_relinquished_lease` takes 9 readings, all pending, then confirmed. Row 3 met: `conformance_7_6_a_relinquish_is_recorded_as_the_holders_own_act` reads relinquish by agent_a, with 1 relinquish line and 0 revoke lines. Row 4 met: `conformance_7_6_the_person_acted_for_may_not_relinquish` gets 403 relinquish_not_permitted naming L1, and L1 keeps issuing. Row 5 met: `conformance_7_6_a_caller_who_cannot_discover_the_lease_may_not_relinquish` gets 404 for person_b and person_c, and L1 keeps issuing. Row 6 met: `conformance_7_6_a_relinquish_after_a_revoke_is_refused` gets 409 revoke, the instant and person_a, with 1 end record naming revoke. Row 7 met: `conformance_7_6_a_second_relinquish_is_refused` gets 409 relinquish, the first instant and agent_a, with 1 end record. Row 8 met: `conformance_7_6_nothing_but_the_acknowledgement_confirms_a_revoked_lease` in tests/lease_revoke.rs takes 9 readings, all pending, then confirmed. Row 9 met: both 9-step tests plus the E0616 doctest. Row 10 met: `conformance_7_6_a_revoke_after_a_relinquish_is_refused` gets 409 relinquish, the instant and agent_a, with 1 end record naming relinquish.
+- Deviation: relinquish.rs was not created; the act is in crates/lys-secrets/src/broker/ending.rs, following the amendment's mapping of relinquish.rs to ending.rs plus revocation.rs. The 9-step test on revoked L1 is in tests/lease_revoke.rs and the one on relinquished L3 in tests/lease_relinquish.rs; both share `nine_steps` in tests/support/leases.rs.
+- Files changed:
+  - modified: `crates/lys-secrets/src/broker/ending.rs` — `relinquish_lease`: 404, then 403 relinquish_not_permitted, then 409, else `end_with_upstream_pending(Relinquish)`, written as a `relinquished by` drop line and folded as its own act.
+  - modified: `crates/lys-secrets/src/bin/lys-secrets/manage.rs` — POST /_lys/leases/{lease_id}/relinquish.
+  - created: `crates/lys-secrets/tests/lease_relinquish.rs` — conformance_7_6 relinquish tests for every row, plus the 9-step test on relinquished L3.
+  - created: `crates/lys-secrets/tests/support/leases.rs` — Shared lease world; `nine_steps` drives the 9 steps in the brief's order for either act.
+- Checklist delivery:
+  - [x] C30 — The person acted for under a lease may revoke it at any time: the revoke stops issuing at once, and GET /leases/{lease_id} reads upstream pending until the system behind confirms, with no timer confirming it (CONFORMANCE 7.6). — Both 9-step tests read pending after every step until the ack.
+  - [x] C32 — A lease's holder may relinquish it, recorded as a relinquish and not as a revoke, which stops issuing at once and reads upstream pending until the system behind confirms. — Recorded as relinquish, never as revoke. Issuing stops and upstream is pending until confirmed.
+  - [x] C37 — A revoke by the person acted for, or a relinquish by the holder, of a lease that has already ended is refused by name as already ended, carrying how, when and by whom it first ended, and records nothing; the first end record stays the only one (CONFORMANCE 7.6). — Every already-ended case gets 409 with the first end record, recording nothing.
+- Story delivery:
+  - [x] S19 (Person, Grants an agent provisioned under them access to an account) — As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed. — The pending-until-confirmed reading holds after a revoke and after a relinquish.
+  - [x] S20 (AI Agent, Uses a handle for its outbound calls and reads its sealed records) — As an agent holding a lease, I want to give it back by a relinquish recorded as my own act, so that ending my own access is never recorded as a revoke nobody asked for. — The agent's relinquish is recorded as its own act.
+
 ### R7: Make the seam ask SpiceDB through the step-2 evaluator
 
 Extends SECRETS-002 R6 and R7. Blocked by: `git cat-file -e origin/main:crates/lys-identity-server/src/spicedb/check.rs` exits 0 and `git cat-file -e origin/main:crates/lys-identity-server/src/routes.rs` exits 0, each keyed on the file and never on a brief id or commit text; and R3 landed. crates/lys-secrets declares, in crates/lys-secrets/src/permission.rs, a trait `PermissionCheck` with one method, which answers whether an identity may do an action on a secret or on a lease issued from it; crates/lys-secrets depends on no server crate, so crates/lys-secrets/Cargo.toml is not changed by this row; crates/lys-identity-server/Cargo.toml gains the dependency on lys-secrets, and Cargo.lock changes with it. crates/lys-identity-server implements `PermissionCheck` in crates/lys-identity-server/src/spicedb/check.rs with the step-2 brief's one evaluator in that file (ADR-001), and passes that implementation in where the routes of R4 are built, in crates/lys-identity-server/src/routes.rs. WHEN the step-2 SpiceDB evaluator exists, THE SYSTEM SHALL answer every check of R3's seam in crates/lys-secrets/src/access.rs by a call on the `PermissionCheck` it was given, with the relations the seam asks written in crates/lys-secrets/schema/secrets.zed. IF the `PermissionCheck` returns an error, THEN THE SYSTEM SHALL answer the request with HTTP 503 and the error `permission_engine_unavailable`, and answer no secret and change no lease. THE SYSTEM SHALL NOT answer any check from the record's scope, team and owner fields once this row lands, SHALL NOT fall back to those fields when the `PermissionCheck` returns an error, SHALL NOT call SpiceDB other than through the step-2 evaluator in check.rs, SHALL NOT add a second evaluator, SHALL NOT add a dependency from crates/lys-secrets on crates/lys-identity-server, and SHALL NOT add any check under crates/lys/src/identity/ (DIRECTORY-002 R4).
@@ -224,6 +343,16 @@ Extends SECRETS-002 R6 and R7. Blocked by: `git cat-file -e origin/main:crates/l
 
 **Checklist:**
 - C36 — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does.
+
+#### R7 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Blocked; no row of R7 was built. `git cat-file -e origin/main:crates/lys-identity-server/src/spicedb/check.rs` exits non-zero: that file never landed. The brief's blocked_by field and the 2026-09-28 sign-off hold R7 behind DIRECTORY-025 and say it is not signed off. The seam stays answered from the record's fields, and crates/lys-secrets/src/permission.rs, the identity server's Cargo.toml and routes.rs, and Cargo.lock are unchanged. The six acceptance rows are unmet.
+- Deviation: (none)
+- Checklist delivery:
+  - [ ] C36 — Every secret visibility and lease revoke check is a call on one seam, answering from the record's scope, team and owner fields until the step-2 SpiceDB evaluator exists, and asking SpiceDB through it once it does. — The SpiceDB half waits on DIRECTORY-025 and the lead's sign-off.
 
 ## Boundaries
 

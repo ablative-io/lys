@@ -1,8 +1,9 @@
 //! What the broker folds from its audit log: each lease's use count, drop,
 //! operations and spend, who has read which sealed record, a rotation the
 //! log shows starting and not finishing, and each secret's owner changes
-//! applied under an operation id, who ended a handle and under which
-//! operation, and where the provider's part of each revocation stands.
+//! applied under an operation id, who ended a handle, by which act, when
+//! and under which operation, and where the provider's part of each
+//! revocation stands.
 //!
 //! One function applies one line, and it is the only way a line reaches the
 //! state, at a start and when a snapshot is written alike. So the state a
@@ -20,12 +21,12 @@ use crate::audit::{AuditKind, AuditLine};
 use crate::encoding::{Canonical, Reader};
 use crate::error::SecretsError;
 
-use super::ending::{self, Ended};
+use super::ending::{self, EndAct, Ended};
 use super::owner::{self, Operations, Owners};
-use super::revocation::{self, UpstreamRevocation};
+use super::revocation::{self, Upstream, UpstreamRevocation};
 use super::{HandleRecord, ROTATING, lineage, records};
 
-const STATE_FORMAT: &str = "lys-secrets/broker-folded/v3";
+const STATE_FORMAT: &str = "lys-secrets/broker-folded/v4";
 const CONTEXT: &str = "broker snapshot state";
 
 /// The handle records with what the log says of each.
@@ -85,7 +86,7 @@ impl Folded {
                     operations: record.operations.clone(),
                     open: record.open.clone(),
                     ended: record.ended.clone(),
-                    upstream: record.upstream.clone(),
+                    upstream: record.upstream.state().clone(),
                 };
                 (id.clone(), lease)
             })
@@ -114,7 +115,7 @@ impl Folded {
             record.operations = lease.operations;
             record.open = lease.open;
             record.ended = lease.ended;
-            record.upstream = lease.upstream;
+            record.upstream = Upstream::restored(lease.upstream);
         }
     }
 
@@ -147,13 +148,7 @@ impl Folded {
                 }
                 ending::fold(handles, &line);
             }
-            AuditKind::Refresh => {
-                if let (Some(record), Some(upstream)) =
-                    (handles.get_mut(&id), revocation::upstream_of(&line))
-                {
-                    record.upstream = upstream;
-                }
-            }
+            AuditKind::Refresh => revocation::fold(handles, &line),
             AuditKind::Use if line.outcome == "admitted" => {
                 if let (Some(operation), Some(mark)) = (&line.operation, &line.request) {
                     lineage::admitted(handles, &id, (operation, mark), line.spend.unwrap_or(0));
@@ -202,7 +197,9 @@ impl Folded {
                     .field(&[1])?
                     .field(ended.by.as_bytes())?
                     .field(ended.operation.as_bytes())?
-                    .field(ended.root.as_bytes())?,
+                    .field(ended.root.as_bytes())?
+                    .field(&[ended.act.code()])?
+                    .field(&ended.at_ms.to_be_bytes())?,
             };
             match &lease.upstream {
                 UpstreamRevocation::NotAsked => state.field(&[0])?,
@@ -317,10 +314,22 @@ fn decode_ended(reader: &mut Reader<'_>) -> Result<Option<Ended>, SecretsError> 
         [1] => {
             let by = text(reader)?;
             let operation = text(reader)?;
+            let root = text(reader)?;
+            let act = match reader.field()? {
+                [code] => EndAct::from_code(*code),
+                _ => None,
+            }
+            .ok_or_else(|| unreadable("an ending's act is neither revoke nor relinquish"))?;
+            let at: [u8; 8] = reader
+                .field()?
+                .try_into()
+                .map_err(|_length| unreadable("an ending's instant is not 8 bytes"))?;
             Ok(Some(Ended {
                 by,
                 operation,
-                root: text(reader)?,
+                root,
+                act,
+                at_ms: i64::from_be_bytes(at),
             }))
         }
         _ => Err(unreadable("an ending is neither absent nor present")),

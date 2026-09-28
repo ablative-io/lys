@@ -6,11 +6,17 @@
 //! address the host resolves to is tried in turn, so a name that resolves to
 //! `::1` first still reaches a service published only on `127.0.0.1`. A
 //! response is read to the end and its status line parsed field by field.
+//!
+//! No exchange is bounded by a clock. A refused or reset connection is an
+//! error at once, naming the address and the cause; a peer that accepts and
+//! never answers is waited on for as long as it is alive, because a stuck
+//! service is found by its signal, never cut off by a wait in seconds. A
+//! peer that closes before its answer is whole is an error naming how many
+//! bytes arrived.
 
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::Duration;
 
 use zeroize::Zeroizing;
 
@@ -73,7 +79,7 @@ impl Authority {
     }
 
     /// Opens a connection, trying every address the host resolves to.
-    pub fn connect(&self, timeout: Duration) -> Result<TcpStream, String> {
+    pub fn connect(&self) -> Result<TcpStream, String> {
         let addresses: Vec<SocketAddr> = (self.host.as_str(), self.port)
             .to_socket_addrs()
             .map_err(|error| format!("{self}: {error}"))?
@@ -81,7 +87,7 @@ impl Authority {
         if addresses.is_empty() {
             return Err(format!("{self} resolves to no address"));
         }
-        connect_any(&addresses, timeout)
+        connect_any(&addresses)
     }
 }
 
@@ -95,20 +101,13 @@ impl fmt::Display for Authority {
     }
 }
 
-/// Connects to the first of `addresses` that accepts, each within
-/// `timeout`, and applies `timeout` to reads and writes. The refusal names
-/// every address tried.
-pub fn connect_any(addresses: &[SocketAddr], timeout: Duration) -> Result<TcpStream, String> {
+/// Connects to the first of `addresses` that accepts. A refusal is known
+/// at once and names every address tried with its cause.
+pub fn connect_any(addresses: &[SocketAddr]) -> Result<TcpStream, String> {
     let mut refused = Vec::with_capacity(addresses.len());
     for address in addresses {
-        match TcpStream::connect_timeout(address, timeout) {
-            Ok(stream) => {
-                stream
-                    .set_read_timeout(Some(timeout))
-                    .and_then(|()| stream.set_write_timeout(Some(timeout)))
-                    .map_err(|error| format!("{address}: {error}"))?;
-                return Ok(stream);
-            }
+        match TcpStream::connect(address) {
+            Ok(stream) => return Ok(stream),
             Err(error) => refused.push(format!("{address}: {error}")),
         }
     }
@@ -144,17 +143,15 @@ pub enum Failure {
     Unreachable(String),
     /// The request may have been sent and no whole response arrived.
     Uncertain(String),
-    /// A response arrived that is not a well-formed HTTP/1.x response.
-    Malformed(&'static str),
+    /// A response arrived that is not a well-formed HTTP/1.x response, or
+    /// the peer closed before it was whole; the detail says how many bytes
+    /// arrived.
+    Malformed(String),
 }
 
 /// Sends `request` to `authority` and reads the whole response.
-pub fn exchange(
-    authority: &Authority,
-    timeout: Duration,
-    request: &Request<'_>,
-) -> Result<Response, Failure> {
-    let mut stream = authority.connect(timeout).map_err(Failure::Unreachable)?;
+pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response, Failure> {
+    let mut stream = authority.connect().map_err(Failure::Unreachable)?;
     let mut raw = Zeroizing::new(Vec::new());
     raw.extend_from_slice(
         format!(
@@ -176,10 +173,16 @@ pub fn exchange(
         .and_then(|()| stream.flush())
         .map_err(|error| Failure::Uncertain(format!("writing the request: {error}")))?;
     let mut answer = Vec::new();
-    stream
-        .read_to_end(&mut answer)
-        .map_err(|error| Failure::Uncertain(format!("reading the response: {error}")))?;
-    parse_response(&answer).map_err(Failure::Malformed)
+    let read = stream.read_to_end(&mut answer);
+    let arrived = answer.len();
+    read.map_err(|error| {
+        Failure::Uncertain(format!(
+            "reading the response after {arrived} bytes: {error}"
+        ))
+    })?;
+    parse_response(&answer).map_err(|detail| {
+        Failure::Malformed(format!("{detail}: the peer closed after {arrived} bytes"))
+    })
 }
 
 /// The status code of an HTTP/1.x status line: the version, one space and

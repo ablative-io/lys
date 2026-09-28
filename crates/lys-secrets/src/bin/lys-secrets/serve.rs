@@ -78,6 +78,18 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
                 "/_lys/drop",
                 axum::routing::post(crate::manage::drop_handle),
             )
+            .route(
+                "/_lys/leases/{lease_id}",
+                axum::routing::get(crate::manage::lease),
+            )
+            .route(
+                "/_lys/leases/{lease_id}/revoke",
+                axum::routing::post(crate::manage::revoke),
+            )
+            .route(
+                "/_lys/leases/{lease_id}/relinquish",
+                axum::routing::post(crate::manage::relinquish),
+            )
             .fallback(proxy)
             .with_state(shared);
         axum::serve(listener, app)

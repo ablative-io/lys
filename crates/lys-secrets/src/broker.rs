@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::audit::{AuditKind, AuditLine, AuditLog};
 use crate::encoding::hex;
-use crate::error::{LeaseRefusal, SecretsError};
+use crate::error::{BoundsRefusal, SecretsError};
 use crate::fsutil::{io, write_atomic};
 use crate::handle::{HandleId, HandleToken, Holder, IssuedHandle};
 use crate::keys::StoreKey;
@@ -25,10 +25,10 @@ use crate::store::{EntryClass, SecretStore};
 mod accounts;
 mod admit;
 mod ending;
-pub use ending::{Ended, HandleEnded};
+pub use ending::{EndAct, EndWay, Ended, HandleEnded, LeaseEnd, SystemBehind};
 mod folded;
 mod held;
-pub use held::HeldHandle;
+pub use held::{HeldHandle, LeaseView};
 mod inflight;
 mod lineage;
 mod oauth_grants;
@@ -38,10 +38,11 @@ mod records;
 mod restart;
 pub use restart::{SNAPSHOT_EVERY, SnapshotReport};
 mod revocation;
+use revocation::Upstream;
 pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
-pub use scope::SecretSettings;
+pub use scope::{ListScope, SecretSettings};
 mod spawn;
 mod using;
 
@@ -108,8 +109,13 @@ pub enum RevokeOutcome {
     AlreadyDropped,
 }
 
+/// A lease: the broker's record of one handle, counting its uses, window
+/// and spend against one grant, with who holds it, the secret it was issued
+/// from, how it ended and where the provider's part of its revocation
+/// stands. Read only by the broker; none of its fields is reachable from
+/// outside the crate, and it holds the handle's digest, never the handle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct HandleRecord {
+pub struct HandleRecord {
     id: String,
     digest: String,
     identity: String,
@@ -143,7 +149,7 @@ struct HandleRecord {
     ended: Option<Ended>,
     /// Where the provider's part of its revocation stands.
     #[serde(skip)]
-    upstream: UpstreamRevocation,
+    upstream: Upstream,
 }
 
 /// The secrets broker.
@@ -348,7 +354,7 @@ impl<P: PermissionCheck> Broker<P> {
             open: BTreeMap::new(),
             parent: None,
             ended: None,
-            upstream: UpstreamRevocation::NotAsked,
+            upstream: Upstream::default(),
         };
         self.record(
             AuditKind::Issue,
@@ -447,7 +453,7 @@ type Subject<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
 /// grant `permit` answers for; a grant with no end of its own bounds nothing.
 fn within_grant(secret: &str, not_after_ms: i64, permit: &Permitted) -> Result<(), SecretsError> {
     if let Some(grant_ends_ms) = permit.ends_at_ms.filter(|ends| not_after_ms > *ends) {
-        return Err(SecretsError::from(LeaseRefusal::BeyondGrant {
+        return Err(SecretsError::from(BoundsRefusal::BeyondGrant {
             secret: secret.to_owned(),
             not_after_ms,
             grant_ends_ms,

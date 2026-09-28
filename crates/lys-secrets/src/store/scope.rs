@@ -33,6 +33,22 @@ impl Scope {
         }
     }
 
+    /// The kind of the scope: `personal`, `team` or `organisation`.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Personal(_) => "personal",
+            Self::Team(_) => "team",
+            Self::Organisation(_) => "organisation",
+        }
+    }
+
+    /// Whom the scope names: the person, the team or the organisation.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Personal(name) | Self::Team(name) | Self::Organisation(name) => name,
+        }
+    }
+
     /// Reads `personal:<person>`, `team:<name>` or `organisation:<name>`.
     ///
     /// # Errors

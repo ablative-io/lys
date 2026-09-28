@@ -7,7 +7,8 @@ use std::sync::PoisonError;
 
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use lys_secrets::{OnBehalf, SecretsError, request_digest};
+use lys_secrets::{Asker, AskerKind, OnBehalf, Recipients, SecretsError, request_digest};
+use serde_json::Value;
 
 use crate::files::now_ms;
 use crate::serve::{Shared, signed};
@@ -17,6 +18,22 @@ use crate::serve::{Shared, signed};
 pub struct Caller {
     pub identity: String,
     pub via: Option<String>,
+}
+
+impl Caller {
+    /// The caller as the secrets list and the lease routes ask about it. A
+    /// person a screen service vouches for, or a handle held by a person,
+    /// is a person; any other holder is an agent. The service's signature
+    /// carries no group claims, so the served broker hands none on and a
+    /// person asking through it belongs to no team here.
+    pub fn asker(&self) -> Asker {
+        let kind = if self.via.is_some() || Recipients::PeopleOnly.admits(&self.identity) {
+            AskerKind::Person
+        } else {
+            AskerKind::Agent
+        };
+        Asker::new(&self.identity, kind, &Value::Null)
+    }
 }
 
 /// The status a refusal answers with: a name the caller may not discover

@@ -46,6 +46,25 @@ Behavioural. crates/lys/src/identity/install/services.rs:135-150 (the readiness 
 **Stories:**
 - S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.
 
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (a scratch service told over a pipe is ready within the same event, with 0 sleeps): met. crates/lys/src/identity/install_tests.rs:263 `a_service_is_ready_within_the_log_event_that_says_so` starts `/bin/sh` that blocks reading a fifo, then echoes 'listening'. Its first check tells it through the fifo and returns false. It asserts exactly 2 checks: one when the wait began and one on the log event. services.rs holds no sleep function, so the zero-sleep half rests on the grep in row 3. Row 2 (a service that exits before ready gives the named refusal with the log path): met. install_tests.rs:285 asserts ErrorKind::Unready, 'the process exited' and the log path in the message, produced at services.rs:418-486 (the EXITED branch). Row 3 (`grep -n 'thread::sleep' crates/lys/src/identity/install/services.rs` prints nothing): met, checked. The periodic 'waiting for' line is replaced by one line when the wait begins and one per service as it becomes ready (services.rs:153-243), shown by install_tests.rs:307.
+- Deviation: (1) The macOS log watch uses kqueue EVFILT_READ on the log file (what BSD `tail -f` uses: it fires when the file grows past the reader, and each drain seeks to the end), registered through mio's safe Registry. EVFILT_VNODE was not used because rustix's `kevent` is an `unsafe fn`, libc needs unsafe, and the workspace has unsafe_code = "deny". Linux uses rustix's safe inotify. (2) The compose services have no log file on the host (Docker keeps them), so wait_ready's event is the followed `docker compose logs --follow` output, checked once per piece that arrives. wait_ready now takes the Layout and returns IdentityResult, so install.rs changed. (3) Files beyond the brief's list: install.rs, Cargo.toml, crates/lys/Cargo.toml, Cargo.lock, and the test files. (4) CN1's 'Documents only' conflicts with this brief's code files; the requirements were followed and no document was touched. (5) The old install test's `/bin/sleep 60` scratch process was replaced with a fifo-blocked `/bin/sh`; the test's assertions are unchanged.
+- Files changed:
+  - modified: `crates/lys/src/identity/install/services.rs` — wait_until (418) arms a log watch (mio + kqueue EVFILT_READ on the log vnode on macOS/BSD, rustix inotify IN_MODIFY on Linux, mod log_watch 511/553), checks once, then checks once per log event; the exit of the pid file's process (exit-lock thread waking a UnixStream registered in the same Poll) refuses 'wait for service' naming the log. wait_answering (404) is wait_until over answers(). wait_ready (153) checks once, says one 'waiting for' line, follows `docker compose logs --follow` and runs ready_on_output (203), which checks once per piece of output, says '<service> ready' once each, and refuses by name when the output ends. No thread::sleep, Duration or timeout remains.
+  - modified: `crates/lys/src/identity/install.rs` — Declares `pub mod exit_wait;` and calls `services::wait_ready(&layout, &config, ...)?`, now that the wait takes the layout and can refuse.
+  - modified: `crates/lys/src/identity/install_tests.rs` — Adds told_service (a /bin/sh scratch service told over a fifo) and tests for readiness within one log event, the named refusal with the log path when the service exits, and the compose wait's once-per-output check and its refusal. The older left-alone test's /bin/sleep 60 is replaced by a fifo-blocked sh, so no bound in seconds remains in these tests.
+  - modified: `Cargo.toml` — Workspace dependency mio 1 (default-features off, os-ext): the safe kqueue/epoll registry.
+  - modified: `crates/lys/Cargo.toml` — lys depends on mio and rustix for cfg(unix) targets.
+  - modified: `Cargo.lock` — The lys package lists mio and rustix, both already locked at 1.2.3 and 1.1.4. `cargo metadata --locked --offline` accepts it.
+- Checklist delivery:
+  - [x] C340 — Waiting for a service to answer waits on its readiness event, not a one-second sleep (DIRECTORY-044 R1). — The readiness loop and wait_answering are replaced by log-event waits, and the compose wait follows the compose output. No sleep remains in services.rs.
+- Story delivery:
+  - [x] S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does. — The install moves on at the log event that makes a service ready, and names the dead one at once with its log. No clock cuts anything off.
+
 ### R2: Stopping a service waits on the platform's exit notification
 
 Behavioural. crates/lys/src/identity/install/services.rs:220-231 polls alive(pid_file) every 200 ms after kill. Wait for the process's exit through kqueue EVFILT_PROC (NOTE_EXIT) on macOS and a pidfd on Linux; a pid that is already gone returns at once; a pid the platform refuses to watch is an error naming it.
@@ -63,6 +82,22 @@ Behavioural. crates/lys/src/identity/install/services.rs:220-231 polls alive(pid
 
 **Stories:**
 - S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (stop returns after the exit event with 0 polls): met. crates/lys/src/identity/install/exit_wait_tests.rs:37 stops a scratch service through stop_with with a counting double on alive. It asserts 1 call (before the kill, none after) and that ExitWatch::open(..).exited() is true afterwards, which means the kernel released the lock at exit. The wait is exit_wait.rs:96 (a blocking flock) called from services.rs:320-336. Row 2 (a pid file naming a gone process returns Ok(false) at once, as the base does): met. exit_wait_tests.rs:54 writes the pid of a reaped /usr/bin/true, asserts Ok(false), 1 alive call and no exit lock created. A pid the platform cannot watch is refused by name: exit_wait.rs:71-84, tested at exit_wait_tests.rs:72.
+- Deviation: The brief asks for kqueue EVFILT_PROC (NOTE_EXIT) on macOS and a pidfd on Linux. rustix's kevent is an `unsafe fn`, libc would need unsafe blocks, the workspace has unsafe_code = "deny", and a pidfd wait needs rustix's `event` feature, which this workspace does not enable. So the exit event is the kernel's release of an exclusive flock that the service inherits through its stdin; this is the same on every Unix. Consequence: a live process started without an exit lock (by an older lys) cannot be watched and is refused by name with its pid, never polled. A running service must not close its stdin (stated as a module invariant).
+- Files changed:
+  - created: `crates/lys/src/identity/install/exit_wait.rs` — The exit lock beside each pid file. hold() takes an exclusive flock on the file handed to the service as its stdin, so the kernel releases it only when the service's last descriptor closes at exit. ExitWatch::open refuses a pid file with no exit lock, naming the pid. exited() asks without blocking, and wait() blocks on the same lock until the kernel grants it. The EINTR retry is not a poll.
+  - created: `crates/lys/src/identity/install/exit_wait_tests.rs` — Tests: a stop returns after the exit event, with alive asked exactly once (before the kill) and the lock free afterwards; a pid file naming a gone process answers Ok(false) at once with nothing watched; a live process with no exit lock is refused naming its pid, before any kill.
+  - modified: `crates/lys/src/identity/install/services.rs` — stop (313) is stop_with (320) over alive: alive is asked once, then the exit watch is opened, kill is sent and exit.wait() blocks on the event. The 200 ms poll is gone. start_detached (341) passes exit_wait::hold's file as the service's stdin (363). alive (286) also counts a process whose exit lock is free as gone, which matches the exit event.
+- Checklist delivery:
+  - [x] C341 — Stopping a service waits on the platform's exit notification (DIRECTORY-044 R2). — stop waits on the exit event with no poll. A gone pid answers at once, and an unwatchable pid is a named error.
+- Story delivery:
+  - [x] S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does. — A stop returns the moment the service has exited, never on a 200 ms schedule.
 
 ### R3: Loopback, Rauthy and health exchanges carry no timeout
 
@@ -84,6 +119,24 @@ Behavioural. crates/lys/src/identity/loopback_http.rs:76-160 (connect, connect_a
 **Stories:**
 - S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.
 
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (`grep -nE 'timeout|Duration'` over loopback_http.rs, rauthy.rs and health.rs prints nothing): met, checked. Row 2 (tests for a refused port and a peer that closes mid-answer show the named errors): met. crates/lys/src/identity/loopback_http_tests.rs:185 `a_refused_port_is_named_at_once_with_its_address_and_cause` and :200 `a_peer_that_closes_mid_answer_is_named_with_the_bytes_that_arrived`, which asserts Err(Failure::Malformed("the body was cut short: the peer closed after <len> bytes")). Produced at loopback_http.rs:106-114 and :175-183. Every caller is updated and none keeps a Duration.
+- Deviation: Failure::Malformed now carries a String instead of &'static str, so it can name the byte count. Callers map it to the same error kinds as before, so no refusal name changes.
+- Files changed:
+  - modified: `crates/lys/src/identity/loopback_http.rs` — connect, connect_any and exchange take no timeout and use TcpStream::connect. No connect_timeout, set_read_timeout or set_write_timeout remains. A refusal names each address and cause. A read that fails names the bytes that had arrived, and a peer that closes before the answer is whole is Failure::Malformed carrying '<parse detail>: the peer closed after N bytes'. The module doc states the no-clock rule.
+  - modified: `crates/lys/src/identity/rauthy.rs` — The TIMEOUT constant and Duration import are removed. The now-identical Uncertain and Malformed arms are merged (clippy match_same_arms), and both still map to RauthyUncertain.
+  - modified: `crates/lys/src/identity/health.rs` — The TIMEOUT constant and Duration import are removed. Postgres connect and SpiceDB exchange call the no-timeout forms, and the refusal names are unchanged.
+  - modified: `crates/lys/src/identity/install/services.rs` — answers() calls exchange with no 2 s bound.
+  - modified: `crates/lys/src/identity/loopback_http_tests.rs` — The TIMEOUT constant is gone. Adds tests for a refused port (Failure::Unreachable starting with the address and containing 'refused') and a peer that closes mid-answer (Failure::Malformed naming exactly the bytes that arrived).
+- Checklist delivery:
+  - [x] C342 — Loopback, Rauthy and health exchanges carry no timeout (DIRECTORY-044 R3). — No timeout or Duration remains in the three files. A refused connection and a short answer are named errors.
+- Story delivery:
+  - [x] S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does. — A service is never cut off by a clock. A refused or reset peer is named at once.
+
 ### R4: The Explain view re-measures on a layout signal
 
 Behavioural. surface/identity/src/shell/Explain.tsx:52-55 re-measures its marks on a 120 ms setTimeout. Re-measure from a ResizeObserver on the measured elements (and once in a requestAnimationFrame after the content changes), and disconnect it on unmount. The toast's display duration (ShellContext.tsx:140) and the two-key chord window (keys.ts:65) are interaction timings, not waits, and stay.
@@ -100,6 +153,21 @@ Behavioural. surface/identity/src/shell/Explain.tsx:52-55 re-measures its marks 
 
 **Stories:**
 - S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does.
+
+#### R4 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: Row 1 (a vitest drives a resize through a ResizeObserver double and shows setMarks once per resize with no timer): met. surface/identity/tests/explain-remeasure.test.tsx asserts measures() is 1 then 2 after two resizes, the first mark's left is 292px then 392px, and getTimerCount() is 0. Fake timers also fake requestAnimationFrame in vitest 5.0.2, so no frame is pending either. The code is Explain.tsx:51-91. Row 2 (npx tsc --noEmit, npx vitest run and npx vite build exit 0 in surface/identity): believed met, not run here because the clone has no node_modules. I checked in a sibling clone's vitest 5.0.2 that its jsdom environment defaults pretendToBeVisual to true, so requestAnimationFrame and cancelAnimationFrame exist in the existing tests. Explain guards the ResizeObserver, which jsdom lacks, so the existing help tests keep running.
+- Deviation: Scroll and window resize, which the old code debounced, now re-measure in one requestAnimationFrame. 'After the content changes' is detected with a MutationObserver on the page outside the Explain layer.
+- Files changed:
+  - modified: `surface/identity/src/shell/Explain.tsx` — The 120 ms setTimeout debounce is gone. A ResizeObserver on the page and every element a mark could stand on re-measures on each resize. A MutationObserver on content outside the layer, plus scroll and window resize, re-observes and re-measures once in a requestAnimationFrame. All observers and listeners are disconnected on unmount. The toast duration and the chord window are untouched.
+  - created: `surface/identity/tests/explain-remeasure.test.tsx` — Drives resizes through a ResizeObserver double under vi.useFakeTimers. It asserts exactly one measure per resize (querySelectorAll calls for the first concept), the marks moving to the new position synchronously, vi.getTimerCount() === 0, and the observer disconnected once Explain closes.
+- Checklist delivery:
+  - [x] C343 — The Explain view re-measures on a layout signal (DIRECTORY-044 R4). — Re-measure runs on ResizeObserver or requestAnimationFrame signals, never on a timer, and is disconnected on unmount.
+- Story delivery:
+  - [x] S146 (Installer of the identity stack, Runs lys identity install and stop on a machine) — As the person installing the identity stack, I want the install to go on the moment each service is ready and to name at once the one that died, so that nothing is cut off by a clock and nothing waits longer than the service does. — The Explain marks follow the layout the moment it changes, not 120 ms later.
 
 ## Boundaries
 

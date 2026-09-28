@@ -1,13 +1,10 @@
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{Ipv6Addr, SocketAddr, TcpListener};
-use std::time::Duration;
 
 use super::*;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
-
-const TIMEOUT: Duration = Duration::from_secs(3);
 
 fn authority(host: &str, port: u16) -> Authority {
     Authority {
@@ -88,9 +85,9 @@ fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
     let refusing = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let accepting = listener.local_addr()?;
-    let stream = connect_any(&[refusing, accepting], TIMEOUT)?;
+    let stream = connect_any(&[refusing, accepting])?;
     assert_eq!(stream.peer_addr()?, accepting);
-    let refusal = connect_any(&[refusing], TIMEOUT)
+    let refusal = connect_any(&[refusing])
         .err()
         .ok_or("a closed port accepted")?;
     assert!(refusal.starts_with(&refusing.to_string()), "{refusal}");
@@ -101,7 +98,7 @@ fn every_resolved_address_is_tried_until_one_accepts() -> TestResult {
 fn a_name_reaches_a_service_published_only_on_ipv4() -> TestResult {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
-    let stream = authority("localhost", port).connect(TIMEOUT)?;
+    let stream = authority("localhost", port).connect()?;
     assert_eq!(stream.peer_addr()?, listener.local_addr()?);
     Ok(())
 }
@@ -160,21 +157,76 @@ fn a_response_body_is_read_by_length_or_by_chunk() {
     );
 }
 
+/// Reads one request head, so the peer closes with nothing unread and the
+/// client sees a clean end rather than a reset.
+fn read_request(stream: &mut std::net::TcpStream) -> Result<Vec<u8>, std::io::Error> {
+    let mut request = Vec::new();
+    let mut buffer = [0_u8; 1024];
+    while !request.ends_with(b"\r\n\r\n") {
+        let read = stream.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        request.extend_from_slice(&buffer[..read]);
+    }
+    Ok(request)
+}
+
+fn health_request() -> Request<'static> {
+    Request {
+        method: "GET",
+        path: "/healthz",
+        headers: &[],
+        body: &[],
+    }
+}
+
+#[test]
+fn a_refused_port_is_named_at_once_with_its_address_and_cause() -> TestResult {
+    let closed = TcpListener::bind("127.0.0.1:0")?.local_addr()?;
+    let failure = exchange(&authority("127.0.0.1", closed.port()), &health_request())
+        .err()
+        .ok_or("a closed port answered")?;
+    let detail = match failure {
+        Failure::Unreachable(detail) => detail,
+        other => return Err(format!("a refused connection was not unreachable: {other:?}").into()),
+    };
+    assert!(detail.starts_with(&closed.to_string()), "{detail}");
+    assert!(detail.contains("refused"), "{detail}");
+    Ok(())
+}
+
+#[test]
+fn a_peer_that_closes_mid_answer_is_named_with_the_bytes_that_arrived() -> TestResult {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    let partial = b"HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nok";
+    let server = std::thread::spawn(move || -> Result<(), std::io::Error> {
+        let (mut stream, _) = listener.accept()?;
+        read_request(&mut stream)?;
+        stream.write_all(partial)
+    });
+    let response = exchange(&authority("127.0.0.1", port), &health_request());
+    server
+        .join()
+        .map_err(|panic| format!("the server panicked: {panic:?}"))??;
+    assert_eq!(
+        response,
+        Err(Failure::Malformed(format!(
+            "the body was cut short: the peer closed after {} bytes",
+            partial.len()
+        )))
+    );
+    Ok(())
+}
+
 #[test]
 fn an_exchange_sends_the_request_and_reads_the_whole_response() -> TestResult {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
     let server = std::thread::spawn(move || -> Result<Vec<u8>, std::io::Error> {
         let (mut stream, _) = listener.accept()?;
-        let mut request = Vec::new();
-        let mut buffer = [0_u8; 1024];
-        while !request.ends_with(b"\r\n\r\n") {
-            let read = stream.read(&mut buffer)?;
-            if read == 0 {
-                break;
-            }
-            request.extend_from_slice(&buffer[..read]);
-        }
+        let request = read_request(&mut stream)?;
         stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 4\r\n\r\ndown")?;
         Ok(request)
     });
@@ -184,7 +236,7 @@ fn an_exchange_sends_the_request_and_reads_the_whole_response() -> TestResult {
         headers: &[("Accept", b"text/plain".as_slice())],
         body: &[],
     };
-    let response = exchange(&authority("127.0.0.1", port), TIMEOUT, &request);
+    let response = exchange(&authority("127.0.0.1", port), &request);
     let sent = server
         .join()
         .map_err(|panic| format!("the server panicked: {panic:?}"))??;

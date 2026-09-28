@@ -4,7 +4,7 @@
 //! the lease (its uses, its window, its scope), then the permission.
 
 use crate::encoding::{Canonical, ct_eq, hex, sha256, unhex};
-use crate::error::{LeaseRefusal, SecretsError};
+use crate::error::{BoundsRefusal, SecretsError};
 use crate::handle::{HandleToken, Presentation, check_operation_id};
 use crate::permission::PermissionCheck;
 
@@ -119,7 +119,7 @@ impl<P: PermissionCheck> Broker<P> {
         if named {
             return Ok(());
         }
-        Err(SecretsError::from(LeaseRefusal::OutsideScope {
+        Err(SecretsError::from(BoundsRefusal::OutsideScope {
             handle: record.id.clone(),
             secret: record.secret.clone(),
             asked: asked.to_owned(),
