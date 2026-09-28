@@ -15,6 +15,7 @@ base64.workspace = true
 lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true
+jiff.workspace = true
 lys-log-store.workspace = true
 lys-openapi.workspace = true
 lys-runner.workspace = true

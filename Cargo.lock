@@ -1698,6 +1698,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "identity-contract",
+ "jiff",
  "lys-core",
  "lys-home",
  "lys-identity",

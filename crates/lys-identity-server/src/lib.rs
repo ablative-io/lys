@@ -20,6 +20,7 @@ pub mod apps_schema_api;
 pub mod apps_state;
 pub mod apps_store;
 pub mod apps_views;
+pub mod budgets_state;
 pub mod certificates_api;
 mod certificates_issue;
 pub mod certificates_store;
