@@ -4802,6 +4802,61 @@
       "path": "surface/identity/tests/acceptance/agent-control.spec.ts",
       "note": "Plain controls and a real managed-session proof (DIRECTORY-064 R6).",
       "brief": "DIRECTORY-064"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/runner.rs",
+      "note": "Place the runner binary without restarting a live runner",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/runner_tests.rs",
+      "note": "Place the runner binary without restarting a live runner",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/scratch_tests.rs",
+      "note": "Place the runner binary without restarting a live runner",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys-runner/tests/build_identity.rs",
+      "note": "Record running and placed builds as different facts",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/commands/runner.rs",
+      "note": "Record running and placed builds as different facts",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/runner_restart.rs",
+      "note": "Restart only through an explicit session-aware operation",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/runner_restart_tests.rs",
+      "note": "Restart only through an explicit session-aware operation",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys-runner/tests/restart_fence.rs",
+      "note": "Restart only through an explicit session-aware operation",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/status.rs",
+      "note": "Show the same pending restart on the page and CLI",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "crates/lys/src/identity/status_tests.rs",
+      "note": "Show the same pending restart on the page and CLI",
+      "brief": "DIRECTORY-066"
+    },
+    {
+      "path": "surface/identity/tests/acceptance/runner-build.spec.ts",
+      "note": "Show the same pending restart on the page and CLI",
+      "brief": "DIRECTORY-066"
     }
   ],
   "inventory": [

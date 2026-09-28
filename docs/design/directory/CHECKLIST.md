@@ -407,3 +407,10 @@
 - [ ] **C436** — Deliver current goal and reminder words at turn boundaries (DIRECTORY-064 R4).
 - [ ] **C437** — Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5).
 - [ ] **C438** — Plain controls and a real managed-session proof (DIRECTORY-064 R6).
+
+## Placed and running runner builds (DIRECTORY-066)
+
+- [ ] **C445** — Place the runner binary without restarting a live runner (DIRECTORY-066 R1).
+- [ ] **C446** — Record running and placed builds as different facts (DIRECTORY-066 R2).
+- [ ] **C447** — Restart only through an explicit session-aware operation (DIRECTORY-066 R3).
+- [ ] **C448** — Show the same pending restart on the page and CLI (DIRECTORY-066 R4).

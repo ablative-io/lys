@@ -2614,6 +2614,31 @@
         "RM-088"
       ],
       "notes": "Written by hand. Non-writer Chippy reviews. Builds on DIRECTORY-051; supplies managed Codex reader for065."
+    },
+    {
+      "id": "RM-107",
+      "title": "Place the runner and distinguish its running build from the installed build",
+      "status": "briefed",
+      "kind": "fix",
+      "summary": "Place bin/lys through the existing install/upgrade transaction, keep a live runner running across upgrade, record its actual compiled build separately, and add explicit controlled restart plus plain status. This fixes the merge seam through the full card chain without pretending the on-disk replacement is already executing.",
+      "provenance": {
+        "requested_by": "waffles",
+        "date": "2026-09-29T07:44:32+10:00",
+        "quote": "Row 3 must run against a real pty session, not a fake.",
+        "context": "Independent acceptance contract after integration review; card c8HKiQoa."
+      },
+      "links": {
+        "cluster": "directory",
+        "decisions": [
+          "ADR-132"
+        ],
+        "briefs": [
+          "DIRECTORY-066"
+        ],
+        "commits": []
+      },
+      "depends_on": [],
+      "notes": "Handwritten follow-up to the 045/050 integration. Distinguishes placing from restarting."
     }
   ]
 }

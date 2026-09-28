@@ -1,0 +1,185 @@
+---
+type: brief
+id: DIRECTORY-066
+cluster: directory
+title: Place the runner and distinguish its running build from the installed build
+---
+
+# DIRECTORY-066: Place the runner and distinguish its running build from the installed build
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-045, DIRECTORY-050
+> **Design anchor:**
+> - ADR-132 — Runner placement and process identity are separate upgrade facts — Place lys as the runner binary without putting the runner in the broker/service restart set. Record the running process build separately from placed bytes. Show pending restart and require explicit session-aware confirmation before ending live sessions. Preserve the runner through ordinary upgrade and rollback.
+> **Checklist:**
+> - C445 — Place the runner binary without restarting a live runner (DIRECTORY-066 R1).
+> - C446 — Record running and placed builds as different facts (DIRECTORY-066 R2).
+> - C447 — Restart only through an explicit session-aware operation (DIRECTORY-066 R3).
+> - C448 — Show the same pending restart on the page and CLI (DIRECTORY-066 R4).
+> **Stories:**
+> - S177 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
+> - S178 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+## Purpose
+
+The 050 integration e7ec3905 preserves runner startup, but start_runner executes services::sibling("lys") while 045 places only the broker and service. The runner is therefore missing from the installed build set and cannot be upgraded honestly. Archie identified this at 07:41; Waffles supplied the independent acceptance contract at 07:44 (post b162bb51). Gypsy chooses tracked runner placement with separate live/placed evidence and session-preserving upgrades. Card c8HKiQoa.
+
+## Task
+
+Place bin/lys through the existing install/upgrade transaction, keep a live runner running across upgrade, record its actual compiled build separately, and add explicit controlled restart plus plain status. This fixes the merge seam through the full card chain without pretending the on-disk replacement is already executing.
+
+## Requirements
+
+### R1: Place the runner binary without restarting a live runner
+
+Behavioural. WHEN install or upgrade prepares its binary set, THE SYSTEM SHALL include lys, the executable that serves the runner, alongside lys-secrets and lys-identity-server, and verify its build stamp before any change. The runner starts from layout.binary("lys"), never services::sibling("lys"). Separate the binaries to place from the units to stop/start: upgrade::units continues to govern broker/service restarts, while a running runner is preserved. In the inspected integrated tree e7ec3905, upgrade derives its names from parts.units and adopt::settle places those unit binaries; changing BINARIES alone is insufficient. Extend the actual placement, preflight, intent, rollback and adoption paths to carry the runner binary explicitly without adding it to the ordinary restart set. Atomic file/directory replacement must preserve the running executable and its sessions. Rollback restores the previous placed lys without stopping the live runner. Fresh install places the runner before starting it and records its readiness after authenticated status answers. Reinstall with no upgrade is byte-preserving and does not restart it. A legacy unplaced runner is recorded honestly as unplaced until an explicit controlled restart; copying a new file is not evidence its process changed. Missing or mismatched input stamps refuse before stopping services and name expected and actual builds. Keep data, keys and session state unchanged.
+
+**Acceptance:**
+- A fresh install places bin/lys.
+- The fresh running runner executable is the placed bin/lys.
+- Preflight refuses a missing lys binary before stopping any service.
+- A mismatched runner stamp is refused by name.
+- The stamp refusal names the expected build.
+- The stamp refusal names the actual build.
+- Reinstall leaves every placed binary byte-identical.
+- Reinstall leaves the runner pid unchanged.
+- A real PTY session started before upgrade retains its pid after upgrade.
+- That real session retains its PTY identity after upgrade.
+- The same real PTY accepts input after upgrade.
+- Rollback restores the former placed runner binary.
+- Rollback leaves the running runner pid unchanged.
+
+**Files:**
+- create: crates/lys/src/identity/upgrade/runner.rs
+- create: crates/lys/src/identity/upgrade/runner_tests.rs
+- modify: crates/lys/src/identity/install/layout.rs
+- modify: crates/lys/src/identity/install.rs
+- modify: crates/lys/src/identity/upgrade.rs
+- modify: crates/lys/src/identity/upgrade/adopt.rs
+- modify: crates/lys/src/identity/upgrade/intent.rs
+- modify: crates/lys/src/identity/upgrade/swap.rs
+- modify: crates/lys/src/identity/upgrade/scratch_tests.rs
+
+**Checklist:**
+- C445 — Place the runner binary without restarting a live runner (DIRECTORY-066 R1).
+
+**Stories:**
+- S177 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
+
+### R2: Record running and placed builds as different facts
+
+Behavioural. WHEN the runner answers authenticated status, THE SYSTEM SHALL report its compiled lys build stamp passed from the executing CLI into Runner::open, with runner instance identity and process start identity. The running stamp cannot be supplied by a caller's request or inferred by executing a replacement file on disk. Extend the runner protocol by a compatible optional field or a new version alongside the existing contract; an older runner without the field is explicitly unknown, never assumed to match. install/build.json keeps the existing broker/service records and adds a runner object with separate placed_build, running_build, running_instance and restart_pending/unknown state. Before persisting a running build, reconcile the status answer with the expected local runner instance; a stale answer from the old process cannot confirm the new one. A missing/unavailable runner records unknown/unavailable, without substituting placed_build. The record is written atomically through the repository's private-file convention. Each successful install, upgrade, rollback and controlled restart updates it from actual observations. Pending restart means an observed live runner differs from the placed build; an unobserved runner is unknown instead. The existing statement that build.json always names what runs is amended to distinguish the two facts, not weakened into an unverified claim.
+
+**Acceptance:**
+- The live runner reports its compiled build stamp through authenticated status.
+- Changing bin/lys while the runner lives does not change its reported running build.
+- After upgrade build.json records the new placed build.
+- After upgrade build.json records the old running build.
+- After upgrade build.json records pending restart.
+- A legacy status answer without build identity records unknown.
+- An unavailable runner never copies placed_build into running_build.
+- A stale old-instance answer cannot confirm the restarted runner.
+- An interrupted build-record write leaves a readable prior or complete new record.
+
+**Files:**
+- create: crates/lys-runner/tests/build_identity.rs
+- modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/socket.rs
+- modify: crates/lys/src/commands/runner.rs
+- modify: crates/lys/src/identity/upgrade.rs
+- modify: crates/lys/src/identity/upgrade/runner.rs
+
+**Checklist:**
+- C446 — Record running and placed builds as different facts (DIRECTORY-066 R2).
+
+**Stories:**
+- S177 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
+- S178 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+### R3: Restart only through an explicit session-aware operation
+
+Behavioural. WHEN an authorised local operator asks for a runner restart, THE SYSTEM SHALL use new lys identity runner-restart with the install root, preserving existing private-key/control authority. Without explicit confirmation naming the currently observed live-session set and runner instance, refuse runner_sessions_live if any sessions live. Confirmation is tied to that observed instance/set and is invalidated if a session starts or membership changes before the restart fence. Establish the fence through the runner so new starts cannot race the check. A confirmed restart ends the sessions through their existing owned process lifecycle, waits for actual exits, stops the old runner, verifies the placed stamp against the recorded placed build, starts layout.binary("lys") and confirms its authenticated instance/build before recording success. A changed or mismatched placed stamp refuses before stopping anything. No request deadline, watchdog or polling is added: process and socket events drive progress. Crash recovery reconciles the same restart operation and actual instance before any repeated stop/start. If restart fails, show its exact stage and leave running/placed states honest; do not claim the new binary runs. No silent automatic restart accompanies an upgrade, page reload or ordinary install.
+
+**Acceptance:**
+- A restart with live sessions and no confirmation refuses runner_sessions_live.
+- A refusal leaves the real PTY session running.
+- A changed live-session set invalidates the prior confirmation.
+- A start racing the committed restart fence is refused.
+- A mismatched placed stamp prevents stopping the old runner.
+- A confirmed restart waits for actual session exits.
+- After confirmed restart running_build equals placed_build.
+- The new running executable is the placed binary.
+- Crash recovery issues no duplicate restart for a confirmed operation.
+- A failed restart is never displayed as successful.
+
+**Files:**
+- create: crates/lys/src/identity/runner_restart.rs
+- create: crates/lys/src/identity/runner_restart_tests.rs
+- create: crates/lys-runner/tests/restart_fence.rs
+- modify: crates/lys/src/identity/cli.rs
+- modify: crates/lys/src/identity/mod.rs
+- modify: crates/lys/src/main.rs
+- modify: crates/lys-runner/src/protocol.rs
+- modify: crates/lys-runner/src/socket.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys/src/identity/upgrade/runner.rs
+
+**Checklist:**
+- C447 — Restart only through an explicit session-aware operation (DIRECTORY-066 R3).
+
+**Stories:**
+- S178 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+### R4: Show the same pending restart on the page and CLI
+
+Behavioural. WHEN a person inspects a runner-owned agent, THE SYSTEM SHALL expose the running and placed builds plus pending-restart/unknown state through the existing authorised runtime/runner views and agent page. Add lys identity status as a thin read of this install's observed runner state; it is new in the inspected tree and is not the existing dependency-health command. Both surfaces say pending restart only on the R2 evidence and name both builds. Old/unknown coverage stays visible. Do not expose the private service key, absolute sensitive paths or another person's session. Keep the page read-only for this card's restart action; the explicit local CLI owns restart confirmation, so no new remote administration authority is invented. Split helpers rather than growing existing oversized files. The actual scratch proof uses an old and a new stamped runner and a live PTY before upgrade, and records executable identity, process/PTY continuity, both build fields, page/CLI output, explicit restart refusal and confirmed restart. A fake runner cannot satisfy the PTY continuity rows.
+
+**Acceptance:**
+- The agent page displays pending restart after a newer binary is placed.
+- The agent page names the running build.
+- The agent page names the placed build.
+- lys identity status displays pending restart from the same observations.
+- lys identity status names the running build.
+- lys identity status names the placed build.
+- The page shows unknown when the running stamp is unavailable.
+- An unrelated viewer cannot read protected runner session information.
+- The scratch proof records real PTY continuity across upgrade.
+- The scratch proof records the post-restart executable path.
+
+**Files:**
+- create: crates/lys/src/identity/status.rs
+- create: crates/lys/src/identity/status_tests.rs
+- create: surface/identity/tests/acceptance/runner-build.spec.ts
+- modify: crates/lys/src/identity/cli.rs
+- modify: crates/lys/src/identity/mod.rs
+- modify: crates/lys/src/main.rs
+- modify: crates/lys-identity-server/src/runner_api.rs
+- modify: crates/lys-identity-server/src/runner_client.rs
+- modify: surface/identity/src/features/runtime/Sessions.tsx
+- modify: surface/identity/src/features/file/IdentityFile.tsx
+- modify: surface/identity/src/api.ts
+
+**Checklist:**
+- C448 — Show the same pending restart on the page and CLI (DIRECTORY-066 R4).
+
+**Stories:**
+- S177 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions.
+- S178 (Person upgrading a live runner, Installs and changes builds while agents work) — As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action.
+
+## Boundaries
+
+- SHALL NOT restart the runner automatically during install, upgrade or rollback.
+- SHALL NOT infer a running build from the newly placed file.
+- SHALL NOT add the runner blindly to upgrade::units and stop its sessions during the ordinary swap.
+- SHALL NOT bypass confirmation of live-session termination.
+- SHALL NOT rotate keys, change data or detach a session during a normal upgrade.
+- SHALL NOT add a timeout, deadline, watchdog, poll, unsafe, ignored test or lint suppression.
+
+## Verification
+
+- Handwritten main brief passes the design gate and receives a non-writer read.
+- Implementation follows card_build_v3, src_pr and src_land with Jev, fmt, Clippy pedantic, tests, ast-grep and full gates on Dean.
+- Independent acceptance source is Waffles post b162bb51a1a3eb03762c26e94cbfee95bc62ad8d08d7fd6cff0dbe6dec0540f2; real PTY continuity is mandatory.
+- Run a scratch install/upgrade/restart proof on the resulting exact commit; preserve receipts and page evidence without claiming production installed.

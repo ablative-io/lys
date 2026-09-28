@@ -1921,6 +1921,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-132",
+      "title": "Runner placement and process identity are separate upgrade facts",
+      "status": "decided",
+      "scope": "directory",
+      "date": "2026-09-29",
+      "decided_by": "Gypsy, integration owner, with Waffles acceptance contract",
+      "context": "The 050 integration e7ec3905 preserves runner startup, but start_runner executes services::sibling(\"lys\") while 045 places only the broker and service. The runner is therefore missing from the installed build set and cannot be upgraded honestly. Archie identified this at 07:41; Waffles supplied the independent acceptance contract at 07:44 (post b162bb51). Gypsy chooses tracked runner placement with separate live/placed evidence and session-preserving upgrades. Card c8HKiQoa.",
+      "decision": "Place lys as the runner binary without putting the runner in the broker/service restart set. Record the running process build separately from placed bytes. Show pending restart and require explicit session-aware confirmation before ending live sessions. Preserve the runner through ordinary upgrade and rollback.",
+      "quote": "the runner joins 045's placed builds",
+      "consequences": [
+        "An upgrade can correctly leave the old runner running.",
+        "The installed record must name both builds.",
+        "A local status read cannot substitute for an authenticated live runner answer."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

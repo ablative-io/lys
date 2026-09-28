@@ -634,6 +634,20 @@
           "text": "As the person setting a goal, I want my saved words delivered at a turn boundary with honest receipts, so a reminder never interrupts a tool or silently arrives twice."
         }
       ]
+    },
+    {
+      "name": "Person upgrading a live runner",
+      "role": "Installs and changes builds while agents work",
+      "stories": [
+        {
+          "id": "S177",
+          "text": "As the person upgrading Lys, I want the runner binary placed and both its installed and running builds stated honestly, without losing live sessions."
+        },
+        {
+          "id": "S178",
+          "text": "As the person responsible for live sessions, I want a pending runner restart shown clearly and performed only through my explicit controlled action."
+        }
+      ]
     }
   ]
 }

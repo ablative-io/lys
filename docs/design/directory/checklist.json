@@ -1580,6 +1580,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Placed and running runner builds (DIRECTORY-066)",
+      "items": [
+        {
+          "id": "C445",
+          "text": "Place the runner binary without restarting a live runner (DIRECTORY-066 R1).",
+          "done": false
+        },
+        {
+          "id": "C446",
+          "text": "Record running and placed builds as different facts (DIRECTORY-066 R2).",
+          "done": false
+        },
+        {
+          "id": "C447",
+          "text": "Restart only through an explicit session-aware operation (DIRECTORY-066 R3).",
+          "done": false
+        },
+        {
+          "id": "C448",
+          "text": "Show the same pending restart on the page and CLI (DIRECTORY-066 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

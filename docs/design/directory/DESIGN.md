@@ -1058,6 +1058,17 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/control_recovery.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
 | `crates/lys-identity-server/tests/control_receipts.rs` | Reconcile uncertain delivery with existing operation receipts (DIRECTORY-064 R5). | DIRECTORY-064 |
 | `surface/identity/tests/acceptance/agent-control.spec.ts` | Plain controls and a real managed-session proof (DIRECTORY-064 R6). | DIRECTORY-064 |
+| `crates/lys/src/identity/upgrade/runner.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/runner_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys/src/identity/upgrade/scratch_tests.rs` | Place the runner binary without restarting a live runner | DIRECTORY-066 |
+| `crates/lys-runner/tests/build_identity.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/commands/runner.rs` | Record running and placed builds as different facts | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/runner_restart_tests.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys-runner/tests/restart_fence.rs` | Restart only through an explicit session-aware operation | DIRECTORY-066 |
+| `crates/lys/src/identity/status.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `crates/lys/src/identity/status_tests.rs` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
+| `surface/identity/tests/acceptance/runner-build.spec.ts` | Show the same pending restart on the page and CLI | DIRECTORY-066 |
 
 ## Inventory
 
