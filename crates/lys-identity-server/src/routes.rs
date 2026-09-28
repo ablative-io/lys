@@ -63,6 +63,8 @@ pub struct AppState {
     pub reviews: Option<Mutex<ReviewStore>>,
     /// The teams, when the configuration names their directory.
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
+    /// The nonces agents' signed requests carried within the last minute.
+    pub agent_nonces: crate::agent_signature::Nonces,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -129,6 +131,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         service_accounts: service_accounts.map(Mutex::new),
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
+        agent_nonces: Mutex::default(),
         say,
     })))
 }

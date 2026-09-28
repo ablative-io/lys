@@ -1,8 +1,12 @@
 //! How the directory's and the grants' own refusals are answered over HTTP.
 
+use axum::Json;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use lys_identity::IdentityError;
 use lys_identity::grants::GrantError;
+
+use crate::error::ServerError;
 
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
@@ -51,5 +55,12 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
         _ => StatusCode::FORBIDDEN,
+    }
+}
+
+impl IntoResponse for ServerError {
+    fn into_response(self) -> Response {
+        let body = serde_json::json!({ "refusal": self.name(), "reason": self.to_string() });
+        (self.status(), Json(body)).into_response()
     }
 }

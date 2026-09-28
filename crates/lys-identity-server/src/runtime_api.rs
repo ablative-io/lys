@@ -5,8 +5,9 @@
 //! resolves the signed-in caller, or by the person responsible for the agent
 //! or the administrator, who already answer for it; no other identity
 //! reports in its place, and each report is kept under who delivered it. The
-//! directory binds logins only to people, so an agent reports for itself
-//! only once it has a credential this service accepts. A session a runtime sees that carries no identity is
+//! directory binds logins only to people, so an agent reports for itself by
+//! signing the request with the key its certificate names, as
+//! `agent_signature` checks. A session a runtime sees that carries no identity is
 //! found: any identity the directory knows may report one, it is kept under
 //! who reported it, and it is never given an identity here.
 //!
@@ -19,15 +20,17 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
+use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, Uri};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::projection::Projection;
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 
+use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_api::placed;
@@ -248,13 +251,19 @@ async fn report_agent(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((id, session)): Path<(String, String)>,
-    body: Result<Json<ReportBody>, JsonRejection>,
+    uri: Uri,
+    bytes: Bytes,
 ) -> Result<Json<SessionView>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let body: ReportBody =
+        serde_json::from_slice(&bytes).map_err(|refused| malformed(refused.to_string()))?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let asker = caller(&state, &headers, directory)?;
+        let signed = signed_agent(&state, directory, &headers, ("POST", uri.path(), &bytes))?;
+        let asker = match signed {
+            Some(own) => IdentityId::Agent(own),
+            None => caller(&state, &headers, directory)?,
+        };
         let Some(record) = directory.record(IdentityId::Agent(agent)) else {
             return Err(ServerError::AgentNotVisible);
         };
