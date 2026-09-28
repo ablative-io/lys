@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, header};
-use axum::response::Response;
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::receipt::Receipt;
