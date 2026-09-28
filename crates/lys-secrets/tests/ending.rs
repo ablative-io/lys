@@ -194,7 +194,7 @@ fn the_person_acted_for_ends_a_handle_and_what_was_lent_on_ends_with_it() -> Tes
 
     let drops: Vec<String> = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| recorded.line.kind == AuditKind::Drop)
         .map(|recorded| recorded.line.outcome)

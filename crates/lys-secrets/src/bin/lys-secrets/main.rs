@@ -1,6 +1,7 @@
 //! The secrets broker's command line: make a broker, seal a credential from
 //! standard input, grant and revoke its use, issue and drop handles, sign a
-//! presentation as an agent, read the audit log, and serve the proxy.
+//! presentation as an agent, page through the audit log from its tail, audit
+//! every line of it, and serve the proxy.
 
 #![warn(clippy::await_holding_lock)]
 
@@ -28,11 +29,11 @@ use std::process::ExitCode;
 use clap::Parser;
 use lys_core::Ed25519Identity;
 use lys_secrets::{
-    Broker, EntryClass, HandleId, Holder, Presentation, Recipients, Relation, Scope, Secret,
-    SecretsError, UpstreamRevocation, new_operation_id, request_digest, to_hex,
+    Broker, EntryClass, HandleId, Holder, Presentation, Recipients, RecordedLine, Relation, Scope,
+    Secret, SecretsError, UpstreamRevocation, new_operation_id, request_digest, to_hex,
 };
 
-use args::RecordClass;
+use args::{Page, RecordClass};
 use cli::{Cli, Command, Where};
 use files::{FileGrants, Layout, Route, now_ms};
 use spice::Grants;
@@ -59,6 +60,37 @@ fn open(at: &Where) -> Result<Broker<Grants>, SecretsError> {
 fn open_with(at: &Where, grants: Grants) -> Result<Broker<Grants>, SecretsError> {
     let layout = Layout::new(&at.root, &at.keys);
     Broker::open(&layout.paths(), grants, Box::new(now_ms))
+}
+
+fn print_line(recorded: RecordedLine) {
+    let line = recorded.line;
+    println!(
+        "{:>3} {:<8} {:<32} {:<14} {:<16} {}",
+        recorded.index,
+        line.kind.label(),
+        line.handle.unwrap_or_default(),
+        line.identity.unwrap_or_default(),
+        line.secret.unwrap_or_default(),
+        line.outcome
+    );
+}
+
+/// Prints one page of the audit log through its window, then the index the
+/// next older page ends before, or that this page reached the first line.
+/// It reads the page's lines and no others.
+fn print_page(broker: &Broker<Grants>, page: &Page) -> Result<(), SecretsError> {
+    let lines = broker.audit().window(page.before, page.most.get())?;
+    // A page holds at least one line unless it ends at line 0.
+    let from = lines.first().map_or(0, |first| first.index);
+    for recorded in lines {
+        print_line(recorded);
+    }
+    if from > 0 {
+        println!("older: --before {from}");
+    } else {
+        println!("first line reached");
+    }
+    Ok(())
 }
 
 fn run(command: Command) -> Result<(), SecretsError> {
@@ -366,20 +398,14 @@ fn run(command: Command) -> Result<(), SecretsError> {
             println!("lys-signed-at: {signed_at}");
             println!("lys-presentation: {signature}");
         }
-        Command::Log(at) => {
+        Command::Log { at, page } => print_page(&open(&at)?, &page)?,
+        Command::Audit(at) => {
             let broker = open(&at)?;
-            for recorded in broker.audit().replay()? {
-                let line = recorded.line;
-                println!(
-                    "{:>3} {:<8} {:<32} {:<14} {:<16} {}",
-                    recorded.index,
-                    line.kind.label(),
-                    line.handle.unwrap_or_default(),
-                    line.identity.unwrap_or_default(),
-                    line.secret.unwrap_or_default(),
-                    line.outcome
-                );
-            }
+            let checked = broker.audit().audit_every_line()?.len();
+            println!(
+                "audit sound: every one of {checked} lines is signed by {}",
+                to_hex(&broker.audit().verifying_key())
+            );
         }
         Command::Serve {
             at,

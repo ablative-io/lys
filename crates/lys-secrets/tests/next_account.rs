@@ -35,7 +35,7 @@ fn sec3_next_refusals_accounts_rested() -> TestResult {
     assert!(refused.contains("none to move to"), "{refused}");
     let answered = broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| {
             recorded.line.kind == AuditKind::NextAccount

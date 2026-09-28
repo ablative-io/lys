@@ -20,7 +20,7 @@ const ACT_SIGN: &str =
 fn admitted_uses(broker: &Broker<LocalGrants>) -> Result<usize, lys_secrets::SecretsError> {
     Ok(broker
         .audit()
-        .replay()?
+        .audit_every_line()?
         .into_iter()
         .filter(|recorded| {
             recorded.line.kind == AuditKind::Use && recorded.line.outcome == "admitted"
