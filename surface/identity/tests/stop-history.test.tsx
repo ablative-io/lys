@@ -6,11 +6,11 @@ import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 const path = '/agents/' + SCRIBE + '/stops';
 const route = '#/file/' + SCRIBE + '/record';
 const stop = {
-  agent: SCRIBE, operation: 'op-saved-stop', state: 'suspended', by: ADA, at: 1790553600,
+  agent: SCRIBE, operation: 'op-saved-stop', state: 'suspended', done: true, by: ADA, at: 1790553600,
   reason: 'Unexpected activity', certificates_withdrawn: ['serial-withdrawn'],
   credentials_ended: ['handle-ended'], credentials_refused: null, sessions_asked: ['session-asked'],
 };
-const empty = 'No completed emergency stops have been recorded';
+const empty = 'No emergency-stop requests have been recorded';
 describe('Saved emergency-stop history', () => {
   it('reads the agent’s own saved outcomes without writing or claiming sessions ended', async () => {
     const { requests, posted } = await mount(route, { ...SERVICE, [path]: ok({ stops: [stop] }) });
@@ -24,6 +24,15 @@ describe('Saved emergency-stop history', () => {
     expect(text()).toContain('Not confirmed: BrokerUnavailable: connection refused');
     expect(text()).not.toContain('handle-ended'); expect(text()).not.toContain(empty);
   });
+  it('shows an interrupted request without claiming any effects completed', async () => {
+    const { posted } = await mount(route, { ...SERVICE, [path]: ok({ stops: [{ ...stop, done: false, state: 'asked', certificates_withdrawn: [], credentials_ended: null, sessions_asked: [] }] }) });
+    const history = $('section[aria-label="Emergency-stop history"]')?.textContent ?? '';
+    expect(history).toContain('Stop requested — outcome not confirmed');
+    expect(history).toContain('Unexpected activity'); expect(history).toContain('op-saved-stop');
+    expect(history).not.toContain('Authority after this stop');
+    expect(history).not.toContain('Certificates withdrawn'); expect(history).not.toContain('Credentials ended');
+    expect(history).not.toContain('Sessions asked to end'); expect(posted).toEqual([]);
+  });
   it('distinguishes an empty record from a refusal and lets a subsequent read recover', async () => {
     let answered = false;
     const { requests, posted } = await mount(route, { ...SERVICE, [path]: () => answered ? ok({ stops: [] }) : refused(503, 'StopsUnavailable', 'Stop log could not be read') });
@@ -36,6 +45,8 @@ describe('Saved emergency-stop history', () => {
   it.each([
     { stops: [{ ...stop, agent: ADA }] },
     { stops: [{ ...stop, state: 'active' }] },
+    { stops: [{ ...stop, done: false }] },
+    { stops: [{ ...stop, done: undefined }] },
     { stops: [{ ...stop, credentials_ended: null }] },
     { stops: [{ ...stop, certificates_withdrawn: [false] }] },
     { stops: [stop, stop] },
