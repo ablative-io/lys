@@ -3,7 +3,7 @@
   "title": "The standalone identity directory, with every grant rooted in a person",
   "intention": "An operator installs the identity product without Cambium or Manifold, signs in, links Google and GitHub to one person, registers an agent under a responsible person, and inspects the signed history of every identity change. Cambium later uses this issuer, keeping its participant ids (row 06); that direction is recorded here while row 06 stays the non-goal recorded below, and this sentence does not promise it.",
   "problem": "IDENTITY-001 revision 5 is the reviewed plan for this, in the older row form, and it predates Tom's ruling of 22 September 17:15 that every grant is pegged to a human authority, his PostgreSQL ruling of 23 September 14:14, and the working lifecycle states. Its row 02 installs SpiceDB without saying what it enforces. It cannot be dispatched to the design-system loop as it stands. Separately, conformance rows 9.1 to 9.3, the identity surface's shell, name no brief, and the mock-up that defines the shell falls short of rows 9.2 and 9.3 itself: its help overlay does not return focus to the element that had it, and the network map's nodes, the palette's rows and the j and k cursor are not fully usable by keyboard.",
-  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nDIRECTORY-037 builds the shell to the mock-up on the surface pull request 35 lands, which already carries a shell under surface/identity/src/shell. It adds one route table (surface/identity/src/shell/routeTable.ts) naming every rail screen and every hash-routed tab with a built column; the tests read it as the list the router is checked against, so routes.tsx does not read it. It closes the two gaps in the built shell (keyable.ts, Palette.tsx, keys.ts) and in the mock-up, written as index.v6.html beside v5 with CONFORMANCE.md and DIRECTORY-006's pin moved to it (ADR-104), and adds the surface's test command to .land/gates.sh so every clause is proved on every landing.",
+  "solution": "Carry IDENTITY-001's open rows (02, 04, 03, 05) into design-system briefs in this cluster, DIRECTORY-002 to DIRECTORY-005, revised for the grant ruling (ADR-003), the PostgreSQL ruling (ADR-005) and the working lifecycle states (ADR-011, proposed), with the fork (ADR-009) and the product accents (ADR-010) in the project ledger and every decision still open for Tom marked open. The IDENTITY-001 files stay as they are, as the record of revision 5.\n\nDIRECTORY-037 builds the shell to the mock-up on the surface pull request 35 lands, which already carries a shell under surface/identity/src/shell. It adds one route table (surface/identity/src/shell/routeTable.ts) naming every rail screen and every hash-routed tab with a built column; the tests read it as the list the router is checked against, so routes.tsx does not read it. It closes the two gaps in the built shell (keyable.ts, Palette.tsx, keys.ts) and in the mock-up, written as index.v6.html beside v5, with CONFORMANCE.md's reference line moved to it and carrying its path and sha256; DIRECTORY-006 pins no file and no hash, so this is the first pin of the mock-up (ADR-104), and adds the surface's test command to .land/gates.sh so every clause is proved on every landing.",
   "principles": [
     {
       "id": "P1",
@@ -2367,6 +2367,21 @@
       "path": "docs/design/identity/CONFORMANCE.md",
       "note": "the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html",
       "brief": ""
+    },
+    {
+      "path": ".land/gates.sh",
+      "note": "the repository gate; DIRECTORY-037 adds the surface's test leg",
+      "brief": "DIRECTORY-037"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "the project setup; DIRECTORY-037 adds the surface/identity tree with its measured legs npm ci and npm test",
+      "brief": "DIRECTORY-037"
+    },
+    {
+      "path": "docs/design/identity/CONFORMANCE.md",
+      "note": "the mock-up conformance table; DIRECTORY-037 changes its line 3 to name index.v6.html, with its sha256, as the reference and v5 as the prior",
+      "brief": "DIRECTORY-037"
     }
   ],
   "inventory": [
