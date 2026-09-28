@@ -51,6 +51,11 @@ pub struct Config {
     /// there server-side.
     #[serde(default)]
     pub sign_in_api: Option<String>,
+    /// The file holding the install's operator token. A request carrying it
+    /// in the `lys-operator` header acts as the administrator, recorded as
+    /// authenticated by the operator token. Without it no request may.
+    #[serde(default)]
+    pub operator_token_file: Option<PathBuf>,
     /// The step-1 administrator, by issuer and subject (P9), when the
     /// install named one before the service started. Without it the
     /// administrator is the one first-run setup records (`setup`).

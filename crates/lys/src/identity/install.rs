@@ -132,6 +132,18 @@ pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResul
     write_providers_key(config)?;
     provider_key(config)?;
     service_key(layout)?;
+    operator_token(config)?;
+    Ok(())
+}
+
+/// The install's operator token, made once and kept owner-only.
+fn operator_token(config: &DeploymentConfig) -> IdentityResult<()> {
+    let path = config.state_dir().join(server_config::OPERATOR_TOKEN_FILE);
+    if path.exists() {
+        return Ok(());
+    }
+    let token = setup_code::generate();
+    private_files::write(&path, token.expose().as_bytes())?;
     Ok(())
 }
 

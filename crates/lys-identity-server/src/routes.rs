@@ -86,6 +86,8 @@ pub struct AppState {
     pub sign_in_providers: Option<crate::sign_in_providers::SignInProviders>,
     /// The nonces agents' signed requests carried within the last minute.
     pub agent_nonces: crate::agent_signature::Nonces,
+    /// The install's operator token, when the configuration names its file.
+    pub operator_token: Option<zeroize::Zeroizing<String>>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -187,6 +189,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             })
             .transpose()?,
         agent_nonces: Mutex::default(),
+        operator_token: crate::operator::token(config)?,
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -291,8 +294,12 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
         .and_then(|value| value.to_str().ok())
 }
 
-/// The signed-in actor, or a refusal.
+/// The signed-in actor, or a refusal: the administrator for a request
+/// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+    if let Some(actor) = crate::operator::actor(state, headers)? {
+        return Ok(actor);
+    }
     state.sessions.actor(cookie_header(headers))
 }
 

@@ -34,6 +34,10 @@ pub const PROVIDERS_KEY_FILE: &str = "sign-in-providers-api-key";
 /// written owner-only by the install.
 pub const PROVIDER_KEY_FILE: &str = "provider-signing.key";
 
+/// The operator token's file in the state folder: a request carrying it acts
+/// as the administrator.
+pub const OPERATOR_TOKEN_FILE: &str = "operator-token";
+
 /// How long a sign-in lasts, in seconds: one working day.
 pub const SESSION_SECONDS: u64 = 28_800;
 
@@ -79,6 +83,7 @@ pub fn render(
         "log_dir": dir("directory-log"),
         "log_origin": LOG_ORIGIN,
         "event_key_file": layout.service_key().display().to_string(),
+        "operator_token_file": state.join(OPERATOR_TOKEN_FILE).display().to_string(),
         "issuer": issuer,
         "client_id": config.clients.platform.id,
         "client_secret_file": state
