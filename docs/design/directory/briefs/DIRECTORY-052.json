@@ -36,7 +36,9 @@
         "A member naming an account handle the broker does not hold is refused account_unknown.",
         "Three members who check each other in a ring (A checks B, B checks C, C checks A) are refused checkers_circular naming all three.",
         "A person without provision_team who creates a plan is refused, and nothing is written.",
-        "A plan is read back unchanged after the service restarts, from the checkpoint and the tail."
+        "A plan is read back unchanged after the service restarts.",
+        "That restart reads no plan event from before the checkpoint.",
+        "A person who is not the plan's responsible person, one of its checkers or an administrator is refused not_your_plan when reading it."
       ],
       "files": {
         "create": [
@@ -45,7 +47,8 @@
           "crates/lys-identity-server/tests/team_plans.rs"
         ],
         "modify": [
-          "crates/lys-identity-server/src/routes.rs"
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/lib.rs"
         ],
         "delete": []
       },
@@ -59,20 +62,28 @@
     {
       "id": "R2",
       "title": "Provision in one all-or-nothing act",
-      "spec": "Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). Provisioning runs in three passes: check every member and step, then create every record, then start every agent, so no agent starts until every member exists. If a step is refused after records exist, or a member fails to start after others have started, every started member is stopped through the runner and its process's end is taken from the runner's own exit record (never assumed from the stop request), then each created agent is retired and its grants revoked by recorded acts, so nothing of theirs runs or can be used (a log keeps what happened; nothing is unmade), and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice. The operation id and each pass's progress are recorded before the pass acts, so a provision cut off by a restart and sent again with the same id finishes or rolls back from where it stood, and never starts a member twice.",
+      "spec": "Behavioural. POST /team-plans/{id}/provision creates, under the responsible person's grants: each agent, its grants as the profile names, its home, its budgets (DIRECTORY-051 R2) and goals (R4), then starts each through the runner (DIRECTORY-050 R3). Provisioning runs in three passes: check every member and step, then create every record, then start every agent, so no agent starts until every member exists. If a step is refused after records exist, or a member fails to start after others have started, every started member is stopped through the runner and its process's end is taken from the runner's own exit record (never assumed from the stop request), then each created agent is retired and its grants revoked by recorded acts, so nothing of theirs runs or can be used (a log keeps what happened; nothing is unmade), and the refusal names the member and the step; a second provision under the same operation id answers what was done and does nothing twice. The operation id and each pass's progress are recorded before the pass acts, so a provision cut off by a restart and sent again with the same id finishes or rolls back from where it stood, and never starts a member twice. Each member's start carries a stable per-member operation identity (the operation id and the member) to the runner, which records the start's outcome under it durably before it answers; a provision resumed after a restart first reads the runner's start records for each member's identity and reconciles with them, so a member whose process started but whose answer never arrived is recognised, not started again.",
       "acceptance": [
         "Provisioning a three-member plan leaves three running agents with their budgets and goals.",
         "A refusal at the third member leaves the first two retired with their grants revoked and never started, naming the member and step.",
         "Sending the same operation twice does nothing the second time.",
-        "A start that fails at the third member, after the first two started, leaves the first two stopped, with the runner's exit record for each process, retired and with grants revoked, naming the member and the step.",
-        "A provision interrupted by a service restart between the record and start passes, sent again with the same operation id, starts each member exactly once."
+        "A start that fails at the third member, after the first two started, leaves the first two stopped.",
+        "That test finds the runner's exit record for each of the first two processes.",
+        "That test finds the first two members retired.",
+        "That test finds the first two members' grants revoked.",
+        "That refusal names the third member and the start step.",
+        "A provision interrupted by a service restart between the record and start passes, sent again with the same operation id, starts each member exactly once.",
+        "A provision cut off after the runner started a member but before its answer was recorded, sent again with the same operation id after a restart, starts that member no second time.",
+        "That resumed provision records the member as started from the runner's own start record."
       ],
       "files": {
         "create": [
           "crates/lys-identity-server/src/team_plans_provision.rs"
         ],
         "modify": [
-          "crates/lys-identity-server/src/team_plans_api.rs"
+          "crates/lys-identity-server/src/team_plans_api.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/tests/team_plans.rs"
         ],
         "delete": []
       },
@@ -86,19 +97,27 @@
     {
       "id": "R3",
       "title": "Starting memories and opening conversation",
-      "spec": "Behavioural. Each member's home is created with the memories the plan names copied in as its inherited memory, and its session starts by resuming the opening conversation written for it, so its first turn already holds them. The render records both in the session's given record (lys.given).",
+      "spec": "Behavioural. Each member's home is created with the memories the plan names copied in as its inherited memory, and its session starts by resuming the opening conversation written for it, so its first turn already holds them. The render records both in the session's given record (lys.given). Writing fewshot turns is exposed from lys-home's library (the writer the fewshot command uses, moved behind a public library function in lib.rs and called by the command in cli.rs), so the identity server calls the same code across the crate boundary; crates/lys-home/tests/fewshot_write.rs calls it through the public function.",
       "acceptance": [
         "With a fixture harness, the input given to a member's first turn holds its starting memory text and its opening conversation, and no model is called.",
         "The given record names both by digest.",
-        "The starting memory is written into the member's home as lantern notes, and the opening conversation as fewshot turns, by the same code paths lys-home's own commands use, and the rendered first turn shows both."
+        "The starting memory is written into the member's home as lantern notes through crates/lys-home/src/record/lantern.rs.",
+        "The opening conversation is written as fewshot turns through crates/lys-home/src/cli/fewshot.rs.",
+        "The rendered first turn shows the starting memory text.",
+        "The rendered first turn shows the opening conversation.",
+        "crates/lys-home/tests/fewshot_write.rs writes turns through lys-home's public library function and reads them back as the fewshot command writes them."
       ],
       "files": {
-        "create": [],
+        "create": [
+          "crates/lys-home/tests/fewshot_write.rs"
+        ],
         "modify": [
           "crates/lys-home/src/record/given.rs",
           "crates/lys-identity-server/src/team_plans_provision.rs",
           "crates/lys-home/src/record/lantern.rs",
-          "crates/lys-home/src/cli/fewshot.rs"
+          "crates/lys-home/src/cli/fewshot.rs",
+          "crates/lys-home/src/lib.rs",
+          "crates/lys-home/src/cli.rs"
         ],
         "delete": []
       },
@@ -141,7 +160,12 @@
         "A plan built from a template on the screen provisions and appears with every member running.",
         "The screen shows spend, goals and deliverables per member.",
         "Surface tests cover building, provisioning and the refusals.",
-        "The Teams screen is reached from the rail and at its own route, and surface/identity/tests/team-plans.test.tsx covers reaching it, building, provisioning and each refusal."
+        "The Teams screen is reached from the rail.",
+        "The Teams screen is reached at its own route.",
+        "surface/identity/tests/team-plans.test.tsx covers reaching the screen.",
+        "That test file covers building a plan from a template.",
+        "That test file covers provisioning a plan.",
+        "That test file covers each refusal the screen can show."
       ],
       "files": {
         "create": [

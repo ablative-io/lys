@@ -4217,6 +4217,21 @@
       "path": "crates/lys-home/src/cli/fewshot.rs",
       "note": "DIRECTORY-052 R3: a member's opening conversation is written as fewshot turns",
       "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/tests/fewshot_write.rs",
+      "note": "DIRECTORY-052 R3: fewshot turns written through lys-home's public library function",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/src/lib.rs",
+      "note": "DIRECTORY-052 R3: lys-home's library exposes the fewshot writer",
+      "brief": "DIRECTORY-052"
+    },
+    {
+      "path": "crates/lys-home/src/cli.rs",
+      "note": "DIRECTORY-052 R3: the fewshot command calls the library writer",
+      "brief": "DIRECTORY-052"
     }
   ],
   "inventory": [
