@@ -6,12 +6,14 @@ use crate::support::{
     with_flag,
 };
 
-/// The names in the bench directory other than the fixtures, sorted.
+/// The names in the bench directory other than the fixtures, sorted. The
+/// issuer certificate stored beside the issuer key belongs with the key.
 fn written(bench: &Bench) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(bench.dir())
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| !["issuer.key", "operator.key", "log"].contains(&name.as_str()))
+        .filter(|name| name != "issuer.key.issuer.pem")
         .collect();
     names.sort();
     names
@@ -98,7 +100,7 @@ fn an_existing_output_is_refused_by_name_before_anything_is_signed_or_appended()
 }
 
 #[test]
-fn an_existing_certificate_is_refused_without_a_log_too() {
+fn an_existing_certificate_is_refused_with_the_ca_key_only_too() {
     let bench = Bench::new();
     let existing = bench.path("agent-plain.pem");
     std::fs::write(&existing, b"an older certificate").unwrap();
@@ -113,6 +115,10 @@ fn an_existing_certificate_is_refused_without_a_log_too() {
         "1h",
         "--out",
         path_str(&existing),
+        "--log",
+        path_str(&bench.log_dir),
+        "--leaf-out",
+        path_str(&bench.path("agent-plain.leaf")),
     ]);
     assert_ne!(refused.status.code(), Some(0));
     assert!(
@@ -121,6 +127,8 @@ fn an_existing_certificate_is_refused_without_a_log_too() {
         said(&refused)
     );
     assert_eq!(std::fs::read(&existing).unwrap(), b"an older certificate");
+    assert!(!bench.path("agent-plain.leaf").exists());
+    assert_eq!(bench.log_size(), 0);
 }
 
 #[test]

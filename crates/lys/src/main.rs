@@ -116,9 +116,9 @@ fn main() -> ExitCode {
             } => commands::duration::validity_window(validity_days, validity.as_deref()).and_then(
                 |ttl| {
                     let entry = commands::ca_log::LogEntry::from_flags(
-                        log.as_deref(),
+                        &log,
+                        &leaf_out,
                         log_key.as_deref(),
-                        leaf_out.as_deref(),
                         artifact_out.as_deref(),
                     )?;
                     let outputs = commands::ca::IssueOutputs {
@@ -137,6 +137,7 @@ fn main() -> ExitCode {
                     )
                 },
             ),
+            CaCommand::IssuerCert { key, out } => commands::ca::issuer_cert(&key, &out, json),
             CaCommand::Verify {
                 cert,
                 issuer_public_key,

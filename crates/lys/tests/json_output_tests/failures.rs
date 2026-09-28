@@ -62,7 +62,19 @@ fn a_refused_request_issuance_writes_no_certificate() {
         &request,
     ]);
 
+    let log = path("log");
+    run_lys(&[
+        "--json",
+        "log",
+        "init",
+        "--dir",
+        &log,
+        "--origin",
+        "example.com/lys/issuance",
+    ]);
+
     let out = dir.join("never-written.pem");
+    let leaf = dir.join("never-written.leaf");
     let output = run_lys(&[
         "--json",
         "ca",
@@ -77,6 +89,10 @@ fn a_refused_request_issuance_writes_no_certificate() {
         "1",
         "--out",
         &out.to_string_lossy(),
+        "--log",
+        &log,
+        "--leaf-out",
+        &leaf.to_string_lossy(),
     ]);
 
     assert!(!output.status.success(), "expected a failing exit code");
@@ -88,6 +104,12 @@ fn a_refused_request_issuance_writes_no_certificate() {
         !out.exists(),
         "a refused issuance must not leave a certificate behind"
     );
+    assert!(
+        !leaf.exists(),
+        "a refused issuance must not leave a leaf behind"
+    );
+    let leaves = std::fs::read_dir(dir.join("log/leaves")).unwrap();
+    assert_eq!(leaves.count(), 0);
 }
 
 /// A verification failure stays non-oracle in JSON mode.

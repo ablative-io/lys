@@ -194,8 +194,15 @@ $ cat capabilities.json
   "max_budget_usd": 50
 }
 
+$ lys log init --dir issuance-log --origin example.com/lys/issuance
+initialized log directory: issuance-log
+origin: example.com/lys/issuance
+tree size: 0
+root hash (sha256): e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
 $ lys ca issue --key orchestrator.key --subject agent-noor --request agent-noor.csr.pem \
-    --claims capabilities.json --validity-days 7 --out agent-noor.pem
+    --claims capabilities.json --validity-days 7 --out agent-noor.pem \
+    --log issuance-log --leaf-out agent-noor.leaf
 issued certificate for subject: agent-noor
 subject public key (ed25519): 254f31d0057e669e47b8078eca766eefc2070467a6a6da3185ca25fff18cc6a8
 subject key origin: presented by the holder, proof of possession verified
@@ -204,7 +211,15 @@ fingerprint (sha256): a06815abf461ca4d01184b47f136811f6789e7e8344d3e17418b0e632d
 expires at (rfc3339): 2026-08-05T21:21:23+00:00
 capability claims embedded from: capabilities.json
 certificate written: agent-noor.pem
+entered in log: issuance-log
+leaf index: 0
+tree size: 1
+root hash (sha256): 6abea3f5575b7f6a12cb7a3dcad22ac8753b75919aba84f2391359e06b7ff4e5
+root hash (base64): ar6j9Vdbf2oSy3o9ytIqyHU7dZGauoTyORNZ4Gt/9OU=
+leaf written: agent-noor.leaf
 ```
+
+Every certificate is entered in a transparency log before it is written: `--log` and `--leaf-out` are required, and the leaf is the certificate's DER and nothing else. Issuing needs only the CA key. The log's operator, who alone holds the log's key, makes the inclusion proof for the reported leaf index with `lys log prove inclusion`, and anyone checks the certificate with `openssl verify -CAfile` against the issuer certificate `lys ca issuer-cert` writes, and its entry with `scripts/verify_inclusion.py`, holding nothing from lys.
 
 The subject public key in the certificate is the agent's own key, byte for byte — `254f31d0…` in all three commands. That identity is what makes the rest of this example mean anything: the same key signs the session log below, so the certificate and the log are provably about one agent rather than two unrelated keys that each verify on their own. The request is a public artifact and carries no private material; the agent's private key never leaves the agent.
 

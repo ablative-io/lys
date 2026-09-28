@@ -1,14 +1,22 @@
 //! `lys ca issue --log`: entering an issued certificate in a transparency log.
 //!
+//! Every issuance enters its certificate: `--log` and `--leaf-out` are
+//! required, and the leaf's bytes are the certificate's DER and nothing else.
+//! The issuer needs only the CA key. The inclusion-proof artifact is signed
+//! with the log's key, which a production issuer never holds, so the log's
+//! operator makes it with `lys log prove inclusion` from the reported leaf
+//! index. `--log-key` and `--artifact-out`, given together, make it in the
+//! same run for one operator who holds both keys; one without the other is
+//! refused before anything is read.
+//!
 //! The append is the one step that cannot be undone, so everything that can be
-//! checked or written ahead of it is: the flags come together or not at all,
-//! the log is opened and its size checked against what an inclusion proof can
-//! carry, and the certificate, the issuer certificate and the leaf are staged
-//! to disk and flushed. After the append only the renames and the
-//! inclusion-proof artifact remain. If any of those fails, the error names the
-//! entry that now stands (index, tree size and root) and the exact
-//! `lys log prove inclusion` command that recovers the artifact, and nothing
-//! is signed again.
+//! checked or written ahead of it is: the log is opened and its size checked
+//! against what an inclusion proof can carry, and the certificate, the issuer
+//! certificate and the leaf are staged to disk and flushed. After the append
+//! only the renames and, with `--log-key`, the inclusion-proof artifact remain.
+//! If any of those fails, the error names the entry that now stands (index,
+//! tree size and root) and the exact `lys log prove inclusion` command that
+//! recovers the artifact, and nothing is appended or signed again.
 
 use std::path::Path;
 
@@ -25,63 +33,69 @@ use crate::commands::log::prove::artifact_json;
 use crate::commands::log::store::{self, LogStore};
 use crate::commands::output::Emitter;
 
+/// The log operator's half of an entry, for one operator holding both the CA
+/// key and the log's key: the inclusion-proof artifact is made in the same run.
+#[derive(Debug)]
+pub struct OperatorProof<'a> {
+    /// The log operator's identity key, which signs the proof's checkpoint.
+    pub key: &'a Path,
+    /// Where the `lys/log-inclusion-proof/v1` artifact is written.
+    pub artifact_out: &'a Path,
+}
+
 /// A transparency log an issued certificate is entered in, and where the
 /// evidence of that entry is written.
 #[derive(Debug)]
 pub struct LogEntry<'a> {
     /// An initialized `lys log` directory.
     pub dir: &'a Path,
-    /// The log operator's identity key, which signs the proof's checkpoint.
-    pub key: &'a Path,
     /// Where the leaf is written: the certificate's DER bytes, exactly.
     pub leaf_out: &'a Path,
-    /// Where the `lys/log-inclusion-proof/v1` artifact is written.
-    pub artifact_out: &'a Path,
+    /// The artifact made in the same run, or `None` when the issuer holds
+    /// only the CA key and the log's operator makes it.
+    pub proof: Option<OperatorProof<'a>>,
 }
 
 impl<'a> LogEntry<'a> {
-    /// Reads the four log flags as one entry, or as no log at all.
+    /// Reads the log flags as one entry: `--log` and `--leaf-out` always, and
+    /// `--log-key` with `--artifact-out` together or not at all.
     ///
     /// # Errors
     ///
-    /// [`CliError::LogFlagsIncomplete`] naming the missing flags when some
-    /// but not all four are given. A partial set is never read as "no log".
+    /// [`CliError::LogFlagsIncomplete`] naming the missing flag when only one
+    /// of `--log-key` and `--artifact-out` is given. Half a pair is never read
+    /// as "no artifact".
     pub fn from_flags(
-        dir: Option<&'a Path>,
+        dir: &'a Path,
+        leaf_out: &'a Path,
         key: Option<&'a Path>,
-        leaf_out: Option<&'a Path>,
         artifact_out: Option<&'a Path>,
-    ) -> CliResult<Option<Self>> {
-        match (dir, key, leaf_out, artifact_out) {
-            (None, None, None, None) => Ok(None),
-            (Some(dir), Some(key), Some(leaf_out), Some(artifact_out)) => Ok(Some(Self {
-                dir,
-                key,
-                leaf_out,
-                artifact_out,
-            })),
-            _ => {
-                let flags = [
-                    ("--log", dir.is_none()),
-                    ("--log-key", key.is_none()),
-                    ("--leaf-out", leaf_out.is_none()),
-                    ("--artifact-out", artifact_out.is_none()),
-                ];
-                let missing: Vec<&str> = flags
-                    .iter()
-                    .filter(|(_, absent)| *absent)
-                    .map(|(flag, _)| *flag)
-                    .collect();
-                Err(CliError::LogFlagsIncomplete {
-                    missing: missing.join(", "),
-                })
+    ) -> CliResult<Self> {
+        let proof = match (key, artifact_out) {
+            (None, None) => None,
+            (Some(key), Some(artifact_out)) => Some(OperatorProof { key, artifact_out }),
+            (Some(_), None) => {
+                return Err(CliError::LogFlagsIncomplete {
+                    missing: "--artifact-out",
+                });
             }
-        }
+            (None, Some(_)) => {
+                return Err(CliError::LogFlagsIncomplete {
+                    missing: "--log-key",
+                });
+            }
+        };
+        Ok(Self {
+            dir,
+            leaf_out,
+            proof,
+        })
     }
 
-    /// Opens the log, loads the operator key, and refuses a log whose next
-    /// leaf would take the tree to a size an inclusion proof cannot carry.
-    /// Nothing is signed or appended here.
+    /// Opens the log, loads the operator key when one was given, and refuses
+    /// a log whose next leaf would take the tree to a size an inclusion proof
+    /// cannot carry. Nothing is signed or appended here, and without
+    /// `--log-key` no log key is read at all.
     ///
     /// # Errors
     ///
@@ -90,7 +104,11 @@ impl<'a> LogEntry<'a> {
     /// with no room for one more provable leaf.
     pub(crate) fn open(&'a self) -> CliResult<OpenedLog<'a>> {
         let log = store::open(self.dir)?;
-        let operator = load_identity(self.key)?;
+        let operator = self
+            .proof
+            .as_ref()
+            .map(|proof| load_identity(proof.key))
+            .transpose()?;
         let size = log.tree().len();
         if size
             .checked_add(1)
@@ -115,19 +133,21 @@ impl<'a> LogEntry<'a> {
 /// A log opened and checked for an entry, before anything is appended.
 pub(crate) struct OpenedLog<'a> {
     log: LogStore,
-    operator: Ed25519Identity,
+    /// The operator's identity, loaded only when `--log-key` was given.
+    operator: Option<Ed25519Identity>,
     entry: &'a LogEntry<'a>,
 }
 
 impl<'a> OpenedLog<'a> {
     /// Stages the leaf, appends the certificate's DER, places every staged
-    /// output, then builds and places the inclusion-proof artifact.
+    /// output, then, only when the operator's key was given, builds and places
+    /// the inclusion-proof artifact.
     ///
     /// # Errors
     ///
-    /// Before the append, the staging error of the leaf file. After it,
-    /// [`CliError::LoggedButUnwritten`], which names the entry and the command
-    /// that recovers the artifact.
+    /// Before the append, the staging error of the leaf file and the log's
+    /// refusal of the append. After it, [`CliError::LoggedButUnwritten`],
+    /// which names the entry and the command that recovers the artifact.
     pub(crate) fn enter(mut self, der: &[u8], staged: Vec<StagedFile>) -> CliResult<Entered<'a>> {
         let leaf = StagedFile::stage(self.entry.leaf_out, der, "leaf file")?;
         let (leaf_index, _) = self.log.append(der)?;
@@ -144,7 +164,8 @@ impl<'a> OpenedLog<'a> {
         }
     }
 
-    /// Everything after the append: the renames, then the artifact.
+    /// Everything after the append: the renames, then the artifact when the
+    /// operator's key was given. Without it nothing is signed.
     fn finish(
         &self,
         der: &[u8],
@@ -154,16 +175,19 @@ impl<'a> OpenedLog<'a> {
         for file in staged {
             file.place()?;
         }
+        let (Some(operator_identity), Some(proof)) = (&self.operator, &self.entry.proof) else {
+            return Ok(());
+        };
         let artifact = build_inclusion_artifact(
             self.log.tree(),
             der,
             self.log.origin(),
-            &self.operator,
+            operator_identity,
             leaf_index,
         )?;
         let json = artifact_json(&artifact, "inclusion proof artifact")?;
         StagedFile::stage(
-            self.entry.artifact_out,
+            proof.artifact_out,
             json.as_bytes(),
             "inclusion proof artifact",
         )?
@@ -187,20 +211,25 @@ impl Entered<'_> {
     }
 
     /// The error for a failure after the append: the entry stands, so it is
-    /// named in full with the command that recovers its artifact.
+    /// named in full with the command that recovers its artifact. Without
+    /// `--log-key` the command names the key and the artifact by the literal
+    /// placeholders `<log-key>` and `<artifact>`, for the log's operator to
+    /// fill in.
     fn unwritten(&self, cause: CliError) -> CliError {
         let entry = self.entry;
+        let (key, artifact) = match &entry.proof {
+            Some(proof) => (shell_word(proof.key), shell_word(proof.artifact_out)),
+            None => ("<log-key>".to_string(), "<artifact>".to_string()),
+        };
         CliError::LoggedButUnwritten {
             log: entry.dir.to_path_buf(),
             leaf_index: self.leaf_index,
             tree_size: self.tree_size,
             root_base64: self.root_base64(),
             recover: format!(
-                "lys log prove inclusion --dir {} --key {} --leaf-index {} --out {}",
+                "lys log prove inclusion --dir {} --key {key} --leaf-index {} --out {artifact}",
                 shell_word(entry.dir),
-                shell_word(entry.key),
-                self.leaf_index,
-                shell_word(entry.artifact_out)
+                self.leaf_index
             ),
             cause: Box::new(cause),
         }
@@ -219,11 +248,13 @@ impl Entered<'_> {
             "leaf_path",
             entry.leaf_out.display().to_string(),
         );
-        emit.field(
-            "artifact written",
-            "artifact_path",
-            entry.artifact_out.display().to_string(),
-        );
+        if let Some(proof) = &entry.proof {
+            emit.field(
+                "artifact written",
+                "artifact_path",
+                proof.artifact_out.display().to_string(),
+            );
+        }
     }
 }
 

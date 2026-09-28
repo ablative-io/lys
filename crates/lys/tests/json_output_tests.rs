@@ -253,6 +253,16 @@ fn every_subcommand_honours_the_global_json_flag() {
     let claims = dir.join("claims.json");
     write(&claims, b"{\"capabilities\":[\"repo:read\"]}");
     let cert = p("agent.pem");
+    let issuance_log = p("issuance-log");
+    json_ok(&[
+        "--json",
+        "log",
+        "init",
+        "--dir",
+        &issuance_log,
+        "--origin",
+        "example.com/lys/issuance",
+    ]);
     let issued = json_ok(&[
         "--json",
         "ca",
@@ -267,6 +277,10 @@ fn every_subcommand_honours_the_global_json_flag() {
         "7",
         "--out",
         &cert,
+        "--log",
+        &issuance_log,
+        "--leaf-out",
+        &p("agent.leaf"),
     ]);
     assert_eq!(issued["subject"], "agent-json");
     let ca_verified = json_ok(&[
@@ -321,6 +335,10 @@ fn every_subcommand_honours_the_global_json_flag() {
         "7",
         "--out",
         &presented_cert,
+        "--log",
+        &issuance_log,
+        "--leaf-out",
+        &p("holder.leaf"),
     ]);
     // The certificate binds the holder's own key rather than one the issuer
     // minted, and says so — a consumer must be able to tell the two paths

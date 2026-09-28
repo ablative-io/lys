@@ -23,6 +23,16 @@
 //! path produced the certificate, because the distinction is the whole
 //! difference in what the certificate is evidence of.
 //!
+//! Every issuance is entered in a transparency log before anything is
+//! written (see [`crate::commands::ca_log`]), holding only the CA key.
+//!
+//! The issuer's self-signed certificate is built once per issuer key and
+//! stored beside it, at the key file's path with `.issuer.pem` appended, so
+//! `lys ca issuer-cert` and `lys ca issue --issuer-out` write the same bytes
+//! on every call. The stored file is public; it is never rebuilt, overwritten
+//! or deleted once it exists, and one that is not the key's own is refused by
+//! name before anything is written or appended.
+//!
 //! Invariants: the issuer key file must already exist — only `lys key
 //! generate` creates key material — and the subject keypair the library
 //! generates during issuance is discarded, never written to disk or printed;
@@ -34,7 +44,7 @@
 //! contents can never inject terminal escape sequences into the verification
 //! output.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -44,6 +54,7 @@ use lys_core::ca::{
     CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
     encode_extension, verify_certificate_chain_at,
 };
+use x509_parser::prelude::{FromDer, X509Certificate};
 
 use crate::commands::ca_log::LogEntry;
 use crate::commands::error::{CliError, CliResult};
@@ -136,15 +147,167 @@ pub fn request(key: &Path, subject: &str, out: &Path, json: bool) -> CliResult<(
     Ok(())
 }
 
+/// The path of the issuer certificate stored beside an issuer key: the key
+/// file's path with `.issuer.pem` appended (for `issuer.key`,
+/// `issuer.key.issuer.pem`).
+#[must_use]
+pub fn stored_issuer_certificate_path(key: &Path) -> PathBuf {
+    let mut path = key.as_os_str().to_owned();
+    path.push(".issuer.pem");
+    PathBuf::from(path)
+}
+
+/// What the stored issuer certificate file is called in errors.
+const STORED_ISSUER: &str = "stored issuer certificate";
+
+/// An issuer key's stored issuer certificate, as read from disk or as built
+/// by this run.
+struct StoredIssuer {
+    /// The PEM bytes every output of the issuer certificate is written with.
+    pem: Vec<u8>,
+    /// The stored file, staged but not yet placed, when this run built it.
+    /// `None` when it was already on disk.
+    built: Option<StagedFile>,
+}
+
+/// Reads the issuer certificate stored beside `key` and checks it is the
+/// authority's own, or, when there is none, builds it once and stages it at
+/// the stored path for the caller to place.
+///
+/// # Errors
+///
+/// [`CliError::StoredIssuerCertificateInvalid`] if the stored file is not one
+/// PEM `CERTIFICATE` block whose subject public key is the authority's,
+/// [`CliError::Io`] if it cannot be read or staged, and [`CliError::Trust`]
+/// if the issuer certificate cannot be built.
+fn stored_issuer_certificate(
+    key: &Path,
+    authority: &CertificateAuthority,
+) -> CliResult<StoredIssuer> {
+    let path = stored_issuer_certificate_path(key);
+    match std::fs::read(&path) {
+        Ok(pem_bytes) => {
+            check_stored_issuer(&pem_bytes, &path, key, &authority.public_key_bytes())?;
+            Ok(StoredIssuer {
+                pem: pem_bytes,
+                built: None,
+            })
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let pem_text = pem::encode_certificate(&authority.issuer_certificate_der()?);
+            let built = StagedFile::stage(&path, pem_text.as_bytes(), STORED_ISSUER)?;
+            Ok(StoredIssuer {
+                pem: pem_text.into_bytes(),
+                built: Some(built),
+            })
+        }
+        Err(source) => Err(CliError::Io {
+            context: format!(
+                "failed to read the {STORED_ISSUER} {} beside the issuer key",
+                path.display()
+            ),
+            source,
+        }),
+    }
+}
+
+/// Refuses a stored issuer certificate that is not exactly one PEM
+/// `CERTIFICATE` block holding one X.509 certificate whose subject public key
+/// is `issuer`.
+fn check_stored_issuer(
+    pem_bytes: &[u8],
+    path: &Path,
+    key: &Path,
+    issuer: &[u8; 32],
+) -> CliResult<()> {
+    let refuse = |reason: String| CliError::StoredIssuerCertificateInvalid {
+        path: path.to_path_buf(),
+        key: key.to_path_buf(),
+        reason,
+    };
+    let der = match pem::decode_certificate(pem_bytes, path) {
+        Ok(der) => der,
+        Err(err) => return Err(refuse(err.to_string())),
+    };
+    let (rest, certificate) = match X509Certificate::from_der(&der) {
+        Ok(parsed) => parsed,
+        Err(err) => return Err(refuse(format!("its body is not X.509: {err:?}"))),
+    };
+    if !rest.is_empty() {
+        let trailing = rest.len();
+        return Err(refuse(format!("{trailing} bytes follow the certificate")));
+    }
+    let subject_key = certificate.public_key().subject_public_key.data.as_ref();
+    if subject_key != issuer.as_slice() {
+        let found = hex_lower(subject_key);
+        return Err(refuse(format!("its subject public key is {found}")));
+    }
+    Ok(())
+}
+
+/// `lys ca issuer-cert --key <path> --out <file>`.
+///
+/// Writes the issuer's self-signed CA certificate, the one stored beside the
+/// key (see [`stored_issuer_certificate_path`]), so a person who did not run
+/// an issuance can still check its certificates with `openssl verify -CAfile`.
+/// The stored certificate is built once, when first asked for, and every
+/// later call writes its bytes unchanged. It is public: it carries the issuer
+/// public key and a signature, never the seed. No log is opened.
+///
+/// # Errors
+///
+/// [`CliError::OutputExists`] if `out` already exists, refused before the
+/// stored certificate is built or written; [`CliError::OutputPathShared`] if
+/// `out` names the stored file; [`CliError::KeyFileMissing`] if the key file
+/// does not exist; [`CliError::StoredIssuerCertificateInvalid`] if the stored
+/// file is not the key's own; [`CliError::Io`] if a file cannot be read or
+/// written; and [`CliError::Trust`] if the issuer certificate cannot be built.
+pub fn issuer_cert(key: &Path, out: &Path, json: bool) -> CliResult<()> {
+    let stored_path = stored_issuer_certificate_path(key);
+    refuse_shared_paths(&[
+        ("issuer certificate file", out),
+        (STORED_ISSUER, stored_path.as_path()),
+    ])?;
+    refuse_existing(out, "issuer certificate file")?;
+    let authority = CertificateAuthority::new(load_identity(key)?);
+    let stored = stored_issuer_certificate(key, &authority)?;
+    if let Some(built) = stored.built {
+        built.place()?;
+    }
+    let written = StagedFile::stage(out, &stored.pem, "issuer certificate file")?;
+    written.place()?;
+
+    let mut emit = Emitter::new(json);
+    emit.field(
+        "issuer public key (ed25519)",
+        "issuer_public_key",
+        hex_lower(&authority.public_key_bytes()),
+    );
+    emit.field(
+        "stored issuer certificate",
+        "stored_issuer_certificate_path",
+        stored_path.display().to_string(),
+    );
+    emit.field(
+        "issuer certificate written",
+        "issuer_certificate_path",
+        out.display().to_string(),
+    );
+    emit.note("public: it carries no private key material");
+    emit.finish();
+    Ok(())
+}
+
 /// Where an issuance writes what it produces.
 #[derive(Debug)]
 pub struct IssueOutputs<'a> {
     /// The PEM certificate.
     pub certificate: &'a Path,
-    /// The issuer's self-signed PEM certificate, for standard X.509 tooling.
+    /// Where to write the issuer's stored self-signed PEM certificate, for
+    /// standard X.509 tooling.
     pub issuer_certificate: Option<&'a Path>,
     /// The transparency log the certificate is entered in before it is written.
-    pub log: Option<LogEntry<'a>>,
+    pub log: LogEntry<'a>,
 }
 
 impl IssueOutputs<'_> {
@@ -154,9 +317,9 @@ impl IssueOutputs<'_> {
         if let Some(path) = self.issuer_certificate {
             named.push(("issuer certificate file", path));
         }
-        if let Some(entry) = &self.log {
-            named.push(("leaf file", entry.leaf_out));
-            named.push(("inclusion proof artifact", entry.artifact_out));
+        named.push(("leaf file", self.log.leaf_out));
+        if let Some(proof) = &self.log.proof {
+            named.push(("inclusion proof artifact", proof.artifact_out));
         }
         named
     }
@@ -164,23 +327,32 @@ impl IssueOutputs<'_> {
 
 /// `lys ca issue --key <path> --subject <name> [--request <file>]
 /// [--claims <file>] (--validity <window> | --validity-days <n>) --out <file>
-/// [--issuer-out <file>] [--log <dir> --log-key <path> --leaf-out <file>
+/// [--issuer-out <file>] --log <dir> --leaf-out <file> [--log-key <path>
 /// --artifact-out <file>]`.
 ///
-/// With `--log`, the certificate is entered in that transparency log as one
-/// leaf whose bytes are its DER, and nothing else, before anything is written.
-/// The leaf file and the inclusion-proof artifact are written beside it, so a
-/// third party verifies the entry with `scripts/verify_inclusion.py` and the
-/// certificate with `openssl verify` against `--issuer-out`. A log that cannot
-/// be opened, or refuses the entry, stops the issuance before the certificate
-/// is written, so no certificate this command writes is missing from its log.
+/// The certificate is entered in the transparency log at `--log` as one leaf
+/// whose bytes are its DER, and nothing else, before anything is written, and
+/// the leaf is written at `--leaf-out`. Only the CA key is needed: the log's
+/// operator makes the inclusion-proof artifact with `lys log prove inclusion`
+/// from the reported leaf index, and a third party verifies the entry with
+/// `scripts/verify_inclusion.py` and the certificate with `openssl verify`
+/// against the issuer certificate. `--log-key` and `--artifact-out` together
+/// make the artifact in this run, for one operator holding both keys. A log
+/// that cannot be opened, or refuses the entry, stops the issuance before the
+/// certificate is written, so no certificate this command writes is missing
+/// from its log.
+///
+/// `--issuer-out` writes the issuer certificate stored beside the key (see
+/// [`stored_issuer_certificate_path`]), building and storing it first if this
+/// is the first time it is asked for; the stored file is staged with the
+/// other outputs and placed only after the append.
 ///
 /// Every output is refused, before anything is signed or appended, if it
 /// already exists or shares a path with another output. Each is written to a
-/// flushed temporary file and renamed into place, so none is ever torn. With
-/// `--log`, the certificate, issuer certificate and leaf are staged before the
-/// append; a failure after it names the entry and the command that recovers
-/// its artifact, and never signs again (see [`crate::commands::ca_log`]).
+/// flushed temporary file and renamed into place, so none is ever torn. The
+/// certificate, issuer certificate and leaf are staged before the append; a
+/// failure after it names the entry and the command that recovers its
+/// artifact, and never appends or signs again (see [`crate::commands::ca_log`]).
 ///
 /// `ttl` is the already-resolved validity window; the two flags are reconciled
 /// in [`crate::commands::duration::validity_window`] so this function has one
@@ -201,6 +373,10 @@ impl IssueOutputs<'_> {
 /// rejects the issuance parameters, rejects the request's proof of possession,
 /// or signing fails. [`CliError::OutputExists`] and
 /// [`CliError::OutputPathShared`] refuse outputs before anything is signed;
+/// the log's own refusal (an uninitialized or invalid log directory, or the
+/// store's message) stops the run before anything is written;
+/// [`CliError::StoredIssuerCertificateInvalid`] refuses a stored issuer
+/// certificate that is not the key's own; and
 /// [`CliError::LoggedButUnwritten`] reports a failure after the log entry.
 pub fn issue(
     key: &Path,
@@ -212,12 +388,19 @@ pub fn issue(
     json: bool,
 ) -> CliResult<()> {
     let named = outputs.named();
-    refuse_shared_paths(&named)?;
+    let stored_path = outputs
+        .issuer_certificate
+        .map(|_| stored_issuer_certificate_path(key));
+    let mut distinct = named.clone();
+    if let Some(path) = &stored_path {
+        distinct.push((STORED_ISSUER, path.as_path()));
+    }
+    refuse_shared_paths(&distinct)?;
     for &(what, path) in &named {
         refuse_existing(path, what)?;
     }
     let identity = load_identity(key)?;
-    let opened = outputs.log.as_ref().map(LogEntry::open).transpose()?;
+    let opened = outputs.log.open()?;
 
     let extensions = match claims {
         Some(claims_path) => {
@@ -236,6 +419,13 @@ pub fn issue(
     };
 
     let authority = CertificateAuthority::new(identity);
+    // Read, or built and staged, before anything is signed, so a stored
+    // issuer certificate that is not this key's stops the run with nothing
+    // written or appended.
+    let stored = outputs
+        .issuer_certificate
+        .map(|_| stored_issuer_certificate(key, &authority))
+        .transpose()?;
 
     let issued = if let Some(path) = request_path {
         let pem_bytes = read_file(path, "certificate-signing request file")?;
@@ -270,22 +460,15 @@ pub fn issue(
         pem::encode_certificate(&issued.der_bytes).as_bytes(),
         "certificate file",
     )?];
-    if let Some(path) = outputs.issuer_certificate {
-        let issuer_pem = pem::encode_certificate(&authority.issuer_certificate_der()?);
+    if let (Some(path), Some(stored)) = (outputs.issuer_certificate, stored) {
+        staged.extend(stored.built);
         staged.push(StagedFile::stage(
             path,
-            issuer_pem.as_bytes(),
+            &stored.pem,
             "issuer certificate file",
         )?);
     }
-    let entered = if let Some(log) = opened {
-        Some(log.enter(&issued.der_bytes, staged)?)
-    } else {
-        for file in staged {
-            file.place()?;
-        }
-        None
-    };
+    let entered = opened.enter(&issued.der_bytes, staged)?;
 
     let mut emit = Emitter::new(json);
     emit.field("issued certificate for subject", "subject", subject);
@@ -334,10 +517,7 @@ pub fn issue(
             path.display().to_string(),
         );
     }
-    match &entered {
-        Some(entered) => entered.report(&mut emit),
-        None => emit.field("transparency log", "log", "none"),
-    }
+    entered.report(&mut emit);
     emit.finish();
     Ok(())
 }

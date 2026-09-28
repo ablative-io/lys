@@ -229,16 +229,33 @@ pub enum CliError {
         path: PathBuf,
     },
 
-    /// Only some of the flags that enter a certificate in a transparency log
-    /// were given. They come together or not at all; a partial set is never
-    /// read as "no log".
-    #[error(
-        "--log, --log-key, --leaf-out and --artifact-out come together or not at all: \
-         missing {missing}"
-    )]
+    /// Only one of `--log-key` and `--artifact-out` was given. They make the
+    /// inclusion-proof artifact in the issuing run and come together or not at
+    /// all; half the pair is never read as "no artifact".
+    #[error("--log-key and --artifact-out come together or not at all: missing {missing}")]
     LogFlagsIncomplete {
-        /// The flags that were not given, comma-separated.
-        missing: String,
+        /// The one of `--log-key` and `--artifact-out` that was not given.
+        missing: &'static str,
+    },
+
+    /// The issuer certificate stored beside an issuer key is not that key's:
+    /// it does not hold exactly one PEM `CERTIFICATE` block whose subject
+    /// public key is the issuer key's public key. A stored issuer certificate
+    /// is never rebuilt, overwritten or deleted, so the run stops before it
+    /// writes anything or appends to any log.
+    #[error(
+        "the stored issuer certificate {} does not belong to the issuer key {}: {reason}; \
+         nothing was written or appended",
+        path.display(),
+        key.display()
+    )]
+    StoredIssuerCertificateInvalid {
+        /// The stored issuer certificate file.
+        path: PathBuf,
+        /// The issuer key file it is stored beside.
+        key: PathBuf,
+        /// What is wrong with it.
+        reason: String,
     },
 
     /// A certificate was entered in its transparency log and then an output

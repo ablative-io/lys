@@ -109,12 +109,35 @@ fn der_from_pem(pem_text: &str) -> Vec<u8> {
         .expect("PEM body was not valid base64")
 }
 
+/// Initialize a test log at `dir/log`, the log every `lys ca issue` enters
+/// its certificate in, and return its path.
+fn init_test_log(dir: &Path) -> std::path::PathBuf {
+    let log_dir = dir.join("log");
+    let init = run_lys(&[
+        "log",
+        "init",
+        "--dir",
+        path_str(&log_dir),
+        "--origin",
+        "example.com/lys/issuance",
+    ]);
+    assert_eq!(init.status.code(), Some(0), "{}", stderr_of(&init));
+    log_dir
+}
+
+/// The number of leaves in the test log at `log_dir`.
+fn log_leaf_count(log_dir: &Path) -> usize {
+    std::fs::read_dir(log_dir.join("leaves")).unwrap().count()
+}
+
 /// Generate an issuer key and issue a certificate with the standard claims,
 /// returning the cert path and the issuer public key hex.
 fn ca_issue_fixture(dir: &Path, validity_days: &str) -> (std::path::PathBuf, String) {
     let key_path = dir.join("issuer.key");
     let claims_path = dir.join("claims.json");
     let cert_path = dir.join("subject.pem");
+    let log_dir = init_test_log(dir);
+    let leaf_path = dir.join("subject.leaf");
 
     let generate = run_lys(&["key", "generate", "--out", path_str(&key_path)]);
     assert_eq!(generate.status.code(), Some(0), "{}", stderr_of(&generate));
@@ -134,6 +157,10 @@ fn ca_issue_fixture(dir: &Path, validity_days: &str) -> (std::path::PathBuf, Str
         validity_days,
         "--out",
         path_str(&cert_path),
+        "--log",
+        path_str(&log_dir),
+        "--leaf-out",
+        path_str(&leaf_path),
     ]);
     assert_eq!(issue.status.code(), Some(0), "{}", stderr_of(&issue));
     (cert_path, issuer_pub)

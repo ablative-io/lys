@@ -63,6 +63,10 @@ fn a_certificate_checked_against_another_issuer_fails_openssl_verify() {
         path_str(&bench.path("someone-else.pem")),
         "--issuer-out",
         path_str(&bench.path("other-issuer.pem")),
+        "--log",
+        path_str(&bench.log_dir),
+        "--leaf-out",
+        path_str(&bench.path("someone-else.leaf")),
     ]));
 
     let refused = openssl_verify(bench.dir(), "other-issuer.pem", "agent-issuer.pem");
