@@ -22,6 +22,7 @@ use crate::keys::StoreKey;
 use crate::secret::Secret;
 
 mod accounts;
+mod index_commit;
 mod lock;
 mod policy;
 mod scope;
@@ -234,10 +235,7 @@ impl SecretStore {
         };
         self.write_entry(key, &view, value)?;
         self.index.entries.insert(name.to_owned(), view.clone());
-        if let Err(error) = self.write_index() {
-            self.index.entries.remove(name);
-            return Err(error);
-        }
+        self.commit_add(name)?;
         Ok(view)
     }
 

@@ -53,6 +53,7 @@ impl<P: PermissionCheck> Broker<P> {
                 let same = left.len() == right.len()
                     && left.iter().zip(right).fold(0_u8, |d, (a, b)| d | (a ^ b)) == 0;
                 if same {
+                    self.store.confirm_index()?;
                     // A previous store write may have succeeded before its audit
                     // append failed. Confirm the save durably before answering.
                     self.record(
@@ -203,6 +204,79 @@ mod tests {
             api.expose(),
             format!("lys-app.fixture.{}", "ab".repeat(32)).as_bytes()
         );
+        Ok(())
+    }
+    #[test]
+    fn post_rename_sync_failure_preserves_custody_and_refuses_unconfirmed_retry()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let name = "lys-app-person-a-fixture-client";
+        let key = Secret::from_slice("ab".repeat(32).as_bytes());
+        crate::fsutil::sync_fault::arm(&paths.store_dir.join("index.json"), 2);
+        assert!(matches!(
+            broker.seal_once(name, EntryClass::Key, "person-a", &key),
+            Err(SecretsError::IndexUnresolved { .. })
+        ));
+        assert_eq!(
+            crate::fsutil::sync_fault::remaining(),
+            1,
+            "post-rename fault did not fire"
+        );
+        let written = broker
+            .store()
+            .entry(name)
+            .cloned()
+            .ok_or("forgot renamed entry")?;
+        let persisted: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(paths.store_dir.join("index.json"))?)?;
+        assert_eq!(persisted["entries"][name]["id"], written.id);
+        // A second failed directory sync must not be reported as confirmed.
+        assert!(matches!(
+            broker.prepare_app("fixture", "person-a"),
+            Err(SecretsError::IndexUnresolved { .. })
+        ));
+        assert_eq!(
+            crate::fsutil::sync_fault::remaining(),
+            0,
+            "retry did not attempt sync"
+        );
+        let index_path = paths.store_dir.join("index.json");
+        let committed_bytes = std::fs::read(&index_path)?;
+        std::fs::write(&index_path, b"{}")?;
+        assert!(
+            matches!(
+                broker.prepare_app("fixture", "person-a"),
+                Err(SecretsError::IndexUnresolved { .. })
+            ),
+            "a different persisted index cannot confirm held custody"
+        );
+        std::fs::write(&index_path, committed_bytes)?;
+        let digest = broker.prepare_app("fixture", "person-a")?;
+        assert_eq!(
+            digest,
+            crate::encoding::hex(&crate::encoding::sha256(key.expose()))
+        );
+        assert_eq!(broker.store().entry(name), Some(&written));
+        broker.seal_once(
+            "unrelated",
+            EntryClass::Key,
+            "person-a",
+            &Secret::from_slice(b"other"),
+        )?;
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert_eq!(broker.store().entry(name), Some(&written));
+        assert_eq!(broker.prepare_app("fixture", "person-a")?, digest);
+        assert!(broker.store().entry("unrelated").is_some());
         Ok(())
     }
 }

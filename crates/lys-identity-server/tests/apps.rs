@@ -81,7 +81,7 @@ async fn a_pending_app_has_no_client_and_its_kinds_answer_app_not_approved() -> 
 }
 
 #[tokio::test]
-async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_check_pass()
+async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_check_pass()
 -> TestResult {
     let (service, seeded) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -93,21 +93,17 @@ async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_che
     let approval = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(approval["app"]["state"], "approved", "{approval}");
     assert_eq!(approval["app"]["version"], 1);
-    let secret = approval["client"]["client_secret"]
-        .as_str()
-        .ok_or("no secret")?
-        .to_owned();
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?
-        .to_owned();
-    assert_eq!(secret.len(), 64);
+    assert!(approval["client"].is_null());
+    assert_eq!(approval["credentials"]["app"], NOTES);
+    let secret = identity_contract::app_custody::secret();
+    let credential = identity_contract::app_custody::credential(NOTES);
+    assert!(!approval.to_string().contains(&secret));
 
     let again = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(
         again["client"],
         Value::Null,
-        "the secret is shown once: {again}"
+        "approval never returns the secret: {again}"
     );
     let other = json!({"operation": op()?});
     refused(
@@ -575,10 +571,9 @@ async fn approval_binds_the_service_account_the_registration_names() -> TestResu
         account.as_str(),
         "{approval}"
     );
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?;
-    let me = ok(get(&service, "/apps/me", Auth::Bearer(credential)).await?)?;
+    assert!(approval["client"].is_null());
+    let credential = identity_contract::app_custody::credential(NOTES);
+    let me = ok(get(&service, "/apps/me", Auth::Bearer(&credential)).await?)?;
     assert_eq!(me["service_account"], account.as_str());
     Ok(())
 }

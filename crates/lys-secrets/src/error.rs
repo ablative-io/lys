@@ -87,6 +87,9 @@ pub enum SecretsError {
         /// The directory.
         path: PathBuf,
     },
+    /// The persisted index has not yet been reconciled and durably synced.
+    #[error("IndexUnresolved: {reason} (act: reconcile the index before confirming custody)")]
+    IndexUnresolved { reason: String },
     /// The store's index could not be read.
     #[error("StoreCorrupt: {reason} (act: restore the store from its current copy)")]
     StoreCorrupt {

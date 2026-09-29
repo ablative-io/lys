@@ -596,3 +596,37 @@ async fn wrong_broker_custody_receipt_keeps_app_pending() -> TestResult {
     assert!(held["client_id"].is_null());
     Ok(())
 }
+
+#[tokio::test]
+async fn approval_without_configured_broker_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let (service, _seeded) =
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_save_unavailable";
+    ok(post(
+        &service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    let held = ok(get(&service, &format!("/apps/{app}"), Auth::Cookie(&admin)).await?)?;
+    // Inspect the retained state even when the response incorrectly claims success.
+    assert_eq!(
+        held["state"], "pending",
+        "missing-broker approval activated the app without credential custody"
+    );
+    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    assert!(answer.1.get("client").is_none());
+    Ok(())
+}

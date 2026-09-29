@@ -7,8 +7,7 @@
 //!
 //! `POST /apps` records the registration as pending and nothing else: no
 //! client exists anywhere and no kind of the app is judged. Approval creates
-//! the app's sign-in client after broker custody when configured, otherwise
-//! answers its secret once to the administrator. The app log keeps only the
+//! the app's sign-in client only after confirmed broker custody. The app log keeps only the
 //! secret's SHA-256. Approval binds the service
 //! account the registration names, makes the registered schema version 1
 //! and gives its kinds to the grants. A declined app never takes effect. A
@@ -38,11 +37,11 @@ use lys_identity::grants::{AppSchema, LYS_APP, app_id};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::apps_binding::{APP_CREDENTIAL, Acting, Binding, Registrar, acting, new_secret};
+use crate::apps_binding::{Acting, Binding, Registrar, acting, new_secret};
 use crate::apps_error::AppError;
 use crate::apps_state::{Approved, By, Client, Decided, Line, LysRecorded, Registered, Standing};
 use crate::apps_store::AppStore;
-use crate::apps_views::{AppView, Approval, AppsView, ClientIssued, RegistrarIssued};
+use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued};
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::grants::GrantState;
@@ -406,7 +405,7 @@ async fn approve(
     // Authenticate and check pending state before doing any broker work. Never
     // hold directory/apps locks across a network wait; recheck after custody.
     let pending = crate::apps_credentials::pending(&state, &headers, &id, &operation)?;
-    let prepared = if pending && state.secrets.is_some() {
+    let prepared = if pending {
         Some(crate::apps_credentials::prepare(&state, &headers, &id).await?)
     } else {
         None
@@ -440,20 +439,9 @@ async fn approve(
                 bound_by: by.clone(),
                 at,
             });
-        let (issued, digest, credentials) = if let Some((digest, saved)) = prepared {
-            (None, digest, Some(saved))
-        } else {
-            let (secret, digest) = new_secret()?;
-            (
-                Some(ClientIssued {
-                    client_id: id.clone(),
-                    credential: format!("{APP_CREDENTIAL}.{id}.{secret}"),
-                    client_secret: secret,
-                }),
-                digest,
-                None,
-            )
-        };
+        let (digest, credentials) = prepared.ok_or_else(|| ServerError::SecretsUnavailable {
+            reason: "app approval requires confirmed broker credential custody".to_owned(),
+        })?;
         let client = Client {
             client_id: id.clone(),
             secret_sha256: digest,
@@ -469,8 +457,8 @@ async fn approve(
         refresh(&state, apps)?;
         Ok(Approval {
             app: view(apps, &id)?,
-            client: issued,
-            credentials,
+            client: None,
+            credentials: Some(credentials),
         })
     })
     .map(Json)
