@@ -141,6 +141,7 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
         GrantError::StaleDecision { .. }
             | GrantError::PermissionEngineUnavailable { .. }
             | GrantError::ProjectionPending { .. }
+            | GrantError::OperationUnresolved { .. }
             | GrantError::LogUnavailable { .. }
     )
 }
