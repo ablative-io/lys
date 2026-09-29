@@ -258,6 +258,10 @@
         {
           "id": "S139",
           "text": "As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request."
+        },
+        {
+          "id": "S182",
+          "text": "As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave."
         }
       ]
     },
@@ -548,6 +552,10 @@
         {
           "id": "S179",
           "text": "As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs."
+        },
+        {
+          "id": "S181",
+          "text": "As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has."
         }
       ]
     },

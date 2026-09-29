@@ -122,6 +122,8 @@
 
 **S139.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
 
+**S182.** As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave.
+
 ## Directory administrator — Resolves a refused act
 
 **S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
@@ -243,6 +245,8 @@
 **S152.** As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
 
 **S179.** As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
+
+**S181.** As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has.
 
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 

@@ -430,3 +430,9 @@
 - [ ] **C450** — A retired app's codes and tokens stop at once (DIRECTORY-067 R2).
 - [ ] **C451** — A suspended or retired person gets no code, no token and no answer (DIRECTORY-067 R3).
 - [ ] **C452** — A code presented twice ends the tokens it bought (DIRECTORY-067 R4).
+
+## Sign-out ends app access and apps may read email (DIRECTORY-068)
+
+- [ ] **C453** — A code or token dies with the Lys session it came from (DIRECTORY-068 R1).
+- [ ] **C454** — An app signs the person out through Lys's end-session endpoint (DIRECTORY-068 R2).
+- [ ] **C455** — An app that asks for the email scope receives the person's email (DIRECTORY-068 R3).

@@ -1665,6 +1665,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Sign-out ends app access and apps may read email (DIRECTORY-068)",
+      "items": [
+        {
+          "id": "C453",
+          "text": "A code or token dies with the Lys session it came from (DIRECTORY-068 R1).",
+          "done": false
+        },
+        {
+          "id": "C454",
+          "text": "An app signs the person out through Lys's end-session endpoint (DIRECTORY-068 R2).",
+          "done": false
+        },
+        {
+          "id": "C455",
+          "text": "An app that asks for the email scope receives the person's email (DIRECTORY-068 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }
