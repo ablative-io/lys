@@ -3,6 +3,8 @@
 //! names, before any extractor reads the request, so an anonymous caller
 //! learns that it is not signed in and never how its body was malformed.
 //!
+//! A HEAD is judged as the GET it is served by.
+//!
 //! A session is judged here in full, since a session is one lookup. A
 //! credential in the Authorization header or an agent's signature is only
 //! seen to be present, whatever doors the table names: the route judges it,
@@ -57,7 +59,10 @@ async fn check(
 ) -> Response {
     let named = matched.and_then(|matched| {
         let path = matched.as_str();
-        let method = request.method().clone();
+        let method = match request.method() {
+            &HttpMethod::HEAD => HttpMethod::GET,
+            method => method.clone(),
+        };
         doors
             .doors
             .get(&(method.clone(), path))
