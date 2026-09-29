@@ -25,6 +25,7 @@ impl Attempts {
     }
 
     fn at(&self, address: IpAddr, limit: u8, now: Instant) -> Result<(), ServerError> {
+        let address = crate::sign_in_flights::address_key(address);
         let mut buckets = self.0.lock().unwrap_or_else(PoisonError::into_inner);
         buckets.retain(|_, bucket| now.saturating_duration_since(bucket.start) < WINDOW);
         if let Some(bucket) = buckets.get_mut(&address) {

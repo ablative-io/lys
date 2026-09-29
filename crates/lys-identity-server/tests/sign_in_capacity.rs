@@ -48,3 +48,36 @@ async fn abandoned_provider_flows_are_bounded_per_address_and_leave_other_client
     assert_eq!(actor.binding().subject(), "quiet-person");
     Ok(())
 }
+
+#[tokio::test]
+async fn a_full_provider_pool_cannot_refuse_a_password_sign_in() -> Result<(), Box<dyn Error>> {
+    let (service, config) = Service::start_with(|config| Ok(config.clone())).await?;
+    service.issuer.hold(Account {
+        login: Login {
+            subject: "quiet-person".into(),
+            email: "quiet@example.test".into(),
+        },
+        password: "Correct-Person-Password1".into(),
+        second_factor: false,
+    });
+    let oidc = Oidc::discover(&config).await?;
+    let issuer = IssuerSignIn::configured(&config)?;
+    for address in 0..64u8 {
+        for _ in 0..16 {
+            oidc.begin_provider(IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, address)))?;
+        }
+    }
+    assert!(oidc.begin_provider("203.0.113.1".parse()?).is_err());
+    let actor = issuer
+        .password(
+            &oidc,
+            &Attempt {
+                email: "quiet@example.test",
+                password: "Correct-Person-Password1",
+                address: "203.0.113.1".parse()?,
+            },
+        )
+        .await?;
+    assert_eq!(actor.binding().subject(), "quiet-person");
+    Ok(())
+}

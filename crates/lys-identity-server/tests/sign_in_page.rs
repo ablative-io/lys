@@ -389,6 +389,8 @@ async fn lys_limits_attempts_even_when_the_issuer_accepts_every_password() -> Te
     let answer = browser
         .post(format!("{}/sign-in", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header("x-forwarded-for", "203.0.113.99")
+        .header("forwarded", "for=203.0.113.99")
         .body(sign_in_body(EMAIL, PASSWORD))
         .send()
         .await?;

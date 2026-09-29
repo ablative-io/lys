@@ -9,6 +9,30 @@ use crate::error::ServerError;
 pub(crate) const PER_ADDRESS: usize = 16;
 const MAX_AGE: Duration = Duration::from_secs(600);
 
+/// IPv6 privacy addresses share their /64 allowance. Mapped IPv4 keys are
+/// identical to native IPv4, so spelling does not buy another allowance.
+pub(crate) fn address_key(address: IpAddr) -> IpAddr {
+    match address {
+        IpAddr::V4(_) => address,
+        IpAddr::V6(ip) => ip.to_ipv4_mapped().map_or_else(
+            || {
+                let segments = ip.segments();
+                IpAddr::V6(std::net::Ipv6Addr::new(
+                    segments[0],
+                    segments[1],
+                    segments[2],
+                    segments[3],
+                    0,
+                    0,
+                    0,
+                    0,
+                ))
+            },
+            IpAddr::V4,
+        ),
+    }
+}
+
 struct Flight<T> {
     address: IpAddr,
     began: Instant,
@@ -31,6 +55,7 @@ impl<T> Flights<T> {
         address: IpAddr,
         now: Instant,
     ) -> Result<(), ServerError> {
+        let address = address_key(address);
         self.0
             .retain(|_, flight| now.saturating_duration_since(flight.began) < MAX_AGE);
         if self.0.len() >= crate::oidc::IN_FLIGHT_MAX

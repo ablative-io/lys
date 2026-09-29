@@ -78,7 +78,7 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
-        let begun = reqwest::Url::parse(&oidc.begin(address)?)
+        let begun = reqwest::Url::parse(&oidc.begin_provider(address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
