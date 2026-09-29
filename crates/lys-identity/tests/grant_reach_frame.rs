@@ -1,6 +1,8 @@
 //! Who may act across many resources is answered from one reading of the
 //! permission engine, and a graph of twenty resources is answered in under
-//! a second against an engine as slow as a local `SpiceDB`.
+//! a second against an engine as slow as a local `SpiceDB`. An engine that
+//! takes a write and does not move is named after that one write, never
+//! written to again and again while the directory waits.
 
 mod support;
 
@@ -314,5 +316,85 @@ fn a_frame_over_a_failed_read_is_refused_and_a_moved_frame_is_stale() -> TestRes
         recorded + 1,
         "the pass-on is the later event"
     );
+    Ok(())
+}
+
+/// Writes a stalled engine takes before it refuses on its own, so that a
+/// projection that never stops writing fails here instead of never ending.
+const PATIENCE: usize = 3;
+
+/// An engine that, while `standing` is set, takes every write and keeps
+/// nothing, counting each write it is asked for.
+#[derive(Debug, Clone, Default)]
+struct Stalled {
+    inner: MemoryRelationships,
+    standing: Arc<AtomicBool>,
+    writes: Arc<AtomicUsize>,
+}
+
+impl RelationshipStore for Stalled {
+    fn revision(&self) -> Result<u64, GrantError> {
+        self.inner.revision()
+    }
+
+    fn write(
+        &mut self,
+        revision: u64,
+        touch: &[Relationship],
+        delete: &[Relationship],
+    ) -> Result<(), GrantError> {
+        if !self.standing.load(Ordering::SeqCst) {
+            return self.inner.write(revision, touch, delete);
+        }
+        let asked = self.writes.fetch_add(1, Ordering::SeqCst) + 1;
+        if asked > PATIENCE {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: format!("the stalled engine was asked for {asked} writes"),
+            });
+        }
+        Ok(())
+    }
+
+    fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
+        self.inner.read()
+    }
+}
+
+#[test]
+fn an_engine_whose_revision_stands_still_after_a_write_is_named_after_one_write() -> TestResult {
+    let engine = Stalled::default();
+    let mut world = World::with(
+        Box::new(|path: &Path| -> Reopen<FileLeafStore> {
+            let path = path.to_owned();
+            Box::new(move || FileLeafStore::open(&path))
+        }),
+        engine.clone(),
+    )?;
+    engine.standing.store(true, Ordering::SeqCst);
+    let refused = world.root(world.dana, "kite", PassOn::UseOnly, None);
+    let named = refused.err().map(|error| error.to_string());
+    assert!(
+        named
+            .as_deref()
+            .is_some_and(|words| words.starts_with("ProjectionPending")),
+        "a grant the engine did not take is pending: {named:?}"
+    );
+    assert_eq!(engine.writes.load(Ordering::SeqCst), 1, "written once");
+
+    engine.writes.store(0, Ordering::SeqCst);
+    let stalled = world.grants.project();
+    let reason = match stalled {
+        Err(GrantError::PermissionEngineUnavailable { reason }) => reason,
+        other => return Err(format!("expected the stall named, got {other:?}").into()),
+    };
+    assert!(
+        reason.contains("did not move"),
+        "the stall is named: {reason}"
+    );
+    assert_eq!(engine.writes.load(Ordering::SeqCst), 1, "written once more");
+
+    engine.standing.store(false, Ordering::SeqCst);
+    let projected = world.grants.project()?;
+    assert!(projected > 0, "an engine that moves again is caught up");
     Ok(())
 }
