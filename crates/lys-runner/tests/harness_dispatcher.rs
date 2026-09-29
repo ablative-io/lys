@@ -48,6 +48,20 @@ impl<F: FnMut(&Event) -> Result<(), RunnerError>> EventJournal for OnlyKeep<F> {
     }
 }
 
+// Historical replay must not run a callback bound to the newer operation.
+struct ReplayOnly<'a>(&'a mut lys_runner::tracking_store::Feed);
+impl EventJournal for ReplayOnly<'_> {
+    fn retained(&mut self, event: &Event) -> Result<bool, RunnerError> {
+        self.0.control_retained(event)
+    }
+    fn keep(&mut self, _event: &Event) -> Result<(), RunnerError> {
+        Err(RunnerError::refused(
+            "fixture_wrong_receipt",
+            "historical replay reached a new receipt writer",
+        ))
+    }
+}
+
 fn setup() -> Result<(Held, Source, Dispatcher), Box<dyn std::error::Error>> {
     let child = Command::new("/bin/cat")
         .stdin(Stdio::piped())
@@ -377,6 +391,25 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
     );
     assert_eq!(dispatcher.boundary(), &Boundary::Unknown);
     assert!(!dispatcher.flight().ok_or("flight lost")?.terminal);
+    let cursor = feed.end();
+    let mut conflict = terminal.clone();
+    conflict.kind = Kind::TurnCompleted {
+        turn: "other-turn".into(),
+    };
+    let mut rejected = 0;
+    for other in [conflict, event(&source, Kind::IdleReconciled)] {
+        assert_eq!(
+            dispatcher
+                .observe(&other, &mut feed)
+                .expect_err("different retry")
+                .name(),
+            "control_event_unresolved"
+        );
+        rejected += 1;
+    }
+    assert_eq!(rejected, 2);
+    assert_eq!(dispatcher.boundary(), &Boundary::Unknown);
+    assert_eq!(feed.end(), cursor);
     assert!(
         dispatcher
             .dispatch("two", &request("two")?, &mut journal, &mut |_| Ok(()))
@@ -452,12 +485,12 @@ fn retained_terminal_and_compaction_replays_do_not_release_the_next_flight() -> 
     assert!(dispatcher.flight().is_none());
     let cursor = feed.end();
     for replay in [&terminal, &compacted] {
-        dispatcher.observe(replay, &mut feed)?;
+        dispatcher.observe(replay, &mut ReplayOnly(&mut feed))?;
     }
     assert_eq!(feed.end(), cursor);
     dispatcher.dispatch("next", &request("next")?, &mut journal, &mut |_| Ok(()))?;
     for replay in [&terminal, &compacted] {
-        dispatcher.observe(replay, &mut feed)?;
+        dispatcher.observe(replay, &mut ReplayOnly(&mut feed))?;
     }
     let flight = dispatcher.flight().ok_or("new flight was released")?;
     assert_eq!(flight.operation, "next");

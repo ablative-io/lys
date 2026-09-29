@@ -215,13 +215,21 @@ impl Dispatcher {
                 }
             },
         };
+        if retained {
+            // This dispatcher already applied a retained fact, or restarted
+            // without its live projection. Neither case permits applying that
+            // old fact to today's flight. A partial keep in THIS dispatcher is
+            // pending with retained=false and still completes its original keep.
+            // Historical receipt repair uses explicit operation reconciliation.
+            self.pending = None;
+            self.projection = before;
+            return Ok(());
+        }
         let mut next = before.clone();
-        if !retained {
-            self.validate_flight(event)?;
-            if let Err(error) = next.apply(event) {
-                self.projection = next;
-                return Err(error);
-            }
+        self.validate_flight(event)?;
+        if let Err(error) = next.apply(event) {
+            self.projection = next;
+            return Err(error);
         }
         if let Err(error) = journal.keep(event) {
             self.pending = Some(Pending {
@@ -234,11 +242,6 @@ impl Dispatcher {
         }
         self.pending = None;
         self.projection = next;
-        if retained {
-            // Historical replay cannot reopen a boundary or release a newer
-            // flight. Its original application already committed those changes.
-            return Ok(());
-        }
         if let Some(flight) = &mut self.flight {
             match &event.kind {
                 Kind::TurnStarted { turn } => flight.turn = Some(turn.clone()),
