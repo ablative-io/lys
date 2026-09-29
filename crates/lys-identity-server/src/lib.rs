@@ -80,6 +80,7 @@ pub mod roles_views;
 pub mod routes;
 pub mod runner_acts;
 pub mod runner_api;
+mod runner_bytes_api;
 pub mod runner_client;
 mod runner_dial;
 pub mod runner_operate;

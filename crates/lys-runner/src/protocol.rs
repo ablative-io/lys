@@ -150,6 +150,22 @@ pub struct Launch {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "act", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Act {
+    /// Read the exact PTY bytes without UTF-8 replacement or boundary trimming.
+    ReadBytes {
+        /// The session.
+        session: String,
+        /// The next byte cursor, or the oldest retained byte when absent.
+        cursor: Option<u64>,
+        /// Wait for output or an observed process exit.
+        follow: bool,
+    },
+    /// Deliver exact terminal input, including escape sequences and binary replies.
+    InputBytes {
+        /// The session.
+        session: String,
+        /// Exact bytes; no implicit newline or character decoding.
+        data: Vec<u8>,
+    },
     /// Start a session in its own pseudo-terminal.
     Start {
         /// What it is started with.
@@ -331,6 +347,11 @@ pub struct StatusView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Answer {
+    /// Exact bytes from a terminal, with byte cursors and observed end evidence.
+    Bytes {
+        /// The byte window.
+        output: crate::terminal_bytes::ByteOutput,
+    },
     /// The session's process is up.
     Started {
         /// The session.

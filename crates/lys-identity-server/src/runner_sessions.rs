@@ -227,6 +227,7 @@ pub fn ended_in(answer: &Answer) -> Option<&Ended> {
     match answer {
         Answer::Ended { ended, .. } => Some(ended),
         Answer::Output { output } => output.ended.as_ref(),
+        Answer::Bytes { output } => output.ended.as_ref(),
         Answer::Status { status } => status
             .sessions
             .first()
@@ -241,6 +242,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Started { .. } => "started",
         Answer::Delivered { .. } => "delivered",
         Answer::Output { .. } => "output",
+        Answer::Bytes { .. } => "bytes",
         Answer::Matched { .. } => "matched",
         Answer::Ended { .. } => "ended",
         Answer::Status { .. } => "status",

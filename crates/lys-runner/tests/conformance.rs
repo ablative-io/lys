@@ -365,6 +365,15 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         .ok_or("the section names no acts")?;
     let id = "published".to_owned();
     let every_act = [
+        Act::ReadBytes {
+            session: id.clone(),
+            cursor: None,
+            follow: false,
+        },
+        Act::InputBytes {
+            session: id.clone(),
+            data: vec![0xff],
+        },
         Act::Start { launch: shell(&id) },
         Act::Input {
             session: id.clone(),
@@ -429,6 +438,16 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         .as_array()
         .ok_or("the section names no answers")?;
     let every_answer = [
+        Answer::Bytes {
+            output: lys_runner::terminal_bytes::ByteOutput {
+                session: id.clone(),
+                from: 0,
+                cursor: 1,
+                oldest: 0,
+                data: vec![0xff],
+                ended: None,
+            },
+        },
         Answer::Started {
             session: id.clone(),
             pid: 1,
