@@ -127,8 +127,15 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     let files = Templates.render(&layout, &own_build(), true)?;
     let by_name: BTreeMap<&str, &RenderedFile> =
         files.iter().map(|file| (file.name, file)).collect();
-    assert_eq!(by_name.len(), 4);
+    assert_eq!(by_name.len(), 5);
     let file = |name: &str| by_name.get(name).copied().ok_or(format!("no {name}"));
+    let estate = file("estate-approval.json")?;
+    assert_eq!(estate.bytes.as_slice(), layout::ESTATE_PLAN.as_bytes());
+    assert_eq!(
+        estate.target,
+        layout.data_dir().join("estate-approval.json")
+    );
+    assert!(estate.private && !estate.compose);
     let compose = file("compose.yaml")?;
     assert_eq!(compose.bytes.as_slice(), layout::COMPOSE_YAML.as_bytes());
     assert_eq!(compose.target, layout.deploy_dir().join("compose.yaml"));

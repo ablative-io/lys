@@ -44,13 +44,13 @@ const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
 
 /// The protected header naming `EdDSA`, this envelope's content type and `kid`.
-fn protected_header(kid: &[u8; KEY_LEN], kind: &str) -> Vec<u8> {
+fn protected_header(kid: &[u8; KEY_LEN], media_type: &str) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 3);
     uint(&mut out, 1);
     head(&mut out, MAJOR_NEGATIVE, 7);
     uint(&mut out, 3);
-    text(&mut out, kind);
+    text(&mut out, media_type);
     uint(&mut out, 4);
     bytes(&mut out, kid);
     out

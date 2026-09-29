@@ -30,6 +30,7 @@ pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
 mod error_status;
+mod estate_api;
 pub mod file_stores;
 pub mod grant_contract;
 mod grant_sight;

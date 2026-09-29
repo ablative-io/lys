@@ -462,6 +462,8 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
         ),
         (POST, "/teams/{id}/retire", Some(retire_team), Some(changed)),
         (GET, "/resources", None, Some(api.schema::<ResourceList>())),
+        (GET, "/identity/estate-plan", None, None),
+        (POST, "/identity/estate-apply", None, None),
         (GET, "/secrets", None, None),
         (GET, "/secrets/grants", None, None),
         (GET, "/secrets/audit", None, None),

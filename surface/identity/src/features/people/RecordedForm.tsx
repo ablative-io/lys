@@ -27,7 +27,7 @@ function restored(value: unknown, name: string): PendingChange | null {
   return { path: value.path, operation: value.operation, body: { ...value.body } };
 }
 
-export function RecordedForm({ name, title, heading, description, submitLabel, children, change, done }: {
+export function RecordedForm({ name, title, heading, description, submitLabel, children, change, done, success }: {
   name: string;
   title: string;
   heading?: string;
@@ -36,6 +36,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
   children: ReactNode;
   change: (data: FormData) => Change;
   done: () => void;
+  success?: (change: Change) => string;
 }) {
   const key = 'lys.pending.' + name;
   const [pending, setPending] = useState(() => {
@@ -51,6 +52,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     return 'Pending record could not be read; inspect ' + key;
   });
   const [answer, setAnswer] = useState('');
+  const [message, setMessage] = useState('');
   const [failure, setFailure] = useState('');
   const busy = useRef(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -59,6 +61,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     busy.current = true;
     setFailure('');
     setAnswer('');
+    setMessage('');
     try {
       const asked = change(new FormData(event.currentTarget));
       const operation = operationId();
@@ -69,6 +72,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
         const result = await request<unknown>(asked.path, { ...asked.body, operation });
         confirmReceipt(result, operation, asked.path);
         setAnswer(JSON.stringify(result, null, 2));
+        setMessage(success?.(asked) ?? 'Change recorded.');
         sessionStorage.removeItem(key);
         setPending(null);
         done();
@@ -95,6 +99,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
       sessionStorage.removeItem(key);
       setPending(null);
       setAnswer(JSON.stringify(result, null, 2));
+      setMessage(success?.(pending) ?? 'Change recorded.');
       done();
     } catch (error) {
       // Even a later refusal cannot establish that the original uncertain call did not commit.
@@ -113,7 +118,8 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     {pending ? <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
     {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>Check original change</button> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
-    {answer ? <details open><summary>Recorded receipt</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
+    {message ? <p role="status">{message}</p> : null}
+    {answer ? <details><summary>Recorded receipt</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
   </form>;
 }
 

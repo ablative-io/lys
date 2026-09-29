@@ -251,6 +251,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
     server_state(&layout, &config)?;
+    private_files::write(&layout.data_dir().join("estate-approval.json"), layout::ESTATE_PLAN.as_bytes())?;
     let carried = server_config::carried(&layout)?.unwrap_or_default();
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {

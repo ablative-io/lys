@@ -113,7 +113,7 @@
     },
     {
       "kind": "cambium.topic",
-      "id": "Cambium",
+      "id": "cambium",
       "relation": "participant",
       "actions": [
         "read",
@@ -149,7 +149,7 @@
     },
     {
       "kind": "cambium.topic",
-      "id": "haematite Studio",
+      "id": "haematite-studio",
       "relation": "participant",
       "actions": [
         "read",
@@ -202,7 +202,7 @@
     },
     {
       "kind": "aion.workflow",
-      "id": "default/src_land",
+      "id": "default.src_land",
       "relation": "operator",
       "actions": [
         "read",
@@ -217,7 +217,7 @@
     },
     {
       "kind": "aion.workflow",
-      "id": "default/src_update",
+      "id": "default.src_update",
       "relation": "operator",
       "actions": [
         "read",
@@ -231,7 +231,7 @@
     },
     {
       "kind": "aion.workflow",
-      "id": "default/src_pr",
+      "id": "default.src_pr",
       "relation": "operator",
       "actions": [
         "read",
@@ -244,7 +244,7 @@
     },
     {
       "kind": "aion.repository",
-      "id": "github.com/ablative-io/lys",
+      "id": "github.com.ablative-io.lys",
       "relation": "contributor",
       "actions": [
         "read",
@@ -260,7 +260,7 @@
     },
     {
       "kind": "aion.repository",
-      "id": "github.com/ablative-io/lys",
+      "id": "github.com.ablative-io.lys",
       "relation": "integrator",
       "actions": [
         "read",
