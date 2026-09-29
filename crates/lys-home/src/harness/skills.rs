@@ -8,7 +8,7 @@
 //! are the same. Nothing is written anywhere else.
 
 use std::io::{ErrorKind, Write};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -66,8 +66,8 @@ pub fn check(file: &SkillFile) -> Result<KeptSkill, HomeError> {
     })
 }
 
-/// The name a skill is staged under beside its `SKILL.md` before it is
-/// published.
+/// The prefix of the name a skill is staged under beside its `SKILL.md`;
+/// each writer's staged file is its own.
 const STAGED: &str = "SKILL.md.writing";
 
 /// `path` as a directory of the session's own: made when it is absent,
@@ -101,13 +101,10 @@ fn publish(name: &str, path: &Path, text: &[u8]) -> Result<(), HomeError> {
         Err(error) if error.kind() == ErrorKind::NotFound => {}
         Err(error) => return Err(HomeError::io("reading a kept skill", path, error)),
     }
-    let staged = path.with_file_name(STAGED);
-    match std::fs::remove_file(&staged) {
-        Err(error) if error.kind() != ErrorKind::NotFound => {
-            return Err(HomeError::io("clearing a staged skill", &staged, error));
-        }
-        _ => {}
-    }
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos());
+    let staged = path.with_file_name(format!("{STAGED}-{}-{nanos}", std::process::id()));
     let mut out = std::fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -118,19 +115,46 @@ fn publish(name: &str, path: &Path, text: &[u8]) -> Result<(), HomeError> {
     out.sync_all()
         .map_err(|e| HomeError::io("syncing a staged skill", &staged, e))?;
     drop(out);
-    std::fs::hard_link(&staged, path).map_err(|e| HomeError::io("publishing a skill", path, e))?;
-    std::fs::remove_file(&staged).map_err(|e| HomeError::io("clearing a staged skill", &staged, e))
+    let linked = std::fs::hard_link(&staged, path);
+    std::fs::remove_file(&staged)
+        .map_err(|e| HomeError::io("clearing a staged skill", &staged, e))?;
+    linked.map_err(|e| HomeError::io("publishing a skill", path, e))?;
+    let dir = path.parent().unwrap_or(path);
+    std::fs::File::open(dir)
+        .and_then(|dir| dir.sync_all())
+        .map_err(|e| HomeError::io("syncing a skill directory", dir, e))
+}
+
+/// `config_dir` rebuilt from its components, so a trailing slash cannot make
+/// a symlink read as the directory it names; refused unless every part of
+/// it that exists is already canonical, so no symlink above it is followed.
+fn owned(config_dir: &Path) -> Result<PathBuf, HomeError> {
+    let plain: PathBuf = config_dir.components().collect();
+    let refused_dir = || HomeError::SkillDirectory {
+        path: config_dir.to_path_buf(),
+    };
+    if !plain.is_absolute() || plain.components().any(|part| part == Component::ParentDir) {
+        return Err(refused_dir());
+    }
+    let mut existing = plain.as_path();
+    while std::fs::symlink_metadata(existing).is_err() {
+        existing = existing.parent().ok_or_else(refused_dir)?;
+    }
+    let canonical = existing
+        .canonicalize()
+        .map_err(|e| HomeError::io("resolving the config directory", existing, e))?;
+    if canonical != existing {
+        return Err(refused_dir());
+    }
+    Ok(plain)
 }
 
 /// Write each of `files` under `config_dir`, answering them as recorded.
 /// Every file is checked before the first is written, and nothing is
 /// written through a symlink at or below `config_dir`.
 pub fn write(config_dir: &Path, files: &[SkillFile]) -> Result<Vec<KeptSkill>, HomeError> {
-    if !config_dir.is_absolute() {
-        return Err(HomeError::SkillDirectory {
-            path: config_dir.to_path_buf(),
-        });
-    }
+    let config_dir = owned(config_dir)?;
+    let config_dir = config_dir.as_path();
     let kept = files.iter().map(check).collect::<Result<Vec<_>, _>>()?;
     for (file, skill) in files.iter().zip(&kept) {
         let skills = config_dir.join("skills");

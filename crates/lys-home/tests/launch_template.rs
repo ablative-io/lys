@@ -419,7 +419,7 @@ fn with_skill(dir: &Path, name: &str, config: Option<&Path>) -> PathBuf {
 fn a_kept_skill_is_written_into_the_sessions_own_config_directory_and_the_manifest() -> Gate {
     let dir = tempfile::tempdir()?;
     let home = fresh_home(dir.path());
-    let config = dir.path().join("config");
+    let config = dir.path().canonicalize()?.join("config");
     let template = with_skill(dir.path(), "skill.json", Some(&config));
     let out = dir.path().join("out");
     std::fs::create_dir(&out)?;
