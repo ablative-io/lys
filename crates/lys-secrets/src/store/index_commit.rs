@@ -1,5 +1,5 @@
 //! Reconcile ambiguous index commits without discarding a renamed entry.
-use super::{INDEX, SecretStore};
+use super::{INDEX, Index, SecretStore};
 use crate::{SecretsError, fsutil};
 
 impl SecretStore {
@@ -40,10 +40,14 @@ impl SecretStore {
         let unresolved = |reason| SecretsError::IndexUnresolved { reason };
         let path = self.dir.join(INDEX);
         let bytes = std::fs::read(&path).map_err(|error| unresolved(error.to_string()))?;
+        let persisted: Index =
+            serde_json::from_slice(&bytes).map_err(|error| unresolved(error.to_string()))?;
+        let actual =
+            serde_json::to_vec_pretty(&persisted).map_err(|error| unresolved(error.to_string()))?;
         let expected = self
             .index_bytes()
             .map_err(|error| unresolved(error.to_string()))?;
-        if bytes != expected {
+        if actual != expected {
             return Err(unresolved(
                 "persisted index differs from the broker's held index".to_owned(),
             ));

@@ -259,7 +259,13 @@ mod tests {
             ),
             "a different persisted index cannot confirm held custody"
         );
-        std::fs::write(&index_path, committed_bytes)?;
+        let mut restored: serde_json::Value = serde_json::from_slice(&committed_bytes)?;
+        restored
+            .as_object_mut()
+            .ok_or("index is not an object")?
+            .remove("scopes");
+        // An older index may omit a default field or use different whitespace.
+        std::fs::write(&index_path, serde_json::to_vec(&restored)?)?;
         let digest = broker.prepare_app("fixture", "person-a")?;
         assert_eq!(
             digest,
