@@ -14,12 +14,26 @@ class UpgradeProofTests(unittest.TestCase):
         before = {name: {"value": name} for name in (
             "people", "grant", "app", "configuration", "budgets", "goals", "policy")}
         before["sessions"] = {"sessions": [{"id": "preserved"}]}
-        same_records(before, copy.deepcopy(before))
+        after = copy.deepcopy(before)
+        after["budgets"]["unconfirmed"] = []
+        same_records(before, after)
         for name in before:
             with self.subTest(domain=name):
                 after = copy.deepcopy(before)
+                after["budgets"]["unconfirmed"] = []
                 after[name] = {}
                 with self.assertRaisesRegex(RuntimeError, name):
+                    same_records(before, after)
+
+    def test_only_empty_agent_budget_confirmation_is_additive(self):
+        before = {"sessions": {"sessions": ["original"]}, "budgets": {"budgets": [100]}}
+        after = copy.deepcopy(before)
+        after["budgets"]["unconfirmed"] = []
+        same_records(before, after)
+        for changed in ([{"requested": 200}], None, "", False):
+            with self.subTest(changed=changed):
+                after["budgets"]["unconfirmed"] = changed
+                with self.assertRaisesRegex(RuntimeError, "budgets"):
                     same_records(before, after)
 
     def test_empty_session_proof_is_refused(self):

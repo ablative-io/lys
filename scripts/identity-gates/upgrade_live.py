@@ -13,6 +13,7 @@ import subprocess
 import sys
 
 from upgrade_fixture import Browser, admitted_after_upgrade, observe, populate, same_records
+from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
 
 OLD_COMMIT = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
@@ -168,6 +169,8 @@ def exercise(args):
     try:
         run(installed, evidence / "install-old.log", env)
         ids = populate(browser, root)
+        legacy, legacy_browser = seed_legacy(browser, root, ids)
+        (evidence / "legacy-before.json").write_text(json.dumps(legacy, indent=2))
         config_file = root / "identity.json"
         config = json.loads(config_file.read_text())
         bridge = {"url": f"http://127.0.0.1:{port()}",
@@ -186,6 +189,9 @@ def exercise(args):
         after = observe(browser, ids)
         (evidence / "after.json").write_text(json.dumps(after, indent=2))
         same_records(before, after)
+        legacy_counts = verify_legacy(browser, legacy)
+        if legacy_browser.ask("GET", "/me")["person"]["id"] != ids["person"]:
+            raise RuntimeError("the ordinary legacy person's session changed during upgrade")
         preserve_leaves(root, leaves)
         new_config = json.loads(config_file.read_text())
         expected = {key: value for key, value in old_config.items() if key != "cambium_messages"}
@@ -198,7 +204,7 @@ def exercise(args):
         admitted_person = admitted_after_upgrade(browser)
         receipt = {"registered_admin_wrote": admitted_person, "old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
                    "surfaces": surfaces, "domains": list(before), "old_app_leaves": len(leaves),
-                   "config_keys_preserved": list(expected), "passed": True}
+                   "config_keys_preserved": list(expected), "legacy": legacy_counts, "passed": True}
     except BaseException as error:
         primary = error
         raise

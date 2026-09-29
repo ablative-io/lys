@@ -118,7 +118,14 @@ def same_records(before, after):
     if before.keys() != after.keys():
         raise RuntimeError("upgrade readback domains differ")
     for name in before:
-        if before[name] != after[name]:
+        value = after[name]
+        # This fixture's agent budget cannot need personal-budget confirmation.
+        # Accept only the declared additive empty field, never erase its contents.
+        if name == "budgets" and "unconfirmed" not in before[name]:
+            if value.get("unconfirmed") != []:
+                raise RuntimeError("upgrade changed the budgets confirmation readback")
+            value = {key: entry for key, entry in value.items() if key != "unconfirmed"}
+        if before[name] != value:
             raise RuntimeError(f"upgrade changed the {name} readback")
     if not before["sessions"]["sessions"]:
         raise RuntimeError("the old install had no session to preserve")

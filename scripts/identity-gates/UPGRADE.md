@@ -30,9 +30,17 @@ accounts; the directory is owner-only because setup and API evidence may contain
 credentials. Do not publish its raw contents. A failed run retains its evidence
 and tears down only its own processes and compose project.
 
+The old API also creates an ordinary person's real issuer login, a team with
+that person and two foreign members, a first self-set personal budget, a raised
+budget and a period-only budget edit. After upgrade it requires exactly the two
+foreign members held, all membership history retained, all three budgets named
+unconfirmed, and the complete earlier effective limit, period and action.
+The ordinary person's original session must also still work. Only the declared
+empty `unconfirmed` field is additive on the unchanged agent budget readback.
+
 Current boundary: this runner is not yet the complete combined-release gate.
-The held legacy team-membership cases and person-set budget confirmation/raise
-cases must be added once their migration/API contract is available. A pass of the
+The deterministic reversible-window real-binary rollback leg is still required,
+as is running the proof against the complete landed release. A pass of the
 current runner cannot authorize installation without those cases. The old build
 is a clean reconstruction of the recorded live commit; it does not establish
 that the historical working tree that produced the live binary was clean.
@@ -40,5 +48,5 @@ that the historical working tree that produced the live binary was clean.
 The small Python suite checks the verifier itself, not an installation:
 
 ```
-python3 -m unittest discover -s scripts/identity-gates -p test_upgrade_fixture.py -v
+python3 -m unittest discover -s scripts/identity-gates -p 'test_upgrade_*.py' -v
 ```
