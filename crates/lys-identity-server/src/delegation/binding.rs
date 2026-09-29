@@ -179,19 +179,20 @@ fn credentials(headers: &HeaderMap, form: &[(&str, &str)]) -> Result<Credentials
 
 /// Parse authentication before resolving authority. The form must retain every
 /// decoded pair so duplicate fields cannot be hidden by a map/struct decoder.
+/// The lookup callback is invoked only after syntax and ambiguity checks pass.
 /// This does not authenticate a human, grant consent or issue anything.
 ///
 /// # Errors
 /// Refuses duplicate/mixed authentication, configured-client authority, wrong
 /// credentials, an unapproved app or a redirect absent from its exact set.
-pub fn authenticate(
+pub fn authenticate<'a>(
     headers: &HeaderMap,
     form: &[(&str, &str)],
-    source: ClientSource<'_>,
+    lookup: impl FnOnce(&str) -> Result<ClientSource<'a>, Refusal>,
     redirect: &str,
 ) -> Result<Binding, Refusal> {
     let given = credentials(headers, form)?;
-    let ClientSource::ApprovedApp(app) = source else {
+    let ClientSource::ApprovedApp(app) = lookup(&given.client)? else {
         return Err(Refusal::ClientAuthority);
     };
     let binding = Binding::current(app)?;

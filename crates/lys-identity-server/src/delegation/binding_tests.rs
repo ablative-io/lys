@@ -17,7 +17,7 @@ fn approved_app_resolves_with_exact_secret_and_redirect() -> TestResult {
         authenticate(
             &basic(CLIENT, SECRET)?,
             &[],
-            ClientSource::ApprovedApp(&app),
+            |_client| Ok(ClientSource::ApprovedApp(&app)),
             REDIRECT
         )?,
         expected
@@ -26,7 +26,7 @@ fn approved_app_resolves_with_exact_secret_and_redirect() -> TestResult {
         authenticate(
             &HeaderMap::new(),
             &[("client_id", CLIENT), ("client_secret", SECRET)],
-            ClientSource::ApprovedApp(&app),
+            |_client| Ok(ClientSource::ApprovedApp(&app)),
             REDIRECT
         )?,
         expected
@@ -35,7 +35,7 @@ fn approved_app_resolves_with_exact_secret_and_redirect() -> TestResult {
         authenticate(
             &basic(CLIENT, "wrong-private-secret")?,
             &[],
-            ClientSource::ApprovedApp(&app),
+            |_client| Ok(ClientSource::ApprovedApp(&app)),
             REDIRECT
         ),
         Err(Refusal::ClientRefused)
@@ -43,7 +43,7 @@ fn approved_app_resolves_with_exact_secret_and_redirect() -> TestResult {
     let error = authenticate(
         &basic(CLIENT, SECRET)?,
         &[],
-        ClientSource::ApprovedApp(&app),
+        |_client| Ok(ClientSource::ApprovedApp(&app)),
         "https://other.example/return",
     )
     .err()
@@ -71,7 +71,7 @@ fn equal_client_ids_in_configured_registry_do_not_gain_app_authority() -> TestRe
         authenticate(
             &basic(CLIENT, SECRET)?,
             &[],
-            ClientSource::Configured(&configured),
+            |_client| Ok(ClientSource::Configured(&configured)),
             REDIRECT
         ),
         Err(Refusal::ClientAuthority)
@@ -106,14 +106,22 @@ fn mixed_and_duplicate_authentication_refuse_before_registry_resolution() -> Tes
         ),
         (HeaderMap::new(), vec![("client_id", CLIENT)]),
     ] {
+        let looked_up = std::cell::Cell::new(false);
         assert_eq!(
             authenticate(
                 &headers,
                 &form,
-                ClientSource::Configured(&configured),
+                |_client| {
+                    looked_up.set(true);
+                    Ok(ClientSource::Configured(&configured))
+                },
                 REDIRECT
             ),
             Err(Refusal::ClientAuthentication)
+        );
+        assert!(
+            !looked_up.get(),
+            "ambiguous authentication reached the registry"
         );
     }
     Ok(())
