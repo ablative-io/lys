@@ -1,5 +1,5 @@
 #![cfg(test)]
-//! Lifecycle admission preserves registered people and names refused states.
+//! Lifecycle action admission requires Active and names refused states.
 
 use std::error::Error;
 
@@ -13,8 +13,7 @@ use lys_identity_server::routes::open_directory;
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[tokio::test]
-async fn a_person_is_admitted_when_registered_or_active_and_refused_when_suspended_or_retired()
--> TestResult {
+async fn a_person_is_admitted_only_when_active_and_other_states_are_named() -> TestResult {
     Service::start_with(|config| {
         let mut directory = open_directory(config)?;
         let binding = LoginBinding::new(&config.issuer, "lifecycle-person")?;
@@ -27,7 +26,11 @@ async fn a_person_is_admitted_when_registered_or_active_and_refused_when_suspend
         )?;
         directory.bind_login(actor.clone(), OperationId::generate()?, person, binding, 2)?;
         let id = IdentityId::Person(person);
-        assert_eq!(active_caller(directory.projection()?, &actor)?, id);
+        let refused = active_caller(directory.projection()?, &actor)
+            .err()
+            .ok_or("Registered person admitted")?;
+        assert_eq!(refused.name(), "inactive");
+        assert!(refused.to_string().contains("registered"));
         directory.transition(
             actor.clone(),
             OperationId::generate()?,
