@@ -17,7 +17,7 @@ use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use lys_identity::{Actor, AgentId, AuthMethod, LoginBinding, Provenance};
+use lys_identity::{Actor, AgentId, AuthMethod, LoginBinding, Provenance, ServiceAccountId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -32,6 +32,7 @@ pub const FORMAT: &str = "lys-directory-sessions/v1";
 enum StoredMethod {
     Oidc,
     AgentSignature,
+    ServiceAccountBearer,
 }
 
 /// An actor, as stored.
@@ -78,6 +79,10 @@ impl StoredActor {
             AuthMethod::AgentSignature(agent) => {
                 (StoredMethod::AgentSignature, Some(agent.to_string()))
             }
+            AuthMethod::ServiceAccountBearer(account) => (
+                StoredMethod::ServiceAccountBearer,
+                Some(account.to_string()),
+            ),
         };
         Self {
             issuer: actor.binding().issuer().to_owned(),
@@ -98,6 +103,16 @@ impl StoredActor {
                 AuthMethod::AgentSignature(agent.parse::<AgentId>().map_err(|error| {
                     unavailable(path, &format!("a stored agent does not read: {error}"))
                 })?)
+            }
+            (StoredMethod::ServiceAccountBearer, Some(account)) => {
+                AuthMethod::ServiceAccountBearer(account.parse::<ServiceAccountId>().map_err(
+                    |error| {
+                        unavailable(
+                            path,
+                            &format!("a stored service account does not read: {error}"),
+                        )
+                    },
+                )?)
             }
             _ => {
                 return Err(unavailable(

@@ -34,12 +34,17 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   for (const [id, who] of world.who) add(id, who.name, who.kind, who.state === 'active');
   const edges: Edge[] = [];
   for (const grant of world.list.grants) {
-    const target = 'resource:' + grant.resource.kind + ':' + grant.resource.id;
-    add(target, grant.resource.id, 'resource', true);
     add(grant.holder, nameOf(world, grant.holder), 'agent', false);
+    const kind = grant.resource.kind.toLowerCase(), id = grant.resource.id.toLowerCase();
+    const members = world.who.has(grant.resource.id) ? [grant.resource.id]
+      : kind === 'agents' || id === 'agents' || (kind === 'agent' && id === '*') ? [...world.who].filter(([, w]) => w.kind === 'agent').map(([k]) => k)
+      : kind === 'people' || id === 'people' || (kind === 'person' && id === '*') ? [...world.who].filter(([, w]) => w.kind === 'person').map(([k]) => k)
+      : [];
+    const targets = members.length ? members.filter((m) => m !== grant.holder) : ['resource:' + grant.resource.kind + ':' + grant.resource.id];
+    if (!members.length) add(targets[0], grant.resource.id, 'resource', true);
     if (show.grants) {
-      edges.push({ a: grant.holder, b: target, kind: grant.standing.stands ? 'grant' : 'void',
-        label: nameOf(world, grant.holder) + ' may ' + grant.actions.join(', ') + ' on ' + grant.resource.id + (grant.standing.stands ? '' : ' (does not stand)') });
+      for (const target of targets) edges.push({ a: grant.holder, b: target, kind: grant.standing.stands ? 'grant' : 'void',
+        label: nameOf(world, grant.holder) + ' may ' + grant.actions.join(', ') + ' on ' + (members.length ? nameOf(world, target) : grant.resource.id) + (grant.standing.stands ? '' : ' (does not stand)') });
     }
   }
   if (show.answers) {
@@ -114,7 +119,7 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
     const cx = view.x + (event.clientX - box.left) * scale(), cy = view.y + (event.clientY - box.top) * scale();
     zoom(event.deltaY > 0 ? 1.15 : 1 / 1.15, cx, cy);
   };
-  const onDown = (event: PointerEvent<SVGSVGElement>) => { drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
+  const onDown = (event: PointerEvent<SVGSVGElement>) => { event.preventDefault(); window.getSelection()?.removeAllRanges(); drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
   const onMove = (event: PointerEvent<SVGSVGElement>) => {
     const start = drag.current;
     if (!start || event.buttons !== 1) return;
