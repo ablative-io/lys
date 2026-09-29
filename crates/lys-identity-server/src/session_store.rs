@@ -72,21 +72,26 @@ fn unavailable(path: &Path, what: &str) -> ServerError {
 }
 
 impl StoredActor {
-    fn of(actor: &Actor) -> Self {
+    fn of(actor: &Actor) -> Result<Self, ServerError> {
         let provenance = actor.provenance();
         let (method, agent) = match provenance.method() {
+            AuthMethod::Operator => {
+                return Err(ServerError::OperatorRefused {
+                    reason: "an operator credential cannot create a personal session",
+                });
+            }
             AuthMethod::Oidc => (StoredMethod::Oidc, None),
             AuthMethod::AgentSignature(agent) => {
                 (StoredMethod::AgentSignature, Some(agent.to_string()))
             }
         };
-        Self {
+        Ok(Self {
             issuer: actor.binding().issuer().to_owned(),
             subject: actor.binding().subject().to_owned(),
             method,
             agent,
             authenticated_at: provenance.authenticated_at(),
-        }
+        })
     }
 
     fn actor(&self, path: &Path) -> Result<Actor, ServerError> {
@@ -153,14 +158,16 @@ pub fn save<S: BuildHasher>(
 ) -> Result<(), ServerError> {
     let mut sessions: Vec<StoredSession> = live
         .iter()
-        .map(|(key, entry)| StoredSession {
-            key: key.clone(),
-            id: entry.id.clone(),
-            actor: StoredActor::of(&entry.actor),
-            started_at: entry.started_at,
-            ends_at: entry.ends_at,
+        .map(|(key, entry)| {
+            Ok(StoredSession {
+                key: key.clone(),
+                id: entry.id.clone(),
+                actor: StoredActor::of(&entry.actor)?,
+                started_at: entry.started_at,
+                ends_at: entry.ends_at,
+            })
         })
-        .collect();
+        .collect::<Result<_, ServerError>>()?;
     sessions.sort_by(|a, b| a.key.cmp(&b.key));
     let stored = StoredSessions {
         format: FORMAT.to_owned(),

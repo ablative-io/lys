@@ -138,6 +138,14 @@ impl Sessions {
 
     /// Begin a session for `actor`, answering the Set-Cookie header value.
     pub fn begin(&self, actor: Actor) -> Result<String, ServerError> {
+        if matches!(
+            actor.provenance().method(),
+            lys_identity::AuthMethod::Operator
+        ) {
+            return Err(ServerError::OperatorRefused {
+                reason: "an operator credential cannot create a personal session",
+            });
+        }
         let secret = random_hex::<32>()?;
         let started_at = now();
         let entry = SessionEntry {

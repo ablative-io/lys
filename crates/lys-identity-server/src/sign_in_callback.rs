@@ -1,11 +1,12 @@
 //! Complete an issuer callback, preserving the personal session admission check.
 
 use crate::error::ServerError;
-use crate::routes::Shared;
+use crate::routes::AppState;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub(crate) struct Answer {
@@ -14,7 +15,7 @@ pub(crate) struct Answer {
 }
 
 pub(crate) async fn callback(
-    State(state): State<Shared>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(answer): Query<Answer>,
 ) -> Result<Response, ServerError> {
