@@ -1640,6 +1640,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Approved apps sign in and inactive people are refused (DIRECTORY-067)",
+      "items": [
+        {
+          "id": "C449",
+          "text": "An approved app's client is a provider client (DIRECTORY-067 R1).",
+          "done": false
+        },
+        {
+          "id": "C450",
+          "text": "A retired app's codes and tokens stop at once (DIRECTORY-067 R2).",
+          "done": false
+        },
+        {
+          "id": "C451",
+          "text": "A suspended or retired person gets no code, no token and no answer (DIRECTORY-067 R3).",
+          "done": false
+        },
+        {
+          "id": "C452",
+          "text": "A code presented twice ends the tokens it bought (DIRECTORY-067 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }
