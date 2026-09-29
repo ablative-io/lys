@@ -60,6 +60,8 @@ pub struct Carried {
     pub products: Option<Value>,
     /// The message service bridge an earlier configuration declared.
     pub message_service: Option<Value>,
+    /// Explicit front-proxy trust, absent unless an operator configured it.
+    pub trusted_proxies: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -146,6 +148,9 @@ pub fn render(
     if let Some(bridge) = &carried.message_service {
         rendered[MESSAGE_SERVICE] = bridge.clone();
     }
+    if let Some(proxies) = &carried.trusted_proxies {
+        rendered["trusted_proxies"] = proxies.clone();
+    }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
@@ -173,6 +178,7 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         administrator: named(earlier.get("administrator")),
         products: named(earlier.pointer("/provider/clients")),
         message_service: message_service(&earlier, &path)?,
+        trusted_proxies: named(earlier.get("trusted_proxies")),
     }))
 }
 

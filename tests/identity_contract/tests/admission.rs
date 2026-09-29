@@ -84,8 +84,8 @@ async fn a_caller_without_a_session_is_refused_by_name() -> TestResult {
 #[tokio::test]
 async fn a_browser_coming_back_from_sign_in_is_taken_to_the_screens_signed_in() -> TestResult {
     let service = Service::start().await?;
-    let back = service.issuer_answer(login(ADMINISTRATOR)).await?;
-    let (status, to, cookie) = service.get_page(&back).await?;
+    let (back, binding) = service.issuer_answer(login(ADMINISTRATOR)).await?;
+    let (status, to, cookie) = service.get_page(&back, &binding).await?;
     assert_eq!(status, 303, "a browser is sent on, never shown the JSON");
     assert_eq!(to.as_deref(), Some("/#/me"), "it lands on its own screen");
     assert!(cookie, "and it arrives signed in");
