@@ -342,7 +342,10 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
         Act::Feed { cursor, follow } => {
             if follow {
                 sessions.until_any(left, |table| {
-                    table.feed.after(cursor.as_deref()).map_or(Some(()), |more| more.then_some(()))
+                    table
+                        .feed
+                        .after(cursor.as_deref())
+                        .map_or(Some(()), |more| more.then_some(()))
                 })?;
             }
             let page = sessions.lock().feed.page(cursor.as_deref())?;

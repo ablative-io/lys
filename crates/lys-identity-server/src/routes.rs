@@ -221,6 +221,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);
+    crate::grants_refusals::hold_at_start(&state);
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())

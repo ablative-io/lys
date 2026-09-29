@@ -9,10 +9,10 @@
 use lys_openapi::Api;
 
 use crate::agent_policy_api::{PolicyBody, PolicyView};
-use crate::refusals_api::RefusalsView;
 use crate::budgets_act::{UsageBody, UsageView};
 use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
+use crate::refusals_api::RefusalsView;
 use crate::runner_acts::ActReceipt;
 use crate::runner_api::{
     Empty, InputBody, KeysBody, ReadBody, ResizeBody, RunnerBody, WaitBody, WakeBody,

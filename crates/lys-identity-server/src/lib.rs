@@ -45,6 +45,7 @@ pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
 pub mod grants_batch;
+pub mod grants_refusals;
 pub mod launch_api;
 pub mod launch_template;
 pub mod link_audit_api;

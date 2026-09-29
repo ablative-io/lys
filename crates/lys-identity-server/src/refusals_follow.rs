@@ -38,7 +38,9 @@ pub fn follow_at_start(state: &Arc<AppState>) {
     }) {
         Ok(runners) => runners,
         Err(error) => {
-            (state.say)(&format!("refusals: the runners could not be listed: {error}"));
+            (state.say)(&format!(
+                "refusals: the runners could not be listed: {error}"
+            ));
             return;
         }
     };
@@ -83,7 +85,9 @@ async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) -> S
                 _ => None,
             })
             .collect();
-        if let Err(error) = with_budgets(state, |store| store.read_feed(machine, refusals, page.cursor)) {
+        if let Err(error) = with_budgets(state, |store| {
+            store.read_feed(machine, refusals, page.cursor)
+        }) {
             return error;
         }
     }
