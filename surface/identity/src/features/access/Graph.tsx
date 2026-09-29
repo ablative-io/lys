@@ -17,13 +17,12 @@ interface Node { id: string; label: string; kind: Kind; active: boolean; x: numb
 interface Edge { a: string; b: string; kind: 'grant' | 'void' | 'answers' | 'installed'; label: string }
 type Show = { grants: boolean; answers: boolean; installed: boolean };
 
-const W = 1400;
-const H = 820;
+const W = 1600;
+const H = 1100;
 
 async function readGraph() {
   const world = await readGrantWorld();
-  const [reach, installed] = await Promise.all([reachMap([...resourcesSeen(world).values()]), installedOf(world)]);
-  return { world, reach, installed };
+  return { world, installed: await installedOf(world) };
 }
 
 function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: Node[]; edges: Edge[] } {
@@ -59,36 +58,17 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   return { nodes: [...nodes.values()], edges };
 }
 
-function layout(nodes: Node[], edges: Edge[]) {
-  let seed = 7;
-  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  const at = new Map(nodes.map((node) => [node.id, node]));
-  const column = (node: Node) => node.kind === 'person' ? W * 0.14 : node.kind === 'agent' ? W * 0.42 : node.kind === 'app' ? W * 0.9 : W * 0.72;
-  for (const node of nodes) { node.x = column(node) + (rnd() - 0.5) * 80; node.y = H / 2 + (rnd() - 0.5) * H * 0.8; }
-  for (let it = 0; it < 420; it++) {
-    const k = 1 - it / 420;
-    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i], b = nodes[j];
-      let dx = a.x - b.x, dy = a.y - b.y;
-      const d2 = dx * dx + dy * dy + 0.01, f = 9000 / d2, d = Math.sqrt(d2);
-      dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
-    }
-    for (const edge of edges) {
-      const a = at.get(edge.a), b = at.get(edge.b);
-      if (!a || !b) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 200) * 0.0008 * d;
-      a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
-    }
-    for (const node of nodes) {
-      node.vx += (column(node) - node.x) * 0.08; node.vy += (H / 2 - node.y) * 0.003;
-      node.x += Math.max(-12, Math.min(12, node.vx * k)); node.y += Math.max(-12, Math.min(12, node.vy * k));
-      node.vx *= 0.6; node.vy *= 0.6;
-      node.x = Math.max(40, Math.min(W - 40, node.x)); node.y = Math.max(30, Math.min(H - 30, node.y));
-    }
+/** Columns by kind (people, agents, resources by kind, apps), each spread evenly with room for its labels. */
+function layout(nodes: Node[], _edges: Edge[]) {
+  const order: Kind[] = ['person', 'agent', 'resource', 'app'];
+  const x: Record<Kind, number> = { person: W * 0.08, agent: W * 0.34, resource: W * 0.62, app: W * 0.9 };
+  for (const kind of order) {
+    const column = nodes.filter((node) => node.kind === kind).sort((a, b) => a.label.localeCompare(b.label));
+    const gap = column.length > 1 ? (H - 120) / (column.length - 1) : 0;
+    column.forEach((node, i) => { node.x = x[kind]; node.y = column.length > 1 ? 60 + i * gap : H / 2; });
   }
 }
 
-/** The resource a resource node stands for, as the permission service names it: kind:id. */
 const resourceOf = (node: Node): string => node.id.replace(/^resource:/, '');
 
 const colour = (kind: Kind): string => kind === 'person' ? 'var(--accent)' : kind === 'agent' ? '#e8c9a6' : kind === 'app' ? '#8b8b96' : '#5f7f9a';
@@ -100,7 +80,13 @@ function Shape({ node }: { node: Node }) {
   return <circle r={node.kind === 'person' ? 9 : 7} fill={node.active ? stroke : 'var(--surface-card)'} stroke={stroke} strokeWidth={1.5} />;
 }
 
-function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach: Map<string, Map<string, string[]>>; installed: Installed[]; focus: string | undefined }) {
+function Graphed({ world, installed, focus }: { world: GrantWorld; installed: Installed[]; focus: string | undefined }) {
+  const reachLoad = useLoad(() => reachMap([...resourcesSeen(world).values()]), 'identity-graph-reach');
+  if (reachLoad.status === 'refused') return <Gate load={reachLoad} title="Graph" ok={() => null} />;
+  return <Drawing world={world} installed={installed} focus={focus} reach={reachLoad.status === 'ok' ? reachLoad.data : new Map<string, Map<string, string[]>>()} />;
+}
+
+function Drawing({ world, installed, focus, reach }: { world: GrantWorld; installed: Installed[]; focus: string | undefined; reach: Map<string, Map<string, string[]>> }) {
   const navigate = useNavigate();
   const [show, setShow] = useState<Show>({ grants: true, answers: true, installed: true });
   const { nodes, edges } = useMemo(() => { const m = model(world, installed, show); layout(m.nodes, m.edges); return m; }, [world, installed, show]);
@@ -184,8 +170,8 @@ export function Graph() {
   const load = useLoad(readGraph, 'identity-graph');
   return <div className="page"><div className="eyebrow">Access</div><h1>Graph</h1>
     <p className="sub">Every person, agent and resource, and the relations between them.</p>
-    <Gate load={load} title="Graph" ok={({ world, reach, installed }) => <>
-      <Drawing world={world} reach={reach} installed={installed} focus={id} />
+    <Gate load={load} title="Graph" ok={({ world, installed }) => <>
+      <Graphed world={world} installed={installed} focus={id} />
       <p className="note">Answers are limited to the directory and resources you may see. These reads do not exercise a grant.</p>
     </>} />
   </div>;
