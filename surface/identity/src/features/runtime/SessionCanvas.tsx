@@ -3,8 +3,11 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { Terminal } from './Terminal';
-import { readSessionGraph } from './session-graph';
+import { readSessionGraph, withMessages } from './session-graph';
 import type { SessionGraph } from './session-graph';
+import { firstMessagePage } from './message-connections';
+import type { MessageRead } from './message-connections';
+import { MessageConnections } from './MessageConnections';
 import './session-canvas.css';
 
 interface Line { id: string; path: string; kind: string; stands: boolean }
@@ -43,7 +46,7 @@ function Canvas({ graph }: { graph: SessionGraph }) {
       <div className="session-canvas" ref={space}>
         <svg className="session-canvas-lines" aria-hidden="true">{lines.map((line) => <path key={line.id} d={line.path} data-kind={line.kind} data-standing={line.stands} />)}</svg>
         {(['teams', 'sessions', 'resources'] as const).map((column) => <section className={'session-canvas-column ' + column} key={column} aria-label={column}>
-          <h2>{column === 'sessions' ? 'Running agents' : column === 'teams' ? 'Teams' : 'Granted resources'}</h2>
+          <h2>{column === 'sessions' ? 'Running agents' : column === 'teams' ? 'Teams and senders' : 'Resources and recipients'}</h2>
           {graph.nodes.filter((node) => node.column === column).map((node) => <article className="session-canvas-node" key={node.id} ref={(element) => { if (element) nodes.current.set(node.id, element); else nodes.current.delete(node.id); }}>
             <h3>{node.title}</h3><p className="note">{node.detail}</p>
             {node.session ? <>
@@ -62,9 +65,15 @@ function Canvas({ graph }: { graph: SessionGraph }) {
   </>;
 }
 
+function MessageCanvas({ graph, first }: { graph: SessionGraph; first: MessageRead }) {
+  const [messages, setMessages] = useState(first);
+  return <><MessageConnections value={messages} change={setMessages} /><Canvas graph={withMessages(graph, messages.messages)} /></>;
+}
+
 export function SessionCanvas() {
   const [revision, setRevision] = useState(0);
   const load = useLoad(readSessionGraph, 'session-canvas:' + revision);
+  const messages = useLoad(firstMessagePage, 'canvas-message-edges:' + revision);
   return <div className="page session-canvas-page">
     <h1>Agent canvas</h1>
     <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running.</p>
@@ -72,7 +81,8 @@ export function SessionCanvas() {
     <Gate load={load} title="Agent canvas" ok={(graph) => <>
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
-      {graph.nodes.some((node) => node.session) ? <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
+      {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
+      {graph.nodes.some((node) => node.session) ? messages.status === 'ok' ? <MessageCanvas key={revision} graph={graph} first={messages.data} /> : <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
       <p className="note">Team membership does not grant access. Dashed grant connections no longer stand. Terminal actions are checked by the service each time.</p>
     </>} />
   </div>;

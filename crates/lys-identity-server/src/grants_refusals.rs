@@ -96,8 +96,7 @@ pub fn judged(state: &AppState, question: &GrantQuestion) -> GrantAnswer {
 }
 
 fn permits(state: &AppState, question: &GrantQuestion) -> Result<bool, ServerError> {
-    let agent =
-        AgentId::from_str(&question.agent).map_err(|_unread| ServerError::AgentNotVisible)?;
+    let agent = AgentId::from_str(&question.agent)?;
     with_grants(state, |judged| {
         let request = ExerciseRequest {
             caller: IdentityId::Agent(agent),
