@@ -399,8 +399,11 @@ pub fn upgrade(
     let result = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
         .and_then(|()| {
             if let Some(program) = parts.runner {
-                let key = std::sync::Arc::new(install::service_key(layout)?);
-                install::start_runner(layout, &key, program, say)?;
+                let key = std::sync::Arc::new(
+                    install::service_key(layout).map_err(|error| error.to_string())?,
+                );
+                install::start_runner(layout, &key, program, say)
+                    .map_err(|error| error.to_string())?;
             }
             Ok(())
         });
