@@ -208,7 +208,7 @@ async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> Te
 #[tokio::test(flavor = "multi_thread")]
 async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -> TestResult {
     let table = Table::set().await?;
-    let rule = json!({ "id": "no-denied-writes", "tool": "Write", "kind": "path_prefix",
+    let rule = json!({ "id": "no-denied-writes", "tool": "Edit", "kind": "path_prefix",
                        "target": "/probe/denied", "authority": "hard" });
     let kept = table
         .ok(
