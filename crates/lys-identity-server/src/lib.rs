@@ -50,6 +50,7 @@ pub mod launch_api;
 pub mod launch_template;
 pub mod link_audit_api;
 pub mod memory_api;
+pub mod message_edges;
 pub mod network_api;
 pub mod network_store;
 pub mod oidc;

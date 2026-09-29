@@ -12,6 +12,8 @@
 .session-canvas-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .session-canvas-lines path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .session-canvas-lines path[data-kind="membership"] { stroke: var(--text-muted); }
+.session-canvas-lines path[data-kind="message"] { stroke: var(--text-primary); }
+.session-canvas-lines path[data-kind="identity"] { stroke: var(--text-secondary); stroke-dasharray: 2 3; }
 .session-canvas-lines path[data-standing="false"] { stroke-dasharray: 5 4; opacity: .6; }
 .canvas-connections { margin-top: 16px; }
 .canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
