@@ -20,7 +20,7 @@ pub enum Refusal {
     /// The request did not present exactly one client authentication method.
     #[error("DelegationClientAuthenticationAmbiguous")]
     ClientAuthentication,
-    /// Configured OpenID clients do not confer approved-app delegation authority.
+    /// Configured `OpenID` clients do not confer approved-app delegation authority.
     #[error("DelegationClientAuthorityRefused")]
     ClientAuthority,
     /// No current approved app with valid authority coordinates was supplied.
