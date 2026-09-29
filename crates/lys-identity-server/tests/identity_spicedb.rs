@@ -272,9 +272,21 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let run = format!("{}_{now}", std::process::id());
     let engine = settings(&format!("proof_bench_{run}"))?;
-    let (service, seeded) = Service::start_judging(GRANT_MODEL, Some(engine.clone()), |config| {
-        Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
-    })
+    let broker = identity_contract::app_custody::start().await?;
+    let (service, seeded) = Service::start_adjusted(
+        GRANT_MODEL,
+        Some(engine.clone()),
+        None,
+        None,
+        move |config| {
+            config.secrets = Some(lys_identity_server::secrets_api::SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
+        },
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
+    )
     .await?;
     let left = "lys/bdeadbeefdeadbeef";
     let held = held_schema(&engine).await?;

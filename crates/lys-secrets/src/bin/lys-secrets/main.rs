@@ -14,6 +14,8 @@ mod oauth_proxy;
 mod redact;
 #[cfg(test)]
 mod redact_tests;
+#[cfg(test)]
+mod route_write_fault_tests;
 mod save_app;
 mod save_app_tests;
 mod serve;
