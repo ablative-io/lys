@@ -1,6 +1,7 @@
 """Upgrade a disposable real old install; never operate a person's live root."""
 
 import argparse
+from functools import partial
 import hashlib
 import ipaddress
 import json
@@ -20,6 +21,7 @@ from upgrade_restart import settle as settle_restart
 from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
 
 from upgrade_preflight import socket_paths
+from upgrade_layout import inventory, executables, harness_inventory, harness_paths
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
 
@@ -30,9 +32,9 @@ def run(command, log, env=None, expected=0):
         raise RuntimeError(f"{command[0]} exited {completed.returncode}, expected {expected}; evidence: {log}")
 
 
-def stamp(directory, expected):
+def stamp(directory, expected, programs=PROGRAMS):
     versions = {}
-    for name in PROGRAMS:
+    for name in programs:
         output = subprocess.check_output([str(directory / name), "--version"], text=True).strip()
         if f"({expected})" not in output or "dirty" in output:
             raise RuntimeError(f"{directory / name} must be a clean build of {expected}: {output}")
@@ -162,6 +164,15 @@ def prepare(args):
         ["git", "-C", str(args.old_source), "status", "--porcelain"], text=True)
     if dirty:
         raise RuntimeError("old source must be clean, including its deployment template")
+    layouts = {"old": inventory(lambda path: (args.old_source / path).read_text(), args.old_commit)}
+    repository = Path(__file__).resolve().parents[2]
+    def candidate_source(path):
+        return subprocess.check_output(["git", "-C", str(repository), "show",
+                                        args.candidate_commit + ":" + path], text=True)
+    layouts["candidate"] = inventory(candidate_source, args.candidate_commit, candidate=True)
+    installed_binaries = layouts["old"]["installed_binaries"]
+    if installed_binaries != layouts["candidate"]["installed_binaries"]:
+        raise RuntimeError("old and candidate installed binary layouts differ; proof needs a new contract")
     surfaces = {}
     for name, path, commit in [("old", args.old_surface, args.old_commit),
                                ("candidate", args.candidate_surface, args.candidate_commit)]:
@@ -186,8 +197,11 @@ def prepare(args):
     versions["driver"] = {"version": driver_version,
                           "sha256": hashlib.sha256(driver.read_bytes()).hexdigest()}
     paths = socket_paths(args.work)
+    verifiers = harness_inventory(Path(__file__).resolve().parent)
     return {"old": args.old_commit, "candidate": args.candidate_commit,
-            "versions": versions, "surfaces": surfaces, "socket_paths": paths}
+            "versions": versions, "surfaces": surfaces, "socket_paths": paths,
+            "layouts": layouts, "executables": executables(),
+            "verifiers": verifiers, "harness_paths": harness_paths(verifiers, layouts)}
 
 
 def exercise(args):
@@ -201,6 +215,7 @@ def exercise(args):
     versions = args.prepared["versions"]
     surfaces = args.prepared["surfaces"]
     driver = args.candidate_bin / "examples/upgrade_window"
+    installed_stamp = partial(stamp, programs=args.prepared["layouts"]["old"]["installed_binaries"])
     project = "lys-upgrade-proof-" + str(os.getpid())
     browser = Browser(installation(root, args.old_source, project))
     headless = args.work / "headless"
@@ -246,7 +261,7 @@ def exercise(args):
         unchanged(files, legacy_files(root, json.loads(config_file.read_text())))
         if args.negative_control:
             receipt = exercise_negative(root, evidence, driver, installed, env, files,
-                                        run, stamp, args.old_commit)
+                                        run, installed_stamp, args.old_commit)
         else:
             # Re-enter the real old installer. Its existing recovery runs before installation.
             intent_bytes = (root / "install/upgrade.json").read_bytes()
@@ -263,7 +278,7 @@ def exercise(args):
             }, indent=2))
             if (root / "install/upgrade.json").exists():
                 raise RuntimeError("old installer recovery left the upgrade intent standing")
-            stamp(root / "bin", args.old_commit)
+            installed_stamp(root / "bin", args.old_commit)
             same_records(before, observe(browser, ids))
             for path, expected in [
                 (f"/teams/{legacy['team']}", legacy["team_before"]),
@@ -290,7 +305,7 @@ def exercise(args):
                 evidence / "candidate-recover.log", env)
             if config_file.read_bytes() != original_config:
                 raise RuntimeError("candidate back path did not restore original config bytes")
-            stamp(root / "bin", args.old_commit)
+            installed_stamp(root / "bin", args.old_commit)
             same_records(before, observe(browser, ids))
             verify_provenance(browser, provenance)
             (evidence / "candidate-back.json").write_text(json.dumps({

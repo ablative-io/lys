@@ -38,6 +38,14 @@ upgrade pass. Use a short work path; the named socket refusal comes before an
 install, rather than after the runner has been started. Then coordinate the
 service window and run without `--prepare-only`.
 
+Preparation also resolves the old and candidate install layouts from their
+exact source revisions. Installed readbacks use `Layout::BINARIES`, which names
+the broker and identity server; the CLI remains in the input artifact package.
+The receipt includes every fixed product path, all verifier modules and their
+hashes, external executables, and an inventory of the harness's path expressions.
+Inputs must exist now. Future fixture logs and rollback paths are checked against
+their source producers; preparation does not pretend those future files exist.
+
 The runner creates separate positive and negative installs under `work/`.
 Evidence is written under each one's `evidence/`. A passing root receipt is
 written only after both legs and their fixture cleanup succeed. The fixtures use synthetic

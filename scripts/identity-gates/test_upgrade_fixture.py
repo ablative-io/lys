@@ -8,10 +8,23 @@ from pathlib import Path
 from unittest.mock import patch
 
 from upgrade_fixture import same_records
-from upgrade_live import app_leaves, installation, network_subnets, preserve_leaves
+from upgrade_live import app_leaves, installation, network_subnets, preserve_leaves, stamp
 
 
 class UpgradeProofTests(unittest.TestCase):
+    def test_installed_stamps_use_only_the_installers_declared_binaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            installed = ("lys-secrets", "lys-identity-server")
+            for name in installed:
+                (root / name).write_bytes(b"binary")
+            with patch("upgrade_live.subprocess.check_output", return_value="program (commit)") as run:
+                result = stamp(root, "commit", programs=installed)
+            self.assertEqual(list(result), list(installed))
+            self.assertEqual([call.args[0][0] for call in run.call_args_list],
+                             [str(root / name) for name in installed])
+            self.assertFalse((root / "lys").exists())
+
     def test_nullable_network_fields_keep_every_assigned_subnet(self):
         self.assertEqual(network_subnets([
             {}, {"IPAM": None}, {"IPAM": {}}, {"IPAM": {"Config": None}},
