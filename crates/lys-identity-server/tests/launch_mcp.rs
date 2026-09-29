@@ -200,6 +200,7 @@ async fn a_credential_or_an_unrepresentable_setting_is_refused_by_name_when_reco
         command(json!([]), json!({ "MERIDIAN_TOKEN": INLINE })),
         command(json!([format!("sk-{INLINE}")]), json!({})),
         json!([{ "name": "meridian", "url": format!("https://seat:{INLINE}@meridian.example.test/mcp") }]),
+        json!([{ "name": "meridian", "url": format!("https://meridian.example.test/mcp?access_token={INLINE}") }]),
     ];
     for servers in inline {
         let (status, answer) = table.record(0, &servers).await?;
@@ -218,6 +219,28 @@ async fn a_credential_or_an_unrepresentable_setting_is_refused_by_name_when_reco
         let (status, answer) = table.record(0, &command(json!([]), env)).await?;
         assert_eq!(status, 400, "{answer}");
         assert_eq!(answer["refusal"], "McpSettingUnrepresentable", "{answer}");
+    }
+    let started = |program: &str, args: Value, cwd: Value| json!([{ "name": "meridian", "command": { "program": program, "args": args, "cwd": cwd } }]);
+    for inexact in [
+        started(" /opt/seat/bin/meridian", json!([]), Value::Null),
+        started("/opt/seat/bin/meridian ", json!([]), Value::Null),
+        started("/opt/seat/bin/mer\0idian", json!([]), Value::Null),
+        started(
+            "/opt/seat/bin/meridian",
+            json!(["--seat\0archie"]),
+            Value::Null,
+        ),
+        started("/opt/seat/bin/meridian", json!([]), json!("")),
+        started("/opt/seat/bin/meridian", json!([]), json!("  ")),
+        started("/opt/seat/bin/meridian", json!([]), json!(" /seat")),
+        started("/opt/seat/bin/meridian", json!([]), json!("/se\0at")),
+    ] {
+        let (status, answer) = table.record(0, &inexact).await?;
+        assert_eq!(status, 400, "{inexact} {answer}");
+        assert_eq!(
+            answer["refusal"], "McpSettingUnrepresentable",
+            "{inexact} {answer}"
+        );
     }
     let both = json!([{ "name": "meridian", "url": "https://meridian.example.test/mcp",
         "command": { "program": "/opt/seat/bin/meridian" } }]);
