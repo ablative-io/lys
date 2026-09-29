@@ -43,6 +43,10 @@ pub(crate) fn route(
             named.push(name);
         }
     }
+    // The common ingress check can refuse any inactive authenticated caller.
+    if !named.contains(&"inactive") {
+        named.push("inactive");
+    }
     Route {
         method,
         path,

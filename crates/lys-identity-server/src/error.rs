@@ -20,6 +20,14 @@ pub enum ServerError {
     /// A goals refusal: an item, its judgement or its reminders.
     #[error(transparent)]
     Goal(#[from] crate::goals_state::GoalError),
+    /// The caller's directory identity is suspended or retired.
+    #[error("inactive: {identity} is {state} and may not act")]
+    Inactive {
+        /// The person or agent refused.
+        identity: String,
+        /// The current recorded lifecycle state.
+        state: lys_identity::LifecycleState,
+    },
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,

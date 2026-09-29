@@ -22,7 +22,7 @@ use axum::http::HeaderMap;
 use lys_core::attestation::verify_attestation_bytes_by_signer;
 use lys_core::ca::certificate_subject_public_key;
 use lys_identity::projection::Projection;
-use lys_identity::{AgentId, IdentityId, LifecycleState};
+use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, Provenance};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
@@ -100,6 +100,13 @@ pub fn signed_agent(
     if !verified {
         return Err(refused("the signature does not verify"));
     }
+    let person = record
+        .responsible()
+        .and_then(|person| directory.record(IdentityId::Person(person)))
+        .ok_or(ServerError::NoPerson)?;
+    let binding = person.bindings().first().ok_or(ServerError::NoPerson)?;
+    let actor = Actor::new(binding.clone(), Provenance::by_agent(agent, now / 1000));
+    crate::caller_admission::active_caller(directory, &actor)?;
     let mut seen = state
         .agent_nonces
         .lock()
