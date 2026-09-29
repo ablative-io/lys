@@ -16,6 +16,7 @@ use crate::runner_acts::ActReceipt;
 use crate::runner_api::{
     Empty, InputBody, KeysBody, ReadBody, ResizeBody, RunnerBody, WaitBody, WakeBody,
 };
+use crate::runner_bytes_api::{InputBytesBody, ReadBytesBody};
 
 /// The runner routes' entries.
 pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
@@ -41,6 +42,18 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             POST,
             "/runtime/sessions/{id}/input",
             Some(api.schema::<InputBody>()),
+            None,
+        ),
+        (
+            POST,
+            "/runtime/sessions/{id}/input-bytes",
+            Some(api.schema::<InputBytesBody>()),
+            None,
+        ),
+        (
+            POST,
+            "/runtime/sessions/{id}/read-bytes",
+            Some(api.schema::<ReadBytesBody>()),
             None,
         ),
         (

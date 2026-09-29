@@ -149,6 +149,14 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "answers the runner's own answer and the act's receipt",
     ),
     (
+        "post /runtime/sessions/{id}/input-bytes",
+        "answers the runner's own answer and the act's receipt",
+    ),
+    (
+        "post /runtime/sessions/{id}/read-bytes",
+        "answers the runner's own answer and the act's receipt",
+    ),
+    (
         "post /runtime/sessions/{id}/keys",
         "answers the runner's own answer and the act's receipt",
     ),
