@@ -528,4 +528,44 @@ pub enum ServerError {
         /// The issuer's message.
         reason: String,
     },
+    /// The caller does not hold the operate relation on the agent.
+    #[error("not_permitted: {reason}")]
+    NotPermitted {
+        /// What was refused.
+        reason: String,
+    },
+    /// The agent has no live session a message can be typed into.
+    #[error("no_live_session: agent `{agent}` has no live session to wake")]
+    NoLiveSession {
+        /// The agent.
+        agent: String,
+    },
+    /// The session's machine names no runner, so Lys does not drive it.
+    #[error("runner_absent: machine `{machine}` names no runner")]
+    RunnerAbsent {
+        /// The machine.
+        machine: String,
+    },
+    /// A runner refused the act, or could not be reached, by its own name.
+    #[error("{refusal}: {words}")]
+    Runner {
+        /// The refusal's name.
+        refusal: String,
+        /// Why, in words.
+        words: String,
+    },
+    /// A dial request was not signed by the machine's key, or names a
+    /// machine with no dialled runner.
+    #[error("runner_dial_refused: {reason}")]
+    DialRefused {
+        /// Why.
+        reason: String,
+    },
+    /// A dial was signed under an epoch not this server's: it was made
+    /// before the server last started, or captured and sent again after.
+    #[error("runner_dial_stale: {reason}")]
+    DialStale {
+        /// Why.
+        reason: String,
+    },
 }

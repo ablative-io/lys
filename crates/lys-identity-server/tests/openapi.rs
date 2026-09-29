@@ -15,6 +15,10 @@ use identity_contract::harness::Service;
 use lys_identity_server::openapi::{api, document};
 use serde_json::Value;
 
+#[path = "shared/openapi_unnamed.rs"]
+mod unnamed;
+use unnamed::{NO_BODY, OPEN_ANSWERS};
+
 /// A route as `method path`.
 type Declared = BTreeSet<(String, String)>;
 
@@ -258,110 +262,6 @@ fn every_refusal_the_document_names_is_produced_by_a_test() -> TestResult {
     );
     Ok(())
 }
-
-/// Every route whose answer the document describes by its words alone, with
-/// why. `every_route_names_the_types_it_takes_and_answers` holds this list
-/// exact from both sides: a route named here that in fact names an answer
-/// fails, and a route that names none and is not here fails.
-const OPEN_ANSWERS: &[(&str, &str)] = &[
-    ("get /authority", "answers text/plain, not JSON"),
-    ("get /login", "answers a 303 to the issuer, with no body"),
-    (
-        "get /callback",
-        "answers through Response, since it must set the session cookie",
-    ),
-    (
-        "get /configuration",
-        "answers the startup settings as a dump that follows the configuration",
-    ),
-    ("get /secrets", "the secrets broker's own answer, forwarded"),
-    (
-        "get /secrets/grants",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "get /secrets/audit",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "get /secrets/revocation",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "get /secrets/settings",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "get /secrets/handles",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "post /secrets/scope",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "post /secrets/recipients",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "post /secrets/drop",
-        "the secrets broker's own answer, forwarded",
-    ),
-    (
-        "post /agents/{id}/start",
-        "the start owners' own rendered JSON, which this crate holds no type for",
-    ),
-    (
-        "post /launch-records/{id}/start-again",
-        "the start owners' own rendered JSON, which this crate holds no type for",
-    ),
-    (
-        "post /launch-records/{id}/withdraw",
-        "the start owners' own rendered JSON, which this crate holds no type for",
-    ),
-    (
-        "get /launch-records/{id}/state",
-        "the start owners' own rendered JSON, which this crate holds no type for",
-    ),
-    ("get /openapi.json", "answers this document"),
-    (
-        "post /apps/{app}/placements",
-        "answers the placement made, with nothing of its own to say",
-    ),
-    ("post /apps/bench", "answers the bench opened"),
-    ("post /apps/bench/{id}/close", "answers the bench closed"),
-];
-
-/// Every POST or PUT route the document gives no request body schema, with
-/// why. Each either takes no body at all or takes one it does not own.
-const NO_BODY: &[(&str, &str)] = &[
-    ("post /requests/{id}/reconcile", "takes no body"),
-    ("post /network/machines/{id}/retire", "takes no body"),
-    ("post /sessions/{id}/end", "takes no body"),
-    (
-        "post /directory/people/{id}/sessions/{session}/end",
-        "takes no body",
-    ),
-    ("post /launch-records/{id}/start-again", "takes no body"),
-    ("post /launch-records/{id}/withdraw", "takes no body"),
-    ("post /apps/bench/{id}/close", "takes no body"),
-    (
-        "post /secrets/scope",
-        "forwards its bytes to the secrets broker unread",
-    ),
-    (
-        "post /secrets/recipients",
-        "forwards its bytes to the secrets broker unread",
-    ),
-    (
-        "post /secrets/drop",
-        "forwards its bytes to the secrets broker unread",
-    ),
-    (
-        "post /agents/{id}/start",
-        "takes the start grammar's members as they came, not a Rust type",
-    ),
-];
 
 /// The schema an operation names at `at`, when it names one by reference.
 fn reference<'a>(operation: &'a Value, at: &str) -> Option<&'a str> {

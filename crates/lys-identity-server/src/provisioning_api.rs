@@ -27,7 +27,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
-use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Review, Settings, Version};
+use crate::provisioning_store::{
+    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, Version,
+};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -130,6 +132,8 @@ pub(crate) struct SetBody {
     mcp_servers: Vec<McpServer>,
     instructions: String,
     note: String,
+    #[serde(default)]
+    session: Option<SessionSettings>,
 }
 
 /// The provisioning routes.
@@ -217,7 +221,26 @@ fn settings(body: &SetBody) -> Result<Settings, ServerError> {
         mcp_servers: servers(&body.mcp_servers)?,
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
+        session: body.session.clone().map(session).transpose()?,
     })
+}
+
+/// The session settings, each refused by name when a runner could not use it.
+fn session(settings: SessionSettings) -> Result<SessionSettings, ServerError> {
+    if settings
+        .compact
+        .as_deref()
+        .is_some_and(|line| line.trim().is_empty())
+    {
+        return Err(malformed(
+            "session.compact is empty: name the command or leave it out",
+        ));
+    }
+    if let Some(accounts) = &settings.accounts {
+        lys_runner::rotation::RotationState::new(accounts.clone())
+            .map_err(|refused| malformed(format!("session.accounts: {refused}")))?;
+    }
+    Ok(settings)
 }
 
 pub(crate) fn with_provisioning<T>(

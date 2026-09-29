@@ -84,10 +84,10 @@ use crate::teams_api::{
 };
 
 /// A schema's name in the document, or none where a route names none.
-type Schema = Option<Cow<'static, str>>;
+pub(crate) type Schema = Option<Cow<'static, str>>;
 
 /// One route's method, path, body schema and answer schema.
-type Entry = (Method, &'static str, Schema, Schema);
+pub(crate) type Entry = (Method, &'static str, Schema, Schema);
 
 /// What each entry of the table takes and answers, by method and path.
 pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, Schema)> {
@@ -96,6 +96,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(roles_and_requests(api));
     entries.extend(machines_and_runtime(api));
     entries.extend(accounts_teams_and_sessions(api));
+    entries.extend(crate::openapi_runner_types::runner(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))
@@ -352,6 +353,60 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             "/agents/{id}/stops",
             None,
             Some(api.schema::<StopsView>()),
+        ),
+        (
+            POST,
+            "/sign-in",
+            Some(api.schema::<crate::sign_in::SignInBody>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/open",
+            Some(api.schema::<crate::setup::Opened>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/administrator",
+            Some(api.schema::<crate::setup::NewAdministrator>()),
+            None,
+        ),
+        (
+            POST,
+            "/setup/password",
+            Some(api.schema::<crate::setup::NewPassword>()),
+            None,
+        ),
+        (
+            POST,
+            "/me/account/email",
+            Some(api.schema::<crate::accounts::OwnEmail>()),
+            None,
+        ),
+        (
+            POST,
+            "/me/account/password",
+            Some(api.schema::<crate::accounts::OwnPassword>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/email",
+            Some(api.schema::<crate::accounts::NewEmail>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/enabled",
+            Some(api.schema::<crate::accounts::Enabled>()),
+            None,
+        ),
+        (
+            POST,
+            "/directory/people/{id}/account/password",
+            Some(api.schema::<crate::accounts::Reset>()),
+            None,
         ),
     ]
 }

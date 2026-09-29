@@ -422,9 +422,9 @@ pub fn person_address(extensions: &Extensions) -> Result<IpAddr, ServerError> {
 }
 
 /// What the sign-in screen posts. Never printed.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct SignInBody {
+pub(crate) struct SignInBody {
     email: String,
     password: String,
 }

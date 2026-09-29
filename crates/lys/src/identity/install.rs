@@ -21,8 +21,10 @@
 //! code and hands it to the browser in the setup page's address
 //! (`setup_code`), where the person makes the administrator. Everything it
 //! says names Lys and its parts by what they do, never the issuer.
+//! The runner starts beside the service and is not restarted by reinstall.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use base64::Engine;
 use lys_core::Ed25519Identity;
@@ -122,6 +124,64 @@ fn write_providers_key(config: &DeploymentConfig) -> IdentityResult<()> {
     Ok(())
 }
 
+/// Start the runner beside the service, as the service is started: it holds
+/// each agent the service starts in its own pseudo-terminal, on a Unix socket
+/// in the run folder, acting only on the service key's requests. It is never
+/// restarted here, since a restart ends every session it holds.
+fn start_runner(
+    layout: &Layout,
+    key: &Arc<Ed25519Identity>,
+    emitter: &mut Emitter,
+) -> IdentityResult<()> {
+    let program = services::sibling("lys")?;
+    let log = layout.logs_dir().join("runner.log");
+    let pid = layout.run_dir().join("runner.pid");
+    let public = layout.run_dir().join("runner-server.pub");
+    write_plain(&public, &lys_runner::protocol::hex(&key.public_key_bytes()))?;
+    let socket = layout.runner_socket();
+    let args = [
+        "runner",
+        "serve",
+        "--socket",
+        &socket.display().to_string(),
+        "--state",
+        &layout.data_dir().join("runner").display().to_string(),
+        "--server-key",
+        &public.display().to_string(),
+    ]
+    .map(str::to_string);
+    let started = services::start_detached(&program, &args, &log, &pid, false)?;
+    let client = lys_runner::Client::new(socket.clone(), Arc::clone(key));
+    log_wait::wait_until("runner", &log, &pid, &mut || {
+        client
+            .ask(&lys_runner::Act::Status { session: None })
+            .is_ok()
+    })?;
+    emitter.note(&format!(
+        "runner {} on {}",
+        if started {
+            "started"
+        } else {
+            "already running"
+        },
+        socket.display()
+    ));
+    Ok(())
+}
+
+/// Makes every file the directory service reads from the state folder that
+/// is not there yet, leaving each one that is: the grant model, the
+/// providers' key, the provider signing key and the service key. Install
+/// and upgrade both run it, so an install made by an earlier build gains
+/// what this build's service needs before it starts.
+pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
+    write_providers_key(config)?;
+    provider_key(config)?;
+    service_key(layout)?;
+    Ok(())
+}
+
 /// Runs `lys identity install`. A failure is said in Lys's words, because
 /// the person installing reads it.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
@@ -179,7 +239,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     emitter.note("database, sign-in and permission services ready");
     configure::reconcile(&config)?;
     emitter.note("sign-in clients registered");
-    let key = service_key(&layout)?;
+    let key = Arc::new(service_key(&layout)?);
     let public = base64::engine::general_purpose::STANDARD.encode(key.public_key_bytes());
     emitter.note(&format!("service key public {public}"));
     if services::broker_init(&layout)? {
@@ -192,9 +252,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         emitter.note(&format!("screens placed from commit {}", manifest.commit));
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
-    write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
-    write_providers_key(&config)?;
-    provider_key(&config)?;
+    server_state(&layout, &config)?;
     let carried = server_config::carried(&layout)?.unwrap_or_default();
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {
@@ -229,6 +287,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     if emitter.is_json() {
         emitter.field("build", "build", build);
     }
+    start_runner(&layout, &key, &mut emitter)?;
     emitter.field("open", "url", Layout::service_url());
     emitter.field("sign-in for products", "issuer", Layout::service_url());
     if let Some(code) = code {
