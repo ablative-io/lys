@@ -1,5 +1,5 @@
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent, WheelEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
@@ -58,15 +58,40 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   return { nodes: [...nodes.values()], edges };
 }
 
-/** Columns by kind (people, agents, resources by kind, apps), each spread evenly with room for its labels. */
-function layout(nodes: Node[], _edges: Edge[]) {
-  const order: Kind[] = ['person', 'agent', 'resource', 'app'];
-  const x: Record<Kind, number> = { person: W * 0.08, agent: W * 0.34, resource: W * 0.62, app: W * 0.9 };
-  for (const kind of order) {
-    const column = nodes.filter((node) => node.kind === kind).sort((a, b) => a.label.localeCompare(b.label));
-    const gap = column.length > 1 ? (H - 120) / (column.length - 1) : 0;
-    column.forEach((node, i) => { node.x = x[kind]; node.y = column.length > 1 ? 60 + i * gap : H / 2; });
+/** A force simulation with room to breathe: strong repulsion, springy links, a collision radius for labels, weak gravity. Answers the drawing's bounds. */
+function layout(nodes: Node[], edges: Edge[]): { x: number; y: number; w: number; h: number } {
+  const at = new Map(nodes.map((node) => [node.id, node]));
+  nodes.forEach((node, i) => { const a = (i / Math.max(1, nodes.length)) * Math.PI * 2; node.x = Math.cos(a) * 420; node.y = Math.sin(a) * 420; node.vx = 0; node.vy = 0; });
+  const rounds = 500;
+  for (let it = 0; it < rounds; it++) {
+    const heat = 1 - it / rounds;
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y;
+      const d = Math.max(20, Math.hypot(dx, dy));
+      dx /= d; dy /= d;
+      let f = 90000 / (d * d);
+      if (d < 110) f += (110 - d) * 0.5;
+      a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+    }
+    for (const edge of edges) {
+      const a = at.get(edge.a), b = at.get(edge.b);
+      if (!a || !b) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.max(1, Math.hypot(dx, dy)), f = (d - 220) * 0.02;
+      a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
+    }
+    for (const node of nodes) {
+      node.vx -= node.x * 0.004; node.vy -= node.y * 0.004;
+      node.x += Math.max(-30, Math.min(30, node.vx * heat)); node.y += Math.max(-30, Math.min(30, node.vy * heat));
+      node.vx *= 0.55; node.vy *= 0.55;
+    }
   }
+  const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+  if (!nodes.length) return { x: 0, y: 0, w: W, h: H };
+  const x0 = Math.min(...xs) - 80, x1 = Math.max(...xs) + 260, y0 = Math.min(...ys) - 60, y1 = Math.max(...ys) + 60;
+  let w = x1 - x0, h = y1 - y0;
+  if (w / h < W / H) w = h * W / H; else h = w * H / W;
+  return { x: (x0 + x1) / 2 - w / 2 - 90, y: (y0 + y1) / 2 - h / 2, w, h };
 }
 
 const resourceOf = (node: Node): string => node.id.replace(/^resource:/, '');
@@ -89,19 +114,20 @@ function Graphed({ world, installed, focus }: { world: GrantWorld; installed: In
 function Drawing({ world, installed, focus, reach }: { world: GrantWorld; installed: Installed[]; focus: string | undefined; reach: Map<string, Map<string, string[]>> }) {
   const navigate = useNavigate();
   const [show, setShow] = useState<Show>({ grants: true, answers: true, installed: true });
-  const { nodes, edges } = useMemo(() => { const m = model(world, installed, show); layout(m.nodes, m.edges); return m; }, [world, installed, show]);
+  const { nodes, edges, bounds } = useMemo(() => { const m = model(world, installed, show); return { ...m, bounds: layout(m.nodes, m.edges) }; }, [world, installed, show]);
   const at = new Map(nodes.map((node) => [node.id, node]));
   const hot = focus ? new Set([focus, ...edges.filter((edge) => edge.a === focus || edge.b === focus).flatMap((edge) => [edge.a, edge.b])]) : null;
   const picked = focus ? at.get(focus) : undefined;
   const reaches = focus ? [...reach].flatMap(([resource, holders]) => { const actions = holders.get(focus); return actions ? [{ resource, actions }] : []; }) : [];
   const reachedBy = picked?.kind === 'resource' ? [...(reach.get(resourceOf(picked)) ?? new Map<string, string[]>())] : [];
   const go = (id: string) => navigate('/graph/' + encodeURIComponent(id));
-  const [view, setView] = useState({ x: 0, y: 0, w: W, h: H });
+  const [view, setView] = useState(bounds);
+  useEffect(() => { setView(bounds); }, [bounds]);
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const scale = () => { const box = svg.current?.getBoundingClientRect(); return box && box.width ? view.w / box.width : 1; };
   const zoom = (factor: number, cx = view.x + view.w / 2, cy = view.y + view.h / 2) => setView((v) => {
-    const w = Math.min(W * 1.6, Math.max(W / 6, v.w * factor)); const k = w / v.w;
+    const w = Math.min(bounds.w * 3, Math.max(bounds.w / 8, v.w * factor)); const k = w / v.w;
     return { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w, h: v.h * k };
   });
   const onWheel = (event: WheelEvent<SVGSVGElement>) => {
@@ -121,8 +147,11 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
     const k = scale();
     setView((v) => ({ ...v, x: v.x - dx * k, y: v.y - dy * k }));
   };
-  const onUp = () => { const was = drag.current?.moved; drag.current = null; return was; };
-  const pick = (id: string) => { if (!drag.current?.moved) go(id); };
+  const dragged = useRef(false);
+  const onUp = () => { dragged.current = Boolean(drag.current?.moved); drag.current = null; };
+  const clear = (event: { target: EventTarget; currentTarget: EventTarget }) => { if (event.target === event.currentTarget && !dragged.current && focus) navigate('/graph'); };
+  useEffect(() => { const esc = (event: KeyboardEvent) => { if (event.key === 'Escape' && focus) navigate('/graph'); }; window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc); }, [focus, navigate]);
+  const pick = (id: string) => { if (!dragged.current) go(id); };
   if (focus && !picked) return <p role="alert">Identity {focus} is not in the directory records you may see.</p>;
   return <>
     <div className="graph-toggles">
@@ -131,8 +160,8 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
     </div>
     <div className="graph-split">
       <div className="graph-wrap">
-        <div className="graph-zoom"><button className="btn" onClick={() => zoom(1 / 1.3)} aria-label="Zoom in">+</button><button className="btn" onClick={() => zoom(1.3)} aria-label="Zoom out">−</button><button className="btn" onClick={() => setView({ x: 0, y: 0, w: W, h: H })}>Fit</button></div>
-        <svg ref={svg} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="img" aria-label="Permission graph"
+        <div className="graph-zoom"><button className="btn" onClick={() => zoom(1 / 1.3)} aria-label="Zoom in">+</button><button className="btn" onClick={() => zoom(1.3)} aria-label="Zoom out">−</button><button className="btn" onClick={() => setView(bounds)}>Fit</button></div>
+        <svg ref={svg} onClick={clear} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="img" aria-label="Permission graph"
           onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { drag.current = null; }}>
           {edges.map((edge, index) => {
             const a = at.get(edge.a), b = at.get(edge.b);
