@@ -220,3 +220,49 @@ async fn only_those_answering_for_the_agent_report_its_sessions() -> TestResult 
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn forged_browser_reports_cannot_change_an_agents_session() -> TestResult {
+    let table = Table::set().await?;
+    let agent = table.seeded.people[0].agents[0].id.to_string();
+    let session = operation()?;
+    let path = format!("/agents/{agent}/runtime/sessions/{session}/reports");
+    let body = table.body("starting", "")?;
+    let client = reqwest::Client::new();
+    for (kind, origin) in [
+        ("text/plain", None),
+        ("application/json", Some("http://127.0.0.1:1")),
+    ] {
+        let mut request = client
+            .post(format!("{}{path}", table.service.base))
+            .header("cookie", &table.ada)
+            .header("content-type", kind)
+            .body(body.to_string());
+        if let Some(origin) = origin {
+            request = request.header("origin", origin);
+        }
+        let response = request.send().await?;
+        assert_eq!(response.status(), 400);
+        let answer: Value = serde_json::from_str(&response.text().await?)?;
+        assert_eq!(answer["refusal"], "RequestMalformed", "{answer}");
+    }
+    let (status, held) = table
+        .service
+        .get(
+            &format!("/agents/{agent}/runtime/sessions"),
+            Some(&table.ada),
+        )
+        .await?;
+    assert_eq!(status, 200, "{held}");
+    assert_eq!(held["sessions"], json!([]));
+    let response = client
+        .post(format!("{}{path}", table.service.base))
+        .header("cookie", &table.ada)
+        .header("content-type", "application/json")
+        .header("origin", &table.service.base)
+        .body(body.to_string())
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200, "{}", response.text().await?);
+    Ok(())
+}

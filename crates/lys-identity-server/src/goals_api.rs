@@ -378,8 +378,7 @@ async fn mark(
     uri: Uri,
     bytes: Bytes,
 ) -> Result<Json<Item>, ServerError> {
-    let body: MarkBody =
-        serde_json::from_slice(&bytes).map_err(|refused| malformed(refused.to_string()))?;
+    let body: MarkBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let operation = OperationId::from_str(&body.operation)?;
     if body.standing == Standing::Open {
         return Err(malformed("a mark is met, missed or dropped"));

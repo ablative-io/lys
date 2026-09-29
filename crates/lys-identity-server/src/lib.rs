@@ -116,5 +116,6 @@ pub mod teams_state;
 pub mod teams_store;
 
 pub use config::Config;
+mod signed_json;
 pub use error::ServerError;
 pub use routes::{AppState, Say, router, service, service_saying};

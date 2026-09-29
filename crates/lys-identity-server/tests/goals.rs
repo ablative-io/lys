@@ -669,3 +669,51 @@ async fn without_a_goals_directory_the_routes_say_so() -> TestResult {
     );
     Ok(())
 }
+
+async fn forged_mark_is_refused(content_type: &str, foreign_origin: bool) -> TestResult {
+    let table = Table::set().await?;
+    let (status, set) = table.set_goal(&deliverable(now()? + 86_400)?).await?;
+    assert_eq!(status, 200, "{set}");
+    let id = set["goal"]["id"].as_str().ok_or("no goal id")?;
+    let path = format!("/goals/{id}/mark");
+    let body = json!({ "operation": operation()?, "standing": "met", "words": "forged completion", "evidence": "a=b" });
+    let client = reqwest::Client::new();
+    let mut request = client
+        .post(format!("{}{path}", table.service.base))
+        .header("cookie", &table.bea)
+        .header("content-type", content_type)
+        .body(body.to_string());
+    if foreign_origin {
+        request = request.header("origin", "http://127.0.0.1:1");
+    }
+    let response = request.send().await?;
+    assert_eq!(response.status(), 400);
+    let answer: Value = serde_json::from_str(&response.text().await?)?;
+    assert_eq!(answer["refusal"], "RequestMalformed", "{answer}");
+    let read = table
+        .service
+        .get(&format!("/agents/{}/goals", table.agent), Some(&table.bea))
+        .await?;
+    assert_eq!(read.0, 200, "{}", read.1);
+    assert!(!read.1.to_string().contains("forged completion"));
+    let response = client
+        .post(format!("{}{path}", table.service.base))
+        .header("cookie", &table.bea)
+        .header("content-type", "application/json")
+        .header("origin", &table.service.base)
+        .body(body.to_string())
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200, "{}", response.text().await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_plain_text_form_cannot_mark_a_goal_with_the_owners_cookie() -> TestResult {
+    forged_mark_is_refused("text/plain", false).await
+}
+
+#[tokio::test]
+async fn a_json_request_from_another_origin_cannot_mark_a_goal() -> TestResult {
+    forged_mark_is_refused("application/json", true).await
+}
