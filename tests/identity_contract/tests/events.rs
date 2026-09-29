@@ -192,10 +192,10 @@ fn a_long_form_head_is_not_canonical() -> TestResult {
 fn an_unknown_version_is_refused_by_name() -> TestResult {
     let mut body = encode_body(&every_change()?.remove(0));
     assert_eq!(&body[..3], &[0xa7, 0x01, 0x01], "key 1 holds version 1");
-    body[2] = 0x02;
+    body[2] = 0x03;
     assert_eq!(
         decode_body(&body),
-        Err(IdentityError::VersionUnsupported { version: 2 })
+        Err(IdentityError::VersionUnsupported { version: 3 })
     );
     Ok(())
 }

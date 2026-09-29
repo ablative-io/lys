@@ -344,7 +344,7 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
 /// The actor an actor's map names: keys 1 to 4, and the agent's id under key
 /// 5 for an agent signature or service-account bearer. Code 3 without key 5
 /// is the operator; code 3 with a 16-byte key 5 is a service account.
-fn decode_actor(value: Value) -> Result<Actor, IdentityError> {
+fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
     const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names a principal";
     let named = matches!(&value, Value::Map(pairs) if pairs.len() == 5);
     let ([issuer, subject, method, authenticated_at], agent) = if named {
@@ -358,6 +358,11 @@ fn decode_actor(value: Value) -> Result<Actor, IdentityError> {
         (fields::<4>(value, SHAPE)?, None)
     };
     let code = as_uint(&method, "an authentication method is a code")?;
+    if code == wire::OPERATOR_OR_SERVICE_ACCOUNT && version == EVENT_VERSION && named {
+        return Err(malformed(
+            "an operator actor carries no principal id under key 5",
+        ));
+    }
     let method = wire::method_from(code, agent).map_err(malformed)?;
     Ok(Actor::new(
         LoginBinding::new(
@@ -383,8 +388,17 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
             return Err(IdentityError::VersionUnsupported { version });
         }
     }
-    let [_, operation, actor, identity, recorded_at, kind, change] = fields::<7>(value, SHAPE)?;
-    let actor = decode_actor(actor)?;
+    let [
+        version,
+        operation,
+        actor,
+        identity,
+        recorded_at,
+        kind,
+        change,
+    ] = fields::<7>(value, SHAPE)?;
+    let version = as_uint(&version, SHAPE)?;
+    let actor = decode_actor(actor, version)?;
     let [identity_kind, identity_id] =
         fields::<2>(identity, "an identity is a map of keys 1 and 2")?;
     let identity_id = as_id(identity_id, "an identity id is 16 bytes")?;
@@ -400,6 +414,11 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
         as_uint(&recorded_at, "a recorded time is seconds")?,
         decode_change(as_uint(&kind, "a change kind is a code")?, change)?,
     )?;
+    if event.version() != version {
+        return Err(malformed(
+            "event version does not match actor authentication method",
+        ));
+    }
     if encode_body(&event) != body {
         return Err(IdentityError::EventNotCanonical);
     }

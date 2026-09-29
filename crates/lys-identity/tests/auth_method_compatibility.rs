@@ -65,9 +65,15 @@ fn historical_code_three_keeps_operator_and_service_account_distinct() -> TestRe
         assert_eq!(decoded.actor().provenance().method(), method);
         assert_eq!(encode_body(&decoded), body);
         *member(&mut value, 1)? = Value::Integer((3 - version).into());
+        let refused = decode_body(&bytes(&value)?);
+        let named = if version == 1 {
+            "event version does not match actor authentication method"
+        } else {
+            "an operator actor carries no principal id under key 5"
+        };
         assert!(
-            decode_body(&bytes(&value)?).is_err(),
-            "method {method:?} changed event version"
+            matches!(&refused, Err(lys_identity::IdentityError::EventMalformed { reason }) if *reason == named),
+            "method {method:?} changed event version: {refused:?}"
         );
     }
     Ok(())
