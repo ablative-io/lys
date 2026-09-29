@@ -9,9 +9,8 @@ use super::{Body, Commit, Feed, FeedEntry, failed};
 use crate::error::RunnerError;
 use crate::harness_control::events::{Event, Projection, Source};
 
-fn identity(event: &Event) -> Result<String, RunnerError> {
-    let bytes = serde_json::to_vec(&("lys-managed-event/v1", &event.source, &event.source_id))
-        .map_err(failed)?;
+fn identity(source: &Source, source_id: &str) -> Result<String, RunnerError> {
+    let bytes = serde_json::to_vec(&("lys-managed-event/v1", source, source_id)).map_err(failed)?;
     Ok(crate::protocol::hex(&Sha256::digest(bytes)))
 }
 
@@ -36,7 +35,7 @@ impl Feed {
                 "native observation differs from the proved session generation",
             ));
         }
-        let key = identity(event)?;
+        let key = identity(&event.source, &event.source_id)?;
         if let Some(offset) = self.index.controls.get(&key).copied() {
             let kept = self.control_at(offset)?;
             if kept.session != expected.binding.session || kept.body != Body::Control(event.clone())
@@ -57,6 +56,34 @@ impl Feed {
                 ..Commit::default()
             },
         )
+    }
+
+    /// Read one committed observation for explicit receipt reconciliation.
+    /// A missing identity is not proof of non-delivery and never permits resend.
+    /// This uses the existing index and reads only the indexed log line.
+    pub fn control_event(&self, expected: &Source, source_id: &str) -> Result<Event, RunnerError> {
+        let offset = self
+            .index
+            .controls
+            .get(&identity(expected, source_id)?)
+            .copied()
+            .ok_or_else(|| {
+                RunnerError::refused(
+                    "control_event_gap",
+                    "the named native observation is not retained; delivery stays unresolved",
+                )
+            })?;
+        let kept = self.control_at(offset)?;
+        if let Body::Control(event) = kept.body
+            && kept.session == expected.binding.session
+            && event.source == *expected
+            && event.source_id == source_id
+        {
+            return Ok(event);
+        }
+        Err(failed(
+            "the indexed managed observation differs from its source identity",
+        ))
     }
 
     // Read only the indexed observation, not all later events in the log.
