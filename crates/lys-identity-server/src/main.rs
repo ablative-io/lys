@@ -44,7 +44,9 @@ async fn serve(config_path: PathBuf) -> Result<(), ServerError> {
 #[tokio::main]
 async fn main() -> ExitCode {
     let Some(first) = std::env::args_os().nth(1) else {
-        eprintln!("usage: lys-identity-server <config.json> | --version");
+        eprintln!(
+            "usage: lys-identity-server <config.json> | --check-config <config.json|-> | --version"
+        );
         return ExitCode::from(2);
     };
     if first == "--version" || first == "-V" {

@@ -25,7 +25,7 @@ fn check(mut args: impl Iterator<Item = OsString>) -> Result<serde_json::Value, 
     // Serde errors can quote submitted values. Keep diagnostics independent
     // of the input, including unknown keys, paths and credentials.
     let config: Config = serde_json::from_slice(&bytes).map_err(
-        |_| "config_check_schema_refused: unsupported, missing or mistyped configuration",
+        |_error| "config_check_schema_refused: unsupported, missing or mistyped configuration",
     )?;
     config.validate().map_err(
         |_error| "config_check_validation_refused: configuration constraints were not met",
