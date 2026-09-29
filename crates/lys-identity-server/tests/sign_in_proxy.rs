@@ -61,7 +61,9 @@ async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
         |_| Ok(()),
     )
     .await?;
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
     for forwarded in [None, Some("not-an-address")] {
         for path in [
             "/sign-in",
@@ -81,6 +83,30 @@ async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
             let body: serde_json::Value = serde_json::from_str(&response.text().await?)?;
             assert_eq!(status, 502, "{path}: {body}");
             assert_eq!(body["refusal"], "SignInFailed", "{path}: {body}");
+        }
+        for path in [
+            "/sign-in/providers/example",
+            "/auth/v1/providers/callback?code=example&state=example",
+        ] {
+            let mut request = client.get(format!("{}{path}", service.base));
+            if let Some(forwarded) = forwarded {
+                request = request.header("x-forwarded-for", forwarded);
+            }
+            let response = request.send().await?;
+            assert_eq!(response.status(), 303, "{path}");
+            assert_eq!(
+                response.headers().get(reqwest::header::LOCATION),
+                Some(&reqwest::header::HeaderValue::from_static(
+                    "/#/sign-in?refused=SignInFailed"
+                )),
+                "{path}"
+            );
+            assert!(
+                response
+                    .headers()
+                    .get(reqwest::header::SET_COOKIE)
+                    .is_none()
+            );
         }
     }
     Ok(())
