@@ -35,7 +35,7 @@ pub(crate) const GRANT_ASKED: &[&str] = &[
     "action_not_declared",
 ];
 /// An agent's signed request.
-pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused", "OperatorRefused"];
+pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
 /// A registration.
 pub(crate) const REGISTER: &[&str] = &[
     "NotAdmitted",

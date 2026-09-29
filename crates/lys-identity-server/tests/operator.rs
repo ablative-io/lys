@@ -204,3 +204,37 @@ fn old_app_actor_shapes_round_trip_without_a_migration_or_relabelling() -> TestR
     }
     Ok(())
 }
+
+#[test]
+fn openapi_names_the_operator_header_and_keeps_oauth_token_authority_separate() -> TestResult {
+    let document = lys_identity_server::openapi::document()?;
+    assert_eq!(
+        document["components"]["securitySchemes"]["lys_operator"]["name"],
+        "lys-operator"
+    );
+    for (path, method) in [("/setup", "post"), ("/apps", "post"), ("/apps", "get")] {
+        let security = document["paths"][path][method]["security"]
+            .as_array()
+            .ok_or("no security")?;
+        assert!(
+            security
+                .iter()
+                .any(|entry| entry.get("lys_operator").is_some())
+        );
+    }
+    for (path, method) in [
+        ("/oauth/authorize", "get"),
+        ("/oauth/token", "post"),
+        ("/oauth/userinfo", "get"),
+    ] {
+        let security = document["paths"][path][method]["security"]
+            .as_array()
+            .ok_or("no security")?;
+        assert!(
+            !security
+                .iter()
+                .any(|entry| entry.get("lys_operator").is_some())
+        );
+    }
+    Ok(())
+}

@@ -15,12 +15,14 @@ pub(crate) const PUT: Method = Method::Put;
 
 /// Anyone.
 pub(crate) const P: &[Auth] = &[Auth::Public];
-/// A signed-in person.
-pub(crate) const S: &[Auth] = &[Auth::Session];
+/// A signed-in person or the install's operator.
+pub(crate) const S: &[Auth] = &[Auth::Session, Auth::Operator];
 /// A signed-in person, or an app or registrar through its credential.
-pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer];
+pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer, Auth::Operator];
 /// An agent's signed request, or a signed-in person.
-pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session];
+pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session, Auth::Operator];
+/// A provider-issued access token; a session or operator token cannot replace it.
+pub(crate) const B: &[Auth] = &[Auth::Bearer];
 
 /// One untyped entry: method, path, words, authentication and the refusal
 /// sets it answers with.
@@ -107,7 +109,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/oauth/authorize" "Begin an authorization" P [];
     POST "/oauth/token" "Exchange a code for tokens" P [];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
-    GET "/oauth/userinfo" "The signed-in subject's claims" A [SIGNED];
+    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED];
     POST "/sign-in" "Sign in with a password" P [];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];

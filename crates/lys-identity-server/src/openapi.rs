@@ -43,6 +43,9 @@ pub(crate) fn route(
             named.push(name);
         }
     }
+    if auth.contains(&Auth::Operator) && !named.contains(&"OperatorRefused") {
+        named.push("OperatorRefused");
+    }
     Route {
         method,
         path,
