@@ -215,6 +215,8 @@ pub enum Body {
     Refusal(RefusalRecord),
     /// Where an operation stands.
     Operation(OperationOutcome),
+    /// A safe event from the one session-owned managed harness pipe.
+    Control(crate::harness_control::events::Event),
     /// The end of a unit, and what it consumed.
     Commit(Commit),
 }
