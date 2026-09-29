@@ -29,8 +29,8 @@ fn filled(path: &str) -> String {
 const PAGE: &str = "<title>Lys</title>";
 
 /// Every route without a public door, asked anonymously under `prefix` with
-/// a malformed body, or at the root when `prefix` answers the screens' page
-/// because the route is served beside the screens rather than under them;
+/// a malformed body. The provider's `/oauth/userinfo` route stays at the
+/// origin root beside the screens, as its discovery document advertises;
 /// each one that does not answer `NotSignedIn`, named.
 async fn walk(
     service: &Service,
@@ -49,13 +49,13 @@ async fn walk(
             Method::Put => reqwest::Method::PUT,
         };
         let body = (method != reqwest::Method::GET).then_some(&malformed);
-        let mut path = format!("{prefix}{}", filled(route.path));
-        let (mut status, mut answer) =
-            send(service, method.clone(), &path, Auth::Nobody, body).await?;
-        if answer == PAGE {
-            path = filled(route.path);
-            (status, answer) = send(service, method, &path, Auth::Nobody, body).await?;
-        }
+        let mount = if route.path == "/oauth/userinfo" {
+            ""
+        } else {
+            prefix
+        };
+        let path = format!("{mount}{}", filled(route.path));
+        let (status, answer) = send(service, method, &path, Auth::Nobody, body).await?;
         if status != 401 || answer["refusal"] != "NotSignedIn" {
             wrong.push(format!("{} {path}: {status} {answer}", route.method.word()));
         }
@@ -161,6 +161,7 @@ async fn nested_api_authentication_precedes_json_extraction_while_static_screen_
     assert_eq!(refused.status(), 401);
     let answer: serde_json::Value = serde_json::from_str(&refused.text().await?)?;
     assert_eq!(answer["refusal"], "NotSignedIn");
-    assert_eq!(service.log_size().await?, 0);
+    let (status, receipt) = service.get("/api/receipts/0", None).await?;
+    assert_eq!(status, 404, "the refused request wrote a leaf: {receipt}");
     Ok(())
 }
