@@ -127,6 +127,17 @@ async fn exchange(
     code: &str,
     verifier: &str,
 ) -> Result<(u16, Value), Box<dyn Error>> {
+    exchange_at(service, code, verifier, CALLBACK).await
+}
+
+/// Exchange `code` with `verifier`, naming `redirect` as the address the
+/// code was issued for.
+async fn exchange_at(
+    service: &Service,
+    code: &str,
+    verifier: &str,
+    redirect: &str,
+) -> Result<(u16, Value), Box<dyn Error>> {
     let answer = reqwest::Client::new()
         .post(format!("{}/oauth/token", service.base))
         .header(
@@ -136,7 +147,7 @@ async fn exchange(
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", code),
-            ("redirect_uri", CALLBACK),
+            ("redirect_uri", redirect),
             ("code_verifier", verifier),
         ])
         .send()
@@ -287,5 +298,23 @@ async fn a_code_past_its_instant_is_refused() -> TestResult {
     let (status, refused) = exchange(&service, &code, verifier).await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "CodeExpired");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_code_exchanged_for_another_redirect_is_refused_and_not_used_up() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let verifier = "a-verifier-of-enough-length-for-pkce-0123456789";
+    let code = code(&service, &cookie, &challenge_of(verifier)).await?;
+    let elsewhere = "http://elsewhere.example.test/callback";
+    let (status, refused) = exchange_at(&service, &code, verifier, elsewhere).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "RedirectUnregistered");
+    assert!(!refused.to_string().contains("elsewhere"), "{refused}");
+    let (status, tokens) = exchange(&service, &code, verifier).await?;
+    assert_eq!(
+        status, 200,
+        "the code is still good where it was issued: {tokens}"
+    );
     Ok(())
 }
