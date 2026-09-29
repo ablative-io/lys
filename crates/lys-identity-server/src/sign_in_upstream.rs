@@ -23,7 +23,7 @@ use std::net::IpAddr;
 use std::sync::{Arc, PoisonError};
 
 use axum::extract::{Path, Query, State};
-use axum::http::{Extensions, StatusCode, header};
+use axum::http::{Extensions, HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
@@ -54,6 +54,7 @@ pub(super) struct Upstream {
     xsrf: String,
     verifier: String,
     state: String,
+    browser: [u8; 32],
 }
 
 /// A PKCE verifier: 32 bytes from the secure random source, base64url.
@@ -74,13 +75,14 @@ impl IssuerSignIn {
         oidc: &Oidc,
         provider: &str,
         address: IpAddr,
+        browser: [u8; 32],
     ) -> Result<String, ServerError> {
         let begun = reqwest::Url::parse(&oidc.begin()?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
         match self
-            .start_upstream(&begun, provider, address, state.clone())
+            .start_upstream(&begun, provider, address, state.clone(), browser)
             .await
         {
             Ok(location) => Ok(location),
@@ -97,6 +99,7 @@ impl IssuerSignIn {
         provider: &str,
         address: IpAddr,
         state: String,
+        browser: [u8; 32],
     ) -> Result<String, ServerError> {
         let address = address.to_string();
         let mut opened = self.open(begun, &address).await?;
@@ -159,6 +162,7 @@ impl IssuerSignIn {
                 xsrf,
                 verifier,
                 state,
+                browser,
             },
         );
         Ok(location)
@@ -172,6 +176,7 @@ impl IssuerSignIn {
         code: &str,
         upstream: &str,
         address: IpAddr,
+        browser: [u8; 32],
     ) -> Result<Actor, ServerError> {
         let held = self
             .upstream
@@ -179,6 +184,10 @@ impl IssuerSignIn {
             .unwrap_or_else(PoisonError::into_inner)
             .remove(upstream)
             .ok_or(ServerError::SignInStateUnknown)?;
+        if !crate::provider_browser::matches(&held.browser, &browser) {
+            oidc.abandon(&held.state);
+            return Err(ServerError::SignInStateUnknown);
+        }
         let body = json!({
             "state": upstream,
             "code": code,
@@ -258,7 +267,11 @@ async fn offered(State(state): State<Arc<AppState>>) -> Result<Json<Value>, Serv
     Ok(Json(json!({ "providers": providers })))
 }
 
-async fn begin(state: &AppState, extensions: &Extensions, id: &str) -> Result<String, ServerError> {
+async fn begin(
+    state: &AppState,
+    extensions: &Extensions,
+    id: &str,
+) -> Result<(String, String), ServerError> {
     if id.is_empty()
         || !id
             .chars()
@@ -267,7 +280,13 @@ async fn begin(state: &AppState, extensions: &Extensions, id: &str) -> Result<St
         return Err(failed("that sign-in provider is not set up"));
     }
     let address = person_address(extensions)?;
-    state.sign_in.begin_provider(&state.oidc, id, address).await
+    let (cookie, digest) =
+        crate::provider_browser::begin(state.sign_in.callback().starts_with("https://"))?;
+    let location = state
+        .sign_in
+        .begin_provider(&state.oidc, id, address, digest)
+        .await?;
+    Ok((location, cookie))
 }
 
 async fn start(
@@ -276,7 +295,11 @@ async fn start(
     Path(id): Path<String>,
 ) -> Response {
     match begin(&state, &extensions, &id).await {
-        Ok(location) => (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response(),
+        Ok((location, cookie)) => (
+            StatusCode::SEE_OTHER,
+            [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
+        )
+            .into_response(),
         Err(error) => to_sign_in(&error),
     }
 }
@@ -292,6 +315,7 @@ async fn finish(
     state: &AppState,
     extensions: &Extensions,
     back: Back,
+    headers: &HeaderMap,
 ) -> Result<String, ServerError> {
     let (Some(code), Some(upstream)) = (back.code, back.state) else {
         return Err(failed("the provider did not sign the person in"));
@@ -299,7 +323,13 @@ async fn finish(
     let address = person_address(extensions)?;
     let actor = state
         .sign_in
-        .finish_provider(&state.oidc, &code, &upstream, address)
+        .finish_provider(
+            &state.oidc,
+            &code,
+            &upstream,
+            address,
+            crate::provider_browser::digest(headers)?,
+        )
         .await?;
     state.sessions.begin(actor)
 }
@@ -308,8 +338,9 @@ async fn callback(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
     Query(back): Query<Back>,
+    headers: HeaderMap,
 ) -> Response {
-    match finish(&state, &extensions, back).await {
+    match finish(&state, &extensions, back, &headers).await {
         Ok(cookie) => (
             StatusCode::SEE_OTHER,
             [

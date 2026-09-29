@@ -101,3 +101,5 @@ pub mod teams_store;
 pub use config::Config;
 pub use error::ServerError;
 pub use routes::{AppState, Say, router, service, service_saying};
+
+mod provider_browser;

@@ -250,7 +250,13 @@ async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestRe
     let mut next = format!("{}/sign-in/providers/google-provider", service.base);
     for _ in 0..3 {
         visited.push(next.clone());
-        let answer = browser.get(&next).send().await?;
+        let mut request = browser.get(&next);
+        if next.starts_with(&service.base)
+            && let Some(cookie) = &cookie
+        {
+            request = request.header(reqwest::header::COOKIE, cookie);
+        }
+        let answer = request.send().await?;
         assert_eq!(answer.status(), 303, "{next}");
         if let Some(set) = answer.headers().get(reqwest::header::SET_COOKIE) {
             cookie = set.to_str()?.split(';').next().map(str::to_owned);
