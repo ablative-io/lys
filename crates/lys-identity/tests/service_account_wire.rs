@@ -42,7 +42,9 @@ fn provenance_is_service_account_and_cannot_be_downgraded_to_v1() -> Result<(), 
     ciborium::into_writer(&downgraded, &mut bytes)?;
     assert!(decode_body(&bytes).is_err());
     let temp = tempfile::tempdir()?;
-    let key = load_service_key(&temp.path().join("key"))?;
+    let key_path = temp.path().join("key");
+    std::fs::write(&key_path, [7; 32])?;
+    let key = load_service_key(&key_path)?;
     let signed = sign_event(event.clone(), &key)?;
     assert_eq!(
         verify_event(signed.bytes(), &key.public_key_bytes())?.event(),

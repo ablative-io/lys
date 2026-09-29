@@ -434,24 +434,32 @@ pub(crate) async fn register_agent(
     headers: HeaderMap,
     Json(body): Json<Named>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
+    if !headers.contains_key(axum::http::header::AUTHORIZATION) {
+        let actor = signed_in(&state, &headers)?;
+        state.admission.administrator(&actor)?;
+        let (op, profile) = (
+            operation(&body.operation)?,
+            Profile::new(&body.display_name)?,
+        );
+        return with_directory(&state, |directory| {
+            let responsible = directory.projection()?.person_for(actor.binding())
+                .ok_or(ServerError::NotAdmitted { reason: "the administrator's login is bound to no person, so no agent can be registered under them" })?;
+            let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
+            Ok(Json(AgentRegistered {
+                agent: id.to_string(),
+                responsible: responsible.to_string(),
+                receipt: receipt_view(&receipt),
+            }))
+        });
+    }
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
     crate::grants::with_directory_grants(&state, |directory, mut judged| {
-        let (actor, responsible) = if headers.contains_key(axum::http::header::AUTHORIZATION) {
-            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-            crate::service_account_grants::admit(&mut judged, caller, "agents")?;
-            crate::service_account_grants::actor(&judged, caller)?
-        } else {
-            let actor = signed_in(&state, &headers)?;
-            state.admission.administrator(&actor)?;
-            let responsible = judged
-                .directory
-                .person_for(actor.binding())
-                .ok_or(ServerError::NoPerson)?;
-            (actor, responsible)
-        };
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+        crate::service_account_grants::admit(&mut judged, caller, "agents")?;
+        let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
         let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
         Ok(Json(AgentRegistered {
             agent: id.to_string(),
