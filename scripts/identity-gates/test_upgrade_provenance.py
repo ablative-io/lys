@@ -2,9 +2,12 @@
 
 import copy
 import hashlib
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
-from upgrade_provenance import verify
+from upgrade_provenance import seed, verify
 
 
 class Reader:
@@ -20,6 +23,23 @@ class Reader:
 
 
 class Provenance(unittest.TestCase):
+    def test_seed_records_the_selected_old_binary_not_a_fixed_baseline(self):
+        reader = Reader()
+        class ImportReader:
+            def ask(self, method, path, body=None, **options):
+                if path == "/identity/import":
+                    receipt = dict(reader.answer["receipt"], log={"index": reader.vector["leaf"]})
+                    return {"completed": [{"result": {"receipt": receipt}}]}
+                return reader.ask(method, path)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            credential = root / "credential"
+            credential.write_text("fixture-only")
+            baseline = "8c064b62a0c77f0874c203189a2ed3238b7ba57a"
+            vector = seed(ImportReader(), root, {"import_credential_file": str(credential)}, root, baseline)
+            self.assertEqual(vector["source_commit"], baseline)
+            self.assertEqual(json.loads((root / "old-service-account-vector.json").read_text()), vector)
+
     def test_reads_the_exact_leaf_and_service_key(self):
         reader = Reader()
         verify(reader, reader.vector)

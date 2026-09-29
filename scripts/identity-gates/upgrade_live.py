@@ -1,4 +1,4 @@
-"""Upgrade a disposable real 1b568cd9 install; never operate a person's live root."""
+"""Upgrade a disposable real old install; never operate a person's live root."""
 
 import argparse
 import hashlib
@@ -19,7 +19,7 @@ from upgrade_negative import exercise as exercise_negative
 from upgrade_restart import settle as settle_restart
 from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
 
-OLD_COMMIT = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
+from upgrade_preflight import socket_paths
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
 
@@ -150,6 +150,46 @@ def stop_fixture(root, project, evidence):
         raise RuntimeError("; ".join(errors))
 
 
+def prepare(args):
+    """Validate copied artifacts and kernel paths without using service ports."""
+    if args.work.exists():
+        raise RuntimeError(f"fixture work directory already exists: {args.work}")
+    old_head = subprocess.check_output(
+        ["git", "-C", str(args.old_source), "rev-parse", "HEAD"], text=True).strip()
+    if old_head != args.old_commit:
+        raise RuntimeError(f"old source is {old_head}, expected {args.old_commit}")
+    dirty = subprocess.check_output(
+        ["git", "-C", str(args.old_source), "status", "--porcelain"], text=True)
+    if dirty:
+        raise RuntimeError("old source must be clean, including its deployment template")
+    surfaces = {}
+    for name, path, commit in [("old", args.old_surface, args.old_commit),
+                               ("candidate", args.candidate_surface, args.candidate_commit)]:
+        manifest_path = path / "surface-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        if manifest["commit"] != commit:
+            raise RuntimeError(f"{name} surface does not name {commit}")
+        for entry in manifest["files"]:
+            artifact = (path / entry["path"]).resolve()
+            if not artifact.is_relative_to(path) or not artifact.is_file():
+                raise RuntimeError(f"{name} surface artifact absent or outside its root: {artifact}")
+            data = artifact.read_bytes()
+            if len(data) != entry["bytes"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+                raise RuntimeError(f"{name} surface artifact differs from its manifest: {artifact}")
+        surfaces[name] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    versions = {"old": stamp(args.old_bin, args.old_commit),
+                "candidate": stamp(args.candidate_bin, args.candidate_commit)}
+    driver = args.candidate_bin / "examples/upgrade_window"
+    driver_version = subprocess.check_output([str(driver), "--version"], text=True).strip()
+    if f"({args.candidate_commit})" not in driver_version or "dirty" in driver_version:
+        raise RuntimeError(f"upgrade driver must be a clean build of {args.candidate_commit}: {driver_version}")
+    versions["driver"] = {"version": driver_version,
+                          "sha256": hashlib.sha256(driver.read_bytes()).hexdigest()}
+    paths = socket_paths(args.work)
+    return {"old": args.old_commit, "candidate": args.candidate_commit,
+            "versions": versions, "surfaces": surfaces, "socket_paths": paths}
+
+
 def exercise(args):
     os.umask(0o077)
     args.work.mkdir(mode=0o700)
@@ -158,30 +198,9 @@ def exercise(args):
     root = args.work / "install"
     root.mkdir()
     (root / ".upgrade-proof").write_text(MARKER)
-    old_head = subprocess.check_output(
-        ["git", "-C", str(args.old_source), "rev-parse", "HEAD"], text=True).strip()
-    if old_head != OLD_COMMIT:
-        raise RuntimeError(f"old source is {old_head}, expected {OLD_COMMIT}")
-    dirty = subprocess.check_output(
-        ["git", "-C", str(args.old_source), "status", "--porcelain"], text=True)
-    if dirty:
-        raise RuntimeError("old source must be clean, including its deployment template")
-    surfaces = {}
-    for name, path, commit in [("old", args.old_surface, OLD_COMMIT),
-                               ("candidate", args.candidate_surface, args.candidate_commit)]:
-        manifest_path = path / "surface-manifest.json"
-        manifest = json.loads(manifest_path.read_text())
-        if manifest["commit"] != commit:
-            raise RuntimeError(f"{name} surface does not name {commit}")
-        surfaces[name] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-    versions = {"old": stamp(args.old_bin, OLD_COMMIT),
-                "candidate": stamp(args.candidate_bin, args.candidate_commit)}
+    versions = args.prepared["versions"]
+    surfaces = args.prepared["surfaces"]
     driver = args.candidate_bin / "examples/upgrade_window"
-    driver_version = subprocess.check_output([str(driver), "--version"], text=True).strip()
-    if f"({args.candidate_commit})" not in driver_version or "dirty" in driver_version:
-        raise RuntimeError(f"upgrade driver must be a clean build of {args.candidate_commit}: {driver_version}")
-    versions["driver"] = {"version": driver_version,
-                          "sha256": hashlib.sha256(driver.read_bytes()).hexdigest()}
     project = "lys-upgrade-proof-" + str(os.getpid())
     browser = Browser(installation(root, args.old_source, project))
     headless = args.work / "headless"
@@ -190,7 +209,8 @@ def exercise(args):
         executable = headless / name
         executable.write_text("#!/bin/sh\nexit 1\n")
         executable.chmod(0o700)
-    env = dict(os.environ, PATH=str(headless) + os.pathsep + os.environ["PATH"])
+    env = dict(os.environ, PATH=str(headless) + os.pathsep + os.environ["PATH"],
+               PYTHONDONTWRITEBYTECODE="1")
     installed = [str(args.old_bin / "lys"), "identity", "install", "--root", str(root),
                  "--surface", str(args.old_surface)]
     primary = None
@@ -207,7 +227,7 @@ def exercise(args):
         config_file.write_text(json.dumps(config))
         run(installed, evidence / "reinstall-old.log", env)
         old_config = json.loads(config_file.read_text())
-        provenance = seed_provenance(browser, root, old_config, evidence)
+        provenance = seed_provenance(browser, root, old_config, evidence, args.old_commit)
         original_config = config_file.read_bytes()
         before = observe(browser, ids)
         leaves = app_leaves(root, old_config)
@@ -226,7 +246,7 @@ def exercise(args):
         unchanged(files, legacy_files(root, json.loads(config_file.read_text())))
         if args.negative_control:
             receipt = exercise_negative(root, evidence, driver, installed, env, files,
-                                        run, stamp, OLD_COMMIT)
+                                        run, stamp, args.old_commit)
         else:
             # Re-enter the real old installer. Its existing recovery runs before installation.
             intent_bytes = (root / "install/upgrade.json").read_bytes()
@@ -238,12 +258,12 @@ def exercise(args):
                 raise RuntimeError("old installer did not restore exact original config")
             verify_provenance(browser, provenance)
             (evidence / "old-intent-parser.json").write_text(json.dumps({
-                "reader_commit": OLD_COMMIT, "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
+                "reader_commit": args.old_commit, "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
                 "old_installer_recovered": True, "configuration_restored_byte_for_byte": True,
             }, indent=2))
             if (root / "install/upgrade.json").exists():
                 raise RuntimeError("old installer recovery left the upgrade intent standing")
-            stamp(root / "bin", OLD_COMMIT)
+            stamp(root / "bin", args.old_commit)
             same_records(before, observe(browser, ids))
             for path, expected in [
                 (f"/teams/{legacy['team']}", legacy["team_before"]),
@@ -256,7 +276,7 @@ def exercise(args):
             preserve_leaves(root, leaves)
             unchanged(profile, profile_file(root, json.loads(config_file.read_text())))
             (evidence / "rollback.json").write_text(json.dumps({
-                "passed": True, "old_binary": OLD_COMMIT, "domains": list(before),
+                "passed": True, "old_binary": args.old_commit, "domains": list(before),
                 "team": legacy["team"], "personal_budgets": 3,
             }, indent=2))
             # Independently exercise the candidate's own production recovery path.
@@ -270,12 +290,12 @@ def exercise(args):
                 evidence / "candidate-recover.log", env)
             if config_file.read_bytes() != original_config:
                 raise RuntimeError("candidate back path did not restore original config bytes")
-            stamp(root / "bin", OLD_COMMIT)
+            stamp(root / "bin", args.old_commit)
             same_records(before, observe(browser, ids))
             verify_provenance(browser, provenance)
             (evidence / "candidate-back.json").write_text(json.dumps({
                 "passed": True, "candidate": args.candidate_commit,
-                "old_binary": OLD_COMMIT, "configuration_restored_byte_for_byte": True,
+                "old_binary": args.old_commit, "configuration_restored_byte_for_byte": True,
             }, indent=2))
             post_rollback_files = legacy_files(root, json.loads(config_file.read_text()))
             run([str(args.candidate_bin / "lys"), "identity", "upgrade", "--root", str(root),
@@ -313,7 +333,7 @@ def exercise(args):
             migration = settle_restart(root, evidence, driver, env, browser, legacy, run)
             unchanged(profile, profile_file(root, new_config))
             admitted_person = admitted_after_upgrade(browser)
-            receipt = {"registered_admin_wrote": admitted_person, "old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
+            receipt = {"active_admin_wrote": admitted_person, "old": args.old_commit, "candidate": args.candidate_commit, "versions": versions,
                        "surfaces": surfaces, "domains": list(before), "old_app_leaves": len(leaves),
                        "config_keys_preserved": list(expected), "legacy": legacy_counts,
                        "reversible_window": True, "old_binary_rollback": True,
@@ -338,9 +358,16 @@ def main():
     for name in ["old-source", "old-bin", "candidate-bin", "old-surface", "candidate-surface", "work"]:
         parser.add_argument("--" + name, type=lambda value: Path(value).resolve(), required=True)
     parser.add_argument("--candidate-commit", required=True)
+    parser.add_argument("--old-commit", required=True)
+    parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
-    if re.fullmatch(r"[0-9a-f]{40}", args.candidate_commit) is None:
-        parser.error("candidate-commit must be a full commit id")
+    for name in ("old_commit", "candidate_commit"):
+        if re.fullmatch(r"[0-9a-f]{40}", getattr(args, name)) is None:
+            parser.error(f"{name} must be a full commit id")
+    args.prepared = prepare(args)
+    if args.prepare_only:
+        print(json.dumps(args.prepared, indent=2))
+        return
     os.umask(0o077)
     args.work.mkdir(mode=0o700)
     for name, negative in [("positive", False), ("negative", True)]:
@@ -349,7 +376,7 @@ def main():
         leg.negative_control = negative
         exercise(leg)
     (args.work / "receipt.json").write_text(json.dumps({
-        "passed": True, "candidate": args.candidate_commit,
+        "passed": True, "old": args.old_commit, "candidate": args.candidate_commit,
         "positive": "positive/evidence/receipt.json",
         "negative": "negative/evidence/receipt.json",
     }, indent=2))

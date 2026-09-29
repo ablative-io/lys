@@ -81,6 +81,21 @@ class UpgradeProofTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no session"):
             same_records(empty, empty)
 
+    def test_legacy_profile_allows_only_declared_empty_additions(self):
+        before = {"sessions": {"sessions": ["old"]}, "provisioning": {
+            "profile": {"version": 1, "mcp_servers": [{"url": "https://example.test"}]},
+            "versions": [{"version": 1}]}}
+        after = copy.deepcopy(before)
+        after["provisioning"]["profile"].update(skill_pins=[], harness=None, permissions=None)
+        same_records(before, after)
+        for field, changed in [("skill_pins", ["unexpected"]), ("harness", {}),
+                               ("permissions", {}), ("version", 2), ("unknown", None)]:
+            value = copy.deepcopy(after)
+            value["provisioning"]["profile"][field] = changed
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, "provisioning"):
+                same_records(before, value)
+        self.assertEqual(before["provisioning"]["profile"]["version"], 1)
+
     def test_missing_domain_is_refused(self):
         with self.assertRaisesRegex(RuntimeError, "domains differ"):
             same_records({"people": []}, {})
