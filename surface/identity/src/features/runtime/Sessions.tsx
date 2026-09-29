@@ -30,6 +30,7 @@ export function RunningSessions() {
   return <div className="page runner-sessions">
     <h1>Running sessions</h1>
     <p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p>
+    <a className="btn" href="#/runtime/canvas">Open agent canvas</a>
     <button type="button" className="btn" onClick={() => setRevision((value) => value + 1)}>Ask the runners again</button>
     <Gate load={load} title="Running sessions" ok={({ sessions, unanswered }) => <>
       {unanswered.length ? <div className="why-not" role="alert"><h3>Runners that did not answer</h3><ul>{unanswered.map((entry) => <li key={entry.session}><span className="mono">{entry.session}</span> on {entry.machine}: {entry.refusal}: {entry.reason}</li>)}</ul></div> : null}
