@@ -8,7 +8,9 @@ checks old app leaves byte for byte and the declared message-service config
 migration. No production root is accepted: the work directory must not exist.
 
 Build the old and candidate binaries on Dean with the normal release target and
-package each surface with its own `npm run package`. Coordinate ports 8490 and
+package each surface with its own `npm run package`. Build the candidate's
+test-only driver with `cargo build -p lys --release --example upgrade_window`;
+its build stamp must match the candidate. Coordinate ports 8490 and
 8472 with other identity gates before running. The script refuses dirty or wrong
 binary stamps and a surface manifest naming a different commit. Install and
 upgrade themselves verify the surface files against that manifest.
@@ -24,8 +26,9 @@ python3 scripts/identity-gates/upgrade_live.py \
   --work /path/to/new-private-fixture
 ```
 
-Evidence is written under `work/evidence`. A passing receipt is written only
-after all comparisons and fixture cleanup succeed. The fixture uses synthetic
+The runner creates separate positive and negative installs under `work/`.
+Evidence is written under each one's `evidence/`. A passing root receipt is
+written only after both legs and their fixture cleanup succeed. The fixtures use synthetic
 accounts; the directory is owner-only because setup and API evidence may contain
 credentials. Do not publish its raw contents. A failed run retains its evidence
 and tears down only its own processes and compose project.
@@ -38,11 +41,37 @@ unconfirmed, and the complete earlier effective limit, period and action.
 The ordinary person's original session must also still work. Only the declared
 empty `unconfirmed` field is additive on the unchanged agent budget readback.
 
-Current boundary: this runner is not yet the complete combined-release gate.
-The deterministic reversible-window real-binary rollback leg is still required,
-as is running the proof against the complete landed release. A pass of the
-current runner cannot authorize installation without those cases. The old build
-is a clean reconstruction of the recorded live commit; it does not establish
+An ordinary old provisioning profile includes an MCP server. Its HTTP readback
+and complete stored file must survive the window, rollback and normal upgrade.
+
+The test-only `upgrade_window` example calls the very same production
+`identity::upgrade::upgrade` used by the CLI. At its existing service-ready
+callback it invokes the HTTP/byte verifier and exits75 before `Started` is
+recorded. It adds no production pause, timer or configuration switch. Both
+membership and budget confirmation must answer503 naming `upgrade_pending`;
+both logs, snapshots and the provisioning file must be byte-identical. The
+positive leg then re-enters the real old installer, which performs its normal
+recovery, and requires the old binaries to read all the original records and
+sessions. It finally runs the normal candidate CLI upgrade separately.
+
+The negative leg creates its own fresh old install. At the same interruption
+point the driver stops only that install using the production unit lifecycle,
+then deliberately appends one new-format Held leaf through the actual log
+store. The byte checker must name that record and the real old installer's
+recovery must fail with that exact leaf's unknown Held variant. A generic boot
+failure does not count. The private receipt records the path and decoder refusal.
+
+After the positive normal upgrade clears its intent, the proof checks that the
+old family bytes still stand, crashes only its own identity process, and waits
+on the installer's exit lock. Restart through the production unit lifecycle
+must write exactly two Held rows and one Checked row, retain every old leaf,
+and persist the new budget snapshot. Another crash and restart must leave all
+these files byte-identical. There is no sleep or PID polling in this proof.
+
+Current boundary: the real installs have not yet been exercised. Running this
+against the complete landed release remains required, as do the separate
+exact-head repository gates.
+The old build is a clean reconstruction of the recorded live commit; it does not establish
 that the historical working tree that produced the live binary was clean.
 
 The small Python suite checks the verifier itself, not an installation:

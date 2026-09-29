@@ -10,6 +10,10 @@ from upgrade_live import app_leaves, preserve_leaves
 
 
 class UpgradeProofTests(unittest.TestCase):
+    def test_rollback_readback_accepts_the_actual_old_budget_shape(self):
+        before = {"sessions": {"sessions": ["old"]}, "budgets": {"budgets": [100]}}
+        same_records(before, copy.deepcopy(before))
+
     def test_every_domain_difference_is_refused(self):
         before = {name: {"value": name} for name in (
             "people", "grant", "app", "configuration", "budgets", "goals", "policy")}

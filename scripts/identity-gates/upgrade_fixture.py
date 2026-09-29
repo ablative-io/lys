@@ -14,7 +14,7 @@ class Browser:
         self.port = port
         self.cookie = None
 
-    def ask(self, method, path, body=None):
+    def ask(self, method, path, body=None, expected_status=200):
         connection = http.client.HTTPConnection("127.0.0.1", self.port)
         headers = {"Content-Type": "application/json"}
         if self.cookie:
@@ -24,7 +24,7 @@ class Browser:
             connection.request(method, "/api" + path, payload, headers)
             answer = connection.getresponse()
             text = answer.read().decode()
-            if answer.status != 200:
+            if answer.status != expected_status:
                 raise RuntimeError(f"{method} {path}: HTTP {answer.status}: {text}")
             cookie = answer.getheader("Set-Cookie")
             if cookie:
@@ -84,6 +84,12 @@ def populate(browser, root):
         "version": 0, "rules": [{"id": "preserve-denial", "tool": "Write",
             "kind": "path_prefix", "target": "/upgrade-fixture/denied", "authority": "hard"}],
     })
+    browser.ask("POST", f"/agents/{agent}/provisioning", {
+        "operation": operation(), "from_version": 0,
+        "model_access": ["fixture-model"], "tools": ["Read"], "skills": [],
+        "mcp_servers": [{"name": "fixture-records", "url": "https://mcp.example.test/records"}],
+        "instructions": "Preserve this ordinary legacy profile.", "note": "Old-install proof",
+    })
     return {"owner": owner, "person": person, "agent": agent, "app": app, "grant": grant}
 
 
@@ -101,6 +107,7 @@ def observe(browser, ids):
         "budgets": f"/budgets/agent/{ids['agent']}",
         "goals": f"/agents/{ids['agent']}/goals",
         "policy": f"/agents/{ids['agent']}/policy",
+        "provisioning": f"/agents/{ids['agent']}/provisioning",
     }
     result = {name: browser.ask("GET", path) for name, path in paths.items()}
     for domain, member in [("sessions", "sessions"), ("budgets", "budgets"),
@@ -111,6 +118,8 @@ def observe(browser, ids):
         raise RuntimeError("empty policy cannot prove an upgrade")
     if result["app"]["state"] != "approved":
         raise RuntimeError("fixture app was not approved on the old install")
+    if not result["provisioning"]["profile"]["mcp_servers"]:
+        raise RuntimeError("empty profile cannot prove legacy MCP configuration survives")
     return result
 
 
@@ -121,7 +130,7 @@ def same_records(before, after):
         value = after[name]
         # This fixture's agent budget cannot need personal-budget confirmation.
         # Accept only the declared additive empty field, never erase its contents.
-        if name == "budgets" and "unconfirmed" not in before[name]:
+        if name == "budgets" and "unconfirmed" not in before[name] and "unconfirmed" in value:
             if value.get("unconfirmed") != []:
                 raise RuntimeError("upgrade changed the budgets confirmation readback")
             value = {key: entry for key, entry in value.items() if key != "unconfirmed"}

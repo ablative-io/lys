@@ -14,16 +14,19 @@ import sys
 
 from upgrade_fixture import Browser, admitted_after_upgrade, observe, populate, same_records
 from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
+from upgrade_window import MARKER, legacy_files, pending, profile_file, unchanged
+from upgrade_negative import exercise as exercise_negative
+from upgrade_restart import settle as settle_restart
 
 OLD_COMMIT = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
 
-def run(command, log, env=None):
+def run(command, log, env=None, expected=0):
     with log.open("wb") as output:
         completed = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, env=env)
-    if completed.returncode:
-        raise RuntimeError(f"{command[0]} exited {completed.returncode}; evidence: {log}")
+    if completed.returncode != expected:
+        raise RuntimeError(f"{command[0]} exited {completed.returncode}, expected {expected}; evidence: {log}")
 
 
 def stamp(directory, expected):
@@ -136,6 +139,7 @@ def exercise(args):
     evidence.mkdir()
     root = args.work / "install"
     root.mkdir()
+    (root / ".upgrade-proof").write_text(MARKER)
     old_head = subprocess.check_output(
         ["git", "-C", str(args.old_source), "rev-parse", "HEAD"], text=True).strip()
     if old_head != OLD_COMMIT:
@@ -154,6 +158,12 @@ def exercise(args):
         surfaces[name] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     versions = {"old": stamp(args.old_bin, OLD_COMMIT),
                 "candidate": stamp(args.candidate_bin, args.candidate_commit)}
+    driver = args.candidate_bin / "examples/upgrade_window"
+    driver_version = subprocess.check_output([str(driver), "--version"], text=True).strip()
+    if f"({args.candidate_commit})" not in driver_version or "dirty" in driver_version:
+        raise RuntimeError(f"upgrade driver must be a clean build of {args.candidate_commit}: {driver_version}")
+    versions["driver"] = {"version": driver_version,
+                          "sha256": hashlib.sha256(driver.read_bytes()).hexdigest()}
     project = "lys-upgrade-proof-" + str(os.getpid())
     browser = Browser(installation(root, args.old_source, project))
     headless = args.work / "headless"
@@ -183,28 +193,70 @@ def exercise(args):
         leaves = app_leaves(root, old_config)
         (evidence / "app-leaves.json").write_text(json.dumps(leaves, indent=2))
         (evidence / "before.json").write_text(json.dumps(before, indent=2))
-        run([str(args.candidate_bin / "lys"), "identity", "upgrade", "--root", str(root),
-             "--from", str(args.candidate_bin), "--surface", str(args.candidate_surface)],
-            evidence / "upgrade.log", env)
-        after = observe(browser, ids)
-        (evidence / "after.json").write_text(json.dumps(after, indent=2))
-        same_records(before, after)
-        legacy_counts = verify_legacy(browser, legacy)
-        if legacy_browser.ask("GET", "/me")["person"]["id"] != ids["person"]:
-            raise RuntimeError("the ordinary legacy person's session changed during upgrade")
-        preserve_leaves(root, leaves)
-        new_config = json.loads(config_file.read_text())
-        expected = {key: value for key, value in old_config.items() if key != "cambium_messages"}
-        expected["message_service"] = dict(bridge, cookie="cambium_session")
-        for key, value in expected.items():
-            if new_config.get(key) != value:
-                raise RuntimeError(f"upgrade changed or removed configuration member {key}")
-        if "cambium_messages" in new_config:
-            raise RuntimeError("upgrade retained the legacy message key")
-        admitted_person = admitted_after_upgrade(browser)
-        receipt = {"registered_admin_wrote": admitted_person, "old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
-                   "surfaces": surfaces, "domains": list(before), "old_app_leaves": len(leaves),
-                   "config_keys_preserved": list(expected), "legacy": legacy_counts, "passed": True}
+        files = legacy_files(root, old_config)
+        profile = profile_file(root, old_config)
+        context = {"files": files, "legacy": legacy, "port": browser.port, "cookie": browser.cookie}
+        (root / ".upgrade-window.json").write_text(json.dumps(context))
+        run([str(driver), "--root", str(root), "window", "--from", str(args.candidate_bin),
+             "--surface", str(args.candidate_surface), "--verifier",
+             str(Path(__file__).with_name("upgrade_window.py"))],
+            evidence / "window-driver.log", env, expected=75)
+        pending(root)
+        unchanged(files, legacy_files(root, json.loads(config_file.read_text())))
+        if args.negative_control:
+            receipt = exercise_negative(root, evidence, driver, installed, env, files,
+                                        run, stamp, OLD_COMMIT)
+        else:
+            # Re-enter the real old installer. Its existing recovery runs before installation.
+            run(installed, evidence / "recover-old.log", env)
+            if (root / "install/upgrade.json").exists():
+                raise RuntimeError("old installer recovery left the upgrade intent standing")
+            stamp(root / "bin", OLD_COMMIT)
+            same_records(before, observe(browser, ids))
+            for path, expected in [
+                (f"/teams/{legacy['team']}", legacy["team_before"]),
+                (f"/budgets/person/{legacy['person']}", legacy["budgets_before"]),
+            ]:
+                if browser.ask("GET", path) != expected:
+                    raise RuntimeError(f"old binary after rollback did not read original {path}")
+            if legacy_browser.ask("GET", "/me")["person"]["id"] != ids["person"]:
+                raise RuntimeError("rollback changed the ordinary person's original session")
+            preserve_leaves(root, leaves)
+            unchanged(profile, profile_file(root, json.loads(config_file.read_text())))
+            (evidence / "rollback.json").write_text(json.dumps({
+                "passed": True, "old_binary": OLD_COMMIT, "domains": list(before),
+                "team": legacy["team"], "personal_budgets": 3,
+            }, indent=2))
+            post_rollback_files = legacy_files(root, json.loads(config_file.read_text()))
+            run([str(args.candidate_bin / "lys"), "identity", "upgrade", "--root", str(root),
+                 "--from", str(args.candidate_bin), "--surface", str(args.candidate_surface)],
+                evidence / "upgrade.log", env)
+            after = observe(browser, ids)
+            (evidence / "after.json").write_text(json.dumps(after, indent=2))
+            same_records(before, after)
+            legacy_counts = verify_legacy(browser, legacy)
+            if legacy_browser.ask("GET", "/me")["person"]["id"] != ids["person"]:
+                raise RuntimeError("the ordinary legacy person's session changed during upgrade")
+            preserve_leaves(root, leaves)
+            new_config = json.loads(config_file.read_text())
+            unchanged(profile, profile_file(root, new_config))
+            expected = {key: value for key, value in old_config.items() if key != "cambium_messages"}
+            expected["message_service"] = dict(bridge, cookie="cambium_session")
+            for key, value in expected.items():
+                if new_config.get(key) != value:
+                    raise RuntimeError(f"upgrade changed or removed configuration member {key}")
+            if "cambium_messages" in new_config:
+                raise RuntimeError("upgrade retained the legacy message key")
+            unchanged(post_rollback_files, legacy_files(root, new_config))
+            migration = settle_restart(root, evidence, driver, env, browser, legacy, run)
+            unchanged(profile, profile_file(root, new_config))
+            admitted_person = admitted_after_upgrade(browser)
+            receipt = {"registered_admin_wrote": admitted_person, "old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
+                       "surfaces": surfaces, "domains": list(before), "old_app_leaves": len(leaves),
+                       "config_keys_preserved": list(expected), "legacy": legacy_counts,
+                       "reversible_window": True, "old_binary_rollback": True,
+                       "normal_cli_upgrade": True, "passed": True}
+            receipt["post_commit_migration"] = migration
     except BaseException as error:
         primary = error
         raise
@@ -227,7 +279,18 @@ def main():
     args = parser.parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.candidate_commit) is None:
         parser.error("candidate-commit must be a full commit id")
-    exercise(args)
+    os.umask(0o077)
+    args.work.mkdir(mode=0o700)
+    for name, negative in [("positive", False), ("negative", True)]:
+        leg = argparse.Namespace(**vars(args))
+        leg.work = args.work / name
+        leg.negative_control = negative
+        exercise(leg)
+    (args.work / "receipt.json").write_text(json.dumps({
+        "passed": True, "candidate": args.candidate_commit,
+        "positive": "positive/evidence/receipt.json",
+        "negative": "negative/evidence/receipt.json",
+    }, indent=2))
 
 
 if __name__ == "__main__":
