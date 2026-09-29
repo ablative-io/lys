@@ -148,10 +148,6 @@ fn existing_policy_verifier_rejects_widening_and_setup_cannot_retry() -> TestRes
 fn a_gap_cannot_be_hidden_by_late_readback_and_another_id_cannot_admit_config() -> TestResult {
     let plan = plan()?;
     let (mut setup, _) = begin(&plan)?;
-    assert!(
-        setup.readback(&readback()?).is_err(),
-        "config cannot precede initialize"
-    );
     setup.initialized(&initialized())?;
     setup.lost();
     assert_eq!(
@@ -167,6 +163,31 @@ fn a_gap_cannot_be_hidden_by_late_readback_and_another_id_cannot_admit_config() 
         "control_source_mismatch"
     );
     assert!(setup.readback(&readback()?).is_err());
+    Ok(())
+}
+
+#[test]
+fn out_of_phase_native_frames_close_the_exchange_permanently() -> TestResult {
+    let plan = plan()?;
+    let (mut setup, _) = begin(&plan)?;
+    assert!(
+        setup.readback(&readback()?).is_err(),
+        "config cannot precede initialize"
+    );
+    assert!(
+        setup.initialized(&initialized()).is_err(),
+        "a late initialize cannot reopen an invalid exchange"
+    );
+    let (mut setup, _) = begin(&plan)?;
+    setup.initialized(&initialized())?;
+    assert!(
+        setup.initialized(&initialized()).is_err(),
+        "a second initialize is out of phase"
+    );
+    assert!(
+        setup.readback(&readback()?).is_err(),
+        "config cannot repair an out-of-phase native exchange"
+    );
     Ok(())
 }
 
