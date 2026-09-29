@@ -25,7 +25,9 @@ pub fn serving(dir: PathBuf, api: Router) -> Router {
         .route("/", get(page))
         .route("/{*path}", get(file))
         .with_state(Arc::<Path>::from(dir));
-    Router::new().nest("/api", api).merge(screens)
+    // Reserve the whole API mount, including unknown paths. A route-only nest
+    // can otherwise lose an unknown API path to the public screen wildcard.
+    Router::new().nest_service("/api", api).merge(screens)
 }
 
 async fn page(State(dir): State<Arc<Path>>) -> Response {

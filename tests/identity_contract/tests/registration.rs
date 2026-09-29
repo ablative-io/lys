@@ -159,6 +159,16 @@ async fn administered() -> Result<(Service, FakeRauthy, String, String), Box<dyn
         .await?;
     assert_eq!(status, 200, "{body}");
     let ada = text(&body, "person")?.to_owned();
+    // Activate the administrator before binding its login: Registered people
+    // may sign in, but cannot administer the directory.
+    let (status, answer) = service
+        .post(
+            &format!("/identities/{ada}/transitions"),
+            Some(&cookie),
+            &json!({ "operation": op(250).to_string(), "transition": "activate" }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
     let bind = json!({
         "operation": op(2).to_string(),
         "issuer": service.issuer.issuer(),

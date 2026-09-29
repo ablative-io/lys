@@ -243,17 +243,21 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let starts = start::routes(start_service(config, &state)?);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
-    let api = router(Arc::clone(&state)).merge(configured).merge(starts);
+    // Only the API/provider handlers take identity acts. Static screens stay
+    // public; an explicit API fallback prevents /api paths reaching their wildcard.
+    let guarded = |routes| crate::session_admission::guarded(routes, Arc::clone(&state));
+    let api = guarded(
+        router(Arc::clone(&state))
+            .merge(configured)
+            .merge(starts)
+            .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
+    );
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
     };
     Ok(served
-        .merge(provider_callback)
-        .layer(axum::middleware::from_fn_with_state(
-            Arc::clone(&state),
-            crate::session_admission::guard,
-        ))
+        .merge(guarded(provider_callback))
         .layer(axum::middleware::from_fn_with_state(
             state,
             crate::operator::guard,

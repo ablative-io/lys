@@ -184,6 +184,16 @@ async fn every_mutation_by_a_denied_caller_is_refused_and_changes_nothing() -> T
         .await?;
     assert_eq!(status, 200, "{body}");
     let ada = body["person"].as_str().ok_or("no person")?.to_owned();
+    // Activate the administrator before binding its login: Registered people
+    // may sign in, but cannot administer the directory.
+    let (status, answer) = service
+        .post(
+            &format!("/identities/{ada}/transitions"),
+            Some(&administrator),
+            &json!({ "operation": op(250).to_string(), "transition": "activate" }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
     let bind = json!({
         "operation": op(2).to_string(),
         "issuer": service.issuer.issuer(),
@@ -198,7 +208,7 @@ async fn every_mutation_by_a_denied_caller_is_refused_and_changes_nothing() -> T
     assert_eq!(status, 200, "{body}");
     let agent = body["agent"].as_str().ok_or("no agent")?.to_owned();
     let size = service.log_size().await?;
-    assert_eq!(size, 3, "the administrator's three changes are logged");
+    assert_eq!(size, 4, "the administrator's four changes are logged");
     let (_, before) = service.get("/identities", Some(&administrator)).await?;
 
     let same_email = service.sign_in(login("someone-else")).await?;

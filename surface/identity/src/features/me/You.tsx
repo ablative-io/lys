@@ -9,17 +9,23 @@ import { useShell } from '../../shell/ShellContext';
 import { useNavigate } from 'react-router';
 import { Gate } from '../signin/Gate';
 import { OwnAccount } from '../people/Account';
+import { SessionList } from '../sessions/Sessions';
 
-interface YouData {
+interface ActiveData {
+  kind: 'active';
   me: MeView;
   agents: AgentSummary[];
   w: GrantWorld;
 }
 
+type YouData = ActiveData | { kind: 'registered'; me: MeView };
+
 async function readYou(): Promise<YouData> {
-  const [w, own] = await Promise.all([readGrantWorld(), api.ownPeople()]);
+  const me = await api.me();
+  if (me.person.state === 'registered') return { kind: 'registered', me };
+  const [w, own] = await Promise.all([readGrantWorld(me), api.ownPeople()]);
   const self = own.people.find((p) => p.id === w.me.person.id);
-  return { me: w.me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired'), w };
+  return { kind: 'active', me: w.me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired'), w };
 }
 
 /** An issuer URL named by its host, as a provider is shown. */
@@ -42,7 +48,7 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
   );
 }
 
-function Page({ data, reload }: { data: YouData; reload: () => void }) {
+function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
   const shell = useShell();
   const navigate = useNavigate();
   const { me, agents, w } = data;
@@ -140,8 +146,22 @@ function Page({ data, reload }: { data: YouData; reload: () => void }) {
   );
 }
 
+function Registered({ me }: { me: MeView }) {
+  return <div className="page">
+    <div className="head"><div><div className="eyebrow">Signed in as</div>
+      <h1>{me.person.display_name}</h1>
+      <p>Your account is waiting for activation by an administrator.</p>
+    </div></div>
+    <OwnAccount readOnly />
+    <section className="card" aria-label="Your signed-in sessions">
+      <h2>Your signed-in sessions</h2>
+      <SessionList person="" />
+    </section>
+  </div>;
+}
+
 export function You() {
   const [version, setVersion] = useState(0);
   const load = useLoad(readYou, 'me' + version);
-  return <Gate load={load} title="Signed in as" ok={(data) => <Page data={data} reload={() => setVersion((v) => v + 1)} />} />;
+  return <Gate load={load} title="Signed in as" ok={(data) => data.kind === 'registered' ? <Registered me={data.me} /> : <Page data={data} reload={() => setVersion((v) => v + 1)} />} />;
 }
