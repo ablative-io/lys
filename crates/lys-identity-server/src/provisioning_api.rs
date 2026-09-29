@@ -190,7 +190,7 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
 }
 
 fn settings(body: SetBody) -> Result<Settings, ServerError> {
-    Ok(Settings {
+    let settings = Settings {
         model_access: names("model_access", &body.model_access)?,
         tools: names("tools", &body.tools)?,
         skills: names("skills", &body.skills)?,
@@ -199,7 +199,11 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
         harness: body.harness.map(harness).transpose()?,
-    })
+    };
+    if let Some(declared) = &settings.harness {
+        crate::launch_fields::models(declared, &settings.model_access)?;
+    }
+    Ok(settings)
 }
 
 /// The declared build, refused when its program is not an absolute path or
