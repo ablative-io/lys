@@ -3,6 +3,8 @@ import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { AgentMemory } from './AgentMemory';
+import { AgentPolicy } from './AgentPolicy';
+import { AgentRefusals } from './AgentRefusals';
 import { AgentCredentials } from './AgentCredentials';
 import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
@@ -200,6 +202,12 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
         <div className="card"><div className="sec">People sign in; they are not issued certificates here.</div></div>
       ) : (
         <AgentCertificates id={data.x.id} />
+      );
+    case 'policy':
+      return person ? (
+        <div className="card"><div className="sec">A person’s own tools are not judged by an agent policy.</div></div>
+      ) : (
+        <><AgentPolicy key={data.x.id} id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>
       );
     case 'record':
       return <><Record data={data} />{person ? null : <StopHistory key={data.x.id} id={data.x.id} />}</>;
