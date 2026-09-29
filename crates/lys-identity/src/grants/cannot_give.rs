@@ -94,7 +94,7 @@ impl CannotGiveReason {
         }
     }
 
-    /// The reason `name` spells, or none when it is not one of the six.
+    /// The reason `name` spells, or none when it is not one of the seven.
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|reason| reason.name() == name)
     }

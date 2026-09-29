@@ -161,8 +161,6 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/retire" "Retire a team" S [SIGNED_BODY];
     GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]];
-    GET "/identity/estate-plan" "Read the installed estate plan" S [SIGNED, &["NotAdmitted", "ConfigInvalid", "ServiceAccountUnknown", "RequestMalformed", "credential_refused"]];
-    POST "/identity/estate-apply" "Apply grants through the installed loader" S [SIGNED_BODY, &["NotAdmitted", "ConfigInvalid", "ServiceAccountUnknown", "credential_refused", "NotHeld"]];
     GET "/secrets" "The secrets" S [SIGNED, &["NoPerson", "SecretsUnavailable"]];
     GET "/secrets/grants" "The secrets' grants" S [SIGNED];
     GET "/secrets/audit" "The secrets' audit" S [SIGNED];

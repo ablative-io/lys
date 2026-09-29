@@ -70,8 +70,8 @@ fn invalid(entry: impl Into<String>, reason: &'static str) -> Invalid {
 
 /// The entire document is parsed before the first mutation is attempted.
 pub fn parse(bytes: &[u8], account: &str) -> Result<Vec<Entry>, Invalid> {
-    let document: Value =
-        serde_json::from_slice(bytes).map_err(|_error| invalid("document", "expected a JSON object"))?;
+    let document: Value = serde_json::from_slice(bytes)
+        .map_err(|_error| invalid("document", "expected a JSON object"))?;
     let object = document
         .as_object()
         .ok_or_else(|| invalid("document", "expected a JSON object"))?;

@@ -26,19 +26,19 @@ use crate::routes::AppState;
 #[derive(Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ImportDocument {
-    /// RegisterBody entries without operation ids.
+    /// `RegisterBody` entries without operation ids.
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
     apps: Vec<Value>,
-    /// Agent entries with display_name.
+    /// Agent entries with `display_name`.
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
     agents: Vec<Value>,
-    /// Named RootBody entries; root authority is still required.
+    /// Named `RootBody` entries; root authority is still required.
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
     root_grants: Vec<Value>,
-    /// Named DelegateBody entries without operation ids.
+    /// Named `DelegateBody` entries without operation ids.
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
     delegations: Vec<Value>,
@@ -47,7 +47,7 @@ pub(crate) struct ImportDocument {
 /// The actual account and each existing owner's receipt, in document order.
 #[derive(Serialize, utoipa::ToSchema)]
 pub(crate) struct ImportAnswer {
-    /// The independently authenticated account, always kind service_account.
+    /// The independently authenticated account, always kind `service_account`.
     #[schema(value_type = Object)]
     by: By,
     /// Entry name, operation id and the mutation owner's original result.
@@ -63,11 +63,11 @@ fn malformed(reason: impl Into<String>) -> ServerError {
 
 fn decode<T: DeserializeOwned>(body: Value) -> Result<T, ServerError> {
     serde_json::from_value(body)
-        .map_err(|_| malformed("import entry does not match its route's request body"))
+        .map_err(|_error| malformed("import entry does not match its route's request body"))
 }
 
 fn value<T: Serialize>(answer: T) -> Result<Value, ServerError> {
-    serde_json::to_value(answer).map_err(|_| malformed("import receipt could not be encoded"))
+    serde_json::to_value(answer).map_err(|_error| malformed("import receipt could not be encoded"))
 }
 
 fn validate(entry: &Entry) -> Result<(), ServerError> {
@@ -88,7 +88,7 @@ fn validate(entry: &Entry) -> Result<(), ServerError> {
     Ok(())
 }
 
-fn refusal(entry: Option<&Entry>, completed: &[Value], error: ServerError) -> Response {
+fn refusal(entry: Option<&Entry>, completed: &[Value], error: &ServerError) -> Response {
     (
         error.status(),
         Json(json!({
@@ -106,13 +106,13 @@ fn recorded_refusal(
     account: &str,
     entry: &Entry,
     completed: &[Value],
-    error: ServerError,
+    error: &ServerError,
 ) -> Response {
     let record = crate::service_accounts_state::ImportRefused {
         account: account.to_owned(),
         operation: entry.operation.to_string(),
         entry: format!("{}/{}", entry.kind.section(), entry.name),
-        refusal: error.name().to_owned(),
+        refusal: error.name(),
         at: crate::session::now(),
     };
     let recorded = state
@@ -209,15 +209,12 @@ pub(crate) async fn import(
     headers: HeaderMap,
     body: Result<Json<ImportDocument>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
-    let document = match body {
-        Ok(Json(document)) => document,
-        Err(_) => {
-            return refusal(
-                None,
-                &[],
-                malformed("expected the import document's arrays and no unknown members"),
-            );
-        }
+    let Ok(Json(document)) = body else {
+        return refusal(
+            None,
+            &[],
+            &malformed("expected the import document's arrays and no unknown members"),
+        );
     };
     let caller = crate::grants::with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
@@ -235,19 +232,18 @@ pub(crate) async fn import(
     });
     let (account, owner) = match caller {
         Ok(caller) => caller,
-        Err(error) => return refusal(None, &[], error),
+        Err(error) => return refusal(None, &[], &error),
     };
-    let encoded = match serde_json::to_vec(&document) {
-        Ok(encoded) => encoded,
-        Err(_) => return refusal(None, &[], malformed("cannot encode import document")),
+    let Ok(encoded) = serde_json::to_vec(&document) else {
+        return refusal(None, &[], &malformed("cannot encode import document"));
     };
     let entries = match lys_identity::import_document::parse(&encoded, &account) {
         Ok(entries) => entries,
-        Err(error) => return refusal(None, &[], malformed(error.to_string())),
+        Err(error) => return refusal(None, &[], &malformed(error.to_string())),
     };
     for entry in &entries {
         if let Err(error) = validate(entry) {
-            return refusal(Some(entry), &[], error);
+            return refusal(Some(entry), &[], &error);
         }
     }
     let mut names = BTreeMap::from([
@@ -258,11 +254,11 @@ pub(crate) async fn import(
     for entry in &entries {
         let mut body = entry.body.clone();
         if let Err(error) = resolve(&mut body, &names) {
-            return refusal(Some(entry), &completed, error);
+            return refusal(Some(entry), &completed, &error);
         }
         let answer = match apply(&state, &headers, entry, body).await {
             Ok(answer) => answer,
-            Err(error) => return recorded_refusal(&state, &account, entry, &completed, error),
+            Err(error) => return recorded_refusal(&state, &account, entry, &completed, &error),
         };
         let reference = match entry.kind {
             Kind::Agent => answer

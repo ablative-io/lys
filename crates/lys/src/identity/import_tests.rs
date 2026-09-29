@@ -114,7 +114,7 @@ fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn
     assert_eq!(error.kind(), super::ErrorKind::ImportUncertain);
     assert!(error.to_string().contains("ServiceAccountsUnavailable"));
     assert!(error.to_string().contains("no retry was made"));
-    let listener = fixture.join().map_err(|_| "fixture panicked")??;
+    let listener = fixture.join().map_err(|_panic| "fixture panicked")??;
     listener.set_nonblocking(true)?;
     assert_eq!(
         listener.accept().unwrap_err().kind(),

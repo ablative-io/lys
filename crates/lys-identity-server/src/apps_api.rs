@@ -88,6 +88,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/apps/registrars", post(registrar))
         .route("/apps/{app}", get(one))
         .route("/apps/{app}/approve", post(approve))
+        .route(
+            "/apps/{app}/credentials/save",
+            post(crate::apps_credentials::save),
+        )
         .route("/apps/{app}/decline", post(decline))
         .route("/apps/{app}/retire", post(retire))
 }

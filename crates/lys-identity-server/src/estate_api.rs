@@ -6,10 +6,18 @@ use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use lys_identity::IdentityId;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in, with_directory};
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct EstatePlanAnswer {
+    #[schema(value_type = Object)]
+    plan: Value,
+    loader: String,
+}
 
 fn loader(state: &AppState, headers: &HeaderMap) -> Result<(HeaderMap, String), ServerError> {
     let actor = signed_in(state, headers)?;
@@ -55,7 +63,7 @@ fn loader(state: &AppState, headers: &HeaderMap) -> Result<(HeaderMap, String), 
 pub(crate) async fn plan(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<EstatePlanAnswer>, ServerError> {
     let (_, account) = loader(&state, &headers)?;
     let bytes =
         std::fs::read(&state.estate_plan_file).map_err(|_error| ServerError::ConfigInvalid {
@@ -71,7 +79,10 @@ pub(crate) async fn plan(
         serde_json::from_slice(&bytes).map_err(|_error| ServerError::ConfigInvalid {
             reason: "the installed estate plan is not JSON".to_owned(),
         })?;
-    Ok(Json(json!({"plan":plan,"loader":account})))
+    Ok(Json(EstatePlanAnswer {
+        plan,
+        loader: account,
+    }))
 }
 
 pub(crate) async fn apply(

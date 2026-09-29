@@ -41,7 +41,7 @@ pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
         .parent()
         .ok_or_else(|| refused(ErrorKind::ImportInvalid, "credential path has no parent"))?;
     private_files::ensure_dir(parent)?;
-    let operation = lys_identity::OperationId::generate().map_err(|_| {
+    let operation = lys_identity::OperationId::generate().map_err(|_error| {
         refused(
             ErrorKind::ImportUnavailable,
             "secure random source unavailable",
@@ -82,7 +82,7 @@ pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
     };
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
-        .map_err(|_| {
+        .map_err(|_error| {
             refused(
                 ErrorKind::PrivateFileIo,
                 "cannot durably write the loader credential",
@@ -91,7 +91,7 @@ pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
         })?;
     fs::File::open(parent)
         .and_then(|file| file.sync_all())
-        .map_err(|_| {
+        .map_err(|_error| {
             refused(
                 ErrorKind::PrivateFileIo,
                 "cannot sync the credential directory",
@@ -113,7 +113,7 @@ pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
 
 fn credential(bytes: &[u8]) -> IdentityResult<&str> {
     let text = std::str::from_utf8(bytes)
-        .map_err(|_| refused(ErrorKind::ImportInvalid, "credential is not text"))?
+        .map_err(|_error| refused(ErrorKind::ImportInvalid, "credential is not text"))?
         .trim();
     let mut parts = text.split('.');
     match (parts.next(), parts.next(), parts.next(), parts.next()) {
@@ -132,7 +132,7 @@ fn credential(bytes: &[u8]) -> IdentityResult<&str> {
 }
 
 fn authority(address: &str) -> IdentityResult<Authority> {
-    let authority = Authority::parse(address, None).map_err(|_| {
+    let authority = Authority::parse(address, None).map_err(|_error| {
         refused(
             ErrorKind::ImportInvalid,
             "expected a numeric loopback address and port",
@@ -156,14 +156,14 @@ fn authority(address: &str) -> IdentityResult<Authority> {
 /// this before sending anything, never probe by retrying a mutation.
 fn endpoint(layout: &Layout, address: Option<&str>) -> IdentityResult<(Authority, &'static str)> {
     let path = layout.service_config();
-    let bytes = fs::read(&path).map_err(|_| {
+    let bytes = fs::read(&path).map_err(|_error| {
         refused(
             ErrorKind::ConfigUnreadable,
             "cannot read the installed identity service configuration",
         )
         .at(&path)
     })?;
-    let config: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| {
+    let config: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_error| {
         refused(
             ErrorKind::ConfigInvalid,
             "the installed identity service configuration is not JSON",
@@ -241,7 +241,7 @@ pub fn run(
             Failure::Uncertain(_) | Failure::Malformed(_) => refused(ErrorKind::ImportUncertain,
                 "no complete answer; no retry was made. Reconcile the content-derived operations before explicitly repeating this document"),
         })?;
-    let body: serde_json::Value = serde_json::from_slice(&answer.body).map_err(|_| {
+    let body: serde_json::Value = serde_json::from_slice(&answer.body).map_err(|_error| {
         refused(
             ErrorKind::ImportUncertain,
             "the service answered without an import receipt; no retry was made",

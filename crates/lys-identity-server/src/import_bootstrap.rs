@@ -40,12 +40,12 @@ fn operation(account: &str, label: &str) -> OperationId {
 pub(crate) fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
     use std::io::Read;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    let metadata = fs::symlink_metadata(path).map_err(|_| unavailable())?;
+    let metadata = fs::symlink_metadata(path).map_err(|_error| unavailable())?;
     if !metadata.is_file() || metadata.permissions().mode() & 0o077 != 0 {
         return Err(unavailable());
     }
-    let mut file = fs::File::open(path).map_err(|_| unavailable())?;
-    let opened = file.metadata().map_err(|_| unavailable())?;
+    let mut file = fs::File::open(path).map_err(|_error| unavailable())?;
+    let opened = file.metadata().map_err(|_error| unavailable())?;
     if !opened.is_file()
         || opened.permissions().mode() & 0o077 != 0
         || opened.dev() != metadata.dev()
@@ -54,7 +54,8 @@ pub(crate) fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerEr
         return Err(unavailable());
     }
     let mut bytes = Zeroizing::new(String::new());
-    file.read_to_string(&mut bytes).map_err(|_| unavailable())?;
+    file.read_to_string(&mut bytes)
+        .map_err(|_error| unavailable())?;
     Ok(bytes)
 }
 
@@ -86,7 +87,7 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
     else {
         return Err(unavailable());
     };
-    let id = ServiceAccountId::from_str(account).map_err(|_| unavailable())?;
+    let id = ServiceAccountId::from_str(account).map_err(|_error| unavailable())?;
     if secret.len() != 64 || !secret.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(unavailable());
     }

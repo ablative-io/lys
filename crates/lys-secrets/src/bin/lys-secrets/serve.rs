@@ -81,6 +81,10 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
             })?;
         println!("lys-secrets proxy listening on {listen}");
         let app = Router::new()
+            .route(
+                "/_lys/apps/save",
+                axum::routing::post(crate::save_app::save),
+            )
             .route("/_lys/secrets", axum::routing::get(crate::view::secrets))
             .route("/_lys/audit", axum::routing::get(crate::view::audit))
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
