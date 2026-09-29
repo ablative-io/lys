@@ -225,7 +225,7 @@ impl<S: LeafStore> BudgetStore<S> {
         self.settle()?;
         for record in refusals {
             if !self.held.refusals.holds(&record) {
-                self.append(Leaf::Refused(record))?;
+                self.append(Leaf::Refused(Box::new(record)))?;
             }
         }
         if self.held.refusals.cursors.get(runner) != Some(&cursor) {

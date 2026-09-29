@@ -1,7 +1,7 @@
 /** The canvas starts with a returned running session and never turns membership or missing reads into authority. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, click, mount, text } from './harness';
-import { GRANTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, GRANTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import { mockTerminal } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
@@ -25,9 +25,21 @@ describe('Agent canvas', () => {
     expect(text()).toContain('Delivery');
     expect(text()).toContain('Member; no permission implied');
     expect(text()).toContain('view on project:identity');
-    expect(text()).toContain('Message connections are unavailable');
+    expect(text()).toContain('Message connections unavailable');
     expect(document.querySelectorAll('.canvas-connections li')).toHaveLength(2);
     expect(posted).toEqual([]);
+  });
+
+  it('draws the returned message addresses between identities without calling them terminal deliveries', async () => {
+    await mount('#/runtime/canvas', {
+      ...routes,
+      '/runtime/message-edges': ok({ places: ['chat'], messages: [], roots: [], next: null, unmapped: [] }),
+      '/runtime/message-edges?stream=chat': ok({ places: [], messages: [{ message: 'message-one', stream: 'chat', source: ADA, recipients: [SCRIBE], addressing: 'direct', at: 1 }], roots: [], next: null, unmapped: [] }),
+    });
+    expect(text()).toContain('Direct message message-one in chat');
+    expect(text()).toContain('not whether a person read the message or an agent consumed it');
+    expect(document.querySelectorAll('.canvas-connections li[data-kind="message"]')).toHaveLength(1);
+    expect(document.querySelectorAll('.canvas-connections li[data-kind="identity"]')).toHaveLength(1);
   });
 
   it('keeps the server refusal on a grant instead of drawing it as authority', async () => {

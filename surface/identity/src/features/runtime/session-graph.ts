@@ -6,13 +6,35 @@ import type { GrantWorld } from '../grants/model';
 import type { Team } from '../teams/contract';
 import type { RuntimeSession } from './RuntimeSessions';
 import type { Unanswered } from './Sessions';
+import type { MessageConnection } from './message-connections';
 
 export interface SessionNode {
   id: string; title: string; detail: string; column: 'teams' | 'sessions' | 'resources';
   session?: RuntimeSession;
 }
-export interface SessionEdge { id: string; from: string; to: string; label: string; kind: 'membership' | 'grant'; stands: boolean }
-export interface SessionGraph { nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[] }
+export interface SessionEdge { id: string; from: string; to: string; label: string; kind: 'membership' | 'grant' | 'message' | 'identity'; stands: boolean }
+export interface SessionGraph { nodes: SessionNode[]; edges: SessionEdge[]; notices: string[]; unanswered: Unanswered[]; names: Record<string, string> }
+
+export function withMessages(graph: SessionGraph, messages: MessageConnection[]): SessionGraph {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
+  const identity = (id: string, column: 'teams' | 'resources') => {
+    const key = 'identity:' + id;
+    if (!nodes.has(key)) nodes.set(key, { id: key, column, title: graph.names[id] ?? id, detail: 'Message identity (not a terminal delivery)' });
+    for (const node of graph.nodes) if (node.session?.agent === id) {
+      const edgeId = key + ':' + node.id;
+      edges.set(edgeId, { id: edgeId, from: key, to: node.id, kind: 'identity', label: 'Session belongs to this identity', stands: true });
+    }
+    return key;
+  };
+  for (const message of messages) for (const recipient of message.recipients) {
+    const from = identity(message.source, 'teams');
+    const to = identity(recipient, 'resources');
+    const id = 'message:' + message.message + ':' + recipient;
+    edges.set(id, { id, from, to, kind: 'message', stands: true, label: `${message.addressing === 'direct' ? 'Direct message' : 'Explicit mention'} ${message.message} in ${message.stream}` });
+  }
+  return { ...graph, nodes: [...nodes.values()], edges: [...edges.values()] };
+}
 
 export function graphFromRecords(sessions: RuntimeSession[], teams: Team[], world: GrantWorld | null): Pick<SessionGraph, 'nodes' | 'edges'> {
   const nodes = new Map<string, SessionNode>();
@@ -59,9 +81,8 @@ export async function readSessionGraph(): Promise<SessionGraph> {
   }
   if (teams.status === 'fulfilled' && !Array.isArray(teams.value.teams)) throw new Error('The service did not return a team list.');
   const graph = graphFromRecords(live.value.sessions, teams.status === 'fulfilled' ? teams.value.teams : [], world.status === 'fulfilled' ? world.value : null);
-  return { ...graph, unanswered: live.value.unanswered, notices: [
+  return { ...graph, names: world.status === 'fulfilled' ? Object.fromEntries([...world.value.who].map(([id, person]) => [id, person.name])) : {}, unanswered: live.value.unanswered, notices: [
     ...(teams.status === 'rejected' ? [unavailable('Team connections', teams.reason)] : []),
     ...(world.status === 'rejected' ? [unavailable('Names and grant connections', world.reason)] : []),
-    'Message connections are unavailable. No message delivery records were read.',
   ] };
 }

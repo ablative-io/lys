@@ -88,6 +88,9 @@ function layout(nodes: Node[], edges: Edge[]) {
   }
 }
 
+/** The resource a resource node stands for, as the permission service names it: kind:id. */
+const resourceOf = (node: Node): string => node.id.replace(/^resource:/, '');
+
 const colour = (kind: Kind): string => kind === 'person' ? 'var(--accent)' : kind === 'agent' ? '#e8c9a6' : kind === 'app' ? '#8b8b96' : '#5f7f9a';
 
 function Shape({ node }: { node: Node }) {
@@ -105,7 +108,7 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
   const hot = focus ? new Set([focus, ...edges.filter((edge) => edge.a === focus || edge.b === focus).flatMap((edge) => [edge.a, edge.b])]) : null;
   const picked = focus ? at.get(focus) : undefined;
   const reaches = focus ? [...reach].flatMap(([resource, holders]) => { const actions = holders.get(focus); return actions ? [{ resource, actions }] : []; }) : [];
-  const reachedBy = picked?.kind === 'resource' ? [...(reach.get(picked.label) ?? new Map<string, string[]>())] : [];
+  const reachedBy = picked?.kind === 'resource' ? [...(reach.get(resourceOf(picked)) ?? new Map<string, string[]>())] : [];
   const go = (id: string) => navigate('/graph/' + encodeURIComponent(id));
   const [view, setView] = useState({ x: 0, y: 0, w: W, h: H });
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -134,6 +137,7 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
   };
   const onUp = () => { const was = drag.current?.moved; drag.current = null; return was; };
   const pick = (id: string) => { if (!drag.current?.moved) go(id); };
+  if (focus && !picked) return <p role="alert">Identity {focus} is not in the directory records you may see.</p>;
   return <>
     <div className="graph-toggles">
       {([['grants', 'Grants'], ['answers', 'Who answers for whom'], ['installed', 'Set up by the install']] as const).map(([key, label]) =>
@@ -165,7 +169,7 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
           : picked.kind === 'resource' ? <><h2>{picked.label}</h2><p className="note">Highlighted: everyone who can reach it, per the permission service.</p>
             {reachedBy.map(([holder, actions]) => <div className="row" key={holder}><span>{nameOf(world, holder)}</span><span className="mono dim">{actions.join(', ')}</span></div>)}
             {!reachedBy.length ? <p className="dim">Nobody.</p> : null}
-            <div className="actions"><a className="btn" href={'#/access/who/' + encodeURIComponent(picked.label)}>Open resource</a><a className="btn" href="#/graph">Clear</a></div></>
+            <div className="actions"><a className="btn" href={'#/access/who/' + encodeURIComponent(resourceOf(picked))}>Open resource</a><a className="btn" href="#/graph">Clear</a></div></>
           : <><h2>{picked.label}</h2><p className="note">Highlighted: everything it can reach, per the permission service.</p>
             {reaches.map(({ resource, actions }) => <a className="row" key={resource} href={'#/access/who/' + encodeURIComponent(resource)}><span>{resource}</span><span className="mono dim">{actions.join(', ')}</span></a>)}
             {!reaches.length ? <p className="dim">Nothing.</p> : null}
