@@ -127,6 +127,7 @@ pub(crate) fn identity(value: IdentityId) -> Value {
     let (kind, id) = match value {
         IdentityId::Person(id) => (wire::PERSON, *id.as_bytes()),
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
+        IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
     };
     array(vec![uint(kind), bytes(&id)])
 }
@@ -138,6 +139,9 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, Unreadable> {
     match read_uint(&kind, "an identity kind")? {
         wire::PERSON => Ok(IdentityId::Person(PersonId::from_bytes(id))),
         wire::AGENT => Ok(IdentityId::Agent(AgentId::from_bytes(id))),
+        wire::SERVICE_ACCOUNT => Ok(IdentityId::ServiceAccount(
+            crate::ServiceAccountId::from_bytes(id),
+        )),
         code => Err(format!("identity kind {code} is not a person or an agent")),
     }
 }

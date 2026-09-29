@@ -150,8 +150,11 @@ fn change(out: &mut Vec<u8>, value: &Change) {
 /// signed the request. An OIDC actor is written as it always was.
 fn actor(out: &mut Vec<u8>, value: &Actor) {
     let provenance = value.provenance();
-    let agent = provenance.agent();
-    map(out, if agent.is_some() { 5 } else { 4 });
+    let principal = provenance
+        .agent()
+        .map(|id| *id.as_bytes())
+        .or_else(|| provenance.service_account().map(|id| *id.as_bytes()));
+    map(out, if principal.is_some() { 5 } else { 4 });
     uint(out, 1);
     text(out, value.binding().issuer());
     uint(out, 2);
@@ -160,9 +163,9 @@ fn actor(out: &mut Vec<u8>, value: &Actor) {
     uint(out, wire::method(provenance.method()));
     uint(out, 4);
     uint(out, provenance.authenticated_at());
-    if let Some(agent) = agent {
+    if let Some(principal) = principal {
         uint(out, 5);
-        bytes(out, agent.as_bytes());
+        bytes(out, &principal);
     }
 }
 
@@ -171,7 +174,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 7);
     uint(&mut out, 1);
-    uint(&mut out, EVENT_VERSION);
+    uint(&mut out, event.version());
     uint(&mut out, 2);
     bytes(&mut out, event.operation().as_bytes());
     uint(&mut out, 3);
@@ -182,6 +185,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     let (kind, id) = match event.identity() {
         IdentityId::Person(id) => (wire::PERSON, *id.as_bytes()),
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
+        IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
     };
     uint(&mut out, kind);
     uint(&mut out, 2);
@@ -371,7 +375,7 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
         && let Some((_, version)) = pairs.first()
     {
         let version = as_uint(version, SHAPE)?;
-        if version != EVENT_VERSION {
+        if version != EVENT_VERSION && version != 2 {
             return Err(IdentityError::VersionUnsupported { version });
         }
     }

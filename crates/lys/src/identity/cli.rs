@@ -8,6 +8,21 @@ use clap::Subcommand;
 /// dependencies for development and check them.
 #[derive(Debug, Subcommand)]
 pub enum IdentityCommand {
+    /// Import apps, agents and delegated permissions using a service
+    /// account's own credential. Stops at the first named refusal.
+    Import {
+        /// The JSON document to import.
+        file: PathBuf,
+        /// The installed product's data root.
+        #[arg(long)]
+        root: Option<PathBuf>,
+        /// A private file containing the account's bearer credential.
+        #[arg(long)]
+        credential_file: Option<PathBuf>,
+        /// The loopback listener; credentials are never sent off this machine.
+        #[arg(long, default_value = "127.0.0.1:8490")]
+        address: String,
+    },
     /// Validate the deployment configuration and materialise its private
     /// artifacts: generated or provided credentials and the compose
     /// environment, each owner-only in the state directory. Existing

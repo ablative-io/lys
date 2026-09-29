@@ -26,7 +26,7 @@ use serde::Deserialize;
 use crate::error::ServerError;
 use crate::grant_contract::{RouteWire, grant_id};
 use crate::grant_sight::as_seen_by;
-use crate::grants::{Judged, caller, with_grants};
+use crate::grants::{Judged, with_grants};
 use crate::requests_api::{
     Weighed, decider, malformed, seen, settled, taken, with_requests, words,
 };
@@ -131,7 +131,7 @@ pub(crate) async fn approve(
     body: Result<Json<ApproveBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
         let at = now();
         with_requests(&state, |store| {
@@ -196,7 +196,7 @@ pub(crate) async fn approve(
                     },
                     at,
                 ),
-                (None, IdentityId::Agent(_)) => {
+                (None, IdentityId::Agent(_) | IdentityId::ServiceAccount(_)) => {
                     return Err(malformed(
                         "an agent's access is lent from a grant a person holds: name the source",
                     ));
@@ -238,7 +238,7 @@ pub(crate) async fn settle(
     Path(id): Path<String>,
 ) -> Result<Json<RequestView>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let at = now();
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
@@ -261,7 +261,7 @@ pub(crate) async fn decline(
     body: Result<Json<DeclineBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
         let at = now();
         with_requests(&state, |store| {

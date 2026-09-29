@@ -77,6 +77,47 @@ fn unknown(identity: IdentityId) -> IdentityError {
 }
 
 impl Projection {
+    /// Add an account from the separately signed service-account log to a
+    /// request's projection. Call only on a clone after settling that log.
+    /// This never creates a login binding or changes the directory's log.
+    /// The recorded owner must be a known person; retirement and suspension
+    /// of that person also stop the account from exercising grants.
+    pub fn service_account(
+        &mut self,
+        id: crate::ServiceAccountId,
+        owner: PersonId,
+        profile: Profile,
+        retired: bool,
+        created_by: LoginBinding,
+    ) -> Result<(), IdentityError> {
+        let person = self
+            .record(IdentityId::Person(owner))
+            .ok_or_else(|| unknown(IdentityId::Person(owner)))?;
+        let state = if retired {
+            LifecycleState::Retired
+        } else {
+            person.state()
+        };
+        let identity = IdentityId::ServiceAccount(id);
+        if self.records.contains_key(&identity) {
+            return Err(IdentityError::AlreadyRegistered {
+                identity: identity.to_string(),
+            });
+        }
+        self.records.insert(
+            identity,
+            Record {
+                profile,
+                state,
+                responsible: Some(owner),
+                bindings: Vec::new(),
+                registered_by: created_by,
+                events: Vec::new(),
+            },
+        );
+        Ok(())
+    }
+
     /// An empty directory.
     pub fn new() -> Self {
         Self::default()
@@ -229,6 +270,11 @@ impl Projection {
                     }
                     IdentityId::Agent(agent) => {
                         self.agent_bindings.insert(binding.clone(), agent);
+                    }
+                    IdentityId::ServiceAccount(_) => {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "a service account never acquires a sign-in binding",
+                        });
                     }
                 }
             }

@@ -37,6 +37,7 @@ pub(crate) fn seen_agent(
         let sees = state.admission.administrator(&actor).is_ok()
             || match asker {
                 IdentityId::Agent(own) => own == agent,
+                IdentityId::ServiceAccount(_) => false,
                 IdentityId::Person(person) => responsible == Some(person),
             };
         if sees {

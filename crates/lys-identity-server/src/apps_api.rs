@@ -246,15 +246,19 @@ fn service_account_held(state: &AppState, id: &str) -> Result<(), ServerError> {
     }
 }
 
-async fn register(
+pub(crate) async fn register(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     body: Result<Json<RegisterBody>, JsonRejection>,
 ) -> Result<Json<AppView>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    crate::grants::with_grants(&state, |mut judged| {
+        let who = acting(&state, judged.apps.held(), &headers)?;
+        if matches!(who, Acting::Registrar { .. }) {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            crate::service_account_grants::admit(&mut judged, caller, "apps")?;
+        }
         let service_account = match &who {
             Acting::Administrator(_) => body.service_account.clone(),
             Acting::Registrar { service_account } => match &body.service_account {
@@ -272,9 +276,6 @@ async fn register(
             }
         };
         let id = app_id(&body.id).map_err(AppError::from)?.to_owned();
-        if apps.app(&id).is_some() {
-            return Err(AppError::AppExists { app: id }.into());
-        }
         let name = words("name", &body.name)?;
         if name.is_empty() {
             return Err(malformed("an app has a name"));
@@ -298,8 +299,8 @@ async fn register(
             by: who.by(),
             at: now(),
         });
-        apps.keep(line)?;
-        view(apps, &id)
+        judged.apps.keep(line)?;
+        view(judged.apps, &id)
     })
     .map(Json)
 }

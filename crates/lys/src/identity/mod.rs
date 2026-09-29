@@ -8,6 +8,7 @@ pub mod configure;
 pub mod credentials;
 pub mod error;
 pub mod health;
+pub mod import;
 pub mod install;
 pub mod loopback_http;
 pub mod prepare;

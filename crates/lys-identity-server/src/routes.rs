@@ -3,6 +3,7 @@
 //! route and the door's handle records it reads are declared here, in
 //! [`start`] and [`door_handles`].
 
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -46,6 +47,8 @@ pub struct AppState {
     pub setup: Option<crate::setup::SetupSettings>,
     /// One setup act at a time, so one code makes one administrator.
     pub setup_lock: tokio::sync::Mutex<()>,
+    /// The private loader credential provisioned by install or upgrade.
+    pub import_credential_file: Option<PathBuf>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -144,6 +147,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let state = Arc::new(AppState {
+        import_credential_file: config.import_credential_file.clone(),
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
@@ -204,6 +208,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts: Mutex::new(acts),
         say,
     });
+    crate::import_bootstrap::ensure(&state)?;
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
@@ -261,6 +266,7 @@ pub fn router(state: Shared) -> Router {
         .route("/callback", get(callback))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
+        .route("/identity/import", post(crate::import_api::import))
         .route("/identities", get(list))
         .route("/identities/{id}", get(read))
         .route("/identities/{id}/profile", post(change_profile))
@@ -337,6 +343,11 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
+    if text.starts_with("op-") {
+        return lys_identity::ServiceAccountId::from_str(text)
+            .map(IdentityId::ServiceAccount)
+            .map_err(ServerError::from);
+    }
     if text.starts_with("agent-") {
         return AgentId::from_str(text)
             .map(IdentityId::Agent)
@@ -418,24 +429,29 @@ async fn register_person(
     })
 }
 
-async fn register_agent(
+pub(crate) async fn register_agent(
     State(state): State<Shared>,
     headers: HeaderMap,
     Json(body): Json<Named>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    with_directory(&state, |directory| {
-        let responsible = directory
-            .projection()?
-            .person_for(actor.binding())
-            .ok_or(ServerError::NotAdmitted {
-                reason: "the administrator's login is bound to no person, so no agent can be registered under them",
-            })?;
+    crate::grants::with_directory_grants(&state, |directory, mut judged| {
+        let (actor, responsible) = if headers.contains_key(axum::http::header::AUTHORIZATION) {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            crate::service_account_grants::admit(&mut judged, caller, "agents")?;
+            crate::service_account_grants::actor(&judged, caller)?
+        } else {
+            let actor = signed_in(&state, &headers)?;
+            state.admission.administrator(&actor)?;
+            let responsible = judged
+                .directory
+                .person_for(actor.binding())
+                .ok_or(ServerError::NoPerson)?;
+            (actor, responsible)
+        };
         let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
         Ok(Json(AgentRegistered {
             agent: id.to_string(),

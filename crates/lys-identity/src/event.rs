@@ -166,6 +166,11 @@ pub struct IdentityEvent {
 
 /// Refuse `change` if it does not fit `identity`.
 fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError> {
+    if matches!(identity, IdentityId::ServiceAccount(_)) {
+        return Err(IdentityError::ChangeMismatch {
+            reason: "service account lifecycle belongs to the service-account log",
+        });
+    }
     match (change, identity) {
         (Change::RegisterPerson { .. } | Change::SetupPerson { .. }, IdentityId::Agent(_)) => {
             Err(IdentityError::ChangeMismatch {
@@ -214,6 +219,16 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
 }
 
 impl IdentityEvent {
+    /// Service-account provenance uses a new envelope version. Existing
+    /// OIDC and agent-signature events retain their exact v1 encoding.
+    pub fn version(&self) -> u64 {
+        if self.actor.provenance().service_account().is_some() {
+            2
+        } else {
+            EVENT_VERSION
+        }
+    }
+
     /// The event recording `change` to `identity`, made by `actor` under `operation`.
     pub fn new(
         operation: OperationId,
@@ -267,6 +282,8 @@ pub(crate) mod wire {
     pub(crate) const PERSON: u64 = 1;
     /// An identity that is an agent.
     pub(crate) const AGENT: u64 = 2;
+    /// A principal held in the service-account log.
+    pub(crate) const SERVICE_ACCOUNT: u64 = 3;
 
     /// A person is registered.
     pub(crate) const REGISTER_PERSON: u64 = 1;
@@ -304,6 +321,7 @@ pub(crate) mod wire {
         match value {
             AuthMethod::Oidc => OIDC,
             AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
+            AuthMethod::ServiceAccountBearer(_) => 3,
         }
     }
 
@@ -317,6 +335,9 @@ pub(crate) mod wire {
         match (code, agent) {
             (OIDC, None) => Ok(AuthMethod::Oidc),
             (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
+            (3, Some(account)) => Ok(AuthMethod::ServiceAccountBearer(
+                crate::ServiceAccountId::from_bytes(*account.as_bytes()),
+            )),
             (OIDC, Some(_)) => Err("an OIDC actor carries no agent id under key 5"),
             (AGENT_SIGNATURE, None) => {
                 Err("an agent-signature actor carries the agent's id under key 5")

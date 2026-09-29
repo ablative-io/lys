@@ -10,7 +10,7 @@
 use lys_core::merkle::{InclusionProof, RootHash, raw_leaf_hash, verify_inclusion_raw};
 
 use super::error::GrantError;
-use super::events::{GRANT_EVENT_VERSION, SignedGrantEvent, change_kind, verify_grant_event};
+use super::events::{SignedGrantEvent, change_kind, verify_grant_event};
 use super::types::GrantId;
 use crate::id::IdentityId;
 use crate::log::Coordinate;
@@ -40,7 +40,7 @@ impl GrantReceipt {
     pub fn of(signed: &SignedGrantEvent, coordinate: Coordinate) -> Self {
         let event = signed.event();
         Self {
-            version: GRANT_EVENT_VERSION,
+            version: event.version(),
             operation: event.operation(),
             caller: event.caller(),
             grant: event.grant(),

@@ -199,7 +199,7 @@ async fn every_person(
                     let agents = grouped.remove(person).unwrap_or_default();
                     Some(person_view(*person, record, agents))
                 }
-                IdentityId::Agent(_) => None,
+                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => None,
             })
             .collect();
         Ok(Json(PeopleView {

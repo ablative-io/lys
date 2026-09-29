@@ -178,6 +178,7 @@ pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResul
     write_providers_key(config)?;
     provider_key(config)?;
     service_key(layout)?;
+    super::import::prepare_credential(layout)?;
     Ok(())
 }
 

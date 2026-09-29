@@ -35,7 +35,7 @@ use serde::Deserialize;
 
 use crate::error::ServerError;
 use crate::grant_sight::is_root;
-use crate::grants::{Judged, caller, with_grants};
+use crate::grants::{Judged, with_grants};
 use crate::read_api::{person_record, person_summary};
 use crate::requests_store::{Asked, Decided, RequestStore};
 use crate::requests_views::{DecisionView, RequestList, RequestView};
@@ -293,7 +293,7 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<RequestList>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let at = now();
         with_requests(&state, |store| {
             let mut requests = Vec::new();
@@ -315,12 +315,12 @@ async fn ask(
     body: Result<Json<AskBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
         let at = now();
         let responsible = match caller {
             IdentityId::Person(person) => Some(person),
-            IdentityId::Agent(_) => judged
+            IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => judged
                 .directory
                 .record(caller)
                 .and_then(lys_identity::projection::Record::responsible),
