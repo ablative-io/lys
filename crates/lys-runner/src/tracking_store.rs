@@ -352,6 +352,9 @@ impl Feed {
     /// it; where the last whole line that reads ends; and, when a whole line
     /// does not read, why.
     fn lines(&self, from: u64, to: u64) -> Result<Lines, RunnerError> {
+        if from >= to {
+            return Ok((Vec::new(), from, None));
+        }
         let mut file = fs::File::open(&self.path).map_err(failed)?;
         file.seek(SeekFrom::Start(from)).map_err(failed)?;
         let mut reader = BufReader::new(file.take(to.saturating_sub(from)));
