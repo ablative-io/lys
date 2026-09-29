@@ -21,14 +21,15 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use lys_home::harness::launch_fields::DeclaredHarness;
 use lys_identity::{AgentId, IdentityId, OperationId};
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
+use crate::launch_permissions::{Permissions, checked};
 use crate::provisioning_store::{
-    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, Version,
+    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, SkillPin, Version,
 };
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -63,6 +64,13 @@ pub struct VersionView {
     pub instructions: String,
     /// Why this version was set.
     pub note: String,
+    /// Each named skill's text as this version was recorded with it.
+    pub skill_pins: Vec<SkillPin>,
+    /// The harness build it is started with, null when none is declared.
+    #[schema(value_type = Option<Object>)]
+    pub harness: Option<DeclaredHarness>,
+    /// The permissions its settings file carries, null when none are set.
+    pub permissions: Option<Permissions>,
     /// The person who set it.
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
@@ -129,16 +137,22 @@ pub(crate) struct SetBody {
     model_access: Vec<String>,
     tools: Vec<String>,
     skills: Vec<String>,
-    mcp_servers: Vec<McpServer>,
+    mcp_servers: Vec<crate::mcp_record::McpServerBody>,
     instructions: String,
     note: String,
     #[serde(default)]
     session: Option<SessionSettings>,
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    harness: Option<DeclaredHarness>,
+    #[serde(default)]
+    permissions: Option<Permissions>,
 }
 
 /// The provisioning routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(crate::skills_api::routes())
         .route("/agents/{id}/provisioning", get(read).post(set))
         .route("/agents/{id}/provisioning/{version}/review", post(review))
 }
@@ -183,46 +197,52 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
     Ok(kept)
 }
 
-fn servers(given: &[McpServer]) -> Result<Vec<McpServer>, ServerError> {
-    if given.len() > LIST_MAX {
-        return Err(malformed(format!(
-            "mcp_servers holds more than {LIST_MAX} servers"
-        )));
-    }
-    let mut kept: Vec<McpServer> = Vec::new();
-    for server in given {
-        let name = named("mcp_servers", &server.name)?;
-        let url = Url::parse(server.url.trim()).map_err(|error| {
-            malformed(format!(
-                "the URL of MCP server `{name}` does not read: {error}"
-            ))
-        })?;
-        if !matches!(url.scheme(), "http" | "https") {
-            return Err(malformed(format!(
-                "the URL of MCP server `{name}` is not http or https"
-            )));
-        }
-        if kept.iter().any(|other| other.name == name) {
-            return Err(malformed(format!("MCP server `{name}` is named twice")));
-        }
-        kept.push(McpServer {
-            name,
-            url: url.to_string(),
-        });
-    }
-    Ok(kept)
-}
-
-fn settings(body: &SetBody) -> Result<Settings, ServerError> {
-    Ok(Settings {
+fn settings(body: SetBody) -> Result<Settings, ServerError> {
+    let declared = body.harness.map(harness).transpose()?;
+    let permissions = body
+        .permissions
+        .map(|given| {
+            let contract = declared
+                .as_ref()
+                .ok_or_else(|| malformed("permissions require harness.description.permissions"))?;
+            checked(given, &contract.description.permissions)
+        })
+        .transpose()?;
+    let settings = Settings {
         model_access: names("model_access", &body.model_access)?,
         tools: names("tools", &body.tools)?,
         skills: names("skills", &body.skills)?,
-        mcp_servers: servers(&body.mcp_servers)?,
+        mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
-    })
+        harness: declared,
+        skill_pins: Vec::new(),
+        permissions,
+    };
+    if let Some(declared) = &settings.harness {
+        crate::launch_fields::models(declared, &settings.model_access)?;
+        crate::launch_fields::mcp(declared, &settings.mcp_servers)?;
+    }
+    Ok(settings)
+}
+
+/// The declared build, refused when its program is not an absolute path or
+/// it names no package to verify the program against.
+fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
+    if !declared.program.starts_with('/') || declared.program.contains('\0') {
+        return Err(malformed("harness.program is not an absolute path"));
+    }
+    if declared.name.trim().is_empty() {
+        return Err(malformed("harness.name is empty"));
+    }
+    if declared.description.rendering_contract.trim().is_empty() {
+        return Err(malformed("harness.description.rendering_contract is empty"));
+    }
+    if declared.package.trim().is_empty() {
+        return Err(malformed("harness.package names no package"));
+    }
+    Ok(declared)
 }
 
 /// The session settings, each refused by name when a runner could not use it.
@@ -259,6 +279,29 @@ pub(crate) fn with_provisioning<T>(
     act(&mut store)
 }
 
+/// A profile or skill mutation, refused while the previous build may be
+/// restored. Check after taking the store lock, immediately before its write.
+pub(crate) fn write_provisioning<T>(
+    state: &AppState,
+    act: impl FnOnce(&mut ProvisioningStore) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_provisioning(state, |store| {
+        let pending = crate::operator::upgrade_pending(state).map_err(|error| {
+            ServerError::ProvisioningUnavailable {
+                reason: format!("the provisioning writer cannot read the upgrade intent: {error}"),
+            }
+        })?;
+        if pending {
+            return Err(ServerError::ProvisioningUnavailable {
+                reason:
+                    "upgrade_pending: provisioning cannot change while the upgrade is reversible"
+                        .to_owned(),
+            });
+        }
+        act(store)
+    })
+}
+
 fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> ProvisioningView {
     let versions = profile.map_or(&[][..], |profile| profile.versions.as_slice());
     ProvisioningView {
@@ -272,6 +315,9 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
             mcp_servers: version.settings.mcp_servers.clone(),
             instructions: version.settings.instructions.clone(),
             note: version.settings.note.clone(),
+            skill_pins: version.settings.skill_pins.clone(),
+            harness: version.settings.harness.clone(),
+            permissions: version.settings.permissions.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
             reviewed_by: version.reviewed.as_ref().map(|review| review.by.clone()),
@@ -321,18 +367,24 @@ async fn set(
         if directory.record(IdentityId::Agent(agent)).is_none() {
             return Err(ServerError::AgentNotVisible);
         }
+        let from_version = body.from_version;
         let version = Version {
             number: 0,
             operation: OperationId::from_str(&body.operation)?.to_string(),
-            settings: settings(&body)?,
+            settings: settings(body)?,
             set_by: own_person(directory, &actor)?.to_string(),
             set_at: now(),
             reviewed: None,
         };
         let agent = agent.to_string();
-        with_provisioning(&state, |store| {
+        write_provisioning(&state, |store| {
             let operation = version.operation.clone();
-            let version = store.set(&agent, body.from_version, version)?;
+            let mut version = version;
+            version.settings.skill_pins = match store.pins_for(&version.operation) {
+                Some(recorded) => recorded,
+                None => store.pins(&version.settings.skills)?,
+            };
+            let version = store.set(&agent, from_version, version)?;
             let recorded = Recorded { operation, version };
             Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))
         })
@@ -373,7 +425,7 @@ async fn review(
             at: now(),
         };
         let agent = agent.to_string();
-        with_provisioning(&state, |store| {
+        write_provisioning(&state, |store| {
             store.review(&agent, number, review)?;
             let recorded = store
                 .profile(&agent)

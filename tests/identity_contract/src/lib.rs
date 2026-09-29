@@ -1,5 +1,6 @@
 //! Shared support for the directory's contract tests.
 
+pub mod app_custody;
 pub mod apps;
 pub mod fake_issuer;
 pub mod fake_rauthy;

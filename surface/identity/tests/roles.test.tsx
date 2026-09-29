@@ -103,7 +103,7 @@ describe('Roles on identity screens', () => {
     const { posted } = await mount('#/people', routes);
     const row = document.querySelector('[data-href="#/file/' + SCRIBE + '"]');
     expect(row?.textContent).toContain('Reviewer · v1');
-    expect(posted.every((call) => call.path === '/grants/who')).toBe(true);
+    expect(posted.map((call) => call.path)).toEqual(['/grants/reach']);
   });
   it('keeps ended assignments in history without representing them as current', async () => {
     await mount('#/file/' + SCRIBE, { ...routes, '/roles': ok({ roles: [{ ...role, holders: [{ ...holder, state: 'ended', ended_at: 1790000099 }] }] }) });

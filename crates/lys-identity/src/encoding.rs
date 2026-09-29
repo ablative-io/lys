@@ -150,8 +150,11 @@ fn change(out: &mut Vec<u8>, value: &Change) {
 /// signed the request. An OIDC actor is written as it always was.
 fn actor(out: &mut Vec<u8>, value: &Actor) {
     let provenance = value.provenance();
-    let agent = provenance.agent();
-    map(out, if agent.is_some() { 5 } else { 4 });
+    let principal = provenance
+        .agent()
+        .map(|id| *id.as_bytes())
+        .or_else(|| provenance.service_account().map(|id| *id.as_bytes()));
+    map(out, if principal.is_some() { 5 } else { 4 });
     uint(out, 1);
     text(out, value.binding().issuer());
     uint(out, 2);
@@ -160,9 +163,9 @@ fn actor(out: &mut Vec<u8>, value: &Actor) {
     uint(out, wire::method(provenance.method()));
     uint(out, 4);
     uint(out, provenance.authenticated_at());
-    if let Some(agent) = agent {
+    if let Some(principal) = principal {
         uint(out, 5);
-        bytes(out, agent.as_bytes());
+        bytes(out, &principal);
     }
 }
 
@@ -171,7 +174,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 7);
     uint(&mut out, 1);
-    uint(&mut out, EVENT_VERSION);
+    uint(&mut out, event.version());
     uint(&mut out, 2);
     bytes(&mut out, event.operation().as_bytes());
     uint(&mut out, 3);
@@ -182,6 +185,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
     let (kind, id) = match event.identity() {
         IdentityId::Person(id) => (wire::PERSON, *id.as_bytes()),
         IdentityId::Agent(id) => (wire::AGENT, *id.as_bytes()),
+        IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
     };
     uint(&mut out, kind);
     uint(&mut out, 2);
@@ -338,18 +342,27 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
 }
 
 /// The actor an actor's map names: keys 1 to 4, and the agent's id under key
-/// 5 when, and only when, the method is an agent's signature.
-fn decode_actor(value: Value) -> Result<Actor, IdentityError> {
-    const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names an agent";
+/// 5 for an agent signature or service-account bearer. Code 3 without key 5
+/// is the operator; code 3 with a 16-byte key 5 is a service account.
+fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
+    const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names a principal";
     let named = matches!(&value, Value::Map(pairs) if pairs.len() == 5);
     let ([issuer, subject, method, authenticated_at], agent) = if named {
         let [issuer, subject, method, authenticated_at, agent] = fields::<5>(value, SHAPE)?;
-        let agent = AgentId::from_bytes(as_id(agent, "a signing agent's id is 16 bytes")?);
+        let agent = AgentId::from_bytes(as_id(
+            agent,
+            "actor key 5 must hold a 16-byte principal id",
+        )?);
         ([issuer, subject, method, authenticated_at], Some(agent))
     } else {
         (fields::<4>(value, SHAPE)?, None)
     };
     let code = as_uint(&method, "an authentication method is a code")?;
+    if code == wire::OPERATOR_OR_SERVICE_ACCOUNT && version == EVENT_VERSION && named {
+        return Err(malformed(
+            "an operator actor carries no principal id under key 5",
+        ));
+    }
     let method = wire::method_from(code, agent).map_err(malformed)?;
     Ok(Actor::new(
         LoginBinding::new(
@@ -371,12 +384,21 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
         && let Some((_, version)) = pairs.first()
     {
         let version = as_uint(version, SHAPE)?;
-        if version != EVENT_VERSION {
+        if version != EVENT_VERSION && version != 2 {
             return Err(IdentityError::VersionUnsupported { version });
         }
     }
-    let [_, operation, actor, identity, recorded_at, kind, change] = fields::<7>(value, SHAPE)?;
-    let actor = decode_actor(actor)?;
+    let [
+        version,
+        operation,
+        actor,
+        identity,
+        recorded_at,
+        kind,
+        change,
+    ] = fields::<7>(value, SHAPE)?;
+    let version = as_uint(&version, SHAPE)?;
+    let actor = decode_actor(actor, version)?;
     let [identity_kind, identity_id] =
         fields::<2>(identity, "an identity is a map of keys 1 and 2")?;
     let identity_id = as_id(identity_id, "an identity id is 16 bytes")?;
@@ -392,6 +414,11 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
         as_uint(&recorded_at, "a recorded time is seconds")?,
         decode_change(as_uint(&kind, "a change kind is a code")?, change)?,
     )?;
+    if event.version() != version {
+        return Err(malformed(
+            "event version does not match actor authentication method",
+        ));
+    }
     if encode_body(&event) != body {
         return Err(IdentityError::EventNotCanonical);
     }

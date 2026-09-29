@@ -2,7 +2,8 @@
 //! the home by its SHA-256, that names how a session becomes a running
 //! Claude Code session. Its schema is `docs/design/home/launch-template.schema.json`
 //! and this parser accepts exactly that shape: `harness`, `flags` and the
-//! five `slots` (`transcript`, `mcp`, `env`, `secrets`, `instructions`).
+//! five `slots` (`transcript`, `mcp`, `env`, `secrets`, `instructions`),
+//! with `skills` and `permissions` when it carries them.
 //!
 //! Nothing in a template is interpreted, expanded or executed here. A slot
 //! outside the five is refused by name, a missing slot is refused by name, a
@@ -17,12 +18,15 @@ use serde_json::{Map, Value};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
+use crate::harness::skills::{SkillFile, check};
 use crate::record::blocks::Hash;
 
 /// The one way this harness fills the transcript slot.
 pub const FILL_RESUME_BY_PATH: &str = "resume-by-path";
 /// The five slots, in the schema's order.
 pub const SLOTS: [&str; 5] = ["transcript", "mcp", "env", "secrets", "instructions"];
+/// The slots a template may carry beyond those it must.
+pub const OPTIONAL_SLOTS: [&str; 2] = ["skills", "permissions"];
 /// The three members of a template.
 pub const MEMBERS: [&str; 3] = ["harness", "flags", "slots"];
 /// The most characters of a refused value an error repeats.
@@ -54,6 +58,10 @@ pub struct Template {
     pub use_only: Vec<SecretRef>,
     /// The text appended to the system prompt.
     pub instructions: String,
+    /// The kept skills written into the session's config directory.
+    pub skills: Vec<SkillFile>,
+    /// The permissions the settings file carries, when the template sets them.
+    pub permissions: Option<Map<String, Value>>,
 }
 
 /// Read a template file and parse it, returning the template and the bytes
@@ -87,7 +95,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         return Err(shape("slots", "must be an object"));
     };
     for key in slots.keys() {
-        if !SLOTS.contains(&key.as_str()) {
+        if !SLOTS.contains(&key.as_str()) && !OPTIONAL_SLOTS.contains(&key.as_str()) {
             return Err(HomeError::UnknownSlot { slot: key.clone() });
         }
     }
@@ -114,6 +122,21 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
     let Value::String(instructions) = &slots["instructions"] else {
         return Err(shape("slots.instructions", "must be a string"));
     };
+    let skills = match slots.get("skills") {
+        None => Vec::new(),
+        Some(given) => {
+            let skills: Vec<SkillFile> =
+                serde_json::from_value(given.clone()).map_err(|source| HomeError::Json {
+                    context: "slots.skills is not a list of kept skills",
+                    source,
+                })?;
+            for skill in &skills {
+                check(skill)?;
+            }
+            skills
+        }
+    };
+    let permissions = slots.get("permissions").map(permissions).transpose()?;
     let mut named: BTreeSet<&str> = env.keys().map(String::as_str).collect();
     for secret in use_only.iter().chain(readable.iter()) {
         if !named.insert(secret.env.as_str()) {
@@ -130,7 +153,35 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         env,
         use_only,
         instructions: instructions.clone(),
+        skills,
+        permissions,
     })
+}
+
+/// The permissions slot: the rule lists, the directories and the mode the
+/// settings file's `permissions` takes, and nothing else.
+fn permissions(value: &Value) -> Result<Map<String, Value>, HomeError> {
+    let Value::Object(slot) = value else {
+        return Err(shape("slots.permissions", "must be an object"));
+    };
+    for (key, member) in slot {
+        match key.as_str() {
+            "allow" | "deny" | "ask" | "additionalDirectories" => {
+                string_list(&format!("slots.permissions.{key}"), member)?;
+            }
+            "defaultMode" if member.is_string() => {}
+            "defaultMode" => {
+                return Err(shape("slots.permissions.defaultMode", "must be a string"));
+            }
+            _ => {
+                return Err(shape(
+                    &format!("slots.permissions.{key}"),
+                    "is not a member of the settings file's permissions",
+                ));
+            }
+        }
+    }
+    Ok(slot.clone())
 }
 
 fn shape(field: &str, reason: &'static str) -> HomeError {

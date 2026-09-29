@@ -54,7 +54,22 @@ pub fn op() -> Result<String, Box<dyn Error>> {
 
 /// The service with the administrator's person and Bea seeded.
 pub async fn seeded() -> Result<(Service, Seeded), Box<dyn Error>> {
-    Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await
+    let broker = crate::app_custody::start().await?;
+    Service::start_adjusted(
+        crate::harness::GRANT_MODEL,
+        None,
+        None,
+        None,
+        move |config| {
+            config.secrets = Some(lys_identity_server::secrets_api::SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
+        },
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
+    )
+    .await
 }
 
 /// Send `method` to `path` with `body`, authenticated as `auth`.
@@ -193,10 +208,10 @@ pub async fn registered(
 ) -> Result<String, Box<dyn Error>> {
     register(service, admin, app).await?;
     let approval = approve(service, admin, app).await?;
-    Ok(approval["client"]["credential"]
-        .as_str()
-        .ok_or("the approval answered no credential")?
-        .to_owned())
+    if approval["credentials"]["app"] != app || !approval["client"].is_null() {
+        return Err("approval did not confirm fixture broker custody".into());
+    }
+    Ok(crate::app_custody::credential(app))
 }
 
 /// A root grant of `relation` on `kind:id` to `holder`, as the administrator.

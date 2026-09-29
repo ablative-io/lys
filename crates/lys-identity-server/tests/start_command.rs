@@ -2,6 +2,9 @@
 //! kept profile for a chosen machine, names the agent and its handle ids and
 //! never a credential's value, is never run, and each refusal is by name.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -112,10 +115,17 @@ impl Table {
     }
 
     async fn profile(&self) -> TestResult {
+        let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
+        let (status, kept) = self
+            .service
+            .post("/skills", Some(&self.ada), &skill)
+            .await?;
+        assert_eq!(status, 200, "{kept}");
         let body = json!({
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
+            "harness": harness_description::declared(),
             "instructions": "Build what the brief says.", "note": "First setup.",
         });
         let path = format!("/agents/{}/provisioning", self.agent());
@@ -260,9 +270,11 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
     assert_eq!(parsed.use_only[0].handle, "h-live");
     assert_eq!(parsed.env.get("LYS_AGENT"), Some(&agent));
     assert_eq!(parsed.instructions, "Build what the brief says.");
+    assert_eq!(start["left_out"], json!([]));
+    assert_eq!(parsed.skills.len(), 1);
     assert_eq!(
-        start["left_out"],
-        json!(["skills, which no template slot carries: review"])
+        parsed.skills[0].text,
+        "Read the change against its brief.\n"
     );
 
     let (status, again) = table.ask(&agent, &machine, &table.ada).await?;

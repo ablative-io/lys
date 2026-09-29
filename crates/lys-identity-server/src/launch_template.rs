@@ -10,13 +10,14 @@
 
 use std::collections::BTreeSet;
 
-use lys_home::harness::claude_code::HARNESS;
-use lys_home::harness::claude_code::launch::shell_word;
-use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
+use lys_home::harness::rendering::{SecretBinding, render as render_contract, shell_word};
+use lys_home::harness::skills::SkillFile;
+use lys_runner::judge::Policy;
 use serde::Serialize;
-use serde_json::{Map, Value, json};
 
 use crate::error::ServerError;
+use crate::launch_harness::fields;
+use crate::launch_permissions::settings as permissions;
 use crate::provisioning_store::Version;
 
 /// One handle the agent holds, as the start command names it.
@@ -42,18 +43,22 @@ pub struct Start<'a> {
     pub runtime: &'a str,
     /// The profile version it starts from.
     pub version: &'a Version,
+    /// The text of each skill that version pinned.
+    pub skills: &'a [SkillFile],
+    /// The agent's latest Tool policy, when it has one.
+    pub policy: Option<&'a Policy>,
 }
 
 /// A rendered start.
 pub struct Rendered {
+    /// The native template format returned by the home registry.
+    pub harness: String,
     /// The template's bytes, exactly as hashed.
     pub template: String,
     /// The SHA-256 of those bytes, as the home keeps the template by.
     pub template_sha256: String,
     /// The start command, as text.
     pub command: String,
-    /// What of the profile no slot of the template carries.
-    pub left_out: Vec<String>,
 }
 
 /// The variable a handle on `secret` is set in, unique among `taken`.
@@ -79,88 +84,37 @@ pub fn handle_variable(secret: &str, taken: &mut BTreeSet<String>) -> String {
     name
 }
 
-fn flags(version: &Version) -> Vec<String> {
-    let settings = &version.settings;
-    let mut flags = Vec::new();
-    if let Some(model) = settings.model_access.first() {
-        flags.push("--model".to_owned());
-        flags.push(model.clone());
-    }
-    if !settings.tools.is_empty() {
-        flags.push("--allowedTools".to_owned());
-        flags.push(settings.tools.join(","));
-    }
-    flags
-}
-
-fn left_out(version: &Version) -> Vec<String> {
-    let settings = &version.settings;
-    let mut left = Vec::new();
-    if settings.model_access.len() > 1 {
-        left.push(format!(
-            "model_access after the first: {}",
-            settings
-                .model_access
-                .iter()
-                .skip(1)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-    if !settings.skills.is_empty() {
-        left.push(format!(
-            "skills, which no template slot carries: {}",
-            settings.skills.join(", ")
-        ));
-    }
-    left
-}
-
-fn template(start: &Start<'_>, handles: &[HandleName]) -> Value {
-    let settings = &start.version.settings;
-    let mut servers = Map::new();
-    for server in &settings.mcp_servers {
-        servers.insert(
-            server.name.clone(),
-            json!({ "type": "http", "url": server.url }),
-        );
-    }
-    json!({
-        "harness": HARNESS,
-        "flags": flags(start.version),
-        "slots": {
-            "transcript": { "fill": FILL_RESUME_BY_PATH, "canon": null },
-            "mcp": { "mcpServers": servers },
-            "env": {
-                "LYS_AGENT": start.agent,
-                "LYS_SESSION": start.session,
-                "LYS_MACHINE": start.machine,
-                "LYS_PROVISIONING_VERSION": start.version.number.to_string(),
-            },
-            "secrets": {
-                "use_only": handles
-                    .iter()
-                    .map(|handle| json!({ "env": handle.env, "handle": handle.id }))
-                    .collect::<Vec<_>>(),
-                "readable": [],
-                "reader": "",
-            },
-            "instructions": settings.instructions,
-        },
-    })
-}
-
 /// Render `start` with the agent's `handles`: the template the home checks
 /// and keeps by hash, and the command a machine's runtime is given.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
-    let bytes = serde_json::to_vec_pretty(&template(start, handles))
-        .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;
-    let parsed = parse_template(&bytes).map_err(|error| unrenderable(error.to_string()))?;
-    let template = String::from_utf8(bytes)
-        .map_err(|error| unrenderable(format!("the template is not text: {error}")))?;
-    let template_sha256 = parsed.hash.as_str().to_owned();
+    let fields = fields(start, handles)?;
+    let settings = &start.version.settings;
+    let granted = permissions(
+        settings.permissions.as_ref(),
+        &settings.tools,
+        start.policy,
+        &fields.harness.description.permissions,
+    )?;
+    let held: Vec<SecretBinding> = handles
+        .iter()
+        .map(|handle| SecretBinding {
+            env: handle.env.clone(),
+            handle: handle.id.clone(),
+        })
+        .collect();
+    let rendered = render_contract(&fields, start.skills, &granted, &held).map_err(|error| {
+        if error.member == "permissions" {
+            ServerError::PolicyUnrepresentable {
+                rule: "permissions".to_owned(),
+                reason: error.to_string(),
+            }
+        } else {
+            unrenderable(error.to_string())
+        }
+    })?;
+    let template = rendered.text;
+    let template_sha256 = rendered.sha256;
     let handle_ids: Vec<&str> = handles.iter().map(|handle| handle.id.as_str()).collect();
     let words = [
         "env".to_owned(),
@@ -177,9 +131,9 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
         .collect::<Vec<_>>()
         .join(" ");
     Ok(Rendered {
+        harness: rendered.harness,
         template,
         template_sha256,
         command,
-        left_out: left_out(start.version),
     })
 }

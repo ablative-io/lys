@@ -140,7 +140,7 @@ pub(crate) fn person_record(projection: &Projection, id: PersonId) -> Result<&Re
 pub(crate) fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, ServerError> {
     match crate::caller_admission::active_caller(projection, actor)? {
         IdentityId::Person(person) => Ok(person),
-        IdentityId::Agent(_) => Err(ServerError::NoPerson),
+        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => Err(ServerError::NoPerson),
     }
 }
 
@@ -200,7 +200,7 @@ async fn every_person(
                     let agents = grouped.remove(person).unwrap_or_default();
                     Some(person_view(*person, record, agents))
                 }
-                IdentityId::Agent(_) => None,
+                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => None,
             })
             .collect();
         Ok(Json(PeopleView {

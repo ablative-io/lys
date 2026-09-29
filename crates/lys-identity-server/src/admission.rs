@@ -77,6 +77,11 @@ impl Admission {
 
     /// Admit `actor` as the administrator, or refuse by name.
     pub fn administrator(&self, actor: &Actor) -> Result<(), ServerError> {
+        if actor.provenance().service_account().is_some() {
+            return Err(ServerError::NotAdmitted {
+                reason: "a service account is not its owner's administrator sign-in",
+            });
+        }
         match self.administrator_login() {
             Some(login) if actor.binding() == &login => Ok(()),
             Some(_) => Err(ServerError::NotAdmitted {

@@ -223,6 +223,7 @@ fn test_sources() -> Result<String, Box<dyn Error>> {
     let mut text = String::new();
     for dir in [
         root.join("tests"),
+        root.join("tests/shared"),
         root.join("../../tests/identity_contract/tests"),
     ] {
         for entry in std::fs::read_dir(&dir)? {

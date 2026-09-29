@@ -65,17 +65,20 @@ pub enum CannotGiveReason {
     PeopleOnly,
     /// The grant may be passed on only to agents, and the recipient is a person.
     AgentsOnly,
+    /// The grant does not permit this recipient kind.
+    RecipientKindExcluded,
 }
 
 impl CannotGiveReason {
     /// Every reason, in precedence order.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::SignInIdentity,
         Self::AboveWhatYouHold,
         Self::LentToYou,
         Self::UseOnly,
         Self::PeopleOnly,
         Self::AgentsOnly,
+        Self::RecipientKindExcluded,
     ];
 
     /// The reason's name, as the answer spells it.
@@ -87,10 +90,11 @@ impl CannotGiveReason {
             Self::UseOnly => "use_only",
             Self::PeopleOnly => "people_only",
             Self::AgentsOnly => "agents_only",
+            Self::RecipientKindExcluded => "recipient_kind_excluded",
         }
     }
 
-    /// The reason `name` spells, or none when it is not one of the six.
+    /// The reason `name` spells, or none when it is not one of the seven.
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|reason| reason.name() == name)
     }
@@ -168,9 +172,12 @@ pub fn grant_reason(grant: &Grant, kind: RecipientKind) -> Option<CannotGiveReas
             }
         }
         PassOn::To { recipients, .. } if !recipients.contains(&kind) => {
-            applicable.insert(match kind {
-                RecipientKind::Agent => CannotGiveReason::PeopleOnly,
-                RecipientKind::Person => CannotGiveReason::AgentsOnly,
+            applicable.insert(if recipients == &BTreeSet::from([RecipientKind::Person]) {
+                CannotGiveReason::PeopleOnly
+            } else if recipients == &BTreeSet::from([RecipientKind::Agent]) {
+                CannotGiveReason::AgentsOnly
+            } else {
+                CannotGiveReason::RecipientKindExcluded
             });
         }
         PassOn::To { .. } => {}
@@ -248,7 +255,7 @@ pub fn cannot_give(
             });
         }
     }
-    if kind == RecipientKind::Agent {
+    if kind != RecipientKind::Person {
         list.push(CannotGiveItem {
             subject: CannotGiveSubject::SignInIdentity,
             reason: CannotGiveReason::SignInIdentity,

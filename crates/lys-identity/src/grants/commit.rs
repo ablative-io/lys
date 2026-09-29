@@ -129,21 +129,30 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// Project every committed event the relationships do not yet reflect, in
     /// log order, answering the revision they stand at. What each event did
-    /// is read from the book, never from the log.
+    /// is read from the book, never from the log. An engine that takes a
+    /// write and does not move past the revision it stood at is refused by
+    /// name rather than written to again.
     pub fn project(&mut self) -> Result<u64, GrantError> {
-        let from = self.relationships.revision()?;
-        if from >= self.folded {
-            return Ok(from);
+        let mut revision = self.relationships.revision()?;
+        if revision >= self.folded {
+            return Ok(revision);
         }
-        let changes = self.book.changes_from(from);
-        loop {
-            let revision = self.relationships.revision()?;
-            if revision >= self.folded {
-                return Ok(revision);
-            }
+        let changes = self.book.changes_from(revision);
+        while revision < self.folded {
             let (touch, delete) = self.delta(revision, &changes)?;
             self.relationships.write(revision + 1, &touch, &delete)?;
+            let moved = self.relationships.revision()?;
+            if moved <= revision {
+                return Err(GrantError::PermissionEngineUnavailable {
+                    reason: format!(
+                        "the permission engine took the write for revision {} and did not move from revision {revision}",
+                        revision + 1
+                    ),
+                });
+            }
+            revision = moved;
         }
+        Ok(revision)
     }
 
     /// The event an operation recorded and its receipt, if it recorded one,

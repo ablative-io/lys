@@ -10,6 +10,9 @@
 //! the runner holds that digest. Every wait ends on an
 //! answer, never a clock.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
@@ -126,6 +129,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
+            "harness": harness_description::declared(),
         });
         self.ok(&path, &body).await?;
         self.ok(
@@ -204,7 +208,7 @@ async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> Te
 #[tokio::test(flavor = "multi_thread")]
 async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -> TestResult {
     let table = Table::set().await?;
-    let rule = json!({ "id": "no-denied-writes", "tool": "Write", "kind": "path_prefix",
+    let rule = json!({ "id": "no-denied-writes", "tool": "Edit", "kind": "path_prefix",
                        "target": "/probe/denied", "authority": "hard" });
     let kept = table
         .ok(

@@ -389,6 +389,7 @@ impl Service {
             log_dir: dir.path().join("log"),
             log_origin: ORIGIN.to_owned(),
             event_key_file: dir.path().join("service.key"),
+            import_credential_file: None,
             issuer: issuer.issuer().to_owned(),
             client_id: CLIENT_ID.to_owned(),
             client_secret_file: dir.path().join("client.secret"),
@@ -465,6 +466,16 @@ impl Service {
         self.server = server;
         self.client = client;
         Ok(())
+    }
+
+    /// Restart an existing installation with the configuration an upgrade
+    /// writes, retaining every durable log and credential.
+    pub async fn restart_adjusted(
+        &mut self,
+        adjust: impl FnOnce(&mut Config),
+    ) -> Result<(), Box<dyn Error>> {
+        adjust(&mut self.config);
+        self.restart().await
     }
 
     /// Begin a sign-in through a sign-in provider and let it answer as

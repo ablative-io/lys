@@ -139,6 +139,8 @@ impl ServerError {
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
+            | Self::HarnessUndeclared { .. }
+            | Self::McpHandleUnsupported { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }
             | Self::RuntimeReportReused { .. }
@@ -167,6 +169,11 @@ impl ServerError {
             | Self::CodeUsed
             | Self::CodeExpired
             | Self::VerifierWrong
+            | Self::McpCredentialInline { .. }
+            | Self::McpSettingUnrepresentable { .. }
+            | Self::ModelUnrepresentable { .. }
+            | Self::PolicyUnrepresentable { .. }
+            | Self::SkillUnknown { .. }
             | Self::BudgetRefused { .. }
             | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }

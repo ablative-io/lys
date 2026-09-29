@@ -28,8 +28,10 @@ definition person {}
 
 definition agent {}
 
+definition service_account {}
+
 definition grant {
-  relation holder: person | person with unexpired | agent | agent with unexpired
+  relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired
   relation source: grant | person
 }
 ";
@@ -57,6 +59,7 @@ impl ObjectRef {
         let kind = match identity {
             IdentityId::Person(_) => "person",
             IdentityId::Agent(_) => "agent",
+            IdentityId::ServiceAccount(_) => "service_account",
         };
         Self {
             kind: kind.to_owned(),

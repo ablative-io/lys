@@ -25,6 +25,16 @@ use crate::event::IdentityEvent;
 
 /// The content type the protected header names.
 pub const CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v1+cbor";
+/// New envelope for events authenticated by a service account's bearer.
+pub const SERVICE_ACCOUNT_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v2+cbor";
+
+fn content_type(event: &IdentityEvent) -> &'static str {
+    if event.version() == 2 {
+        SERVICE_ACCOUNT_CONTENT_TYPE
+    } else {
+        CONTENT_TYPE
+    }
+}
 
 /// The largest event this directory reads or writes, in bytes.
 pub const MAX_EVENT_BYTES: usize = 64 * 1024;
@@ -34,13 +44,13 @@ const SIGNATURE_LEN: usize = 64;
 const KEY_LEN: usize = 32;
 
 /// The protected header naming `EdDSA`, this envelope's content type and `kid`.
-fn protected_header(kid: &[u8; KEY_LEN]) -> Vec<u8> {
+fn protected_header(kid: &[u8; KEY_LEN], media_type: &str) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 3);
     uint(&mut out, 1);
     head(&mut out, MAJOR_NEGATIVE, 7);
     uint(&mut out, 3);
-    text(&mut out, CONTENT_TYPE);
+    text(&mut out, media_type);
     uint(&mut out, 4);
     bytes(&mut out, kid);
     out
@@ -102,7 +112,7 @@ pub fn sign_event(
     service_key: &Ed25519Identity,
 ) -> Result<SignedEvent, IdentityError> {
     let body = encode_body(&event);
-    let protected = protected_header(&service_key.public_key_bytes());
+    let protected = protected_header(&service_key.public_key_bytes(), content_type(&event));
     let signature = service_key.sign(&sig_structure(&protected, &body));
     let bytes = cose_sign1(&protected, &body, &signature);
     if bytes.len() > MAX_EVENT_BYTES {
@@ -135,7 +145,9 @@ pub fn verify_event(
             reason: "the key id is not a 32-byte Ed25519 public key",
         });
     };
-    if parts.protected != protected_header(&kid) {
+    if parts.protected != protected_header(&kid, CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, SERVICE_ACCOUNT_CONTENT_TYPE)
+    {
         return Err(IdentityError::EventMalformed {
             reason: "the protected header is not the identity-event header",
         });
@@ -154,6 +166,11 @@ pub fn verify_event(
         return Err(IdentityError::SignatureInvalid);
     }
     let event = decode_body(&parts.payload)?;
+    if parts.protected != protected_header(&kid, content_type(&event)) {
+        return Err(malformed(
+            "the identity event body version differs from its envelope",
+        ));
+    }
     if cose_sign1(&parts.protected, &parts.payload, &parts.signature) != message {
         return Err(IdentityError::EventNotCanonical);
     }

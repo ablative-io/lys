@@ -29,7 +29,8 @@ use crate::openapi_types::types;
 use crate::routes::AppState;
 
 /// One entry of the table, answering with every refusal of `refusals`'
-/// sets once.
+/// sets once, and `NotSignedIn` when it has no public door, since
+/// `signed_first.rs` answers that before the route is reached.
 pub(crate) fn route(
     (method, path, summary): (Method, &'static str, &'static str),
     auth: &'static [Auth],
@@ -38,7 +39,8 @@ pub(crate) fn route(
     refusals: &[&'static [&'static str]],
 ) -> Route {
     let mut named: Vec<&'static str> = Vec::new();
-    for name in refusals.iter().copied().flatten() {
+    let signed_first = (!auth.contains(&Auth::Public)).then_some(&["NotSignedIn"][..]);
+    for name in refusals.iter().copied().chain(signed_first).flatten() {
         if !named.contains(name) {
             named.push(name);
         }

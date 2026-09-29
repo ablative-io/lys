@@ -8,6 +8,9 @@
 //! more; an act whose answer cannot be had stays unconfirmed and is asked
 //! again under its own id. Every wait ends on an answer, never a clock.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -139,6 +142,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
+            "harness": harness_description::declared(),
             "instructions": "", "note": "", "session": session,
         });
         self.ok(&path, &body).await?;

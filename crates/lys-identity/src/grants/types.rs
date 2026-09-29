@@ -161,6 +161,8 @@ pub enum RecipientKind {
     Person,
     /// An agent.
     Agent,
+    /// A service account owned by a person.
+    ServiceAccount,
 }
 
 impl RecipientKind {
@@ -169,6 +171,7 @@ impl RecipientKind {
         match identity {
             IdentityId::Person(_) => Self::Person,
             IdentityId::Agent(_) => Self::Agent,
+            IdentityId::ServiceAccount(_) => Self::ServiceAccount,
         }
     }
 }
@@ -178,6 +181,7 @@ impl fmt::Display for RecipientKind {
         f.write_str(match self {
             Self::Person => "person",
             Self::Agent => "agent",
+            Self::ServiceAccount => "service_account",
         })
     }
 }

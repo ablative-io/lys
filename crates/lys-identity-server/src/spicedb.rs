@@ -41,7 +41,14 @@ pub(crate) mod scope;
 /// The line of an environment file that holds the preshared key.
 const KEY_LINE: &str = "SPICEDB_GRPC_PRESHARED_KEY=";
 /// The definitions every schema holds beside the resource kinds.
-const FIXED: [&str; 5] = ["person", "agent", "grant", "lys_revision", "lys_mirror"];
+const FIXED: [&str; 6] = [
+    "person",
+    "agent",
+    "service_account",
+    "grant",
+    "lys_revision",
+    "lys_mirror",
+];
 /// The definitions the mirror's revision is kept in.
 const MIRROR_SCHEMA: &str = "\ndefinition lys_revision {}\n\ndefinition lys_mirror {\n  relation revision: lys_revision\n}\n";
 
@@ -247,7 +254,7 @@ impl SpiceDb {
         let body: String = relations.chain(permissions).collect();
         let kinds = kinds
             .iter()
-            .filter(|kind| !kind.contains('.'))
+            .filter(|kind| !kind.contains('.') && kind.as_str() != "service_account")
             .map(|kind| format!("\ndefinition {kind} {{\n{body}}}\n"));
         let app_kinds = self
             .app_kinds
@@ -257,11 +264,20 @@ impl SpiceDb {
         let apps = app_kinds
             .iter()
             .map(|(kind, model)| app_definition(kind, model, &app_kinds));
-        [SCHEMA.to_owned(), MIRROR_SCHEMA.to_owned()]
-            .into_iter()
-            .chain(kinds)
-            .chain(apps)
-            .collect()
+        // A service account is also an existing resource kind. Keep one
+        // definition with its ordinary resource relations, never emit a
+        // second definition when a grant names an account as a resource.
+        [
+            SCHEMA.replace(
+                "definition service_account {}",
+                &format!("definition service_account {{\n{body}}}"),
+            ),
+            MIRROR_SCHEMA.to_owned(),
+        ]
+        .into_iter()
+        .chain(kinds)
+        .chain(apps)
+        .collect()
     }
 
     /// Hold `kinds` as the approved apps' kinds from now on and write the
@@ -313,7 +329,7 @@ impl SpiceDb {
             .lines()
             .filter_map(|line| line.strip_prefix("definition "))
             .filter_map(|rest| rest.split([' ', '{']).next())
-            .filter(|name| !FIXED.contains(name))
+            .filter(|name| *name == "service_account" || !FIXED.contains(name))
             .map(|name| name.replacen('/', ".", 1))
             .collect())
     }
@@ -532,3 +548,11 @@ impl RelationshipStore for Relationships {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "spicedb_upgrade_tests.rs"]
+mod upgrade_tests;
+
+#[cfg(test)]
+#[path = "spicedb_calls_tests.rs"]
+mod calls_tests;

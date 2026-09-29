@@ -74,6 +74,25 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
                 .collect(),
             body: body.to_vec(),
         });
+    if path == "/_lys/apps/save" || path == "/_lys/apps/prepare" {
+        let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        let owner = parts
+            .headers
+            .get("lys-on-behalf-of")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("missing");
+        let app = asked["app"].as_str().unwrap_or("missing");
+        let prefix = format!("lys-app-{owner}-{app}");
+        let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
+        if path == "/_lys/apps/prepare" {
+            answer["client_secret_sha256"] =
+                json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
+        }
+        if app == "fixture_bad_custody" {
+            answer["client_secret_ref"] = json!("another-app");
+        }
+        return axum::Json(answer).into_response();
+    }
     answer(&path, &body)
 }
 
@@ -105,11 +124,24 @@ struct Setup {
 }
 
 async fn setup() -> Result<Setup, Box<dyn Error>> {
+    setup_with_person(ADA).await
+}
+
+async fn setup_with_person(subject: &str) -> Result<Setup, Box<dyn Error>> {
+    setup_with_broker(subject, true).await
+}
+
+async fn setup_with_broker(subject: &str, running: bool) -> Result<Setup, Box<dyn Error>> {
     let log: Log = Arc::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let app = Router::new().fallback(broker).with_state(Arc::clone(&log));
-    tokio::spawn(async move { axum::serve(listener, app).await });
+    let serving = tokio::spawn(async move { axum::serve(listener, app).await });
+    if !running {
+        serving.abort();
+        let stopped = serving.await;
+        assert!(stopped.is_err_and(|error| error.is_cancelled()));
+    }
     let keys = tempfile::TempDir::new()?;
     let key_file = keys.path().join("secrets-service.key");
     let key = Ed25519Identity::load_or_generate(&key_file)?.public_key_bytes();
@@ -120,7 +152,7 @@ async fn setup() -> Result<Setup, Box<dyn Error>> {
     };
     // The service reads its key once, at start, so the key file may go after.
     let (service, seeded) = Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-        Ok(seed_configured(config, [ADA, BEA])?)
+        Ok(seed_configured(config, [subject, BEA])?)
     })
     .await?;
     drop(keys);
@@ -390,3 +422,6 @@ async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
     assert_eq!(body["refusal"], "SecretsUnavailable");
     Ok(())
 }
+
+#[path = "shared/secrets_custody.rs"]
+mod secrets_custody;

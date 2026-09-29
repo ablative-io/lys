@@ -344,11 +344,77 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// A skill Lys keeps no text for.
+    #[error("SkillUnknown: Lys keeps no skill named `{name}`; keep its text under /skills first")]
+    SkillUnknown {
+        /// The skill.
+        name: String,
+    },
+    /// A permission rule, mode or directory the settings file cannot express.
+    #[error("PolicyUnrepresentable: the settings file cannot express `{rule}`: {reason}")]
+    PolicyUnrepresentable {
+        /// The rule, mode or directory, or the policy rule's id.
+        rule: String,
+        /// Why it cannot.
+        reason: String,
+    },
+    /// A model the declared harness cannot carry.
+    #[error("ModelUnrepresentable: the harness `{harness}` cannot carry model `{model}`: {reason}")]
+    ModelUnrepresentable {
+        /// The declared harness name.
+        harness: String,
+        /// The model.
+        model: String,
+        /// Why it cannot.
+        reason: String,
+    },
+    /// The profile declares no harness build to start.
+    #[error(
+        "HarnessUndeclared: profile version {version} declares no harness build to start; declare the build's name, description, program and package in the profile"
+    )]
+    HarnessUndeclared {
+        /// The profile version.
+        version: u32,
+    },
     /// The launch template the profile renders to is not one the home takes.
     #[error("LaunchUnrenderable: {reason}")]
     LaunchUnrenderable {
         /// What the home refused.
         reason: String,
+    },
+    /// An MCP server's program, argument, setting or address carries a
+    /// credential where only a handle may; the value is never repeated.
+    #[error(
+        "McpCredentialInline: MCP server `{server}` carries a credential in {member}; give the secret as a handle"
+    )]
+    McpCredentialInline {
+        /// The server.
+        server: String,
+        /// Where in it.
+        member: String,
+    },
+    /// An MCP server's setting is not one the launch can carry.
+    #[error("McpSettingUnrepresentable: MCP server `{server}` {member}: {reason}")]
+    McpSettingUnrepresentable {
+        /// The server.
+        server: String,
+        /// Which setting.
+        member: String,
+        /// Why it cannot be carried.
+        reason: String,
+    },
+    /// An MCP server's setting names a secret the agent holds no handle on,
+    /// so nothing could resolve it at start.
+    #[error(
+        "McpHandleUnsupported: MCP server `{server}` {member} names secret `{secret}`, on which the agent holds no handle for the secrets broker to resolve"
+    )]
+    McpHandleUnsupported {
+        /// The server.
+        server: String,
+        /// Which setting.
+        member: String,
+        /// The secret it names.
+        secret: String,
     },
     /// The runtime reports are not configured, or their log could not be read or written.
     #[error("RuntimeUnavailable: {reason}")]

@@ -44,8 +44,10 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::agent_policy_api::with_policies;
 use crate::error::ServerError;
 use crate::grants::caller;
+use crate::launch_harness::skill_files;
 use crate::launch_template::{HandleName, Start, handle_variable, render};
 use crate::network_api::with_network;
 use crate::network_store::{Machine, NetworkStore};
@@ -70,7 +72,7 @@ pub struct StartCommandView {
     /// The profile version it starts from.
     pub provisioning_version: u32,
     /// The harness the template renders for.
-    pub harness: &'static str,
+    pub harness: String,
     /// The handles the command names, by id.
     pub handles: Vec<HandleName>,
     /// The launch template, exactly the bytes its hash is of.
@@ -245,6 +247,11 @@ async fn start_command(
         .as_ref()
         .and_then(|session| session.accounts.clone());
     let handles = handles(&state, &headers, &agent).await?;
+    let skills = with_provisioning(&state, |store| skill_files(store, &version))?;
+    let policy = match state.policies {
+        Some(_) => with_policies(&state, |store| Ok(store.held().latest(&agent).cloned()))?,
+        None => None,
+    };
     let rendered = render(
         &Start {
             agent: &agent,
@@ -252,6 +259,8 @@ async fn start_command(
             machine: &machine,
             runtime: &runtime,
             version: &version,
+            skills: &skills,
+            policy: policy.as_ref(),
         },
         &handles,
     )?;
@@ -261,12 +270,12 @@ async fn start_command(
         runtime,
         session: session.clone(),
         provisioning_version: version.number,
-        harness: lys_home::harness::claude_code::HARNESS,
+        harness: rendered.harness,
         handles,
         template: rendered.template,
         template_sha256: rendered.template_sha256.clone(),
         command: rendered.command,
-        left_out: rendered.left_out,
+        left_out: Vec::new(),
         executed: false,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {
@@ -339,9 +348,15 @@ async fn run(
 }
 
 /// Refuse by name the first host a server of `version` is reached at that
-/// `machine`'s egress list does not name.
+/// `machine`'s egress list does not name. A command server is started on
+/// the machine and reached over its own streams, so it names no host here.
 fn reaches(machine: &Machine, version: &Version) -> Result<(), ServerError> {
-    for server in &version.settings.mcp_servers {
+    for server in version
+        .settings
+        .mcp_servers
+        .iter()
+        .filter(|server| server.command.is_none())
+    {
         let host = url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
             reason: format!(
                 "server `{}` is reached at `{}`, which names no host",

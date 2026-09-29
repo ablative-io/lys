@@ -107,6 +107,9 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
                     .agent_bindings
                     .insert(bound.clone(), agent)
                     .is_some(),
+                IdentityId::ServiceAccount(_) => {
+                    return Err("a service account cannot hold login bindings".to_owned());
+                }
             };
             if taken {
                 return Err(format!("a login is bound twice, the second time to {id}"));

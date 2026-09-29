@@ -29,7 +29,7 @@ pub(crate) fn own_account_person(
 ) -> Result<lys_identity::PersonId, ServerError> {
     match authenticating_caller(directory, actor)? {
         IdentityId::Person(person) => Ok(person),
-        IdentityId::Agent(_) => Err(ServerError::NoPerson),
+        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => Err(ServerError::NoPerson),
     }
 }
 

@@ -1,0 +1,42 @@
+{
+  "delegations": [
+    {
+      "name": "cambium-read",
+      "route": "api",
+      "source": "REPLACE_WITH_SOURCE_GRANT_HELD_BY_LOADER",
+      "recipient": "REPLACE_WITH_ACTIVE_AGENT_ID",
+      "responsible": "@owner",
+      "resource": {
+        "kind": "cambium.workspace",
+        "id": "estate"
+      },
+      "relation": "reader",
+      "pass_on": {
+        "kind": "use_only"
+      },
+      "window": {
+        "starts_at": 0,
+        "ends_at": null
+      }
+    },
+    {
+      "name": "aion-read",
+      "route": "api",
+      "source": "REPLACE_WITH_SOURCE_GRANT_HELD_BY_LOADER",
+      "recipient": "REPLACE_WITH_ACTIVE_AGENT_ID",
+      "responsible": "@owner",
+      "resource": {
+        "kind": "aion.workspace",
+        "id": "estate"
+      },
+      "relation": "reader",
+      "pass_on": {
+        "kind": "use_only"
+      },
+      "window": {
+        "starts_at": 0,
+        "ends_at": null
+      }
+    }
+  ]
+}

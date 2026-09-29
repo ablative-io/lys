@@ -1,0 +1,288 @@
+//! Reconcile a save against the encrypted value, without replacing any entry.
+use crate::{Broker, EntryClass, PermissionCheck, Secret, SecretsError};
+
+impl<P: PermissionCheck> Broker<P> {
+    /// Prepare both app credentials durably, returning only the client digest.
+    /// Reconciliation reuses the sealed client after a partial or lost answer.
+    ///
+    /// # Errors
+    /// Refuses conflicting entries and propagates store/audit failures.
+    pub fn prepare_app(&mut self, app: &str, owner: &str) -> Result<String, SecretsError> {
+        let prefix = format!("lys-app-{owner}-{app}");
+        let client = format!("{prefix}-client");
+        let value = if let Some(entry) = self.store.entry(&client) {
+            if entry.owner != owner || entry.class != EntryClass::Key {
+                return Err(SecretsError::SecretExists { name: client });
+            }
+            self.store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?
+        } else {
+            Secret::new(crate::encoding::hex(&crate::encoding::random_bytes::<32>()?).into_bytes())
+        };
+        self.seal_once(&client, EntryClass::Key, owner, &value)?;
+        let mut credential = zeroize::Zeroizing::new(format!("lys-app.{app}.").into_bytes());
+        credential.extend_from_slice(value.expose());
+        self.seal_once(
+            &format!("{prefix}-api"),
+            EntryClass::Credential,
+            owner,
+            &Secret::from_slice(&credential),
+        )?;
+        Ok(crate::encoding::hex(&crate::encoding::sha256(
+            value.expose(),
+        )))
+    }
+
+    /// Seal a new value, or confirm that this exact owner, class and value
+    /// are already sealed. A conflicting entry is never replaced.
+    ///
+    /// # Errors
+    /// `SecretExists` for a conflicting name, plus store and audit failures.
+    pub fn seal_once(
+        &mut self,
+        name: &str,
+        class: EntryClass,
+        owner: &str,
+        value: &Secret,
+    ) -> Result<bool, SecretsError> {
+        if let Some(entry) = self.store.entry(name) {
+            if entry.owner == owner && entry.class == class {
+                let existing = self.store.open_for_use(&self.store_key, name, class)?;
+                let left = existing.expose();
+                let right = value.expose();
+                let same = left.len() == right.len()
+                    && left.iter().zip(right).fold(0_u8, |d, (a, b)| d | (a ^ b)) == 0;
+                if same {
+                    self.store.confirm_index()?;
+                    // A previous store write may have succeeded before its audit
+                    // append failed. Confirm the save durably before answering.
+                    self.record(
+                        crate::audit::AuditKind::Seal,
+                        (None, Some(owner), Some(name)),
+                        None,
+                        None,
+                        "confirmed",
+                    )?;
+                    return Ok(true);
+                }
+            }
+            return Err(SecretsError::SecretExists {
+                name: name.to_owned(),
+            });
+        }
+        self.seal_record(name, class, owner, value)?;
+        Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{BrokerPaths, LocalGrants};
+
+    #[test]
+    fn same_save_after_restart_preserves_entry_and_conflicts_never_replace_it()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let secret = Secret::from_slice(b"fixture only");
+        assert!(!broker.seal_once("app-key", EntryClass::Key, "person-a", &secret)?);
+        let before = broker.store().entry("app-key").cloned();
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert!(broker.seal_once("app-key", EntryClass::Key, "person-a", &secret)?);
+        assert!(
+            broker
+                .seal_once("app-key", EntryClass::Key, "person-b", &secret)
+                .is_err()
+        );
+        assert!(
+            broker
+                .seal_once("app-key", EntryClass::Credential, "person-a", &secret)
+                .is_err()
+        );
+        assert!(
+            broker
+                .seal_once(
+                    "app-key",
+                    EntryClass::Key,
+                    "person-a",
+                    &Secret::from_slice(b"different")
+                )
+                .is_err()
+        );
+        assert_eq!(broker.store().entry("app-key"), before.as_ref());
+        Ok(())
+    }
+    #[test]
+    fn second_credential_index_failure_retry_survives_reopen()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let client = Secret::from_slice(b"fixture client only");
+        let api = Secret::from_slice(b"fixture api only");
+        broker.seal_once("app-client", EntryClass::Key, "person-a", &client)?;
+        let index = paths.store_dir.join("index.json");
+        let saved_index = paths.store_dir.join("saved-index.json");
+        std::fs::rename(&index, &saved_index)?;
+        // The sealed file is writable, but rename onto this directory must fail.
+        std::fs::create_dir(&index)?;
+        let failed = broker.seal_once("app-api", EntryClass::Credential, "person-a", &api);
+        std::fs::remove_dir(&index)?;
+        std::fs::rename(&saved_index, &index)?;
+        assert!(
+            matches!(failed, Err(SecretsError::Io { .. })),
+            "index rename fault did not fire"
+        );
+        broker.seal_once("app-client", EntryClass::Key, "person-a", &client)?;
+        broker.seal_once("app-api", EntryClass::Credential, "person-a", &api)?;
+        drop(broker);
+        let broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        for (name, class, expected) in [
+            ("app-client", EntryClass::Key, &client),
+            ("app-api", EntryClass::Credential, &api),
+        ] {
+            assert!(
+                broker.store().entry(name).is_some(),
+                "successful retry lost {name} on reopen"
+            );
+            let stored = broker.store.open_for_use(&broker.store_key, name, class)?;
+            assert_eq!(stored.expose(), expected.expose());
+        }
+        Ok(())
+    }
+    #[test]
+    fn prepare_repairs_partial_pair_with_the_same_key_and_digest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let client_name = "lys-app-person-a-fixture-client";
+        let api_name = "lys-app-person-a-fixture-api";
+        let key = Secret::from_slice("ab".repeat(32).as_bytes());
+        // Simulate a completed first write and a lost/failed second write.
+        broker.seal_once(client_name, EntryClass::Key, "person-a", &key)?;
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let digest = broker.prepare_app("fixture", "person-a")?;
+        assert_eq!(
+            digest,
+            crate::encoding::hex(&crate::encoding::sha256(key.expose()))
+        );
+        let client_before = broker.store().entry(client_name).cloned();
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert_eq!(broker.prepare_app("fixture", "person-a")?, digest);
+        assert_eq!(broker.store().entry(client_name), client_before.as_ref());
+        let api = broker
+            .store
+            .open_for_use(&broker.store_key, api_name, EntryClass::Credential)?;
+        assert_eq!(
+            api.expose(),
+            format!("lys-app.fixture.{}", "ab".repeat(32)).as_bytes()
+        );
+        Ok(())
+    }
+    #[test]
+    fn post_rename_sync_failure_preserves_custody_and_refuses_unconfirmed_retry()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let name = "lys-app-person-a-fixture-client";
+        let key = Secret::from_slice("ab".repeat(32).as_bytes());
+        crate::fsutil::sync_fault::arm(&paths.store_dir.join("index.json"), 2);
+        assert!(matches!(
+            broker.seal_once(name, EntryClass::Key, "person-a", &key),
+            Err(SecretsError::IndexUnresolved { .. })
+        ));
+        assert_eq!(
+            crate::fsutil::sync_fault::remaining(),
+            1,
+            "post-rename fault did not fire"
+        );
+        let written = broker
+            .store()
+            .entry(name)
+            .cloned()
+            .ok_or("forgot renamed entry")?;
+        let persisted: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(paths.store_dir.join("index.json"))?)?;
+        assert_eq!(persisted["entries"][name]["id"], written.id);
+        // A second failed directory sync must not be reported as confirmed.
+        assert!(matches!(
+            broker.prepare_app("fixture", "person-a"),
+            Err(SecretsError::IndexUnresolved { .. })
+        ));
+        assert_eq!(
+            crate::fsutil::sync_fault::remaining(),
+            0,
+            "retry did not attempt sync"
+        );
+        let index_path = paths.store_dir.join("index.json");
+        let committed_bytes = std::fs::read(&index_path)?;
+        std::fs::write(&index_path, b"{}")?;
+        assert!(
+            matches!(
+                broker.prepare_app("fixture", "person-a"),
+                Err(SecretsError::IndexUnresolved { .. })
+            ),
+            "a different persisted index cannot confirm held custody"
+        );
+        let mut restored: serde_json::Value = serde_json::from_slice(&committed_bytes)?;
+        restored
+            .as_object_mut()
+            .ok_or("index is not an object")?
+            .remove("scopes");
+        // An older index may omit a default field or use different whitespace.
+        std::fs::write(&index_path, serde_json::to_vec(&restored)?)?;
+        let digest = broker.prepare_app("fixture", "person-a")?;
+        assert_eq!(
+            digest,
+            crate::encoding::hex(&crate::encoding::sha256(key.expose()))
+        );
+        assert_eq!(broker.store().entry(name), Some(&written));
+        broker.seal_once(
+            "unrelated",
+            EntryClass::Key,
+            "person-a",
+            &Secret::from_slice(b"other"),
+        )?;
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert_eq!(broker.store().entry(name), Some(&written));
+        assert_eq!(broker.prepare_app("fixture", "person-a")?, digest);
+        assert!(broker.store().entry("unrelated").is_some());
+        Ok(())
+    }
+}

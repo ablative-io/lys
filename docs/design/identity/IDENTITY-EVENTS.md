@@ -27,9 +27,9 @@ A canonical CBOR map (RFC 8949 section 4.2: shortest heads, definite lengths, ke
 
 | Key | Field | Value |
 | --- | --- | --- |
-| 1 | version | `1` |
+| 1 | version | `1`; service-account bearer events use `2` |
 | 2 | operation | the caller's operation id, 16 bytes |
-| 3 | actor | map: `1` issuer (text), `2` subject (text), `3` method (`1` OIDC, `2` agent signature), `4` authenticated-at (seconds since the Unix epoch), `5` the signing agent's id (16 bytes), present when the method is `2` and never otherwise |
+| 3 | actor | map: `1` issuer (text), `2` subject (text), `3` method (`1` OIDC, `2` agent signature, `3` operator or service-account bearer), `4` authenticated-at (seconds since the Unix epoch), `5` the principal id (16 bytes), present for an agent signature or service-account bearer and absent for OIDC or operator; see the closed code-3 rule below |
 | 4 | identity | map: `1` kind (`1` person, `2` agent), `2` id (16 bytes) |
 | 5 | recorded-at | seconds since the Unix epoch, by the service's clock |
 | 6 | change kind | a code from the table below |
@@ -100,7 +100,7 @@ A canonical CBOR map with keys 1 to 12, every key present:
 
 | Key | Field | Value |
 | --- | --- | --- |
-| 1 | version | `1` |
+| 1 | version | `1`; service-account bearer events use `2` |
 | 2 | launch record id | text: `launch-` and 32 lowercase hex digits from the secure random source |
 | 3 | agent | text: the enduring agent id |
 | 4 | machine | text: the machine's identifier |
@@ -124,3 +124,9 @@ A message is refused unless it is the exact canonical message over its three par
 ### What reads them
 
 A launch record's state is derived and never kept: running when the sessions record (the sessions brief of run d5055cc1, drafted as DIRECTORY-015) holds a verified `lys/session-start/v1` report, signed with the agent's own key, whose agent id and launch record id equal the record's; unconfirmed while no such report exists and no withdrawal names it; withdrawn when a withdrawal names it and no such report exists. The ruling that report rests on: the sessions brief adds the launch record id to `lys/session-start/v1` before its tag freezes, so its signed message holds five things, the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge; this card does not define that message.
+
+## Historical authentication code 3 (29 September 2026)
+
+Code 3 is closed. In the actor map, method 3 with no key 5 means the install operator. Method 3 with key 5 holding exactly 16 bytes means the service-account bearer identified by those bytes. Neither shape is renumbered. Every other key-5 shape is refused; there is no fallback between methods. A future authentication method requires a fresh code.
+
+Operator events retain the v1 body and signed envelope. Service-account bearer events written by build `1b568cd90578f5ed5d7d438e628b23724eef7f12` retain their v2 body and signed envelope. Canonical re-encoding and the signed content type must agree with the decoded method. An operator write is refused while the reversible upgrade intent exists, because the previous binary cannot read that form.

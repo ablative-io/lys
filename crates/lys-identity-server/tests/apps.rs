@@ -81,7 +81,7 @@ async fn a_pending_app_has_no_client_and_its_kinds_answer_app_not_approved() -> 
 }
 
 #[tokio::test]
-async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_check_pass()
+async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_check_pass()
 -> TestResult {
     let (service, seeded) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -93,21 +93,17 @@ async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_che
     let approval = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(approval["app"]["state"], "approved", "{approval}");
     assert_eq!(approval["app"]["version"], 1);
-    let secret = approval["client"]["client_secret"]
-        .as_str()
-        .ok_or("no secret")?
-        .to_owned();
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?
-        .to_owned();
-    assert_eq!(secret.len(), 64);
+    assert!(approval["client"].is_null());
+    assert_eq!(approval["credentials"]["app"], NOTES);
+    let secret = identity_contract::app_custody::secret();
+    let credential = identity_contract::app_custody::credential(NOTES);
+    assert!(!approval.to_string().contains(&secret));
 
     let again = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(
         again["client"],
         Value::Null,
-        "the secret is shown once: {again}"
+        "approval never returns the secret: {again}"
     );
     let other = json!({"operation": op()?});
     refused(
@@ -467,95 +463,5 @@ async fn a_schema_fault_is_refused_at_its_pointer_and_a_bad_redirect_by_name() -
     Ok(())
 }
 
-#[tokio::test]
-async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not() -> TestResult {
-    let (service, _) = seeded().await?;
-    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
-    let account = op()?;
-    let made = json!({"operation": account, "name": "registrar fixture"});
-    ok(post(&service, "/service-accounts", Auth::Cookie(&admin), &made).await?)?;
-    let registrar = json!({"operation": op()?, "service_account": account});
-    let issued = ok(post(
-        &service,
-        "/apps/registrars",
-        Auth::Cookie(&admin),
-        &registrar,
-    )
-    .await?)?;
-    let credential = issued["credential"]
-        .as_str()
-        .ok_or("no credential")?
-        .to_owned();
-
-    let body = registration(NOTES, &workspace_schema(NOTES))?;
-    let pending = ok(post(&service, "/apps", Auth::Bearer(&credential), &body).await?)?;
-    assert_eq!(pending["state"], "pending");
-    assert_eq!(
-        pending["registered_by"]["kind"], "service_account",
-        "{pending}"
-    );
-    assert_eq!(pending["service_account"], account.as_str());
-
-    let mut refusals = 0;
-    let bea = service.sign_in(login(BEA)).await?;
-    let other = registration(FILES, &workspace_schema(FILES))?;
-    refused(
-        &post(&service, "/apps", Auth::Cookie(&bea), &other).await?,
-        403,
-        "NotAdmitted",
-    )?;
-    refusals += 1;
-    let wrong = format!("lys-registrar.{account}.{}", "f".repeat(64));
-    refused(
-        &post(&service, "/apps", Auth::Bearer(&wrong), &other).await?,
-        401,
-        "credential_refused",
-    )?;
-    refusals += 1;
-    let listed = ok(get(&service, "/apps", Auth::Cookie(&bea)).await?)?;
-    let names: Vec<&str> = listed["apps"]
-        .as_array()
-        .ok_or("no apps")?
-        .iter()
-        .filter_map(|app| app["id"].as_str())
-        .collect();
-    assert_eq!(names, vec!["lys"], "a person sees approved apps only");
-    refused(
-        &get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&bea)).await?,
-        404,
-        "app_unknown",
-    )?;
-    refusals += 1;
-    assert_eq!(refusals, 3);
-    Ok(())
-}
-
-#[tokio::test]
-async fn approval_binds_the_service_account_the_registration_names() -> TestResult {
-    let (service, _) = seeded().await?;
-    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
-    let account = op()?;
-    let made = json!({"operation": account, "name": "app fixture"});
-    ok(post(&service, "/service-accounts", Auth::Cookie(&admin), &made).await?)?;
-    let mut body = registration(NOTES, &workspace_schema(NOTES))?;
-    body["service_account"] = json!(account);
-    ok(post(&service, "/apps", Auth::Cookie(&admin), &body).await?)?;
-    let approval = ok(post(
-        &service,
-        &format!("/apps/{NOTES}/approve"),
-        Auth::Cookie(&admin),
-        &json!({"operation": op()?}),
-    )
-    .await?)?;
-    assert_eq!(
-        approval["app"]["service_account"],
-        account.as_str(),
-        "{approval}"
-    );
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?;
-    let me = ok(get(&service, "/apps/me", Auth::Bearer(credential)).await?)?;
-    assert_eq!(me["service_account"], account.as_str());
-    Ok(())
-}
+#[path = "shared/app_registration.rs"]
+mod app_registration;

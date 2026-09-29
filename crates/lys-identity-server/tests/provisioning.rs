@@ -7,6 +7,7 @@ use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
+use lys_home::harness::launch_fields::Channel;
 use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::error::ServerError;
@@ -63,6 +64,9 @@ impl Table {
                 .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
+        let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
+        let (status, kept) = service.post("/skills", Some(&ada), &skill).await?;
+        assert_eq!(status, 200, "{kept}");
         Ok(Self {
             service,
             seeded,
@@ -254,10 +258,15 @@ fn version(operation: &str, note: &str) -> Version {
             mcp_servers: vec![McpServer {
                 name: "cambium".to_owned(),
                 url: "https://cambium.example.test/mcp".to_owned(),
+                command: None,
+                channel: Channel::Off,
             }],
             instructions: String::new(),
             note: note.to_owned(),
             session: None,
+            harness: None,
+            skill_pins: Vec::new(),
+            permissions: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

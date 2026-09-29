@@ -9,7 +9,7 @@ export interface ResourceRef {
   id: string;
 }
 
-export type RecipientKind = 'person' | 'agent';
+export type RecipientKind = 'person' | 'agent' | 'service_account';
 
 /** `pass_on_json` and `PassOnWire`: what a holder may pass on, stated affirmatively. */
 export type PassOn = { kind: 'use_only' } | { kind: 'to'; actions: string[]; recipients: RecipientKind[] };
@@ -165,5 +165,20 @@ export interface WhoAnswer {
 
 /** `PAGE_MAX`. */
 export const PAGE_MAX = 100;
+
+/** POST /grants/reach: `ReachBody`, each resource with the actions asked about it. */
+export interface ReachBody {
+  route: RouteWire;
+  resources: (ResourceRef & { actions: string[] })[];
+}
+
+/** POST /grants/reach answers each resource, in the order asked, with every visible holder and the actions it may take. */
+export interface ReachAnswer {
+  revision: number;
+  resources: (ResourceRef & { holders: { holder: IdentityId; actions: string[] }[] })[];
+}
+
+/** `REACH_MAX`. */
+export const REACH_MAX = 500;
 
 export const resourceText = (r: ResourceRef): string => `${r.kind}:${r.id}`;

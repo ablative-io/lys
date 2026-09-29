@@ -35,6 +35,8 @@ use crate::operation::OperationId;
 
 /// The grant event version this crate writes and reads.
 pub const GRANT_EVENT_VERSION: u64 = 1;
+/// Separate signed envelope for service-account grant events.
+pub const SERVICE_ACCOUNT_ENVELOPE: &str = "application/vnd.lys.grant-event.v2+cbor";
 
 /// The largest grant event written or read, in bytes.
 pub const MAX_GRANT_EVENT_BYTES: usize = 64 * 1024;
@@ -77,6 +79,26 @@ pub struct GrantEvent {
 }
 
 impl GrantEvent {
+    /// Version two adds service-account principals. Events using only the
+    /// original principal and recipient kinds retain their original bytes.
+    pub fn version(&self) -> u64 {
+        use super::types::{PassOn, RecipientKind};
+        let named = matches!(self.caller, IdentityId::ServiceAccount(_))
+            || matches!(&self.change, GrantChange::Issue(grant)
+                if matches!(grant.holder(), IdentityId::ServiceAccount(_))
+                || matches!(grant.pass_on(), PassOn::To { recipients, .. }
+                    if recipients.contains(&RecipientKind::ServiceAccount)));
+        if named { 2 } else { GRANT_EVENT_VERSION }
+    }
+
+    fn content_type(&self) -> &'static str {
+        if self.version() == 2 {
+            SERVICE_ACCOUNT_ENVELOPE
+        } else {
+            GRANT_ENVELOPE
+        }
+    }
+
     /// The event recording `change`, requested by `caller` under `operation`.
     ///
     /// An issued grant names this event's operation as the one that
@@ -168,7 +190,7 @@ pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 6);
     uint(&mut out, 1);
-    uint(&mut out, GRANT_EVENT_VERSION);
+    uint(&mut out, event.version());
     uint(&mut out, 2);
     bytes(&mut out, event.operation.as_bytes());
     uint(&mut out, 3);
@@ -235,7 +257,7 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
         && let Some((_, version)) = pairs.first()
     {
         let version = as_uint(version, SHAPE)?;
-        if version != GRANT_EVENT_VERSION {
+        if version != GRANT_EVENT_VERSION && version != 2 {
             return Err(GrantError::VersionUnsupported { version });
         }
     }
@@ -271,13 +293,13 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
     Ok(event)
 }
 
-fn protected_header(kid: &[u8; KEY_LEN]) -> Vec<u8> {
+fn protected_header(kid: &[u8; KEY_LEN], content_type: &str) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 3);
     uint(&mut out, 1);
     head(&mut out, MAJOR_NEGATIVE, 7);
     uint(&mut out, 3);
-    text(&mut out, GRANT_ENVELOPE);
+    text(&mut out, content_type);
     uint(&mut out, 4);
     bytes(&mut out, kid);
     out
@@ -335,7 +357,7 @@ pub fn sign_grant_event(
     service_key: &Ed25519Identity,
 ) -> Result<SignedGrantEvent, GrantError> {
     let body = encode_event_body(&event);
-    let protected = protected_header(&service_key.public_key_bytes());
+    let protected = protected_header(&service_key.public_key_bytes(), event.content_type());
     let signature = service_key.sign(&sig_structure(&protected, &body));
     let bytes = cose_sign1(&protected, &body, &signature);
     if bytes.len() > MAX_GRANT_EVENT_BYTES {
@@ -406,7 +428,7 @@ pub fn verify_grant_event(
         as_bytes(signature, SHAPE)?,
     );
     let (content_type, kid) = header(&protected)?;
-    if content_type != GRANT_ENVELOPE {
+    if content_type != GRANT_ENVELOPE && content_type != SERVICE_ACCOUNT_ENVELOPE {
         return Err(GrantError::EnvelopeMismatch {
             reason: format!("it names {content_type}"),
         });
@@ -414,7 +436,7 @@ pub fn verify_grant_event(
     let kid = <[u8; KEY_LEN]>::try_from(kid.as_slice())
         .ok()
         .ok_or_else(|| malformed("the key id is not a 32-byte Ed25519 public key"))?;
-    if protected != protected_header(&kid) {
+    if protected != protected_header(&kid, &content_type) {
         return Err(malformed(
             "the protected header is not the grant-event header",
         ));
@@ -433,6 +455,11 @@ pub fn verify_grant_event(
         return Err(GrantError::SignatureInvalid);
     }
     let event = decode_event_body(&payload)?;
+    if content_type != event.content_type() {
+        return Err(malformed(
+            "the grant body version differs from its envelope",
+        ));
+    }
     if cose_sign1(&protected, &payload, &signature) != message {
         return Err(GrantError::EventNotCanonical);
     }
