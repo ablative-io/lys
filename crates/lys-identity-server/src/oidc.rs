@@ -5,8 +5,10 @@
 //! with PKCE S256, the nonce, and the ID token's signature and claims. The
 //! state of a sign-in in flight is kept here and used once.
 
-use std::collections::HashMap;
+use crate::sign_in_flights::Flights;
+use std::net::IpAddr;
 use std::sync::{Mutex, PoisonError};
+use std::time::Instant;
 
 use lys_identity::{Actor, AuthMethod, LoginBinding, Provenance};
 use openidconnect::core::{
@@ -43,7 +45,7 @@ pub struct Oidc {
     secret: ClientSecret,
     redirect: RedirectUrl,
     http: reqwest::Client,
-    in_flight: Mutex<HashMap<String, (PkceCodeVerifier, Nonce)>>,
+    in_flight: Mutex<Flights<(PkceCodeVerifier, Nonce)>>,
 }
 
 impl Oidc {
@@ -107,7 +109,7 @@ impl Oidc {
             redirect: RedirectUrl::new(config.redirect_url.clone())
                 .map_err(|error| failed(&error))?,
             http,
-            in_flight: Mutex::new(HashMap::new()),
+            in_flight: Mutex::new(Flights::default()),
         })
     }
 
@@ -117,7 +119,7 @@ impl Oidc {
     }
 
     /// Begin a sign-in, answering the issuer URL to send the browser to.
-    pub fn begin(&self) -> Result<String, ServerError> {
+    pub fn begin(&self, address: IpAddr) -> Result<String, ServerError> {
         let client = CoreClient::from_provider_metadata(
             self.metadata.clone(),
             self.client_id.clone(),
@@ -137,10 +139,12 @@ impl Oidc {
             .in_flight
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        if in_flight.len() >= IN_FLIGHT_MAX {
-            return Err(failed(&"too many sign-ins are in flight"));
-        }
-        in_flight.insert(state.secret().clone(), (verifier, nonce));
+        in_flight.insert(
+            state.secret().clone(),
+            (verifier, nonce),
+            address,
+            Instant::now(),
+        )?;
         Ok(url.to_string())
     }
 
@@ -158,8 +162,7 @@ impl Oidc {
             .in_flight
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .remove(state)
-            .ok_or(ServerError::SignInStateUnknown)?;
+            .take(state, Instant::now())?;
         let client = CoreClient::from_provider_metadata(
             self.metadata.clone(),
             self.client_id.clone(),

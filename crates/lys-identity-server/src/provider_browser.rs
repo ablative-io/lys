@@ -31,9 +31,9 @@ pub(crate) fn begin(secure: bool) -> Result<(String, [u8; 32]), ServerError> {
 pub(crate) fn digest(headers: &HeaderMap) -> Result<[u8; 32], ServerError> {
     let mut found = None;
     for header in headers.get_all(header::COOKIE) {
-        let header = header
-            .to_str()
-            .map_err(|_| ServerError::SignInStateUnknown)?;
+        let Ok(header) = header.to_str() else {
+            return Err(ServerError::SignInStateUnknown);
+        };
         for pair in header.split(';') {
             if let Some((COOKIE, token)) = pair.trim().split_once('=') {
                 if token.is_empty() || found.is_some() {

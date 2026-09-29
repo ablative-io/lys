@@ -21,6 +21,7 @@
 
 use std::net::IpAddr;
 use std::sync::{Arc, PoisonError};
+use std::time::Instant;
 
 use axum::extract::{Path, Query, State};
 use axum::http::{Extensions, HeaderMap, StatusCode, header};
@@ -41,7 +42,7 @@ use super::{
     request_fields, unreachable_issuer,
 };
 use crate::error::ServerError;
-use crate::oidc::{IN_FLIGHT_MAX, Oidc};
+use crate::oidc::Oidc;
 use crate::routes::AppState;
 use crate::sign_in_providers::Provider;
 
@@ -77,7 +78,7 @@ impl IssuerSignIn {
         address: IpAddr,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
-        let begun = reqwest::Url::parse(&oidc.begin()?)
+        let begun = reqwest::Url::parse(&oidc.begin(address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
@@ -101,6 +102,8 @@ impl IssuerSignIn {
         state: String,
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
+        let client_address = address;
+        let began = Instant::now();
         let address = address.to_string();
         let mut opened = self.open(begun, &address).await?;
         let verifier = verifier()?;
@@ -152,9 +155,6 @@ impl IssuerSignIn {
         let upstream = query_value(&provider_url, "state")
             .ok_or_else(|| failed("the provider's address carries no state"))?;
         let mut held = self.upstream.lock().unwrap_or_else(PoisonError::into_inner);
-        if held.len() >= IN_FLIGHT_MAX {
-            return Err(failed("too many sign-ins are in flight"));
-        }
         held.insert(
             upstream,
             Upstream {
@@ -164,7 +164,9 @@ impl IssuerSignIn {
                 state,
                 browser,
             },
-        );
+            client_address,
+            began,
+        )?;
         Ok(location)
     }
 
@@ -182,8 +184,7 @@ impl IssuerSignIn {
             .upstream
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .remove(upstream)
-            .ok_or(ServerError::SignInStateUnknown)?;
+            .take(upstream, Instant::now())?;
         if !crate::provider_browser::matches(&held.browser, &browser) {
             oidc.abandon(&held.state);
             return Err(ServerError::SignInStateUnknown);

@@ -26,7 +26,7 @@
 //! issuer's; the password is never logged, never kept and never part of an
 //! error.
 
-use std::collections::HashMap;
+use crate::sign_in_flights::Flights;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
@@ -89,7 +89,7 @@ pub struct IssuerSignIn {
     api: String,
     callback: String,
     http: reqwest::Client,
-    upstream: Mutex<HashMap<String, upstream::Upstream>>,
+    upstream: Mutex<Flights<upstream::Upstream>>,
 }
 
 /// One person's sign-in: what they typed, and where they are.
@@ -285,7 +285,7 @@ impl IssuerSignIn {
             api,
             callback,
             http,
-            upstream: Mutex::new(HashMap::new()),
+            upstream: Mutex::new(Flights::default()),
         })
     }
 
@@ -305,7 +305,7 @@ impl IssuerSignIn {
     /// Sign `attempt` in through the issuer for this service's own client,
     /// answering the actor its validated ID token names.
     pub async fn password(&self, oidc: &Oidc, attempt: &Attempt<'_>) -> Result<Actor, ServerError> {
-        let begun = reqwest::Url::parse(&oidc.begin()?)
+        let begun = reqwest::Url::parse(&oidc.begin(attempt.address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;

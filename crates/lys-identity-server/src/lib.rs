@@ -103,3 +103,5 @@ pub use error::ServerError;
 pub use routes::{AppState, Say, router, service, service_saying};
 
 mod provider_browser;
+
+mod sign_in_flights;
