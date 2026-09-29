@@ -1,11 +1,14 @@
 /** The graph draws permission answers, preserves visibility and never exercises grants. */
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, text } from './harness';
+import { $, $$, mount, serve, text } from './harness';
+import { reachMap } from '../src/features/grants/check';
 import { OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 const drawing = () => $('svg[aria-label="Permission graph"]');
 const titles = (kind: string) => $$('line.ge.' + kind).map((line) => line.textContent ?? '');
 const card = () => $('.node-card')?.textContent ?? '';
+/** A reach answer naming every resource asked about, with no holder on any. */
+const noHolders = (body: unknown) => ok({ revision: 7, resources: (body as { resources: { kind: string; id: string }[] }).resources.map(({ kind, id }) => ({ kind, id, holders: [] })) });
 
 describe('Identity graph', () => {
   it('draws every identity and resource, the recorded grants and who answers to whom', async () => {
@@ -15,8 +18,7 @@ describe('Identity graph', () => {
     expect(titles('grant')).toEqual(['Ada (test person) may edit, grant, view on identity', 'Ada (test person) may view on ledger', 'Scribe may view on identity']);
     expect(titles('answers')).toHaveLength(5);
     expect(titles('answers')).toContain('Scribe answers to Ada (test person)');
-    expect(app.posted.length).toBeGreaterThan(0);
-    expect(app.posted.every((call) => call.path === '/grants/who')).toBe(true);
+    expect(app.posted.map((call) => call.path)).toEqual(['/grants/reach']);
   });
   it('lights up a selected agent, its responsible person and what the service says it reaches', async () => {
     await mount('#/graph/' + SCRIBE);
@@ -39,7 +41,7 @@ describe('Identity graph', () => {
     expect($('a[href="#/access/who/project%3Aidentity"]')).not.toBeNull();
   });
   it('does not turn recorded grants into permission when the evaluator returns none', async () => {
-    await mount('#/graph/' + SCRIBE, { ...SERVICE, 'POST /grants/who': ok({ holders: [], revision: 7, complete: true, next: null }) });
+    await mount('#/graph/' + SCRIBE, { ...SERVICE, 'POST /grants/reach': noHolders });
     expect(titles('grant')).toContain('Scribe may view on identity');
     expect(card()).toContain('Nothing.');
     expect($('.node-card a[href^="#/access/who/"]')).toBeNull();
@@ -60,7 +62,7 @@ describe('Identity graph', () => {
     expect(titles('installed')).toHaveLength(0);
   });
   it('names an unavailable evaluator instead of drawing partial permissions', async () => {
-    await mount('#/graph', { ...SERVICE, 'POST /grants/who': refused(503, 'PermissionEngineUnavailable', 'engine unavailable') });
+    await mount('#/graph', { ...SERVICE, 'POST /grants/reach': refused(503, 'PermissionEngineUnavailable', 'engine unavailable') });
     expect(text()).toContain('PermissionEngineUnavailable');
     expect(drawing()).toBeNull();
   });
@@ -77,8 +79,7 @@ describe('Directory reach', () => {
     expect($('tbody tr td:last-child')?.textContent).toBe('2 resources');
     expect($('.preview')?.textContent).toContain('project:identity');
     expect($('.preview')?.textContent).not.toContain('reach comes from grants');
-    expect(app.posted).toHaveLength(4);
-    expect(app.posted.every((call) => call.path === '/grants/who')).toBe(true);
+    expect(app.posted.map((call) => call.path)).toEqual(['/grants/reach']);
   });
   it('shows the named refusal instead of zero reach on an unreadable grant store', async () => {
     await mount('#/people', { ...SERVICE, '/grants': refused(503, 'GrantStoreUnavailable', 'store offline') });
@@ -88,15 +89,17 @@ describe('Directory reach', () => {
 });
 
 describe('Complete permission reads', () => {
-  it('refuses a repeated paging cursor instead of displaying a partial graph', async () => {
-    await mount('#/graph', { ...SERVICE, 'POST /grants/who': ok({ holders: [], revision: 7, complete: false, next: 'stuck' }) });
-    expect(text()).toContain('PermissionPageIncomplete');
+  it('refuses an answer that leaves out a resource asked about instead of displaying a partial graph', async () => {
+    await mount('#/graph', { ...SERVICE, 'POST /grants/reach': ok({ revision: 7, resources: [] }) });
+    expect(text()).toContain('PermissionAnswerIncomplete');
     expect(drawing()).toBeNull();
   });
-  it('refuses permissions assembled across changing revisions', async () => {
+  it('asks at most REACH_MAX resources at once and refuses permissions assembled across changing revisions', async () => {
     let revision = 7;
-    await mount('#/graph', { ...SERVICE, 'POST /grants/who': () => ok({ holders: [], revision: revision++, complete: false, next: 'page' }) });
-    expect(text()).toContain('GrantRevisionChanged');
-    expect(drawing()).toBeNull();
+    const posted: { path: string; body: unknown }[] = [];
+    serve({ 'POST /grants/reach': (body) => ({ ...noHolders(body), body: { ...(noHolders(body).body as object), revision: revision++ } }) }, posted);
+    const many = Array.from({ length: 501 }, (_, n) => ({ resource: { kind: 'project', id: String(n) }, actions: ['view'] }));
+    await expect(reachMap(many)).rejects.toMatchObject({ refusal: { refusal: 'GrantRevisionChanged' } });
+    expect(posted.map((call) => (call.body as { resources: unknown[] }).resources.length)).toEqual([500, 1]);
   });
 });

@@ -1,5 +1,5 @@
 import { Refused, api } from '../../api';
-import { PAGE_MAX, resourceText } from '../../generated/grants';
+import { PAGE_MAX, REACH_MAX, resourceText } from '../../generated/grants';
 import type { Permit, ResourceRef } from '../../generated/grants';
 import { clock } from '../file/time';
 
@@ -71,14 +71,30 @@ export async function whoAll(resource: ResourceRef, action: string): Promise<(Pe
   return out;
 }
 
-/** For each resource the caller can see, which of its actions each holder can exercise, from /grants/who. */
+/**
+ * For each resource the caller can see, which of its actions each holder can
+ * exercise, from /grants/reach: every resource in one question, or one per
+ * REACH_MAX resources, each answered at one revision. Answers at different
+ * revisions, or an answer that leaves out a resource asked about, are refused
+ * rather than drawn as a partial graph.
+ */
 export async function reachMap(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, string[]>>> {
   const out = new Map<string, Map<string, string[]>>();
-  await Promise.all(resources.map(async ({ resource, actions }) => {
-    const byHolder = new Map<string, string[]>();
-    const answers = await Promise.all(actions.map(async (action) => ({ action, holders: await whoAll(resource, action) })));
-    for (const { action, holders } of answers) for (const h of holders) byHolder.set(h.holder, [...(byHolder.get(h.holder) ?? []), action]);
-    out.set(resourceText(resource), byHolder);
-  }));
+  let revision: number | null = null;
+  for (let start = 0; start < resources.length; start += REACH_MAX) {
+    const asked = resources.slice(start, start + REACH_MAX);
+    const answer = await api.reach({ route: 'browser', resources: asked.map(({ resource, actions }) => ({ ...resource, actions })) });
+    if (revision !== null && answer.revision !== revision) {
+      throw new Refused(409, { refusal: 'GrantRevisionChanged', reason: 'Permissions changed while reading them; refresh to read them again.' });
+    }
+    revision = answer.revision;
+    asked.forEach(({ resource }, n) => {
+      const answered = answer.resources[n];
+      if (!answered || answered.kind !== resource.kind || answered.id !== resource.id) {
+        throw new Refused(502, { refusal: 'PermissionAnswerIncomplete', reason: `The permission service did not answer for ${resourceText(resource)}.` });
+      }
+      out.set(resourceText(resource), new Map(answered.holders.map(({ holder, actions }) => [holder, actions])));
+    });
+  }
   return out;
 }

@@ -134,6 +134,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/which", post(crate::grants_batch::which))
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
+        .route("/grants/reach", post(crate::grants_reach::reach))
         .route("/grants/cannot-give", get(cannot_give))
         .route("/grants/{id}", get(read))
         .route("/grants/{id}/revoke", post(revoke))
@@ -493,6 +494,7 @@ async fn who(
             .collect();
         // A holder is on a page only when its own grant permits the action,
         // and the page names a next holder only when a later holder permits.
+        let frame = judged.grants.frame(None)?;
         let (page, more) = {
             let mut permitted = holders.into_iter().filter_map(|(text, holder)| {
                 let request = ExerciseRequest {
@@ -503,7 +505,7 @@ async fn who(
                 };
                 judged
                     .grants
-                    .explain(judged.directory, &request, at, None)
+                    .explain_in(&frame, judged.directory, &request, at)
                     .ok()
                     .map(|permit| HolderView {
                         holder: text,
@@ -521,7 +523,7 @@ async fn who(
         };
         Ok(Json(WhoPage {
             holders: page,
-            revision: judged.grants.revision(),
+            revision: frame.revision(),
             complete: next.is_none(),
             next,
         }))
