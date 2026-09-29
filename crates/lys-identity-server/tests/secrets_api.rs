@@ -88,6 +88,9 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
             answer["client_secret_sha256"] =
                 json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
         }
+        if app == "fixture_bad_custody" {
+            answer["client_secret_ref"] = json!("another-app");
+        }
         return axum::Json(answer).into_response();
     }
     answer(&path, &body)
@@ -436,11 +439,12 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &registration(app, &workspace_schema(app))?,
     )
     .await?)?;
+    let approval_operation = op()?;
     let approved = ok(post(
         &setup.service,
         &format!("/apps/{app}/approve"),
         Auth::Cookie(&admin),
-        &json!({"operation":op()?}),
+        &json!({"operation":approval_operation}),
     )
     .await?)?;
     assert!(approved["client"].is_null());
@@ -459,6 +463,19 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
+    let replay = ok(post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":approval_operation}),
+    )
+    .await?)?;
+    assert!(replay["client"].is_null());
+    assert!(!replay.to_string().contains(secret));
+    assert!(
+        received(&setup.log).is_empty(),
+        "replay must not prepare again"
+    );
     let path = format!("/apps/{app}/credentials/save");
     let body = json!({"client_secret":secret});
     assert_eq!(
@@ -540,8 +557,42 @@ async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
         held["state"], "pending",
         "broker-down approval activated the app without credential custody"
     );
-    assert_eq!(answer.0, 502);
+    assert_eq!(answer.0, 502, "{}", answer.1);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     assert!(answer.1.get("client").is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn wrong_broker_custody_receipt_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_person(ADMINISTRATOR).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_bad_custody";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    let held = ok(get(
+        &setup.service,
+        &format!("/apps/{app}"),
+        Auth::Cookie(&admin),
+    )
+    .await?)?;
+    assert_eq!(held["state"], "pending");
+    assert!(held["client_id"].is_null());
     Ok(())
 }

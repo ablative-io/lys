@@ -3,8 +3,8 @@
  * checked here. An app registers itself through the API and nothing it
  * registers takes effect until the administrator approves it on this screen,
  * which shows its name, its redirect addresses and its whole schema in words
- * before the button. Approval offers to save the app's credentials directly
- * in Lys secrets. A proposed schema change waits here the same way. The permission template is built and edited here too, and saved
+ * before the button. Broker-backed approval saves credentials in Lys secrets
+ * before activation. A proposed schema change waits here the same way. The permission template is built and edited here too, and saved
  * through the same routes an upload uses.
  */
 import { useState } from 'react';

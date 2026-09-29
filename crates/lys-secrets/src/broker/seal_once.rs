@@ -17,9 +17,7 @@ impl<P: PermissionCheck> Broker<P> {
             self.store
                 .open_for_use(&self.store_key, &client, EntryClass::Key)?
         } else {
-            Secret::from_slice(
-                crate::encoding::hex(&crate::encoding::random_bytes::<32>()?).as_bytes(),
-            )
+            Secret::new(crate::encoding::hex(&crate::encoding::random_bytes::<32>()?).into_bytes())
         };
         self.seal_once(&client, EntryClass::Key, owner, &value)?;
         let mut credential = zeroize::Zeroizing::new(format!("lys-app.{app}.").into_bytes());

@@ -7,8 +7,9 @@
 //!
 //! `POST /apps` records the registration as pending and nothing else: no
 //! client exists anywhere and no kind of the app is judged. Approval creates
-//! the app's sign-in client, answers its secret once to the approving
-//! administrator and keeps only the secret's SHA-256, binds the service
+//! the app's sign-in client after broker custody when configured, otherwise
+//! answers its secret once to the administrator. The app log keeps only the
+//! secret's SHA-256. Approval binds the service
 //! account the registration names, makes the registered schema version 1
 //! and gives its kinds to the grants. A declined app never takes effect. A
 //! retired app's client credential is refused and every check on its kinds
