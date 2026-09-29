@@ -214,6 +214,29 @@ impl<S: LeafStore> BudgetStore<S> {
         self.append(Leaf::Acted(acted))
     }
 
+    /// Keep the refusals a page of `runner`'s feed held, each once, then
+    /// how far the feed has been read.
+    pub fn read_feed(
+        &mut self,
+        runner: &str,
+        refusals: Vec<lys_runner::refusals::RefusalRecord>,
+        cursor: String,
+    ) -> Result<(), ServerError> {
+        self.settle()?;
+        for record in refusals {
+            if !self.held.refusals.holds(&record) {
+                self.append(Leaf::Refused(record))?;
+            }
+        }
+        if self.held.refusals.cursors.get(runner) != Some(&cursor) {
+            self.append(Leaf::FeedRead(crate::refusals_store::FeedRead {
+                runner: runner.to_owned(),
+                cursor,
+            }))?;
+        }
+        Ok(())
+    }
+
     /// Charge `usage`; false when its event was charged before, and then
     /// nothing is written.
     pub fn charge(&mut self, usage: Usage) -> Result<bool, ServerError> {

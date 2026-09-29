@@ -171,7 +171,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .transpose()?,
         setup: config.setup.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
-        sessions: Sessions::new(config.session_seconds, config.secure_cookie),
+        sessions: match &config.sessions_file {
+            Some(file) => {
+                Sessions::open(file.clone(), config.session_seconds, config.secure_cookie)?
+            }
+            None => Sessions::new(config.session_seconds, config.secure_cookie),
+        },
         admission: Admission::new(
             crate::setup::administrator(config)?,
             config.link_audit_binding()?,
@@ -225,6 +230,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::import_bootstrap::ensure(&state)?;
+    crate::refusals_follow::follow_at_start(&state);
+    crate::grants_refusals::hold_at_start(&state);
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
@@ -309,6 +316,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::budgets_api::routes())
         .merge(crate::budgets_act::routes())
         .merge(crate::agent_policy_api::routes())
+        .merge(crate::refusals_api::routes())
         .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())

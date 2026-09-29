@@ -32,6 +32,7 @@
 //! against any runner given its socket.
 
 pub mod admitted;
+pub mod claude_judge;
 pub mod client;
 pub mod codex_judge;
 pub mod codex_judge_client;
@@ -69,7 +70,7 @@ pub mod terminal_bytes;
 pub mod tracking;
 pub mod tracking_store;
 
-pub use client::{Client, Closer, Connection, connect};
+pub use client::{Client, Closer, Connection, GrantChannel, connect};
 pub use error::RunnerError;
 pub use protocol::{Act, Answer, Ended, EndedHow, Key, Launch, PROTOCOL_VERSION};
 pub use rotation::{Limit, Rotation};

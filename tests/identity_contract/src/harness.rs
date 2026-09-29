@@ -397,6 +397,7 @@ impl Service {
             administrator: Some(configured(ADMINISTRATOR)),
             link_audit_source: configured(LINK_AUDIT_SOURCE),
             session_seconds: 600,
+            sessions_file: Some(dir.path().join("sessions.json")),
             secure_cookie: false,
             grant_log_dir: dir.path().join("grant-log"),
             grant_log_origin: GRANT_ORIGIN.to_owned(),
@@ -448,7 +449,8 @@ impl Service {
 
     /// Stop the service and start it again over the same directory, on a new
     /// address with a new client, so every store is opened from disk and no
-    /// session or connection of the stopped service carries over.
+    /// connection of the stopped service carries over. Signed-in sessions are
+    /// among what is opened from disk: a cookie from before still answers.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
         self.server.abort();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

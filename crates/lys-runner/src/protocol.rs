@@ -253,6 +253,22 @@ pub enum Act {
         /// The operation's id.
         operation: String,
     },
+    /// Read the tracking feed after `cursor`, from its start when none is
+    /// given. With `follow`, the answer waits until an entry is committed
+    /// after the cursor or the caller leaves.
+    Feed {
+        /// Where the last page ended.
+        #[serde(default)]
+        cursor: Option<String>,
+        /// Whether to wait for an entry.
+        #[serde(default)]
+        follow: bool,
+    },
+    /// Hold this connection as the live grant authority's channel: the
+    /// runner answers `grant_channel`, then writes each grantable question
+    /// as one line and reads the answer line to it, until the connection
+    /// closes.
+    GrantChannel,
 }
 
 /// How a session ended.
@@ -407,6 +423,13 @@ pub enum Answer {
         /// Its outcome.
         outcome: crate::operations::OperationOutcome,
     },
+    /// A page of the tracking feed.
+    Feed {
+        /// The page.
+        page: crate::tracking_store::FeedPage,
+    },
+    /// The connection is held as the grant channel from here on.
+    GrantChannel,
     /// The act was refused, by name.
     Refused {
         /// The refusal's name.
