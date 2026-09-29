@@ -183,6 +183,14 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
         }
     }
     let scratch = Scratch::new()?;
+    use std::os::unix::fs::PermissionsExt;
+    for directory in [
+        scratch.layout.run_dir(),
+        scratch.layout.logs_dir(),
+        scratch.layout.data_dir(),
+    ] {
+        std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700))?;
+    }
     let pid = scratch.layout.run_dir().join("runner.pid");
     let _cleanup = RunnerCleanup(pid.clone());
     assert!(!scratch.layout.runner_socket().exists());
