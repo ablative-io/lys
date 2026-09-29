@@ -72,6 +72,14 @@ beforeEach(() => sessionStorage.clear());
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
 
 describe('the permission template builder', () => {
+  it('names an operator registration as the install operator, never a sign-in or service start', async () => {
+    const app = { id: APP, name: 'Notes', state: 'pending', redirects: [], schema: documents, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'operator', login: { provider: 'https://issuer.test', subject: 'administrator' } }, registered_at: 1 };
+    stub({ 'GET /apps': () => ok({ apps: [app] }) });
+    await render(<Apps />);
+    expect(text()).toContain('Registered by the install operator for administrator');
+    expect(text()).not.toContain('Lys at start');
+  });
+
   it('builds a two-kind schema with a parent from a template, nothing typed, and saves the body an upload sends', async () => {
     const calls = stub({ ['POST /apps/' + APP + '/schema/check']: () => applies, ['PUT /apps/' + APP + '/schema']: () => ok({ applied: true }) });
     let saved = '';

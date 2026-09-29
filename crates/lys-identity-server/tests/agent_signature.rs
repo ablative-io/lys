@@ -246,3 +246,25 @@ async fn a_signed_agent_report_is_refused_when_its_responsible_person_is_suspend
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_valid_agent_signature_cannot_bypass_a_bad_operator_header() -> TestResult {
+    let table = Table::set().await?;
+    let path = table.path(&operation()?);
+    let body = table.body()?;
+    let header = table.header(&path, &body, now_ms()?, &nonce(42));
+    let answer = table
+        .service
+        .post_carrying(
+            &path,
+            &[(HEADER, &header), ("lys-operator", "wrong")],
+            body.clone(),
+        )
+        .await?;
+    assert_eq!(answer.0, 401, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "OperatorRefused");
+    // Admission refused before consuming the valid signature's nonce.
+    let accepted = table.send(&path, &header, body).await?;
+    assert_eq!(accepted.0, 200, "{}", accepted.1);
+    Ok(())
+}

@@ -25,6 +25,9 @@ pub enum AuthMethod {
     /// A request signed by this agent, which the actor is responsible for,
     /// whose signature the service verified against the agent's certificate.
     AgentSignature(AgentId),
+    /// A request made on the machine the service runs on with the install's
+    /// operator token, which only the account that owns the install can read.
+    Operator,
 }
 
 /// How and when the service authenticated the actor.
@@ -58,7 +61,7 @@ impl Provenance {
     /// actor signed in themselves.
     pub fn agent(&self) -> Option<AgentId> {
         match self.method {
-            AuthMethod::Oidc => None,
+            AuthMethod::Oidc | AuthMethod::Operator => None,
             AuthMethod::AgentSignature(agent) => Some(agent),
         }
     }

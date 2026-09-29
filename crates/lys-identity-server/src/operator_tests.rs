@@ -1,0 +1,51 @@
+#![cfg(test)]
+//! Permission repair is observable; a failed repair never releases the token.
+
+use std::cell::RefCell;
+use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
+
+use super::{read, read_protected};
+use crate::error::ServerError;
+
+type TestResult = Result<(), Box<dyn Error>>;
+const TOKEN: &str = "operator-permissions-fixture-0123456789abcdef";
+
+#[test]
+fn wider_token_permissions_are_tightened_and_recorded_without_the_secret() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("operator.token");
+    std::fs::write(&path, TOKEN)?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
+    let said = RefCell::new(Vec::new());
+    let record = |line: &str| said.borrow_mut().push(line.to_owned());
+    assert_eq!(read(&path, &record)?.as_str(), TOKEN);
+    assert_eq!(
+        std::fs::metadata(&path)?.permissions().mode() & 0o7777,
+        0o600
+    );
+    assert_eq!(said.borrow().len(), 1);
+    assert!(said.borrow()[0].contains("tightened to 0600"));
+    assert!(!said.borrow()[0].contains(TOKEN));
+    assert_eq!(read(&path, &record)?.as_str(), TOKEN);
+    assert_eq!(said.borrow().len(), 1, "already private needs no repair");
+    Ok(())
+}
+
+#[test]
+fn a_permission_repair_error_is_named_and_releases_no_token() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("operator.token");
+    std::fs::write(&path, TOKEN)?;
+    // Inject the filesystem's chmod refusal, independent of the test user's uid.
+    let refused = read_protected(&path, |_| {
+        Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+    });
+    let Err(ServerError::ConfigInvalid { reason }) = refused else {
+        return Err("a failed permission repair must refuse ConfigInvalid".into());
+    };
+    assert!(reason.contains("cannot be protected and read"));
+    assert!(!reason.contains(TOKEN));
+    assert_eq!(std::fs::read_to_string(path)?, TOKEN);
+    Ok(())
+}

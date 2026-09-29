@@ -58,6 +58,8 @@ pub enum Auth {
     Bearer,
     /// An agent's signature over the request.
     AgentSignature,
+    /// The install's operator token, carried in the dedicated header.
+    Operator,
 }
 
 impl Auth {
@@ -68,6 +70,7 @@ impl Auth {
             Self::Session => Some("session_cookie"),
             Self::Bearer => Some("lys_bearer"),
             Self::AgentSignature => Some("agent_signature"),
+            Self::Operator => Some("lys_operator"),
         }
     }
 }
@@ -254,6 +257,7 @@ impl Api {
                     "session_cookie": {"type": "apiKey", "in": "cookie", "name": "lys_directory_session", "description": "A person's signed-in session."},
                     "lys_bearer": {"type": "http", "scheme": "bearer", "description": "An app's credential, `lys-app.{app}.{secret}`, or a registrar's, `lys-registrar.{account}.{secret}`."},
                     "agent_signature": {"type": "apiKey", "in": "header", "name": "lys-agent-signature", "description": "An agent's signature over the request's method, path, body digest, time and nonce."},
+                    "lys_operator": {"type": "apiKey", "in": "header", "name": "lys-operator", "description": "The install's operator token, acting as the administrator without a sign-in."},
                 },
             },
         }))

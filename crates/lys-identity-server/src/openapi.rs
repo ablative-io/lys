@@ -47,6 +47,10 @@ pub(crate) fn route(
     if !named.contains(&"inactive") {
         named.push("inactive");
     }
+    // The global admission guard refuses a bad operator header on every route.
+    if !named.contains(&"OperatorRefused") {
+        named.push("OperatorRefused");
+    }
     Route {
         method,
         path,

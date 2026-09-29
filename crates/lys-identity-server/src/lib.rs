@@ -61,6 +61,7 @@ mod openapi_runner_types;
 mod openapi_table;
 mod openapi_typed;
 mod openapi_types;
+pub mod operator;
 pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;

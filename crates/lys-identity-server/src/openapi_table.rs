@@ -15,12 +15,16 @@ pub(crate) const PUT: Method = Method::Put;
 
 /// Anyone.
 pub(crate) const P: &[Auth] = &[Auth::Public];
-/// A signed-in person.
-pub(crate) const S: &[Auth] = &[Auth::Session];
+/// A personal session; the operator has no personal account.
+pub(crate) const C: &[Auth] = &[Auth::Session];
+/// A signed-in person or the install's operator.
+pub(crate) const S: &[Auth] = &[Auth::Session, Auth::Operator];
 /// A signed-in person, or an app or registrar through its credential.
-pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer];
+pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer, Auth::Operator];
 /// An agent's signed request, or a signed-in person.
-pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session];
+pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session, Auth::Operator];
+/// A provider-issued access token; a session or operator token cannot replace it.
+pub(crate) const B: &[Auth] = &[Auth::Bearer];
 
 /// One untyped entry: method, path, words, authentication and the refusal
 /// sets it answers with.
@@ -53,13 +57,13 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
-    GET "/me" "The signed-in caller" S [SIGNED, &["NoPerson", "SetupRequired"]];
+    GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson"]];
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]];
     GET "/directory/people" "Every person, for the administrator" S [ADMIN];
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, &["NoPerson", "ExpiryBeyondSource"], &["UseOnly"]];
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, &["RelationUnknown"], &["RootAuthorityRefused"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, &["NotHeld", "Revoked"]];
@@ -86,7 +90,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/requests/{id}/reconcile" "Settle an approval" S [SIGNED_BODY, &["NoPerson", "NotAdmitted"]];
     GET "/connections" "What the service is connected to" S [ADMIN];
     GET "/sign-in-providers" "The sign-in providers" S [ADMIN, &["SignInProvidersUnavailable"]];
-    POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY];
+    POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY, &["ProviderRefused"]];
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED];
@@ -129,23 +133,23 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]];
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
-    GET "/oauth/authorize" "Begin an authorization" P [];
-    POST "/oauth/token" "Exchange a code for tokens" P [];
+    GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered"]];
+    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
-    GET "/oauth/userinfo" "The signed-in subject's claims" A [SIGNED];
-    POST "/sign-in" "Sign in with a password" P [];
+    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED];
+    POST "/sign-in" "Sign in with a password" P [&["SecondFactorUnsupported", "SignInRefused"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
-    POST "/setup/open" "Open first-run setup with its code" P [];
-    POST "/setup/administrator" "Register the first administrator" P [];
-    POST "/setup/password" "Set the first administrator's password" P [];
-    GET "/me/account" "The caller's sign-in account" S [SIGNED];
-    POST "/me/account/email" "Change the caller's email" S [SIGNED_BODY];
-    POST "/me/account/password" "Change the caller's password" S [SIGNED_BODY];
-    GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN];
-    POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY];
-    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY];
-    POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY];
+    POST "/setup/open" "Open first-run setup with its code" P [&["SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/administrator" "Register the first administrator" P [&["AccountRefused", "SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/password" "Set the first administrator's password" P [&["SetupCodeRefused"]];
+    GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
+    POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
+    POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
+    GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]];
+    POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
+    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
+    POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused"]];
     GET "/teams/{id}/goals" "A team's goals" S [SIGNED, &["NotAdmitted", "TeamUnknown"]];

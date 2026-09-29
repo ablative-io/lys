@@ -309,6 +309,12 @@ pub enum ServerError {
         "LaunchRecordMissing: the agent has no provisioning profile to start it from: set its profile first"
     )]
     LaunchRecordMissing,
+    /// A request carrying the operator token was refused, naming the check.
+    #[error("OperatorRefused: {reason}")]
+    OperatorRefused {
+        /// Which check refused it.
+        reason: &'static str,
+    },
     /// An agent's signed request was refused, naming the check that refused it.
     #[error("AgentSignatureRefused: {reason}")]
     AgentSignatureRefused {

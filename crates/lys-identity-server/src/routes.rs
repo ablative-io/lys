@@ -93,6 +93,10 @@ pub struct AppState {
     pub sign_in_providers: Option<crate::sign_in_providers::SignInProviders>,
     /// The nonces agents' signed requests carried within the last minute.
     pub agent_nonces: crate::agent_signature::Nonces,
+    /// The install's operator token, when the configuration names its file.
+    pub operator_token: Option<zeroize::Zeroizing<String>>,
+    /// The managed install's durable upgrade intent, checked on each operator request.
+    pub operator_upgrade_file: Option<std::path::PathBuf>,
     /// How machines' runners are reached.
     pub runners: crate::runner_client::Runners,
     /// The acts on sessions through a runner, each kept as its receipt.
@@ -122,6 +126,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let operator_token = crate::operator::token(config, &*say)?;
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
@@ -219,6 +224,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             })
             .transpose()?,
         agent_nonces: Mutex::default(),
+        operator_token,
+        operator_upgrade_file: config.operator_upgrade_file.clone(),
         runners: crate::runner_client::Runners::new(key, config.runner_socket.clone()),
         acts: Mutex::new(acts),
         say,
@@ -243,8 +250,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     Ok(served
         .merge(provider_callback)
         .layer(axum::middleware::from_fn_with_state(
-            state,
+            Arc::clone(&state),
             crate::session_admission::guard,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            crate::operator::guard,
         )))
 }
 
@@ -341,8 +352,12 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
         .and_then(|value| value.to_str().ok())
 }
 
-/// The signed-in actor, or a refusal.
+/// The signed-in actor, or a refusal: the administrator for a request
+/// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+    if let Some(actor) = crate::operator::actor(state, headers)? {
+        return Ok(actor);
+    }
     state.sessions.actor(cookie_header(headers))
 }
 
