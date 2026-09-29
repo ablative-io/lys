@@ -39,12 +39,11 @@ use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::{HeaderMap, Uri, header};
+use axum::http::{HeaderMap, Uri};
 use axum::routing::post;
 use axum::{Json, Router};
 use lys_identity::{Actor, LinkChange, LinkObservation, LoginBinding, PersonId, Provenance};
 use serde::Deserialize;
-use serde::de::DeserializeOwned;
 
 use crate::agent_signature::signed_agent;
 use crate::directory_views::{LinkAuditPerson, ReceiptAnswer, receipt_view};
@@ -95,31 +94,6 @@ fn admitted(
     Ok(source)
 }
 
-/// Whether the request says its body is JSON.
-fn says_json(headers: &HeaderMap) -> bool {
-    headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(|kind| kind.trim().to_ascii_lowercase())
-        .is_some_and(|kind| {
-            kind == "application/json"
-                || (kind.starts_with("application/") && kind.ends_with("+json"))
-        })
-}
-
-/// The members `body` carries, which must be the ones `T` names and no others.
-fn read<T: DeserializeOwned>(headers: &HeaderMap, body: &[u8]) -> Result<T, ServerError> {
-    if !says_json(headers) {
-        return Err(malformed(
-            "the request does not say its body is JSON (act: send it with `Content-Type: application/json`)",
-        ));
-    }
-    let Json(members) =
-        Json::<T>::from_bytes(body).map_err(|refused| malformed(refused.body_text()))?;
-    Ok(members)
-}
-
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = LinkAuditAsked)]
@@ -135,7 +109,7 @@ async fn holder(
     bytes: Bytes,
 ) -> Result<Json<LinkAuditPerson>, ServerError> {
     admitted(&state, &headers, uri.path(), &bytes)?;
-    let asked: Asked = read(&headers, &bytes)?;
+    let asked: Asked = crate::signed_json::read(&state, &headers, &bytes)?;
     let login = LoginBinding::new(&asked.issuer, &asked.subject)
         .map_err(|refused| malformed(refused.to_string()))?;
     with_directory(&state, |directory| {
@@ -169,7 +143,7 @@ async fn deliver(
     bytes: Bytes,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let source = admitted(&state, &headers, uri.path(), &bytes)?;
-    let body: Delivery = read(&headers, &bytes)?;
+    let body: Delivery = crate::signed_json::read(&state, &headers, &bytes)?;
     let change = match body.change.as_str() {
         "linked" => LinkChange::Linked,
         "unlinked" => LinkChange::Unlinked,

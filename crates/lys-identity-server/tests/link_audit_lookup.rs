@@ -105,3 +105,27 @@ async fn a_question_in_other_words_is_refused() -> TestResult {
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn a_foreign_origin_cannot_use_the_link_audit_sources_cookie() -> TestResult {
+    let (service, _) = seeded().await?;
+    let cookie = service.sign_in(login(LINK_AUDIT_SOURCE)).await?;
+    let body = json!({ "issuer": service.issuer.issuer(), "subject": ADA });
+    let client = reqwest::Client::new();
+    for (origin, status) in [("http://127.0.0.1:1", 400), (service.base.as_str(), 200)] {
+        let response = client
+            .post(format!("{}{PATH}", service.base))
+            .header("cookie", &cookie)
+            .header("content-type", "application/json")
+            .header("origin", origin)
+            .body(body.to_string())
+            .send()
+            .await?;
+        assert_eq!(response.status(), status);
+        let answer: Value = serde_json::from_str(&response.text().await?)?;
+        if status == 400 {
+            assert_eq!(answer["refusal"], "RequestMalformed", "{answer}");
+        }
+    }
+    Ok(())
+}

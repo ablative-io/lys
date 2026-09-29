@@ -265,8 +265,7 @@ async fn report_agent(
     uri: Uri,
     bytes: Bytes,
 ) -> Result<Json<SessionView>, ServerError> {
-    let body: ReportBody =
-        serde_json::from_slice(&bytes).map_err(|refused| malformed(refused.to_string()))?;
+    let body: ReportBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
