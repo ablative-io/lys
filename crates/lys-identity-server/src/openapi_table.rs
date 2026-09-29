@@ -127,7 +127,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED];
-    POST "/sign-in" "Sign in with a password" P [&["SecondFactorUnsupported", "SignInRefused"]];
+    POST "/sign-in" "Sign in with a password" P [&["SecondFactorUnsupported", "SignInRefused", "SignInThrottled"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
     POST "/setup/open" "Open first-run setup with its code" P [&["SignInThrottled", "SetupClosed", "SetupCodeRefused"]];
