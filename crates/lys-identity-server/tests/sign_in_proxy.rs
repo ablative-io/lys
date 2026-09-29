@@ -48,3 +48,40 @@ async fn a_trusted_proxy_does_not_put_all_password_clients_in_one_bucket()
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
+-> Result<(), Box<dyn Error>> {
+    let (service, ()) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.trusted_proxies = vec![std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)],
+        |_| Ok(()),
+    )
+    .await?;
+    let client = reqwest::Client::new();
+    for forwarded in [None, Some("not-an-address")] {
+        for path in [
+            "/sign-in",
+            "/setup/open",
+            "/setup/administrator",
+            "/setup/password",
+        ] {
+            let mut request = client
+                .post(format!("{}{path}", service.base))
+                .header("content-type", "application/json")
+                .body(r#"{"email":"person@example.test","password":"Correct-Password-For-Test1"}"#);
+            if let Some(forwarded) = forwarded {
+                request = request.header("x-forwarded-for", forwarded);
+            }
+            let response = request.send().await?;
+            let status = response.status();
+            let body: serde_json::Value = response.json().await?;
+            assert_eq!(status, 502, "{path}: {body}");
+            assert_eq!(body["refusal"], "SignInFailed", "{path}: {body}");
+        }
+    }
+    Ok(())
+}
