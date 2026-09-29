@@ -118,7 +118,7 @@ fn verify_historical(encoded: &str, source: &str, version: u64, method: AuthMeth
     let message = hexadecimal(vector["message"].as_str().ok_or("no signed fixture")?)?;
     let key: [u8; 32] = hexadecimal(vector["public_key"].as_str().ok_or("no public key")?)?
         .try_into()
-        .map_err(|_bytes| "fixture public key is not 32 bytes")?;
+        .map_err(|_| "fixture public key is not 32 bytes")?;
     let verified = lys_identity::signer::verify_event(&message, &key)?;
     assert_eq!(verified.bytes(), message);
     assert_eq!(verified.event().version(), version);
