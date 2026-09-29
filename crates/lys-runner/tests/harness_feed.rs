@@ -84,13 +84,14 @@ fn foreign_generations_and_conflicting_replay_cannot_append() -> Outcome {
     let source = source();
     let mut event = completed(&source);
     event.source.generation += 1;
+    let before = feed.end();
     assert_eq!(
         feed.append_control(&source, 10, &event)
             .expect_err("foreign generation")
             .name(),
         "control_source_mismatch"
     );
-    assert!(feed.page(None)?.entries.is_empty());
+    assert_eq!(feed.end(), before);
     event = completed(&source);
     feed.append_control(&source, 11, &event)?;
     let cursor = feed.end();
