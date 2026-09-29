@@ -155,6 +155,10 @@ pub enum Leaf {
     Used(Usage),
     /// What came of a crossing's act.
     Acted(Acted),
+    /// A tool call a runner's judge denied.
+    Refused(lys_runner::refusals::RefusalRecord),
+    /// How far a runner's feed has been read.
+    FeedRead(crate::refusals_store::FeedRead),
 }
 
 /// Why a budget was refused, by name.
@@ -198,6 +202,9 @@ pub struct Held {
     /// The crossings and what came of their acts.
     #[serde(default)]
     pub crossings: Crossings,
+    /// The refusals read from the runners' feeds.
+    #[serde(default)]
+    pub refusals: crate::refusals_store::Refusals,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -319,6 +326,8 @@ impl Held {
             Leaf::Acted(acted) => {
                 self.crossings.acted.insert(acted.operation.clone(), acted);
             }
+            Leaf::Refused(record) => self.refusals.hold(record),
+            Leaf::FeedRead(read) => self.refusals.read_to(read),
         }
         Ok(())
     }

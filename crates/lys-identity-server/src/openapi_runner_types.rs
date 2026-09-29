@@ -9,6 +9,7 @@
 use lys_openapi::Api;
 
 use crate::agent_policy_api::{PolicyBody, PolicyView};
+use crate::refusals_api::RefusalsView;
 use crate::budgets_act::{UsageBody, UsageView};
 use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
@@ -30,6 +31,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             "/agents/{id}/policy",
             Some(api.schema::<PolicyBody>()),
             Some(policy),
+        ),
+        (
+            GET,
+            "/agents/{id}/refusals",
+            None,
+            Some(api.schema::<RefusalsView>()),
         ),
         (GET, "/agents/{id}/usage", None, Some(usage.clone())),
         (

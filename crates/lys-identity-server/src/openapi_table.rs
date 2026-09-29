@@ -106,6 +106,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/budgets/{kind}/{id}" "A holder's budgets" S [SIGNED, &["not_permitted"]];
     PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid"], &["BudgetVersionConflict"]];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
+    GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     POST "/runtime/sessions/{id}/read-bytes" "Read a session's exact output bytes" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/keys" "Send a session keys" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
