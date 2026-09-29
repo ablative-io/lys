@@ -78,7 +78,7 @@ async fn signed_write(person_active: bool) -> TestResult {
         )?);
         let service_key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
         let request = create_certificate_request(&key, &agent.to_string())?;
-        let certificate = CertificateAuthority::new(Arc::clone(&service_key))
+        let certificate = CertificateAuthority::new(Ed25519Identity::load(&config.event_key_file)?)
             .issue_certificate_for_request(
                 &request,
                 &agent.to_string(),
