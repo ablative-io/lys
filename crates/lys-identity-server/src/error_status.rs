@@ -168,7 +168,8 @@ impl ServerError {
             | Self::VerifierWrong
             | Self::McpCredentialInline { .. }
             | Self::McpSettingUnrepresentable { .. }
-            | Self::ModelUnrepresentable { .. } => StatusCode::BAD_REQUEST,
+            | Self::ModelUnrepresentable { .. }
+            | Self::SkillUnknown { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,

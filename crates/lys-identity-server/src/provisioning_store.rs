@@ -74,6 +74,32 @@ pub enum Setting {
     Literal(Literal),
 }
 
+/// A skill Lys keeps: its text under its name, by the hash of its bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SkillText {
+    /// Its name, one visible path component.
+    pub name: String,
+    /// Its text, as the harness reads it from SKILL.md.
+    pub text: String,
+    /// The length of the text in bytes.
+    pub len: u64,
+    /// The SHA-256 of the text's bytes, as lowercase hex.
+    pub sha256: String,
+}
+
+/// The skill a profile version names, pinned to the text it was recorded with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SkillPin {
+    /// The skill's name.
+    pub name: String,
+    /// The length of that text in bytes.
+    pub len: u64,
+    /// The SHA-256 of the text the version was recorded with.
+    pub sha256: String,
+}
+
 /// What an agent is set up with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -96,6 +122,9 @@ pub struct Settings {
     /// The harness build it is started with, as the operator declared it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<DeclaredHarness>,
+    /// Each named skill's text as it was when this version was recorded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_pins: Vec<SkillPin>,
 }
 
 /// How an agent's sessions are driven through a runner.
@@ -173,6 +202,8 @@ impl Profile {
 #[serde(deny_unknown_fields)]
 struct Kept {
     profiles: Vec<Profile>,
+    #[serde(default)]
+    skills: Vec<SkillText>,
 }
 
 /// The provisioning profiles, read from their file and written to it.
@@ -303,7 +334,8 @@ impl ProvisioningStore {
                 versions: vec![version],
             }),
         }
-        self.write(Kept { profiles })?;
+        let skills = self.kept.skills.clone();
+        self.write(Kept { profiles, skills })?;
         Ok(number)
     }
 
@@ -342,6 +374,53 @@ impl ProvisioningStore {
             return Ok(());
         }
         version.reviewed = Some(review);
-        self.write(Kept { profiles })
+        let skills = self.kept.skills.clone();
+        self.write(Kept { profiles, skills })
+    }
+
+    /// Keep `skill`; kept already with the same text, it is kept once.
+    pub fn keep_skill(&mut self, skill: SkillText) -> Result<(), ServerError> {
+        self.settle()?;
+        if self.skill(&skill.name, &skill.sha256).is_some() {
+            return Ok(());
+        }
+        let mut skills = self.kept.skills.clone();
+        skills.push(skill);
+        let profiles = self.kept.profiles.clone();
+        self.write(Kept { profiles, skills })
+    }
+
+    /// Every kept skill text, in the order kept.
+    pub fn skills(&self) -> &[SkillText] {
+        &self.kept.skills
+    }
+
+    /// The text of `name` whose hash is `sha256`.
+    pub fn skill(&self, name: &str, sha256: &str) -> Option<&SkillText> {
+        self.kept
+            .skills
+            .iter()
+            .find(|kept| kept.name == name && kept.sha256 == sha256)
+    }
+
+    /// Each of `names` pinned to its latest kept text, refusing a name Lys
+    /// keeps no text for.
+    pub fn pins(&self, names: &[String]) -> Result<Vec<SkillPin>, ServerError> {
+        names
+            .iter()
+            .map(|name| {
+                self.kept
+                    .skills
+                    .iter()
+                    .rev()
+                    .find(|kept| &kept.name == name)
+                    .map(|kept| SkillPin {
+                        name: name.clone(),
+                        len: kept.len,
+                        sha256: kept.sha256.clone(),
+                    })
+                    .ok_or_else(|| ServerError::SkillUnknown { name: name.clone() })
+            })
+            .collect()
     }
 }

@@ -77,6 +77,7 @@ use crate::service_accounts_api::{CreateBody as AccountBody, RetireBody as Accou
 use crate::sessions_api::{EndedView, SessionsView};
 use crate::setup::SetupRequest;
 use crate::sign_in_providers::{ProvidersView, SetBody as ProviderBody};
+use crate::skills_api::{SkillBody, SkillsView};
 use crate::stop_api::{StopBody, StopView, StopsView};
 use crate::teams_api::{
     CreateBody as TeamBody, MemberBody, RetireBody as TeamRetireBody, TeamChanged, TeamView,
@@ -279,6 +280,7 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     let (delivery, asked) = (api.schema::<Delivery>(), api.schema::<Asked>());
     let machine = api.schema::<MachineView>();
     let profile = api.schema::<ProvisioningView>();
+    let skills = api.schema::<SkillsView>();
     let (set, review) = (api.schema::<ProfileBody>(), api.schema::<ReviewBody>());
     let (report, session) = (api.schema::<ReportBody>(), api.schema::<RuntimeSession>());
     let running = api.schema::<RuntimeList>();
@@ -309,6 +311,13 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             "/agents/{id}/provisioning",
             Some(set),
             Some(profile.clone()),
+        ),
+        (GET, "/skills", None, Some(skills.clone())),
+        (
+            POST,
+            "/skills",
+            Some(api.schema::<SkillBody>()),
+            Some(skills),
         ),
         (
             POST,

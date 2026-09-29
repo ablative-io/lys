@@ -30,11 +30,16 @@ pub fn models(harness: &DeclaredHarness, models: &[String]) -> Result<(), Server
                     ))
                 })
         }
-        HarnessKind::Codex => models.get(1).map_or(Ok(()), |model| {
-            Err(refused(
-                model,
+        HarnessKind::Codex => match models {
+            [_] => Ok(()),
+            [] => Err(refused(
+                &String::new(),
+                "the Codex build takes exactly one model and the profile names none",
+            )),
+            [_, further, ..] => Err(refused(
+                further,
                 "the Codex build takes one model for a session and no further ones",
-            ))
-        }),
+            )),
+        },
     }
 }

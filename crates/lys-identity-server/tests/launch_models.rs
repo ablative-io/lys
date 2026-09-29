@@ -163,6 +163,12 @@ async fn a_model_the_declared_harness_cannot_carry_is_refused_when_recorded() ->
     let (status, refused) = table.record(0, &harness("claude_code"), &listed).await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "ModelUnrepresentable");
+    let (status, refused) = table.record(0, &harness("codex"), &json!([])).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(
+        refused["refusal"], "ModelUnrepresentable",
+        "a Codex profile names its model"
+    );
     let (status, set) = table
         .record(0, &harness("codex"), &json!(["gpt-seat-1"]))
         .await?;

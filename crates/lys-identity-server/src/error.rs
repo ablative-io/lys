@@ -327,6 +327,12 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// A skill Lys keeps no text for.
+    #[error("SkillUnknown: Lys keeps no skill named `{name}`; keep its text under /skills first")]
+    SkillUnknown {
+        /// The skill.
+        name: String,
+    },
     /// A model the declared harness cannot carry.
     #[error("ModelUnrepresentable: the harness `{harness}` cannot carry model `{model}`: {reason}")]
     ModelUnrepresentable {

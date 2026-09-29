@@ -5,12 +5,12 @@
 //! layout, which come only from what the profile declares.
 
 use lys_home::harness::launch_fields::{
-    EnvText, HandleEnv, LaunchFields, LaunchIdentity, LaunchMcp, Transport,
+    EnvText, HandleEnv, KeptSkill, LaunchFields, LaunchIdentity, LaunchMcp, Transport,
 };
 
 use crate::error::ServerError;
 use crate::launch_template::{HandleName, Start};
-use crate::provisioning_store::{McpServer, Setting};
+use crate::provisioning_store::{McpServer, Setting, Settings};
 
 /// The launch fields `start` gives, with each secret resolved to one of the
 /// agent's `handles`; a profile that declares no harness is refused.
@@ -39,8 +39,30 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         instructions: settings.instructions.clone(),
         models: settings.model_access.clone(),
         mcp_servers,
-        skills: Vec::new(),
+        skills: skills(settings)?,
     })
+}
+
+/// Each skill the profile names, as the text the version pinned; a name
+/// with no pin was recorded before Lys kept its text and is refused.
+fn skills(settings: &Settings) -> Result<Vec<KeptSkill>, ServerError> {
+    settings
+        .skills
+        .iter()
+        .map(|name| {
+            settings
+                .skill_pins
+                .iter()
+                .find(|pin| &pin.name == name)
+                .map(|pin| KeptSkill {
+                    name: pin.name.clone(),
+                    path: format!("skills/{}/SKILL.md", pin.name),
+                    len: pin.len,
+                    sha256: pin.sha256.clone(),
+                })
+                .ok_or_else(|| ServerError::SkillUnknown { name: name.clone() })
+        })
+        .collect()
 }
 
 fn server_fields(server: &McpServer, handles: &[HandleName]) -> Result<LaunchMcp, ServerError> {
