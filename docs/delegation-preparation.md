@@ -7,7 +7,10 @@ to review and test before a durable consent flow is enabled.
 
 `authenticate` rejects duplicate Authorization headers, mixed Basic/form client
 authentication and duplicate decoded form members before inspecting the supplied
-authority. The form input must preserve all pairs. A configured OpenID client
+authority. Basic components are form-decoded exactly once after Base64 decoding,
+as specified by [RFC 6749 section 2.3.1](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1).
+Malformed escapes refuse before lookup; form inputs are already decoded and must
+preserve all pairs. A configured OpenID client
 never resolves as an approved-app client, even with identical IDs and credentials.
 The supplied app must come from the freshly settled apps log. Its snapshot binds
 registration, approval and current-version operations, client identity/credential

@@ -121,6 +121,40 @@ struct Credentials {
     secret: Zeroizing<String>,
 }
 
+// OAuth Basic encodes each component with form encoding before joining it with
+// a colon and base64 encoding it (RFC 6749 section 2.3.1). Decode exactly once.
+fn component(text: &str) -> Result<Zeroizing<String>, Refusal> {
+    fn digit(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            b'A'..=b'F' => Some(byte - b'A' + 10),
+            _ => None,
+        }
+    }
+    let mut bytes = Zeroizing::new(Vec::with_capacity(text.len()));
+    let mut input = text.bytes();
+    while let Some(byte) = input.next() {
+        bytes.push(match byte {
+            b'+' => b' ',
+            b'%' => {
+                let high = input
+                    .next()
+                    .and_then(digit)
+                    .ok_or(Refusal::ClientAuthentication)?;
+                let low = input
+                    .next()
+                    .and_then(digit)
+                    .ok_or(Refusal::ClientAuthentication)?;
+                (high << 4) | low
+            }
+            other => other,
+        });
+    }
+    let decoded = std::str::from_utf8(&bytes).map_err(|_error| Refusal::ClientAuthentication)?;
+    Ok(Zeroizing::new(decoded.to_owned()))
+}
+
 fn credentials(headers: &HeaderMap, form: &[(&str, &str)]) -> Result<Credentials, Refusal> {
     let mut names = BTreeSet::new();
     if form.iter().any(|(key, _)| !names.insert(*key)) {
@@ -162,8 +196,8 @@ fn credentials(headers: &HeaderMap, form: &[(&str, &str)]) -> Result<Credentials
             .split_once(':')
             .ok_or(Refusal::ClientAuthentication)?;
         Credentials {
-            client: client.to_owned(),
-            secret: Zeroizing::new(secret.to_owned()),
+            client: component(client)?.to_string(),
+            secret: component(secret)?,
         }
     } else {
         Credentials {

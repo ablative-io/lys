@@ -2,6 +2,7 @@
 //! Registry identity, revision binding and authentication ambiguity regressions.
 
 use axum::http::{HeaderMap, header};
+use sha2::{Digest, Sha256};
 
 use crate::apps_state::{By, Decided};
 use crate::delegation::fixture::{CLIENT, REDIRECT, SECRET, TestResult, app, basic};
@@ -190,5 +191,51 @@ fn redirect_set_order_is_irrelevant_but_duplicates_are_refused() -> TestResult {
     assert_eq!(Binding::current(&app)?, before);
     app.registered.redirects.push(REDIRECT.to_owned());
     assert_eq!(Binding::current(&app), Err(Refusal::BindingInvalid));
+    Ok(())
+}
+
+#[test]
+fn basic_components_are_form_decoded_once_and_bad_escapes_never_reach_lookup() -> TestResult {
+    let mut app = app()?;
+    app.approved
+        .as_mut()
+        .ok_or("approval missing")?
+        .client
+        .secret_sha256 = format!("{:x}", Sha256::digest(b"secret+%20"));
+    let expected = Binding::current(&app)?;
+    assert_eq!(
+        authenticate(
+            &basic("fixture%5Fnotes", "secret%2B%2520")?,
+            &[],
+            |_client| Ok(ClientSource::ApprovedApp(&app)),
+            REDIRECT
+        )?,
+        expected
+    );
+    assert_eq!(
+        authenticate(
+            &HeaderMap::new(),
+            &[("client_id", CLIENT), ("client_secret", "secret+%20")],
+            |_client| Ok(ClientSource::ApprovedApp(&app)),
+            REDIRECT
+        )?,
+        expected
+    );
+    for malformed in ["%", "%0", "%GG", "%FF"] {
+        let called = std::cell::Cell::new(false);
+        assert_eq!(
+            authenticate(
+                &basic(CLIENT, malformed)?,
+                &[],
+                |_client| {
+                    called.set(true);
+                    Ok(ClientSource::ApprovedApp(&app))
+                },
+                REDIRECT
+            ),
+            Err(Refusal::ClientAuthentication)
+        );
+        assert!(!called.get());
+    }
     Ok(())
 }
