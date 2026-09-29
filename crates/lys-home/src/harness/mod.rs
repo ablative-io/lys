@@ -10,11 +10,15 @@ pub mod claude_code;
 /// same session: the rollout opens with an in-band marker saying so, and the
 /// durable link back is the account and a `lys.translation` side leaf.
 pub mod codex;
+/// The pinned model, permission, transport and rendering capabilities.
+pub mod description;
 /// What a recorded profile gives a launch, in words neither harness owns:
 /// the declared build, the models, the MCP servers with their settings,
 /// handles and channel policy, and the kept skills (HOME-037).
 pub mod launch_fields;
 mod launch_fields_tests;
+/// The native rendering registry, addressed by description contract identifier.
+pub mod rendering;
 /// Kept skills written into a session's own config directory, each checked
 /// against the hash Lys keeps it by (HOME-037 R3).
 pub mod skills;

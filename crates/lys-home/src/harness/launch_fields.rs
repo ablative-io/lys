@@ -8,21 +8,14 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Which harness a declared build is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HarnessKind {
-    /// Claude Code.
-    ClaudeCode,
-    /// Our own Codex build.
-    Codex,
-}
-
 /// The harness build a profile declares, as the operator declared it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeclaredHarness {
-    /// Which harness it is.
-    pub kind: HarnessKind,
+    /// Its operator-chosen name, which never selects behavior.
+    pub name: String,
+    /// The pinned capabilities and rendering contract.
+    pub description: super::description::Description,
     /// The program the operator declared, run as given.
     pub program: String,
     /// The package or build identity the program is verified against.

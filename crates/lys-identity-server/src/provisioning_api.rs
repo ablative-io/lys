@@ -198,6 +198,16 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
 }
 
 fn settings(body: SetBody) -> Result<Settings, ServerError> {
+    let declared = body.harness.map(harness).transpose()?;
+    let permissions = body
+        .permissions
+        .map(|given| {
+            let contract = declared
+                .as_ref()
+                .ok_or_else(|| malformed("permissions require harness.description.permissions"))?;
+            checked(given, &contract.description.permissions)
+        })
+        .transpose()?;
     let settings = Settings {
         model_access: names("model_access", &body.model_access)?,
         tools: names("tools", &body.tools)?,
@@ -206,9 +216,9 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
-        harness: body.harness.map(harness).transpose()?,
+        harness: declared,
         skill_pins: Vec::new(),
-        permissions: body.permissions.map(checked).transpose()?,
+        permissions,
     };
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
@@ -221,6 +231,12 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
 fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
     if !declared.program.starts_with('/') || declared.program.contains('\0') {
         return Err(malformed("harness.program is not an absolute path"));
+    }
+    if declared.name.trim().is_empty() {
+        return Err(malformed("harness.name is empty"));
+    }
+    if declared.description.rendering_contract.trim().is_empty() {
+        return Err(malformed("harness.description.rendering_contract is empty"));
     }
     if declared.package.trim().is_empty() {
         return Err(malformed("harness.package names no package"));

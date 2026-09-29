@@ -10,14 +10,10 @@
 
 use std::collections::BTreeSet;
 
-use lys_home::harness::claude_code::HARNESS;
-use lys_home::harness::claude_code::launch::shell_word;
-use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
-use lys_home::harness::launch_fields::{Channel, HarnessKind, LaunchFields, LaunchMcp, Transport};
+use lys_home::harness::rendering::{SecretBinding, render as render_contract, shell_word};
 use lys_home::harness::skills::SkillFile;
 use lys_runner::judge::Policy;
 use serde::Serialize;
-use serde_json::{Map, Value, json};
 
 use crate::error::ServerError;
 use crate::launch_harness::fields;
@@ -86,126 +82,29 @@ pub fn handle_variable(secret: &str, taken: &mut BTreeSet<String>) -> String {
     name
 }
 
-fn flags(version: &Version) -> Vec<String> {
-    let settings = &version.settings;
-    let mut flags = Vec::new();
-    if let Some((model, further)) = settings.model_access.split_first() {
-        flags.push("--model".to_owned());
-        flags.push(model.clone());
-        if !further.is_empty() {
-            flags.push("--fallback-model".to_owned());
-            flags.push(further.join(","));
-        }
-    }
-    let waking: Vec<String> = settings
-        .mcp_servers
-        .iter()
-        .filter(|server| server.channel == Channel::Wake)
-        .map(|server| format!("server:{}", server.name))
-        .collect();
-    if !waking.is_empty() {
-        flags.push("--channels".to_owned());
-        flags.extend(waking);
-    }
-    flags
-}
-
-/// A server's Claude Code entry: its address, or its stdio command with
-/// each setting as its text and each secret as the agent's handle id on it.
-fn server_entry(server: &LaunchMcp) -> Result<Value, ServerError> {
-    match &server.transport {
-        Transport::Http { url } => Ok(json!({ "type": "http", "url": url })),
-        Transport::Stdio {
-            program,
-            args,
-            cwd,
-            env,
-            handles,
-        } => {
-            if cwd.is_some() {
-                return Err(ServerError::McpSettingUnrepresentable {
-                    server: server.name.clone(),
-                    member: "cwd".to_owned(),
-                    reason: "Claude Code starts a stdio server with no directory of its own"
-                        .to_owned(),
-                });
-            }
-            let mut vars = Map::new();
-            for one in env {
-                vars.insert(one.name.clone(), Value::String(one.text.clone()));
-            }
-            for one in handles {
-                vars.insert(one.name.clone(), Value::String(one.handle_id.clone()));
-            }
-            Ok(json!({ "type": "stdio", "command": program, "args": args, "env": vars }))
-        }
-    }
-}
-
-fn template(
-    start: &Start<'_>,
-    fields: &LaunchFields,
-    handles: &[HandleName],
-) -> Result<Value, ServerError> {
-    let mut servers = Map::new();
-    for server in &fields.mcp_servers {
-        servers.insert(server.name.clone(), server_entry(server)?);
-    }
-    Ok(json!({
-        "harness": HARNESS,
-        "flags": flags(start.version),
-        "slots": {
-            "transcript": { "fill": FILL_RESUME_BY_PATH, "canon": null },
-            "mcp": { "mcpServers": servers },
-            "env": {
-                "LYS_AGENT": start.agent,
-                "LYS_SESSION": start.session,
-                "LYS_MACHINE": start.machine,
-                "LYS_PROVISIONING_VERSION": start.version.number.to_string(),
-            },
-            "secrets": {
-                "use_only": handles
-                    .iter()
-                    .map(|handle| json!({ "env": handle.env, "handle": handle.id }))
-                    .collect::<Vec<_>>(),
-                "readable": [],
-                "reader": "",
-            },
-            "instructions": fields.instructions,
-        },
-    }))
-}
-
 /// Render `start` with the agent's `handles`: the template the home checks
 /// and keeps by hash, and the command a machine's runtime is given.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
     let fields = fields(start, handles)?;
-    if fields.harness.kind != HarnessKind::ClaudeCode {
-        return Err(unrenderable(
-            "the declared harness is Codex, whose render this start does not take yet".to_owned(),
-        ));
-    }
-    let mut body = template(start, &fields, handles)?;
-    if !start.skills.is_empty() {
-        body["slots"]["skills"] = json!(start.skills);
-    }
     let settings = &start.version.settings;
-    let granted = permissions(settings.permissions.as_ref(), &settings.tools, start.policy)?;
-    let empty = granted.as_object().is_some_and(|members| {
-        members
-            .values()
-            .all(|value| value.as_array().is_some_and(Vec::is_empty))
-    });
-    if !empty {
-        body["slots"]["permissions"] = granted;
-    }
-    let bytes = serde_json::to_vec_pretty(&body)
-        .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;
-    let parsed = parse_template(&bytes).map_err(|error| unrenderable(error.to_string()))?;
-    let template = String::from_utf8(bytes)
-        .map_err(|error| unrenderable(format!("the template is not text: {error}")))?;
-    let template_sha256 = parsed.hash.as_str().to_owned();
+    let granted = permissions(
+        settings.permissions.as_ref(),
+        &settings.tools,
+        start.policy,
+        &fields.harness.description.permissions,
+    )?;
+    let held: Vec<SecretBinding> = handles
+        .iter()
+        .map(|handle| SecretBinding {
+            env: handle.env.clone(),
+            handle: handle.id.clone(),
+        })
+        .collect();
+    let rendered = render_contract(&fields, start.skills, &granted, &held)
+        .map_err(|error| unrenderable(error.to_string()))?;
+    let template = rendered.text;
+    let template_sha256 = rendered.sha256;
     let handle_ids: Vec<&str> = handles.iter().map(|handle| handle.id.as_str()).collect();
     let words = [
         "env".to_owned(),

@@ -1,45 +1,50 @@
-//! Which of a profile's models its declared harness carries. The first
-//! model is the session's own; every further one goes where the harness
-//! takes further models, or the profile is refused by name, so no model is
-//! dropped.
-
-use lys_home::harness::launch_fields::{DeclaredHarness, HarnessKind};
+//! A profile's models checked against its recorded description, never its name.
+use lys_home::harness::description::FurtherModels;
+use lys_home::harness::launch_fields::DeclaredHarness;
 
 use crate::error::ServerError;
 
-/// Refuse the first of `models` that `harness` cannot carry.
+/// Refuse an absent model or the first model the described build cannot carry.
 pub fn models(harness: &DeclaredHarness, models: &[String]) -> Result<(), ServerError> {
-    let refused = |model: &String, reason: &str| ServerError::ModelUnrepresentable {
-        harness: match harness.kind {
-            HarnessKind::ClaudeCode => "claude_code",
-            HarnessKind::Codex => "codex",
-        }
-        .to_owned(),
-        model: model.clone(),
+    let contract = &harness.description.models;
+    let refused = |model: &str, reason: &str| ServerError::ModelUnrepresentable {
+        harness: harness.name.clone(),
+        model: model.to_owned(),
         reason: reason.to_owned(),
     };
-    match harness.kind {
-        HarnessKind::ClaudeCode => {
-            models
-                .iter()
-                .find(|model| model.contains(','))
-                .map_or(Ok(()), |model| {
-                    Err(refused(
-                        model,
-                        "Claude Code takes further models as one comma-separated list",
-                    ))
-                })
-        }
-        HarnessKind::Codex => match models {
-            [_] => Ok(()),
-            [] => Err(refused(
-                &String::new(),
-                "the Codex build takes exactly one model and the profile names none",
-            )),
-            [_, further, ..] => Err(refused(
-                further,
-                "the Codex build takes one model for a session and no further ones",
-            )),
-        },
+    if models.len() < contract.minimum {
+        return Err(refused(
+            "",
+            "description.models.minimum exceeds the supplied model count",
+        ));
     }
+    if let Some(maximum) = contract.maximum {
+        if maximum < contract.minimum {
+            return Err(refused(
+                "",
+                "description.models.maximum is below its minimum",
+            ));
+        }
+        if let Some(model) = models.get(maximum) {
+            return Err(refused(
+                model,
+                "description.models.maximum does not admit this model",
+            ));
+        }
+    }
+    if let FurtherModels::Delimited { separator } = &contract.further_encoding {
+        if separator.is_empty() {
+            return Err(refused(
+                "",
+                "description.models.further_encoding.separator is empty",
+            ));
+        }
+        if let Some(model) = models.iter().find(|model| model.contains(separator)) {
+            return Err(refused(
+                model,
+                "the model contains description.models.further_encoding.separator",
+            ));
+        }
+    }
+    Ok(())
 }

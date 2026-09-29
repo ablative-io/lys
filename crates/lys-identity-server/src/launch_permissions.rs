@@ -1,4 +1,4 @@
-//! The permissions a Claude Code launch's settings file carries (HOME-037
+//! The permissions a described launch carries (HOME-037
 //! R5): the profile's allow, deny and ask rules, its permission mode and its
 //! additional directories, with the profile's tools allowed and each hard
 //! rule of the agent's Tool policy denied. A profile rule the settings file
@@ -7,22 +7,12 @@
 //! grant may lift stays with the judge hook, which reads the live grant; a
 //! settings deny could never be lifted.
 
+use lys_home::harness::description::Permissions as PermissionContract;
 use lys_runner::judge::{Authority, Policy, Rule, RuleKind};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::error::ServerError;
-
-/// The permission modes Claude Code takes, as `claude --help` lists the
-/// choices of `--permission-mode` in Claude Code 2.1.284.
-const MODES: [&str; 6] = [
-    "acceptEdits",
-    "auto",
-    "bypassPermissions",
-    "manual",
-    "dontAsk",
-    "plan",
-];
 
 /// A profile's permissions, as the operator recorded them.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -75,7 +65,22 @@ fn expressible(rule: &str) -> bool {
 
 /// `given`, refused by the first rule, mode or directory the settings file
 /// cannot express.
-pub fn checked(given: Permissions) -> Result<Permissions, ServerError> {
+pub fn checked(
+    given: Permissions,
+    contract: &PermissionContract,
+) -> Result<Permissions, ServerError> {
+    if !given.allow.is_empty() || !given.deny.is_empty() || !given.ask.is_empty() {
+        if !contract
+            .rule_forms
+            .iter()
+            .any(|form| form == "tool_specifier")
+        {
+            return Err(unrepresentable(
+                "description.permissions.rule_forms",
+                "no supported rule form was declared",
+            ));
+        }
+    }
     for rule in given.allow.iter().chain(&given.deny).chain(&given.ask) {
         if !expressible(rule) {
             return Err(unrepresentable(
@@ -85,11 +90,11 @@ pub fn checked(given: Permissions) -> Result<Permissions, ServerError> {
         }
     }
     if let Some(mode) = &given.default_mode
-        && !MODES.contains(&mode.as_str())
+        && !contract.modes.contains(mode)
     {
         return Err(unrepresentable(
             mode,
-            "the permission mode is not one Claude Code takes",
+            "the permission mode is absent from description.permissions.modes",
         ));
     }
     for dir in &given.additional_directories {
@@ -153,6 +158,7 @@ pub fn settings(
     permissions: Option<&Permissions>,
     tools: &[String],
     policy: Option<&Policy>,
+    contract: &PermissionContract,
 ) -> Result<Value, ServerError> {
     let given = permissions.cloned().unwrap_or_default();
     let mut allow = given.allow;
@@ -167,14 +173,15 @@ pub fn settings(
             }
         }
     }
-    let mut out = json!({
-        "allow": allow,
-        "deny": deny,
-        "ask": given.ask,
-        "additionalDirectories": given.additional_directories,
-    });
-    if let Some(mode) = given.default_mode {
-        out["defaultMode"] = json!(mode);
-    }
-    Ok(out)
+    let merged = checked(
+        Permissions {
+            allow,
+            deny,
+            ask: given.ask,
+            additional_directories: given.additional_directories,
+            default_mode: given.default_mode,
+        },
+        contract,
+    )?;
+    serde_json::to_value(merged).map_err(|error| unrepresentable("permissions", &error.to_string()))
 }
