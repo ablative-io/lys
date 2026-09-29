@@ -1,20 +1,24 @@
-/* Directory responsibility and permission connections use the shared surface typography and borders. */
-.identity-graph { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr); gap: 24px; margin: 20px 0; }
-.graph-identity { display: flex; flex-direction: column; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--border-default); }
-.graph-identity [aria-current="page"] { color: var(--accent); }
-.graph-connection, .graph-installed { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(120px, 1fr); gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--border-default); overflow-wrap: anywhere; }
-.graph-connection .note, .graph-installed .note { grid-column: 3; }
-@media (max-width: 720px) { .identity-graph { grid-template-columns: 1fr; } }
-.permission-graph-scroll { overflow: auto; margin: 20px 0; border: 1px solid var(--border-default); border-radius: 8px; }
-.permission-graph { position: relative; display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 120px; padding: 24px 32px; min-width: 900px; }
-.permission-graph-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.permission-graph-lines path { fill: none; stroke-width: 2; stroke: var(--accent); opacity: .85; }
-.permission-graph-lines path[data-kind="responsible"] { stroke: var(--text-secondary, #888); stroke-dasharray: 6 4; }
-.permission-graph-lines path[data-kind="installed"] { stroke: var(--text-secondary, #888); }
-.permission-graph-lines path[data-lit="false"] { opacity: .12; }
-.permission-graph-column { display: flex; flex-direction: column; gap: 14px; position: relative; z-index: 1; }
-.permission-graph-node { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--surface, var(--bg, #fff)); color: inherit; text-decoration: none; }
-.permission-graph-node[aria-current="page"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.permission-graph-node[data-dim="true"] { opacity: .35; }
-.permission-graph-key { display: flex; gap: 24px; flex-wrap: wrap; }
-.permission-graph-list ul { padding-left: 18px; }
+/* The permission graph, drawn as the design mockup draws it. */
+.graph-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: 999px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-secondary); }
+.chk.on { border-color: rgba(212,151,90,.5); color: var(--accent); background: rgba(212,151,90,.07); }
+.graph-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+.graph-wrap { position: relative; height: calc(100vh - 220px); min-height: 460px; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
+.graph-wrap svg { display: block; width: 100%; height: 100%; }
+.gn { cursor: pointer; }
+.gn text { font-size: 11px; fill: var(--text-secondary); pointer-events: none; }
+.gn:focus { outline: none; } .gn:focus-visible circle, .gn:focus-visible rect { stroke-width: 3; }
+.gn.dimmed { opacity: .18; } .ge.dimmed { opacity: .07; }
+.ge { stroke: rgba(255,255,255,.14); stroke-width: 1.2; fill: none; }
+.ge.grant { stroke: rgba(212,151,90,.55); }
+.ge.void { stroke: rgba(248,113,113,.5); stroke-dasharray: 4 3; }
+.ge.answers { stroke: rgba(255,255,255,.22); stroke-dasharray: 2 3; }
+.ge.installed { stroke: rgba(255,255,255,.18); }
+.ge.hot { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.legend { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; font-size: 11px; color: var(--text-muted); }
+.legend i { display: inline-block; width: 16px; margin-right: 5px; vertical-align: middle; border-top: 2px solid; }
+.legend i.grant { border-color: rgba(212,151,90,.7); } .legend i.void { border-color: rgba(248,113,113,.6); border-top-style: dashed; } .legend i.answers { border-color: rgba(255,255,255,.3); border-top-style: dotted; }
+.node-card { padding: 16px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 12px; color: var(--text-primary); align-self: start; }
+.node-card .row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; color: inherit; text-decoration: none; }
+.node-card .actions { display: flex; gap: 8px; margin-top: 10px; }
+@media (max-width: 900px) { .graph-split { grid-template-columns: 1fr; } }
