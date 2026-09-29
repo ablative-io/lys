@@ -10,11 +10,29 @@ use crate::error::ServerError;
 /// Resolve the caller's bound person or agent and refuse a suspended or retired
 /// identity. Registered people retain the authority of existing installations.
 pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId, ServerError> {
-    let identity = directory
-        .person_for(actor.binding())
-        .map(IdentityId::Person)
+    let identity = actor
+        .provenance()
+        .agent()
+        .map(IdentityId::Agent)
+        .or_else(|| {
+            directory
+                .person_for(actor.binding())
+                .map(IdentityId::Person)
+        })
         .or_else(|| directory.agent_for(actor.binding()).map(IdentityId::Agent))
         .ok_or(ServerError::NoPerson)?;
+    admit_identity(directory, identity)?;
+    if let IdentityId::Agent(_) = identity {
+        let person = directory
+            .record(identity)
+            .and_then(lys_identity::projection::Record::responsible)
+            .ok_or(ServerError::NoPerson)?;
+        admit_identity(directory, IdentityId::Person(person))?;
+    }
+    Ok(identity)
+}
+
+fn admit_identity(directory: &Projection, identity: IdentityId) -> Result<IdentityId, ServerError> {
     let record = directory.record(identity).ok_or(ServerError::NoPerson)?;
     match record.state() {
         LifecycleState::Registered | LifecycleState::Active => Ok(identity),

@@ -43,6 +43,9 @@ pub(crate) fn route(
             named.push(name);
         }
     }
+    if auth.contains(&Auth::AgentSignature) && !named.contains(&"inactive") {
+        named.push("inactive");
+    }
     Route {
         method,
         path,
