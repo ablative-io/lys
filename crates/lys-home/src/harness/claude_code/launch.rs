@@ -42,7 +42,7 @@ use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template
 use crate::harness::claude_code::given::{
     CONFIG_DIR_NAME, CONFIG_DIR_VARIABLE, ConfigDir, ConfigSource, resolve_given,
 };
-use crate::harness::claude_code::launch_env::{write_env_file, write_new};
+use crate::harness::claude_code::launch_env::{Judge, write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
@@ -95,6 +95,14 @@ pub struct LaunchArgs {
     /// given is signed as a given statement.
     #[arg(long)]
     pub key: Option<PathBuf>,
+    /// The runner's Unix socket the session's tool calls are judged on;
+    /// when given, the settings file installs `lys runner judge` as the
+    /// session's `PreToolUse` hook for every tool.
+    #[arg(long, requires = "judge_program")]
+    pub judge_socket: Option<PathBuf>,
+    /// The `lys` program the hook runs, by absolute path.
+    #[arg(long, requires = "judge_socket")]
+    pub judge_program: Option<PathBuf>,
 }
 
 /// The five files a launch is made of, under `out`, in write order.
@@ -176,7 +184,11 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         source,
     })?;
     write_new(&mcp_file, &with_newline(mcp_bytes))?;
-    write_env_file(&template, &env)?;
+    let judge = match (&args.judge_socket, &args.judge_program) {
+        (Some(socket), Some(program)) => Some(Judge::new(program, socket)?),
+        _ => None,
+    };
+    write_env_file(&template, judge.as_ref(), &env)?;
     write_new(&instructions, template.instructions.as_bytes())?;
     let skills = if template.skills.is_empty() {
         Vec::new()

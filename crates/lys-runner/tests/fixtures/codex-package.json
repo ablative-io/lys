@@ -1,0 +1,9 @@
+{
+  "layoutVersion": 1,
+  "version": "0.0.0-channels.3+bd3798faee33820aad0044ed732841261d2bbe15",
+  "target": "aarch64-apple-darwin",
+  "variant": "codex",
+  "entrypoint": "bin/codex",
+  "resourcesDir": "codex-resources",
+  "pathDir": "codex-path"
+}

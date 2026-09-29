@@ -58,6 +58,8 @@ pub struct Carried {
     pub administrator: Option<Value>,
     /// The products an earlier configuration registered as clients of Lys.
     pub products: Option<Value>,
+    /// The message service bridge an earlier configuration declared.
+    pub message_service: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -100,6 +102,7 @@ pub fn render(
         },
         "link_audit_source": {"issuer": issuer, "subject": LINK_AUDIT_SUBJECT},
         "session_seconds": SESSION_SECONDS,
+        "sessions_file": state.join("sessions.json").display().to_string(),
         "secure_cookie": false,
         "grant_log_dir": dir("grant-log"),
         "grant_log_origin": GRANT_LOG_ORIGIN,
@@ -130,12 +133,18 @@ pub fn render(
         "runtime_dir": dir("runtime"),
         "service_accounts_dir": dir("service-accounts"),
         "teams_dir": dir("teams"),
+        "budgets_dir": dir("budgets"),
+        "policies_dir": dir("policies"),
         "stops_dir": dir("stops"),
+        "goals_dir": dir("goals"),
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });
     if let Some(administrator) = &carried.administrator {
         rendered["administrator"] = administrator.clone();
+    }
+    if let Some(bridge) = &carried.message_service {
+        rendered[MESSAGE_SERVICE] = bridge.clone();
     }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
@@ -163,5 +172,51 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     Ok(Some(Carried {
         administrator: named(earlier.get("administrator")),
         products: named(earlier.pointer("/provider/clients")),
+        message_service: message_service(&earlier, &path)?,
     }))
+}
+
+/// The member the message service bridge is written under.
+pub const MESSAGE_SERVICE: &str = "message_service";
+
+/// The message service bridge `earlier` declares. An earlier build wrote it
+/// as `<service>_messages` holding only `url` and `bindings`, and forwarded
+/// the service's `<service>_session` cookie without naming it in the
+/// configuration; that member is carried as `message_service` with that
+/// cookie named, so the new build reads the same bridge.
+fn message_service(earlier: &Value, path: &std::path::Path) -> IdentityResult<Option<Value>> {
+    if let Some(current) = earlier
+        .get(MESSAGE_SERVICE)
+        .filter(|value| !value.is_null())
+    {
+        return Ok(Some(current.clone()));
+    }
+    let Some(members) = earlier.as_object() else {
+        return Ok(None);
+    };
+    let mut older = members.iter().filter_map(|(key, value)| {
+        let service = key.strip_suffix("_messages")?;
+        let bridge = value.as_object()?;
+        let shaped =
+            bridge.len() == 2 && bridge.contains_key("url") && bridge.contains_key("bindings");
+        shaped.then_some((service, bridge))
+    });
+    let Some((service, bridge)) = older.next() else {
+        return Ok(None);
+    };
+    if older.next().is_some() {
+        return Err(IdentityError::new(
+            ErrorKind::ConfigInvalid,
+            "read",
+            "identity.json",
+            "it declares more than one earlier message service bridge",
+        )
+        .at(path));
+    }
+    let mut carried = bridge.clone();
+    carried.insert(
+        "cookie".to_owned(),
+        Value::String(format!("{service}_session")),
+    );
+    Ok(Some(Value::Object(carried)))
 }

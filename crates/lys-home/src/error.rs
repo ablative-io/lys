@@ -342,6 +342,18 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// A path the judge hook would run is not one plain absolute path.
+    #[error(
+        "render-launch {flag} must be an absolute path without a quote or control character: {}",
+        path.display()
+    )]
+    JudgePath {
+        /// The flag that named it.
+        flag: &'static str,
+        /// The path.
+        path: PathBuf,
+    },
+
     /// The signing key file given to render-launch could not be loaded.
     #[error("render-launch signing key could not be loaded from {}: {reason}", path.display())]
     SigningKey {

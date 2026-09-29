@@ -60,6 +60,7 @@ fn started(client: &Client, id: &str, script: &str) -> TestResult {
         columns: 80,
         rows: 24,
         rotation: None,
+        policy: None,
     };
     assert!(matches!(
         client.ask(&Act::Start { launch })?,

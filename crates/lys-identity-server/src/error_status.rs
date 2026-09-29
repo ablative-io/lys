@@ -96,7 +96,8 @@ impl ServerError {
             | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
-            Self::NotAdmitted { .. }
+            Self::Inactive { .. }
+            | Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }
@@ -148,6 +149,8 @@ impl ServerError {
             | Self::ServiceAccountOwnerRetired { .. }
             | Self::TeamReused { .. }
             | Self::StopReused { .. }
+            | Self::BudgetVersionConflict { .. }
+            | Self::PolicyVersionConflict { .. }
             | Self::TeamRetired { .. }
             | Self::TeamMemberHeld
             | Self::TeamMemberAbsent
@@ -170,7 +173,9 @@ impl ServerError {
             | Self::McpSettingUnrepresentable { .. }
             | Self::ModelUnrepresentable { .. }
             | Self::PolicyUnrepresentable { .. }
-            | Self::SkillUnknown { .. } => StatusCode::BAD_REQUEST,
+            | Self::SkillUnknown { .. }
+            | Self::BudgetRefused { .. }
+            | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
@@ -179,6 +184,7 @@ impl ServerError {
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
+            | Self::SessionsUnavailable { .. }
             | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }
@@ -186,6 +192,8 @@ impl ServerError {
             | Self::ServiceAccountsUnavailable { .. }
             | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
+            | Self::BudgetsUnavailable { .. }
+            | Self::PolicyUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::SetupUnavailable { .. }
             | Self::ProviderUnavailable { .. }
@@ -195,6 +203,7 @@ impl ServerError {
             Self::Identity(error) => identity_status(error),
             Self::Grant(error) => grant_status(error),
             Self::App(error) => error.status(),
+            Self::Goal(error) => error.status(),
         }
     }
 }

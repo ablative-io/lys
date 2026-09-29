@@ -10,7 +10,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+jiff.workspace = true
 lys-core.workspace = true
+# A session's stream file is followed by the platform's change notices,
+# never by polling on a clock.
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+# A peer's process id and user are read from the connected socket.
+nix = { version = "0.28", default-features = false, features = ["fs", "socket", "user"] }
 # Each session's pseudo-terminal: opening it, making it the child's
 # controlling terminal and resizing it, behind a safe interface.
 portable-pty.workspace = true
@@ -23,13 +29,19 @@ rustix.workspace = true
 # at the version already in the lock, as lys-home pins them.
 rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
+sha2.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 # `lys runner serve` ends every session when the process is asked to stop.
 tokio = { workspace = true, features = ["rt", "signal", "macros"] }
+url = "2.5"
 # The rotation's shape in the identity server's OpenAPI document.
 utoipa.workspace = true
 webpki-roots = "=1.0.9"
+
+# A peer's ancestry is read from the macOS process records.
+[target.'cfg(target_os = "macos")'.dependencies]
+libproc = "0.14"
 
 [dev-dependencies]
 rcgen.workspace = true

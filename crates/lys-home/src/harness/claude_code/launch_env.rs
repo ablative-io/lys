@@ -40,9 +40,74 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     Ok(bytes)
 }
 
+/// The hook that sends each of the session's tool calls to the runner's
+/// judge before it runs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Judge {
+    command: String,
+}
+
+impl Judge {
+    /// The hook running `program` against the runner on `socket`. Both must
+    /// be absolute, so the hook never depends on the session's directory or
+    /// search path, and neither may hold a character the hook's shell would
+    /// read as more than a path.
+    pub fn new(program: &Path, socket: &Path) -> Result<Self, HomeError> {
+        let program = hook_path("--judge-program", program)?;
+        let socket = hook_path("--judge-socket", socket)?;
+        Ok(Self {
+            command: format!("'{program}' runner judge --harness claude --socket '{socket}'"),
+        })
+    }
+
+    /// The hook's command line.
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+}
+
+fn hook_path<'a>(flag: &'static str, path: &'a Path) -> Result<&'a str, HomeError> {
+    let text = path
+        .to_str()
+        .filter(|text| path.is_absolute() && !text.chars().any(|c| c == '\'' || c.is_control()));
+    text.ok_or_else(|| HomeError::JudgePath {
+        flag,
+        path: path.to_path_buf(),
+    })
+}
+
+/// The settings file's bytes with the judge's `PreToolUse` hook beside
+/// `env` when there is a judge; without one, exactly [`env_settings`].
+pub fn settings(template: &Template, judge: Option<&Judge>) -> Result<Vec<u8>, HomeError> {
+    let Some(judge) = judge else {
+        return env_settings(template);
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&env_settings(template)?).map_err(|source| HomeError::Json {
+            context: "the environment file could not be read back",
+            source,
+        })?;
+    value["hooks"] = json!({
+        "PreToolUse": [{
+            "matcher": "*",
+            "hooks": [{"type": "command", "command": judge.command()}]
+        }]
+    });
+    let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
+        context: "the environment file could not be serialised",
+        source,
+    })?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
 /// Write the environment file at `path`, which must not exist.
-pub fn write_env_file(template: &Template, path: &Path) -> Result<Hash, HomeError> {
-    write_new(path, &env_settings(template)?)
+pub fn write_env_file(
+    template: &Template,
+    judge: Option<&Judge>,
+    path: &Path,
+) -> Result<Hash, HomeError> {
+    write_new(path, &settings(template, judge)?)
 }
 
 /// Write a launch file exclusively (an existing path is refused by name),

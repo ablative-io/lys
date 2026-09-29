@@ -127,6 +127,8 @@ impl Fixture {
             version: "2.1.283".to_owned(),
             out: out.to_path_buf(),
             key: key.map(Path::to_path_buf),
+            judge_socket: None,
+            judge_program: None,
         }
     }
 

@@ -221,6 +221,33 @@ async fn a_withdrawn_certificates_key_is_refused() -> TestResult {
 }
 
 #[tokio::test]
+async fn a_signed_agent_report_is_refused_when_its_responsible_person_is_suspended() -> TestResult {
+    let table = Table::set().await?;
+    let admin = table.service.sign_in(login(ADMINISTRATOR)).await?;
+    let (_, me) = table.service.get("/me", Some(&table.bea)).await?;
+    let person = me["person"]["id"].as_str().ok_or("no responsible person")?;
+    let response = table.service.post(
+        &format!("/identities/{person}/transitions"),
+        Some(&admin),
+        &json!({"operation": operation()?, "transition": "suspend", "reason": "no further authority"}),
+    ).await?;
+    assert_eq!(response.0, 200, "{}", response.1);
+    let path = table.path(&operation()?);
+    let body = table.body()?;
+    let header = table.header(&path, &body, now_ms()?, &nonce(43));
+    let answer = table.send(&path, &header, body).await?;
+    assert_eq!(answer.0, 403, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "inactive");
+    assert!(
+        answer.1["reason"]
+            .as_str()
+            .ok_or("no reason")?
+            .contains("suspended")
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_valid_agent_signature_cannot_bypass_a_bad_operator_header() -> TestResult {
     let table = Table::set().await?;
     let path = table.path(&operation()?);

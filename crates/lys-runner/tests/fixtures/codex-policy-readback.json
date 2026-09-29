@@ -1,0 +1,40 @@
+{
+  "approval_policy": "never",
+  "default_permissions": "lys-bound",
+  "sandbox_mode": null,
+  "sandbox_workspace_write": null,
+  "profile": null,
+  "permissions": {
+    "lys-bound": {
+      "description": null,
+      "extends": null,
+      "workspace_roots": null,
+      "filesystem": {
+        "glob_scan_max_depth": null,
+        "/": "deny",
+        "/agent/home": "write",
+        "/agent/work": "write",
+        "/runner/control": "deny",
+        "/runtime": "read"
+      },
+      "network": {
+        "enabled": true,
+        "proxy_url": null,
+        "enable_socks5": false,
+        "socks_url": null,
+        "enable_socks5_udp": false,
+        "allow_upstream_proxy": false,
+        "dangerously_allow_non_loopback_proxy": false,
+        "dangerously_allow_all_unix_sockets": false,
+        "mode": "full",
+        "domains": {
+          "allowed.example": "allow",
+          "denied.example": "deny"
+        },
+        "unix_sockets": null,
+        "allow_local_binding": false,
+        "mitm": null
+      }
+    }
+  }
+}

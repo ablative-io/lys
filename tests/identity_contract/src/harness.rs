@@ -384,6 +384,7 @@ impl Service {
             subject: subject.to_owned(),
         };
         let mut config = Config {
+            message_service: None,
             listen,
             log_dir: dir.path().join("log"),
             log_origin: ORIGIN.to_owned(),
@@ -398,6 +399,7 @@ impl Service {
             administrator: Some(configured(ADMINISTRATOR)),
             link_audit_source: configured(LINK_AUDIT_SOURCE),
             session_seconds: 600,
+            sessions_file: Some(dir.path().join("sessions.json")),
             secure_cookie: false,
             grant_log_dir: dir.path().join("grant-log"),
             grant_log_origin: GRANT_ORIGIN.to_owned(),
@@ -414,6 +416,9 @@ impl Service {
             service_accounts_dir: Some(dir.path().join("service-accounts")),
             teams_dir: Some(dir.path().join("teams")),
             stops_dir: Some(dir.path().join("stops")),
+            budgets_dir: Some(dir.path().join("budgets")),
+            policies_dir: Some(dir.path().join("policies")),
+            goals_dir: Some(dir.path().join("goals")),
             reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
             provider_origins: Some(ProviderOrigins {
@@ -446,7 +451,8 @@ impl Service {
 
     /// Stop the service and start it again over the same directory, on a new
     /// address with a new client, so every store is opened from disk and no
-    /// session or connection of the stopped service carries over.
+    /// connection of the stopped service carries over. Signed-in sessions are
+    /// among what is opened from disk: a cookie from before still answers.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
         self.server.abort();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

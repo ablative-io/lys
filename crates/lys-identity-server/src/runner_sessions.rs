@@ -88,6 +88,36 @@ pub fn driven(state: &AppState, session: &str) -> Result<Driven, ServerError> {
     })
 }
 
+/// The agent a tracked session belongs to, before any runner is looked up.
+pub(crate) fn session_agent(state: &AppState, session: &str) -> Result<String, ServerError> {
+    with_runtime(state, |store| {
+        store
+            .session(session)
+            .and_then(|tracked| tracked.agent.clone())
+            .ok_or(ServerError::RuntimeSessionUnknown)
+    })
+}
+
+/// Refuse a usage target outside the named agent before recording or acting.
+pub(crate) fn usage_session(
+    state: &AppState,
+    agent: &str,
+    session: &str,
+) -> Result<(), ServerError> {
+    let belongs = with_runtime(state, |store| {
+        Ok(store
+            .session(session)
+            .is_some_and(|tracked| tracked.agent.as_deref() == Some(agent)))
+    })?;
+    if belongs {
+        Ok(())
+    } else {
+        Err(ServerError::RequestMalformed {
+            reason: format!("usage session `{session}` is not tracked under agent `{agent}`"),
+        })
+    }
+}
+
 /// The caller, admitted to operate `agent` for `act`: the administrator,
 /// the person responsible for the agent, or the holder of a grant of
 /// `operate` on it. Anyone else is refused `not_permitted`, by name.
@@ -227,6 +257,7 @@ pub fn ended_in(answer: &Answer) -> Option<&Ended> {
     match answer {
         Answer::Ended { ended, .. } => Some(ended),
         Answer::Output { output } => output.ended.as_ref(),
+        Answer::Bytes { output } => output.ended.as_ref(),
         Answer::Status { status } => status
             .sessions
             .first()
@@ -241,9 +272,15 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Started { .. } => "started",
         Answer::Delivered { .. } => "delivered",
         Answer::Output { .. } => "output",
+        Answer::Bytes { .. } => "bytes",
         Answer::Matched { .. } => "matched",
         Answer::Ended { .. } => "ended",
         Answer::Status { .. } => "status",
+        Answer::Judged { .. } => "judged",
+        Answer::Collected { .. } => "collected",
+        Answer::Operation { .. } => "operation",
+        Answer::Feed { .. } => "feed",
+        Answer::GrantChannel => "grant_channel",
         Answer::Refused { .. } => "refused",
     }
 }
@@ -408,6 +445,10 @@ impl Launcher for DirectoryLauncher {
                 Ok(settings) => settings.and_then(|settings| settings.accounts),
                 Err(refused) => return Some(Err(refused)),
             };
+            let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
+                Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
@@ -426,6 +467,7 @@ impl Launcher for DirectoryLauncher {
                 columns: COLUMNS,
                 rows: ROWS,
                 rotation,
+                policy,
             };
             run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch)
                 .await

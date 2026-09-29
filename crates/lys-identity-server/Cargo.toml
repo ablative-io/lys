@@ -16,6 +16,7 @@ base64.workspace = true
 lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true
+jiff.workspace = true
 lys-log-store.workspace = true
 lys-openapi.workspace = true
 lys-runner.workspace = true
@@ -26,7 +27,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["time"] }
 tracing.workspace = true
 utoipa.workspace = true
 

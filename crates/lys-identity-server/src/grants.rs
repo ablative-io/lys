@@ -275,13 +275,7 @@ pub(crate) fn caller(
     directory: &Projection,
 ) -> Result<IdentityId, ServerError> {
     let actor = signed_in(state, headers)?;
-    if let Some(person) = directory.person_for(actor.binding()) {
-        return Ok(IdentityId::Person(person));
-    }
-    directory
-        .agent_for(actor.binding())
-        .map(IdentityId::Agent)
-        .ok_or(ServerError::NoPerson)
+    crate::caller_admission::active_caller(directory, &actor)
 }
 
 async fn list(

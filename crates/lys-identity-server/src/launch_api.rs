@@ -326,6 +326,7 @@ async fn run(
         member("session")?,
         member("command")?,
     );
+    let policy = crate::agent_policy_api::launch_policy(state, &agent)?;
     let launch = lys_runner::Launch {
         session,
         program: SHELL.to_owned(),
@@ -335,6 +336,7 @@ async fn run(
         columns: crate::runner_sessions::COLUMNS,
         rows: crate::runner_sessions::ROWS,
         rotation,
+        policy,
     };
     let ran = crate::runner_sessions::run_on_runner(state, (&agent, &machine, admitted_by), launch)
         .await?;
