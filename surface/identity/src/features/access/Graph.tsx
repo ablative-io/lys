@@ -1,5 +1,6 @@
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { PointerEvent, WheelEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
@@ -99,6 +100,33 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
   const reaches = focus ? [...reach].flatMap(([resource, holders]) => { const actions = holders.get(focus); return actions ? [{ resource, actions }] : []; }) : [];
   const reachedBy = picked?.kind === 'resource' ? [...(reach.get(picked.label) ?? new Map<string, string[]>())] : [];
   const go = (id: string) => navigate('/graph/' + encodeURIComponent(id));
+  const [view, setView] = useState({ x: 0, y: 0, w: W, h: H });
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const svg = useRef<SVGSVGElement>(null);
+  const scale = () => { const box = svg.current?.getBoundingClientRect(); return box && box.width ? view.w / box.width : 1; };
+  const zoom = (factor: number, cx = view.x + view.w / 2, cy = view.y + view.h / 2) => setView((v) => {
+    const w = Math.min(W * 4, Math.max(W / 8, v.w * factor)); const k = w / v.w;
+    return { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w, h: v.h * k };
+  });
+  const onWheel = (event: WheelEvent<SVGSVGElement>) => {
+    const box = svg.current?.getBoundingClientRect();
+    if (!box) return;
+    const cx = view.x + (event.clientX - box.left) * scale(), cy = view.y + (event.clientY - box.top) * scale();
+    zoom(event.deltaY > 0 ? 1.15 : 1 / 1.15, cx, cy);
+  };
+  const onDown = (event: PointerEvent<SVGSVGElement>) => { drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
+  const onMove = (event: PointerEvent<SVGSVGElement>) => {
+    const start = drag.current;
+    if (!start || event.buttons !== 1) return;
+    const dx = event.clientX - start.x, dy = event.clientY - start.y;
+    if (!start.moved && Math.hypot(dx, dy) < 4) return;
+    if (!start.moved) svg.current?.setPointerCapture(event.pointerId);
+    start.moved = true; start.x = event.clientX; start.y = event.clientY;
+    const k = scale();
+    setView((v) => ({ ...v, x: v.x - dx * k, y: v.y - dy * k }));
+  };
+  const onUp = () => { const was = drag.current?.moved; drag.current = null; return was; };
+  const pick = (id: string) => { if (!drag.current?.moved) go(id); };
   return <>
     <div className="graph-toggles">
       {([['grants', 'Grants'], ['answers', 'Who answers for whom'], ['installed', 'Set up by the install']] as const).map(([key, label]) =>
@@ -106,7 +134,9 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
     </div>
     <div className="graph-split">
       <div className="graph-wrap">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Permission graph">
+        <div className="graph-zoom"><button className="btn" onClick={() => zoom(1 / 1.3)} aria-label="Zoom in">+</button><button className="btn" onClick={() => zoom(1.3)} aria-label="Zoom out">−</button><button className="btn" onClick={() => setView({ x: 0, y: 0, w: W, h: H })}>Fit</button></div>
+        <svg ref={svg} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="img" aria-label="Permission graph"
+          onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { drag.current = null; }}>
           {edges.map((edge, index) => {
             const a = at.get(edge.a), b = at.get(edge.b);
             if (!a || !b) return null;
@@ -114,7 +144,7 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
             return <line key={index} className={'ge ' + edge.kind + state} x1={a.x} y1={a.y} x2={b.x} y2={b.y}><title>{edge.label}</title></line>;
           })}
           {nodes.map((node) => <g key={node.id} className={'gn' + (hot && !hot.has(node.id) ? ' dimmed' : '')} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`}
-            tabIndex={0} role="link" aria-label={node.label} onClick={() => go(node.id)} onKeyDown={(event) => { if (event.key === 'Enter') go(node.id); }}>
+            tabIndex={0} role="link" aria-label={node.label} onClick={() => pick(node.id)} onKeyDown={(event) => { if (event.key === 'Enter') go(node.id); }}>
             <Shape node={node} /><text x={13} y={4}>{node.label}</text>
           </g>)}
         </svg>
