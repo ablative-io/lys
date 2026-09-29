@@ -59,6 +59,23 @@ pub fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError> {
     })
 }
 
+const OWN_ACCOUNT_ROUTES: &[(Method, &str)] = &[
+    (Method::GET, "me"),
+    (Method::GET, "me/account"),
+    (Method::GET, "sessions"),
+    (Method::GET, "login"),
+    (Method::GET, "callback"),
+    (Method::GET, "sign-in/providers"),
+    (Method::GET, "sign-in/providers/{id}"),
+    (Method::GET, "auth/v1/providers/callback"),
+    (Method::POST, "sign-in"),
+    (Method::POST, "setup"),
+    (Method::POST, "setup/open"),
+    (Method::POST, "setup/administrator"),
+    (Method::POST, "setup/password"),
+    (Method::POST, "sessions/{id}/end"),
+];
+
 /// Explicit exceptions to C39: authentication (lifecycle contract section 2),
 /// setup's existing code/bootstrap rules, own-account reads, and ending one's
 /// own session. No transition or account mutation is an exception. Match the
@@ -70,31 +87,16 @@ fn own_account_route(request: &Request) -> bool {
     let route = route.as_str();
     let route = route.strip_prefix("/api/").unwrap_or(route);
     let route = route.strip_prefix('/').unwrap_or(route);
-    match *request.method() {
-        Method::GET => matches!(
-            route,
-            "me" | "me/account"
-                | "sessions"
-                | "login"
-                | "callback"
-                | "sign-in/providers"
-                | "sign-in/providers/{id}"
-                | "auth/v1/providers/callback"
-        ),
-        Method::POST => matches!(
-            route,
-            "sign-in"
-                | "setup"
-                | "setup/open"
-                | "setup/administrator"
-                | "setup/password"
-                | "sessions/{id}/end"
-        ),
-        _ => false,
-    }
+    OWN_ACCOUNT_ROUTES
+        .iter()
+        .any(|(method, path)| request.method() == method && route == *path)
 }
 
 /// Apply state admission to an API handler tree, including its own fallback.
 pub(crate) fn guarded(routes: axum::Router, state: Arc<AppState>) -> axum::Router {
     routes.layer(axum::middleware::from_fn_with_state(state, guard))
 }
+
+#[cfg(test)]
+#[path = "session_admission_tests.rs"]
+mod tests;

@@ -91,5 +91,40 @@ async fn public_screens_do_not_exempt_unknown_or_wildcard_shaped_api_requests() 
         200,
         "own-account read through nested API"
     );
+    let sessions = client
+        .get(format!("{}/api/sessions", service.base))
+        .header(reqwest::header::COOKIE, &cookie)
+        .send()
+        .await?;
+    assert_eq!(sessions.status().as_u16(), 200);
+    let sessions: serde_json::Value = serde_json::from_str(&sessions.text().await?)?;
+    let id = sessions["sessions"][0]["id"]
+        .as_str()
+        .ok_or("nested own session id")?;
+    let ended = client
+        .post(format!("{}/api/sessions/{id}/end", service.base))
+        .header(reqwest::header::COOKIE, &cookie)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body("{}")
+        .send()
+        .await?;
+    assert_eq!(
+        ended.status().as_u16(),
+        200,
+        "own session end through nested API"
+    );
+    assert!(ended.headers().contains_key(reqwest::header::SET_COOKIE));
+    let ended: serde_json::Value = serde_json::from_str(&ended.text().await?)?;
+    assert_eq!(ended["ended"], id);
+    let after = client
+        .get(format!("{}/api/me", service.base))
+        .header(reqwest::header::COOKIE, &cookie)
+        .send()
+        .await?;
+    assert_eq!(
+        after.status().as_u16(),
+        401,
+        "ended nested session is no longer authenticated"
+    );
     Ok(())
 }
