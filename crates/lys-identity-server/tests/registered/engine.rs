@@ -31,7 +31,10 @@ impl CountedEngine {
                 let listener = tokio::net::TcpListener::from_std(listener)?;
                 axum::serve(listener, router)
                     .with_graceful_shutdown(async {
-                        let _ = stopped.await;
+                        if stopped.await.is_err() {
+                            // Failed fixture setup drops its sender without an explicit stop.
+                            tracing::debug!("engine fixture owner dropped before shutdown");
+                        }
                     })
                     .await
             })
@@ -63,7 +66,10 @@ impl CountedEngine {
 impl Drop for CountedEngine {
     fn drop(&mut self) {
         if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
+            if stop.send(()).is_err() {
+                // The join below still checks and reports the server's actual outcome.
+                tracing::debug!("engine fixture server already stopped");
+            }
         }
         if let Some(server) = self.server.take() {
             assert!(
