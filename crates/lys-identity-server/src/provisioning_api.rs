@@ -262,6 +262,29 @@ pub(crate) fn with_provisioning<T>(
     act(&mut store)
 }
 
+/// A profile or skill mutation, refused while the previous build may be
+/// restored. Check after taking the store lock, immediately before its write.
+pub(crate) fn write_provisioning<T>(
+    state: &AppState,
+    act: impl FnOnce(&mut ProvisioningStore) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_provisioning(state, |store| {
+        let pending = crate::operator::upgrade_pending(state).map_err(|error| {
+            ServerError::ProvisioningUnavailable {
+                reason: format!("the provisioning writer cannot read the upgrade intent: {error}"),
+            }
+        })?;
+        if pending {
+            return Err(ServerError::ProvisioningUnavailable {
+                reason:
+                    "upgrade_pending: provisioning cannot change while the upgrade is reversible"
+                        .to_owned(),
+            });
+        }
+        act(store)
+    })
+}
+
 fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> ProvisioningView {
     let versions = profile.map_or(&[][..], |profile| profile.versions.as_slice());
     ProvisioningView {
@@ -337,7 +360,7 @@ async fn set(
             reviewed: None,
         };
         let agent = agent.to_string();
-        with_provisioning(&state, |store| {
+        write_provisioning(&state, |store| {
             let operation = version.operation.clone();
             let mut version = version;
             version.settings.skill_pins = match store.pins_for(&version.operation) {
@@ -385,7 +408,7 @@ async fn review(
             at: now(),
         };
         let agent = agent.to_string();
-        with_provisioning(&state, |store| {
+        write_provisioning(&state, |store| {
             store.review(&agent, number, review)?;
             let recorded = store
                 .profile(&agent)

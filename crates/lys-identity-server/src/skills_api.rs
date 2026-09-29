@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::provisioning_api::with_provisioning;
+use crate::provisioning_api::{with_provisioning, write_provisioning};
 use crate::provisioning_store::SkillText;
 use crate::routes::{AppState, hex, signed_in};
 
@@ -117,7 +117,7 @@ async fn keep(
         sha256: hex(&Sha256::digest(body.text.as_bytes())),
         text: body.text,
     };
-    with_provisioning(&state, |store| {
+    write_provisioning(&state, |store| {
         store.keep_skill(skill)?;
         Ok(Json(view(store.skills())))
     })
