@@ -67,6 +67,10 @@ fn the_service_configuration_keeps_everything_under_the_root() -> Result<(), Box
         DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root.clone())?;
     let rendered =
         server_config::render(&layout, &config, &server_config::Carried::default(), true);
+    assert_eq!(
+        rendered["operator_upgrade_file"],
+        layout.upgrade_intent().display().to_string()
+    );
     let object = rendered.as_object().ok_or("not an object")?;
     for (key, value) in object {
         if let Some(text) = value.as_str()

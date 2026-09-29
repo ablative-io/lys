@@ -84,6 +84,7 @@ pub fn render(
         "log_origin": LOG_ORIGIN,
         "event_key_file": layout.service_key().display().to_string(),
         "operator_token_file": state.join(OPERATOR_TOKEN_FILE).display().to_string(),
+        "operator_upgrade_file": layout.upgrade_intent().display().to_string(),
         "issuer": issuer,
         "client_id": config.clients.platform.id,
         "client_secret_file": state

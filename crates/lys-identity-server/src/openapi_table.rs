@@ -15,6 +15,8 @@ pub(crate) const PUT: Method = Method::Put;
 
 /// Anyone.
 pub(crate) const P: &[Auth] = &[Auth::Public];
+/// A personal session; the operator has no personal account.
+pub(crate) const C: &[Auth] = &[Auth::Session];
 /// A signed-in person or the install's operator.
 pub(crate) const S: &[Auth] = &[Auth::Session, Auth::Operator];
 /// A signed-in person, or an app or registrar through its credential.
@@ -55,7 +57,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
-    GET "/me" "The signed-in caller" S [SIGNED, &["NoPerson", "SetupRequired"]];
+    GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson"]];
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]];
     GET "/directory/people" "Every person, for the administrator" S [ADMIN];
@@ -116,9 +118,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/setup/open" "Open first-run setup with its code" P [];
     POST "/setup/administrator" "Register the first administrator" P [];
     POST "/setup/password" "Set the first administrator's password" P [];
-    GET "/me/account" "The caller's sign-in account" S [SIGNED];
-    POST "/me/account/email" "Change the caller's email" S [SIGNED_BODY];
-    POST "/me/account/password" "Change the caller's password" S [SIGNED_BODY];
+    GET "/me/account" "The caller's sign-in account" C [SIGNED];
+    POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY];
+    POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN];
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY];
     POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY];

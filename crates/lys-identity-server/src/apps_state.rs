@@ -32,7 +32,7 @@ pub enum By {
         login: Login,
     },
     /// The install's operator token, acting under the administrator's login.
-    /// This is a new act kind; existing person records keep their exact shape.
+    /// Its provenance distinguishes authority from a person signing in.
     Operator {
         /// The administrator's login, not a claim that the person signed in.
         login: Login,

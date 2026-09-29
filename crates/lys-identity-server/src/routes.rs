@@ -88,6 +88,8 @@ pub struct AppState {
     pub agent_nonces: crate::agent_signature::Nonces,
     /// The install's operator token, when the configuration names its file.
     pub operator_token: Option<zeroize::Zeroizing<String>>,
+    /// The managed install's durable upgrade intent, checked on each operator request.
+    pub operator_upgrade_file: Option<std::path::PathBuf>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -113,6 +115,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let operator_token = crate::operator::token(config, &*say)?;
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
@@ -189,7 +192,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             })
             .transpose()?,
         agent_nonces: Mutex::default(),
-        operator_token: crate::operator::token(config)?,
+        operator_token,
+        operator_upgrade_file: config.operator_upgrade_file.clone(),
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -199,12 +203,17 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let starts = start::routes(start_service(config, &state)?);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
-    let api = router(state).merge(configured).merge(starts);
+    let api = router(Arc::clone(&state)).merge(configured).merge(starts);
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
     };
-    Ok(served.merge(provider_callback))
+    Ok(served
+        .merge(provider_callback)
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            crate::operator::guard,
+        )))
 }
 
 /// The start route's service over the directory `state` holds. The route

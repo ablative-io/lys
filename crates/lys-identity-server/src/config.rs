@@ -56,6 +56,10 @@ pub struct Config {
     /// authenticated by the operator token. Without it no request may.
     #[serde(default)]
     pub operator_token_file: Option<PathBuf>,
+    /// An installer upgrade intent blocks operator authority until rollback is
+    /// no longer possible. Managed installs always supply this path.
+    #[serde(default)]
+    pub operator_upgrade_file: Option<PathBuf>,
     /// The step-1 administrator, by issuer and subject (P9), when the
     /// install named one before the service started. Without it the
     /// administrator is the one first-run setup records (`setup`).

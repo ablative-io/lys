@@ -43,7 +43,8 @@ pub(crate) fn route(
             named.push(name);
         }
     }
-    if auth.contains(&Auth::Operator) && !named.contains(&"OperatorRefused") {
+    // The global admission guard refuses a bad operator header on every route.
+    if !named.contains(&"OperatorRefused") {
         named.push("OperatorRefused");
     }
     Route {

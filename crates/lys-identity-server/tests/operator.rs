@@ -25,6 +25,7 @@ async fn service(administrator: bool) -> Result<Service, Box<dyn Error>> {
         None,
         |config| {
             config.operator_token_file = Some(config.log_dir.with_file_name("operator.token"));
+            config.operator_upgrade_file = Some(config.log_dir.with_file_name("upgrade.json"));
             if !administrator {
                 config.administrator = None;
                 config.setup = Some(SetupSettings {
@@ -236,5 +237,173 @@ fn openapi_names_the_operator_header_and_keeps_oauth_token_authority_separate() 
                 .any(|entry| entry.get("lys_operator").is_some())
         );
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
+    let service = service(true).await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    assert_eq!(
+        service.post("/setup", Some(&cookie), &setup()?).await?.0,
+        200
+    );
+    let body = registration(NOTES, &workspace_schema(NOTES))?;
+    assert_eq!(service.post("/apps", Some(&cookie), &body).await?.0, 200);
+    let path = format!("/apps/{NOTES}/approve");
+    let (status, approved) = service
+        .post(
+            &path,
+            Some(&cookie),
+            &json!({"operation": OperationId::generate()?.to_string()}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{approved}");
+    let credential = approved["client"]["credential"]
+        .as_str()
+        .ok_or("no credential")?;
+    let client = reqwest::Client::new();
+    let url = format!("{}/apps/me", service.base);
+    assert_eq!(
+        client
+            .get(&url)
+            .bearer_auth(credential)
+            .send()
+            .await?
+            .status(),
+        200
+    );
+    let response = client
+        .get(&url)
+        .bearer_auth(credential)
+        .header("lys-operator", "wrong")
+        .send()
+        .await?;
+    assert_eq!(response.status(), 401);
+    assert_eq!(
+        serde_json::from_str::<Value>(&response.text().await?)?["refusal"],
+        "OperatorRefused"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn every_start_route_preserves_the_operator_refusal() -> TestResult {
+    let service = service(true).await?;
+    let client = reqwest::Client::new();
+    for (method, path) in [
+        (reqwest::Method::POST, "/agents/agent/start"),
+        (reqwest::Method::POST, "/launch-records/record/start-again"),
+        (reqwest::Method::POST, "/launch-records/record/withdraw"),
+        (reqwest::Method::GET, "/launch-records/record/state"),
+    ] {
+        let response = client
+            .request(method, format!("{}{path}", service.base))
+            .header("lys-operator", "wrong")
+            .header("content-type", "application/json")
+            .body("{}")
+            .send()
+            .await?;
+        assert_eq!(response.status(), 401, "{path}");
+        assert_eq!(
+            serde_json::from_str::<Value>(&response.text().await?)?["refusal"],
+            "OperatorRefused",
+            "{path}"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_operator_has_no_personal_account_even_with_an_administrator_cookie() -> TestResult {
+    let service = service(true).await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let client = reqwest::Client::new();
+    for (method, path) in [
+        (reqwest::Method::GET, "/me"),
+        (reqwest::Method::GET, "/me/account"),
+        (reqwest::Method::POST, "/me/account/email"),
+        (reqwest::Method::POST, "/me/account/password"),
+    ] {
+        let response = client
+            .request(method, format!("{}{path}", service.base))
+            .header("lys-operator", TOKEN)
+            .header("cookie", &cookie)
+            .header("content-type", "application/json")
+            .body("{}")
+            .send()
+            .await?;
+        assert_eq!(response.status(), 401, "{path}");
+        assert_eq!(
+            serde_json::from_str::<Value>(&response.text().await?)?["refusal"],
+            "OperatorRefused",
+            "{path}"
+        );
+    }
+    assert_eq!(service.log_size().await?, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn reversible_upgrade_blocks_operator_writes_until_the_intent_is_cleared() -> TestResult {
+    let service = service(true).await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    assert_eq!(
+        service.post("/setup", Some(&cookie), &setup()?).await?.0,
+        200
+    );
+    let intent = service.dir.path().join("upgrade.json");
+    std::fs::write(&intent, "unfinished upgrade")?;
+    let store_path = service.dir.path().join("apps");
+    let before = FileLeafStore::open_read_only(&store_path)?.extent();
+    let body = serde_json::to_vec(&registration(NOTES, &workspace_schema(NOTES))?)?;
+    let response = service
+        .post_carrying("/apps", &[("lys-operator", TOKEN)], body.clone())
+        .await?;
+    assert_eq!(response.0, 401, "{}", response.1);
+    assert_eq!(response.1["refusal"], "OperatorRefused");
+    assert_eq!(FileLeafStore::open_read_only(&store_path)?.extent(), before);
+    // The service remains live for readiness and sessions during the upgrade.
+    assert_eq!(service.get("/authority", None).await?.0, 200);
+    assert_eq!(service.get("/apps", Some(&cookie)).await?.0, 200);
+    std::fs::remove_file(intent)?;
+    let response = service
+        .post_carrying("/apps", &[("lys-operator", TOKEN)], body)
+        .await?;
+    assert_eq!(response.0, 200, "{}", response.1);
+    assert_eq!(response.1["registered_by"]["kind"], "operator");
+    assert_eq!(
+        FileLeafStore::open_read_only(&store_path)?.extent(),
+        before + 1
+    );
+    Ok(())
+}
+
+#[test]
+fn every_route_publishes_the_global_operator_refusal_but_me_has_no_operator_authority() -> TestResult
+{
+    let document = lys_identity_server::openapi::document()?;
+    let paths = document["paths"].as_object().ok_or("no paths")?;
+    let mut count = 0;
+    for (path, methods) in paths {
+        for operation in methods.as_object().ok_or("no methods")?.values() {
+            let refusals = operation["x-refusals"].as_array().ok_or("no refusals")?;
+            assert!(
+                refusals.iter().any(|name| name == "OperatorRefused"),
+                "{path}"
+            );
+            if path == "/me" || path.starts_with("/me/") {
+                let security = operation["security"].as_array().ok_or("no security")?;
+                assert!(
+                    !security
+                        .iter()
+                        .any(|entry| entry.get("lys_operator").is_some()),
+                    "{path}"
+                );
+            }
+            count += 1;
+        }
+    }
+    assert!(count > 100);
     Ok(())
 }

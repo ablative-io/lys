@@ -62,7 +62,7 @@ pub struct Registrar {
 /// Who is acting.
 #[derive(Debug, Clone)]
 pub enum Acting {
-    /// The configured administrator, signed in.
+    /// The configured administrator, through a session or the operator token.
     Administrator(Actor),
     /// A signed-in person who is not the administrator.
     Person(Actor),
