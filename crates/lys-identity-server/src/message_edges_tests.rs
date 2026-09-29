@@ -185,3 +185,41 @@ fn openapi_names_query_members_without_a_get_body() -> Result<(), Box<dyn Error>
     );
     Ok(())
 }
+
+#[test]
+fn a_bridge_as_an_upgrade_carries_it_forwards_the_earlier_cookie_and_maps_a_page()
+-> Result<(), Box<dyn Error>> {
+    let carried = serde_json::json!({
+        "url": "http://127.0.0.1:6010/",
+        "bindings": [
+            { "participant": "alice", "identity": PERSON },
+            { "participant": "scribe", "identity": AGENT },
+        ],
+        "cookie": "cambium_session",
+    });
+    let settings: Settings = serde_json::from_value(carried)?;
+    settings.validate()?;
+    let bridge = settings.bridge()?;
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::COOKIE,
+        HeaderValue::from_static("lys_session=lys-secret; cambium_session=kept"),
+    );
+    assert_eq!(cookie(&headers, &bridge.cookie)?, "cambium_session=kept");
+    let visible = [PERSON.to_owned(), AGENT.to_owned()].into_iter().collect();
+    let mapped = map_page(page("alice"), &bridge, PERSON, &visible)?;
+    assert_eq!(
+        mapped.messages.first().map(|edge| edge.source.as_str()),
+        Some(PERSON)
+    );
+    Ok(())
+}
+
+#[test]
+fn a_bridge_without_a_cookie_name_is_refused() {
+    let given = serde_json::json!({ "url": "http://127.0.0.1:6010/", "bindings": [] });
+    assert!(serde_json::from_value::<Settings>(given).is_err());
+    let mut bad = settings();
+    bad.cookie = "two words".to_owned();
+    assert!(bad.validate().is_err());
+}
