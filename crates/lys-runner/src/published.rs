@@ -12,7 +12,7 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 12] = [
+pub const ACTS: [&str; 14] = [
     "read_bytes",
     "input_bytes",
     "start",
@@ -25,6 +25,8 @@ pub const ACTS: [&str; 12] = [
     "status",
     "operate",
     "outcome",
+    "feed",
+    "grant_channel",
 ];
 
 /// Every answer the protocol defines, by its kind.
