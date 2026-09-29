@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! An ordinary pre-description profile must survive a read and write byte for byte.
 use super::{ProvisioningStore, read};
 
