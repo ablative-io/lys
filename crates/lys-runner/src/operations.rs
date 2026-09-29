@@ -30,6 +30,8 @@ use crate::protocol::{Ended, Key};
 use crate::session::{Session, Sessions, Table, now_ms};
 use crate::tracking_store::{Body, Commit};
 
+pub mod control;
+
 /// The format of the record of operations.
 pub const FORMAT: &str = "lys-runner-operations/v1";
 
@@ -145,6 +147,9 @@ pub struct OperationOutcome {
     pub text: Option<TextDigest>,
     /// The session's end, for a confirmed stop.
     pub ended: Option<Ended>,
+    /// Bound native delivery metadata; absent for legacy/manual operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control: Option<control::Delivery>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -187,6 +192,10 @@ impl Operations {
         let at = now_ms();
         for outcome in &mut held {
             let (state, words) = match outcome.state {
+                OperationState::Delivering if outcome.control.is_some() => (
+                    OperationState::Uncertain,
+                    "the runner stopped after recording a possible managed pipe write; reconcile native evidence before any further delivery",
+                ),
                 OperationState::Delivering => (
                     OperationState::Uncertain,
                     "the runner stopped while typing it: whether it reached the session cannot be known, and it is not typed again",
@@ -304,6 +313,7 @@ pub(crate) fn accept(
         words,
         text: operation.request.text().map(TextDigest::of),
         ended: None,
+        control: None,
     };
     table.operations.held.push(outcome.clone());
     table.operations.persist()?;

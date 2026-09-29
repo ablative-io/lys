@@ -224,6 +224,7 @@ fn kept(state: OperationState, id: &str) -> OperationOutcome {
         words: "as left".to_owned(),
         text: Some(TextDigest::of("stand-up in 5 minutes")),
         ended: None,
+        control: None,
     }
 }
 

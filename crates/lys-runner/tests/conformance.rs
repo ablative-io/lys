@@ -476,6 +476,7 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
                 words: String::new(),
                 text: None,
                 ended: None,
+                control: None,
             },
         },
         Answer::Feed {
