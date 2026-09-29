@@ -2,7 +2,6 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    str::FromStr,
     sync::Arc,
 };
 
@@ -13,7 +12,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use lys_identity::{AgentId, IdentityId, PersonId};
+use lys_identity::IdentityId;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -22,25 +21,7 @@ use crate::{
     routes::{AppState, signed_in, with_directory},
 };
 
-/// Administrator-declared identity bridge; no secret or service credential is stored here.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Settings {
-    /// Cambium's trusted absolute base URL; HTTPS, or HTTP on loopback.
-    pub url: String,
-    /// Explicit bindings, never guessed from matching display names.
-    pub bindings: Vec<Binding>,
-}
-
-/// One Cambium registry identity and the Lys directory identity it represents.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Binding {
-    /// Cambium participant registry id.
-    pub participant: String,
-    /// Enduring Lys person or agent id.
-    pub identity: String,
-}
+pub use lys_identity::cambium_messages::{Binding, Settings};
 
 /// Opaque page request passed to Cambium, whose configured page bound applies.
 #[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
@@ -138,84 +119,28 @@ struct Bridge {
     client: reqwest::Client,
 }
 
-fn parse_identity(value: &str) -> Result<IdentityId, lys_identity::IdentityError> {
-    if value.starts_with("person-") {
-        PersonId::from_str(value).map(IdentityId::Person)
-    } else {
-        AgentId::from_str(value).map(IdentityId::Agent)
-    }
+/// Validate the trusted endpoint and require a one-to-one identity mapping.
+///
+/// # Errors
+/// Refuses an invalid endpoint, malformed identity or ambiguous binding.
+pub fn validate(settings: &Settings) -> Result<(), ServerError> {
+    bridge(settings).map(|_| ())
 }
 
-impl Settings {
-    /// Validate the trusted endpoint and require a one-to-one identity mapping.
-    ///
-    /// # Errors
-    /// Refuses an invalid endpoint, malformed identity or ambiguous binding.
-    pub fn validate(&self) -> Result<(), ServerError> {
-        self.bridge().map(|_| ())
-    }
-
-    fn bridge(&self) -> Result<Bridge, ServerError> {
-        let invalid = |reason: String| ServerError::ConfigInvalid {
-            reason: format!("cambium_messages: {reason}"),
-        };
-        let mut url = reqwest::Url::parse(&self.url).map_err(|error| invalid(error.to_string()))?;
-        let loopback = url.host_str().is_some_and(|host| {
-            host == "localhost"
-                || host
-                    .trim_matches(['[', ']'])
-                    .parse::<std::net::IpAddr>()
-                    .is_ok_and(|ip| ip.is_loopback())
-        });
-        if (url.scheme() != "https" && !(url.scheme() == "http" && loopback))
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(invalid(
-                "use HTTPS or loopback HTTP, without credentials, query or fragment".to_owned(),
-            ));
-        }
-        if !url.path().ends_with('/') {
-            url.set_path(&format!("{}/", url.path()));
-        }
-        let mut bindings = BTreeMap::new();
-        let mut identities = BTreeSet::new();
-        for binding in &self.bindings {
-            parse_identity(&binding.identity)
-                .map_err(|error| invalid(format!("identity {}: {error}", binding.identity)))?;
-            if binding.participant.is_empty()
-                || !binding
-                    .participant
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-            {
-                return Err(invalid(
-                    "participant must be a Cambium registry id".to_owned(),
-                ));
-            }
-            if bindings
-                .insert(binding.participant.clone(), binding.identity.clone())
-                .is_some()
-                || !identities.insert(binding.identity.clone())
-            {
-                return Err(invalid(format!(
-                    "ambiguous binding for {}",
-                    binding.participant
-                )));
-            }
-        }
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|error| invalid(error.to_string()))?;
-        Ok(Bridge {
-            url,
-            bindings,
-            client,
-        })
-    }
+fn bridge(settings: &Settings) -> Result<Bridge, ServerError> {
+    let invalid = |reason: String| ServerError::ConfigInvalid {
+        reason: format!("cambium_messages: {reason}"),
+    };
+    let checked = settings.check().map_err(invalid)?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|error| invalid(error.to_string()))?;
+    Ok(Bridge {
+        url: checked.url,
+        bindings: checked.bindings,
+        client,
+    })
 }
 
 /// Build this optional integration without making any network request at startup.
@@ -223,13 +148,7 @@ impl Settings {
 /// # Errors
 /// Refuses invalid integration configuration.
 pub fn routes(config: &Config) -> Result<Router<Arc<AppState>>, ServerError> {
-    let bridge = Arc::new(
-        config
-            .cambium_messages
-            .as_ref()
-            .map(Settings::bridge)
-            .transpose()?,
-    );
+    let bridge = Arc::new(config.cambium_messages.as_ref().map(bridge).transpose()?);
     Ok(Router::new().route(
         "/runtime/message-edges",
         get(

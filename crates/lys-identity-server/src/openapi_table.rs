@@ -7,6 +7,7 @@ use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, SIGNED, SIGNED_BODY,
+    UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -62,10 +63,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants" "Pass on part of a grant" S [GRANT_MADE, &["NoPerson", "ExpiryBeyondSource"], &["UseOnly"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, &["RelationUnknown"], &["RootAuthorityRefused"]];
-    POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, &["NotHeld", "Revoked"]];
-    POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, &["NotHeld"]];
-    POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED];
-    POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED];
+    POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]];
+    POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]];
+    POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED, UNANSWERED];
+    POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED, UNANSWERED];
     GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown"]];
     GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]];
     POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, &["GrantUnknown", "RevokeRefused"]];

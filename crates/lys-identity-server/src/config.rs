@@ -212,7 +212,7 @@ impl Config {
     /// Refuse a configuration the service cannot run under.
     pub fn validate(&self) -> Result<(), ServerError> {
         if let Some(settings) = &self.cambium_messages {
-            settings.validate()?;
+            crate::message_edges::validate(settings)?;
         }
         self.configured_administrator()?;
         if self.administrator.is_none() && self.setup.is_none() {

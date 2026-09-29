@@ -552,3 +552,7 @@ impl RelationshipStore for Relationships {
 #[cfg(test)]
 #[path = "spicedb_upgrade_tests.rs"]
 mod upgrade_tests;
+
+#[cfg(test)]
+#[path = "spicedb_calls_tests.rs"]
+mod calls_tests;

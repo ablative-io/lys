@@ -497,10 +497,24 @@ fn a_cambium_message_connection_is_written_and_carried_by_the_next_render()
         next["cambium_messages"], messages,
         "carried by the next render"
     );
-    std::fs::write(&file, "[]")?;
-    let refused = server_config::messages_from(&file)
-        .err()
-        .ok_or("a list was taken as the connection")?;
-    assert_eq!(refused.kind(), ErrorKind::ConfigInvalid);
+    let wrapped = serde_json::json!({ "cambium_messages": messages });
+    let plain_http = serde_json::json!({
+        "url": "http://cambium.example.test/",
+        "bindings": messages["bindings"],
+    });
+    for (wrong, why) in [
+        (serde_json::json!([]), "a list"),
+        (
+            wrapped,
+            "the connection wrapped in a cambium_messages member",
+        ),
+        (plain_http, "HTTP off loopback"),
+    ] {
+        std::fs::write(&file, wrong.to_string())?;
+        let refused = server_config::messages_from(&file)
+            .err()
+            .ok_or(format!("{why} was taken as the connection"))?;
+        assert_eq!(refused.kind(), ErrorKind::ConfigInvalid, "{why}");
+    }
     Ok(())
 }

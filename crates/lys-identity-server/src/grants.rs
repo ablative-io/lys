@@ -494,28 +494,33 @@ async fn who(
             .collect();
         // A holder is on a page only when its own grant permits the action,
         // and the page names a next holder only when a later holder permits.
-        let frame = judged.grants.frame(None)?;
-        let (page, more) = {
-            let mut permitted = holders.into_iter().filter_map(|(text, holder)| {
-                let request = ExerciseRequest {
-                    caller: holder,
-                    route,
-                    resource: resource.clone(),
-                    action: action.clone(),
-                };
-                judged
-                    .grants
-                    .explain_in(&frame, judged.directory, &request, at)
-                    .ok()
-                    .map(|permit| HolderView {
-                        holder: text,
-                        permit: PermitView::from(&permit),
-                    })
-            });
-            let page: Vec<HolderView> = permitted.by_ref().take(body.page_size).collect();
-            let more = page.len() == body.page_size && permitted.next().is_some();
-            (page, more)
-        };
+        let frame = judged.grants.frame(judged.directory, None)?;
+        // A decision that could not be made is the answer, never a holder
+        // left off the page.
+        let mut page = Vec::new();
+        let mut more = false;
+        for (text, holder) in holders {
+            let request = ExerciseRequest {
+                caller: holder,
+                route,
+                resource: resource.clone(),
+                action: action.clone(),
+            };
+            match judged.grants.explain_in(&frame, &request, at) {
+                Ok(_) if page.len() == body.page_size => {
+                    more = true;
+                    break;
+                }
+                Ok(permit) => page.push(HolderView {
+                    holder: text,
+                    permit: PermitView::from(&permit),
+                }),
+                Err(error) if crate::grants_batch::unanswered(&error) => {
+                    return Err(error.into());
+                }
+                Err(_) => {}
+            }
+        }
         let next = if more {
             page.last().map(|last| last.holder.clone())
         } else {

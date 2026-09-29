@@ -173,8 +173,9 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     }))
 }
 
-/// The Cambium message connection in the JSON file at `path`: an object,
-/// which the service checks when it starts.
+/// The Cambium message connection in the JSON file at `path`, checked as
+/// the service checks it when it starts, so a wrong one is refused before
+/// anything is stopped.
 pub fn messages_from(path: &Path) -> IdentityResult<Value> {
     let refused = |reason: String| {
         IdentityError::new(ErrorKind::ConfigInvalid, "read", "cambium_messages", reason).at(path)
@@ -182,10 +183,10 @@ pub fn messages_from(path: &Path) -> IdentityResult<Value> {
     let bytes = std::fs::read(path).map_err(|error| refused(error.to_string()))?;
     let value: Value =
         serde_json::from_slice(&bytes).map_err(|error| refused(error.to_string()))?;
-    if !value.is_object() {
-        return Err(refused(
-            "must be a JSON object with url and bindings".to_owned(),
-        ));
-    }
+    lys_identity::cambium_messages::Settings::from_value(value.clone()).map_err(|reason| {
+        refused(format!(
+            "must be the connection itself, an object of url and bindings: {reason}"
+        ))
+    })?;
     Ok(value)
 }

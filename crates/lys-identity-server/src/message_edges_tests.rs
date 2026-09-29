@@ -1,6 +1,8 @@
 //! The message bridge preserves caller identity, visibility, credentials and explicit addressing.
 
-use super::{Binding, EdgeError, MessageEdge, Settings, UpstreamPage, cookie, map_page};
+use super::{
+    Binding, EdgeError, MessageEdge, Settings, UpstreamPage, bridge, cookie, map_page, validate,
+};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use std::error::Error;
 
@@ -42,7 +44,7 @@ fn page(caller: &str) -> UpstreamPage {
 
 #[test]
 fn maps_only_explicit_visible_identities() -> Result<(), Box<dyn Error>> {
-    let bridge = settings().bridge()?;
+    let bridge = bridge(&settings())?;
     let visible = [PERSON.to_owned(), AGENT.to_owned()].into_iter().collect();
     let mapped = map_page(page("alice"), &bridge, PERSON, &visible)?;
     let edge = mapped.messages.first().ok_or("message absent")?;
@@ -63,7 +65,7 @@ fn maps_only_explicit_visible_identities() -> Result<(), Box<dyn Error>> {
 #[test]
 fn mixed_logins_refuse_instead_of_borrowing_another_callers_visibility()
 -> Result<(), Box<dyn Error>> {
-    let bridge = settings().bridge()?;
+    let bridge = bridge(&settings())?;
     let visible = [PERSON.to_owned(), AGENT.to_owned()].into_iter().collect();
     assert!(matches!(
         map_page(page("scribe"), &bridge, PERSON, &visible),
@@ -84,7 +86,7 @@ fn mixed_logins_refuse_instead_of_borrowing_another_callers_visibility()
 
 #[test]
 fn missing_binding_is_named_without_guessing_by_display_name() -> Result<(), Box<dyn Error>> {
-    let bridge = settings().bridge()?;
+    let bridge = bridge(&settings())?;
     let visible = [PERSON.to_owned(), AGENT.to_owned()].into_iter().collect();
     let mut input = page("alice");
     input
@@ -108,7 +110,7 @@ fn duplicate_binding_and_untrusted_endpoint_refuse() {
     ] {
         let mut candidate = settings();
         candidate.url = url.to_owned();
-        assert!(candidate.validate().is_err(), "{url}");
+        assert!(validate(&candidate).is_err(), "{url}");
     }
     for binding in [
         Binding {
@@ -122,7 +124,7 @@ fn duplicate_binding_and_untrusted_endpoint_refuse() {
     ] {
         let mut candidate = settings();
         candidate.bindings.push(binding);
-        assert!(candidate.validate().is_err());
+        assert!(validate(&candidate).is_err());
     }
 }
 
