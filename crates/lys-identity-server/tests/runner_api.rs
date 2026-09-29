@@ -10,6 +10,9 @@
 //! confirmed with its exit instant. Every wait ends on an answer, never a
 //! clock.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
@@ -199,7 +202,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
             "instructions": "", "note": "", "session": session,
         });
         self.ok(&path, &body).await?;

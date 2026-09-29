@@ -25,6 +25,7 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
             version: start.version.number,
         })?;
     crate::launch_fields::models(&harness, &settings.model_access)?;
+    crate::launch_fields::mcp(&harness, &settings.mcp_servers)?;
     let mcp_servers = settings
         .mcp_servers
         .iter()

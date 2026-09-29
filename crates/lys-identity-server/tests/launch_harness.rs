@@ -3,6 +3,9 @@
 //! back as recorded; a start from a profile that declares none is refused
 //! by name before anything is rendered.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -110,7 +113,7 @@ impl Table {
 }
 
 fn claude_code() -> Value {
-    json!({ "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" })
+    harness_description::declared()
 }
 
 #[tokio::test]
@@ -146,7 +149,9 @@ async fn a_start_from_a_profile_with_no_declared_harness_is_refused_by_name() ->
     assert_eq!(refused["refusal"], "HarnessUndeclared");
     let (status, start) = table.start(1, &claude_code()).await?;
     assert_eq!(status, 200, "{start}");
-    let codex = json!({ "kind": "codex", "program": "/opt/seat/bin/cdx", "package": "codex-seat" });
+    let mut codex = harness_description::declared();
+    codex["name"] = json!("Unregistered build");
+    codex["description"]["rendering_contract"] = json!("unregistered/template-v1");
     let (status, refused) = table.start(2, &codex).await?;
     assert_eq!(status, 409, "{refused}");
     assert_eq!(

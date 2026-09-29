@@ -9,7 +9,13 @@ import { ProfileEditor } from './ProfileEditor';
 
 export type Setting = string | number | boolean | { handle: string };
 export interface McpServer { name: string; url?: string; command?: { program: string; args?: string[]; cwd?: string; env?: Record<string, Setting> }; channel?: 'off' | 'wake' }
-export interface DeclaredHarness { kind: 'claude_code' | 'codex'; program: string; package: string }
+export interface HarnessDescription {
+  models: { minimum: number; maximum: number | null; further_encoding: { kind: 'array' } | { kind: 'delimited'; separator: string } };
+  permissions: { modes: string[]; rule_forms: string[] };
+  mcp: { transports: string[]; working_directory: boolean; handle_variables: boolean; channel_policies: ('off' | 'wake')[] };
+  rendering_contract: string;
+}
+export interface DeclaredHarness { name: string; description: HarnessDescription; program: string; package: string }
 export interface Permissions { allow?: string[]; deny?: string[]; ask?: string[]; default_mode?: string; additional_directories?: string[] }
 export interface ProvisioningProfile { reviewed_by?: string | null; reviewed_at?: number | null; self_reviewed?: boolean; version: number; operation: string; model_access: string[]; tools: string[]; skills: string[]; mcp_servers: McpServer[]; instructions: string; note: string; set_by: string; set_at: number; harness?: DeclaredHarness | null; permissions?: Permissions | null; skill_pins?: { name: string; len: number; sha256: string }[] }
 export interface ProvisioningAnswer { agent: string; recorded?: { operation: string; version: number } | null; profile: ProvisioningProfile | null; versions: { version: number; set_by: string; set_at: number; note: string }[]; enforced: boolean }
@@ -33,7 +39,7 @@ export function Provisioning({ id }: { id: string }) {
       <p className="note">{answer.enforced ? 'The service reports this profile is enforced.' : 'Recorded only: no runtime is applying this profile yet. Saving it does not start an agent or grant access.'}</p>
       {answer.profile ? <section className="card"><h3>Version {answer.profile.version}</h3><p>Recorded {clock(answer.profile.set_at)} by {answer.profile.set_by}.</p>
         {(['model_access', 'tools', 'skills'] as const).map((name) => <div key={name}><h3>{name === 'model_access' ? 'Model access' : name === 'tools' ? 'Tools' : 'Skills'}</h3>{answer.profile?.[name].length ? <ul>{answer.profile[name].map((entry, index) => <li key={index}>{entry}</li>)}</ul> : <p>None recorded.</p>}</div>)}
-        <h3>Harness</h3><p>{answer.profile.harness ? (answer.profile.harness.kind === 'codex' ? 'Codex' : 'Claude Code') + ' · ' + answer.profile.harness.program + ' · package ' + answer.profile.harness.package : 'None declared: a start is refused until one is.'}</p>
+        <h3>Harness</h3><p>{answer.profile.harness ? answer.profile.harness.name + ' · ' + answer.profile.harness.program + ' · package ' + answer.profile.harness.package : 'None declared: a start is refused until one is.'}</p>
         {answer.profile.skill_pins?.length ? <><h3>Skill texts pinned</h3><ul>{answer.profile.skill_pins.map((pin) => <li key={pin.name}>{pin.name} · {pin.len} bytes · {pin.sha256.slice(0, 12)}</li>)}</ul></> : null}
         <h3>MCP servers</h3>{answer.profile.mcp_servers.length ? <ul>{answer.profile.mcp_servers.map((server) => <li key={server.name}>{server.name} · {serverLine(server)}{server.channel === 'wake' ? ' · wakes the agent' : ''}</li>)}</ul> : <p>None recorded.</p>}
         <h3>Permissions</h3>{answer.profile.permissions ? <>{listed('Allow', answer.profile.permissions.allow)}{listed('Deny', answer.profile.permissions.deny)}{listed('Ask', answer.profile.permissions.ask)}{listed('Additional directories', answer.profile.permissions.additional_directories)}<p>Permission mode: {answer.profile.permissions.default_mode ?? 'not set'}.</p></> : <p>None recorded.</p>}

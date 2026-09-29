@@ -101,8 +101,16 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
             handle: handle.id.clone(),
         })
         .collect();
-    let rendered = render_contract(&fields, start.skills, &granted, &held)
-        .map_err(|error| unrenderable(error.to_string()))?;
+    let rendered = render_contract(&fields, start.skills, &granted, &held).map_err(|error| {
+        if error.member == "permissions" {
+            ServerError::PolicyUnrepresentable {
+                rule: "permissions".to_owned(),
+                reason: error.to_string(),
+            }
+        } else {
+            unrenderable(error.to_string())
+        }
+    })?;
     let template = rendered.text;
     let template_sha256 = rendered.sha256;
     let handle_ids: Vec<&str> = handles.iter().map(|handle| handle.id.as_str()).collect();

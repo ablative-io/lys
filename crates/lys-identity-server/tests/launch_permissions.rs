@@ -5,6 +5,9 @@
 //! rule the settings file cannot express is refused by name: a profile's
 //! when it is recorded, a policy's by its id when the start is rendered.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -86,7 +89,7 @@ impl Table {
             "operation": operation()?, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": tools, "skills": [],
             "mcp_servers": [], "instructions": "", "note": "", "permissions": permissions,
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await

@@ -48,3 +48,44 @@ pub fn models(harness: &DeclaredHarness, models: &[String]) -> Result<(), Server
     }
     Ok(())
 }
+
+/// Refuse MCP members absent from the recorded capability description.
+pub fn mcp(
+    harness: &DeclaredHarness,
+    servers: &[crate::provisioning_store::McpServer],
+) -> Result<(), ServerError> {
+    use crate::provisioning_store::Setting;
+    let contract = &harness.description.mcp;
+    for server in servers {
+        let refused = |member: &str| ServerError::McpSettingUnrepresentable {
+            server: server.name.clone(),
+            member: member.to_owned(),
+            reason: format!("harness description does not admit {member}"),
+        };
+        let transport = if server.command.is_some() {
+            "stdio"
+        } else {
+            "http"
+        };
+        if !contract.transports.iter().any(|value| value == transport) {
+            return Err(refused("description.mcp.transports"));
+        }
+        if !contract.channel_policies.contains(&server.channel) {
+            return Err(refused("description.mcp.channel_policies"));
+        }
+        if let Some(command) = &server.command {
+            if command.cwd.is_some() && !contract.working_directory {
+                return Err(refused("cwd"));
+            }
+            if !contract.handle_variables
+                && command
+                    .env
+                    .values()
+                    .any(|value| matches!(value, Setting::Handle { .. }))
+            {
+                return Err(refused("description.mcp.handle_variables"));
+            }
+        }
+    }
+    Ok(())
+}

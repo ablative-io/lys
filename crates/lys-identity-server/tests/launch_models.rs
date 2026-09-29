@@ -3,6 +3,9 @@
 //! order; a model the declared harness cannot carry is refused when the
 //! profile is recorded, and nothing is reported left out.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -118,7 +121,14 @@ impl Table {
 }
 
 fn harness(kind: &str) -> Value {
-    json!({ "kind": kind, "program": format!("/opt/seat/bin/{kind}"), "package": format!("{kind}-seat") })
+    let mut harness = harness_description::declared();
+    harness["name"] = json!(kind);
+    if kind == "codex" {
+        harness["description"]["models"]["maximum"] = json!(1);
+        harness["description"]["models"]["further_encoding"] = json!({"kind": "array"});
+        harness["description"]["rendering_contract"] = json!("codex/template-v1");
+    }
+    harness
 }
 
 #[tokio::test]

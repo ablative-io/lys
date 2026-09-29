@@ -361,7 +361,7 @@ pub enum ServerError {
     /// A model the declared harness cannot carry.
     #[error("ModelUnrepresentable: the harness `{harness}` cannot carry model `{model}`: {reason}")]
     ModelUnrepresentable {
-        /// The declared harness kind.
+        /// The declared harness name.
         harness: String,
         /// The model.
         model: String,

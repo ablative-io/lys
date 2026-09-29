@@ -149,13 +149,8 @@ fn native_template(
     if !skills.is_empty() {
         body["slots"]["skills"] = json!(skills);
     }
-    let mut native = json!({
-        "allow": permissions["allow"], "deny": permissions["deny"], "ask": permissions["ask"],
-        "additionalDirectories": permissions["additional_directories"]
-    });
-    if let Some(mode) = permissions.get("default_mode") {
-        native["defaultMode"] = mode.clone();
-    }
+    let native = super::rendering_permissions::render(permissions)
+        .map_err(|error| refused(fields, "permissions", error))?;
     let empty = native.as_object().is_some_and(|members| {
         members
             .values()

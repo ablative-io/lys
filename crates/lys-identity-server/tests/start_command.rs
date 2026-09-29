@@ -2,6 +2,9 @@
 //! kept profile for a chosen machine, names the agent and its handle ids and
 //! never a credential's value, is never run, and each refusal is by name.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -122,7 +125,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
             "instructions": "Build what the brief says.", "note": "First setup.",
         });
         let path = format!("/agents/{}/provisioning", self.agent());

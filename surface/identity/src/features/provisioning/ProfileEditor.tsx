@@ -5,9 +5,8 @@ import { operationId } from '../../api';
 import { field } from '../people/RecordedForm';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
-import type { McpServer, Permissions, ProvisioningAnswer, ProvisioningProfile } from './Provisioning';
+import type { HarnessDescription, McpServer, Permissions, ProvisioningAnswer, ProvisioningProfile } from './Provisioning';
 
-export const MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'manual', 'dontAsk', 'plan'];
 const lines = (data: FormData, name: string) => field(data, name).split('\n').map((line) => line.trim()).filter(Boolean);
 type Draft = McpServer & { key: number; kind: 'address' | 'command' };
 
@@ -55,7 +54,14 @@ export function ProfileEditor({ id, path, person, profile, changed }: { id: stri
       if (new Set(mcp_servers.map((entry) => entry.name)).size !== mcp_servers.length) throw new Error('Give each MCP server a different name.');
       const program = field(data, 'harness-program'); const pkg = field(data, 'harness-package');
       if (Boolean(program) !== Boolean(pkg)) throw new Error('Declare the harness with both its program and its package, or leave both empty.');
-      const harness = program ? { kind: field(data, 'harness-kind') === 'codex' ? 'codex' : 'claude_code', program, package: pkg } : null;
+      const name = field(data, 'harness-name');
+      let description: HarnessDescription | null = null;
+      if (program) {
+        if (!name) throw new Error('Name the harness build.');
+        try { description = JSON.parse(field(data, 'harness-description')); } catch { throw new Error('The harness description must be a JSON object.'); }
+        if (!description || typeof description !== 'object' || Array.isArray(description)) throw new Error('The harness description must be a JSON object.');
+      }
+      const harness = program ? { name, description, program, package: pkg } : null;
       setError('');
       change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: lines(data, 'model_access'), tools: lines(data, 'tools'), skills: lines(data, 'skills'), mcp_servers, instructions: field(data, 'instructions'), note: field(data, 'note'), harness, permissions: permissions(data) });
     } catch (failure) { setError(String(failure)); }
@@ -65,7 +71,9 @@ export function ProfileEditor({ id, path, person, profile, changed }: { id: stri
     <fieldset disabled={change.blocked} style={{ border: 0, padding: 0 }}>
       <label className="field">Instructions<textarea name="instructions" defaultValue={profile?.instructions ?? ''} rows={5} placeholder="How this agent should carry out its work" /></label>
       <details><summary>Harness</summary><p>The build this agent is started with. A start is refused until one is declared.</p>
-        <label className="field">Harness<select name="harness-kind" defaultValue={profile?.harness?.kind ?? 'claude_code'}><option value="claude_code">Claude Code</option><option value="codex">Codex</option></select></label>
+        <label className="field">Harness name<input name="harness-name" defaultValue={profile?.harness?.name ?? ''} /></label>
+        <label className="field">Build description (JSON)<textarea name="harness-description" rows={12} defaultValue={profile?.harness?.description ? JSON.stringify(profile.harness.description, null, 2) : ''} /></label>
+        <p>Use the build's declared model limits, permission modes, MCP capabilities and rendering contract. Its name is only a label.</p>
         <label className="field">Program<input name="harness-program" defaultValue={profile?.harness?.program ?? ''} placeholder="/absolute/path/to/program" /></label>
         <label className="field">Package<input name="harness-package" defaultValue={profile?.harness?.package ?? ''} placeholder="The package the program is verified against" /></label>
       </details>
@@ -91,7 +99,7 @@ export function ProfileEditor({ id, path, person, profile, changed }: { id: stri
         <label className="field">Allow<textarea name="perm-allow" defaultValue={held?.allow?.join('\n') ?? ''} /></label>
         <label className="field">Deny<textarea name="perm-deny" defaultValue={held?.deny?.join('\n') ?? ''} /></label>
         <label className="field">Ask<textarea name="perm-ask" defaultValue={held?.ask?.join('\n') ?? ''} /></label>
-        <label className="field">Permission mode<select name="perm-mode" defaultValue={held?.default_mode ?? ''}><option value="">Not set</option>{MODES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label>
+        <label className="field">Permission mode<input name="perm-mode" defaultValue={held?.default_mode ?? ''} placeholder="A mode declared by this build" /></label>
         <label className="field">Additional directories, absolute<textarea name="perm-dirs" defaultValue={held?.additional_directories?.join('\n') ?? ''} /></label>
       </details>
       <label className="field">Reason for this version<input name="note" required placeholder="What changed and why" /></label>

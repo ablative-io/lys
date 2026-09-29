@@ -5,6 +5,9 @@
 //! Claude Code enables it by. What would carry a credential is refused when
 //! the profile is recorded, naming the server and where, never the value.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -90,7 +93,7 @@ impl Table {
             "operation": operation()?, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": servers, "instructions": "", "note": "",
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await
@@ -263,7 +266,7 @@ async fn a_start_refuses_a_secret_without_a_handle_and_a_directory_claude_code_c
     assert_eq!(answer["refusal"], "McpHandleUnsupported", "{answer}");
     let placed = json!([{ "name": "meridian", "command": { "program": "/opt/seat/bin/meridian",
         "cwd": "/seat" } }]);
-    let (status, answer) = table.start(1, &placed).await?;
+    let (status, answer) = table.record(1, &placed).await?;
     assert_eq!(status, 400, "{answer}");
     assert_eq!(answer["refusal"], "McpSettingUnrepresentable", "{answer}");
     Ok(())

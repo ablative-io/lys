@@ -10,6 +10,9 @@
 //! the runner holds that digest. Every wait ends on an
 //! answer, never a clock.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
@@ -126,7 +129,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
         });
         self.ok(&path, &body).await?;
         self.ok(

@@ -4,6 +4,9 @@
 //! versions; a skill Lys does not keep is refused when the profile is
 //! recorded.
 
+#[path = "support/harness_description.rs"]
+mod harness_description;
+
 use std::error::Error;
 
 use axum::Router;
@@ -91,7 +94,7 @@ impl Table {
             "operation": operation, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": skills,
             "mcp_servers": [], "instructions": "", "note": note,
-            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
+            "harness": harness_description::declared(),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await

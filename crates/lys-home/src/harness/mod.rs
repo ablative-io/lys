@@ -23,3 +23,5 @@ pub mod rendering;
 /// against the hash Lys keeps it by (HOME-037 R3).
 pub mod skills;
 mod skills_tests;
+
+mod rendering_permissions;

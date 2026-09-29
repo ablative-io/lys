@@ -8,7 +8,7 @@
 //! settings deny could never be lifted.
 
 use lys_home::harness::description::Permissions as PermissionContract;
-use lys_runner::judge::{Authority, Policy, Rule, RuleKind};
+use lys_runner::judge::{Authority, Policy};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -108,43 +108,6 @@ pub fn checked(
     Ok(given)
 }
 
-/// The deny rules the settings file writes for a hard policy `rule`: the
-/// whole tool, a path prefix on `Read` or `Edit` as that path and everything
-/// under it, or `WebFetch`'s host; any other rule is refused by its id.
-fn denied(rule: &Rule) -> Result<Vec<String>, ServerError> {
-    let refused = |reason: &str| unrepresentable(&rule.id, reason);
-    let written = match (rule.kind, rule.target.as_deref()) {
-        (RuleKind::Tool, None) => vec![rule.tool.clone()],
-        (RuleKind::PathPrefix, Some(path)) if matches!(rule.tool.as_str(), "Read" | "Edit") => {
-            if path.contains(['*', '?', '[', ']', '(', ')', '\\', '!']) {
-                return Err(refused(
-                    "the settings file reads a path rule as a pattern, and this path holds a pattern character",
-                ));
-            }
-            let tool = &rule.tool;
-            vec![format!("{tool}(/{path})"), format!("{tool}(/{path}/**)")]
-        }
-        (RuleKind::PathPrefix, _) => {
-            return Err(refused(
-                "the settings file takes a path rule only on Read or Edit",
-            ));
-        }
-        (RuleKind::Host, Some(host)) if rule.tool == "WebFetch" => {
-            vec![format!("WebFetch(domain:{host})")]
-        }
-        (RuleKind::Host, _) => {
-            return Err(refused(
-                "the settings file takes a host rule only on WebFetch",
-            ));
-        }
-        (RuleKind::Tool, Some(_)) => return Err(refused("a whole-tool rule carries no target")),
-    };
-    match written.iter().find(|one| !expressible(one)) {
-        Some(_) => Err(refused("its tool is not a name the settings file reads")),
-        None => Ok(written),
-    }
-}
-
 fn push(list: &mut Vec<String>, rule: String) {
     if !list.contains(&rule) {
         list.push(rule);
@@ -165,23 +128,25 @@ pub fn settings(
     for tool in tools {
         push(&mut allow, tool.clone());
     }
-    let mut deny = given.deny;
-    for rule in policy.map_or(&[][..], |policy| policy.rules.as_slice()) {
-        if rule.authority == Authority::Hard {
-            for one in denied(rule)? {
-                push(&mut deny, one);
-            }
-        }
-    }
     let merged = checked(
         Permissions {
             allow,
-            deny,
+            deny: given.deny,
             ask: given.ask,
             additional_directories: given.additional_directories,
             default_mode: given.default_mode,
         },
         contract,
     )?;
-    serde_json::to_value(merged).map_err(|error| unrepresentable("permissions", &error.to_string()))
+    let mut value = serde_json::to_value(merged)
+        .map_err(|error| unrepresentable("permissions", &error.to_string()))?;
+    value["hard_rules"] = serde_json::to_value(
+        policy
+            .map_or(&[][..], |policy| policy.rules.as_slice())
+            .iter()
+            .filter(|rule| rule.authority == Authority::Hard)
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|error| unrepresentable("policy", &error.to_string()))?;
+    Ok(value)
 }

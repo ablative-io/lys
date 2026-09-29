@@ -222,6 +222,7 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
     };
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
+        crate::launch_fields::mcp(declared, &settings.mcp_servers)?;
     }
     Ok(settings)
 }
