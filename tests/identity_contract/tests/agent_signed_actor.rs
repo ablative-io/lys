@@ -162,9 +162,27 @@ fn an_oidc_method_that_names_an_agent_is_refused() -> TestResult {
 }
 
 #[test]
-fn a_method_other_than_the_two_is_refused() -> TestResult {
+fn an_unassigned_method_is_refused() -> TestResult {
     for body in [encode_body(&by_oidc()?), encode_body(&by_agent()?)] {
-        refused_as_malformed(&with_method(body, 3)?, "method code");
+        refused_as_malformed(&with_method(body, 4)?, "method code");
     }
+    Ok(())
+}
+
+#[test]
+fn operator_provenance_is_distinct_and_preserves_the_signed_event() -> TestResult {
+    let original = observed(Provenance::new(AuthMethod::Operator, AUTHENTICATED_AT))?;
+    let body = encode_body(&original);
+    assert_eq!(body.get(METHOD_AT), Some(&3), "the assigned operator code");
+    assert_eq!(decode_body(&body)?, original);
+    assert_ne!(original, by_oidc()?);
+    let (key, _dir) = service_key(11)?;
+    let signed = sign_event(original.clone(), &key)?;
+    assert_eq!(
+        verify_event(signed.bytes(), &key.public_key_bytes())?.event(),
+        &original
+    );
+    let with_agent = with_method(encode_body(&by_agent()?), 3)?;
+    refused_as_malformed(&with_agent, "operator actor");
     Ok(())
 }

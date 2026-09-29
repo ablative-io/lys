@@ -11,7 +11,7 @@
 //! and never names a credential in a refusal.
 
 use axum::http::{HeaderMap, header};
-use lys_identity::Actor;
+use lys_identity::{Actor, AuthMethod};
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use crate::apps_error::AppError;
 use crate::apps_state::{App, By, Held, Standing};
 use crate::error::ServerError;
 use crate::read_api::login;
-use crate::routes::{AppState, cookie_header, hex};
+use crate::routes::{AppState, hex};
 
 /// The scheme word of an app's bearer credential.
 pub const APP_CREDENTIAL: &str = "lys-app";
@@ -62,7 +62,7 @@ pub struct Registrar {
 /// Who is acting.
 #[derive(Debug, Clone)]
 pub enum Acting {
-    /// The configured administrator, signed in.
+    /// The configured administrator, through a session or the operator token.
     Administrator(Actor),
     /// A signed-in person who is not the administrator.
     Person(Actor),
@@ -97,9 +97,14 @@ impl Acting {
     /// How the apps' log records the caller.
     pub fn by(&self) -> By {
         match self {
-            Self::Administrator(actor) | Self::Person(actor) => By::Person {
-                login: login(actor.binding()),
-            },
+            Self::Administrator(actor) | Self::Person(actor) => {
+                let login = login(actor.binding());
+                if actor.provenance().method() == AuthMethod::Operator {
+                    By::Operator { login }
+                } else {
+                    By::Person { login }
+                }
+            }
             Self::App {
                 app,
                 service_account,
@@ -181,7 +186,7 @@ fn bearer(headers: &HeaderMap) -> Result<Option<(String, String, String)>, AppEr
 /// the session.
 pub fn acting(state: &AppState, held: &Held, headers: &HeaderMap) -> Result<Acting, ServerError> {
     let Some((scheme, holder, secret)) = bearer(headers)? else {
-        let actor = state.sessions.actor(cookie_header(headers))?;
+        let actor = crate::routes::signed_in(state, headers)?;
         return Ok(if state.admission.administrator(&actor).is_ok() {
             Acting::Administrator(actor)
         } else {

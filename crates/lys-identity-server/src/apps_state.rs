@@ -31,6 +31,12 @@ pub enum By {
         /// The login.
         login: Login,
     },
+    /// The install's operator token, acting under the administrator's login.
+    /// Its provenance distinguishes authority from a person signing in.
+    Operator {
+        /// The administrator's login, not a claim that the person signed in.
+        login: Login,
+    },
     /// A service account, by its id.
     ServiceAccount {
         /// The service account's id.

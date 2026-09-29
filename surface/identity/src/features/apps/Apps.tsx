@@ -16,7 +16,7 @@ import type { SchemaJson } from './SchemaBuilder';
 import './apps.css';
 
 /** Who made an act on the apps. */
-export interface By { kind: 'person' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
+export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
 /** An app as the service answers it. */
 export interface AppRecord {
   id: string; name: string; state: 'pending' | 'approved' | 'declined' | 'retired'; redirects: string[];
@@ -28,7 +28,7 @@ export interface AppRecord {
 export interface ClientIssued { client_id: string; client_secret: string; credential: string }
 
 const LYS = 'lys';
-const who = (by: By) => (by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
+const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
 const listed = (items: string[]) => (items.length ? items.join(', ') : 'nothing');
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
 const refusalWords = (error: unknown) => (error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));

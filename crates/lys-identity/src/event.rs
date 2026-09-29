@@ -299,11 +299,14 @@ pub(crate) mod wire {
     pub(crate) const OIDC: u64 = 1;
     /// An agent the actor is responsible for signed the request.
     pub(crate) const AGENT_SIGNATURE: u64 = 2;
+    /// The install's operator token authenticated the request.
+    pub(crate) const OPERATOR: u64 = 3;
 
     pub(crate) fn method(value: AuthMethod) -> u64 {
         match value {
             AuthMethod::Oidc => OIDC,
             AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
+            AuthMethod::Operator => OPERATOR,
         }
     }
 
@@ -317,11 +320,13 @@ pub(crate) mod wire {
         match (code, agent) {
             (OIDC, None) => Ok(AuthMethod::Oidc),
             (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
+            (OPERATOR, None) => Ok(AuthMethod::Operator),
+            (OPERATOR, Some(_)) => Err("an operator actor carries no agent id under key 5"),
             (OIDC, Some(_)) => Err("an OIDC actor carries no agent id under key 5"),
             (AGENT_SIGNATURE, None) => {
                 Err("an agent-signature actor carries the agent's id under key 5")
             }
-            _ => Err("an authentication method code is 1 or 2"),
+            _ => Err("an authentication method code is 1, 2 or 3"),
         }
     }
 

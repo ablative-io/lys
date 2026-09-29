@@ -89,6 +89,7 @@ impl ServerError {
         match self {
             Self::NotSignedIn
             | Self::AgentSignatureRefused { .. }
+            | Self::OperatorRefused { .. }
             | Self::SignInRefused
             | Self::SetupCodeRefused
             | Self::ClientUnknown
