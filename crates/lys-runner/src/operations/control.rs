@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 
 use super::{OperationOutcome, OperationState, Operations, TextDigest};
 use crate::error::RunnerError;
+use crate::harness_control::dispatcher::EventJournal;
 use crate::harness_control::events::{Event, Projection, Source};
 use crate::harness_control::process::WriteAhead;
 use crate::tracking_store::Feed;
@@ -116,6 +117,16 @@ impl Operations {
             return Err(error);
         }
         Ok(next)
+    }
+}
+
+impl EventJournal for (&mut Operations, &mut Feed, &str) {
+    fn retained(&mut self, event: &Event) -> Result<bool, RunnerError> {
+        self.1.control_retained(event)
+    }
+
+    fn keep(&mut self, event: &Event) -> Result<(), RunnerError> {
+        self.0.keep_control(self.1, self.2, event).map(|_| ())
     }
 }
 

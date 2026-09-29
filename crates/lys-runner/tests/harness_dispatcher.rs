@@ -5,7 +5,7 @@ use std::process::{Child, Command, Stdio};
 use lys_runner::RunnerError;
 use lys_runner::containment_policy::Binding;
 use lys_runner::harness_control::codex;
-use lys_runner::harness_control::dispatcher::{Dispatcher, Prepared};
+use lys_runner::harness_control::dispatcher::{Dispatcher, EventJournal, Prepared};
 use lys_runner::harness_control::events::{Boundary, Event, Kind, Source};
 use lys_runner::harness_control::process::{Pipes, WriteAhead};
 use lys_runner::peer::{Leader, Processes, System};
@@ -33,6 +33,18 @@ impl WriteAhead for Journal {
     fn before_write(&mut self, operation: &str, _encoded: &[u8]) -> Result<(), RunnerError> {
         self.0.push(operation.to_owned());
         Ok(())
+    }
+}
+
+// Fresh-event fixtures exercise validation without modelling durable replay.
+// Recovery and duplicate tests below use the real Feed implementation instead.
+struct OnlyKeep<F>(F);
+impl<F: FnMut(&Event) -> Result<(), RunnerError>> EventJournal for OnlyKeep<F> {
+    fn retained(&mut self, _event: &Event) -> Result<bool, RunnerError> {
+        Ok(false)
+    }
+    fn keep(&mut self, event: &Event) -> Result<(), RunnerError> {
+        (self.0)(event)
     }
 }
 
@@ -79,7 +91,10 @@ fn request(id: &str) -> Result<Prepared, RunnerError> {
 #[test]
 fn mismatched_native_operation_is_refused_before_journal_or_pipe_write() -> TestResult {
     let (_child, source, mut dispatcher) = setup()?;
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    dispatcher.observe(
+        &event(&source, Kind::IdleReconciled),
+        &mut OnlyKeep(|_: &Event| Ok(())),
+    )?;
     let mut journal = Journal::default();
     assert_eq!(
         dispatcher
@@ -115,7 +130,10 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
             .is_err()
     );
     assert!(journal.0.is_empty());
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    dispatcher.observe(
+        &event(&source, Kind::IdleReconciled),
+        &mut OnlyKeep(|_: &Event| Ok(())),
+    )?;
     dispatcher.dispatch("one", &request("one")?, &mut journal, &mut |_| Ok(()))?;
     assert_eq!(journal.0, ["one"]);
     assert!(
@@ -130,7 +148,7 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
                 turn: "turn-one".into(),
             },
         ),
-        &mut |_| Ok(()),
+        &mut OnlyKeep(|_: &Event| Ok(())),
     )?;
     dispatcher.observe(
         &event(
@@ -139,7 +157,7 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
                 turn: "turn-one".into(),
             },
         ),
-        &mut |_| Ok(()),
+        &mut OnlyKeep(|_: &Event| Ok(())),
     )?;
     assert!(
         dispatcher
@@ -155,7 +173,7 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
                 turn: Some("turn-one".into()),
             },
         ),
-        &mut |_| Ok(()),
+        &mut OnlyKeep(|_: &Event| Ok(())),
     )?;
     assert!(dispatcher.flight().is_none());
     dispatcher.dispatch("two", &request("two")?, &mut journal, &mut |_| Ok(()))?;
@@ -168,7 +186,7 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
                         turn: "turn-one".into()
                     }
                 ),
-                &mut |_| Ok(())
+                &mut OnlyKeep(|_: &Event| Ok(()))
             )
             .is_err(),
         "an old terminal cannot release the next input"
@@ -182,7 +200,10 @@ fn a_flight_blocks_other_input_until_both_admission_and_terminal_are_durable() -
 fn failed_event_persistence_holds_the_flight_and_unknown_boundary() -> TestResult {
     let (_child, source, mut dispatcher) = setup()?;
     let mut journal = Journal::default();
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    dispatcher.observe(
+        &event(&source, Kind::IdleReconciled),
+        &mut OnlyKeep(|_: &Event| Ok(())),
+    )?;
     dispatcher.dispatch("one", &request("one")?, &mut journal, &mut |_| Ok(()))?;
     let admission = event(
         &source,
@@ -193,10 +214,13 @@ fn failed_event_persistence_holds_the_flight_and_unknown_boundary() -> TestResul
     );
     assert!(
         dispatcher
-            .observe(&admission, &mut |_| Err(RunnerError::refused(
-                "fixture_store_failed",
-                "not durable"
-            )))
+            .observe(
+                &admission,
+                &mut OnlyKeep(|_: &Event| Err(RunnerError::refused(
+                    "fixture_store_failed",
+                    "not durable"
+                )))
+            )
             .is_err()
     );
     assert_eq!(dispatcher.boundary(), &Boundary::Unknown);
@@ -214,7 +238,10 @@ fn failed_event_persistence_holds_the_flight_and_unknown_boundary() -> TestResul
 fn another_operations_compaction_is_never_recorded_as_this_flight() -> TestResult {
     let (_child, source, mut dispatcher) = setup()?;
     let mut journal = Journal::default();
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    dispatcher.observe(
+        &event(&source, Kind::IdleReconciled),
+        &mut OnlyKeep(|_: &Event| Ok(())),
+    )?;
     dispatcher.dispatch("one", &request("one")?, &mut journal, &mut |_| Ok(()))?;
     dispatcher.observe(
         &event(
@@ -223,7 +250,7 @@ fn another_operations_compaction_is_never_recorded_as_this_flight() -> TestResul
                 turn: "turn-one".into(),
             },
         ),
-        &mut |_| Ok(()),
+        &mut OnlyKeep(|_: &Event| Ok(())),
     )?;
     let mut kept = 0;
     for (operation, turn) in [("other", "turn-one"), ("one", "other-turn")] {
@@ -237,10 +264,13 @@ fn another_operations_compaction_is_never_recorded_as_this_flight() -> TestResul
         );
         assert_eq!(
             dispatcher
-                .observe(&compacted, &mut |_| {
-                    kept += 1;
-                    Ok(())
-                })
+                .observe(
+                    &compacted,
+                    &mut OnlyKeep(|_: &Event| {
+                        kept += 1;
+                        Ok(())
+                    })
+                )
                 .expect_err("foreign compaction")
                 .name(),
             "control_operation_mismatch"
@@ -254,7 +284,10 @@ fn another_operations_compaction_is_never_recorded_as_this_flight() -> TestResul
 #[test]
 fn compact_flight_waits_for_actual_compaction_after_terminal_notification() -> TestResult {
     let (_child, source, mut dispatcher) = setup()?;
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    dispatcher.observe(
+        &event(&source, Kind::IdleReconciled),
+        &mut OnlyKeep(|_: &Event| Ok(())),
+    )?;
     let mut journal = Journal::default();
     let compact = Prepared::Codex(codex::Request::compact(
         "compact-1",
@@ -274,7 +307,7 @@ fn compact_flight_waits_for_actual_compaction_after_terminal_notification() -> T
             turn: "compact-turn".into(),
         },
     ] {
-        dispatcher.observe(&event(&source, kind), &mut |_| Ok(()))?;
+        dispatcher.observe(&event(&source, kind), &mut OnlyKeep(|_: &Event| Ok(())))?;
     }
     assert_eq!(dispatcher.boundary(), &Boundary::Idle);
     assert!(
@@ -295,7 +328,7 @@ fn compact_flight_waits_for_actual_compaction_after_terminal_notification() -> T
                 item: "native-item".into(),
             },
         ),
-        &mut |_| Ok(()),
+        &mut OnlyKeep(|_: &Event| Ok(())),
     )?;
     assert!(dispatcher.flight().is_none());
     dispatcher.dispatch("next", &request("next")?, &mut journal, &mut |_| Ok(()))?;
@@ -308,8 +341,7 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
     let (_child, source, mut dispatcher) = setup()?;
     let dir = tempfile::tempdir()?;
     let mut feed = lys_runner::tracking_store::Feed::open(dir.path())?;
-    let mut keep = |event: &Event| feed.append_control(&source, 1, event).map(|_| ());
-    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut keep)?;
+    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut feed)?;
     let mut journal = Journal::default();
     dispatcher.dispatch("one", &request("one")?, &mut journal, &mut |_| Ok(()))?;
     for kind in [
@@ -321,7 +353,7 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
             turn: "turn-one".into(),
         },
     ] {
-        dispatcher.observe(&event(&source, kind), &mut keep)?;
+        dispatcher.observe(&event(&source, kind), &mut feed)?;
     }
     let terminal = event(
         &source,
@@ -331,13 +363,16 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
     );
     assert!(
         dispatcher
-            .observe(&terminal, &mut |event: &Event| {
-                feed.append_control(&source, 1, event)?;
-                Err(RunnerError::refused(
-                    "fixture_receipt_failed",
-                    "feed survived but receipt did not",
-                ))
-            })
+            .observe(
+                &terminal,
+                &mut OnlyKeep(|event: &Event| {
+                    feed.append_control(&source, 1, event)?;
+                    Err(RunnerError::refused(
+                        "fixture_receipt_failed",
+                        "feed survived but receipt did not",
+                    ))
+                })
+            )
             .is_err()
     );
     assert_eq!(dispatcher.boundary(), &Boundary::Unknown);
@@ -348,9 +383,7 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
             .is_err()
     );
     let retained = feed.control_event(&source, &terminal.source_id)?;
-    dispatcher.observe(&retained, &mut |event: &Event| {
-        feed.append_control(&source, 1, event).map(|_| ())
-    })?;
+    dispatcher.observe(&retained, &mut feed)?;
     assert!(dispatcher.flight().is_none());
     assert_eq!(dispatcher.boundary(), &Boundary::Idle);
     assert_eq!(journal.0, ["one"]);
@@ -367,5 +400,70 @@ fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> T
         "no duplicate first request reached the actual pipe"
     );
     assert_eq!(feed.page(None)?.entries.len(), 4);
+    Ok(())
+}
+
+#[test]
+fn retained_terminal_and_compaction_replays_do_not_release_the_next_flight() -> TestResult {
+    let (_child, source, mut dispatcher) = setup()?;
+    let dir = tempfile::tempdir()?;
+    let mut feed = lys_runner::tracking_store::Feed::open(dir.path())?;
+    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut feed)?;
+    let mut journal = Journal::default();
+    let compact = Prepared::Codex(codex::Request::compact(
+        "compact-1",
+        "thread",
+        &Boundary::Idle,
+    )?);
+    dispatcher.dispatch("compact-1", &compact, &mut journal, &mut |_| Ok(()))?;
+    let terminal = event(
+        &source,
+        Kind::TurnCompleted {
+            turn: "compact-turn".into(),
+        },
+    );
+    let compacted = event(
+        &source,
+        Kind::Compacted {
+            operation: "compact-1".into(),
+            turn: "compact-turn".into(),
+            item: "native-item".into(),
+        },
+    );
+    for observed in [
+        event(
+            &source,
+            Kind::Admitted {
+                operation: "compact-1".into(),
+                turn: None,
+            },
+        ),
+        event(
+            &source,
+            Kind::TurnStarted {
+                turn: "compact-turn".into(),
+            },
+        ),
+        terminal.clone(),
+        compacted.clone(),
+    ] {
+        dispatcher.observe(&observed, &mut feed)?;
+    }
+    assert!(dispatcher.flight().is_none());
+    let cursor = feed.end();
+    for replay in [&terminal, &compacted] {
+        dispatcher.observe(replay, &mut feed)?;
+    }
+    assert_eq!(feed.end(), cursor);
+    dispatcher.dispatch("next", &request("next")?, &mut journal, &mut |_| Ok(()))?;
+    for replay in [&terminal, &compacted] {
+        dispatcher.observe(replay, &mut feed)?;
+    }
+    let flight = dispatcher.flight().ok_or("new flight was released")?;
+    assert_eq!(flight.operation, "next");
+    assert!(!flight.admitted && !flight.terminal);
+    assert_eq!(feed.end(), cursor);
+    assert_eq!(feed.page(None)?.entries.len(), 5);
+    assert_eq!(journal.0, ["compact-1", "next"]);
     Ok(())
 }

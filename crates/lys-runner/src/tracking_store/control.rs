@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 
 use super::{Body, Commit, Feed, FeedEntry, failed};
 use crate::error::RunnerError;
+use crate::harness_control::dispatcher::EventJournal;
 use crate::harness_control::events::{Event, Projection, Source};
 
 fn identity(source: &Source, source_id: &str) -> Result<String, RunnerError> {
@@ -15,6 +16,27 @@ fn identity(source: &Source, source_id: &str) -> Result<String, RunnerError> {
 }
 
 impl Feed {
+    /// Check an exact event against durable retention without replaying its
+    /// effect on a live projection. A reused id with changed facts refuses.
+    pub fn control_retained(&self, event: &Event) -> Result<bool, RunnerError> {
+        let Some(offset) = self
+            .index
+            .controls
+            .get(&identity(&event.source, &event.source_id)?)
+        else {
+            return Ok(false);
+        };
+        let kept = self.control_at(*offset)?;
+        if kept.session != event.source.binding.session || kept.body != Body::Control(event.clone())
+        {
+            return Err(RunnerError::refused(
+                "control_event_reused",
+                "native event identity already records different lifecycle facts",
+            ));
+        }
+        Ok(true)
+    }
+
     /// Commit one observation from the launch owner's proved source. A replay
     /// returns the original sequence without appending; reusing a native event
     /// identity for different facts refuses. Callers still validate turn order
@@ -100,5 +122,16 @@ impl Feed {
             ));
         }
         serde_json::from_str(&line).map_err(failed)
+    }
+}
+
+impl EventJournal for Feed {
+    fn retained(&mut self, event: &Event) -> Result<bool, RunnerError> {
+        self.control_retained(event)
+    }
+
+    fn keep(&mut self, event: &Event) -> Result<(), RunnerError> {
+        self.append_control(&event.source, crate::session::now_ms(), event)
+            .map(|_| ())
     }
 }

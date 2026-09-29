@@ -95,6 +95,7 @@ pub enum Boundary {
 
 /// A projection for the one proved process generation. Reopening one starts
 /// unknown; a last-known idle snapshot is never current protocol evidence.
+#[derive(Clone)]
 pub struct Projection {
     source: Source,
     boundary: Boundary,

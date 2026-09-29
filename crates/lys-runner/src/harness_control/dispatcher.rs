@@ -72,6 +72,22 @@ pub struct Dispatcher {
     projection: Projection,
     pipes: Pipes,
     flight: Option<Flight>,
+    pending: Option<Pending>,
+}
+
+struct Pending {
+    event: Event,
+    before: Projection,
+    retained: Option<bool>,
+}
+
+/// The existing feed and receipt owner, consulted before applying a replay.
+/// Retention checks compare the entire fact, not just an event-id string.
+pub trait EventJournal {
+    /// Whether this exact fact is already durable; conflicting reuse refuses.
+    fn retained(&mut self, event: &Event) -> Result<bool, RunnerError>;
+    /// Keep the fact and reconcile its receipt, including after partial failure.
+    fn keep(&mut self, event: &Event) -> Result<(), RunnerError>;
 }
 
 fn refuse(name: &str, reason: &str) -> RunnerError {
@@ -94,6 +110,7 @@ impl Dispatcher {
             projection,
             pipes,
             flight: None,
+            pending: None,
         })
     }
 
@@ -163,13 +180,64 @@ impl Dispatcher {
     pub fn observe(
         &mut self,
         event: &Event,
-        keep: &mut impl FnMut(&Event) -> Result<(), RunnerError>,
+        journal: &mut impl EventJournal,
     ) -> Result<(), RunnerError> {
-        self.validate_flight(event)?;
-        self.projection.apply(event)?;
-        if let Err(error) = keep(event) {
+        if event.source != self.source || event.source_id.is_empty() {
+            return Err(refuse(
+                "control_source_mismatch",
+                "event differs from the owned source",
+            ));
+        }
+        if let Some(pending) = &self.pending
+            && pending.event != *event
+        {
+            return Err(refuse(
+                "control_event_unresolved",
+                "retain or reconcile the failed observation before advancing the reader",
+            ));
+        }
+        let before = self
+            .pending
+            .as_ref()
+            .map_or_else(|| self.projection.clone(), |pending| pending.before.clone());
+        let retained = match self.pending.as_ref().and_then(|pending| pending.retained) {
+            Some(retained) => retained,
+            None => match journal.retained(event) {
+                Ok(retained) => retained,
+                Err(error) => {
+                    self.pending = Some(Pending {
+                        event: event.clone(),
+                        before,
+                        retained: None,
+                    });
+                    self.projection.gap();
+                    return Err(error);
+                }
+            },
+        };
+        let mut next = before.clone();
+        if !retained {
+            self.validate_flight(event)?;
+            if let Err(error) = next.apply(event) {
+                self.projection = next;
+                return Err(error);
+            }
+        }
+        if let Err(error) = journal.keep(event) {
+            self.pending = Some(Pending {
+                event: event.clone(),
+                before,
+                retained: Some(retained),
+            });
             self.projection.gap();
             return Err(error);
+        }
+        self.pending = None;
+        self.projection = next;
+        if retained {
+            // Historical replay cannot reopen a boundary or release a newer
+            // flight. Its original application already committed those changes.
+            return Ok(());
         }
         if let Some(flight) = &mut self.flight {
             match &event.kind {
