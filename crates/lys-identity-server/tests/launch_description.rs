@@ -106,3 +106,55 @@ fn a_missing_capability_never_falls_back_to_the_display_name() -> Result<(), Box
     assert!(error.to_string().contains("handle_variables"), "{error}");
     Ok(())
 }
+
+#[test]
+fn mcp_capabilities_are_checked_before_a_render() -> Result<(), Box<dyn Error>> {
+    let mut version = version("An ordinary label")?;
+    version.settings.mcp_servers = serde_json::from_value(json!([
+        {"name": "messages", "url": "https://example.test/mcp", "channel": "wake"}
+    ]))?;
+    let harness = version.settings.harness.as_mut().ok_or("harness missing")?;
+    lys_identity_server::launch_fields::mcp(harness, &version.settings.mcp_servers)?;
+    harness.description.mcp.channel_policies = vec![lys_home::harness::launch_fields::Channel::Off];
+    let refused = lys_identity_server::launch_fields::mcp(harness, &version.settings.mcp_servers)
+        .err()
+        .ok_or("undeclared wake admitted")?;
+    assert!(
+        refused.to_string().contains("channel_policies"),
+        "{refused}"
+    );
+    harness
+        .description
+        .mcp
+        .channel_policies
+        .push(lys_home::harness::launch_fields::Channel::Wake);
+    harness.description.mcp.transports.clear();
+    let refused = lys_identity_server::launch_fields::mcp(harness, &version.settings.mcp_servers)
+        .err()
+        .ok_or("undeclared transport admitted")?;
+    assert!(refused.to_string().contains("transports"), "{refused}");
+    Ok(())
+}
+
+#[test]
+fn permission_modes_come_from_the_description() -> Result<(), Box<dyn Error>> {
+    use lys_identity_server::launch_permissions::{Permissions, checked};
+    let version = version("Claude Code")?;
+    let mut contract = version
+        .settings
+        .harness
+        .ok_or("harness missing")?
+        .description
+        .permissions;
+    let given = Permissions {
+        default_mode: Some("operator-mode".to_owned()),
+        ..Permissions::default()
+    };
+    let refused = checked(given.clone(), &contract)
+        .err()
+        .ok_or("undeclared mode admitted")?;
+    assert!(refused.to_string().contains("operator-mode"), "{refused}");
+    contract.modes.push("operator-mode".to_owned());
+    assert_eq!(checked(given.clone(), &contract)?, given);
+    Ok(())
+}
