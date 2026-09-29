@@ -35,10 +35,11 @@ fn refuse(name: &str, words: &str) -> RunnerError {
 impl Configuration {
     /// Prepare initialize for the declared package's existing connection.
     /// The launch owner must resolve the config home and reject symlink escapes
-    /// before calling this method. The checks here are lexical consistency only,
-    /// not canonical filesystem containment. Cwd comes from the authenticated
-    /// plan. The policy is fixed for this exchange, so a later response cannot
-    /// be checked against another binding.
+    /// before calling this method. The config directory must be covered by a
+    /// declared runtime read, outside the writable home/workspace and protected
+    /// paths. These are lexical authority checks, not canonical containment or
+    /// proof that the harness can keep mutable state elsewhere. Cwd comes from
+    /// the fixed authenticated plan; readback cannot substitute another binding.
     pub fn begin(
         initialize_id: &str,
         config_id: &str,
@@ -51,7 +52,6 @@ impl Configuration {
             || config_id.is_empty()
             || initialize_id == config_id
             || !config_home.is_absolute()
-            || !config_home.starts_with(&plan.policy.home)
             || config_home.components().any(|part| {
                 !matches!(
                     part,
@@ -65,6 +65,7 @@ impl Configuration {
                 "setup needs distinct request ids and resolved absolute UTF-8 paths",
             ));
         }
+        config_read_authority(plan, config_home)?;
         let frame = json!({"id":initialize_id,"method":"initialize","params":{
             "clientInfo":{"name":"lys-managed-control","title":"Lys","version":env!("CARGO_PKG_VERSION")}
         }});
@@ -161,6 +162,25 @@ impl Configuration {
     pub fn lost(&mut self) {
         self.phase = Phase::Refused;
     }
+}
+
+fn config_read_authority(plan: &Plan, config_home: &Path) -> Result<(), RunnerError> {
+    let overlaps = |path: &Path| config_home.starts_with(path) || path.starts_with(config_home);
+    if !plan
+        .policy
+        .runtime_reads
+        .iter()
+        .any(|root| config_home.starts_with(root))
+        || overlaps(&plan.policy.home)
+        || overlaps(&plan.policy.workspace)
+        || plan.policy.protected.iter().any(|path| overlaps(path))
+    {
+        return Err(refuse(
+            "control_config_not_readonly",
+            "config directory needs declared read authority outside writable and protected roots",
+        ));
+    }
+    Ok(())
 }
 
 fn response_result<'a>(response: &'a Value, id: &str) -> Result<&'a Value, RunnerError> {

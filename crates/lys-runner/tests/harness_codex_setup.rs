@@ -47,7 +47,7 @@ fn begin(plan: &Plan) -> Result<(Configuration, Value), lys_runner::RunnerError>
     Configuration::begin(
         "init-1",
         "config-1",
-        Path::new("/agent/home/.codex"),
+        Path::new("/runtime/lys-config"),
         plan,
         &plan.binding,
     )
@@ -55,7 +55,7 @@ fn begin(plan: &Plan) -> Result<(Configuration, Value), lys_runner::RunnerError>
 
 fn initialized() -> Value {
     json!({"id":"init-1","result":{
-        "userAgent":"captured-native-agent-not-capability-proof", "codexHome":"/agent/home/.codex",
+        "userAgent":"captured-native-agent-not-capability-proof", "codexHome":"/runtime/lys-config",
         "platformFamily":"unix", "platformOs":"macos"
     }})
 }
@@ -203,7 +203,7 @@ fn setup_cannot_substitute_home_or_a_different_binding() -> TestResult {
         Configuration::begin(
             "same",
             "same",
-            Path::new("/agent/home/.codex"),
+            Path::new("/runtime/lys-config"),
             &plan,
             &plan.binding
         )
@@ -215,7 +215,7 @@ fn setup_cannot_substitute_home_or_a_different_binding() -> TestResult {
         Configuration::begin(
             "init",
             "config",
-            Path::new("/agent/home/.codex"),
+            Path::new("/runtime/lys-config"),
             &plan,
             &other
         )
@@ -245,5 +245,46 @@ fn config_directory_uses_declared_read_authority_instead_of_writable_home() -> T
         .is_err(),
         "the writable home cannot establish immutable config authority"
     );
+    Ok(())
+}
+
+#[test]
+fn config_directory_cannot_overlap_protected_data_or_a_writable_root() -> TestResult {
+    let base = plan()?;
+    let mut protected_cases = 0;
+    for protected in [
+        "/runtime",
+        "/runtime/lys-config",
+        "/runtime/lys-config/control",
+    ] {
+        let mut plan = base.clone();
+        plan.policy.protected.insert(protected.into());
+        plan.binding.digest = plan.policy.digest()?;
+        let error = Configuration::begin(
+            "init",
+            "config",
+            Path::new("/runtime/lys-config"),
+            &plan,
+            &plan.binding,
+        )
+        .err()
+        .ok_or("protected overlap accepted")?;
+        assert_eq!(error.name(), "control_config_not_readonly");
+        protected_cases += 1;
+    }
+    assert_eq!(protected_cases, 3);
+    let mut rejected = 0;
+    for path in [
+        "/agent/home/.codex",
+        "/agent/work/config",
+        "/runtime-unrelated/config",
+    ] {
+        let error = Configuration::begin("init", "config", Path::new(path), &base, &base.binding)
+            .err()
+            .ok_or("undeclared/writable config accepted")?;
+        assert_eq!(error.name(), "control_config_not_readonly");
+        rejected += 1;
+    }
+    assert_eq!(rejected, 3);
     Ok(())
 }
