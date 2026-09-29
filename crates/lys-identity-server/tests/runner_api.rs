@@ -282,7 +282,7 @@ async fn typing_a_line_and_reading_it_back_shows_the_line_and_its_output() -> Te
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn each_act_is_refused_not_permitted_without_operate_and_each_admitted_act_leaves_a_receipt()
+async fn each_session_is_hidden_without_operate_and_each_admitted_act_leaves_a_receipt()
 -> TestResult {
     let session_settings = json!({ "compact": "echo compacted-$((2+3))" });
     let mut table = Table::set(&session_settings).await?;
@@ -306,7 +306,7 @@ async fn each_act_is_refused_not_permitted_without_operate_and_each_admitted_act
             .await?;
         assert_eq!(
             (status, answer["refusal"].as_str()),
-            (403, Some("not_permitted")),
+            (404, Some("RuntimeSessionUnknown")),
             "{act}: {answer}"
         );
         refused += 1;
@@ -547,8 +547,8 @@ async fn raw_terminal_routes_keep_grants_receipts_and_original_bytes() -> TestRe
         let (status, answer) = table
             .sent(&format!("/runtime/sessions/{session}/{route}"), &bea, &body)
             .await?;
-        assert_eq!(status, 403, "{answer}");
-        assert_eq!(answer["refusal"], "not_permitted");
+        assert_eq!(status, 404, "{answer}");
+        assert_eq!(answer["refusal"], "RuntimeSessionUnknown");
     }
     let sent = table
         .act(&session, "input-bytes", &json!({ "data": input }))
@@ -578,3 +578,6 @@ async fn raw_terminal_routes_keep_grants_receipts_and_original_bytes() -> TestRe
     }
     table.close()
 }
+
+#[path = "shared/runner_session_security.rs"]
+mod runner_session_security;

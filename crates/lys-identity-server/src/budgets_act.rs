@@ -29,7 +29,7 @@ use crate::budgets_state::{Act, Held, Measure, Standing, Usage, covered};
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
 use crate::runner_operate::{Undelivered, operate};
-use crate::runner_sessions::operator;
+use crate::runner_sessions::{operator, usage_session};
 
 /// A use measured for an agent.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -77,6 +77,9 @@ async fn report(
         reason: refused.body_text(),
     })?;
     operator(&state, &headers, &agent, "usage")?;
+    if let Some(session) = given.session.as_deref() {
+        usage_session(&state, &agent, session)?;
+    }
     if given.context_percent.is_some_and(|figure| figure > 100) {
         return Err(ServerError::RequestMalformed {
             reason: "context_percent is a percentage: 0 to 100".to_owned(),
@@ -331,6 +334,11 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         at_ms: at_ms(),
         ended: None,
     };
+    if let Some(session) = crossing.session.as_deref()
+        && let Err(error) = usage_session(state, &crossing.agent, session)
+    {
+        return Some(kept(Stands::Refused, error.to_string()));
+    }
     let request = match (crossing.act, crossing.text.clone()) {
         (Act::Tell, _) => {
             return Some(kept(

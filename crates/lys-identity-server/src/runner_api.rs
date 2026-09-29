@@ -15,8 +15,9 @@
 //! - `GET`, `POST /network/machines/{id}/runner`: a machine's runner
 //! - `GET /runner/protocol`: the runner protocol, published
 //!
-//! Each act requires the operate relation on the session's agent and is
-//! refused `not_permitted` without it. Each admitted act leaves a receipt
+//! Each act requires the operate relation on the session's agent and
+//! answers `RuntimeSessionUnknown` when the session is absent or not visible.
+//! Authentication precedes session and runner lookups. Each admitted act leaves a receipt
 //! naming the caller and the act, whatever the runner answered; typed text,
 //! a message and a pattern ride in it as length and SHA-256 digest only,
 //! for every profile. A wait, and a read that follows, end when the runner
@@ -189,8 +190,18 @@ pub(crate) fn admitted(
     id: &str,
     name: &str,
 ) -> Result<(Driven, String), ServerError> {
+    signed_in(state, headers)?;
+    crate::routes::with_directory(state, |directory| {
+        crate::grants::caller(state, headers, directory.projection()?)
+    })?;
+    let agent = crate::runner_sessions::session_agent(state, id)?;
+    let caller = match operator(state, headers, &agent, name) {
+        Err(ServerError::NotPermitted { .. } | ServerError::AgentNotVisible) => {
+            return Err(ServerError::RuntimeSessionUnknown);
+        }
+        other => other?,
+    };
     let driven = driven(state, id)?;
-    let caller = operator(state, headers, &driven.agent, name)?;
     Ok((driven, caller))
 }
 
