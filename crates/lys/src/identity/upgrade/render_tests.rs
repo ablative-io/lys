@@ -149,6 +149,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
             serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
         ),
         products: None,
+        messages: None,
     };
     let expected = server_config::render(&layout, &config, &carried, true);
     let service = file("identity.json")?;

@@ -7,6 +7,8 @@
 //! already written, so an upgrade renders the new build's configuration
 //! without asking Rauthy.
 
+use std::path::Path;
+
 use serde_json::{Value, json};
 
 use super::super::config::DeploymentConfig;
@@ -54,6 +56,8 @@ pub struct Carried {
     pub administrator: Option<Value>,
     /// The products an earlier configuration registered as clients of Lys.
     pub products: Option<Value>,
+    /// The Cambium message connection an earlier configuration named.
+    pub messages: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -133,6 +137,9 @@ pub fn render(
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });
+    if let Some(messages) = &carried.messages {
+        rendered["cambium_messages"] = messages.clone();
+    }
     if let Some(administrator) = &carried.administrator {
         rendered["administrator"] = administrator.clone();
     }
@@ -162,5 +169,23 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     Ok(Some(Carried {
         administrator: named(earlier.get("administrator")),
         products: named(earlier.pointer("/provider/clients")),
+        messages: named(earlier.get("cambium_messages")),
     }))
+}
+
+/// The Cambium message connection in the JSON file at `path`: an object,
+/// which the service checks when it starts.
+pub fn messages_from(path: &Path) -> IdentityResult<Value> {
+    let refused = |reason: String| {
+        IdentityError::new(ErrorKind::ConfigInvalid, "read", "cambium_messages", reason).at(path)
+    };
+    let bytes = std::fs::read(path).map_err(|error| refused(error.to_string()))?;
+    let value: Value =
+        serde_json::from_slice(&bytes).map_err(|error| refused(error.to_string()))?;
+    if !value.is_object() {
+        return Err(refused(
+            "must be a JSON object with url and bindings".to_owned(),
+        ));
+    }
+    Ok(value)
 }

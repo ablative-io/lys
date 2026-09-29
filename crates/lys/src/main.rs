@@ -72,11 +72,13 @@ fn main() -> ExitCode {
                 root,
                 admin_email,
                 surface,
+                cambium_messages,
             } => identity::install::run(
                 &identity::install::Options {
                     root,
                     admin_email,
                     surface,
+                    cambium_messages,
                 },
                 json,
             ),

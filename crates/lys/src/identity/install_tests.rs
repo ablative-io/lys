@@ -466,3 +466,42 @@ fn an_earlier_builds_state_gains_what_this_service_reads_and_keeps_the_rest()
     assert_eq!(std::fs::read(&provider)?, key, "an existing key is kept");
     Ok(())
 }
+
+#[test]
+fn a_cambium_message_connection_is_written_and_carried_by_the_next_render()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let root = dir.path().to_path_buf();
+    let layout = Layout::at(root.clone());
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    let file = dir.path().join("messages.json");
+    let messages = serde_json::json!({
+        "url": "http://127.0.0.1:6010/",
+        "bindings": [{"participant": "registry-tom", "identity": "person-00000000000000000000000000000001"}]
+    });
+    std::fs::write(&file, messages.to_string())?;
+    let carried = server_config::Carried {
+        messages: Some(server_config::messages_from(&file)?),
+        ..server_config::Carried::default()
+    };
+    let rendered = server_config::render(&layout, &config, &carried, false);
+    assert_eq!(rendered["cambium_messages"], messages);
+    std::fs::create_dir_all(layout.service_config().parent().ok_or("no parent")?)?;
+    std::fs::write(layout.service_config(), serde_json::to_vec(&rendered)?)?;
+    std::fs::set_permissions(
+        layout.service_config(),
+        std::os::unix::fs::PermissionsExt::from_mode(0o600),
+    )?;
+    let again = server_config::carried(&layout)?.ok_or("nothing carried")?;
+    let next = server_config::render(&layout, &config, &again, false);
+    assert_eq!(
+        next["cambium_messages"], messages,
+        "carried by the next render"
+    );
+    std::fs::write(&file, "[]")?;
+    let refused = server_config::messages_from(&file)
+        .err()
+        .ok_or("a list was taken as the connection")?;
+    assert_eq!(refused.kind(), ErrorKind::ConfigInvalid);
+    Ok(())
+}
