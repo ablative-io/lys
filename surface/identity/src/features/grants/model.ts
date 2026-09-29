@@ -24,8 +24,8 @@ export interface GrantWorld {
   who: Map<string, Who>;
 }
 
-export async function readGrantWorld(): Promise<GrantWorld> {
-  const [me, people, list, model] = await Promise.all([api.me(), api.people(), api.grants(), api.model()]);
+export async function readGrantWorld(knownMe?: MeView): Promise<GrantWorld> {
+  const [me, people, list, model] = await Promise.all([knownMe ?? api.me(), api.people(), api.grants(), api.model()]);
   const who = new Map<string, Who>();
   for (const p of people.people) {
     who.set(p.id, { name: p.display_name, state: p.state, kind: 'person', responsible: null });

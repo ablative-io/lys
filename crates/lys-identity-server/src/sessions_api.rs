@@ -23,8 +23,9 @@ use lys_identity::projection::Projection;
 use lys_identity::{Actor, PersonId};
 use serde::{Deserialize, Serialize};
 
+use crate::caller_admission::own_account_person;
 use crate::error::ServerError;
-use crate::read_api::{own_person, person_record};
+use crate::read_api::person_record;
 use crate::routes::{AppState, cookie_header, signed_in, with_directory};
 use crate::session::SessionEntry;
 
@@ -179,7 +180,7 @@ async fn own_sessions(
 ) -> Result<Json<SessionsView>, ServerError> {
     let (actor, current) = caller(&state, &headers)?;
     sessions_of(&state, &current, |projection| {
-        own_person(projection, &actor)
+        own_account_person(projection, &actor)
     })
 }
 
@@ -191,7 +192,7 @@ async fn end_own(
 ) -> Result<Response, ServerError> {
     let (actor, current) = caller(&state, &headers)?;
     end_session(&state, &actor, &current, &id, |projection| {
-        own_person(projection, &actor)
+        own_account_person(projection, &actor)
     })
 }
 
