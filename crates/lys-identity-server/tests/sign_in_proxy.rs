@@ -78,7 +78,7 @@ async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
             }
             let response = request.send().await?;
             let status = response.status();
-            let body: serde_json::Value = response.json().await?;
+            let body: serde_json::Value = serde_json::from_str(&response.text().await?)?;
             assert_eq!(status, 502, "{path}: {body}");
             assert_eq!(body["refusal"], "SignInFailed", "{path}: {body}");
         }
