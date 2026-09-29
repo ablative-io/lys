@@ -69,17 +69,16 @@ pub fn checked(
     given: Permissions,
     contract: &PermissionContract,
 ) -> Result<Permissions, ServerError> {
-    if !given.allow.is_empty() || !given.deny.is_empty() || !given.ask.is_empty() {
-        if !contract
+    if (!given.allow.is_empty() || !given.deny.is_empty() || !given.ask.is_empty())
+        && !contract
             .rule_forms
             .iter()
             .any(|form| form == "tool_specifier")
-        {
-            return Err(unrepresentable(
-                "description.permissions.rule_forms",
-                "no supported rule form was declared",
-            ));
-        }
+    {
+        return Err(unrepresentable(
+            "description.permissions.rule_forms",
+            "no supported rule form was declared",
+        ));
     }
     for rule in given.allow.iter().chain(&given.deny).chain(&given.ask) {
         if !expressible(rule) {
