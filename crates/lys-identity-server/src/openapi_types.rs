@@ -58,6 +58,7 @@ use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
 };
+use crate::grants_reach::{ReachAnswer, ReachBody};
 use crate::launch_api::{Launch, StartCommandView};
 use crate::link_audit_api::{Asked, Delivery};
 use crate::memory_api::MemoryView;
@@ -174,6 +175,12 @@ fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
         ),
         (POST, "/grants/why", Some(action), Some(permit)),
         (POST, "/grants/who", Some(who), Some(page)),
+        (
+            POST,
+            "/grants/reach",
+            Some(api.schema::<ReachBody>()),
+            Some(api.schema::<ReachAnswer>()),
+        ),
         (
             GET,
             "/grants/cannot-give",

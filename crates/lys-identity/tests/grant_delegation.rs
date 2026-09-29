@@ -1,6 +1,8 @@
 //! R2: affirmative delegation and bounded ancestry (`GRANT_USE_VS_LEND`,
 //! `GRANT_RECIPIENT`, `GRANT_ANCESTRY` and `GRANT_AGENT_PARITY`).
 
+#[path = "grant_delegation/service_accounts.rs"]
+mod service_accounts;
 mod support;
 
 use std::collections::HashMap;

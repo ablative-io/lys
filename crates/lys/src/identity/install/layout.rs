@@ -230,3 +230,6 @@ pub fn render_deployment(admin_email: Option<&str>) -> String {
         .replace("{{rauthy_port}}", &RAUTHY_PORT.to_string())
         .replace("{{service_port}}", &SERVICE_PORT.to_string())
 }
+
+/// The sourced estate plan shipped with this build.
+pub const ESTATE_PLAN: &str = include_str!("../../../../../docs/estate/approval-plan.json");

@@ -1,5 +1,5 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-.screen { flex: 1; overflow: auto; position: relative; }
+.screen { flex: 1; overflow: auto; overscroll-behavior: none; position: relative; }
 .page { padding: 26px 32px 64px; }
 .eyebrow { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
 .eyebrow a { text-decoration: none; }

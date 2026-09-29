@@ -149,6 +149,20 @@ export const who = (body: unknown): Answer => {
   return ok({ holders, revision: 7, complete: true, next: null });
 };
 
+/** /grants/reach: the /grants/who answers above, every resource and action at once. */
+export const reach = (body: unknown): Answer => {
+  const b = body as { resources: { kind: string; id: string; actions: string[] }[] };
+  const resources = b.resources.map(({ kind, id, actions }) => {
+    const byHolder = new Map<string, string[]>();
+    for (const action of actions) {
+      const page = who({ route: 'browser', resource: { kind, id }, action, page_size: 100, after: null }).body as { holders: { holder: string }[] };
+      for (const { holder } of page.holders) byHolder.set(holder, [...(byHolder.get(holder) ?? []), action]);
+    }
+    return { kind, id, holders: [...byHolder].map(([holder, held]) => ({ holder, actions: held })) };
+  });
+  return ok({ revision: 7, resources });
+};
+
 export type Answer = { status: number; body: unknown };
 /** A route's answer, or a function of the posted body for routes that are asked. */
 export type Route = Answer | ((body: unknown) => Answer);
@@ -181,6 +195,7 @@ export const SERVICE: Record<string, Route> = {
   '/grants/model': ok(MODEL),
   'POST /grants/why': why,
   'POST /grants/who': who,
+  'POST /grants/reach': reach,
   'POST /grants': (body) => ok({ operation: (body as { operation: string }).operation, grant: 'grant-' + hex(34), index: 3, receipt: { caller: ADA } }),
   [`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`]: ok(CANNOT_GIVE_ROOT_SCRIBE),
 };

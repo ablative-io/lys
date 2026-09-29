@@ -65,6 +65,7 @@ impl SecretsError {
             Self::AnswerTooLarge { .. } => "AnswerTooLarge",
             Self::Encoding { .. } => "Encoding",
             Self::Io { .. } => "Io",
+            Self::IndexUnresolved { .. } => "IndexUnresolved",
             Self::Trust(_) => "Trust",
             Self::Log(_) => "Log",
         }

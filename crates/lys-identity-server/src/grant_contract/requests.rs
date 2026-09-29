@@ -81,8 +81,11 @@ fn recipient_kind(text: &str) -> Result<RecipientKind, ServerError> {
     match text {
         "person" => Ok(RecipientKind::Person),
         "agent" => Ok(RecipientKind::Agent),
+        "service_account" => Ok(RecipientKind::ServiceAccount),
         other => Err(ServerError::RequestMalformed {
-            reason: format!("{other} is not a recipient kind, which is person or agent"),
+            reason: format!(
+                "{other} is not a recipient kind, which is person, agent or service_account"
+            ),
         }),
     }
 }

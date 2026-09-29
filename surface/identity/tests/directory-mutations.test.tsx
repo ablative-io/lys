@@ -134,6 +134,8 @@ describe('Directory mutations', () => {
     await fill(page, 'reason', 'Owner requested suspension');
     await submit(page);
     expect(posted[0]).toMatchObject({ path: '/identities/' + ADA + '/transitions', body: { transition: 'suspend', reason: 'Owner requested suspension' } });
+    expect(text()).toContain('Ada (test person) is now suspended.');
+    expect(page.querySelector('details')?.hasAttribute('open')).toBe(false);
   });
 
   it('issues a root grant only with the explicitly selected holder, relation and lifetime', async () => {

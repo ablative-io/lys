@@ -25,6 +25,9 @@ pub(crate) const GRANT_MADE: &[&str] = &[
     "app_not_approved",
     "app_retired",
 ];
+/// A grant change the log recorded that the permission engine has not yet
+/// taken, or whose recording is not yet known.
+pub(crate) const RECORDED: &[&str] = &["ProjectionPending", "OperationUnresolved"];
 /// A question on a kind an approved app declares.
 pub(crate) const GRANT_ASKED: &[&str] = &[
     "NotSignedIn",
@@ -34,10 +37,19 @@ pub(crate) const GRANT_ASKED: &[&str] = &[
     "app_retired",
     "action_not_declared",
 ];
+/// A decision the permission engine or the grant log could not make.
+pub(crate) const UNANSWERED: &[&str] = &[
+    "PermissionEngineUnavailable",
+    "ProjectionPending",
+    "OperationUnresolved",
+    "StaleDecision",
+];
 /// An agent's signed request.
 pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
 /// A registration.
 pub(crate) const REGISTER: &[&str] = &[
+    "NotHeld",
+    "ServiceAccountUnknown",
     "NotAdmitted",
     "RequestMalformed",
     "app_id_invalid",
@@ -45,6 +57,7 @@ pub(crate) const REGISTER: &[&str] = &[
     "app_exists",
     "redirect_invalid",
     "credential_refused",
+    "app_operation_reused",
 ];
 /// An app the caller may see.
 pub(crate) const APP_READ: &[&str] = &["NotSignedIn", "app_unknown", "credential_refused"];

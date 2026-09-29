@@ -18,12 +18,25 @@ type TestResult = Result<(), Box<dyn Error>>;
 const TOKEN: &str = "operator-fixture-secret-0123456789abcdef";
 
 async fn service(administrator: bool) -> Result<Service, Box<dyn Error>> {
+    service_with_broker(administrator, None).await
+}
+
+async fn service_with_broker(
+    administrator: bool,
+    broker: Option<String>,
+) -> Result<Service, Box<dyn Error>> {
     Ok(Service::start_adjusted(
         GRANT_MODEL,
         None,
         None,
         None,
         |config| {
+            config.secrets =
+                broker.map(|broker| lys_identity_server::secrets_api::SecretsSettings {
+                    broker,
+                    service: "identity".to_owned(),
+                    service_key_file: config.event_key_file.clone(),
+                });
             config.operator_token_file = Some(config.log_dir.with_file_name("operator.token"));
             config.operator_upgrade_file = Some(config.log_dir.with_file_name("upgrade.json"));
             if !administrator {
@@ -242,7 +255,8 @@ fn openapi_names_the_operator_header_and_keeps_oauth_token_authority_separate() 
 
 #[tokio::test]
 async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
-    let service = service(true).await?;
+    let broker = identity_contract::app_custody::start().await?;
+    let service = service_with_broker(true, Some(broker)).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     assert_eq!(
         service.post("/setup", Some(&cookie), &setup()?).await?.0,
@@ -259,15 +273,15 @@ async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
         )
         .await?;
     assert_eq!(status, 200, "{approved}");
-    let credential = approved["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?;
+    assert!(approved["client"].is_null());
+    assert_eq!(approved["credentials"]["app"], NOTES);
+    let credential = identity_contract::app_custody::credential(NOTES);
     let client = reqwest::Client::new();
     let url = format!("{}/apps/me", service.base);
     assert_eq!(
         client
             .get(&url)
-            .bearer_auth(credential)
+            .bearer_auth(&credential)
             .send()
             .await?
             .status(),
@@ -275,7 +289,7 @@ async fn wrong_operator_cannot_be_bypassed_by_an_app_bearer() -> TestResult {
     );
     let response = client
         .get(&url)
-        .bearer_auth(credential)
+        .bearer_auth(&credential)
         .header("lys-operator", "wrong")
         .send()
         .await?;

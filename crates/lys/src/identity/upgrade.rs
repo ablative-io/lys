@@ -58,6 +58,9 @@ pub struct Options {
     pub surface: Option<PathBuf>,
     /// The data root; the platform's application data path when absent.
     pub root: Option<PathBuf>,
+    /// A JSON file holding the message service connection to write in
+    /// place of the one the install carries.
+    pub message_service: Option<PathBuf>,
 }
 
 /// How a started process is known to be ready: its log gains `says` after
@@ -148,6 +151,8 @@ impl Engine for Compose {
 
 /// What an upgrade works with besides its inputs.
 pub struct Parts<'a> {
+    /// Runner executable to ensure after swapping; absent for service-only fixtures.
+    pub runner: Option<&'a Path>,
     /// The broker and the service, in start order.
     pub units: &'a [Unit],
     /// The engine that runs the compose services.
@@ -351,6 +356,9 @@ pub fn upgrade(
     let names: Vec<&'static str> = parts.units.iter().map(|unit| unit.binary).collect();
     require_install(layout)?;
     let to = incoming(from, &names)?;
+    if let Some(runner) = parts.runner {
+        version(runner, "lys")?;
+    }
     if let Some(package) = package {
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
@@ -388,8 +396,18 @@ pub fn upgrade(
         package,
         files: &files,
     };
-    let Err(failure) = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
-    else {
+    let result = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
+        .and_then(|()| {
+            if let Some(program) = parts.runner {
+                let key = std::sync::Arc::new(
+                    install::service_key(layout).map_err(|error| error.to_string())?,
+                );
+                install::start_runner(layout, &key, program, say)
+                    .map_err(|error| error.to_string())?;
+            }
+            Ok(())
+        });
+    let Err(failure) = result else {
         let record = record_build(layout, &names, say)?;
         Intent::clear(layout)?;
         return Ok(record);
@@ -429,10 +447,22 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     require_install(&layout)?;
     let config = DeploymentConfig::load(&layout.deployment_config())?;
     install::server_state(&layout, &config)?;
+    let templates = render::Templates {
+        messages: options
+            .message_service
+            .as_deref()
+            .map(install::server_config::messages_from)
+            .transpose()?,
+    };
+    if templates.messages.is_some() {
+        emitter.note("message service connection from the given file");
+    }
+    let runner = options.from.join("lys");
     let mut parts = Parts {
+        runner: Some(&runner),
         units: &units,
         engine: &mut Compose,
-        render: &render::Templates,
+        render: &templates,
     };
     let record = upgrade(
         &layout,

@@ -3,12 +3,14 @@
 //! route and the door's handle records it reads are declared here, in
 //! [`start`] and [`door_handles`].
 
+pub use crate::routes_table::router;
+
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
-use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{
     Actor, AgentId, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile, Transition,
@@ -45,6 +47,12 @@ pub struct AppState {
     pub setup: Option<crate::setup::SetupSettings>,
     /// One setup act at a time, so one code makes one administrator.
     pub setup_lock: tokio::sync::Mutex<()>,
+    /// The private loader credential provisioned by install or upgrade.
+    pub import_credential_file: Option<PathBuf>,
+    /// The fixed local destination for app credentials held by the broker.
+    pub identity_upstream: String,
+    /// The estate plan placed beside the directory log by install or upgrade.
+    pub estate_plan_file: PathBuf,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -107,7 +115,7 @@ pub struct AppState {
 /// Where the service says how a thing it keeps was started.
 pub type Say = Arc<dyn Fn(&str) + Send + Sync>;
 
-type Shared = Arc<AppState>;
+pub(crate) type Shared = Arc<AppState>;
 
 #[path = "door_handles.rs"]
 pub mod door_handles;
@@ -159,6 +167,22 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let state = Arc::new(AppState {
+        import_credential_file: config.import_credential_file.clone(),
+        estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
+        identity_upstream: format!(
+            "http://{}:{}{}",
+            if config.listen.is_ipv6() {
+                "[::1]"
+            } else {
+                "127.0.0.1"
+            },
+            config.listen.port(),
+            if config.surface_dir.is_some() {
+                "/api"
+            } else {
+                ""
+            }
+        ),
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
@@ -231,6 +255,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     });
     crate::teams_migration::at_start(&state)?;
     crate::budgets_migration::advance(&state)?;
+    crate::import_bootstrap::ensure(&state)?;
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);
@@ -243,21 +268,24 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let starts = start::routes(start_service(config, &state)?);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
-    let api = router(Arc::clone(&state)).merge(configured).merge(starts);
+    let api = crate::routes_table::router(Arc::clone(&state))
+        .merge(configured)
+        .merge(starts);
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
     };
-    Ok(served
-        .merge(provider_callback)
-        .layer(axum::middleware::from_fn_with_state(
-            Arc::clone(&state),
-            crate::session_admission::guard,
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            state,
-            crate::operator::guard,
-        )))
+    Ok(
+        crate::signed_first::guarded(served.merge(provider_callback), Arc::clone(&state))
+            .layer(axum::middleware::from_fn_with_state(
+                Arc::clone(&state),
+                crate::session_admission::guard,
+            ))
+            .layer(axum::middleware::from_fn_with_state(
+                state,
+                crate::operator::guard,
+            )),
+    )
 }
 
 /// The start route's service over the directory `state` holds. The route
@@ -294,52 +322,6 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
         reopen,
         load_service_key(&config.event_key_file)?,
     )?)
-}
-
-/// The service's routes over `state`.
-pub fn router(state: Shared) -> Router {
-    Router::new()
-        .route("/callback", get(crate::sign_in_callback::callback))
-        .route("/people", post(register_person))
-        .route("/agents", post(register_agent))
-        .route("/identities", get(list))
-        .route("/identities/{id}", get(read))
-        .route("/identities/{id}/profile", post(change_profile))
-        .route("/identities/{id}/transitions", post(transition))
-        .route("/people/{id}/logins", post(bind_login))
-        .merge(crate::sign_in::routes())
-        .merge(crate::setup::routes())
-        .merge(crate::accounts::routes())
-        .merge(crate::read_api::routes())
-        .merge(crate::grants::routes())
-        .merge(crate::receipts_api::routes())
-        .merge(crate::reviews_api::routes())
-        .merge(crate::roles_api::routes())
-        .merge(crate::requests_api::routes())
-        .merge(crate::connections_api::routes())
-        .merge(crate::sign_in_providers::routes())
-        .merge(crate::link_audit_api::routes())
-        .merge(crate::network_api::routes())
-        .merge(crate::provisioning_api::routes())
-        .merge(crate::launch_api::routes())
-        .merge(crate::runtime_api::routes())
-        .merge(crate::runner_api::routes())
-        .merge(crate::stop_api::routes())
-        .merge(crate::budgets_api::routes())
-        .merge(crate::budgets_act::routes())
-        .merge(crate::agent_policy_api::routes())
-        .merge(crate::refusals_api::routes())
-        .merge(crate::goals_api::routes())
-        .merge(crate::service_accounts_api::routes())
-        .merge(crate::teams_api::routes())
-        .merge(crate::resources_api::routes())
-        .merge(crate::secrets_api::routes())
-        .merge(crate::sessions_api::routes())
-        .merge(crate::apps_api::routes())
-        .merge(crate::apps_schema_api::routes())
-        .merge(crate::apps_bench::routes())
-        .merge(crate::openapi::routes())
-        .with_state(state)
 }
 
 fn malformed(reason: String) -> ServerError {
@@ -387,6 +369,11 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
+    if text.starts_with("op-") {
+        return lys_identity::ServiceAccountId::from_str(text)
+            .map(IdentityId::ServiceAccount)
+            .map_err(ServerError::from);
+    }
     if text.starts_with("agent-") {
         return AgentId::from_str(text)
             .map(IdentityId::Agent)
@@ -409,7 +396,7 @@ fn operation(text: &str) -> Result<OperationId, ServerError> {
     OperationId::from_str(text).map_err(ServerError::from)
 }
 
-async fn register_person(
+pub(crate) async fn register_person(
     State(state): State<Shared>,
     headers: HeaderMap,
     Json(body): Json<Named>,
@@ -429,24 +416,37 @@ async fn register_person(
     })
 }
 
-async fn register_agent(
+pub(crate) async fn register_agent(
     State(state): State<Shared>,
     headers: HeaderMap,
     Json(body): Json<Named>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    if !headers.contains_key(axum::http::header::AUTHORIZATION) {
+        let actor = signed_in(&state, &headers)?;
+        state.admission.administrator(&actor)?;
+        let (op, profile) = (
+            operation(&body.operation)?,
+            Profile::new(&body.display_name)?,
+        );
+        return with_directory(&state, |directory| {
+            let responsible = directory.projection()?.person_for(actor.binding())
+                .ok_or(ServerError::NotAdmitted { reason: "the administrator's login is bound to no person, so no agent can be registered under them" })?;
+            let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
+            Ok(Json(AgentRegistered {
+                agent: id.to_string(),
+                responsible: responsible.to_string(),
+                receipt: receipt_view(&receipt),
+            }))
+        });
+    }
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    with_directory(&state, |directory| {
-        let responsible = directory
-            .projection()?
-            .person_for(actor.binding())
-            .ok_or(ServerError::NotAdmitted {
-                reason: "the administrator's login is bound to no person, so no agent can be registered under them",
-            })?;
+    crate::grants::with_directory_grants(&state, |directory, mut judged| {
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+        crate::service_account_grants::admit(&mut judged, caller, "agents")?;
+        let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
         let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
         Ok(Json(AgentRegistered {
             agent: id.to_string(),
@@ -456,7 +456,7 @@ async fn register_agent(
     })
 }
 
-async fn list(
+pub(crate) async fn list(
     State(state): State<Shared>,
     headers: HeaderMap,
 ) -> Result<Json<IdentitiesView>, ServerError> {
@@ -472,7 +472,7 @@ async fn list(
     })
 }
 
-async fn read(
+pub(crate) async fn read(
     State(state): State<Shared>,
     headers: HeaderMap,
     Path(id): Path<String>,
@@ -491,7 +491,7 @@ async fn read(
     })
 }
 
-async fn change_profile(
+pub(crate) async fn change_profile(
     State(state): State<Shared>,
     headers: HeaderMap,
     Path(id): Path<String>,
@@ -522,7 +522,7 @@ pub(crate) struct Moved {
     reason: String,
 }
 
-async fn transition(
+pub(crate) async fn transition(
     State(state): State<Shared>,
     headers: HeaderMap,
     Path(id): Path<String>,
@@ -566,7 +566,7 @@ pub(crate) struct Bound {
     subject: String,
 }
 
-async fn bind_login(
+pub(crate) async fn bind_login(
     State(state): State<Shared>,
     headers: HeaderMap,
     Path(id): Path<String>,

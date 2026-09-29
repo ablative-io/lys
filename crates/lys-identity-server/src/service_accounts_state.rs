@@ -46,6 +46,22 @@ pub struct Retired {
     pub at: u64,
 }
 
+/// A refused import entry, with no credential or request payload retained.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ImportRefused {
+    /// The actual authenticated service account.
+    pub account: String,
+    /// Content-derived operation, which may succeed after authority changes.
+    pub operation: String,
+    /// Document section and entry name.
+    pub entry: String,
+    /// The original named refusal.
+    pub refusal: String,
+    /// When this outcome was first recorded.
+    pub at: u64,
+}
+
 /// One line of the log.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "line", rename_all = "snake_case")]
@@ -54,6 +70,8 @@ pub enum Line {
     Created(Created),
     /// A service account retired.
     Retired(Retired),
+    /// A refused import, without changing account or grant authority.
+    ImportRefused(ImportRefused),
 }
 
 /// One service account, with its retirement once it has one.
@@ -64,6 +82,9 @@ pub struct Account {
     pub created: Created,
     /// How it was retired, null while it is in use.
     pub retired: Option<Retired>,
+    /// Refused imports, visible under the same account ownership rules.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub import_refusals: Vec<ImportRefused>,
 }
 
 impl Account {
@@ -113,18 +134,37 @@ impl Held {
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
+        if let Line::ImportRefused(refused) = line {
+            let account = self
+                .accounts
+                .iter_mut()
+                .find(|account| account.created.id == refused.account)
+                .ok_or_else(|| "import refusal names no existing account".to_owned())?;
+            if account
+                .import_refusals
+                .iter()
+                .any(|kept| kept.operation == refused.operation && kept.refusal == refused.refusal)
+            {
+                return Err("import refusal already recorded".to_owned());
+            }
+            account.import_refusals.push(refused);
+            return Ok(());
+        }
         let operation = match &line {
             Line::Created(created) => &created.id,
             Line::Retired(retired) => &retired.operation,
+            Line::ImportRefused(_) => return Err("unexpected import refusal".to_owned()),
         };
         if self.operation(operation).is_some() {
             return Err(format!("operation `{operation}` already names a line"));
         }
         match line {
+            Line::ImportRefused(_) => Err("unexpected import refusal".to_owned()),
             Line::Created(created) => {
                 self.accounts.push(Account {
                     created,
                     retired: None,
+                    import_refusals: Vec::new(),
                 });
                 Ok(())
             }

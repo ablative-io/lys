@@ -267,3 +267,31 @@ async fn the_administrator_resets_a_password_and_disables_a_person() -> TestResu
         .await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn the_administrator_is_refused_an_email_or_password_the_policy_refuses() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let bea = bea(&service, &rauthy, &ada).await?;
+    let (status, email) = service
+        .post(
+            &format!("/directory/people/{bea}/account/email"),
+            Some(&ada),
+            &json!({ "email": "not-an-email" }),
+        )
+        .await?;
+    assert_eq!(status, 400, "{email}");
+    assert_eq!(email["refusal"], "AccountRefused", "{email}");
+    let (status, password) = service
+        .post(
+            &format!("/directory/people/{bea}/account/password"),
+            Some(&ada),
+            &json!({ "password": "short" }),
+        )
+        .await?;
+    assert_eq!(status, 400, "{password}");
+    assert_eq!(password["refusal"], "AccountRefused", "{password}");
+    service
+        .sign_in_with("bea@example.test", "Bea-Password-000111")
+        .await?;
+    Ok(())
+}

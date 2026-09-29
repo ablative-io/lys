@@ -1,3 +1,4 @@
+import { PersonalBudgets } from './PersonalBudgets';
 import { AgentCertificates } from './AgentCertificates';
 import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
@@ -187,6 +188,8 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
 export function TabBody({ tab, data, reload }: { tab: string; data: FileData; reload: () => void }) {
   const person = data.x.kind === 'person';
   switch (tab) {
+    case 'budgets':
+      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <a className="btn" href={'#/usage/' + encodeURIComponent(data.x.id)}>Open agent usage and budgets</a>;
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':

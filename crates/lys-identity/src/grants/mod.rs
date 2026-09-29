@@ -10,6 +10,7 @@ mod commit;
 pub mod error;
 pub mod events;
 pub mod expiry;
+pub mod frame;
 pub mod lineage;
 pub mod model;
 pub mod permission;
@@ -40,6 +41,7 @@ pub use events::{
     GrantChange, GrantEvent, SignedGrantEvent, decode_event_body, encode_event_body,
     sign_grant_event, verify_grant_event,
 };
+pub use frame::Frame;
 pub use lineage::Lineage;
 pub use model::{KindModel, Model, Within};
 pub use permission::{

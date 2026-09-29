@@ -8,6 +8,21 @@ use clap::Subcommand;
 /// dependencies for development and check them.
 #[derive(Debug, Subcommand)]
 pub enum IdentityCommand {
+    /// Import apps, agents and delegated permissions using a service
+    /// account's own credential. Stops at the first named refusal.
+    Import {
+        /// The JSON document to import.
+        file: PathBuf,
+        /// The installed product's data root.
+        #[arg(long)]
+        root: Option<PathBuf>,
+        /// A private file containing the account's bearer credential.
+        #[arg(long)]
+        credential_file: Option<PathBuf>,
+        /// Override the installed loopback listener; the route prefix still follows identity.json.
+        #[arg(long)]
+        address: Option<String>,
+    },
     /// Validate the deployment configuration and materialise its private
     /// artifacts: generated or provided credentials and the compose
     /// environment, each owner-only in the state directory. Existing
@@ -48,6 +63,12 @@ pub enum IdentityCommand {
         /// A compiled screens package to verify, place and serve.
         #[arg(long)]
         surface: Option<PathBuf>,
+        /// A JSON file holding the message service connection: its `url`
+        /// and the `bindings` of each message service registry id to its Lys
+        /// identity. Kept in the service's configuration, and carried by
+        /// every later install and upgrade until another file replaces it.
+        #[arg(long)]
+        message_service: Option<PathBuf>,
     },
 
     /// Upgrade a running install to the binaries in a folder, run with the
@@ -72,6 +93,11 @@ pub enum IdentityCommand {
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
         root: Option<PathBuf>,
+        /// A JSON file holding the message service connection, written in
+        /// place of the one the install carries; absent, the install's own
+        /// is carried.
+        #[arg(long)]
+        message_service: Option<PathBuf>,
     },
 
     /// Write a fresh one-time setup code and open the setup page with it, so

@@ -80,6 +80,36 @@ pub struct PersonId([u8; ID_LEN]);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AgentId([u8; ID_LEN]);
 
+/// A service account's enduring id, retaining its creation operation's
+/// existing `op-` text form. This is a distinct identity kind, never a person
+/// or an agent even when another identifier has the same bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ServiceAccountId([u8; ID_LEN]);
+
+impl ServiceAccountId {
+    /// The id assigned when the account was created.
+    pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
+        Self(bytes)
+    }
+    /// The bytes recorded by the service-account creation operation.
+    pub fn as_bytes(&self) -> &[u8; ID_LEN] {
+        &self.0
+    }
+}
+
+impl fmt::Display for ServiceAccountId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "op-{}", to_hex(&self.0))
+    }
+}
+
+impl FromStr for ServiceAccountId {
+    type Err = IdentityError;
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        parse_prefixed(text, "op-", "service account").map(Self)
+    }
+}
+
 impl PersonId {
     const PREFIX: &'static str = "person-";
 
@@ -153,6 +183,8 @@ pub enum IdentityId {
     Person(PersonId),
     /// An agent.
     Agent(AgentId),
+    /// A person-owned service account, authenticated independently.
+    ServiceAccount(ServiceAccountId),
 }
 
 impl fmt::Display for IdentityId {
@@ -160,6 +192,7 @@ impl fmt::Display for IdentityId {
         match self {
             Self::Person(id) => id.fmt(f),
             Self::Agent(id) => id.fmt(f),
+            Self::ServiceAccount(id) => id.fmt(f),
         }
     }
 }

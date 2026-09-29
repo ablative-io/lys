@@ -469,3 +469,67 @@ fn an_earlier_builds_state_gains_what_this_service_reads_and_keeps_the_rest()
     assert_eq!(std::fs::read(&provider)?, key, "an existing key is kept");
     Ok(())
 }
+
+#[test]
+fn a_cambium_message_connection_is_written_and_carried_by_the_next_render()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let root = dir.path().to_path_buf();
+    let layout = Layout::at(root.clone());
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    let file = dir.path().join("messages.json");
+    let messages = serde_json::json!({
+        "url": "http://127.0.0.1:6010/",
+        "cookie": "cambium_session",
+        "bindings": [{"participant": "registry-tom", "identity": "person-00000000000000000000000000000001"}]
+    });
+    std::fs::write(&file, messages.to_string())?;
+    let carried = server_config::Carried {
+        message_service: Some(server_config::messages_from(&file)?),
+        ..server_config::Carried::default()
+    };
+    let rendered = server_config::render(&layout, &config, &carried, false);
+    let mut expected = messages.clone();
+    expected["cookie"] = serde_json::json!("cambium_session");
+    assert_eq!(rendered["message_service"], expected);
+    assert!(rendered.get("cambium_messages").is_none());
+    std::fs::create_dir_all(layout.service_config().parent().ok_or("no parent")?)?;
+    std::fs::write(layout.service_config(), serde_json::to_vec(&rendered)?)?;
+    std::fs::set_permissions(
+        layout.service_config(),
+        std::os::unix::fs::PermissionsExt::from_mode(0o600),
+    )?;
+    let again = server_config::carried(&layout)?.ok_or("nothing carried")?;
+    let next = server_config::render(&layout, &config, &again, false);
+    assert_eq!(
+        next["message_service"], expected,
+        "carried by the next render"
+    );
+    let wrapped = serde_json::json!({ "cambium_messages": messages });
+    let plain_http = serde_json::json!({
+        "url": "http://cambium.example.test/",
+        "cookie": "cambium_session",
+        "bindings": messages["bindings"],
+    });
+    let mut no_cookie = messages;
+    no_cookie
+        .as_object_mut()
+        .ok_or("connection is not an object")?
+        .remove("cookie");
+    for (wrong, why) in [
+        (serde_json::json!([]), "a list"),
+        (
+            wrapped,
+            "the connection wrapped in a cambium_messages member",
+        ),
+        (plain_http, "HTTP off loopback"),
+        (no_cookie, "missing explicit cookie"),
+    ] {
+        std::fs::write(&file, wrong.to_string())?;
+        let refused = server_config::messages_from(&file)
+            .err()
+            .ok_or(format!("{why} was taken as the connection"))?;
+        assert_eq!(refused.kind(), ErrorKind::ConfigInvalid, "{why}");
+    }
+    Ok(())
+}

@@ -17,7 +17,7 @@ use super::types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };
 use crate::encoding::{MAJOR_ARRAY, bytes, head, map, text, uint};
-use crate::id::{AgentId, ID_LEN, IdentityId, PersonId};
+use crate::id::{AgentId, ID_LEN, IdentityId, PersonId, ServiceAccountId};
 use crate::operation::OperationId;
 
 /// The application-envelope identifier a signed grant event names in its
@@ -48,6 +48,7 @@ pub(crate) fn write_identity(out: &mut Vec<u8>, identity: IdentityId) {
     let (kind, id) = match identity {
         IdentityId::Person(id) => (1, *id.as_bytes()),
         IdentityId::Agent(id) => (2, *id.as_bytes()),
+        IdentityId::ServiceAccount(id) => (3, *id.as_bytes()),
     };
     map(out, 2);
     uint(out, 1);
@@ -68,6 +69,7 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
     match kind {
         RecipientKind::Person => 1,
         RecipientKind::Agent => 2,
+        RecipientKind::ServiceAccount => 3,
     }
 }
 
@@ -193,6 +195,7 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, GrantError> {
     match as_uint(&kind, SHAPE)? {
         1 => Ok(IdentityId::Person(PersonId::from_bytes(id))),
         2 => Ok(IdentityId::Agent(AgentId::from_bytes(id))),
+        3 => Ok(IdentityId::ServiceAccount(ServiceAccountId::from_bytes(id))),
         _ => Err(malformed("an identity kind code is 1 or 2")),
     }
 }
@@ -225,6 +228,7 @@ fn read_pass_on(value: Value) -> Result<PassOn, GrantError> {
         .map(|kind| match as_uint(kind, "a recipient kind is a code")? {
             1 => Ok(RecipientKind::Person),
             2 => Ok(RecipientKind::Agent),
+            3 => Ok(RecipientKind::ServiceAccount),
             code => Err(GrantError::RecipientKindUnknown { code }),
         })
         .collect::<Result<_, _>>()?;

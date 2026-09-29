@@ -221,7 +221,7 @@ pub fn acting(state: &AppState, held: &Held, headers: &HeaderMap) -> Result<Acti
 }
 
 /// The app acting through the credential whose secret has `digest`.
-fn app_acting(held: &Held, app: &str, digest: &str) -> Result<Acting, ServerError> {
+pub(crate) fn app_acting(held: &Held, app: &str, digest: &str) -> Result<Acting, ServerError> {
     let refused = || AppError::CredentialRefused {
         reason: "no approved app holds that credential",
     };

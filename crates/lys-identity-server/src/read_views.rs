@@ -74,6 +74,9 @@ pub struct ServiceAccountView {
     pub retired_by: Option<Login>,
     /// When it was retired, in seconds since the Unix epoch, null while it is active.
     pub retired_at: Option<u64>,
+    /// Refused imports, with original names and content-derived operations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub import_refusals: Vec<crate::service_accounts_state::ImportRefused>,
 }
 
 /// The answer of `GET /service-accounts`.

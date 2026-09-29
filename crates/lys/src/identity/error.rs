@@ -12,6 +12,14 @@ use std::path::{Path, PathBuf};
 /// test or a script matches on; the detail around it may be reworded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
+    /// The import document or account credential is malformed.
+    ImportInvalid,
+    /// The service refused an import entry by name.
+    ImportRefused,
+    /// An import may have taken effect; its response was not received whole.
+    ImportUncertain,
+    /// No request reached the configured loopback service.
+    ImportUnavailable,
     /// The configuration file could not be read.
     ConfigUnreadable,
     /// The configuration file is not valid TOML of the declared shape.
@@ -73,6 +81,10 @@ impl ErrorKind {
     /// The stable name printed at the start of every diagnostic.
     pub fn name(self) -> &'static str {
         match self {
+            Self::ImportInvalid => "import_invalid",
+            Self::ImportRefused => "import_refused",
+            Self::ImportUncertain => "import_outcome_uncertain",
+            Self::ImportUnavailable => "import_unavailable",
             Self::ConfigUnreadable => "config_unreadable",
             Self::ConfigInvalid => "config_invalid",
             Self::IssuerInvalid => "issuer_invalid",

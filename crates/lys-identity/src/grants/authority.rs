@@ -15,14 +15,12 @@ use std::num::NonZeroU64;
 use lys_core::Ed25519Identity;
 use lys_log_store::LeafStore;
 
-use super::admission::{
-    DelegateRequest, RootRequest, Route, effective, judge_delegation, judge_root,
-};
+use super::admission::{DelegateRequest, RootRequest, Route, judge_delegation, judge_root};
 use super::error::GrantError;
 use super::events::SignedGrantEvent;
 use super::events::{GrantChange, GrantEvent};
 use super::model::Model;
-use super::permission::{RelationshipStore, confirm};
+use super::permission::RelationshipStore;
 use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::GrantLedger;
@@ -340,7 +338,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Refuse unless the relationships reflect every change to a grant on `path`.
-    fn fresh(&self, path: &[GrantId], projected: u64) -> Result<(), GrantError> {
+    pub(super) fn fresh(&self, path: &[GrantId], projected: u64) -> Result<(), GrantError> {
         for grant in path {
             let Some(record) = self.book.record(*grant) else {
                 continue;
@@ -392,83 +390,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
-        self.settle_log().ok();
-        let projected = match self.project() {
-            Ok(projected) => projected,
-            Err(_) => self.relationships.revision()?,
-        };
-        if let Some(required) = at_least
-            && projected < required
-        {
-            return Err(GrantError::StaleDecision {
-                required,
-                projected,
-            });
-        }
-        if let Some(held) = self.ledger.uncertain()
-            && let GrantChange::Issue(grant) = held.event.change()
-            && grant.holder() == request.caller
-            && grant.resource() == &request.resource
-        {
-            return Err(GrantError::OperationUnresolved {
-                operation: held.operation.to_string(),
-                grant: held.grant.to_string(),
-            });
-        }
-        let unresolved = self
-            .ledger
-            .uncertain()
-            .and_then(|held| match held.event.change() {
-                GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
-                GrantChange::Issue(_) | GrantChange::Use { .. } => None,
-            });
-        let held = self.relationships.read()?;
-        let mut refusal = None;
-        let mut permitted = None;
-        let candidates = self.book.held_by(request.caller).filter(|record| {
-            record.grant().resource() == &request.resource
-                && record.grant().actions().contains(&request.action)
-        });
-        for record in candidates {
-            let grant = record.grant();
-            let decided = effective(&self.book, directory, grant.id(), at).and_then(|lineage| {
-                if let Some((operation, revoked)) = unresolved
-                    && lineage.path.contains(&revoked)
-                {
-                    return Err(GrantError::OperationUnresolved {
-                        operation: operation.to_string(),
-                        grant: revoked.to_string(),
-                    });
-                }
-                self.fresh(&lineage.path, projected)?;
-                confirm(&held, &lineage.path, at)?;
-                Ok(lineage)
-            });
-            match decided {
-                Ok(lineage) => {
-                    permitted = Some(Permit {
-                        grant: grant.id(),
-                        path: lineage.path,
-                        root_person: lineage.root_person,
-                        actions: grant.actions().clone(),
-                        model_version: grant.parts().model_version,
-                        revision: projected,
-                        use_event: None,
-                    });
-                    break;
-                }
-                Err(error) => {
-                    refusal.get_or_insert(error);
-                }
-            }
-        }
-        if let Some(permit) = permitted {
-            return Ok(permit);
-        }
-        Err(refusal.unwrap_or_else(|| GrantError::NotHeld {
-            identity: request.caller.to_string(),
-            resource: request.resource.to_string(),
-            action: request.action.to_string(),
-        }))
+        let settled = self.settle(at_least)?;
+        self.unresolved_issue(request)?;
+        let frame = super::frame::Frame::read(self, directory, settled)?;
+        self.explain_in(&frame, request, at)
     }
 }
