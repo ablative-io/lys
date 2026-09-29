@@ -255,8 +255,13 @@ pub(crate) struct Opened {
 /// when that is fixed, and the password policy.
 async fn open(
     State(state): State<Arc<AppState>>,
+    extensions: Extensions,
     body: Result<Json<Opened>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(person_address(&extensions)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let purpose = purpose_of(&state, &body.code)?;
     let email = match purpose {
@@ -292,6 +297,10 @@ async fn make_administrator(
     extensions: Extensions,
     body: Result<Json<NewAdministrator>, JsonRejection>,
 ) -> Result<Response, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(person_address(&extensions)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let turn = state.setup_lock.lock().await;
     admit(&state, &body.code, Purpose::FirstRun)?;
@@ -366,6 +375,10 @@ async fn new_password(
     extensions: Extensions,
     body: Result<Json<NewPassword>, JsonRejection>,
 ) -> Result<Response, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(person_address(&extensions)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let turn = state.setup_lock.lock().await;
     admit(&state, &body.code, Purpose::Password)?;

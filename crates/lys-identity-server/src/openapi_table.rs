@@ -130,9 +130,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/sign-in" "Sign in with a password" P [&["SecondFactorUnsupported", "SignInRefused"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
-    POST "/setup/open" "Open first-run setup with its code" P [&["SetupClosed", "SetupCodeRefused"]];
-    POST "/setup/administrator" "Register the first administrator" P [&["AccountRefused", "SetupClosed", "SetupCodeRefused"]];
-    POST "/setup/password" "Set the first administrator's password" P [&["SetupCodeRefused"]];
+    POST "/setup/open" "Open first-run setup with its code" P [&["SignInThrottled", "SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/administrator" "Register the first administrator" P [&["SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused"]];
+    POST "/setup/password" "Set the first administrator's password" P [&["SignInThrottled", "SetupCodeRefused"]];
     GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
     POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];

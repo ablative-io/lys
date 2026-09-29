@@ -103,7 +103,7 @@ impl IssuerSignIn {
         browser: [u8; 32],
     ) -> Result<String, ServerError> {
         let client_address = address;
-        let began = Instant::now();
+        let started_at = Instant::now();
         let address = address.to_string();
         let mut opened = self.open(begun, &address).await?;
         let verifier = verifier()?;
@@ -165,7 +165,7 @@ impl IssuerSignIn {
                 browser,
             },
             client_address,
-            began,
+            started_at,
         )?;
         Ok(location)
     }

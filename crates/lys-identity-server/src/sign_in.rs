@@ -90,6 +90,8 @@ pub struct IssuerSignIn {
     callback: String,
     http: reqwest::Client,
     upstream: Mutex<Flights<upstream::Upstream>>,
+    attempts: crate::sign_in_attempts::Attempts,
+    pub(crate) setup_attempts: crate::sign_in_attempts::Attempts,
 }
 
 /// One person's sign-in: what they typed, and where they are.
@@ -286,6 +288,8 @@ impl IssuerSignIn {
             callback,
             http,
             upstream: Mutex::new(Flights::default()),
+            attempts: crate::sign_in_attempts::Attempts::default(),
+            setup_attempts: crate::sign_in_attempts::Attempts::default(),
         })
     }
 
@@ -305,6 +309,7 @@ impl IssuerSignIn {
     /// Sign `attempt` in through the issuer for this service's own client,
     /// answering the actor its validated ID token names.
     pub async fn password(&self, oidc: &Oidc, attempt: &Attempt<'_>) -> Result<Actor, ServerError> {
+        self.attempts.admit(attempt.address, 10)?;
         let begun = reqwest::Url::parse(&oidc.begin(attempt.address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
