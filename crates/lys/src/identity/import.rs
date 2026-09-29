@@ -151,19 +151,61 @@ fn authority(address: &str) -> IdentityResult<Authority> {
     Ok(authority)
 }
 
+/// Use the same installation configuration that starts the server. A surface
+/// nests routes under /api; a headless service serves them at the root. Select
+/// this before sending anything, never probe by retrying a mutation.
+fn endpoint(layout: &Layout, address: Option<&str>) -> IdentityResult<(Authority, &'static str)> {
+    let path = layout.service_config();
+    let bytes = fs::read(&path).map_err(|_| {
+        refused(
+            ErrorKind::ConfigUnreadable,
+            "cannot read the installed identity service configuration",
+        )
+        .at(&path)
+    })?;
+    let config: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| {
+        refused(
+            ErrorKind::ConfigInvalid,
+            "the installed identity service configuration is not JSON",
+        )
+        .at(&path)
+    })?;
+    let listen = address
+        .or_else(|| config.get("listen").and_then(serde_json::Value::as_str))
+        .ok_or_else(|| {
+            refused(
+                ErrorKind::ConfigInvalid,
+                "the installed service has no listen address",
+            )
+            .at(&path)
+        })?;
+    let route = match config.get("surface_dir") {
+        None | Some(serde_json::Value::Null) => "/identity/import",
+        Some(serde_json::Value::String(_)) => "/api/identity/import",
+        Some(_) => {
+            return Err(refused(
+                ErrorKind::ConfigInvalid,
+                "surface_dir is not a directory path",
+            )
+            .at(&path));
+        }
+    };
+    Ok((authority(listen)?, route))
+}
+
 /// Execute the CLI's one import request and preserve a named failure.
 pub fn run(
     file: &Path,
     root: Option<PathBuf>,
     credential_file: Option<PathBuf>,
-    address: &str,
+    address: Option<&str>,
     json: bool,
 ) -> IdentityResult<()> {
-    let authority = authority(address)?;
     let layout = match root {
         Some(root) => Layout::at(root),
         None => Layout::discover()?,
     };
+    let (authority, route) = endpoint(&layout, address)?;
     let path = credential_file.unwrap_or_else(|| credential_path(&layout));
     let bytes = private_files::read(&path)?.ok_or_else(|| {
         refused(
@@ -193,7 +235,7 @@ pub fn run(
         ("Authorization", bearer.as_bytes()),
         ("Content-Type", b"application/json".as_slice()),
     ];
-    let answer = exchange(&authority, &Request { method: "POST", path: "/identity/import", headers: &headers, body: &document })
+    let answer = exchange(&authority, &Request { method: "POST", path: route, headers: &headers, body: &document })
         .map_err(|failure| match failure {
             Failure::Unreachable(_) => refused(ErrorKind::ImportUnavailable, "the loopback service could not be reached; nothing was sent"),
             Failure::Uncertain(_) | Failure::Malformed(_) => refused(ErrorKind::ImportUncertain,

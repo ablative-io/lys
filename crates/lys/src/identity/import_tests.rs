@@ -76,6 +76,10 @@ fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn
     std::fs::write(&file, r#"{"agents":[{"display_name":"fixture"}]}"#)?;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?.to_string();
+    std::fs::write(
+        temp.path().join("identity.json"),
+        serde_json::to_vec(&json!({"listen":address,"surface_dir":temp.path().join("surface")}))?,
+    )?;
     let fixture = std::thread::spawn(move || -> Result<TcpListener, String> {
         let (mut socket, _) = listener.accept().map_err(|e| e.to_string())?;
         socket
@@ -88,7 +92,7 @@ fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn
             head.push(byte[0]);
         }
         let head = String::from_utf8(head).map_err(|e| e.to_string())?;
-        assert!(head.starts_with("POST /identity/import HTTP/1.1"));
+        assert!(head.starts_with("POST /api/identity/import HTTP/1.1"));
         let length = head
             .lines()
             .find_map(|line| {
@@ -106,14 +110,7 @@ fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn
         write!(socket,"HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",answer.len()).map_err(|e|e.to_string())?;
         Ok(listener)
     });
-    let error = super::run(
-        &file,
-        Some(temp.path().to_owned()),
-        Some(key),
-        &address,
-        true,
-    )
-    .unwrap_err();
+    let error = super::run(&file, Some(temp.path().to_owned()), Some(key), None, true).unwrap_err();
     assert_eq!(error.kind(), super::ErrorKind::ImportUncertain);
     assert!(error.to_string().contains("ServiceAccountsUnavailable"));
     assert!(error.to_string().contains("no retry was made"));
@@ -141,5 +138,30 @@ fn installation_preserves_existing_private_bearer_and_refuses_open_modes()
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
     assert!(super::prepare_credential(&layout).is_err());
     assert_eq!(std::fs::read(&path)?, before);
+    Ok(())
+}
+
+#[test]
+fn endpoint_follows_installed_surface_and_headless_layout_before_any_request()
+-> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let layout = super::Layout::at(temp.path().to_owned());
+    for (surface, expected) in [
+        (json!("/fixture/surface"), "/api/identity/import"),
+        (json!(null), "/identity/import"),
+    ] {
+        std::fs::write(
+            layout.service_config(),
+            serde_json::to_vec(&json!({"listen":"127.0.0.1:17890", "surface_dir":surface}))?,
+        )?;
+        let (address, route) = super::endpoint(&layout, None)?;
+        assert_eq!(address.port, 17890);
+        assert_eq!(route, expected);
+        assert_eq!(
+            super::endpoint(&layout, Some("127.0.0.1:17891"))?.0.port,
+            17891
+        );
+        assert!(super::endpoint(&layout, Some("192.0.2.1:17891")).is_err());
+    }
     Ok(())
 }

@@ -59,7 +59,7 @@ fn main() -> ExitCode {
                 root,
                 credential_file,
                 address,
-            } => identity::import::run(&file, root, credential_file, &address, json),
+            } => identity::import::run(&file, root, credential_file, address.as_deref(), json),
             identity::IdentityCommand::Prepare { config } => identity::prepare::run(&config, json),
             identity::IdentityCommand::Configure { config } => {
                 identity::configure::run(&config, json)
