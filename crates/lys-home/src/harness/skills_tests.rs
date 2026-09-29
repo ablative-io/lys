@@ -75,3 +75,43 @@ fn a_different_skill_already_there_or_a_relative_directory_is_refused() -> Resul
     assert!(matches!(relative, Err(HomeError::SkillDirectory { .. })));
     Ok(())
 }
+
+#[test]
+fn a_symlink_below_the_config_directory_is_refused_and_nothing_is_written_through_it()
+-> Result<(), Box<dyn Error>> {
+    let outside = tempfile::tempdir()?;
+    let config = tempfile::tempdir()?;
+    std::os::unix::fs::symlink(outside.path(), config.path().join("skills"))?;
+    let through = write(config.path(), &[skill("review", "text\n")]);
+    assert!(refused(through).contains("symlink"));
+    assert!(
+        !outside.path().join("review").exists(),
+        "nothing left the config directory"
+    );
+
+    let config = tempfile::tempdir()?;
+    let aside = outside.path().join("SKILL.md");
+    std::fs::write(&aside, "text\n")?;
+    std::fs::create_dir_all(config.path().join("skills/review"))?;
+    std::os::unix::fs::symlink(&aside, config.path().join("skills/review/SKILL.md"))?;
+    let same = write(config.path(), &[skill("review", "text\n")]);
+    assert!(
+        refused(same).contains("symlink"),
+        "a same-byte link is still refused"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_write_cut_short_is_retried_whole_and_never_leaves_part_of_a_text() -> Result<(), Box<dyn Error>>
+{
+    let config = tempfile::tempdir()?;
+    let own = config.path().join("skills/review");
+    std::fs::create_dir_all(&own)?;
+    std::fs::write(own.join("SKILL.md.writing"), "Read the chan")?;
+    let text = "Read the change against its brief.\n";
+    write(config.path(), &[skill("review", text)])?;
+    assert_eq!(std::fs::read(own.join("SKILL.md"))?, text.as_bytes());
+    assert!(!own.join("SKILL.md.writing").exists());
+    Ok(())
+}

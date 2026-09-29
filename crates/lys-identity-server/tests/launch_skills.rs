@@ -75,10 +75,22 @@ impl Table {
 
     /// Record a Claude Code profile naming `skills`, from `from`.
     async fn record(&self, from: u32, skills: &Value) -> Result<(u16, Value), Box<dyn Error>> {
+        let operation = operation()?;
+        self.record_as(&operation, from, skills, "").await
+    }
+
+    /// Record it under `operation` with `note`.
+    async fn record_as(
+        &self,
+        operation: &str,
+        from: u32,
+        skills: &Value,
+        note: &str,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
-            "operation": operation()?, "from_version": from,
+            "operation": operation, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": skills,
-            "mcp_servers": [], "instructions": "", "note": "",
+            "mcp_servers": [], "instructions": "", "note": note,
             "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
         });
         let path = format!("/agents/{}/provisioning", self.agent());
@@ -156,5 +168,26 @@ async fn each_version_pins_the_text_it_was_recorded_with() -> TestResult {
         Some(2),
         "a text is kept once"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_request_sent_again_after_a_newer_text_is_kept_answers_as_first_recorded() -> TestResult {
+    let table = Table::set().await?;
+    let (first, second) = ("Check the brief.\n", "Check the brief and the tests.\n");
+    table.keep("review", first).await?;
+    let once = operation()?;
+    let (status, set) = table.record_as(&once, 0, &json!(["review"]), "").await?;
+    assert_eq!(status, 200, "{set}");
+    table.keep("review", second).await?;
+    let (status, again) = table.record_as(&once, 0, &json!(["review"]), "").await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(again["recorded"], set["recorded"]);
+    assert_eq!(again["profile"]["skill_pins"], set["profile"]["skill_pins"]);
+    let (status, changed) = table
+        .record_as(&once, 0, &json!(["review"]), "changed")
+        .await?;
+    assert_eq!(status, 409, "{changed}");
+    assert_eq!(changed["refusal"], "ProvisioningReused");
     Ok(())
 }

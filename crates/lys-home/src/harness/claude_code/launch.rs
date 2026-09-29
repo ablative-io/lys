@@ -40,7 +40,7 @@ use serde_json::{Value, json};
 use crate::error::HomeError;
 use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template_render};
 use crate::harness::claude_code::given::{
-    CONFIG_DIR_VARIABLE, ConfigDir, ConfigSource, resolve_given,
+    CONFIG_DIR_NAME, CONFIG_DIR_VARIABLE, ConfigDir, ConfigSource, resolve_given,
 };
 use crate::harness::claude_code::launch_env::{Judge, write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
@@ -148,7 +148,18 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         template.env.get(CONFIG_DIR_VARIABLE).map(String::as_str),
         process_home.as_deref(),
     )?;
-    if !template.skills.is_empty() && config_dir.source != ConfigSource::Template {
+    let operators = process_home
+        .as_deref()
+        .map(|home| home.join(CONFIG_DIR_NAME));
+    let same_dir = |a: &Path, b: &Path| match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    };
+    let operators_own = operators
+        .as_deref()
+        .is_some_and(|operators| same_dir(&config_dir.path, operators));
+    if !template.skills.is_empty() && (config_dir.source != ConfigSource::Template || operators_own)
+    {
         return Err(HomeError::SkillDirectory {
             path: config_dir.path,
         });
