@@ -435,3 +435,7 @@ impl ProvisioningStore {
             .collect()
     }
 }
+
+#[cfg(test)]
+#[path = "provisioning_compat_tests.rs"]
+mod compatibility_tests;
