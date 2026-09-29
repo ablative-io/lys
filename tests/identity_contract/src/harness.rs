@@ -366,6 +366,7 @@ impl Service {
             client_secret_file: dir.path().join("client.secret"),
             redirect_url: format!("{base}/callback"),
             sign_in_api: Some(issuer.api().to_owned()),
+            operator_token_file: None,
             administrator: Some(configured(ADMINISTRATOR)),
             link_audit_source: configured(LINK_AUDIT_SOURCE),
             session_seconds: 600,
