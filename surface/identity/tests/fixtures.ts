@@ -177,6 +177,7 @@ export const SERVICE: Record<string, Route> = {
   ['/agents/' + REVIEWER + '/runtime/sessions']: ok({ sessions: [] }),
   '/authority': ok({ authority: 'Step 1 of the directory has one administrator.', build: BUILD }),
   '/grants': ok({ grants: GRANTS, revision: 7 }),
+  '/apps': ok({ apps: [] }),
   '/grants/model': ok(MODEL),
   'POST /grants/why': why,
   'POST /grants/who': who,
