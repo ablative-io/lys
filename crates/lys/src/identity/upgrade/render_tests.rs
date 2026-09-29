@@ -124,7 +124,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     let state = layout.root.join("state");
     let prepared = std::fs::read(state.join(COMPOSE_ENV))?;
     let recorded = std::fs::read(layout.service_config())?;
-    let files = Templates.render(&layout, &own_build(), true)?;
+    let files = Templates::default().render(&layout, &own_build(), true)?;
     let by_name: BTreeMap<&str, &RenderedFile> =
         files.iter().map(|file| (file.name, file)).collect();
     assert_eq!(by_name.len(), 5);
@@ -181,7 +181,7 @@ fn the_templates_refuse_to_render_for_another_build() -> TestResult {
     let layout = installed_root(dir.path())?;
     let mut other = own_build();
     other.insert(BINARIES[1].to_string(), "0".repeat(40));
-    let refused = Templates
+    let refused = Templates::default()
         .render(&layout, &other, false)
         .err()
         .ok_or("rendered for a build other than this lys")?;
@@ -196,7 +196,7 @@ fn a_missing_credential_is_refused_and_never_generated() -> TestResult {
     let layout = installed_root(dir.path())?;
     let missing = layout.root.join("state").join(SECRETS[0].file);
     std::fs::remove_file(&missing)?;
-    let refused = Templates
+    let refused = Templates::default()
         .render(&layout, &own_build(), false)
         .err()
         .ok_or("rendered without a credential")?;
@@ -209,7 +209,7 @@ fn a_missing_credential_is_refused_and_never_generated() -> TestResult {
 fn a_rendered_file_names_its_length_never_its_bytes() -> TestResult {
     let dir = tempfile::tempdir()?;
     let layout = installed_root(dir.path())?;
-    let files = Templates.render(&layout, &own_build(), false)?;
+    let files = Templates::default().render(&layout, &own_build(), false)?;
     let shown = format!("{files:?}");
     let credential = std::fs::read_to_string(layout.root.join("state").join(SECRETS[3].file))?;
     assert!(!credential.is_empty());
@@ -218,5 +218,45 @@ fn a_rendered_file_names_its_length_never_its_bytes() -> TestResult {
         "a credential reached Debug"
     );
     assert!(shown.contains("compose.env"));
+    Ok(())
+}
+
+#[test]
+fn a_given_cambium_message_connection_is_written_with_the_recorded_choices_and_only_read()
+-> TestResult {
+    let dir = tempfile::tempdir()?;
+    let layout = installed_root(dir.path())?;
+    let credentials_before = credentials(&layout)?;
+    let recorded = std::fs::read(layout.service_config())?;
+    let messages =
+        serde_json::json!({"url": "http://127.0.0.1:4000", "bindings": {"registry-a": "person-a"}});
+    let templates = Templates {
+        messages: Some(messages.clone()),
+    };
+    let files = templates.render(&layout, &own_build(), true)?;
+    let service = files
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    let written: serde_json::Value = serde_json::from_slice(&service.bytes)?;
+    assert_eq!(written["cambium_messages"], messages);
+    assert_eq!(written["administrator"]["subject"], "recorded-subject");
+    assert!(written["sessions_file"].is_string(), "{written}");
+    assert_eq!(
+        credentials(&layout)?,
+        credentials_before,
+        "no credential written"
+    );
+    assert_eq!(std::fs::read(layout.service_config())?, recorded);
+    let carried = Templates::default().render(&layout, &own_build(), true)?;
+    let carried = carried
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    let carried: serde_json::Value = serde_json::from_slice(&carried.bytes)?;
+    assert!(
+        carried.get("cambium_messages").is_none(),
+        "none given, none recorded"
+    );
     Ok(())
 }

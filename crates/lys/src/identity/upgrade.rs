@@ -58,6 +58,9 @@ pub struct Options {
     pub surface: Option<PathBuf>,
     /// The data root; the platform's application data path when absent.
     pub root: Option<PathBuf>,
+    /// A JSON file holding the Cambium message connection to write in
+    /// place of the one the install carries.
+    pub cambium_messages: Option<PathBuf>,
 }
 
 /// How a started process is known to be ready: its log gains `says` after
@@ -429,10 +432,20 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     require_install(&layout)?;
     let config = DeploymentConfig::load(&layout.deployment_config())?;
     install::server_state(&layout, &config)?;
+    let templates = render::Templates {
+        messages: options
+            .cambium_messages
+            .as_deref()
+            .map(install::server_config::messages_from)
+            .transpose()?,
+    };
+    if templates.messages.is_some() {
+        emitter.note("Cambium message connection from the given file");
+    }
     let mut parts = Parts {
         units: &units,
         engine: &mut Compose,
-        render: &render::Templates,
+        render: &templates,
     };
     let record = upgrade(
         &layout,

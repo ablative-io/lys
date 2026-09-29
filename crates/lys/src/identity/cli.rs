@@ -93,6 +93,11 @@ pub enum IdentityCommand {
         /// The data root; the platform's application data path when absent.
         #[arg(long)]
         root: Option<PathBuf>,
+        /// A JSON file holding the Cambium message connection, written in
+        /// place of the one the install carries; absent, the install's own
+        /// is carried.
+        #[arg(long)]
+        cambium_messages: Option<PathBuf>,
     },
 
     /// Write a fresh one-time setup code and open the setup page with it, so
