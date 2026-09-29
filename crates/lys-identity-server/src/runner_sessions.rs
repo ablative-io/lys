@@ -88,6 +88,36 @@ pub fn driven(state: &AppState, session: &str) -> Result<Driven, ServerError> {
     })
 }
 
+/// The agent a tracked session belongs to, before any runner is looked up.
+pub(crate) fn session_agent(state: &AppState, session: &str) -> Result<String, ServerError> {
+    with_runtime(state, |store| {
+        store
+            .session(session)
+            .and_then(|tracked| tracked.agent.clone())
+            .ok_or(ServerError::RuntimeSessionUnknown)
+    })
+}
+
+/// Refuse a usage target outside the named agent before recording or acting.
+pub(crate) fn usage_session(
+    state: &AppState,
+    agent: &str,
+    session: &str,
+) -> Result<(), ServerError> {
+    let belongs = with_runtime(state, |store| {
+        Ok(store
+            .session(session)
+            .is_some_and(|tracked| tracked.agent.as_deref() == Some(agent)))
+    })?;
+    if belongs {
+        Ok(())
+    } else {
+        Err(ServerError::RequestMalformed {
+            reason: format!("usage session `{session}` is not tracked under agent `{agent}`"),
+        })
+    }
+}
+
 /// The caller, admitted to operate `agent` for `act`: the administrator,
 /// the person responsible for the agent, or the holder of a grant of
 /// `operate` on it. Anyone else is refused `not_permitted`, by name.

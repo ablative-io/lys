@@ -348,3 +348,6 @@ async fn an_act_whose_answer_cannot_be_had_stays_unconfirmed_and_is_asked_again_
     assert_ne!(receipts[0]["acted"]["stands"], "confirmed", "{receipts:?}");
     table.stop_runner()
 }
+
+#[path = "shared/budget_session_security.rs"]
+mod budget_session_security;
