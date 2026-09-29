@@ -46,6 +46,8 @@ describe('Teams', () => {
     posted.length = 0;
     await click(button('Allow Scribe to take part'));
     expect(posted).toEqual([]);
+    expect(text()).toContain('Allow Scribe to take part in Delivery?');
+    expect($('section[aria-label="Confirm team change"]')?.textContent).not.toContain(SCRIBE);
     await click(button('Confirm allow member to take part'));
     expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/) } }]);
     expect(text()).toContain('Your team change was recorded');
