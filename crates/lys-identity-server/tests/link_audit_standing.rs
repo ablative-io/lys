@@ -3,9 +3,9 @@
 //! signed the request. While that person is suspended, or once they are
 //! retired, signed requests are refused `inactive` and ended sessions are
 //! refused `NotSignedIn`; nothing is recorded. DIRECTORY checklist C40 and
-//! caller_lifecycle.rs require this suspended/retired lifecycle boundary.
+//! `caller_lifecycle.rs` require this suspended/retired lifecycle boundary.
 //! Reinstatement permits a fresh session, never revives the ended one.
-//! Active non-source refusal remains covered by link_audit_lookup.rs
+//! Active non-source refusal remains covered by `link_audit_lookup.rs`
 //! `only_the_configured_source_may_ask`. Registered behavior is unchanged.
 
 use std::error::Error;
