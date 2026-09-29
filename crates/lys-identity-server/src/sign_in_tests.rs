@@ -97,6 +97,12 @@ fn the_jar_keeps_the_latest_value_of_each_cookie_and_drops_a_cleared_one() {
 fn the_connection_peer_is_the_address_and_no_peer_is_refused() -> Result<(), Box<dyn Error>> {
     let mut extensions = axum::http::Extensions::new();
     assert!(super::person_address(&extensions).is_err());
-    extensions.insert(axum::extract::ConnectInfo("192.0.2.1:1234".parse::<std::net::SocketAddr>()?));
-    assert_eq!(super::person_address(&extensions)?, "192.0.2.1".parse::<std::net::IpAddr>()?);
+    extensions.insert(axum::extract::ConnectInfo(
+        "192.0.2.1:1234".parse::<std::net::SocketAddr>()?,
+    ));
+    assert_eq!(
+        super::person_address(&extensions)?,
+        "192.0.2.1".parse::<std::net::IpAddr>()?
+    );
     Ok(())
+}
