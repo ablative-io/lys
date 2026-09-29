@@ -72,7 +72,7 @@ pub struct StartCommandView {
     /// The profile version it starts from.
     pub provisioning_version: u32,
     /// The harness the template renders for.
-    pub harness: &'static str,
+    pub harness: String,
     /// The handles the command names, by id.
     pub handles: Vec<HandleName>,
     /// The launch template, exactly the bytes its hash is of.
@@ -270,7 +270,7 @@ async fn start_command(
         runtime,
         session: session.clone(),
         provisioning_version: version.number,
-        harness: lys_home::harness::claude_code::HARNESS,
+        harness: rendered.harness,
         handles,
         template: rendered.template,
         template_sha256: rendered.template_sha256.clone(),

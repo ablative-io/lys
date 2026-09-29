@@ -20,6 +20,8 @@ pub struct SecretBinding {
 
 /// A template and its content identity after native-parser validation.
 pub struct RenderedTemplate {
+    /// The native template format selected by this rendering contract.
+    pub harness: String,
     /// The exact template bytes, as text.
     pub text: String,
     /// The hash checked by the home.
@@ -38,7 +40,11 @@ pub struct RenderRefusal {
     pub reason: String,
 }
 
-fn refused(fields: &LaunchFields, member: &str, reason: impl ToString) -> RenderRefusal {
+fn refused(
+    fields: &LaunchFields,
+    member: &str,
+    reason: &(impl ToString + ?Sized),
+) -> RenderRefusal {
     RenderRefusal {
         contract: fields.harness.description.rendering_contract.clone(),
         member: member.to_owned(),
@@ -150,7 +156,7 @@ fn native_template(
         body["slots"]["skills"] = json!(skills);
     }
     let native = super::rendering_permissions::render(permissions)
-        .map_err(|error| refused(fields, "permissions", error))?;
+        .map_err(|error| refused(fields, "permissions", &error))?;
     let empty = native.as_object().is_some_and(|members| {
         members
             .values()
@@ -160,10 +166,11 @@ fn native_template(
         body["slots"]["permissions"] = native;
     }
     let bytes =
-        serde_json::to_vec_pretty(&body).map_err(|error| refused(fields, "template", error))?;
-    let parsed = parse_template(&bytes).map_err(|error| refused(fields, "template", error))?;
-    let text = String::from_utf8(bytes).map_err(|error| refused(fields, "template", error))?;
+        serde_json::to_vec_pretty(&body).map_err(|error| refused(fields, "template", &error))?;
+    let parsed = parse_template(&bytes).map_err(|error| refused(fields, "template", &error))?;
+    let text = String::from_utf8(bytes).map_err(|error| refused(fields, "template", &error))?;
     Ok(RenderedTemplate {
+        harness: HARNESS.to_owned(),
         text,
         sha256: parsed.hash.as_str().to_owned(),
     })

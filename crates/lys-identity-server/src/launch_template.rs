@@ -51,6 +51,8 @@ pub struct Start<'a> {
 
 /// A rendered start.
 pub struct Rendered {
+    /// The native template format returned by the home registry.
+    pub harness: String,
     /// The template's bytes, exactly as hashed.
     pub template: String,
     /// The SHA-256 of those bytes, as the home keeps the template by.
@@ -129,6 +131,7 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
         .collect::<Vec<_>>()
         .join(" ");
     Ok(Rendered {
+        harness: rendered.harness,
         template,
         template_sha256,
         command,

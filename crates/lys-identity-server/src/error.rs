@@ -370,7 +370,7 @@ pub enum ServerError {
     },
     /// The profile declares no harness build to start.
     #[error(
-        "HarnessUndeclared: profile version {version} declares no harness build to start; declare the build's kind, program and package in the profile"
+        "HarnessUndeclared: profile version {version} declares no harness build to start; declare the build's name, description, program and package in the profile"
     )]
     HarnessUndeclared {
         /// The profile version.
