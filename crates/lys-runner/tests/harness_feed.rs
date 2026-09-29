@@ -4,7 +4,7 @@ use std::error::Error;
 use lys_runner::containment_policy::Binding;
 use lys_runner::harness_control::events::{Event, Kind, Source};
 use lys_runner::peer::{Leader, StartIdentity};
-use lys_runner::tracking_store::{Body, Feed};
+use lys_runner::tracking_store::{Body, Commit, Feed};
 
 type Outcome = Result<(), Box<dyn Error>>;
 fn source() -> Source {
@@ -60,7 +60,7 @@ fn replay_after_restart_reuses_sequence_and_cursor() -> Outcome {
 fn stale_index_recovers_control_identity_from_committed_log() -> Outcome {
     let dir = tempfile::tempdir()?;
     let mut feed = Feed::open(dir.path())?;
-    feed.append("session", 1, Vec::new(), Default::default())?;
+    feed.append("session", 1, Vec::new(), Commit::default())?;
     let index_path = dir.path().join("feed.index.json");
     let before = std::fs::read(&index_path)?;
     let source = source();
