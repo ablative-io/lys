@@ -17,12 +17,15 @@ use serde_json::{Map, Value};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
+use crate::harness::skills::{SkillFile, check};
 use crate::record::blocks::Hash;
 
 /// The one way this harness fills the transcript slot.
 pub const FILL_RESUME_BY_PATH: &str = "resume-by-path";
 /// The five slots, in the schema's order.
 pub const SLOTS: [&str; 5] = ["transcript", "mcp", "env", "secrets", "instructions"];
+/// The slots a template may carry beyond those it must.
+pub const OPTIONAL_SLOTS: [&str; 1] = ["skills"];
 /// The three members of a template.
 pub const MEMBERS: [&str; 3] = ["harness", "flags", "slots"];
 /// The most characters of a refused value an error repeats.
@@ -54,6 +57,8 @@ pub struct Template {
     pub use_only: Vec<SecretRef>,
     /// The text appended to the system prompt.
     pub instructions: String,
+    /// The kept skills written into the session's config directory.
+    pub skills: Vec<SkillFile>,
 }
 
 /// Read a template file and parse it, returning the template and the bytes
@@ -87,7 +92,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         return Err(shape("slots", "must be an object"));
     };
     for key in slots.keys() {
-        if !SLOTS.contains(&key.as_str()) {
+        if !SLOTS.contains(&key.as_str()) && !OPTIONAL_SLOTS.contains(&key.as_str()) {
             return Err(HomeError::UnknownSlot { slot: key.clone() });
         }
     }
@@ -114,6 +119,20 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
     let Value::String(instructions) = &slots["instructions"] else {
         return Err(shape("slots.instructions", "must be a string"));
     };
+    let skills = match slots.get("skills") {
+        None => Vec::new(),
+        Some(given) => {
+            let skills: Vec<SkillFile> =
+                serde_json::from_value(given.clone()).map_err(|source| HomeError::Json {
+                    context: "slots.skills is not a list of kept skills",
+                    source,
+                })?;
+            for skill in &skills {
+                check(skill)?;
+            }
+            skills
+        }
+    };
     let mut named: BTreeSet<&str> = env.keys().map(String::as_str).collect();
     for secret in use_only.iter().chain(readable.iter()) {
         if !named.insert(secret.env.as_str()) {
@@ -130,6 +149,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         env,
         use_only,
         instructions: instructions.clone(),
+        skills,
     })
 }
 

@@ -316,6 +316,25 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// A kept skill a launch carries is refused before anything is written.
+    #[error("the kept skill `{name}` is refused: {reason}")]
+    SkillRefused {
+        /// The skill.
+        name: String,
+        /// Why, naming no content.
+        reason: &'static str,
+    },
+
+    /// Kept skills name no config directory of the session's own.
+    #[error(
+        "kept skills are written only into the session's own config directory, and {} is not one; set CLAUDE_CONFIG_DIR in the template's env slot to an absolute directory",
+        path.display()
+    )]
+    SkillDirectory {
+        /// The directory named.
+        path: PathBuf,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {
