@@ -99,9 +99,18 @@ must write exactly two Held rows and one Checked row, retain every old leaf,
 and persist the new budget snapshot. Another crash and restart must leave all
 these files byte-identical. There is no sleep or PID polling in this proof.
 
+Between legs, teardown registers a kernel exit observer before killing each
+verified fixture process and waits for its exit event (kqueue on macOS, pidfd
+on Linux). Docker teardown is also synchronous. The next leg's port check
+uses SO_REUSEADDR and bind/listen, matching the Unix Tokio listeners used by
+both services; a closed connection in TIME_WAIT must not count as a listener.
+An active listener still refuses, naming its address. The check does not
+reserve a port for the installer: this proof requires an exclusive venue.
+
 Current boundary: earlier real-install attempts found harness errors before
-completion. Both complete positive and negative runs remain required, as do
-the separate exact-head repository gates. No successful upgrade is claimed.
+completion. Every required baseline still needs complete positive and negative
+receipts, as well as the separate exact-head repository gates. A successful
+positive leg alone does not establish that the negative leg passed.
 The old build is a clean reconstruction of the recorded live commit; it does not establish
 that the historical working tree that produced the live binary was clean.
 

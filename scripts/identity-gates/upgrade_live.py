@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import re
-import signal
 import socket
 import subprocess
 import sys
@@ -21,6 +20,7 @@ from upgrade_restart import settle as settle_restart
 from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
 
 from upgrade_preflight import socket_paths
+from upgrade_teardown import terminate_fixture
 from upgrade_layout import inventory, executables, harness_inventory, harness_paths
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
 
@@ -69,7 +69,13 @@ def port():
 
 def require_free(number):
     with socket.socket() as held:
-        held.bind(("127.0.0.1", number))
+        # Match Tokio's Unix listener: TIME_WAIT is not an active listener.
+        held.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            held.bind(("127.0.0.1", number))
+            held.listen()
+        except OSError as error:
+            raise RuntimeError(f"fixture service port 127.0.0.1:{number} unavailable: {error}") from error
 
 
 def network_subnets(networks):
@@ -137,9 +143,9 @@ def stop_fixture(root, project, evidence):
             errors.append(f"refuse to stop {pid}: it does not name fixture root {root}")
             continue
         try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+            terminate_fixture(pid)
+        except (OSError, RuntimeError) as error:
+            errors.append(f"fixture {root} process {pid}: {error}")
     compose = root / "deploy/compose.yaml"
     if compose.exists():
         try:
