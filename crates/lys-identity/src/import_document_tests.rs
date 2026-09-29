@@ -73,3 +73,13 @@ fn malformed_input_never_appears_in_the_error() {
     let refused = parse(b"credential-secret-material", "loader-a").unwrap_err();
     assert!(!refused.to_string().contains("credential-secret-material"));
 }
+
+#[test]
+fn grant_names_cannot_shadow_each_other_across_sections() {
+    let document = serde_json::json!({
+        "root_grants":[{"name":"same","route":"api","holder":"@owner","resource":{},"relation":"viewer","pass_on":{},"window":{}}],
+        "delegations":[{"name":"same","route":"api","source":"@grant/same","recipient":"@self","responsible":"@owner","resource":{},"relation":"viewer","pass_on":{},"window":{}}]
+    });
+    let error = super::parse(&serde_json::to_vec(&document).unwrap(), "fixture").unwrap_err();
+    assert_eq!(error.reason, "grant name is repeated across sections");
+}
