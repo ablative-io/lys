@@ -423,3 +423,10 @@
 - [ ] **C442** — Record native Codex rejections with honest provenance (DIRECTORY-065 R4).
 - [ ] **C443** — The Codex agent page shows measured policy and refusal coverage (DIRECTORY-065 R5).
 - [ ] **C444** — Prove config enforcement and denial delivery through the real harness (DIRECTORY-065 R6).
+
+## Approved apps sign in and inactive people are refused (DIRECTORY-067)
+
+- [ ] **C449** — An approved app's client is a provider client (DIRECTORY-067 R1).
+- [ ] **C450** — A retired app's codes and tokens stop at once (DIRECTORY-067 R2).
+- [ ] **C451** — A suspended or retired person gets no code, no token and no answer (DIRECTORY-067 R3).
+- [ ] **C452** — A code presented twice ends the tokens it bought (DIRECTORY-067 R4).

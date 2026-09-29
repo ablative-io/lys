@@ -98,6 +98,8 @@
 
 **S148.** As someone using the identity screens and API all day, I want every read to do its work once, so that the service stays light while it runs beside everything else.
 
+**S180.** As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -239,6 +241,8 @@
 **S151.** As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
 **S152.** As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+**S179.** As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
 
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 

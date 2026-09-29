@@ -206,6 +206,10 @@
         {
           "id": "S148",
           "text": "As someone using the identity screens and API all day, I want every read to do its work once, so that the service stays light while it runs beside everything else."
+        },
+        {
+          "id": "S180",
+          "text": "As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere."
         }
       ]
     },
@@ -540,6 +544,10 @@
         {
           "id": "S152",
           "text": "As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen."
+        },
+        {
+          "id": "S179",
+          "text": "As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs."
         }
       ]
     },
