@@ -1685,6 +1685,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The message service is set on the screen (DIRECTORY-069)",
+      "items": [
+        {
+          "id": "C456",
+          "text": "The setting is Lys's own record, set on the Connections screen (DIRECTORY-069 R1).",
+          "done": false
+        },
+        {
+          "id": "C457",
+          "text": "An install's configured setting becomes the first line, once (DIRECTORY-069 R2).",
+          "done": false
+        },
+        {
+          "id": "C458",
+          "text": "The screen shows whether the service answers (DIRECTORY-069 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -238,6 +238,8 @@
 
 **S160.** As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself.
 
+**S183.** As a person setting up Lys with no terminal, I want to connect my message service and bind its participants to my people and agents on a screen, so that the canvas shows who has spoken.
+
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 
 **S151.** As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.

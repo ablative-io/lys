@@ -534,6 +534,10 @@
         {
           "id": "S160",
           "text": "As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself."
+        },
+        {
+          "id": "S183",
+          "text": "As a person setting up Lys with no terminal, I want to connect my message service and bind its participants to my people and agents on a screen, so that the canvas shows who has spoken."
         }
       ]
     },

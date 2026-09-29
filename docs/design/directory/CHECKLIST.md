@@ -436,3 +436,9 @@
 - [ ] **C453** — A code or token dies with the Lys session it came from (DIRECTORY-068 R1).
 - [ ] **C454** — An app signs the person out through Lys's end-session endpoint (DIRECTORY-068 R2).
 - [ ] **C455** — An app that asks for the email scope receives the person's email (DIRECTORY-068 R3).
+
+## The message service is set on the screen (DIRECTORY-069)
+
+- [ ] **C456** — The setting is Lys's own record, set on the Connections screen (DIRECTORY-069 R1).
+- [ ] **C457** — An install's configured setting becomes the first line, once (DIRECTORY-069 R2).
+- [ ] **C458** — The screen shows whether the service answers (DIRECTORY-069 R3).
