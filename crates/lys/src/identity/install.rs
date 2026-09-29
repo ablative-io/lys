@@ -97,7 +97,7 @@ fn provider_key(config: &DeploymentConfig) -> IdentityResult<()> {
     Ok(())
 }
 
-fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
+pub(super) fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
     let path = layout.service_key();
     if let Some(parent) = path.parent() {
         private_files::ensure_dir(parent)?;
@@ -130,12 +130,15 @@ fn write_providers_key(config: &DeploymentConfig) -> IdentityResult<()> {
 /// each agent the service starts in its own pseudo-terminal, on a Unix socket
 /// in the run folder, acting only on the service key's requests. It is never
 /// restarted here, since a restart ends every session it holds.
-fn start_runner(
+pub(super) fn start_runner(
     layout: &Layout,
     key: &Arc<Ed25519Identity>,
-    emitter: &mut Emitter,
+    program: &Path,
+    say: &mut dyn FnMut(&str),
 ) -> IdentityResult<()> {
-    let program = services::sibling("lys")?;
+    for directory in [layout.run_dir(), layout.logs_dir(), layout.data_dir()] {
+        private_files::ensure_dir(&directory)?;
+    }
     let log = layout.logs_dir().join("runner.log");
     let pid = layout.run_dir().join("runner.pid");
     let public = layout.run_dir().join("runner-server.pub");
@@ -152,14 +155,14 @@ fn start_runner(
         &public.display().to_string(),
     ]
     .map(str::to_string);
-    let started = services::start_detached(&program, &args, &log, &pid, false)?;
+    let started = services::start_detached(program, &args, &log, &pid, false)?;
     let client = lys_runner::Client::new(socket.clone(), Arc::clone(key));
     log_wait::wait_until("runner", &log, &pid, &mut || {
         client
             .ask(&lys_runner::Act::Status { session: None })
             .is_ok()
     })?;
-    emitter.note(&format!(
+    say(&format!(
         "runner {} on {}",
         if started {
             "started"
@@ -298,7 +301,9 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     if emitter.is_json() {
         emitter.field("build", "build", build);
     }
-    start_runner(&layout, &key, &mut emitter)?;
+    start_runner(&layout, &key, &services::sibling("lys")?, &mut |line| {
+        emitter.note(line)
+    })?;
     emitter.field("open", "url", Layout::service_url());
     emitter.field("sign-in for products", "issuer", Layout::service_url());
     if let Some(code) = code {

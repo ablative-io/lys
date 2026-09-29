@@ -151,6 +151,8 @@ impl Engine for Compose {
 
 /// What an upgrade works with besides its inputs.
 pub struct Parts<'a> {
+    /// Runner executable to ensure after swapping; absent for service-only fixtures.
+    pub runner: Option<&'a Path>,
     /// The broker and the service, in start order.
     pub units: &'a [Unit],
     /// The engine that runs the compose services.
@@ -354,6 +356,9 @@ pub fn upgrade(
     let names: Vec<&'static str> = parts.units.iter().map(|unit| unit.binary).collect();
     require_install(layout)?;
     let to = incoming(from, &names)?;
+    if let Some(runner) = parts.runner {
+        version(runner, "lys")?;
+    }
     if let Some(package) = package {
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
@@ -391,8 +396,15 @@ pub fn upgrade(
         package,
         files: &files,
     };
-    let Err(failure) = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
-    else {
+    let result = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
+        .and_then(|()| {
+            if let Some(program) = parts.runner {
+                let key = std::sync::Arc::new(install::service_key(layout)?);
+                install::start_runner(layout, &key, program, say)?;
+            }
+            Ok(())
+        });
+    let Err(failure) = result else {
         let record = record_build(layout, &names, say)?;
         Intent::clear(layout)?;
         return Ok(record);
@@ -442,7 +454,9 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     if templates.messages.is_some() {
         emitter.note("Cambium message connection from the given file");
     }
+    let runner = options.from.join("lys");
     let mut parts = Parts {
+        runner: Some(&runner),
         units: &units,
         engine: &mut Compose,
         render: &templates,
