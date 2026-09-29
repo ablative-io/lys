@@ -37,4 +37,18 @@ describe('Teams', () => {
   it('names an unavailable team store instead of claiming it is empty', async () => {
     await open({ ...routes, '/teams': refused(503, 'TeamsUnavailable', 'No team store') }); expect(text()).toContain('TeamsUnavailable'); expect(text()).not.toContain('No teams have been recorded');
   });
+  it('names a held member and lets the administrator confirm with the original operation receipt', async () => {
+    const path = '/teams/' + team.id + '/members/' + SCRIBE + '/confirm';
+    const held = { ...team, held: [{ member: SCRIBE, reason: 'The earlier addition was not authorized.' }] };
+    const { posted } = await open({ ...routes, '/teams': ok({ teams: [held] }), ['POST ' + path]: (body) => receipt(body, 'confirmed', SCRIBE) });
+    expect(text()).toContain('Awaiting administrator confirmation');
+    expect(text()).toContain('The earlier addition was not authorized.');
+    posted.length = 0;
+    await click(button('Allow Scribe to take part'));
+    expect(posted).toEqual([]);
+    await click(button('Confirm allow member to take part'));
+    expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/) } }]);
+    expect(text()).toContain('Your team change was recorded');
+  });
+
 });

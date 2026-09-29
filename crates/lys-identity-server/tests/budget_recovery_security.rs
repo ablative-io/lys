@@ -17,6 +17,16 @@ use lys_identity_server::runtime_store::RuntimeStore;
 #[tokio::test]
 async fn an_existing_cross_agent_crossing_is_refused_before_its_runner_is_resolved()
 -> Result<(), Box<dyn Error>> {
+    check_crossing(false).await
+}
+
+#[tokio::test]
+async fn an_existing_team_crossing_cannot_act_on_a_legacy_member_now_held()
+-> Result<(), Box<dyn Error>> {
+    check_crossing(true).await
+}
+
+async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
     let (mut service, (agent, victim, machine)) = Service::start_with(|config| {
         let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
         let agent = seeded.people[0].agents[0].id.to_string();
@@ -32,7 +42,7 @@ async fn an_existing_cross_agent_crossing_is_refused_before_its_runner_is_resolv
         runtime.report(Report {
             operation: OperationId::generate()?.to_string(),
             session: victim.clone(),
-            agent: Some(other),
+            agent: Some(if team_hold { agent.clone() } else { other }),
             machine: machine.clone(),
             state: Reported::Starting,
             what: "legacy session".to_owned(),
@@ -45,11 +55,44 @@ async fn an_existing_cross_agent_crossing_is_refused_before_its_runner_is_resolv
             .budgets_dir
             .as_deref()
             .ok_or("no budgets directory")?;
-        let mut budgets = BudgetStore::open(dir, key)?;
-        let holder = Holder {
-            kind: HolderKind::Agent,
-            id: agent.clone(),
+        let holder = if team_hold {
+            use lys_identity_server::teams_state::{Changed, Created, Line};
+            use lys_identity_server::teams_store::TeamStore;
+            let team = OperationId::generate()?.to_string();
+            let by = lys_identity_server::read_views::Login {
+                provider: config.issuer.clone(),
+                subject: "bea-subject".to_owned(),
+            };
+            let mut teams = TeamStore::open(
+                config.teams_dir.as_deref().ok_or("no teams")?,
+                Arc::clone(&key),
+            )?;
+            teams.keep(Line::Created(Created {
+                id: team.clone(),
+                owner: seeded.people[1].id.to_string(),
+                name: "Legacy team".to_owned(),
+                description: String::new(),
+                by: by.clone(),
+                at: 1,
+            }))?;
+            teams.keep(Line::Added(Changed {
+                operation: OperationId::generate()?.to_string(),
+                team: team.clone(),
+                member: agent.clone(),
+                by,
+                at: 1,
+            }))?;
+            Holder {
+                kind: HolderKind::Team,
+                id: team,
+            }
+        } else {
+            Holder {
+                kind: HolderKind::Agent,
+                id: agent.clone(),
+            }
         };
+        let mut budgets = BudgetStore::open(dir, key)?;
         let crossing = Crossing {
             operation: Crossing::id(&holder, Measure::Tokens, 1, "legacy", &victim),
             holder,
@@ -91,8 +134,18 @@ async fn an_existing_cross_agent_crossing_is_refused_before_its_runner_is_resolv
     let words = receipts[0]["acted"]["words"]
         .as_str()
         .ok_or("no refusal words")?;
-    assert!(words.starts_with("RequestMalformed:"), "{words}");
-    assert!(words.contains(&agent) && words.contains(&victim), "{words}");
+    assert!(
+        words.starts_with(if team_hold {
+            "team_membership_held:"
+        } else {
+            "RequestMalformed:"
+        }),
+        "{words}"
+    );
+    assert!(words.contains(&agent), "{words}");
+    if !team_hold {
+        assert!(words.contains(&victim), "{words}");
+    }
     assert!(
         !words.contains(&machine),
         "runner location was never resolved: {words}"

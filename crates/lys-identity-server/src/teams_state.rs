@@ -247,9 +247,8 @@ impl Held {
     /// Whether `line` may be kept on the teams as they stand, by reason.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
         match line {
-            Line::Created(_) => return Ok(()),
             Line::Checked(_) if self.checked.is_some() => return Err(Refused::Checked),
-            Line::Checked(_) => return Ok(()),
+            Line::Created(_) | Line::Checked(_) => return Ok(()),
             _ => {}
         }
         let team = self.team(line.team()).ok_or(Refused::Unknown)?;
