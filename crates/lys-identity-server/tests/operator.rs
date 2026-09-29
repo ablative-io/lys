@@ -173,7 +173,10 @@ async fn operator_admission_reaches_the_app_registration_route() -> TestResult {
             .send()
             .await?;
         assert_eq!(response.status(), 200);
-        assert_eq!(response.json::<Value>().await?, original);
+        assert_eq!(
+            serde_json::from_str::<Value>(&response.text().await?)?,
+            original
+        );
     }
     let store = FileLeafStore::open_read_only(&service.dir.path().join("apps"))?;
     assert_eq!(store.extent(), u64::try_from(old_leaves.len())? + 1);
