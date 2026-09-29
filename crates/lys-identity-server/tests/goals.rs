@@ -675,7 +675,8 @@ async fn without_a_goals_directory_the_routes_say_so() -> TestResult {
 
 async fn forged_mark_is_refused(content_type: &str, foreign_origin: bool) -> TestResult {
     let table = Table::set().await?;
-    let (status, set) = table.set_goal(&deliverable(now()? + 86_400)?).await?;
+    let goal = deliverable(now()? + 86_400)?;
+    let (status, set) = table.set_goal(&goal).await?;
     assert_eq!(status, 200, "{set}");
     let id = set["goal"]["id"].as_str().ok_or("no goal id")?;
     let path = format!("/goals/{id}/mark");

@@ -51,14 +51,14 @@ fn old_log(
     domain: &str,
     key: &Ed25519Identity,
     leaves: Vec<Value>,
-    snapshot: Value,
+    snapshot: &Value,
 ) -> ResultOf {
     FileLeafStore::create(dir, origin)?;
     let (mut log, _) = FrontierLog::open(FileLeafStore::open(dir)?)?;
     for leaf in leaves {
         log.append(&serde_json::to_vec(&leaf)?)?;
     }
-    log.write_snapshot(domain, &serde_json::to_vec(&snapshot)?, key)?;
+    log.write_snapshot(domain, &serde_json::to_vec(snapshot)?, key)?;
     Ok(())
 }
 
@@ -130,7 +130,7 @@ fn seed(config: &Config) -> ResultOf<Seed> {
         "lys/identity/teams-state/v1",
         &key,
         vec![serde_json::to_value(created)?, serde_json::to_value(added)?],
-        json!({"format":"lys-teams-state/v1", "held":old_teams}),
+        &json!({"format":"lys-teams-state/v1", "held":old_teams}),
     )?;
     let earlier = Budget {
         holder: Holder {
@@ -175,7 +175,7 @@ fn seed(config: &Config) -> ResultOf<Seed> {
             serde_json::to_value(Leaf::Set(earlier))?,
             serde_json::to_value(Leaf::Set(changed))?,
         ],
-        json!({"format":"lys-budgets-state/v1", "held":old_budgets}),
+        &json!({"format":"lys-budgets-state/v1", "held":old_budgets}),
     )?;
     let intent = config
         .operator_upgrade_file
@@ -202,7 +202,8 @@ impl Fixture {
             None,
             None,
             |config| {
-                config.operator_upgrade_file = Some(config.log_dir.with_file_name("upgrade.intent"))
+                config.operator_upgrade_file =
+                    Some(config.log_dir.with_file_name("upgrade.intent"));
             },
             seed,
         )
