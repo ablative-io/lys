@@ -18,12 +18,16 @@ async fn profile_and_skill_writes_refuse_pending_or_unreadable_upgrade_intent()
     let parent = temporary.path().join("upgrade");
     std::fs::create_dir(&parent)?;
     let intent = parent.join("intent.json");
+    let file = temporary.path().join("provisioning.json");
     let (service, seeded) = Service::start_adjusted(
         GRANT_MODEL,
         None,
         None,
         None,
-        |config| config.operator_upgrade_file = Some(intent.clone()),
+        |config| {
+            config.operator_upgrade_file = Some(intent.clone());
+            config.provisioning_file = Some(file.clone());
+        },
         |config| Ok(seed_configured(config, [ADMINISTRATOR, "another-person"])?),
     )
     .await?;
@@ -43,12 +47,7 @@ async fn profile_and_skill_writes_refuse_pending_or_unreadable_upgrade_intent()
     });
     let (status, answer) = service.post(&path, Some(&cookie), &profile).await?;
     assert_eq!(status, 200, "{answer}");
-    let file = service
-        .config
-        .provisioning_file
-        .as_ref()
-        .ok_or("provisioning file")?;
-    let original = std::fs::read(file)?;
+    let original = std::fs::read(&file)?;
     profile["operation"] = json!(operation()?);
     profile["from_version"] = json!(1);
     profile["note"] = json!("must not be written");
@@ -63,15 +62,15 @@ async fn profile_and_skill_writes_refuse_pending_or_unreadable_upgrade_intent()
             std::fs::write(&parent, b"not a directory")?;
         }
         for (route, body) in [
-            (&path, &profile),
-            (&review_path, &review),
-            (&"/skills".to_owned(), &skill),
+            (path.as_str(), &profile),
+            (review_path.as_str(), &review),
+            ("/skills", &skill),
         ] {
             let (status, answer) = service.post(route, Some(&cookie), body).await?;
             assert_eq!(status, 503, "{route}: {answer}");
             assert_eq!(answer["refusal"], "ProvisioningUnavailable", "{route}");
             assert_eq!(
-                std::fs::read(file)?,
+                std::fs::read(&file)?,
                 original,
                 "{route} altered old profile bytes"
             );
