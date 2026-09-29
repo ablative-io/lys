@@ -34,9 +34,11 @@ fn refuse(name: &str, words: &str) -> RunnerError {
 
 impl Configuration {
     /// Prepare initialize for the declared package's existing connection.
-    /// The config home is resolved by the launch owner inside its isolated home;
-    /// cwd comes from the authenticated plan. The policy is fixed for this
-    /// exchange, so a later response cannot be checked against another binding.
+    /// The launch owner must resolve the config home and reject symlink escapes
+    /// before calling this method. The checks here are lexical consistency only,
+    /// not canonical filesystem containment. Cwd comes from the authenticated
+    /// plan. The policy is fixed for this exchange, so a later response cannot
+    /// be checked against another binding.
     pub fn begin(
         initialize_id: &str,
         config_id: &str,
@@ -84,6 +86,7 @@ impl Configuration {
     /// reading without cwd would omit project layers. Neither frame writes config.
     pub fn initialized(&mut self, response: &Value) -> Result<[Value; 2], RunnerError> {
         if self.phase != Phase::Initialize {
+            self.phase = Phase::Refused;
             return Err(refuse(
                 "control_setup_unresolved",
                 "initialize is not awaiting a response; do not resend",
@@ -131,6 +134,7 @@ impl Configuration {
     /// Success does not start a thread or establish native containment readiness.
     pub fn readback(&mut self, response: &Value) -> Result<String, RunnerError> {
         if self.phase != Phase::Configuration {
+            self.phase = Phase::Refused;
             return Err(refuse(
                 "control_setup_unresolved",
                 "effective config is not awaiting a response; do not resend",
