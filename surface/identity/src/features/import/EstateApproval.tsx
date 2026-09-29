@@ -1,12 +1,11 @@
-import { useRef, useState } from 'react';
-import { api, request } from '../../api';
+import { useEffect, useRef, useState } from 'react';
+import { api, Refused, request } from '../../api';
 
 type Resource = { kind: string; id: string; relation: string; actions: string[]; seats: string[]; evidence: string };
 type Plan = { version: 1; resources: Resource[]; agents: { display_name: string }[] };
 type Receipt = { operation: string; grant: string; receipt: { caller: string } };
-type Account = { id: string; owner: string; name: string; state: string };
 
-function planOf(value: unknown): Plan {
+export function planOf(value: unknown): Plan {
   const plan = value as Plan;
   if (!plan || plan.version !== 1 || !Array.isArray(plan.resources) || !Array.isArray(plan.agents)
     || plan.resources.length > 250 || plan.agents.length > 100) throw new Error('Expected an estate approval plan');
@@ -17,6 +16,7 @@ function planOf(value: unknown): Plan {
     if (!resource || ![resource.kind, resource.id, resource.relation, resource.evidence].every((x) => typeof x === 'string' && x.trim())
       || !Array.isArray(resource.actions) || !resource.actions.length || resource.actions.some((a) => typeof a !== 'string' || !a.trim())
       || !Array.isArray(resource.seats) || !resource.seats.length || resource.seats.some((name) => !names.has(name))) throw new Error('Invalid resource or seat');
+    if (![resource.kind,resource.id,resource.relation,...resource.actions].every((token)=>/^[a-z0-9_.-]{1,128}$/.test(token))) throw new Error('Invalid resource token: '+resource.id+'; use lowercase letters, digits, _, - or .');
     const key = JSON.stringify([resource.kind, resource.id, resource.relation]);
     if (seen.has(key)) throw new Error('Repeated resource');
     seen.add(key);
@@ -42,21 +42,19 @@ async function recorded(path: string, caller: string, purpose: string, body: obj
 /** Loading previews only. The signed-in person explicitly approves the shown roots. */
 export function EstateApproval() {
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [account, setAccount] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
-  const read = async (file: File) => {
-    setPlan(null); setStatus(''); setAccount('');
-    try {
-      if (file.size > 2_000_000) throw new Error('Plan is too large');
-      const parsed = planOf(JSON.parse(await file.text()));
-      const [me, result] = await Promise.all([api.me(), request<{service_accounts: Account[]}>('/service-accounts')]);
-      setAccounts(result.service_accounts.filter((a) => a.owner === me.person.id && a.state === 'active'));
-      setPlan(parsed);
-    } catch (error) { setStatus(String(error)); }
-  };
+  useEffect(() => {
+    let current = true;
+    void request<{plan:unknown;loader:string}>('/identity/estate-plan').then((answer)=>{
+      const parsed=planOf(answer.plan);
+      if(!/^op-[0-9a-f]{32}$/.test(answer.loader))throw new Error('The installed loader was not identified');
+      if(current){setPlan(parsed);setAccount(answer.loader);}
+    }).catch((error)=>{if(current)setStatus(String(error));});
+    return ()=>{current=false;};
+  },[]);
   const approve = async () => {
     if (!plan || !account || working.current) return;
     working.current = true; setBusy(true); setStatus('Recording your approval…');
@@ -75,19 +73,20 @@ export function EstateApproval() {
         for (const name of resource.seats) delegations.push({ name:resource.kind + '/' + resource.id + '/' + resource.relation + '/' + name, route:'api', source:given.grant, recipient:'@agent/' + name, responsible:'@owner', resource:shared.resource, relation:resource.relation, pass_on:{kind:'use_only'}, window:shared.window });
         setStatus('Recorded ' + (index + 1) + ' of ' + plan.resources.length + ' resources');
       }
-      const blob = new Blob([JSON.stringify({agents:plan.agents,delegations},null,2)+'\n'], {type:'application/json'});
-      const url = URL.createObjectURL(blob); const link=document.createElement('a');link.href=url;link.download='estate-grants.json';link.click();setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setStatus('Your roots and loader delegations are recorded. Downloaded estate-grants.json; import it with the selected loader’s credential.');
-    } catch (error) { setStatus(String(error) + '. Stopped; no automatic retry. Some earlier roots may be recorded. An explicit repeat of the same plan and account uses the same operation IDs.'); }
+      setStatus('Applying the approved grants to the agents…');
+      const result=await request<{by:{kind:string;id:string};completed:{entry:string;operation:string}[]}>('/identity/estate-apply',{agents:plan.agents,delegations});
+      const expected=[...plan.agents.map((a)=>'agents/'+a.display_name),...delegations.map((d)=>'delegations/'+(d as {name:string}).name)];
+      if(result.by?.kind!=='service_account'||result.by.id!==account||!Array.isArray(result.completed)||result.completed.length!==expected.length||result.completed.some((r,i)=>r.entry!==expected[i]||!/^op-[0-9a-f]{32}$/.test(r.operation)))throw new Error('The import answer did not confirm every planned entry');
+      setStatus('Estate grants applied: '+delegations.length+' delegations recorded for '+plan.agents.length+' agents.');
+    } catch (error) { setStatus((error instanceof Refused ? error.refusal.refusal+': '+error.refusal.reason : String(error)) + '. Stopped; no automatic retry. Some earlier grants may be recorded. An explicit repeat of the same plan and account uses the same operation IDs.'); }
     finally { working.current=false;setBusy(false); }
   };
   return <section className="page"><h1>Approve estate grants</h1>
-    <p>Load a sourced plan, inspect every resource and action, then approve as yourself. Loading does not write anything. Each root is held by you; the selected service account may pass only these actions to the listed agents. Apps must already be approved and agents active.</p>
-    <input type="file" accept="application/json,.json" disabled={busy} onChange={(event) => {const file=event.target.files?.[0];if(file) void read(file);}} />
-    {plan ? <><label className="field">Loader service account<select value={account} disabled={busy} onChange={(event)=>setAccount(event.target.value)}><option value="">Choose your loader</option>{accounts.map((a)=><option key={a.id} value={a.id}>{a.name} · {a.id}</option>)}</select></label>
+    <p>Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active.</p>
+    {plan ? <><p>Using your installed Lys directory loader.</p>
       <p>{plan.resources.length} resources. No expiry of their own. You can revoke the roots or loader grants later.</p>
       <ul>{plan.resources.map((r)=><li key={r.kind+'/'+r.id}><strong>{r.id}</strong> ({r.kind}): {r.actions.join(', ')} → {r.seats.join(', ')}. <small>{r.evidence}</small></li>)}</ul>
-      <button className="btn primary" disabled={busy || !account} onClick={()=>void approve()}>Approve these roots and delegate to my loader</button></> : null}
+      <button className="btn primary" disabled={busy || !account} onClick={()=>void approve()}>Approve and apply estate grants</button></> : null}
     {status ? <p role="status">{status}</p> : null}
   </section>;
 }

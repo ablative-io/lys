@@ -52,7 +52,12 @@ function Forms({ initial }: { initial: PeopleView }) {
         <label className="field">Identity<select name="identity" required value={selected} onChange={(event) => setSelected(event.target.value)}><option value="" disabled>Choose an identity</option>{identities.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}</select></label>
         <label className="field">Display name<input name="display_name" required key={selected} defaultValue={identity?.display_name ?? ''} /></label>
       </RecordedForm> : null}
-      {section === 'status' ? <RecordedForm name="lifecycle" title="Record lifecycle change" heading="Change status" description="Activate, suspend or retire a person or agent. Only changes available for their current status are shown." submitLabel="Record change" done={reload} change={(data) => ({ path: '/identities/' + encodeURIComponent(field(data, 'identity')) + '/transitions', body: { transition: field(data, 'transition'), reason: field(data, 'reason') } })}>
+      {section === 'status' ? <RecordedForm name="lifecycle" title="Record lifecycle change" heading="Change status" description="Activate, suspend or retire a person or agent. Only changes available for their current status are shown." submitLabel="Record change" done={reload} success={(asked) => {
+        const id = decodeURIComponent(asked.path.split('/')[2]);
+        const name = identities.find((entry) => entry.id === id)?.display_name ?? 'The identity';
+        const state: Record<string,string> = {activate:'active', suspend:'suspended', retire:'retired', reinstate:'active', resume:'active'};
+        return name + ' is now ' + (state[String(asked.body.transition)] ?? 'updated') + '.';
+      }} change={(data) => ({ path: '/identities/' + encodeURIComponent(field(data, 'identity')) + '/transitions', body: { transition: field(data, 'transition'), reason: field(data, 'reason') } })}>
         <label className="field">Identity<select name="identity" required value={selected} onChange={(e) => setSelected(e.target.value)}><option value="" disabled>Choose an identity</option>{identities.map((p) => <option key={p.id} value={p.id}>{p.display_name} · {p.state}</option>)}</select></label>
         <label className="field">Change<select name="transition" required key={identity?.state} defaultValue=""><option value="" disabled>Choose a change</option>{(identity ? ACTIONS[identity.state] : []).map((action) => <option key={action} value={action}>{action}</option>)}</select></label>
         <TextField name="reason" label="Reason" />

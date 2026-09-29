@@ -71,7 +71,7 @@ fn invalid(entry: impl Into<String>, reason: &'static str) -> Invalid {
 /// The entire document is parsed before the first mutation is attempted.
 pub fn parse(bytes: &[u8], account: &str) -> Result<Vec<Entry>, Invalid> {
     let document: Value =
-        serde_json::from_slice(bytes).map_err(|_| invalid("document", "expected a JSON object"))?;
+        serde_json::from_slice(bytes).map_err(|_error| invalid("document", "expected a JSON object"))?;
     let object = document
         .as_object()
         .ok_or_else(|| invalid("document", "expected a JSON object"))?;
@@ -182,7 +182,7 @@ fn shape(kind: Kind, body: &Map<String, Value>) -> Result<(), &'static str> {
         return Err("required request member is absent");
     }
     if body.keys().any(|key| {
-        !required.contains(&key.as_str()) && !(kind == Kind::App && key == "service_account")
+        !(required.contains(&key.as_str()) || kind == Kind::App && key == "service_account")
     }) {
         return Err("unknown request member");
     }
@@ -222,7 +222,7 @@ fn canonical(value: &Value) -> Result<Vec<u8>, Invalid> {
                 }
                 out.extend(
                     serde_json::to_vec(key)
-                        .map_err(|_| invalid("document", "cannot encode member name"))?,
+                        .map_err(|_error| invalid("document", "cannot encode member name"))?,
                 );
                 out.push(b':');
                 out.extend(value);
@@ -241,7 +241,7 @@ fn canonical(value: &Value) -> Result<Vec<u8>, Invalid> {
             out.push(b']');
             Ok(out)
         }
-        _ => serde_json::to_vec(value).map_err(|_| invalid("document", "cannot encode value")),
+        _ => serde_json::to_vec(value).map_err(|_error| invalid("document", "cannot encode value")),
     }
 }
 

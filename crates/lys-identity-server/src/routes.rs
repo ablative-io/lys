@@ -49,6 +49,8 @@ pub struct AppState {
     pub setup_lock: tokio::sync::Mutex<()>,
     /// The private loader credential provisioned by install or upgrade.
     pub import_credential_file: Option<PathBuf>,
+    /// The estate plan placed beside the directory log by install or upgrade.
+    pub estate_plan_file: PathBuf,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -159,6 +161,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let model = apps.model()?;
     let state = Arc::new(AppState {
         import_credential_file: config.import_credential_file.clone(),
+        estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
@@ -291,6 +294,8 @@ pub fn router(state: Shared) -> Router {
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identity/import", post(crate::import_api::import))
+        .route("/identity/estate-plan", get(crate::estate_api::plan))
+        .route("/identity/estate-apply", post(crate::estate_api::apply))
         .route("/identities", get(list))
         .route("/identities/{id}", get(read))
         .route("/identities/{id}/profile", post(change_profile))

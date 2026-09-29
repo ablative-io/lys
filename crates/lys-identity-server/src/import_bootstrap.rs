@@ -37,7 +37,7 @@ fn operation(account: &str, label: &str) -> OperationId {
 }
 
 #[cfg(unix)]
-fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
+pub(crate) fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
     use std::io::Read;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let metadata = fs::symlink_metadata(path).map_err(|_| unavailable())?;
@@ -59,7 +59,7 @@ fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
 }
 
 #[cfg(not(unix))]
-fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
+pub(crate) fn read(path: &std::path::Path) -> Result<Zeroizing<String>, ServerError> {
     Err(ServerError::ConfigInvalid {
         reason: format!(
             "owner-only loader credential {} requires Unix",

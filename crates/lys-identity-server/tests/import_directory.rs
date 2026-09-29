@@ -211,3 +211,60 @@ async fn refusal_receipt_is_readable_after_restart_and_repeat_adds_no_audit_leaf
     assert_eq!(account["import_refusals"][0], first.1["audit"]);
     Ok(())
 }
+
+#[tokio::test]
+async fn installed_estate_flow_is_admin_only_and_runs_as_real_loader() -> Outcome {
+    let service = upgraded().await?;
+    fs::write(
+        service.dir.path().join("estate-approval.json"),
+        br#"{"version":1,"agents":[],"resources":[]}"#,
+    )?;
+    let admin = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let other = service
+        .sign_in(identity_contract::apps::login("second-person"))
+        .await?;
+    let before = extents(&service)?;
+    assert_eq!(
+        get(&service, "/identity/estate-plan", Auth::Cookie(&other))
+            .await?
+            .0,
+        403
+    );
+    assert_eq!(
+        post(
+            &service,
+            "/identity/estate-apply",
+            Auth::Cookie(&other),
+            &document()
+        )
+        .await?
+        .0,
+        403
+    );
+    assert_eq!(extents(&service)?, before);
+    let read = ok(get(&service, "/identity/estate-plan", Auth::Cookie(&admin)).await?)?;
+    assert_eq!(read["loader"], ACCOUNT);
+    assert!(!read.to_string().contains(&credential()));
+    assert_eq!(extents(&service)?, before, "preview is read-only");
+    let first = ok(post(
+        &service,
+        "/identity/estate-apply",
+        Auth::Cookie(&admin),
+        &document(),
+    )
+    .await?)?;
+    assert_eq!(first["by"], json!({"kind":"service_account","id":ACCOUNT}));
+    let after = extents(&service)?;
+    let repeat = ok(post(
+        &service,
+        "/identity/estate-apply",
+        Auth::Cookie(&admin),
+        &document(),
+    )
+    .await?)?;
+    assert_eq!(repeat, first);
+    assert_eq!(extents(&service)?, after);
+    Ok(())
+}

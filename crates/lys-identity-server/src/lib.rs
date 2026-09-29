@@ -37,6 +37,7 @@ pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
 mod error_status;
+mod estate_api;
 pub mod file_stores;
 pub mod goals_api;
 pub mod goals_state;

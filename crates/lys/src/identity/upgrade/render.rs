@@ -137,6 +137,13 @@ impl Render for Templates {
         let deploy = layout.deploy_dir();
         Ok(vec![
             file(
+                "estate-approval.json",
+                layout.data_dir().join("estate-approval.json"),
+                layout::ESTATE_PLAN.as_bytes(),
+                true,
+                false,
+            ),
+            file(
                 "compose.yaml",
                 deploy.join("compose.yaml"),
                 layout::COMPOSE_YAML.as_bytes(),
