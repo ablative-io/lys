@@ -45,6 +45,18 @@ pub enum Behaviour {
     ExitsEarly,
 }
 
+/// The configuration-check protocol shared by the process and HTTP stubs.
+pub fn checker(commit: &str) -> String {
+    format!(
+        r#"if [ "$1" = "--check-config" ]; then
+ digest=$(shasum -a 256 | cut -d ' ' -f 1)
+ printf '{{"format":"lys-config-check/1","build":"{commit}","config_sha256":"%s"}}\n' "$digest"
+ exit 0
+fi
+"#
+    )
+}
+
 /// Writes the stub `name` answering `--version` with `commit` into `dir`.
 pub fn stub(dir: &Path, name: &str, commit: &str, behaviour: Behaviour) -> TestResult {
     std::fs::create_dir_all(dir)?;
@@ -55,14 +67,7 @@ pub fn stub(dir: &Path, name: &str, commit: &str, behaviour: Behaviour) -> TestR
         ),
         Behaviour::ExitsEarly => format!("echo \"{name} {commit} failing\"\nexit 3\n"),
     };
-    let checker = format!(
-        r#"if [ "$1" = "--check-config" ]; then
- digest=$(shasum -a 256 | cut -d ' ' -f 1)
- printf '{{"format":"lys-config-check/1","build":"{commit}","config_sha256":"%s"}}\n' "$digest"
- exit 0
-fi
-"#
-    );
+    let checker = checker(commit);
     let script = format!(
         "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n{checker}{body}"
     );

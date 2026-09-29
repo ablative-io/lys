@@ -8,7 +8,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
-use super::super::scratch::{A, B, Behaviour, Recorder, Scratch, TestResult, build, ready_lines};
+use super::super::scratch::{
+    A, B, Behaviour, Recorder, Scratch, TestResult, build, checker, ready_lines,
+};
 use super::super::{Unit, version};
 use super::{UNSTAMPED, check_placed_build, settle};
 use crate::identity::error::{ErrorKind, IdentityResult};
@@ -37,8 +39,9 @@ server.serve_forever()
 fn http_service(dir: &Path, commit: &str, server: &Path, port: u16) -> TestResult {
     std::fs::create_dir_all(dir)?;
     let name = BINARIES[1];
+    let checker = checker(commit);
     let script = format!(
-        "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n\
+        "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n{checker}\
          exec python3 \"{}\" {port} {name} {commit}\n",
         server.display()
     );
