@@ -19,9 +19,9 @@ pub(crate) struct SaveBody {
     client_secret: String,
 }
 
-#[derive(Deserialize, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Saved {
+pub struct Saved {
     app: String,
     client_secret_ref: String,
     api_credential_ref: String,
@@ -71,4 +71,42 @@ pub(crate) async fn save(
         return Err(invalid());
     }
     Ok(Json(saved))
+}
+
+/// Save before activation. A repeated request reconciles the broker's sealed value.
+pub(crate) async fn prepare(
+    state: &AppState,
+    headers: &HeaderMap,
+    app: &str,
+) -> Result<(String, Saved), ServerError> {
+    let owner = crate::secrets_api::person(state, headers)?;
+    let body = json!({"app": app, "upstream": state.identity_upstream}).to_string();
+    let mut answer = crate::secrets_api::ask(
+        state,
+        headers,
+        Method::POST,
+        "/_lys/apps/prepare",
+        Bytes::from(body),
+    )
+    .await?;
+    let invalid = || ServerError::SecretsUnavailable {
+        reason: "the broker did not confirm custody of this app's credentials".to_owned(),
+    };
+    let digest = answer
+        .as_object_mut()
+        .and_then(|answer| answer.remove("client_secret_sha256"))
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .ok_or_else(invalid)?;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(invalid());
+    }
+    let saved: Saved = serde_json::from_value(answer).map_err(|_error| invalid())?;
+    let prefix = format!("lys-app-{owner}-{app}");
+    if saved.app != app
+        || saved.client_secret_ref != format!("{prefix}-client")
+        || saved.api_credential_ref != format!("{prefix}-api")
+    {
+        return Err(invalid());
+    }
+    Ok((digest, saved))
 }

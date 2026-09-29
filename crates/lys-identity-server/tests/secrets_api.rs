@@ -74,7 +74,7 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
                 .collect(),
             body: body.to_vec(),
         });
-    if path == "/_lys/apps/save" {
+    if path == "/_lys/apps/save" || path == "/_lys/apps/prepare" {
         let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
         let owner = parts
             .headers
@@ -83,7 +83,12 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
             .unwrap_or("missing");
         let app = asked["app"].as_str().unwrap_or("missing");
         let prefix = format!("lys-app-{owner}-{app}");
-        return axum::Json(json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")})).into_response();
+        let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
+        if path == "/_lys/apps/prepare" {
+            answer["client_secret_sha256"] =
+                json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
+        }
+        return axum::Json(answer).into_response();
     }
     answer(&path, &body)
 }
@@ -438,9 +443,22 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         &json!({"operation":op()?}),
     )
     .await?)?;
-    let secret = approved["client"]["client_secret"]
-        .as_str()
-        .ok_or("no secret")?;
+    assert!(approved["client"].is_null());
+    assert_eq!(approved["credentials"]["app"], app);
+    // The stand-in has custody of this fixed fixture value; it was not returned
+    // by approval. Manual save remains available for already-issued credentials.
+    let fixture = "ab".repeat(32);
+    let secret = fixture.as_str();
+    let prepared = received(&setup.log);
+    assert_eq!(prepared.len(), 1);
+    assert_eq!(prepared[0].path, "/_lys/apps/prepare");
+    signed_as_received(&prepared[0], &setup.key)?;
+    assert!(!String::from_utf8_lossy(&prepared[0].body).contains(secret));
+    setup
+        .log
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clear();
     let path = format!("/apps/{app}/credentials/save");
     let body = json!({"client_secret":secret});
     assert_eq!(
@@ -522,7 +540,7 @@ async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
         held["state"], "pending",
         "broker-down approval activated the app without credential custody"
     );
-    assert_eq!(answer.0, 503);
+    assert_eq!(answer.0, 502);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     assert!(answer.1.get("client").is_none());
     Ok(())

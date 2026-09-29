@@ -86,7 +86,7 @@ function AppCard({ app, issued, issue, changed, stored, saved }: { stored:Stored
     {stored ? <SavedCredentials answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions">
       <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', {}, (answer) => { const client = (answer as { client: ClientIssued | null }).client; if (client) issue(client); changed(app.name + ' is approved: its sign-in client and its schema now take effect.'); }); }}>Approve {app.name}</button>
+      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', {}, (answer) => { const approval = answer as { client: ClientIssued | null; credentials?: StoredCredentials | null }; if (approval.client) issue(approval.client); if (approval.credentials) saved(approval.credentials); changed(app.name + ' is approved: its sign-in client and its schema now take effect.'); }); }}>Approve {app.name}</button>
       <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }}>Decline {app.name}</button>
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>

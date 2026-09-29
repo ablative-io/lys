@@ -2,6 +2,39 @@
 use crate::{Broker, EntryClass, PermissionCheck, Secret, SecretsError};
 
 impl<P: PermissionCheck> Broker<P> {
+    /// Prepare both app credentials durably, returning only the client digest.
+    /// Reconciliation reuses the sealed client after a partial or lost answer.
+    ///
+    /// # Errors
+    /// Refuses conflicting entries and propagates store/audit failures.
+    pub fn prepare_app(&mut self, app: &str, owner: &str) -> Result<String, SecretsError> {
+        let prefix = format!("lys-app-{owner}-{app}");
+        let client = format!("{prefix}-client");
+        let value = if let Some(entry) = self.store.entry(&client) {
+            if entry.owner != owner || entry.class != EntryClass::Key {
+                return Err(SecretsError::SecretExists { name: client });
+            }
+            self.store
+                .open_for_use(&self.store_key, &client, EntryClass::Key)?
+        } else {
+            Secret::from_slice(
+                crate::encoding::hex(&crate::encoding::random_bytes::<32>()?).as_bytes(),
+            )
+        };
+        self.seal_once(&client, EntryClass::Key, owner, &value)?;
+        let mut credential = zeroize::Zeroizing::new(format!("lys-app.{app}.").into_bytes());
+        credential.extend_from_slice(value.expose());
+        self.seal_once(
+            &format!("{prefix}-api"),
+            EntryClass::Credential,
+            owner,
+            &Secret::from_slice(&credential),
+        )?;
+        Ok(crate::encoding::hex(&crate::encoding::sha256(
+            value.expose(),
+        )))
+    }
+
     /// Seal a new value, or confirm that this exact owner, class and value
     /// are already sealed. A conflicting entry is never replaced.
     ///

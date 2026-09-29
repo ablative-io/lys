@@ -402,6 +402,32 @@ async fn approve(
 ) -> Result<Json<Approval>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
+    // Authenticate and check pending state before doing any broker work. Never
+    // hold directory/apps locks across a network wait; recheck after custody.
+    let pending = with_apps(&state, |apps| {
+        administrator(&state, apps, &headers)?;
+        if let Some(line) = apps.held().operation(&operation) {
+            return match line {
+                Line::Approved(approved) if approved.app == id => Ok(false),
+                _ => Err(AppError::AppOperationReused {
+                    operation: operation.clone(),
+                }
+                .into()),
+            };
+        }
+        let app = apps
+            .app(&id)
+            .ok_or_else(|| AppError::AppUnknown { app: id.clone() })?;
+        if app.standing() != Standing::Pending {
+            return Err(AppError::AppDecided { app: id.clone() }.into());
+        }
+        Ok(true)
+    })?;
+    let prepared = if pending && state.secrets.is_some() {
+        Some(crate::apps_credentials::prepare(&state, &headers, &id).await?)
+    } else {
+        None
+    };
     with_apps(&state, |apps| {
         let by = administrator(&state, apps, &headers)?;
         if let Some(Line::Approved(approved)) = apps.held().operation(&operation) {
@@ -411,6 +437,7 @@ async fn approve(
             return Ok(Approval {
                 app: view(apps, &id)?,
                 client: None,
+                credentials: None,
             });
         }
         let app = apps
@@ -430,7 +457,21 @@ async fn approve(
                 bound_by: by.clone(),
                 at,
             });
-        let (secret, digest) = new_secret()?;
+        let (issued, digest, credentials) = match prepared {
+            Some((digest, saved)) => (None, digest, Some(saved)),
+            None => {
+                let (secret, digest) = new_secret()?;
+                (
+                    Some(ClientIssued {
+                        client_id: id.clone(),
+                        credential: format!("{APP_CREDENTIAL}.{id}.{secret}"),
+                        client_secret: secret,
+                    }),
+                    digest,
+                    None,
+                )
+            }
+        };
         let client = Client {
             client_id: id.clone(),
             secret_sha256: digest,
@@ -446,11 +487,8 @@ async fn approve(
         refresh(&state, apps)?;
         Ok(Approval {
             app: view(apps, &id)?,
-            client: Some(ClientIssued {
-                client_id: id.clone(),
-                credential: format!("{APP_CREDENTIAL}.{id}.{secret}"),
-                client_secret: secret,
-            }),
+            client: issued,
+            credentials,
         })
     })
     .map(Json)

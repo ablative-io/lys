@@ -131,6 +131,8 @@ pub struct Approval {
     /// The client created, the one time it is answered; absent when the
     /// same approval is sent again, since the secret is shown only once.
     pub client: Option<ClientIssued>,
+    /// Durable broker references, when approval saved the credentials.
+    pub credentials: Option<crate::apps_credentials::Saved>,
 }
 
 impl std::fmt::Debug for ClientIssued {
