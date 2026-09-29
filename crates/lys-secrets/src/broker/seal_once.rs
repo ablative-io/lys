@@ -166,4 +166,43 @@ mod tests {
         }
         Ok(())
     }
+    #[test]
+    fn prepare_repairs_partial_pair_with_the_same_key_and_digest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let client_name = "lys-app-person-a-fixture-client";
+        let api_name = "lys-app-person-a-fixture-api";
+        let key = Secret::from_slice("ab".repeat(32).as_bytes());
+        // Simulate a completed first write and a lost/failed second write.
+        broker.seal_once(client_name, EntryClass::Key, "person-a", &key)?;
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let digest = broker.prepare_app("fixture", "person-a")?;
+        assert_eq!(
+            digest,
+            crate::encoding::hex(&crate::encoding::sha256(key.expose()))
+        );
+        let client_before = broker.store().entry(client_name).cloned();
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert_eq!(broker.prepare_app("fixture", "person-a")?, digest);
+        assert_eq!(broker.store().entry(client_name), client_before.as_ref());
+        let api = broker
+            .store
+            .open_for_use(&broker.store_key, api_name, EntryClass::Credential)?;
+        assert_eq!(
+            api.expose(),
+            format!("lys-app.fixture.{}", "ab".repeat(32)).as_bytes()
+        );
+        Ok(())
+    }
 }

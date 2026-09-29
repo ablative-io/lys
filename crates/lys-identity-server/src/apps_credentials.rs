@@ -88,7 +88,12 @@ pub(crate) async fn prepare(
         "/_lys/apps/prepare",
         Bytes::from(body),
     )
-    .await?;
+    .await.map_err(|error| match error {
+        ServerError::SecretsRefused { status, refusal, reason } => ServerError::SecretsUnavailable {
+            reason: format!("app credential custody was not confirmed; broker answered {status}: {refusal}: {reason}"),
+        },
+        other => other,
+    })?;
     let invalid = || ServerError::SecretsUnavailable {
         reason: "the broker did not confirm custody of this app's credentials".to_owned(),
     };
