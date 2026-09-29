@@ -267,9 +267,11 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
     assert_eq!(parsed.use_only[0].handle, "h-live");
     assert_eq!(parsed.env.get("LYS_AGENT"), Some(&agent));
     assert_eq!(parsed.instructions, "Build what the brief says.");
+    assert_eq!(start["left_out"], json!([]));
+    assert_eq!(parsed.skills.len(), 1);
     assert_eq!(
-        start["left_out"],
-        json!(["skills, which no template slot carries: review"])
+        parsed.skills[0].text,
+        "Read the change against its brief.\n"
     );
 
     let (status, again) = table.ask(&agent, &machine, &table.ada).await?;

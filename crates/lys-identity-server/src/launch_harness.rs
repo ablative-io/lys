@@ -10,7 +10,9 @@ use lys_home::harness::launch_fields::{
 
 use crate::error::ServerError;
 use crate::launch_template::{HandleName, Start};
-use crate::provisioning_store::{McpServer, Setting, Settings};
+use lys_home::harness::skills::SkillFile;
+
+use crate::provisioning_store::{McpServer, ProvisioningStore, Setting, Settings, Version};
 
 /// The launch fields `start` gives, with each secret resolved to one of the
 /// agent's `handles`; a profile that declares no harness is refused.
@@ -116,4 +118,29 @@ fn handle_id(
             member: format!("env `{variable}`"),
             secret: secret.to_owned(),
         })
+}
+
+/// The text of each skill `version` pinned, as the launch carries it; a pin
+/// whose text Lys no longer keeps is refused.
+pub fn skill_files(
+    store: &ProvisioningStore,
+    version: &Version,
+) -> Result<Vec<SkillFile>, ServerError> {
+    version
+        .settings
+        .skill_pins
+        .iter()
+        .map(|pin| {
+            store
+                .skill(&pin.name, &pin.sha256)
+                .map(|kept| SkillFile {
+                    name: kept.name.clone(),
+                    text: kept.text.clone(),
+                    sha256: kept.sha256.clone(),
+                })
+                .ok_or_else(|| ServerError::SkillUnknown {
+                    name: pin.name.clone(),
+                })
+        })
+        .collect()
 }
