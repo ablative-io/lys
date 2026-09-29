@@ -38,7 +38,7 @@ pub struct McpServer {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<McpCommand>,
     /// Whether its messages wake an idle seat: `off` or `wake`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Channel::is_off")]
     #[schema(value_type = String)]
     pub channel: Channel,
 }
@@ -206,7 +206,7 @@ impl Profile {
 #[serde(deny_unknown_fields)]
 struct Kept {
     profiles: Vec<Profile>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     skills: Vec<SkillText>,
 }
 

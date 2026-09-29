@@ -65,6 +65,13 @@ pub enum Channel {
     Wake,
 }
 
+impl Channel {
+    /// An omitted policy in an older profile already means off.
+    pub fn is_off(&self) -> bool {
+        *self == Self::Off
+    }
+}
+
 /// One environment variable a command server is started with, as text.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvText {
