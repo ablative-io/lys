@@ -45,7 +45,7 @@ use crate::directory_views::{PersonRegistered, receipt_view};
 use crate::error::ServerError;
 use crate::routes::{AppState, hex, signed_in, with_directory};
 use crate::session::now;
-use crate::sign_in::{Attempt, begin_session, person_address};
+use crate::sign_in::{Attempt, begin_session};
 
 /// Where first-run setup reads its code and records its administrator.
 #[derive(Debug, Clone, Deserialize)]
@@ -255,8 +255,14 @@ pub(crate) struct Opened {
 /// when that is fixed, and the password policy.
 async fn open(
     State(state): State<Arc<AppState>>,
+    extensions: Extensions,
+    headers: HeaderMap,
     body: Result<Json<Opened>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let purpose = purpose_of(&state, &body.code)?;
     let email = match purpose {
@@ -290,8 +296,13 @@ pub(crate) struct NewAdministrator {
 async fn make_administrator(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
+    headers: HeaderMap,
     body: Result<Json<NewAdministrator>, JsonRejection>,
 ) -> Result<Response, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let turn = state.setup_lock.lock().await;
     admit(&state, &body.code, Purpose::FirstRun)?;
@@ -307,7 +318,7 @@ async fn make_administrator(
     let operation = OperationId::from_str(&body.operation)?;
     let profile = Profile::new(&body.display_name)?;
     accounts::check_password(&body.password)?;
-    let address = person_address(&extensions)?;
+    let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
     let (id, made) = accounts::make(api, email, &body.display_name).await?;
     let attempt = Attempt {
@@ -364,8 +375,13 @@ pub(crate) struct NewPassword {
 async fn new_password(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
+    headers: HeaderMap,
     body: Result<Json<NewPassword>, JsonRejection>,
 ) -> Result<Response, ServerError> {
+    state
+        .sign_in
+        .setup_attempts
+        .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let turn = state.setup_lock.lock().await;
     admit(&state, &body.code, Purpose::Password)?;
@@ -373,7 +389,7 @@ async fn new_password(
         .admission
         .administrator_login()
         .ok_or(ServerError::SetupCodeRefused)?;
-    let address = person_address(&extensions)?;
+    let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
     accounts::set_password(api, login.subject(), &body.password).await?;
     let email = accounts::email_of(api, login.subject()).await?;

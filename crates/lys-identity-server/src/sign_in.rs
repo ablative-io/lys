@@ -26,13 +26,13 @@
 //! issuer's; the password is never logged, never kept and never part of an
 //! error.
 
-use std::collections::HashMap;
+use crate::sign_in_flights::Flights;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, State};
-use axum::http::{Extensions, StatusCode, header};
+use axum::http::{Extensions, HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -87,9 +87,12 @@ fn unreachable_issuer(error: reqwest::Error) -> ServerError {
 /// through a provider it has begun and not finished.
 pub struct IssuerSignIn {
     api: String,
+    trusted_proxies: Vec<IpAddr>,
     callback: String,
     http: reqwest::Client,
-    upstream: Mutex<HashMap<String, upstream::Upstream>>,
+    upstream: Mutex<Flights<upstream::Upstream>>,
+    attempts: crate::sign_in_attempts::Attempts,
+    pub(crate) setup_attempts: crate::sign_in_attempts::Attempts,
 }
 
 /// One person's sign-in: what they typed, and where they are.
@@ -283,18 +286,31 @@ impl IssuerSignIn {
             .map_err(|error| failed(error.to_string()))?;
         Ok(Self {
             api,
+            trusted_proxies: Vec::new(),
             callback,
             http,
-            upstream: Mutex::new(HashMap::new()),
+            upstream: Mutex::new(Flights::default()),
+            attempts: crate::sign_in_attempts::Attempts::default(),
+            setup_attempts: crate::sign_in_attempts::Attempts::default(),
         })
     }
 
     /// The issuer's sign-in API as `config` names it.
     pub fn configured(config: &Config) -> Result<Self, ServerError> {
-        Self::new(
+        let mut service = Self::new(
             config.sign_in_api(),
             provider_callback(&config.redirect_url)?,
-        )
+        )?;
+        service.trusted_proxies.clone_from(&config.trusted_proxies);
+        Ok(service)
+    }
+
+    pub(crate) fn address(
+        &self,
+        extensions: &Extensions,
+        headers: &HeaderMap,
+    ) -> Result<IpAddr, ServerError> {
+        crate::sign_in_address::resolve(person_address(extensions)?, headers, &self.trusted_proxies)
     }
 
     /// The address a sign-in provider sends a person back to.
@@ -305,7 +321,8 @@ impl IssuerSignIn {
     /// Sign `attempt` in through the issuer for this service's own client,
     /// answering the actor its validated ID token names.
     pub async fn password(&self, oidc: &Oidc, attempt: &Attempt<'_>) -> Result<Actor, ServerError> {
-        let begun = reqwest::Url::parse(&oidc.begin()?)
+        self.attempts.admit(attempt.address, 10)?;
+        let begun = reqwest::Url::parse(&oidc.begin(attempt.address)?)
             .map_err(|error| failed(format!("the sign-in start is not an address: {error}")))?;
         let state = query_value(&begun, "state")
             .ok_or_else(|| failed("the sign-in start carries no state"))?;
@@ -459,6 +476,7 @@ pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response,
 async fn sign_in(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
+    headers: HeaderMap,
     body: Result<Json<SignInBody>, JsonRejection>,
 ) -> Result<Response, ServerError> {
     let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
@@ -471,7 +489,7 @@ async fn sign_in(
     let attempt = Attempt {
         email,
         password: &body.password,
-        address: person_address(&extensions)?,
+        address: state.sign_in.address(&extensions, &headers)?,
     };
     let actor = state.sign_in.password(&state.oidc, &attempt).await?;
     begin_session(&state, &actor)
