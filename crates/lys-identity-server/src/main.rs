@@ -7,6 +7,8 @@ use std::sync::Arc;
 use lys_identity_server::read_api::BUILD;
 use lys_identity_server::{Config, ServerError, service_saying};
 
+mod config_check;
+
 /// What `--version` and `-V` print: the name, the crate version and the
 /// commit this binary was built from.
 const VERSION: &str = concat!(
@@ -48,6 +50,9 @@ async fn main() -> ExitCode {
     if first == "--version" || first == "-V" {
         println!("{VERSION}");
         return ExitCode::SUCCESS;
+    }
+    if first == "--check-config" {
+        return config_check::run(std::env::args_os().skip(2));
     }
     let config_path = PathBuf::from(first);
     println!("lys-identity-server build {BUILD}");

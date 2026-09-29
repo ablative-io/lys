@@ -43,6 +43,7 @@ use crate::commands::output::Emitter;
 
 pub mod adopt;
 pub mod intent;
+mod preflight;
 pub mod render;
 pub mod swap;
 
@@ -363,15 +364,17 @@ pub fn upgrade(
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
     }
+    let original = preflight::Original::check(layout, from, &to)?;
+    let screens_existed = layout.surface_dir().join("index.html").is_file();
+    let files = parts
+        .render
+        .render(layout, &to, screens_existed || package.is_some())?;
+    original.candidate(layout, from, &files)?;
     let installed = adopt::installed(layout, parts.units, say)?;
     for (name, new) in &to {
         let old = installed.get(name).map_or(adopt::UNSTAMPED, String::as_str);
         say(&format!("{name}: installed {old}, new {new}"));
     }
-    let screens_existed = layout.surface_dir().join("index.html").is_file();
-    let files = parts
-        .render
-        .render(layout, &to, screens_existed || package.is_some())?;
     let mut intent = Intent {
         from: installed,
         to,
@@ -497,3 +500,7 @@ mod scratch;
 #[cfg(test)]
 #[path = "upgrade_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "upgrade/preflight_tests.rs"]
+mod preflight_tests;

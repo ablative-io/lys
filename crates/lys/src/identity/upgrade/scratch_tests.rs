@@ -55,8 +55,16 @@ pub fn stub(dir: &Path, name: &str, commit: &str, behaviour: Behaviour) -> TestR
         ),
         Behaviour::ExitsEarly => format!("echo \"{name} {commit} failing\"\nexit 3\n"),
     };
+    let checker = format!(
+        r#"if [ "$1" = "--check-config" ]; then
+ digest=$(shasum -a 256 | cut -d ' ' -f 1)
+ printf '{{"format":"lys-config-check/1","build":"{commit}","config_sha256":"%s"}}\n' "$digest"
+ exit 0
+fi
+"#
+    );
     let script = format!(
-        "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n{body}"
+        "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n{checker}{body}"
     );
     let path = dir.join(name);
     std::fs::write(&path, script)?;
