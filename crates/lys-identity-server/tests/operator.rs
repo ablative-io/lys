@@ -5,7 +5,7 @@
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 
-use identity_contract::apps::{NOTES, login, registration, workspace_schema};
+use identity_contract::apps::{FILES, NOTES, login, registration, workspace_schema};
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
 use lys_identity::signer::verify_event;
@@ -140,18 +140,64 @@ async fn a_token_needs_both_configured_secret_and_administrator() -> TestResult 
 
 #[tokio::test]
 async fn operator_admission_reaches_the_app_registration_route() -> TestResult {
-    let service = service(true).await?;
+    let mut service = service(true).await?;
     let headers = [("lys-operator", TOKEN)];
     let (status, answer) = service
         .post_carrying("/setup", &headers, serde_json::to_vec(&setup()?)?)
         .await?;
     assert_eq!(status, 200, "{answer}");
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let old_body = registration(FILES, &workspace_schema(FILES))?;
+    let (status, old) = service.post("/apps", Some(&cookie), &old_body).await?;
+    assert_eq!(status, 200, "{old}");
+    assert_eq!(old["registered_by"]["kind"], "person");
+    let store = FileLeafStore::open_read_only(&service.dir.path().join("apps"))?;
+    let old_leaves = (0..store.extent())
+        .map(|index| store.leaf(index))
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(store);
     let body = registration(NOTES, &workspace_schema(NOTES))?;
     let (status, answer) = service
         .post_carrying("/apps", &headers, serde_json::to_vec(&body)?)
         .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["id"], NOTES);
-    assert_eq!(answer["registered_by"]["kind"], "lys");
+    assert_eq!(answer["registered_by"]["kind"], "operator");
+    assert_eq!(answer["registered_by"]["login"]["subject"], ADMINISTRATOR);
+    service.restart().await?;
+    let client = reqwest::Client::new();
+    for (id, original) in [(FILES, old), (NOTES, answer)] {
+        let response = client
+            .get(format!("{}/apps/{id}", service.base))
+            .header("lys-operator", TOKEN)
+            .send()
+            .await?;
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.json::<Value>().await?, original);
+    }
+    let store = FileLeafStore::open_read_only(&service.dir.path().join("apps"))?;
+    assert_eq!(store.extent(), u64::try_from(old_leaves.len())? + 1);
+    for (index, bytes) in old_leaves.into_iter().enumerate() {
+        assert_eq!(
+            store.leaf(u64::try_from(index)?)?,
+            bytes,
+            "old leaves never rewritten"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn old_app_actor_shapes_round_trip_without_a_migration_or_relabelling() -> TestResult {
+    use lys_identity_server::apps_state::By;
+    for original in [
+        r#"{"kind":"person","login":{"provider":"https://issuer.test","subject":"administrator"}}"#,
+        r#"{"kind":"service_account","id":"account-1"}"#,
+        r#"{"kind":"start"}"#,
+    ] {
+        let actor: By = serde_json::from_str(original)?;
+        assert!(!matches!(actor, By::Operator { .. }));
+        assert_eq!(serde_json::to_string(&actor)?, original);
+    }
     Ok(())
 }

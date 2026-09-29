@@ -11,7 +11,7 @@
 //! and never names a credential in a refusal.
 
 use axum::http::{HeaderMap, header};
-use lys_identity::Actor;
+use lys_identity::{Actor, AuthMethod};
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -97,9 +97,14 @@ impl Acting {
     /// How the apps' log records the caller.
     pub fn by(&self) -> By {
         match self {
-            Self::Administrator(actor) | Self::Person(actor) => By::Person {
-                login: login(actor.binding()),
-            },
+            Self::Administrator(actor) | Self::Person(actor) => {
+                let login = login(actor.binding());
+                if actor.provenance().method() == AuthMethod::Operator {
+                    By::Operator { login }
+                } else {
+                    By::Person { login }
+                }
+            }
             Self::App {
                 app,
                 service_account,
