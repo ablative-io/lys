@@ -416,6 +416,11 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         Act::Outcome {
             operation: "op".to_owned(),
         },
+        Act::Feed {
+            cursor: None,
+            follow: false,
+        },
+        Act::GrantChannel,
     ];
     let mut named = 0;
     for act in &every_act {
@@ -473,6 +478,14 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
                 ended: None,
             },
         },
+        Answer::Feed {
+            page: lys_runner::tracking_store::FeedPage {
+                format: "f".to_owned(),
+                entries: Vec::new(),
+                cursor: "c".to_owned(),
+            },
+        },
+        Answer::GrantChannel,
         Answer::Refused {
             refusal: "r".to_owned(),
             words: String::new(),

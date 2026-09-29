@@ -225,6 +225,18 @@ fn answer_one(
     if line.is_empty() {
         return Ok(());
     }
+    if !crate::peer::is_peer(&line)
+        && matches!(
+            verify_request(line.trim_end(), server, &greeting),
+            Ok(Act::GrantChannel)
+        )
+    {
+        writer.write_all(reply_line(Answer::GrantChannel).as_bytes())?;
+        writer.write_all(b"\n")?;
+        writer.flush()?;
+        crate::refusals::serve(sessions, stream);
+        return stream.shutdown(Shutdown::Both);
+    }
     let left = Arc::new(AtomicBool::new(false));
     let mut watched = stream.try_clone()?;
     let (flag, woken) = (Arc::clone(&left), Arc::clone(sessions));
@@ -327,6 +339,19 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
         Act::Operate { operation } => sessions
             .operate(operation)
             .map(|outcome| Answer::Operation { outcome }),
+        Act::Feed { cursor, follow } => {
+            if follow {
+                sessions.until_any(left, |table| {
+                    table.feed.after(cursor.as_deref()).map_or(Some(()), |more| more.then_some(()))
+                })?;
+            }
+            let page = sessions.lock().feed.page(cursor.as_deref())?;
+            Ok(Answer::Feed { page })
+        }
+        Act::GrantChannel => Err(RunnerError::refused(
+            "grant_channel_unheld",
+            "a grant channel is held only as the whole of its connection",
+        )),
         Act::Outcome { operation } => sessions
             .outcome(&operation)
             .map(|outcome| Answer::Operation { outcome }),

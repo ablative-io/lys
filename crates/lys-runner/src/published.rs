@@ -28,8 +28,10 @@ pub const ACTS: [&str; 12] = [
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 9] = [
+pub const ANSWERS: [&str; 11] = [
     "bytes",
+    "feed",
+    "grant_channel",
     "started",
     "delivered",
     "output",
@@ -92,13 +94,15 @@ pub fn section() -> Value {
                 "status": {"session": "optional string"},
                 "operate": {"operation": {"operation": "string: the server's stable id, never a connection's challenge", "session": "string", "request": "tagged by request: compact {text}, notice {text}, reminder {text} or stop; text is typed at the next turn boundary"}},
                 "outcome": {"operation": "string"},
+                "feed": {"cursor": "optional string: the last page's cursor", "follow": "bool: answer once an entry is committed after the cursor"},
+                "grant_channel": {"description": "the connection becomes the grant channel: each question is written as one line, and its answer is read as one line"},
             },
             "act_tag": "act",
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
             "bytes": {"output": {"session": "string", "from": "u64", "cursor": "u64", "oldest": "u64", "data": "array of u8, exact PTY bytes", "ended": "observed end or null"}},
             "request_refusals": REQUEST_REFUSALS,
-            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch"],
+            "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left", "operation_reused", "operation_unknown", "policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous", "policy_target_uninspectable", "policy_digest_mismatch", "cursor_invalid", "grant_channel_unheld"],
             "judged_under": "a status's session names the policy its launch carried as policy {version, digest}; absent when none was carried",
             "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null"},
             "dial": {
