@@ -393,6 +393,7 @@ impl Service {
             client_secret_file: dir.path().join("client.secret"),
             redirect_url: format!("{base}/callback"),
             sign_in_api: Some(issuer.api().to_owned()),
+            trusted_proxies: Vec::new(),
             operator_token_file: None,
             operator_upgrade_file: None,
             administrator: Some(configured(ADMINISTRATOR)),
@@ -461,8 +462,9 @@ impl Service {
     }
 
     /// Begin a sign-in through a sign-in provider and let it answer as
-    /// `login`, answering the service path the browser is sent back to.
-    pub async fn issuer_answer(&self, login: Login) -> Result<String, Box<dyn Error>> {
+    /// `login`, answering the callback path and the initiating browser's
+    /// binding cookie. The browser must return that cookie on the callback.
+    pub async fn issuer_answer(&self, login: Login) -> Result<(String, String), Box<dyn Error>> {
         self.issuer.sign_in_as(login);
         let to_issuer = self
             .client
@@ -470,12 +472,22 @@ impl Service {
             .send()
             .await?;
         let authorize = location(&to_issuer)?;
+        let binding = to_issuer
+            .headers()
+            .get(reqwest::header::SET_COOKIE)
+            .ok_or("the provider start did not bind the browser")?
+            .to_str()?
+            .split(';')
+            .next()
+            .ok_or("the provider start set no cookie value")?
+            .to_owned();
         let back = self.client.get(authorize).send().await?;
         let url = location(&back)?;
-        Ok(url
+        let path = url
             .strip_prefix(&self.base)
             .ok_or_else(|| format!("the issuer sent the browser to {url}"))?
-            .to_owned())
+            .to_owned();
+        Ok((path, binding))
     }
 
     /// Sign in on Lys's own sign-in route as `login`, which the issuer
@@ -513,16 +525,18 @@ impl Service {
         answer(request.send().await?).await
     }
 
-    /// GET `path` as a browser following a link does, asking for a page: the
+    /// GET `path` with the initiating browser's cookie, asking for a page: the
     /// status, the redirect it names, and whether it set a session cookie.
     pub async fn get_page(
         &self,
         path: &str,
+        binding: &str,
     ) -> Result<(u16, Option<String>, bool), Box<dyn Error>> {
         let response = self
             .client
             .get(format!("{}{path}", self.base))
             .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml")
+            .header(reqwest::header::COOKIE, binding)
             .send()
             .await?;
         let status = response.status().as_u16();

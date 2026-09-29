@@ -58,6 +58,8 @@ pub struct Carried {
     pub administrator: Option<Value>,
     /// The products an earlier configuration registered as clients of Lys.
     pub products: Option<Value>,
+    /// Explicit front-proxy trust, absent unless an operator configured it.
+    pub trusted_proxies: Option<Value>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -137,6 +139,9 @@ pub fn render(
     if let Some(administrator) = &carried.administrator {
         rendered["administrator"] = administrator.clone();
     }
+    if let Some(proxies) = &carried.trusted_proxies {
+        rendered["trusted_proxies"] = proxies.clone();
+    }
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
@@ -163,5 +168,6 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     Ok(Some(Carried {
         administrator: named(earlier.get("administrator")),
         products: named(earlier.pointer("/provider/clients")),
+        trusted_proxies: named(earlier.get("trusted_proxies")),
     }))
 }

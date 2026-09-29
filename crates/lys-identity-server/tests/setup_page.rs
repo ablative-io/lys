@@ -333,3 +333,28 @@ async fn a_password_code_sets_the_administrator_a_new_password() -> TestResult {
     assert_eq!(table.rauthy.user_count(), 1, "no second account is made");
     Ok(())
 }
+
+#[tokio::test]
+async fn every_setup_code_entry_point_shares_the_attempt_limit() -> TestResult {
+    let table = table().await?;
+    let initial = std::fs::read(&table.code_file)?;
+    for _ in 0..5 {
+        let answer = table
+            .service
+            .post("/setup/open", None, &json!({"code":"wrong"}))
+            .await?;
+        refused(&answer, 401, "SetupCodeRefused");
+    }
+    for (path, body) in [
+        ("/setup/open", json!({"code":CODE})),
+        ("/setup/administrator", administrator(CODE, EMAIL)?),
+        ("/setup/password", json!({"code":CODE,"password":PASSWORD})),
+    ] {
+        let answer = table.service.post(path, None, &body).await?;
+        refused(&answer, 429, "SignInThrottled");
+    }
+    assert_eq!(std::fs::read(&table.code_file)?, initial);
+    assert_eq!(table.rauthy.user_count(), 0);
+    assert!(!table.administrator_file.exists());
+    Ok(())
+}
