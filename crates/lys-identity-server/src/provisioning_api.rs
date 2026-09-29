@@ -333,7 +333,10 @@ async fn set(
         with_provisioning(&state, |store| {
             let operation = version.operation.clone();
             let mut version = version;
-            version.settings.skill_pins = store.pins(&version.settings.skills)?;
+            version.settings.skill_pins = match store.pins_for(&version.operation) {
+                Some(recorded) => recorded,
+                None => store.pins(&version.settings.skills)?,
+            };
             let version = store.set(&agent, from_version, version)?;
             let recorded = Recorded { operation, version };
             Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))

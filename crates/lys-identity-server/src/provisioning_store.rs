@@ -403,6 +403,13 @@ impl ProvisioningStore {
             .find(|kept| kept.name == name && kept.sha256 == sha256)
     }
 
+    /// The skill pins the version set under `operation` was recorded with,
+    /// so a request sent again is compared as it was first recorded.
+    pub fn pins_for(&self, operation: &str) -> Option<Vec<SkillPin>> {
+        self.named(operation)
+            .map(|(_, version)| version.settings.skill_pins.clone())
+    }
+
     /// Each of `names` pinned to its latest kept text, refusing a name Lys
     /// keeps no text for.
     pub fn pins(&self, names: &[String]) -> Result<Vec<SkillPin>, ServerError> {

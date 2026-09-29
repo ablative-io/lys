@@ -449,9 +449,23 @@ fn a_kept_skill_is_written_into_the_sessions_own_config_directory_and_the_manife
 #[test]
 fn a_kept_skill_with_no_config_directory_of_the_sessions_own_is_refused_and_not_written() -> Gate {
     let dir = tempfile::tempdir()?;
-    let home = fresh_home(dir.path());
-    let template = with_skill(dir.path(), "skill.json", None);
-    let out = dir.path().join("out");
+    let named = dir.path().join(".claude");
+    std::fs::create_dir(&named)?;
+    for (config, name) in [(None, "none.json"), (Some(named.as_path()), "named.json")] {
+        refused_without_writing(dir.path(), config, name)?;
+    }
+    Ok(())
+}
+
+/// A launch whose skills would reach the operator's own config directory,
+/// with `HOME` at `dir`, is refused before anything is written.
+fn refused_without_writing(dir: &Path, config: Option<&Path>, name: &str) -> Gate {
+    let home = dir.join(format!("home-{name}"));
+    let root = Home::open(&home)?;
+    std::fs::copy(SESSION, root.session_path("fixture")?)?;
+    let template = with_skill(dir, name, config);
+    let dir = dir.to_path_buf();
+    let out = dir.join(format!("out-{name}"));
     std::fs::create_dir(&out)?;
     let output = Command::new(BIN)
         .args([
@@ -476,14 +490,19 @@ fn a_kept_skill_with_no_config_directory_of_the_sessions_own_is_refused_and_not_
             "2.1.283",
         ])
         .args(["--out", out.to_str().ok_or("out")?])
-        .env("HOME", dir.path())
+        .env("HOME", &dir)
         .env("LYS_FIXTURE_TOKEN", SECRET_VALUE)
         .output()?;
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("CLAUDE_CONFIG_DIR"));
     assert!(
-        !dir.path().join(".claude").exists(),
+        !dir.join(".claude/skills").exists(),
         "nothing reaches the operator's home"
+    );
+    assert_eq!(
+        names_in(&out).len(),
+        0,
+        "nothing is written after a refusal"
     );
     Ok(())
 }
