@@ -44,6 +44,7 @@ pub struct Oidc {
     client_id: ClientId,
     secret: ClientSecret,
     redirect: RedirectUrl,
+    public_origin: String,
     http: reqwest::Client,
     in_flight: Mutex<Flights<(PkceCodeVerifier, Nonce)>>,
     provider_flights: Mutex<Flights<(PkceCodeVerifier, Nonce)>>,
@@ -109,6 +110,7 @@ impl Oidc {
             secret: config.client_secret()?,
             redirect: RedirectUrl::new(config.redirect_url.clone())
                 .map_err(|error| failed(&error))?,
+            public_origin: origin_of(&config.redirect_url)?,
             http,
             in_flight: Mutex::new(Flights::default()),
             provider_flights: Mutex::new(Flights::default()),
@@ -118,6 +120,11 @@ impl Oidc {
     /// The configured issuer; no client credential is included.
     pub(crate) fn issuer(&self) -> &str {
         self.metadata.issuer().as_str()
+    }
+
+    /// The browser-facing service origin, from configuration rather than a request header.
+    pub(crate) fn public_origin(&self) -> &str {
+        &self.public_origin
     }
 
     /// Begin a sign-in, answering the issuer URL to send the browser to.

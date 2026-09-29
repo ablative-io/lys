@@ -66,6 +66,8 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         version: "2.1.283".to_owned(),
         out: out.path().to_path_buf(),
         key: None,
+        judge_socket: None,
+        judge_program: None,
     })?;
     let sessions = root.path().join("sessions");
     assert!(sessions.join("fixture.index.jsonl").is_file());

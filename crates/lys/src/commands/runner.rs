@@ -10,7 +10,8 @@ use lys_runner::dial::Dial;
 use lys_runner::protocol::unhex;
 use lys_runner::{Options, Runner, RunnerError};
 
-use crate::cli::RunnerCommand;
+use crate::cli::{JudgeHarness, RunnerCommand};
+
 use crate::commands::error::CliResult;
 
 /// Runs `lys runner`.
@@ -64,7 +65,31 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
             .bridge()?;
             Ok(())
         }
+        RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
     }
+}
+
+/// Runs `lys runner judge`: the hook's answer, a deny on any failure.
+fn judge(socket: &Path, harness: JudgeHarness) -> CliResult<()> {
+    let mut stdin = String::new();
+    let answer = match std::io::Read::read_to_string(&mut std::io::stdin(), &mut stdin) {
+        Ok(_) => match harness {
+            JudgeHarness::Claude => lys_runner::claude_judge::output(socket, &stdin),
+            JudgeHarness::Codex => lys_runner::codex_judge_client::output(socket, &stdin),
+        },
+        Err(error) => lys_runner::codex_judge::response(&lys_runner::refusals::Verdict::denied(
+            "judge_input_unread",
+            format!("Lys could not read the hook's input: {error}"),
+            "not_attributed",
+        )),
+    };
+    let mut out = std::io::stdout();
+    writeln!(out, "{answer}")
+        .and_then(|()| out.flush())
+        .map_err(|source| crate::commands::error::CliError::Io {
+            context: "writing the judge's answer".to_owned(),
+            source,
+        })
 }
 
 /// The server's public key, read from the hex in `path`.

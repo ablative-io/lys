@@ -5,7 +5,9 @@
 //! second machine, dialling the server through its bridge with that
 //! machine's own key, starts the agent the server asked for. R2: a machine
 //! naming a runner that answers another protocol version is refused
-//! `runner_protocol_mismatch` at start, by name. Every wait ends on an
+//! `runner_protocol_mismatch` at start, by name. DIRECTORY-051 R6: the
+//! start carries the agent's policy and the digest it was kept under, and
+//! the runner holds that digest. Every wait ends on an
 //! answer, never a clock.
 
 use std::error::Error;
@@ -196,6 +198,44 @@ async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> Te
         return Err("the runner answered no status".into());
     };
     assert!(status.sessions[0].ended.is_none(), "{status:?}");
+    table.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -> TestResult {
+    let table = Table::set().await?;
+    let rule = json!({ "id": "no-denied-writes", "tool": "Write", "kind": "path_prefix",
+                       "target": "/probe/denied", "authority": "hard" });
+    let kept = table
+        .ok(
+            &format!("/agents/{}/policy", table.agent()),
+            &json!({ "version": 0, "rules": [rule] }),
+        )
+        .await?;
+    let machine = table.machine(Some(json!({ "kind": "lys" }))).await?;
+    let (status, started) = table.start(&machine).await?;
+    assert_eq!(status, 200, "{started}");
+    let session = started["session"].as_str().ok_or("no session")?;
+    let client = Client::new(
+        table.dir.path().join("runner.sock"),
+        Arc::clone(&table.server_key),
+    );
+    let Answer::Status { status } = client.ask(&Act::Status {
+        session: Some(session.to_owned()),
+    })?
+    else {
+        return Err("the runner answered no status".into());
+    };
+    let held = status.sessions[0]
+        .policy
+        .as_ref()
+        .ok_or("the session holds no policy")?;
+    assert_eq!(held.version, 1);
+    assert_eq!(
+        Some(held.digest.as_str()),
+        kept["digest"].as_str(),
+        "{kept}"
+    );
     table.close()
 }
 

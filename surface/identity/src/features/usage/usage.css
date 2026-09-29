@@ -1,0 +1,16 @@
+/* Plain budget and goal controls, drawn from the shared tokens. No charts: analytics stay with the monitoring app. */
+.usage { display: flex; flex-direction: column; gap: 16px; }
+.usage-agents { display: flex; flex-wrap: wrap; gap: 8px; }
+.usage-agents a { padding: 6px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); text-decoration: none; }
+.usage-agents a[aria-current="page"] { background: var(--accent-wash); border-color: var(--focus); }
+.usage-tracking { margin: 0; color: var(--text-secondary); }
+.usage-tracking[data-complete="false"] { color: var(--warn); }
+.usage-list { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.usage-list th,
+.usage-list td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-default); vertical-align: top; }
+.usage-list tr[data-reached="true"] td:last-child { color: var(--warn); }
+.usage form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.usage form h4 { flex-basis: 100%; margin: 0; }
+.usage form [role="status"],
+.usage form [role="alert"] { flex-basis: 100%; margin: 0; }
+.usage .why-not { color: var(--danger); }

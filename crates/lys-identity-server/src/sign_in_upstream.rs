@@ -334,7 +334,7 @@ async fn finish(
             crate::provider_browser::digest(headers)?,
         )
         .await?;
-    state.sessions.begin(actor)
+    crate::session_admission::begin(state, actor)
 }
 
 async fn callback(

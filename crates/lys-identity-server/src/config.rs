@@ -73,6 +73,10 @@ pub struct Config {
     pub link_audit_source: ConfiguredLogin,
     /// How long a session lives, in seconds.
     pub session_seconds: u64,
+    /// The file the signed-in sessions are kept in, so a restart leaves
+    /// everyone signed in; without it they are kept in memory alone.
+    #[serde(default)]
+    pub sessions_file: Option<PathBuf>,
     /// Whether the session cookie is marked Secure.
     pub secure_cookie: bool,
     /// The directory the grant log is kept in.
@@ -125,6 +129,15 @@ pub struct Config {
     /// `ServiceAccountsUnavailable` and `GET /me` lists none.
     #[serde(default)]
     pub service_accounts_dir: Option<PathBuf>,
+    /// The directory the budgets are kept in, created when it does not
+    /// exist. Without it the budget routes answer `BudgetsUnavailable`.
+    #[serde(default)]
+    pub budgets_dir: Option<PathBuf>,
+    /// The directory the agents' tool-boundary policies are kept in, created
+    /// when it does not exist. Without it the policy routes answer
+    /// `PolicyUnavailable`.
+    #[serde(default)]
+    pub policies_dir: Option<PathBuf>,
     /// The directory the teams are kept in, created when it does not exist.
     /// Without it the team routes answer `TeamsUnavailable`.
     #[serde(default)]
@@ -133,6 +146,11 @@ pub struct Config {
     /// not exist. Without it the stop route answers `StopsUnavailable`.
     #[serde(default)]
     pub stops_dir: Option<PathBuf>,
+    /// The directory the goals, expectations and deliverables are kept in,
+    /// created when it does not exist. Without it the goal routes answer
+    /// `goals_unavailable`.
+    #[serde(default)]
+    pub goals_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]
@@ -165,6 +183,9 @@ pub struct Config {
     /// machine's sessions are refused `runner_unreachable`, by name.
     #[serde(default)]
     pub runner_socket: Option<PathBuf>,
+    /// Message reads from the message service use the caller's session cookie and explicit identity bindings.
+    #[serde(default)]
+    pub message_service: Option<crate::message_edges::Settings>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
@@ -199,6 +220,9 @@ impl Config {
 
     /// Refuse a configuration the service cannot run under.
     pub fn validate(&self) -> Result<(), ServerError> {
+        if let Some(settings) = &self.message_service {
+            settings.validate()?;
+        }
         self.configured_administrator()?;
         if self.administrator.is_none() && self.setup.is_none() {
             return Err(invalid(

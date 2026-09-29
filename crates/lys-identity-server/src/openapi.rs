@@ -43,6 +43,10 @@ pub(crate) fn route(
             named.push(name);
         }
     }
+    // The common ingress check can refuse any inactive authenticated caller.
+    if !named.contains(&"inactive") {
+        named.push("inactive");
+    }
     // The global admission guard refuses a bad operator header on every route.
     if !named.contains(&"OperatorRefused") {
         named.push("OperatorRefused");
@@ -82,14 +86,16 @@ pub fn api() -> Api {
 
 /// The document, generated from the table.
 pub fn document() -> Result<Value, ServerError> {
-    api()
+    let mut document = api()
         .document()
         .map_err(|faults| ServerError::ConfigInvalid {
             reason: format!(
                 "the OpenAPI document could not be generated: {}",
                 faults.join("; ")
             ),
-        })
+        })?;
+    crate::message_edges::document_query(&mut document)?;
+    Ok(document)
 }
 
 /// The document's route: public, since the document describes the API and

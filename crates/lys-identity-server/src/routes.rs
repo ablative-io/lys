@@ -6,9 +6,8 @@
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::extract::{Path, State};
+use axum::http::{HeaderMap, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{
@@ -74,8 +73,15 @@ pub struct AppState {
     pub reviews: Option<Mutex<ReviewStore>>,
     /// The teams, when the configuration names their directory.
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
+    /// The budgets, when the configuration names their directory.
+    pub budgets: Option<Mutex<crate::budgets_store::BudgetStore>>,
+    /// The agents' tool-boundary policies, when the configuration names
+    /// their directory.
+    pub policies: Option<Mutex<crate::agent_policy_store::PolicyStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The goals and their reminders, when the configuration names their directory.
+    pub goals: Option<crate::goals_store::Goals>,
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,
@@ -137,6 +143,10 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
+    let budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    let policies =
+        crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
+    let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
         Arc::clone(&key),
@@ -161,7 +171,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .transpose()?,
         setup: config.setup.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
-        sessions: Sessions::new(config.session_seconds, config.secure_cookie),
+        sessions: match &config.sessions_file {
+            Some(file) => {
+                Sessions::open(file.clone(), config.session_seconds, config.secure_cookie)?
+            }
+            None => Sessions::new(config.session_seconds, config.secure_cookie),
+        },
         admission: Admission::new(
             crate::setup::administrator(config)?,
             config.link_audit_binding()?,
@@ -189,6 +204,9 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        budgets: budgets.map(Mutex::new),
+        policies: policies.map(Mutex::new),
+        goals: goals.map(crate::goals_store::Goals::new),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),
@@ -211,7 +229,14 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts: Mutex::new(acts),
         say,
     });
+    crate::teams_migration::at_start(&state)?;
+    crate::budgets_migration::advance(&state)?;
+    crate::goals_api::remind_from(&state);
+    crate::budgets_act::settle_at_start(&state);
+    crate::refusals_follow::follow_at_start(&state);
+    crate::grants_refusals::hold_at_start(&state);
     let configured = crate::configuration_api::routes(config)
+        .merge(crate::message_edges::routes(config)?)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
@@ -225,6 +250,10 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     };
     Ok(served
         .merge(provider_callback)
+        .layer(axum::middleware::from_fn_with_state(
+            Arc::clone(&state),
+            crate::session_admission::guard,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             state,
             crate::operator::guard,
@@ -270,7 +299,7 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
 /// The service's routes over `state`.
 pub fn router(state: Shared) -> Router {
     Router::new()
-        .route("/callback", get(callback))
+        .route("/callback", get(crate::sign_in_callback::callback))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identities", get(list))
@@ -296,6 +325,11 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::runtime_api::routes())
         .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
+        .merge(crate::budgets_api::routes())
+        .merge(crate::budgets_act::routes())
+        .merge(crate::agent_policy_api::routes())
+        .merge(crate::refusals_api::routes())
+        .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())
         .merge(crate::resources_api::routes())
@@ -361,45 +395,6 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
     PersonId::from_str(text)
         .map(IdentityId::Person)
         .map_err(ServerError::from)
-}
-
-#[derive(Deserialize)]
-struct Answer {
-    code: String,
-    state: String,
-}
-
-async fn callback(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Query(answer): Query<Answer>,
-) -> Result<Response, ServerError> {
-    let actor = state.oidc.finish(answer.code, &answer.state).await?;
-    if wants_page(&headers) {
-        let cookie = state.sessions.begin(actor)?;
-        return Ok((
-            StatusCode::SEE_OTHER,
-            [
-                (header::SET_COOKIE, cookie),
-                (header::LOCATION, "/".to_owned()),
-            ],
-        )
-            .into_response());
-    }
-    crate::sign_in::begin_session(&state, &actor)
-}
-
-/// Whether the caller is a browser following the sign-in, which is taken to the
-/// screens, rather than a program, which is answered the signed-in JSON.
-fn wants_page(headers: &HeaderMap) -> bool {
-    headers
-        .get(header::ACCEPT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|accept| {
-            accept
-                .split(',')
-                .any(|kind| kind.trim().starts_with("text/html"))
-        })
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -545,6 +540,17 @@ async fn transition(
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
     with_directory(&state, |directory| {
         let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
+        if matches!(moved, Transition::Suspend | Transition::Retire) {
+            let projection = directory.projection()?;
+            state.sessions.end_matching(|actor| {
+                projection
+                    .person_for(actor.binding())
+                    .map(IdentityId::Person)
+                    == Some(id)
+                    || projection.agent_for(actor.binding()).map(IdentityId::Agent) == Some(id)
+                    || actor.provenance().agent().map(IdentityId::Agent) == Some(id)
+            })?;
+        }
         Ok(Json(ReceiptAnswer {
             receipt: receipt_view(&receipt),
         }))

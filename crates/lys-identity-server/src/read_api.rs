@@ -138,9 +138,10 @@ pub(crate) fn person_record(projection: &Projection, id: PersonId) -> Result<&Re
 
 /// The person the signed-in `actor`'s login is bound to, or `NoPerson`.
 pub(crate) fn own_person(projection: &Projection, actor: &Actor) -> Result<PersonId, ServerError> {
-    projection
-        .person_for(actor.binding())
-        .ok_or(ServerError::NoPerson)
+    match crate::caller_admission::active_caller(projection, actor)? {
+        IdentityId::Person(person) => Ok(person),
+        IdentityId::Agent(_) => Err(ServerError::NoPerson),
+    }
 }
 
 async fn me(

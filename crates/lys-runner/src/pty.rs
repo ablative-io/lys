@@ -19,6 +19,11 @@ use crate::error::RunnerError;
 /// The terminal type a session is given when its launch names none.
 pub const TERM: &str = "xterm-256color";
 
+/// An isolated helper has no implicit shell. portable-pty otherwise inserts
+/// the account's login shell even after `env_clear`; an explicit empty value
+/// prevents that ambient setting from crossing the boundary.
+pub const ISOLATED_SHELL: &str = "";
+
 /// What a process is started with.
 pub struct Spawn<'a> {
     /// The program.
@@ -70,28 +75,68 @@ fn size(columns: u16, rows: u16) -> Result<PtySize, RunnerError> {
 
 /// Start `spawn` in a new pseudo-terminal of its size.
 pub fn spawn(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
+    spawn_with_environment(spawn, false)
+}
+
+/// Start a trusted containment helper with only the explicitly supplied
+/// environment, TERM and an empty SHELL. No inherited loader, proxy, credential or harness
+/// setting reaches its first instruction. This is not a sandbox receipt.
+pub fn spawn_isolated(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
+    for name in spawn.environment.keys() {
+        if name != "TERM" {
+            return Err(RunnerError::refused(
+                "containment_entry_refused",
+                format!(
+                    "trusted helper environment cannot contain {name}; install agent variables after containment"
+                ),
+            ));
+        }
+    }
+    spawn_with_environment(spawn, true)
+}
+
+fn spawn_with_environment(spawn: &Spawn<'_>, isolated: bool) -> Result<Spawned, RunnerError> {
+    let requested_directory = if spawn.directory.is_empty() {
+        std::env::current_dir().map_err(|error| failed("runner current directory", &error))?
+    } else {
+        std::path::PathBuf::from(spawn.directory)
+    };
+    let requested_directory = if requested_directory.is_absolute() {
+        requested_directory
+    } else {
+        std::env::current_dir()
+            .map_err(|error| failed("runner current directory", &error))?
+            .join(requested_directory)
+    };
+    let directory = rustix::fs::open(
+        &requested_directory,
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(|error| {
+        failed(
+            &format!("working directory {}", requested_directory.display()),
+            &error,
+        )
+    })?;
     let pair = native_pty_system()
         .openpty(size(spawn.columns, spawn.rows)?)
         .map_err(|error| failed("the pseudo-terminal could not be opened", &error))?;
     let mut command = CommandBuilder::new(spawn.program);
-    command.args(spawn.arguments);
-    if !spawn.directory.is_empty() {
-        command.cwd(spawn.directory);
+    if isolated {
+        command.env_clear();
+        command.env("SHELL", ISOLATED_SHELL);
     }
+    command.args(spawn.arguments);
     if !spawn.environment.contains_key("TERM") {
         command.env("TERM", TERM);
     }
     for (name, value) in spawn.environment {
         command.env(name, value);
     }
-    let child = pair
-        .slave
-        .spawn_command(command)
-        .map_err(|error| failed(&format!("{} could not be started", spawn.program), &error))?;
-    drop(pair.slave);
-    let pid = child
-        .process_id()
-        .ok_or_else(|| failed("the process", &"has no process id"))?;
+    crate::pty_command::set_directory(&mut command, spawn.program, &requested_directory)?;
+    // Prepare fallible terminal handles before starting any process. A failed
+    // clone/take must not leave an agent running with no session owner.
     let reader = pair
         .master
         .try_clone_reader()
@@ -100,6 +145,24 @@ pub fn spawn(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
         .master
         .take_writer()
         .map_err(|error| failed("the terminal's input could not be written", &error))?;
+    let mut child = pair
+        .slave
+        .spawn_command(command)
+        .map_err(|error| failed(&format!("{} could not be started", spawn.program), &error))?;
+    drop(directory);
+    drop(pair.slave);
+    let Some(pid) = child.process_id() else {
+        child
+            .kill()
+            .map_err(|error| failed("process has no id and could not be stopped", &error))?;
+        child
+            .wait()
+            .map_err(|error| failed("process has no id and its exit could not be read", &error))?;
+        return Err(failed(
+            "the process",
+            &"has no process id; stopped and reaped",
+        ));
+    };
     Ok(Spawned {
         reader,
         writer,

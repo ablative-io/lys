@@ -1,0 +1,19 @@
+/* Readable terminal nodes and recorded edges share the existing Lys palette and controls. */
+.session-canvas-scroll { overflow: auto; margin-top: 20px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); }
+.session-canvas-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.session-canvas { position: relative; display: grid; grid-template-columns: 200px minmax(600px, 1fr) 240px; gap: 48px; padding: 24px; min-width: 1184px; }
+.session-canvas-column { display: flex; flex-direction: column; gap: 14px; z-index: 1; min-width: 0; }
+.session-canvas-column > h2 { color: var(--text-secondary); font-size: 13px; font-weight: 500; }
+.session-canvas-node { min-width: 0; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); overflow-wrap: anywhere; }
+.session-canvas-node > h3 { margin: 0 0 6px; font-size: 15px; }
+.session-canvas-node > .note { margin: 4px 0 10px; }
+.session-canvas-node .terminal { padding: 0; border: 0; }
+.session-canvas-node .terminal-screen { height: 420px; }
+.session-canvas-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.session-canvas-lines path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.session-canvas-lines path[data-kind="membership"] { stroke: var(--text-muted); }
+.session-canvas-lines path[data-kind="message"] { stroke: var(--text-primary); }
+.session-canvas-lines path[data-kind="identity"] { stroke: var(--text-secondary); stroke-dasharray: 2 3; }
+.session-canvas-lines path[data-standing="false"] { stroke-dasharray: 5 4; opacity: .6; }
+.canvas-connections { margin-top: 16px; }
+.canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }

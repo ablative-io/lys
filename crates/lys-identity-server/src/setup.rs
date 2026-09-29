@@ -356,7 +356,7 @@ async fn make_administrator(
     })?;
     spend(settings)?;
     drop(turn);
-    let cookie = state.sessions.begin(actor)?;
+    let cookie = crate::session_admission::begin(&state, actor)?;
     let answer = PersonRegistered {
         person: person.to_string(),
         receipt: receipt_view(&receipt),

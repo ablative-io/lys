@@ -149,6 +149,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
             serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
         ),
         products: None,
+        message_service: None,
         trusted_proxies: None,
     };
     let expected = server_config::render(&layout, &config, &carried, true);
@@ -211,6 +212,47 @@ fn a_rendered_file_names_its_length_never_its_bytes() -> TestResult {
         "a credential reached Debug"
     );
     assert!(shown.contains("compose.env"));
+    Ok(())
+}
+
+#[test]
+fn an_install_whose_bridge_has_its_earlier_name_upgrades_to_the_named_bridge() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let layout = installed_root(dir.path())?;
+    let bridge = serde_json::json!({
+        "url": "http://127.0.0.1:6010/",
+        "bindings": [{ "participant": "scribe-seat", "identity": "agent-00000000000000000000000000000001" }],
+    });
+    let mut earlier: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(layout.service_config())?)?;
+    earlier["cambium_messages"] = bridge.clone();
+    std::fs::write(
+        layout.service_config(),
+        serde_json::to_vec_pretty(&earlier)?,
+    )?;
+    let files = Templates.render(&layout, &own_build(), true)?;
+    let service = files
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    let rendered: serde_json::Value = serde_json::from_slice(&service.bytes)?;
+    let mut expected = bridge;
+    expected["cookie"] = serde_json::json!("cambium_session");
+    assert_eq!(rendered["message_service"], expected);
+    assert!(
+        rendered.get("cambium_messages").is_none(),
+        "the earlier name is not written again"
+    );
+    std::fs::write(layout.service_config(), &*service.bytes)?;
+    let again = Templates.render(&layout, &own_build(), true)?;
+    let second = again
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    assert_eq!(
+        second.bytes, service.bytes,
+        "a second upgrade renders the same bridge"
+    );
     Ok(())
 }
 

@@ -1,0 +1,125 @@
+/** DIRECTORY-051 R5: plain budget and goal controls that keep what they set and never show an unknown act as done. */
+import { act } from 'react';
+import { describe, expect, it } from 'vitest';
+import { $, choose, click, mount, text, unmountAll } from './harness';
+import { SCRIBE, SERVICE, ok, refused } from './fixtures';
+import type { Route } from './fixtures';
+import type { Budget, GoalItem, Receipt } from '../src/features/usage/contract';
+
+const budgets = '/budgets/agent/' + SCRIBE;
+const usage = '/agents/' + SCRIBE + '/usage';
+const goals = '/agents/' + SCRIBE + '/goals';
+const holder = { kind: 'agent' as const, id: SCRIBE };
+
+/** A service that keeps the budgets and goals it is given, as the identity service does. */
+function keeping(receipts: Receipt[] = [], reported: number | null = 1790000000000): Record<string, Route> {
+  const kept: Budget[] = [];
+  const set: GoalItem[] = [];
+  return {
+    ...SERVICE,
+    [budgets]: () => ok({ holder, budgets: kept }),
+    ['PUT ' + budgets]: (body) => {
+      const given = body as Omit<Budget, 'holder' | 'by' | 'at'>;
+      const budget: Budget = { ...given, holder, version: given.version + 1, by: SCRIBE, at: 1790000000 };
+      kept.splice(0, kept.length, ...kept.filter((b) => b.measure !== budget.measure), budget);
+      return ok(budget);
+    },
+    [usage]: ok({ agent: SCRIBE, receipts, last_reported_ms: reported }),
+    [goals]: () => ok({ goals: set }),
+    ['POST ' + goals]: (body) => {
+      const given = body as { operation: string; kind: GoalItem['goal']['kind']; words: string; deadline: number };
+      const item: GoalItem = { goal: { id: given.operation, kind: given.kind, words: given.words, deadline: given.deadline, evidence: null }, standing: 'open' };
+      set.push(item);
+      return ok(item);
+    },
+  };
+}
+
+async function type(selector: string, value: string): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>(selector);
+  if (!input) throw new Error('no ' + selector);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function submit(form: string): Promise<void> {
+  await click($('form[aria-label="' + form + '"] button[type="submit"]'));
+}
+
+async function reload(routes: Record<string, Route>): Promise<void> {
+  unmountAll();
+  document.body.innerHTML = '';
+  await mount('#/usage/' + SCRIBE, routes);
+}
+
+const reached = (stands: Receipt['acted']): Receipt[] => [{
+  crossing: { operation: 'op-crossing', holder, measure: 'tokens', version: 1, limit: 1000, figure: 1200, act: 'stop', agent: SCRIBE, at_ms: 1790000000000 },
+  acted: stands,
+}];
+
+const tokens: Budget = { holder, measure: 'tokens', limit: 1000, period: { length: 'day', zone: 'UTC' }, act: 'stop', version: 1, by: SCRIBE, at: 1790000000 };
+
+describe('Usage', () => {
+  it('changes a budget from the navigable screen and keeps it across a reload', async () => {
+    const routes = keeping();
+    const { requests } = await mount('#/usage', routes);
+    await click($('a[href="#/usage/' + SCRIBE + '"]'));
+    await choose($('form[aria-label="Set a budget"] select'), 'tokens');
+    await type('input[name="limit"]', '5000');
+    await submit('Set a budget');
+    expect(requests).toContain('PUT ' + budgets);
+    expect(text()).toContain('Budget kept as version 1.');
+    await reload(routes);
+    expect($('section[aria-label="Budgets"] table')?.textContent).toContain('5000');
+  });
+
+  it('keeps a goal entered in the screen across a reload', async () => {
+    const routes = keeping();
+    await mount('#/usage/' + SCRIBE, routes);
+    await type('input[name="words"]', 'Land the Usage screen');
+    await type('input[name="deadline"]', '2026-10-01T12:00');
+    await submit('Set a goal');
+    await reload(routes);
+    expect($('section[aria-label="Goals"] table')?.textContent).toContain('Land the Usage screen');
+    expect($('section[aria-label="Goals"] table')?.textContent).toContain('Open');
+  });
+
+  it('says in plain words that a budget was reached and its act confirmed', async () => {
+    await mount('#/usage/' + SCRIBE, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    expect(text()).toContain('Reached at 1200. Its act was confirmed: end the session.');
+  });
+
+  it('never shows an uncertain act as confirmed', async () => {
+    await mount('#/usage/' + SCRIBE, { ...keeping(reached({ stands: 'uncertain', words: 'runner restarted', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    expect(text()).toContain('cannot be known');
+    expect(text()).not.toContain('confirmed:');
+  });
+
+  it('shows no values to a caller who may not read them', async () => {
+    await mount('#/usage/' + SCRIBE, { ...keeping(), [budgets]: refused(403, 'not_permitted', 'you are not responsible for this agent') });
+    expect(text()).toContain('not_permitted');
+    expect($('section[aria-label="Budgets"]')).toBeNull();
+  });
+
+  it('keeps nothing a caller may not change, and names the refusal', async () => {
+    const routes = { ...keeping(), ['PUT ' + budgets]: refused(403, 'not_permitted', 'you are not responsible for this agent') };
+    await mount('#/usage/' + SCRIBE, routes);
+    await type('input[name="limit"]', '5000');
+    await submit('Set a budget');
+    expect($('[role="alert"]')?.textContent).toContain('not_permitted');
+    await reload(routes);
+    expect(text()).toContain('No budget is set for this agent.');
+  });
+
+  it('shows missing runner tracking as incomplete', async () => {
+    await mount('#/usage/' + SCRIBE, keeping([], null));
+    expect(text()).toContain('Tracking is incomplete');
+  });
+
+  it('draws no analytics dashboard', async () => {
+    await mount('#/usage/' + SCRIBE, { ...keeping(reached(null)), [budgets]: ok({ holder, budgets: [tokens] }) });
+    expect(document.querySelectorAll('section.usage svg, section.usage canvas')).toHaveLength(0);
+  });
+});

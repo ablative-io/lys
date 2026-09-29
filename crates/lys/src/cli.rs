@@ -16,7 +16,7 @@ mod log;
 mod runner;
 
 pub use log::{LogCommand, LogProveCommand, LogVerifyCommand};
-pub use runner::RunnerCommand;
+pub use runner::{JudgeHarness, RunnerCommand};
 
 /// Cryptographic trust infrastructure for AI agents — identity, attestation,
 /// and verification.

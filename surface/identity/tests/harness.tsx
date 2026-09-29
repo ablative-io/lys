@@ -20,18 +20,20 @@ export interface Mounted {
 }
 
 /**
- * Stub the service: each /api path answers from `routes`, a POST under
- * "POST /path"; anything else 404 with no refusal.
+ * Stub the service: each /api path answers from `routes`, a change under
+ * its method, "POST /path" or "PUT /path"; anything else 404 with no refusal.
  */
 export function serve(routes: Record<string, Route>, posted: { path: string; body: unknown }[] = []): string[] {
   const requests: string[] = [];
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
     const path = String(input).replace(/^\/api/, '');
-    const post = init?.method === 'POST';
+    const method = init?.method ?? 'GET';
+    const post = method !== 'GET';
     const body: unknown = post ? JSON.parse(String(init?.body)) : undefined;
-    requests.push(post ? 'POST ' + path : path);
-    if (post) posted.push({ path, body });
-    const route = routes[post ? 'POST ' + path : path];
+    const key = post ? method + ' ' + path : path;
+    requests.push(key);
+    if (post) posted.push({ path: method === 'POST' ? path : key, body });
+    const route = routes[key];
     const answer = typeof route === 'function' ? route(body) : route;
     if (!answer) return new Response('', { status: 404 });
     const text = typeof answer.body === 'string' ? answer.body : JSON.stringify(answer.body);

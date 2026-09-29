@@ -46,6 +46,9 @@ pub struct TeamStore<S: LeafStore = FileLeafStore> {
     since_snapshot: u64,
     snapshot_failure: Option<String>,
     uncertain: bool,
+    snapshots_enabled: bool,
+    pending: Vec<Line>,
+    overlay: Option<Held>,
 }
 
 /// A log opened and folded: the log, what it folds to, and how it started.
@@ -69,7 +72,11 @@ impl TeamStore<FileLeafStore> {
         let Some(dir) = config.teams_dir.as_deref() else {
             return Ok(None);
         };
-        let store = Self::open(dir, key)?;
+        if !dir.exists() {
+            FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
+        }
+        let dir = dir.to_owned();
+        let store = Self::opening(Box::new(move || FileLeafStore::open(&dir)), key, false)?;
         say(&format!(
             "teams log {}, holding {} teams",
             store.start(),
@@ -93,6 +100,14 @@ impl<S: LeafStore> TeamStore<S> {
     /// The teams kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
+        Self::opening(reopen, key, true)
+    }
+
+    fn opening(
+        reopen: Reopen<S>,
+        key: Arc<Ed25519Identity>,
+        snapshots_enabled: bool,
+    ) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
             reopen,
@@ -103,6 +118,9 @@ impl<S: LeafStore> TeamStore<S> {
             since_snapshot: 0,
             snapshot_failure: None,
             uncertain: false,
+            snapshots_enabled,
+            pending: Vec::new(),
+            overlay: None,
         };
         store.after_start(&start);
         Ok(store)
@@ -132,6 +150,9 @@ impl<S: LeafStore> TeamStore<S> {
     }
 
     fn write_snapshot(&mut self) {
+        if !self.snapshots_enabled {
+            return;
+        }
         let written = self.held.encode().and_then(|state| {
             self.log
                 .write_snapshot(DOMAIN, &state, &self.key)
@@ -156,6 +177,7 @@ impl<S: LeafStore> TeamStore<S> {
             self.held = held;
             self.start = start.clone();
             self.uncertain = false;
+            self.refresh_overlay()?;
             self.after_start(&start);
         }
         Ok(())
@@ -171,6 +193,7 @@ impl<S: LeafStore> TeamStore<S> {
                 self.uncertain = true;
                 return Err(unavailable(reason));
             }
+            self.refresh_overlay()?;
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
                 self.write_snapshot();
@@ -190,12 +213,12 @@ impl<S: LeafStore> TeamStore<S> {
 
     /// Every team, in the order created.
     pub fn teams(&self) -> &[Team] {
-        &self.held.teams
+        &self.overlay.as_ref().unwrap_or(&self.held).teams
     }
 
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
-        self.held.team(id)
+        self.overlay.as_ref().unwrap_or(&self.held).team(id)
     }
 
     /// The line first kept under `operation`.
@@ -208,6 +231,9 @@ impl<S: LeafStore> TeamStore<S> {
     /// refused, and so is a line the team as it stands does not take.
     pub fn keep(&mut self, line: Line) -> Result<Team, ServerError> {
         self.settle()?;
+        if matches!(line, Line::Held(_) | Line::Checked(_)) {
+            return Err(unavailable("migration lines use the migration writer"));
+        }
         if let Some(kept) = self.held.operation(line.operation()) {
             if !kept.same_act(&line) {
                 return Err(ServerError::TeamReused {
@@ -223,14 +249,76 @@ impl<S: LeafStore> TeamStore<S> {
             },
             Refused::Held => ServerError::TeamMemberHeld,
             Refused::Absent => ServerError::TeamMemberAbsent,
+            Refused::NotHeld => unavailable(format!("team `{}` member is not held", line.team())),
+            Refused::Checked => unavailable("legacy memberships were already checked"),
         })?;
         let team = line.team().to_owned();
         self.append(line)?;
         self.standing(&team)
     }
 
+    /// Whether the durable log already completed its membership check.
+    pub fn migration_checked(&self) -> bool {
+        self.held.checked.is_some()
+    }
+
+    /// Enforce a validated migration in memory without changing any leaf or snapshot.
+    pub fn stage_migration(&mut self, lines: Vec<Line>) -> Result<(), ServerError> {
+        self.pending = lines;
+        self.refresh_overlay()
+    }
+
+    fn pending_line(&self, line: &Line) -> bool {
+        if self.held.operation(line.operation()).is_some() {
+            return false;
+        }
+        match line {
+            Line::Held(hold) => self.held.team(&hold.team).is_some_and(|team| {
+                team.retired.is_none()
+                    && team.members.contains(&hold.member)
+                    && !team.held.iter().any(|held| held.member == hold.member)
+            }),
+            Line::Checked(_) => self.held.checked.is_none(),
+            _ => false,
+        }
+    }
+
+    fn refresh_overlay(&mut self) -> Result<(), ServerError> {
+        let mut held = self.held.clone();
+        for line in &self.pending {
+            if self.pending_line(line) {
+                held.hold(line.clone()).map_err(unavailable)?;
+            }
+        }
+        self.overlay = if self.pending.is_empty() {
+            None
+        } else {
+            Some(held)
+        };
+        Ok(())
+    }
+
+    /// Complete staged migration after the reversible upgrade window closes.
+    /// Each leaf is idempotent; a crash prefix is completed by the next start.
+    pub fn finish_migration(&mut self) -> Result<(), ServerError> {
+        self.settle()?;
+        if self.pending.is_empty() && self.snapshots_enabled {
+            return Ok(());
+        }
+        for line in self.pending.clone() {
+            if self.pending_line(&line) {
+                self.append(line)?;
+            }
+        }
+        self.pending.clear();
+        self.overlay = None;
+        self.snapshots_enabled = true;
+        self.write_snapshot();
+        Ok(())
+    }
+
     fn standing(&self, id: &str) -> Result<Team, ServerError> {
-        self.held.team(id).cloned().ok_or(ServerError::TeamUnknown)
+        self.team(id).cloned().ok_or(ServerError::TeamUnknown)
     }
 }
 

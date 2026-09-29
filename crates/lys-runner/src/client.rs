@@ -16,6 +16,7 @@ use lys_core::Ed25519Identity;
 
 use crate::error::RunnerError;
 use crate::protocol::{Act, Answer, Greeting, read_greeting, read_reply, sign_request};
+use crate::refusals::{GrantAnswer, GrantQuestion};
 
 /// A client of any runner speaking this protocol on a Unix socket, signing
 /// each request with `key`.
@@ -126,6 +127,72 @@ impl Connection {
             });
         }
         Ok(reply)
+    }
+}
+
+/// A connection held as the live grant authority's channel.
+pub struct GrantChannel {
+    stream: UnixStream,
+    reader: BufReader<UnixStream>,
+}
+
+impl Connection {
+    /// Hold this connection as the grant channel, asked by `key`: refused
+    /// by the runner's own name when it answers anything but
+    /// `grant_channel`.
+    pub fn grant_channel(mut self, key: &Ed25519Identity) -> Result<GrantChannel, RunnerError> {
+        let line = sign_request(key, &self.greeting()?, &Act::GrantChannel)?;
+        let mut writer = &self.stream;
+        writer
+            .write_all(line.as_bytes())
+            .and_then(|()| writer.write_all(b"\n"))
+            .and_then(|()| writer.flush())
+            .map_err(|error| unreachable(&error))?;
+        let mut reply = String::new();
+        self.reader
+            .read_line(&mut reply)
+            .map_err(|error| unreachable(&error))?;
+        match read_reply(&reply)? {
+            Answer::GrantChannel => Ok(GrantChannel {
+                stream: self.stream,
+                reader: self.reader,
+            }),
+            Answer::Refused { refusal, words, .. } => Err(RunnerError::refused(&refusal, words)),
+            other => Err(RunnerError::Unreachable {
+                reason: format!("the runner answered a grant channel with {other:?}"),
+            }),
+        }
+    }
+}
+
+impl GrantChannel {
+    /// The next question the runner asks; none once it closes the channel.
+    pub fn question(&mut self) -> Result<Option<GrantQuestion>, RunnerError> {
+        let mut line = String::new();
+        self.reader
+            .read_line(&mut line)
+            .map_err(|error| unreachable(&error))?;
+        if line.is_empty() {
+            return Ok(None);
+        }
+        serde_json::from_str(line.trim_end())
+            .map(Some)
+            .map_err(|error| RunnerError::Malformed {
+                reason: format!("the runner's grant question does not read: {error}"),
+            })
+    }
+
+    /// Answer the question asked last.
+    pub fn answer(&mut self, answer: &GrantAnswer) -> Result<(), RunnerError> {
+        let line = serde_json::to_string(answer).map_err(|error| RunnerError::Malformed {
+            reason: format!("the grant answer could not be written: {error}"),
+        })?;
+        let mut writer = &self.stream;
+        writer
+            .write_all(line.as_bytes())
+            .and_then(|()| writer.write_all(b"\n"))
+            .and_then(|()| writer.flush())
+            .map_err(|error| unreachable(&error))
     }
 }
 

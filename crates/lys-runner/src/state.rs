@@ -153,7 +153,7 @@ impl Drop for StateFile {
 }
 
 /// Write `bytes` beside `path`, durably, then move them over it.
-fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let beside = path.with_extension("writing");
     let mut file = fs::File::create(&beside)?;
     file.write_all(bytes)?;

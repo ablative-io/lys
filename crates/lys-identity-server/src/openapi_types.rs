@@ -52,6 +52,8 @@ use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
     ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
 };
+use crate::goals_api::{GoalsView, MarkBody, SetBody as GoalBody};
+use crate::goals_state::Item as GoalItem;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
@@ -97,6 +99,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(machines_and_runtime(api));
     entries.extend(accounts_teams_and_sessions(api));
     entries.extend(crate::openapi_runner_types::runner(api));
+    entries.extend(goals(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))
@@ -283,6 +286,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     let (report, session) = (api.schema::<ReportBody>(), api.schema::<RuntimeSession>());
     let running = api.schema::<RuntimeList>();
     vec![
+        (
+            GET,
+            "/runtime/message-edges",
+            Some(api.schema::<crate::message_edges::EdgeQuery>()),
+            Some(api.schema::<crate::message_edges::EdgePage>()),
+        ),
         (POST, "/link-audit", Some(delivery), Some(receipt)),
         (
             POST,
@@ -411,6 +420,24 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     ]
 }
 
+/// The goals, expectations and deliverables on agents and teams.
+fn goals(api: &mut Api) -> Vec<Entry> {
+    let (list, item) = (api.schema::<GoalsView>(), api.schema::<GoalItem>());
+    let (set, mark) = (api.schema::<GoalBody>(), api.schema::<MarkBody>());
+    vec![
+        (GET, "/agents/{id}/goals", None, Some(list.clone())),
+        (
+            POST,
+            "/agents/{id}/goals",
+            Some(set.clone()),
+            Some(item.clone()),
+        ),
+        (GET, "/teams/{id}/goals", None, Some(list)),
+        (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
+        (POST, "/goals/{goal}/mark", Some(mark), Some(item)),
+    ]
+}
+
 /// The service accounts, the teams, the resources grants are on, the
 /// secrets this service brokers, the live sessions and the certificates.
 fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
@@ -457,6 +484,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
         (
             POST,
             "/teams/{id}/members/{member}/remove",
+            Some(retire_team.clone()),
+            Some(changed.clone()),
+        ),
+        (
+            POST,
+            "/teams/{id}/members/{member}/confirm",
             Some(retire_team.clone()),
             Some(changed.clone()),
         ),

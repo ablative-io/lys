@@ -342,6 +342,29 @@ impl Runners {
         read_reply(&reply)
     }
 
+    /// Hold a grant channel to `record`'s runner. A runner that dials in
+    /// holds no connection the server can keep, and is refused by name:
+    /// its grantable rules are then denied `grant_state_unavailable`.
+    pub fn grant_channel(
+        &self,
+        record: &RunnerRecord,
+    ) -> Result<lys_runner::GrantChannel, RunnerError> {
+        let socket = match record {
+            RunnerRecord::Lys => self.own.clone().ok_or_else(|| RunnerError::Unreachable {
+                reason: "the configuration names no runner_socket for this install's own runner"
+                    .to_owned(),
+            })?,
+            RunnerRecord::Socket { path } => PathBuf::from(path),
+            RunnerRecord::Dialled { .. } => {
+                return Err(RunnerError::refused(
+                    "grant_channel_undialled",
+                    "a runner that dials in holds no grant channel",
+                ));
+            }
+        };
+        lys_runner::connect(&socket)?.grant_channel(&self.key)
+    }
+
     /// Ask `act` of the runner on `socket`, signed over the greeting of the
     /// connection it is sent on. The closer is held before the greeting is
     /// read, so a caller that leaves ends the wait whatever the runner does.
