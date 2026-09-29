@@ -6,10 +6,26 @@ import tempfile
 import unittest
 
 from upgrade_negative import require_old_refusal
-from upgrade_window import family_files, pending, profile_file, unchanged
+from upgrade_window import family_files, pending, profile_file, refused_writes, unchanged
 
 
 class WindowProofTests(unittest.TestCase):
+    def test_all_five_mutations_use_real_record_ids_and_stored_versions(self):
+        legacy = {"team": "kept-team", "foreign": ["kept-member"], "person": "kept-person",
+                  "budgets_before": {"budgets": [{"measure": "tokens", "version": 17}]}}
+        profile = {"version": 9, "model_access": ["kept-model"], "tools": ["Read"],
+                   "skills": [], "mcp_servers": [{"name": "kept", "url": "https://example.test/mcp"}],
+                   "instructions": "Kept instructions", "note": "Kept note"}
+        writes = refused_writes(legacy, {"agent": "kept-agent", "profile": profile})
+        self.assertEqual([route for route, body, kind in writes], [
+            "/teams/kept-team/members/kept-member/confirm", "/budgets/person/kept-person/confirm",
+            "/agents/kept-agent/provisioning", "/agents/kept-agent/provisioning/9/review", "/skills"])
+        self.assertEqual(writes[1][1], {"measure": "tokens", "version": 17})
+        self.assertEqual(writes[2][1]["from_version"], 9)
+        self.assertEqual(writes[2][1]["mcp_servers"], profile["mcp_servers"])
+        self.assertEqual([kind for route, body, kind in writes], [
+            "TeamsUnavailable", "BudgetsUnavailable", *(["ProvisioningUnavailable"] * 3)])
+
     def test_an_added_profile_member_is_a_byte_change_even_when_empty(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

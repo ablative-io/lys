@@ -195,7 +195,8 @@ def exercise(args):
         (evidence / "before.json").write_text(json.dumps(before, indent=2))
         files = legacy_files(root, old_config)
         profile = profile_file(root, old_config)
-        context = {"files": files, "legacy": legacy, "port": browser.port, "cookie": browser.cookie}
+        context = {"files": files, "legacy": legacy, "port": browser.port, "cookie": browser.cookie,
+                   "provisioning": before["provisioning"]}
         (root / ".upgrade-window.json").write_text(json.dumps(context))
         run([str(driver), "--root", str(root), "window", "--from", str(args.candidate_bin),
              "--surface", str(args.candidate_surface), "--verifier",

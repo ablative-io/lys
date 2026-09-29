@@ -56,6 +56,27 @@ def pending(root):
     return intent
 
 
+def refused_writes(fixture, provisioning):
+    """Exercise every new-format writer while the actual old-reader rollback is possible."""
+    team = f"/teams/{fixture['team']}/members/{fixture['foreign'][0]}/confirm"
+    budgets = f"/budgets/person/{fixture['person']}/confirm"
+    tokens = next(value for value in fixture["budgets_before"]["budgets"]
+                  if value["measure"] == "tokens")
+    profile = provisioning["profile"]
+    path = f"/agents/{provisioning['agent']}/provisioning"
+    change = {name: profile[name] for name in (
+        "model_access", "tools", "skills", "mcp_servers", "instructions", "note")}
+    change.update(operation=operation(), from_version=profile["version"])
+    return [
+        (team, {"operation": operation()}, "TeamsUnavailable"),
+        (budgets, {"measure": "tokens", "version": tokens["version"]}, "BudgetsUnavailable"),
+        (path, change, "ProvisioningUnavailable"),
+        (f"{path}/{profile['version']}/review", {"operation": operation()}, "ProvisioningUnavailable"),
+        ("/skills", {"name": "upgrade-fixture-skill", "text": "# Held during upgrade\n"},
+         "ProvisioningUnavailable"),
+    ]
+
+
 def check(root):
     if (root / ".upgrade-proof").read_text() != MARKER:
         raise RuntimeError(f"{root} is not a disposable upgrade fixture")
@@ -67,23 +88,19 @@ def check(root):
     fixture = context["legacy"]
     counts = verify(browser, fixture)
     unchanged(context["files"], legacy_files(root, config))
-    team = f"/teams/{fixture['team']}/members/{fixture['foreign'][0]}/confirm"
-    budgets = f"/budgets/person/{fixture['person']}/confirm"
-    tokens = next(value for value in fixture["budgets_before"]["budgets"]
-                  if value["measure"] == "tokens")
-    for path, body, kind in [
-        (team, {"operation": operation()}, "TeamsUnavailable"),
-        (budgets, {"measure": "tokens", "version": tokens["version"]}, "BudgetsUnavailable"),
-    ]:
+    writes = refused_writes(fixture, context["provisioning"])
+    for path, body, kind in writes:
         refusal = browser.ask("POST", path, body, expected_status=503)
         if refusal.get("refusal") != kind or "upgrade_pending" not in refusal.get("reason", ""):
             raise RuntimeError(f"{path} did not refuse {kind} naming upgrade_pending")
+        unchanged(context["files"], legacy_files(root, config))
     # A refused confirmation must also leave every legacy byte alone.
     unchanged(context["files"], legacy_files(root, config))
     verify(browser, fixture)
     pending(root)
     receipt = {"passed": True, "legacy_files": len(context["files"]),
-               "confirmations_refused": 2, **counts}
+               "writes_refused": len(writes), "refused_routes": [path for path, body, kind in writes],
+               **counts}
     (root.parent / "evidence/window.json").write_text(json.dumps(receipt, indent=2))
 
 

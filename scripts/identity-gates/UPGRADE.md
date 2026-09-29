@@ -50,7 +50,10 @@ callback it invokes the HTTP/byte verifier and exits75 before `Started` is
 recorded. It adds no production pause, timer or configuration switch. Both
 membership and budget confirmation must answer503 naming `upgrade_pending`;
 both logs, snapshots and the provisioning file must be byte-identical. The
-positive leg then re-enters the real old installer, which performs its normal
+profile-set, profile-review and skill-write routes must also answer503 naming
+`ProvisioningUnavailable` and `upgrade_pending`; bytes are checked after each
+of the five refusals. These require HOME037's guarded writers in the final build.
+The positive leg then re-enters the real old installer, which performs its normal
 recovery, and requires the old binaries to read all the original records and
 sessions. It finally runs the normal candidate CLI upgrade separately.
 
