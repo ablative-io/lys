@@ -302,3 +302,70 @@ fn compact_flight_waits_for_actual_compaction_after_terminal_notification() -> T
     assert_eq!(journal.0, ["compact-1", "next"]);
     Ok(())
 }
+
+#[test]
+fn retained_terminal_recovers_a_failed_receipt_without_another_pipe_write() -> TestResult {
+    let (_child, source, mut dispatcher) = setup()?;
+    let dir = tempfile::tempdir()?;
+    let mut feed = lys_runner::tracking_store::Feed::open(dir.path())?;
+    let mut keep = |event: &Event| feed.append_control(&source, 1, event).map(|_| ());
+    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut keep)?;
+    let mut journal = Journal::default();
+    dispatcher.dispatch("one", &request("one")?, &mut journal, &mut |_| Ok(()))?;
+    for kind in [
+        Kind::Admitted {
+            operation: "one".into(),
+            turn: Some("turn-one".into()),
+        },
+        Kind::TurnStarted {
+            turn: "turn-one".into(),
+        },
+    ] {
+        dispatcher.observe(&event(&source, kind), &mut keep)?;
+    }
+    let terminal = event(
+        &source,
+        Kind::TurnCompleted {
+            turn: "turn-one".into(),
+        },
+    );
+    assert!(
+        dispatcher
+            .observe(&terminal, &mut |event: &Event| {
+                feed.append_control(&source, 1, event)?;
+                Err(RunnerError::refused(
+                    "fixture_receipt_failed",
+                    "feed survived but receipt did not",
+                ))
+            })
+            .is_err()
+    );
+    assert_eq!(dispatcher.boundary(), &Boundary::Unknown);
+    assert!(!dispatcher.flight().ok_or("flight lost")?.terminal);
+    assert!(
+        dispatcher
+            .dispatch("two", &request("two")?, &mut journal, &mut |_| Ok(()))
+            .is_err()
+    );
+    let retained = feed.control_event(&source, &terminal.source_id)?;
+    dispatcher.observe(&retained, &mut |event: &Event| {
+        feed.append_control(&source, 1, event).map(|_| ())
+    })?;
+    assert!(dispatcher.flight().is_none());
+    assert_eq!(dispatcher.boundary(), &Boundary::Idle);
+    assert_eq!(journal.0, ["one"]);
+    let mut reader = dispatcher.take_reader()?;
+    assert_eq!(reader.next_frame()?.ok_or("missing frame")?["id"], "one");
+    dispatcher.dispatch("two", &request("two")?, &mut journal, &mut |_| Ok(()))?;
+    assert_eq!(
+        reader.next_frame()?.ok_or("missing next frame")?["id"],
+        "two"
+    );
+    drop(dispatcher);
+    assert!(
+        reader.next_frame()?.is_none(),
+        "no duplicate first request reached the actual pipe"
+    );
+    assert_eq!(feed.page(None)?.entries.len(), 4);
+    Ok(())
+}
