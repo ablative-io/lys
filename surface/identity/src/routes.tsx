@@ -1,3 +1,4 @@
+import { EstateApproval } from './features/import/EstateApproval';
 import { ServiceAccounts } from './features/service-accounts/ServiceAccounts';
 import { Roles } from './features/roles/Roles';
 import { Network } from './features/network/Network';
@@ -26,6 +27,7 @@ import { RunningSessions } from './features/runtime/Sessions';
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/access/import" element={<EstateApproval />} />
       <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
       <Route path="/service-accounts" element={<ServiceAccounts />} />
