@@ -1,0 +1,7 @@
+id: no-app-names-tsx
+valid:
+  - "export const title = 'Apps';"
+  - "const app = { id: 'fixture_notes' };"
+invalid:
+  - "export const title = 'Haematite apps';"
+  - "const link = <a href=\"/meridian\">open</a>;"

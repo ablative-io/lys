@@ -15,17 +15,27 @@ mod identity;
 
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 
 use crate::cli::{
     CaCommand, Cli, Command, InspectCommand, KeyCommand, LogCommand, LogProveCommand,
     LogVerifyCommand,
 };
 
+/// What `--version` prints after the name: the crate version and the commit
+/// the binary was built from, stamped by `build.rs`.
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("LYS_BUILD"), ")");
+
+/// The arguments, with `--version` answering [`VERSION`].
+fn parse() -> Cli {
+    let matches = Cli::command().version(VERSION).get_matches();
+    Cli::from_arg_matches(&matches).unwrap_or_else(|error| error.exit())
+}
+
 /// Entry point: parse arguments, dispatch, and translate the outcome into an
 /// exit code. Every failure path prints a diagnostic to stderr.
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = parse();
     let json = cli.json;
     let result = match cli.command {
         Command::Key(key_command) => match key_command {
@@ -49,6 +59,9 @@ fn main() -> ExitCode {
                 identity::configure::run(&config, json)
             }
             identity::IdentityCommand::Health { config } => identity::health::run(&config, json),
+            identity::IdentityCommand::SetupCode { root } => {
+                identity::install::setup_code::run(root, json)
+            }
             identity::IdentityCommand::Install {
                 root,
                 admin_email,
@@ -58,6 +71,18 @@ fn main() -> ExitCode {
                     root,
                     admin_email,
                     surface,
+                },
+                json,
+            ),
+            identity::IdentityCommand::Upgrade {
+                from,
+                surface,
+                root,
+            } => identity::upgrade::run(
+                &identity::upgrade::Options {
+                    from,
+                    surface,
+                    root,
                 },
                 json,
             ),
@@ -144,6 +169,7 @@ fn main() -> ExitCode {
                 at,
             } => commands::ca::verify(&cert, &issuer_public_key, at.as_deref(), json),
         },
+        Command::Runner(runner_command) => commands::runner::run(runner_command),
         Command::Attest { key, payload, out } => commands::attest::run(&key, &payload, &out, json),
         Command::Verify {
             attestation,

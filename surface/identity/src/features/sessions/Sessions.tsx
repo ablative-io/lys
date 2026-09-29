@@ -23,7 +23,7 @@ export function Sessions() {
   const people = useLoad(api.people, 'session-people');
   return <div className="page">
     <div className="head"><div><div className="eyebrow">Account security</div><h1>Signed-in sessions</h1>
-      <p className="sub">See where you’re signed in and end a session you no longer need.</p></div></div>
+      <p className="sub">See where you’re signed in and end a session you no longer need. Agents’ running sessions are on <a href="#/runtime">Running sessions</a>.</p></div></div>
     {people.status === 'ok' && people.data.scope === 'directory' ? <details>
       <summary>Advanced: another person’s sessions</summary>
       <label className="field">Person<select value={person} onChange={(event) => setParams(event.target.value ? { person: event.target.value } : {})}>

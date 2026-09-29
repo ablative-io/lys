@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A sign-in identity: the issuer that authenticates it and the subject it names.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Login {
     /// The issuer URL, exactly as recorded.
     pub provider: String,
@@ -17,7 +17,7 @@ pub struct Login {
 }
 
 /// A person as a view names them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonSummary {
     /// The person's enduring id.
     pub id: String,
@@ -28,7 +28,7 @@ pub struct PersonSummary {
 }
 
 /// An agent as a list of agents names it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentSummary {
     /// The agent's enduring id.
     pub id: String,
@@ -39,7 +39,7 @@ pub struct AgentSummary {
 }
 
 /// The answer of `GET /me`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MeView {
     /// The signed-in person.
     pub person: PersonSummary,
@@ -54,7 +54,7 @@ pub struct MeView {
 }
 
 /// A service account as the views show it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ServiceAccountView {
     /// The operation id it was created with, which names it.
     pub id: String,
@@ -77,7 +77,7 @@ pub struct ServiceAccountView {
 }
 
 /// The answer of `GET /service-accounts`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ServiceAccountsView {
     /// `personal` for the signed-in person's own, `directory` for the administrator's.
     pub scope: String,
@@ -86,7 +86,7 @@ pub struct ServiceAccountsView {
 }
 
 /// A person with their agents.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonView {
     /// The person's enduring id.
     pub id: String,
@@ -99,7 +99,7 @@ pub struct PersonView {
 }
 
 /// The answer of `GET /people` and `GET /directory/people`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PeopleView {
     /// `personal` for the signed-in person's own view, `directory` for the administrator's.
     pub scope: String,
@@ -108,18 +108,21 @@ pub struct PeopleView {
 }
 
 /// Where an agent's record came from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Provenance {
     /// The login of the person who registered the agent.
     pub registered_by: Login,
     /// The log indices of every event about the agent, oldest first.
     pub events: Vec<u64>,
-    /// The receipt of the registering event, as `GET /receipts/{index}` answers it.
+    /// The receipt of the registering event, as `GET /receipts/{index}`
+    /// answers it: a [`crate::directory_views::DirectoryReceiptView`] as a
+    /// value, so a client that keeps a receipt whole keeps it whole here.
+    #[schema(value_type = Object)]
     pub registration: Option<Value>,
 }
 
 /// The answer of `GET /agents/{id}` and `GET /directory/agents/{id}`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentView {
     /// The agent's enduring id.
     pub id: String,

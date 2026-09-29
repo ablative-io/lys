@@ -13,7 +13,7 @@ const connections = {
 
 describe('Connections', () => {
   it('shows configured, local and absent integrations without claiming health', async () => {
-    const { requests, posted } = await mount('#/connections', { ...SERVICE, '/connections': ok(connections), '/sign-in-providers': ok({ providers: [], offered: ['google', 'microsoft', 'github'] }) });
+    const { requests, posted } = await mount('#/connections', { ...SERVICE, '/connections': ok(connections), '/sign-in-providers': ok({ providers: [], offered: ['google', 'microsoft', 'github'], redirect_address: 'http://localhost:8490/auth/v1/providers/callback' }) });
     expect($$('section.card:not([aria-label])')).toHaveLength(3);
     expect(text()).toContain('Local to Lys');
     expect(text()).toContain('Not configured');

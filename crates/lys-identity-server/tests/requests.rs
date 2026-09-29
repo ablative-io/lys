@@ -406,6 +406,7 @@ async fn an_approval_the_grants_refuse_holds_nothing_and_gives_nothing() -> Test
         .decide(&table.bea, &reading, "approve", &first)
         .await?;
     assert_ne!(turned.0, 200, "{}", turned.1);
+    assert_eq!(turned.1["refusal"], "SourceUnknown", "{}", turned.1);
     let (_, seen) = table.service.get("/requests", Some(&table.bea)).await?;
     assert_eq!(seen["requests"][0]["state"], "waiting");
     assert_eq!(

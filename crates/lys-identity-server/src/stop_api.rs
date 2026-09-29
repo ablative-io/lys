@@ -17,6 +17,12 @@
 //! The broker is asked after the suspension, the certificates and the
 //! sessions are recorded, so a broker that cannot be reached leaves those
 //! in force; its refusal is named in the answer, never hidden.
+//!
+//! A session on a machine whose record names a runner is ended through that
+//! runner: the stop asks it to end the session and waits for its answer,
+//! and the session shows confirmed, with the instant of its exit, only once
+//! the runner reports the exit. A runner that refuses or cannot be reached
+//! is named in the answer, and its session stays unconfirmed.
 
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
@@ -46,15 +52,15 @@ use crate::stops_store::StopStore;
 const REASON_MAX: usize = 500;
 
 /// A stop to make.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct StopBody {
+pub(crate) struct StopBody {
     operation: String,
     reason: String,
 }
 
 /// The answer of the stop route: what was done, and what was only asked.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct StopView {
     /// The agent stopped.
     pub agent: String,
@@ -80,8 +86,25 @@ pub struct StopView {
     /// The sessions whose runtimes were asked to end them. Each stays
     /// unconfirmed until its runtime reports it stopped.
     pub sessions_asked: Vec<String>,
+    /// The asked sessions whose end is confirmed, each with its runtime's
+    /// words, which carry the instant of its exit.
+    pub sessions_confirmed: Vec<ConfirmedEnd>,
+    /// The asked sessions whose runner refused to end them or could not be
+    /// reached, each with the refusal by name.
+    pub sessions_refused: Vec<String>,
     /// Why, in the stopper's words.
     pub reason: String,
+}
+
+/// An asked session whose end its runtime confirmed, never inferred.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ConfirmedEnd {
+    /// The session.
+    pub session: String,
+    /// When the confirmation was kept, in seconds since the Unix epoch.
+    pub at: u64,
+    /// The runtime's words, with the instant of the exit.
+    pub confirmation: String,
 }
 
 impl From<Stop> for StopView {
@@ -97,6 +120,8 @@ impl From<Stop> for StopView {
             credentials_ended: stop.credentials_ended,
             credentials_refused: stop.credentials_refused,
             sessions_asked: stop.sessions_asked,
+            sessions_confirmed: Vec::new(),
+            sessions_refused: Vec::new(),
             reason: stop.reason,
         }
     }
@@ -110,7 +135,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// The answer of `GET /agents/{id}/stops`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct StopsView {
     /// Every stop kept on the agent, in the order kept.
     pub stops: Vec<StopView>,
@@ -146,16 +171,113 @@ async fn stops(
 ) -> Result<Json<StopsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let (agent, _by, _lifecycle) = admitted(&state, &actor, &id)?;
-    with_stops(&state, |store| {
-        Ok(StopsView {
-            stops: store
-                .of_agent(&agent.to_string())
-                .into_iter()
-                .map(StopView::from)
-                .collect(),
-        })
-    })
-    .map(Json)
+    let kept = with_stops(&state, |store| Ok(store.of_agent(&agent.to_string())))?;
+    let mut stops = Vec::new();
+    for stop in kept {
+        stops.push(confirmed(&state, StopView::from(stop))?);
+    }
+    Ok(Json(StopsView { stops }))
+}
+
+/// `view` with each asked session whose end its runtime confirmed.
+fn confirmed(state: &AppState, mut view: StopView) -> Result<StopView, ServerError> {
+    if state.runtime.is_none() {
+        return Ok(view);
+    }
+    view.sessions_confirmed = with_runtime(state, |store| {
+        Ok(view
+            .sessions_asked
+            .iter()
+            .filter_map(|session| store.session(session))
+            .filter(|tracked| tracked.stopped())
+            .filter_map(|tracked| {
+                tracked.latest().map(|report| ConfirmedEnd {
+                    session: tracked.session.clone(),
+                    at: report.at,
+                    confirmation: report.confirmation.clone(),
+                })
+            })
+            .collect())
+    })?;
+    Ok(view)
+}
+
+/// Ask the runner of each session to end it, every session at once so no
+/// runner waits on another, answering, by name, each session whose runner
+/// refused or could not be reached. A session on a machine that names no
+/// runner stays asked, as its runtime has not said.
+async fn end_sessions(state: &Arc<AppState>, sessions: Vec<String>, by: &str) -> Vec<String> {
+    let mut asked = tokio::task::JoinSet::new();
+    for session in sessions {
+        let (state, by) = (Arc::clone(state), by.to_owned());
+        asked.spawn(async move { end_session(&state, &session, &by).await });
+    }
+    let mut refused = Vec::new();
+    while let Some(ended) = asked.join_next().await {
+        match ended {
+            Ok(named) => refused.extend(named),
+            Err(failed) => refused.push(format!(
+                "runner_unreachable: asking a runner to end a session ended abnormally: {failed}"
+            )),
+        }
+    }
+    refused.sort();
+    refused
+}
+
+/// Ask the runner of `session` to end it, answering each refusal by name.
+async fn end_session(state: &Arc<AppState>, session: &str, by: &str) -> Vec<String> {
+    let mut refused = Vec::new();
+    let driven = match crate::runner_sessions::driven(state, session) {
+        Ok(driven) => driven,
+        Err(ServerError::RunnerAbsent { .. }) => return refused,
+        Err(other) => {
+            refused.push(format!("{session}: {other}"));
+            return refused;
+        }
+    };
+    let act = lys_runner::Act::End {
+        session: session.to_owned(),
+    };
+    let answered =
+        crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
+    let kept = match &answered {
+        Ok(lys_runner::Answer::Ended { ended, .. }) => {
+            crate::runner_sessions::record_end(state, &driven, ended)
+        }
+        Ok(other) => Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: format!(
+                "an end was answered {}",
+                crate::runner_sessions::kind(other)
+            ),
+        }),
+        Err(error) => Err(ServerError::Runner {
+            refusal: error.name(),
+            words: error.to_string(),
+        }),
+    };
+    let outcome = kept
+        .as_ref()
+        .map_or_else(ServerError::name, |()| "ended".to_owned());
+    let receipt = crate::runner_sessions::keep_act(
+        state,
+        crate::runner_acts::RunnerAct {
+            act: "end".to_owned(),
+            caller: by.to_owned(),
+            session: session.to_owned(),
+            agent: driven.agent.clone(),
+            machine: driven.machine.clone(),
+            at: now(),
+            text: None,
+            keys: Vec::new(),
+            outcome,
+        },
+    );
+    for failed in [kept.err(), receipt.err()].into_iter().flatten() {
+        refused.push(format!("{session}: {failed}"));
+    }
+    refused
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -248,7 +370,7 @@ async fn stop(
     // Asked only once the directory holds this operation's suspension, so a
     // refused stop leaves no asked line in other words behind it.
     if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {
-        return Ok(Json(kept.into()));
+        return through_runners(&state, kept.into(), &by).await.map(Json);
     }
     let agent = agent.to_string();
     let certificates_withdrawn = withdraw_certificates(&state, &agent, &by, &reason)?;
@@ -265,7 +387,36 @@ async fn stop(
         credentials_refused,
         ..asked
     };
-    with_stops(&state, |store| store.keep(done)).map(|stop| Json(stop.into()))
+    // Kept before any runner is waited on, so a runner that never answers
+    // leaves the stop recorded whole, and the same stop sent again asks it
+    // again.
+    let kept = with_stops(&state, |store| store.keep(done))?;
+    through_runners(&state, kept.into(), &by).await.map(Json)
+}
+
+/// `view` once each asked session not yet confirmed ended has been asked of
+/// its runner, all at once, with each confirmed end and each refusal.
+async fn through_runners(
+    state: &Arc<AppState>,
+    view: StopView,
+    by: &str,
+) -> Result<StopView, ServerError> {
+    let view = confirmed(state, view)?;
+    let unconfirmed: Vec<String> = view
+        .sessions_asked
+        .iter()
+        .filter(|session| {
+            !view
+                .sessions_confirmed
+                .iter()
+                .any(|end| &end.session == *session)
+        })
+        .cloned()
+        .collect();
+    let sessions_refused = end_sessions(state, unconfirmed, by).await;
+    let mut view = confirmed(state, view)?;
+    view.sessions_refused = sessions_refused;
+    Ok(view)
 }
 
 /// Withdraw every certificate of the agent that stands, naming the stop.

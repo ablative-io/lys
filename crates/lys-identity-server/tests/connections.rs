@@ -22,7 +22,10 @@ async fn configured_connections_are_not_a_health_claim() -> TestResult {
     let connections = body["connections"].as_array().ok_or("connections absent")?;
     assert_eq!(connections.len(), 3);
     assert_eq!(connections[0]["state"], "configured");
-    assert_eq!(connections[0]["endpoint"], service.issuer.issuer());
+    // The sign-in service is named on Lys's own origin, as installed; its
+    // loopback address is never shown.
+    assert_eq!(connections[0]["endpoint"], service.base.as_str());
+    assert!(!body.to_string().contains(service.issuer.loopback()));
     assert_eq!(connections[1]["state"], "local");
     assert_eq!(connections[2]["state"], "unconfigured");
     assert!(connections[1]["endpoint"].is_null());

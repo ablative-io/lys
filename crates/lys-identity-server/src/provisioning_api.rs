@@ -27,7 +27,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
-use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Review, Settings, Version};
+use crate::provisioning_store::{
+    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, Version,
+};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -42,7 +44,8 @@ const INSTRUCTIONS_MAX: usize = 20_000;
 const NOTE_MAX: usize = 500;
 
 /// One version of a profile, in full.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = ProvisioningVersionView)]
 pub struct VersionView {
     /// Its number, from 1.
     pub version: u32,
@@ -74,7 +77,7 @@ pub struct VersionView {
 }
 
 /// One version of a profile, as the history lists it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct VersionLine {
     /// Its number.
     pub version: u32,
@@ -87,7 +90,7 @@ pub struct VersionLine {
 }
 
 /// The answer of the provisioning routes.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ProvisioningView {
     /// The agent.
     pub agent: String,
@@ -107,7 +110,8 @@ pub struct ProvisioningView {
 }
 
 /// The version a change was recorded as.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(as = ProvisioningRecorded)]
 pub struct Recorded {
     /// The operation id the change was set with.
     pub operation: String,
@@ -116,9 +120,10 @@ pub struct Recorded {
 }
 
 /// A profile to set. Every member is required.
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct SetBody {
+#[schema(as = ProvisioningSetBody)]
+pub(crate) struct SetBody {
     operation: String,
     from_version: u32,
     model_access: Vec<String>,
@@ -127,6 +132,8 @@ struct SetBody {
     mcp_servers: Vec<McpServer>,
     instructions: String,
     note: String,
+    #[serde(default)]
+    session: Option<SessionSettings>,
 }
 
 /// The provisioning routes.
@@ -214,7 +221,26 @@ fn settings(body: &SetBody) -> Result<Settings, ServerError> {
         mcp_servers: servers(&body.mcp_servers)?,
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
+        session: body.session.clone().map(session).transpose()?,
     })
+}
+
+/// The session settings, each refused by name when a runner could not use it.
+fn session(settings: SessionSettings) -> Result<SessionSettings, ServerError> {
+    if settings
+        .compact
+        .as_deref()
+        .is_some_and(|line| line.trim().is_empty())
+    {
+        return Err(malformed(
+            "session.compact is empty: name the command or leave it out",
+        ));
+    }
+    if let Some(accounts) = &settings.accounts {
+        lys_runner::rotation::RotationState::new(accounts.clone())
+            .map_err(|refused| malformed(format!("session.accounts: {refused}")))?;
+    }
+    Ok(settings)
 }
 
 pub(crate) fn with_provisioning<T>(
@@ -313,9 +339,9 @@ async fn set(
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ReviewBody {
+pub(crate) struct ReviewBody {
     operation: String,
 }
 

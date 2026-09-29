@@ -14,6 +14,7 @@ pub mod prepare;
 pub mod private_files;
 pub mod rauthy;
 pub mod themes;
+pub mod upgrade;
 
 pub use cli::IdentityCommand;
 pub use error::IdentityError;

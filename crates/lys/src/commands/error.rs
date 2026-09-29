@@ -42,6 +42,10 @@ pub enum CliError {
     #[error(transparent)]
     Trust(#[from] lys_core::TrustError),
 
+    /// The runner, or the bridge that dials for it, refused by name.
+    #[error(transparent)]
+    Runner(#[from] lys_runner::RunnerError),
+
     /// A JSON file carrying a `lys-core` wire type (sealed envelope, log
     /// proof artifact) could not be parsed. Attestations are not JSON — a
     /// malformed attestation artifact collapses into the relevant command's

@@ -11,19 +11,20 @@ use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::receipt::Receipt;
 use lys_identity::{
-    Actor, AgentId, Directory, IdentityId, LifecycleState, LoginBinding, OperationId, PersonId,
-    Profile, Transition,
+    Actor, AgentId, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile, Transition,
 };
 use lys_log_store::FileLeafStore;
 use serde::Deserialize;
-use serde_json::{Value, json};
 
 use lys_identity::signer::load_service_key;
 
-use crate::admission::{AUTHORITY, Admission};
+use crate::admission::Admission;
 use crate::config::Config;
+use crate::directory_views::{
+    AgentRegistered, IdentitiesView, IdentityRecordView, PersonRegistered, ReceiptAnswer,
+    receipt_view, record_view,
+};
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
@@ -37,6 +38,14 @@ pub struct AppState {
     pub directory: Mutex<Directory<FileLeafStore>>,
     /// Sign-in.
     pub oidc: Oidc,
+    /// The issuer's own sign-in, carried server-side from Lys's sign-in page.
+    pub sign_in: crate::sign_in::IssuerSignIn,
+    /// Lys's `OpenID` provider, when the configuration names it.
+    pub provider: Option<crate::provider::OpenIdProvider>,
+    /// First-run setup, when the configuration names it.
+    pub setup: Option<crate::setup::SetupSettings>,
+    /// One setup act at a time, so one code makes one administrator.
+    pub setup_lock: tokio::sync::Mutex<()>,
     /// Live sessions.
     pub sessions: Sessions,
     /// Who is admitted to what.
@@ -67,11 +76,20 @@ pub struct AppState {
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The apps, kept beside the grant log: always open, holding at least
+    /// the app `lys`.
+    pub apps: Mutex<crate::apps_store::AppStore>,
+    /// The schema builder's test benches, each a throwaway draft.
+    pub benches: crate::apps_bench::Benches,
     /// The issuer's administration API the sign-in providers are set
     /// through, when the configuration names it.
     pub sign_in_providers: Option<crate::sign_in_providers::SignInProviders>,
     /// The nonces agents' signed requests carried within the last minute.
     pub agent_nonces: crate::agent_signature::Nonces,
+    /// How machines' runners are reached.
+    pub runners: crate::runner_client::Runners,
+    /// The acts on sessions through a runner, each kept as its receipt.
+    pub acts: Mutex<crate::runner_acts::ActStore>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -113,13 +131,34 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
-    let stops = crate::stops_store::StopStore::configured(config, key, &say)?;
+    let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
+    let acts = crate::runner_acts::ActStore::open(
+        &config.log_dir.with_file_name("runner-acts"),
+        Arc::clone(&key),
+    )?;
+    say(&format!(
+        "runner-acts log {}, holding {} acts",
+        acts.start(),
+        acts.len()
+    ));
+    let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
+    let model = apps.model()?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
+        sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
+        provider: config
+            .provider
+            .as_ref()
+            .map(|settings| {
+                crate::provider::OpenIdProvider::open(settings, crate::sign_in::lys_origin(config)?)
+            })
+            .transpose()?,
+        setup: config.setup.clone(),
+        setup_lock: tokio::sync::Mutex::new(()),
         sessions: Sessions::new(config.session_seconds, config.secure_cookie),
         admission: Admission::new(
-            config.administrator_binding()?,
+            crate::setup::administrator(config)?,
             config.link_audit_binding()?,
         ),
         grants: Mutex::new(None),
@@ -127,7 +166,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             log_dir: config.grant_log_dir.clone(),
             log_origin: config.grant_log_origin.clone(),
             key_file: config.event_key_file.clone(),
-            model: config.grant_model()?,
+            model: std::sync::RwLock::new(model),
             spicedb: config.spicedb.clone(),
         },
         secrets: config
@@ -145,12 +184,24 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        apps: Mutex::new(apps),
+        benches: crate::apps_bench::Benches::new(
+            config.apps_dir().with_file_name("benches"),
+            &*say,
+        )?,
         sign_in_providers: config
             .sign_in_providers
             .as_ref()
-            .map(crate::sign_in_providers::SignInProviders::open)
+            .map(|settings| {
+                crate::sign_in_providers::SignInProviders::open(
+                    settings,
+                    config.provider_origins.clone(),
+                )
+            })
             .transpose()?,
         agent_nonces: Mutex::default(),
+        runners: crate::runner_client::Runners::new(key, config.runner_socket.clone()),
+        acts: Mutex::new(acts),
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -158,11 +209,14 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
     let starts = start::routes(start_service(config, &state)?);
+    let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
+        .merge(crate::provider::routes(Arc::clone(&state)));
     let api = router(state).merge(configured).merge(starts);
-    Ok(match &config.surface_dir {
+    let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
-    })
+    };
+    Ok(served.merge(provider_callback))
 }
 
 /// The start route's service over the directory `state` holds. The route
@@ -204,10 +258,7 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
 /// The service's routes over `state`.
 pub fn router(state: Shared) -> Router {
     Router::new()
-        .route("/authority", get(authority))
-        .route("/login", get(login))
         .route("/callback", get(callback))
-        .route("/setup", post(crate::setup::finish))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identities", get(list))
@@ -215,6 +266,9 @@ pub fn router(state: Shared) -> Router {
         .route("/identities/{id}/profile", post(change_profile))
         .route("/identities/{id}/transitions", post(transition))
         .route("/people/{id}/logins", post(bind_login))
+        .merge(crate::sign_in::routes())
+        .merge(crate::setup::routes())
+        .merge(crate::accounts::routes())
         .merge(crate::read_api::routes())
         .merge(crate::grants::routes())
         .merge(crate::receipts_api::routes())
@@ -228,12 +282,17 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::provisioning_api::routes())
         .merge(crate::launch_api::routes())
         .merge(crate::runtime_api::routes())
+        .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())
+        .merge(crate::apps_api::routes())
+        .merge(crate::apps_schema_api::routes())
+        .merge(crate::apps_bench::routes())
+        .merge(crate::openapi::routes())
         .with_state(state)
 }
 
@@ -265,30 +324,6 @@ pub(crate) fn with_directory<T>(
     act(&mut directory)
 }
 
-/// A receipt as JSON.
-pub(crate) fn receipt_json(receipt: &Receipt) -> Value {
-    let coordinate = receipt.coordinate();
-    json!({
-        "version": receipt.version(),
-        "operation": receipt.operation().to_string(),
-        "actor": {
-            "issuer": receipt.actor().binding().issuer(),
-            "subject": receipt.actor().binding().subject(),
-            "authenticated_at": receipt.actor().provenance().authenticated_at(),
-        },
-        "identity": receipt.identity().to_string(),
-        "change_kind": receipt.change_kind(),
-        "payload_commitment": hex(&receipt.payload_commitment()),
-        "payload_commitment_hash": "sha-256",
-        "log": {
-            "index": coordinate.index,
-            "tree_size": coordinate.tree_size,
-            "root": hex(&coordinate.root),
-            "leaf_hash": hex(&coordinate.leaf_hash),
-        },
-    })
-}
-
 const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
 /// Lowercase hex.
@@ -312,15 +347,6 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
         .map_err(ServerError::from)
 }
 
-async fn authority() -> &'static str {
-    AUTHORITY
-}
-
-async fn login(State(state): State<Shared>) -> Result<Response, ServerError> {
-    let url = state.oidc.begin()?;
-    Ok((StatusCode::SEE_OTHER, [(header::LOCATION, url)]).into_response())
-}
-
 #[derive(Deserialize)]
 struct Answer {
     code: String,
@@ -333,12 +359,8 @@ async fn callback(
     Query(answer): Query<Answer>,
 ) -> Result<Response, ServerError> {
     let actor = state.oidc.finish(answer.code, &answer.state).await?;
-    let body = json!({
-        "signed_in": { "issuer": actor.binding().issuer(), "subject": actor.binding().subject() },
-        "authority": AUTHORITY,
-    });
-    let cookie = state.sessions.begin(actor)?;
     if wants_page(&headers) {
+        let cookie = state.sessions.begin(actor)?;
         return Ok((
             StatusCode::SEE_OTHER,
             [
@@ -348,7 +370,7 @@ async fn callback(
         )
             .into_response());
     }
-    Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
+    crate::sign_in::begin_session(&state, &actor)
 }
 
 /// Whether the caller is a browser following the sign-in, which is taken to the
@@ -364,9 +386,10 @@ fn wants_page(headers: &HeaderMap) -> bool {
         })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Named {
+#[schema(as = NamedBody)]
+pub(crate) struct Named {
     operation: String,
     display_name: String,
 }
@@ -379,7 +402,7 @@ async fn register_person(
     State(state): State<Shared>,
     headers: HeaderMap,
     Json(body): Json<Named>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<PersonRegistered>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let (op, profile) = (
@@ -388,9 +411,10 @@ async fn register_person(
     );
     with_directory(&state, |directory| {
         let (id, receipt) = directory.register_person(actor, op, profile, now())?;
-        Ok(Json(
-            json!({ "person": id.to_string(), "receipt": receipt_json(&receipt) }),
-        ))
+        Ok(Json(PersonRegistered {
+            person: id.to_string(),
+            receipt: receipt_view(&receipt),
+        }))
     })
 }
 
@@ -398,7 +422,7 @@ async fn register_agent(
     State(state): State<Shared>,
     headers: HeaderMap,
     Json(body): Json<Named>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<AgentRegistered>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let (op, profile) = (
@@ -413,41 +437,27 @@ async fn register_agent(
                 reason: "the administrator's login is bound to no person, so no agent can be registered under them",
             })?;
         let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
-        Ok(Json(json!({
-            "agent": id.to_string(),
-            "responsible": responsible.to_string(),
-            "receipt": receipt_json(&receipt),
-        })))
+        Ok(Json(AgentRegistered {
+            agent: id.to_string(),
+            responsible: responsible.to_string(),
+            receipt: receipt_view(&receipt),
+        }))
     })
 }
 
-fn state_name(state: LifecycleState) -> String {
-    state.to_string()
-}
-
-fn record_json(id: IdentityId, record: &lys_identity::projection::Record) -> Value {
-    json!({
-        "id": id.to_string(),
-        "display_name": record.profile().display_name(),
-        "state": state_name(record.state()),
-        "responsible": record.responsible().map(|person| person.to_string()),
-        "logins": record.bindings().iter().map(|binding| json!({
-            "issuer": binding.issuer(), "subject": binding.subject(),
-        })).collect::<Vec<_>>(),
-        "events": record.events(),
-    })
-}
-
-async fn list(State(state): State<Shared>, headers: HeaderMap) -> Result<Json<Value>, ServerError> {
+async fn list(
+    State(state): State<Shared>,
+    headers: HeaderMap,
+) -> Result<Json<IdentitiesView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     with_directory(&state, |directory| {
-        let records = directory
+        let identities = directory
             .projection()?
             .records()
-            .map(|(id, record)| record_json(*id, record))
+            .map(|(id, record)| record_view(*id, record))
             .collect::<Vec<_>>();
-        Ok(Json(json!({ "identities": records })))
+        Ok(Json(IdentitiesView { identities }))
     })
 }
 
@@ -455,7 +465,7 @@ async fn read(
     State(state): State<Shared>,
     headers: HeaderMap,
     Path(id): Path<String>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<IdentityRecordView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let id = identity_id(&id)?;
@@ -466,7 +476,7 @@ async fn read(
                 .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
                     identity: id.to_string(),
                 })?;
-        Ok(Json(record_json(id, &record)))
+        Ok(Json(record_view(id, &record)))
     })
 }
 
@@ -475,7 +485,7 @@ async fn change_profile(
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<Named>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let (id, op, profile) = (
@@ -485,13 +495,16 @@ async fn change_profile(
     );
     with_directory(&state, |directory| {
         let receipt = directory.change_profile(actor, op, id, profile, now())?;
-        Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
+        Ok(Json(ReceiptAnswer {
+            receipt: receipt_view(&receipt),
+        }))
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Moved {
+#[schema(as = TransitionBody)]
+pub(crate) struct Moved {
     operation: String,
     transition: String,
     #[serde(default)]
@@ -503,7 +516,7 @@ async fn transition(
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<Moved>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let moved = match body.transition.as_str() {
@@ -516,13 +529,16 @@ async fn transition(
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
     with_directory(&state, |directory| {
         let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
-        Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
+        Ok(Json(ReceiptAnswer {
+            receipt: receipt_view(&receipt),
+        }))
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct Bound {
+#[schema(as = BindLoginBody)]
+pub(crate) struct Bound {
     operation: String,
     issuer: String,
     subject: String,
@@ -533,7 +549,7 @@ async fn bind_login(
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<Bound>,
-) -> Result<Json<Value>, ServerError> {
+) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
     let person = PersonId::from_str(&id)?;
@@ -543,6 +559,8 @@ async fn bind_login(
     );
     with_directory(&state, |directory| {
         let receipt = directory.bind_login(actor, op, person, binding, now())?;
-        Ok(Json(json!({ "receipt": receipt_json(&receipt) })))
+        Ok(Json(ReceiptAnswer {
+            receipt: receipt_view(&receipt),
+        }))
     })
 }

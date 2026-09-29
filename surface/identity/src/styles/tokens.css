@@ -1,6 +1,6 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-/* Aion ops console tokens (apps/aion-ops-console/src/index.css), with the identity
-   product's own accent in place of Aion's blue: #D4975A, deep #A86B2E, wash #3D2A17. */
+/* The estate ops console's tokens, with the identity product's own accent in
+   place of the console's blue: #D4975A, deep #A86B2E, wash #3D2A17. */
 :root {
   --radius-sm: .375rem; --radius-md: .5rem; --radius-lg: .625rem;
   --background: #121218;

@@ -124,6 +124,11 @@ impl Sessions {
             .ok_or(ServerError::NotSignedIn)
     }
 
+    /// The live session named by a Cookie header, when and until when it lasts.
+    pub fn session(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
+        self.entry(cookie_header)
+    }
+
     /// The actor of the session named by a Cookie header, if it is live.
     pub fn actor(&self, cookie_header: Option<&str>) -> Result<Actor, ServerError> {
         self.entry(cookie_header).map(|entry| entry.actor)

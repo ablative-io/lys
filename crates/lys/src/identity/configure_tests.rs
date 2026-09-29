@@ -94,10 +94,10 @@ fn theme_with_dark(client_id: &str, dark: ThemeCss) -> Theme {
     }
 }
 
-fn cambium_client() -> Client {
+fn app_client() -> Client {
     Client {
-        id: "cambium".to_string(),
-        name: "Cambium".to_string(),
+        id: "app".to_string(),
+        name: "App".to_string(),
         redirect_uris: vec!["https://cambium.example/callback".to_string()],
         post_logout_redirect_uris: Vec::new(),
         token_alg: "EdDSA".to_string(),
@@ -109,32 +109,32 @@ fn cambium_client() -> Client {
 fn a_theme_that_fails_contrast_is_refused_before_it_is_written() -> TestResult {
     let mut dark = rauthy_dark_defaults();
     dark.text_high = dark.bg;
-    let (url, handle) = fake_rauthy(&theme_with_dark("cambium", dark))?;
+    let (url, handle) = fake_rauthy(&theme_with_dark("app", dark))?;
     let api = RauthyApi::new(&url, None)?;
     let mapping = ThemeMapping::declared()?;
-    let outcome = reconcile_theme(&api, &mapping, ClientRole::Cambium, &cambium_client());
+    let outcome = reconcile_theme(&api, &mapping, ClientRole::App, &app_client());
     let seen = stop(&url, handle)?;
     let error = outcome.err().ok_or("a failing theme was accepted")?;
     assert_eq!(error.kind(), ErrorKind::ThemeInvalid);
     assert!(error.to_string().contains("text_high over ink"), "{error}");
-    assert_eq!(seen, ["POST /auth/v1/theme/cambium HTTP/1.1"]);
+    assert_eq!(seen, ["POST /auth/v1/theme/app HTTP/1.1"]);
     Ok(())
 }
 
 #[test]
 fn a_theme_that_meets_contrast_is_written_and_read_back() -> TestResult {
-    let (url, handle) = fake_rauthy(&theme_with_dark("cambium", rauthy_dark_defaults()))?;
+    let (url, handle) = fake_rauthy(&theme_with_dark("app", rauthy_dark_defaults()))?;
     let api = RauthyApi::new(&url, None)?;
     let mapping = ThemeMapping::declared()?;
-    let outcome = reconcile_theme(&api, &mapping, ClientRole::Cambium, &cambium_client());
+    let outcome = reconcile_theme(&api, &mapping, ClientRole::App, &app_client());
     let seen = stop(&url, handle)?;
     assert_eq!(outcome?.outcome, "applied");
     assert_eq!(
         seen,
         [
-            "POST /auth/v1/theme/cambium HTTP/1.1",
-            "PUT /auth/v1/theme/cambium HTTP/1.1",
-            "POST /auth/v1/theme/cambium HTTP/1.1",
+            "POST /auth/v1/theme/app HTTP/1.1",
+            "PUT /auth/v1/theme/app HTTP/1.1",
+            "POST /auth/v1/theme/app HTTP/1.1",
         ]
     );
     Ok(())

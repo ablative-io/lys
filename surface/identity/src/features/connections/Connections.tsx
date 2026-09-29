@@ -30,7 +30,7 @@ export function Connections() {
         {connection.endpoint ? <details><summary>Connection details</summary><p className="mono">{connection.endpoint}</p></details> : null}
         <span className={'pill' + (connection.state === 'unconfigured' ? '' : ' ok')}>{labels[connection.state]}</span>
       </section>)}</div>}
-      <SignInProviders issuer={data.connections.find((connection) => connection.id === 'sign_in')?.endpoint ?? null} />
+      <SignInProviders />
       <p className="note">This view shows installation settings. It does not yet list products using Lys or external accounts available to agents.</p>
       <div className="actions"><a className="btn" href="#/service-accounts">Manage service accounts</a>
         <a className="btn" href="#/me">Your sign-in accounts</a></div>

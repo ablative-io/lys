@@ -16,5 +16,6 @@ pub mod key;
 pub mod log;
 pub mod output;
 pub mod pem;
+pub mod runner;
 pub mod seal;
 pub mod verify;

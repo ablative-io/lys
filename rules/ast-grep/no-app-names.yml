@@ -1,0 +1,206 @@
+# Lys depends on no app (DIRECTORY-048 R7): no product's name appears in the
+# code, configuration or screens under crates/ and surface/. An app is known to
+# Lys only by the registration it makes through the Apps API, so its name lives
+# in that record and nowhere in Lys. Test code and fixtures named for a test are
+# outside the rule. The match is the innermost comment, string or name node whose
+# text names a product, anywhere in it, so a name is caught wherever it is written,
+# joined to other words or not.
+id: no-app-names-rust
+language: rust
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: line_comment
+        - kind: block_comment
+        - kind: doc_comment
+        - kind: string_content
+        - kind: raw_string_literal
+        - kind: identifier
+        - kind: type_identifier
+        - kind: field_identifier
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end
+
+---
+id: no-app-names-typescript
+language: typescript
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: comment
+        - kind: string_fragment
+        - kind: template_string
+        - kind: identifier
+        - kind: property_identifier
+        - kind: type_identifier
+        - kind: shorthand_property_identifier
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end
+
+---
+id: no-app-names-tsx
+language: tsx
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: comment
+        - kind: string_fragment
+        - kind: template_string
+        - kind: identifier
+        - kind: property_identifier
+        - kind: type_identifier
+        - kind: shorthand_property_identifier
+        - kind: jsx_text
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end
+
+---
+id: no-app-names-javascript
+language: javascript
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: comment
+        - kind: string_fragment
+        - kind: template_string
+        - kind: identifier
+        - kind: property_identifier
+        - kind: shorthand_property_identifier
+        - kind: jsx_text
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end
+
+---
+id: no-app-names-css
+language: css
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: comment
+        - kind: class_name
+        - kind: id_name
+        - kind: property_name
+        - kind: plain_value
+        - kind: string_value
+        - kind: tag_name
+        - kind: feature_name
+        - kind: attribute_name
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end
+
+---
+id: no-app-names-html
+language: html
+severity: error
+message: "A product's name in Lys. Lys depends on no app: an app registers itself through the Apps API, and its name lives in that registration, never in Lys's code, configuration or screens (DIRECTORY-048 R7)."
+files:
+  - "crates/**"
+  - "surface/**"
+ignores:
+  - "vendor/**"
+  - "**/tests/**"
+  - "**/*_tests.rs"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/fixtures/**"
+  - "**/fixtures.*"
+  - "**/node_modules/**"
+rule:
+  all:
+    - any:
+        - kind: comment
+        - kind: text
+        - kind: raw_text
+        - kind: attribute_name
+        - kind: attribute_value
+        - kind: tag_name
+    - regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+    - not:
+        has:
+          regex: '(?i)(cambium|argus|aion|manifold|meridian|haematite)'
+          stopBy: end

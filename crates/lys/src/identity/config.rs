@@ -6,15 +6,19 @@
 //! diagnostic names the field and the rule it broke; none echoes a value
 //! that could be a credential.
 
+use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 
+mod bring_forward;
 mod validate;
 
-use validate::{authority_of, validate_admin_url, validate_client, validate_origin};
+use validate::{
+    authority_of, network_gateway, validate_admin_url, validate_client, validate_origin,
+};
 
 /// The compose service name the bundled `PostgreSQL` answers to.
 pub const BUNDLED_DATABASE_HOST: &str = "postgres";
@@ -49,8 +53,16 @@ pub struct Deployment {
     pub project: String,
     /// The private state directory, relative to the configuration file.
     pub state_dir: PathBuf,
-    /// The test identity Rauthy bootstraps as its administrator.
-    pub admin_email: String,
+    /// The private IPv4 range the compose network is given, written from its
+    /// first address. Its gateway, the range's next address, is the one
+    /// address the directory service on this machine reaches the sign-in
+    /// service from.
+    pub network: String,
+    /// The administrator's email an unattended install was given, the only
+    /// email the setup page then takes. Absent, the person types their own
+    /// on the setup page; nothing is ever filled from the machine.
+    #[serde(default)]
+    pub admin_email: Option<String>,
 }
 
 /// The `[issuer]` table.
@@ -63,7 +75,9 @@ pub struct Issuer {
     pub listen_port: u16,
     /// The URL lys reaches Rauthy's admin API at, over loopback HTTP.
     pub admin_url: String,
-    /// Proxies trusted to set forwarded headers when the origin is HTTPS.
+    /// The addresses the sign-in service takes a person's own address from:
+    /// the network's gateway, which the directory service reaches it from, or
+    /// none, when every sign-in counts as the service's own address.
     #[serde(default)]
     pub trusted_proxies: Vec<String>,
 }
@@ -116,14 +130,18 @@ pub enum CredentialSource {
     Provided,
 }
 
-/// The `[clients]` table: exactly the platform and Cambium clients.
+/// The `[clients]` table: the platform's client, and one app's client where a
+/// configuration names it. An install names only the platform's: every app
+/// registers itself through the directory's Apps API, never with the issuer.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Clients {
     /// The platform's own confidential client, themed identity orange.
     pub platform: Client,
-    /// Cambium's client, themed Cambium green.
-    pub cambium: Client,
+    /// The one app client installed beside the platform's, themed with the
+    /// app accent the theme mapping declares, when a configuration names it.
+    #[serde(default)]
+    pub app: Option<Client>,
 }
 
 /// One managed OIDC client.
@@ -155,9 +173,11 @@ fn refuse(kind: ErrorKind, resource: &str, detail: impl Into<String>) -> Identit
 }
 
 impl DeploymentConfig {
-    /// Reads and validates the configuration at `path`.
+    /// Reads and validates the configuration at `path`, first bringing a
+    /// file an earlier build wrote forward to this build's shape and writing
+    /// it back, so an install is never refused for the build it began on.
     pub fn load(path: &Path) -> IdentityResult<Self> {
-        let text = std::fs::read_to_string(path).map_err(|error| {
+        let read = std::fs::read_to_string(path).map_err(|error| {
             IdentityError::new(
                 ErrorKind::ConfigUnreadable,
                 "read configuration",
@@ -166,6 +186,14 @@ impl DeploymentConfig {
             )
             .at(path)
         })?;
+        let text = match bring_forward::bring_forward(&read).map_err(|error| error.at(path))? {
+            Some(brought) => {
+                Self::parse(&brought, PathBuf::new()).map_err(|error| error.at(path))?;
+                bring_forward::write_back(path, &brought)?;
+                brought
+            }
+            None => read,
+        };
         let base = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
@@ -189,12 +217,13 @@ impl DeploymentConfig {
         self.base.join(&self.deployment.state_dir)
     }
 
-    /// The two managed clients, platform first.
-    pub fn managed_clients(&self) -> [(ClientRole, &Client); 2] {
-        [
-            (ClientRole::Platform, &self.clients.platform),
-            (ClientRole::Cambium, &self.clients.cambium),
-        ]
+    /// The managed clients, platform first.
+    pub fn managed_clients(&self) -> Vec<(ClientRole, &Client)> {
+        let mut clients = vec![(ClientRole::Platform, &self.clients.platform)];
+        if let Some(app) = &self.clients.app {
+            clients.push((ClientRole::App, app));
+        }
+        clients
     }
 
     /// Rauthy's `PUB_URL`: the public origin's authority.
@@ -211,6 +240,12 @@ impl DeploymentConfig {
                 .map_or(authority, |(host, _)| host.trim_start_matches('['));
         }
         authority.split(':').next().unwrap_or(authority)
+    }
+
+    /// The compose network's gateway: the address the directory service
+    /// reaches the sign-in service from.
+    pub fn gateway(&self) -> IdentityResult<Ipv4Addr> {
+        network_gateway(&self.deployment.network)
     }
 
     /// Whether the public origin is served over TLS by a fronting proxy.
@@ -238,30 +273,36 @@ impl DeploymentConfig {
             return Err(refuse(
                 ErrorKind::IssuerInvalid,
                 "issuer.trusted_proxies",
-                "an https public origin is served through a TLS proxy; name it in trusted_proxies",
+                "an https origin runs the sign-in service in proxy mode, which answers its trusted proxies alone; name the network's gateway in trusted_proxies",
             ));
         }
-        let proxies_ok = self.issuer.trusted_proxies.iter().all(|proxy| {
-            !proxy.is_empty()
-                && proxy
-                    .bytes()
-                    .all(|byte| byte.is_ascii_hexdigit() || b".:/".contains(&byte))
-        });
+        let gateway = self.gateway()?.to_string();
+        let proxies_ok = self
+            .issuer
+            .trusted_proxies
+            .iter()
+            .all(|proxy| proxy.strip_suffix("/32").unwrap_or(proxy) == gateway);
         if !proxies_ok {
             return Err(refuse(
                 ErrorKind::IssuerInvalid,
                 "issuer.trusted_proxies",
-                "each trusted proxy is an address or CIDR range",
+                format!(
+                    "the sign-in service takes a person's address from the directory service alone, which reaches it from {gateway}, the gateway of deployment.network"
+                ),
             ));
         }
         validate_admin_url(&self.issuer.admin_url)?;
         self.validate_database()?;
-        let [(_, platform), (_, cambium)] = self.managed_clients();
-        if platform.id == cambium.id {
+        if self
+            .clients
+            .app
+            .as_ref()
+            .is_some_and(|app| app.id == self.clients.platform.id)
+        {
             return Err(refuse(
                 ErrorKind::ClientInvalid,
                 "clients",
-                "the platform and Cambium clients need distinct ids",
+                "the platform and app clients need distinct ids",
             ));
         }
         for (role, client) in self.managed_clients() {
@@ -290,15 +331,13 @@ impl DeploymentConfig {
                 "use lowercase letters, digits, - and _ only",
             ));
         }
-        let email_ok = deployment
-            .admin_email
-            .split_once('@')
-            .is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.'));
-        if !email_ok {
+        if let Some(email) = &deployment.admin_email
+            && !is_email(email)
+        {
             return Err(refuse(
                 ErrorKind::ConfigInvalid,
                 "deployment.admin_email",
-                "expected a test email address",
+                "expected an email address",
             ));
         }
         Ok(())
@@ -379,8 +418,9 @@ impl DeploymentConfig {
 pub enum ClientRole {
     /// The platform's own client.
     Platform,
-    /// Cambium's client.
-    Cambium,
+    /// The one installed app's client. Every further app registers itself
+    /// through the directory's Apps API.
+    App,
 }
 
 impl ClientRole {
@@ -388,9 +428,26 @@ impl ClientRole {
     pub fn key(self) -> &'static str {
         match self {
             Self::Platform => "platform",
-            Self::Cambium => "cambium",
+            Self::App => "app",
         }
     }
+}
+
+/// Whether `text` is shaped as an email address: one `@` with text on each
+/// side, a dot inside the domain, and no space, control character, quote,
+/// backslash or character an address carries in its path or query.
+pub fn is_email(text: &str) -> bool {
+    let refused = |c: char| {
+        c.is_whitespace() || c.is_control() || matches!(c, '/' | '?' | '#' | '%' | '"' | '\\')
+    };
+    !text.chars().any(refused)
+        && text.split_once('@').is_some_and(|(local, domain)| {
+            !local.is_empty()
+                && domain.contains('.')
+                && !domain.starts_with('.')
+                && !domain.ends_with('.')
+                && !domain.contains('@')
+        })
 }
 
 #[cfg(test)]

@@ -22,7 +22,14 @@ fn the_example_configuration_is_valid() -> Result<(), Box<dyn Error>> {
     assert_eq!(config.rp_id(), "localhost");
     assert!(!config.public_tls());
     assert_eq!(config.managed_clients()[0].0, ClientRole::Platform);
-    assert_eq!(config.clients.cambium.token_alg, "RS256");
+    assert_eq!(
+        config
+            .clients
+            .app
+            .as_ref()
+            .map(|client| client.token_alg.as_str()),
+        Some("RS256")
+    );
     assert_eq!(config.clients.platform.challenges, ["S256"]);
     Ok(())
 }
@@ -76,10 +83,63 @@ fn an_invalid_issuer_is_refused_by_name() {
 fn an_https_origin_needs_its_proxy_named() -> Result<(), Box<dyn Error>> {
     let text = EXAMPLE.replace("\"http://localhost:8480\"", "\"https://id.example.test\"");
     assert!(refused_as(&text, ErrorKind::IssuerInvalid));
-    let text = text.replace("trusted_proxies = []", "trusted_proxies = [\"10.0.0.0/8\"]");
+    let text = text.replace(
+        "trusted_proxies = []",
+        "trusted_proxies = [\"172.29.48.1/32\"]",
+    );
     let config = parse(&text)?;
     assert!(config.public_tls());
     assert_eq!(config.pub_url(), "id.example.test");
+    Ok(())
+}
+
+#[test]
+fn only_the_networks_gateway_may_be_a_trusted_proxy() -> Result<(), Box<dyn Error>> {
+    let mut refused = 0;
+    for proxy in [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "172.29.48.0/24",
+        "172.29.48.2",
+        "::1",
+    ] {
+        let text = EXAMPLE.replace(
+            "trusted_proxies = []",
+            &format!("trusted_proxies = [\"{proxy}\"]"),
+        );
+        assert!(refused_as(&text, ErrorKind::IssuerInvalid), "{proxy}");
+        refused += 1;
+    }
+    assert_eq!(refused, 5);
+    for proxy in ["172.29.48.1", "172.29.48.1/32"] {
+        let text = EXAMPLE.replace(
+            "trusted_proxies = []",
+            &format!("trusted_proxies = [\"{proxy}\"]"),
+        );
+        assert_eq!(parse(&text)?.issuer.trusted_proxies, [proxy]);
+    }
+    Ok(())
+}
+
+#[test]
+fn the_network_is_a_private_range_written_from_its_first_address() -> Result<(), Box<dyn Error>> {
+    let mut refused = 0;
+    for network in [
+        "172.29.48.1/24",
+        "8.8.8.0/24",
+        "172.29.48.0/30",
+        "172.29.48.0",
+        "172.29.48.0/x",
+        "fd00::/64",
+        "10.0.0.0/7",
+    ] {
+        let text = EXAMPLE.replace("172.29.48.0/24", network);
+        assert!(refused_as(&text, ErrorKind::ConfigInvalid), "{network}");
+        refused += 1;
+    }
+    assert_eq!(refused, 7);
+    let config = parse(&EXAMPLE.replace("172.29.48.0/24", "10.4.0.0/16"))?;
+    assert_eq!(config.gateway()?, std::net::Ipv4Addr::new(10, 4, 0, 1));
     Ok(())
 }
 
@@ -103,14 +163,60 @@ fn an_invalid_redirect_is_refused_by_name() {
 
 #[test]
 fn clients_are_distinct_and_never_rauthys_own() {
-    let text = EXAMPLE.replace("id = \"cambium\"", "id = \"lys-platform\"");
+    let text = EXAMPLE.replace("id = \"app\"", "id = \"lys-platform\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
-    let text = EXAMPLE.replace("id = \"cambium\"", "id = \"rauthy\"");
+    let text = EXAMPLE.replace("id = \"app\"", "id = \"rauthy\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
     let text = EXAMPLE.replace("token_alg = \"RS256\"", "token_alg = \"HS256\"");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
     let text = EXAMPLE.replace("challenges = [\"S256\"]", "challenges = [\"plain\"]");
     assert!(refused_as(&text, ErrorKind::ClientInvalid));
+}
+
+/// A file as an earlier build wrote it: the app client under the product's
+/// own name and no compose network named.
+fn earlier_build_file() -> String {
+    EXAMPLE
+        .replace("[clients.app]", "[clients.product]")
+        .lines()
+        .filter(|line| !line.starts_with("network ="))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn an_earlier_builds_file_is_brought_forward_and_read() -> Result<(), Box<dyn Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("deployment.toml");
+    let earlier = earlier_build_file();
+    assert!(
+        parse(&earlier).is_err(),
+        "this build cannot read it as written"
+    );
+    std::fs::write(&path, &earlier)?;
+    let config = DeploymentConfig::load(&path)?;
+    assert_eq!(config.clients.app, parse(EXAMPLE)?.clients.app);
+    assert_eq!(config.deployment.network, bring_forward::DEFAULT_NETWORK);
+    let written = std::fs::read_to_string(&path)?;
+    assert!(written.contains("[clients.app]") && !written.contains("[clients.product]"));
+    assert!(written.contains(&format!("network = \"{}\"", bring_forward::DEFAULT_NETWORK)));
+    DeploymentConfig::load(&path)?;
+    assert_eq!(
+        std::fs::read_to_string(&path)?,
+        written,
+        "brought forward once"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_file_in_this_builds_shape_is_left_as_written() -> Result<(), Box<dyn Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("deployment.toml");
+    std::fs::write(&path, EXAMPLE)?;
+    DeploymentConfig::load(&path)?;
+    assert_eq!(std::fs::read_to_string(&path)?, EXAMPLE);
+    Ok(())
 }
 
 #[test]

@@ -4,11 +4,11 @@
 //! Every wait is on an event, never a clock, and never a question asked
 //! again on a schedule. A service is checked once when the wait begins and
 //! once on each change to its output: a detached service's log file through
-//! the platform's file-change notice (kqueue on macOS and the BSDs, inotify
-//! on Linux), the compose services through their followed output. The wait
-//! ends ready when the check passes and is refused by name, with where the
-//! output is, when the process exits first. A stop waits on the exit itself,
-//! as [`super::exit_wait`] describes.
+//! the platform's file-change notice, as [`super::log_wait`] describes, the
+//! compose services through their followed output. The wait ends ready when
+//! the check passes and is refused by name, with where the output is, when
+//! the process exits first. A stop waits on the exit itself, as
+//! [`super::exit_wait`] describes.
 
 use std::fs::OpenOptions;
 use std::io::Read;
@@ -132,9 +132,28 @@ fn compose_args(layout: &Layout, config: &DeploymentConfig) -> Vec<String> {
 
 /// `docker compose up -d --wait` for the deployment under `layout`.
 pub fn compose_up(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    let args = up_args(layout, config, false);
+    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+}
+
+/// `docker compose up -d --wait --force-recreate` for the deployment under
+/// `layout`: every service is made again from the definition now in place.
+/// Compose recreates a changed network without recreating a container whose
+/// own definition is unchanged, which leaves that container off the network
+/// under its service name, so an upgrade makes every service again.
+pub fn compose_recreate(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
+    let args = up_args(layout, config, true);
+    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+}
+
+/// The `docker compose up` arguments, recreating every service when asked.
+pub fn up_args(layout: &Layout, config: &DeploymentConfig, recreate: bool) -> Vec<String> {
     let mut args = compose_args(layout, config);
     args.extend(["up", "-d", "--wait"].map(str::to_string));
-    run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
+    if recreate {
+        args.push("--force-recreate".to_string());
+    }
+    args
 }
 
 /// The declared services of `config` that are not ready now.
@@ -398,184 +417,4 @@ pub fn answers(port: u16, path: &str) -> bool {
         body: &[],
     };
     loopback_http::exchange(&authority, &request).is_ok()
-}
-
-/// Waits until the loopback service on `port` answers `path`, or the
-/// process behind the pid file exits, in which case the log is named.
-pub fn wait_answering(port: u16, path: &str, pid_file: &Path, log: &Path) -> IdentityResult<()> {
-    wait_until(&format!("127.0.0.1:{port}"), log, pid_file, &mut || {
-        answers(port, path)
-    })
-}
-
-/// Runs `check` once now and once on each change to `log`, until it
-/// passes; the process behind `pid_file` exiting first is refused as
-/// `what`, naming the log. The log is watched before the first check, so a
-/// change made after it is never missed.
-#[cfg(unix)]
-pub fn wait_until(
-    what: &str,
-    log: &Path,
-    pid_file: &Path,
-    check: &mut dyn FnMut() -> bool,
-) -> IdentityResult<()> {
-    use mio::unix::SourceFd;
-    use mio::{Events, Interest, Poll, Token};
-    use std::os::fd::AsRawFd;
-    use std::os::unix::net::UnixStream;
-
-    use log_watch::LogWatch;
-
-    const CHANGED: Token = Token(0);
-    const EXITED: Token = Token(1);
-    let watching = |error: std::io::Error| {
-        refuse(
-            "wait for service",
-            what,
-            format!("watching {}: {error}", log.display()),
-        )
-    };
-    let mut poll = Poll::new().map_err(watching)?;
-    let registry = poll.registry();
-    let mut changes = LogWatch::arm(log, registry, CHANGED).map_err(watching)?;
-    if check() {
-        return Ok(());
-    }
-    let exit = ExitWatch::open(pid_file)?;
-    let (signal, notice) = UnixStream::pair().map_err(watching)?;
-    let signal_fd = signal.as_raw_fd();
-    registry
-        .register(&mut SourceFd(&signal_fd), EXITED, Interest::READABLE)
-        .map_err(watching)?;
-    let exited = std::thread::spawn(move || {
-        let outcome = exit.wait();
-        drop(notice);
-        outcome
-    });
-    let mut events = Events::with_capacity(4);
-    loop {
-        match poll.poll(&mut events, None) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(watching(error)),
-        }
-        if events.iter().any(|event| event.token() == EXITED) {
-            return match exited.join() {
-                Ok(Ok(())) => Err(refuse(
-                    "wait for service",
-                    what,
-                    format!("the process exited; its output is in {}", log.display()),
-                )),
-                Ok(Err(error)) => Err(error),
-                Err(panic) => Err(refuse(
-                    "wait for service",
-                    what,
-                    format!("the exit watch failed: {panic:?}"),
-                )),
-            };
-        }
-        changes.drain().map_err(watching)?;
-        if check() {
-            return Ok(());
-        }
-    }
-}
-
-/// Without Unix there is no event to wait on: `check` is asked once and a
-/// service not ready then is refused as `what`, naming the log.
-#[cfg(not(unix))]
-pub fn wait_until(
-    what: &str,
-    log: &Path,
-    pid_file: &Path,
-    check: &mut dyn FnMut() -> bool,
-) -> IdentityResult<()> {
-    if check() {
-        return Ok(());
-    }
-    Err(refuse(
-        "wait for service",
-        what,
-        format!(
-            "waiting on {} and {} needs a Unix host",
-            log.display(),
-            pid_file.display()
-        ),
-    ))
-}
-
-/// The notice of a change to a log file.
-#[cfg(any(target_os = "linux", target_os = "android"))]
-mod log_watch {
-    use std::fs::File;
-    use std::io::{ErrorKind, Read, Result};
-    use std::os::fd::AsRawFd;
-    use std::path::Path;
-
-    use mio::unix::SourceFd;
-    use mio::{Interest, Registry, Token};
-    use rustix::fs::inotify::{self, CreateFlags, WatchFlags};
-
-    /// An inotify watch on one log file, read without blocking.
-    pub struct LogWatch(File);
-
-    impl LogWatch {
-        /// Watches `log` for writes, the notice reaching `registry` as `token`.
-        pub fn arm(log: &Path, registry: &Registry, token: Token) -> Result<Self> {
-            let notices = inotify::init(CreateFlags::NONBLOCK | CreateFlags::CLOEXEC)?;
-            inotify::add_watch(&notices, log, WatchFlags::MODIFY)?;
-            let fd = notices.as_raw_fd();
-            let source = &mut SourceFd(&fd);
-            registry.register(source, token, Interest::READABLE)?;
-            Ok(Self(File::from(notices)))
-        }
-
-        /// Takes every notice waiting, so the next change is a new event.
-        pub fn drain(&mut self) -> Result<()> {
-            let mut notices = [0_u8; 4096];
-            loop {
-                match self.0.read(&mut notices) {
-                    Ok(0) => return Ok(()),
-                    Ok(_) => {}
-                    Err(error) if error.kind() == ErrorKind::WouldBlock => return Ok(()),
-                    Err(error) if error.kind() == ErrorKind::Interrupted => {}
-                    Err(error) => return Err(error),
-                }
-            }
-        }
-    }
-}
-
-/// The notice of a change to a log file.
-#[cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))]
-mod log_watch {
-    use std::fs::File;
-    use std::io::{Result, Seek, SeekFrom};
-    use std::os::fd::AsRawFd;
-    use std::path::Path;
-
-    use mio::unix::SourceFd;
-    use mio::{Interest, Registry, Token};
-
-    /// The log file itself, registered for reading: kqueue reports it when
-    /// the file grows past where this reader stands.
-    pub struct LogWatch(File);
-
-    impl LogWatch {
-        /// Watches `log` for what is appended from now, the notice reaching
-        /// `registry` as `token`.
-        pub fn arm(log: &Path, registry: &Registry, token: Token) -> Result<Self> {
-            let mut file = File::open(log)?;
-            file.seek(SeekFrom::End(0))?;
-            let fd = file.as_raw_fd();
-            let source = &mut SourceFd(&fd);
-            registry.register(source, token, Interest::READABLE)?;
-            Ok(Self(file))
-        }
-
-        /// Stands at the end again, so the next append is a new event.
-        pub fn drain(&mut self) -> Result<()> {
-            self.0.seek(SeekFrom::End(0)).map(drop)
-        }
-    }
 }

@@ -18,6 +18,8 @@ path = "src/main.rs"
 [dependencies]
 lys-core.workspace = true
 lys-log-store.workspace = true
+# `lys runner`: every act of the runner is the library's.
+lys-runner.workspace = true
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
@@ -68,6 +70,11 @@ test = false
 [[test]]
 name = "identity_theme"
 path = "tests/identity_theme.rs"
+test = false
+
+[[test]]
+name = "identity_install"
+path = "tests/identity_install.rs"
 test = false
 
 [lints]

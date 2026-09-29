@@ -71,10 +71,11 @@ async fn google_is_set_from_the_lookup_and_set_again_replaces_it() -> TestResult
     let held = rauthy.providers();
     assert_eq!(held.len(), 1);
     assert_eq!(held[0]["typ"], "google");
-    assert_eq!(held[0]["issuer"], "https://accounts.google.com");
+    let provider = service.issuer.provider_base();
+    assert_eq!(held[0]["issuer"], provider);
     assert_eq!(
         held[0]["authorization_endpoint"],
-        "https://accounts.google.com/authorize"
+        format!("{provider}/authorize")
     );
     assert_eq!(held[0]["scope"], "openid email profile");
     assert_eq!(held[0]["use_pkce"], true);
@@ -107,7 +108,10 @@ async fn github_has_fixed_endpoints_and_microsoft_names_its_tenant() -> TestResu
     assert_eq!(held[0]["typ"], "github");
     assert_eq!(
         held[0]["token_endpoint"],
-        "https://github.com/login/oauth/access_token"
+        format!(
+            "{}/login/oauth/access_token",
+            service.issuer.provider_base()
+        )
     );
     assert_eq!(held[0]["userinfo_endpoint"], "https://api.github.com/user");
     assert_eq!(held[0]["jwks_endpoint"], Value::Null);
@@ -143,7 +147,79 @@ async fn github_has_fixed_endpoints_and_microsoft_names_its_tenant() -> TestResu
     assert_eq!(held[1]["typ"], "oidc");
     assert_eq!(
         held[1]["issuer"],
-        "https://login.microsoftonline.com/contoso.onmicrosoft.com/v2.0"
+        format!(
+            "{}/contoso.onmicrosoft.com/v2.0",
+            service.issuer.provider_base()
+        )
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_redirect_address_shown_is_the_one_the_provider_is_asked_with() -> TestResult {
+    let (service, _rauthy, ada) = table().await?;
+    let (status, shown) = service.get("/sign-in-providers", Some(&ada)).await?;
+    assert_eq!(status, 200, "{shown}");
+    let expected = format!("{}/auth/v1/providers/callback", service.base);
+    assert_eq!(shown["redirect_address"], expected.as_str());
+    let body = json!({ "provider": "google", "client_id": "123-abc.apps.googleusercontent.com", "client_secret": SECRET });
+    let (status, set) = service
+        .post("/sign-in-providers", Some(&ada), &body)
+        .await?;
+    assert_eq!(status, 200, "{set}");
+    assert_eq!(set["redirect_address"], expected.as_str());
+    let asked = service.issuer.provider_redirects();
+    assert_eq!(
+        asked,
+        [expected],
+        "the provider was proved with the address shown"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_client_id_the_provider_rejects_is_refused_in_the_providers_words() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    for provider in ["google", "github"] {
+        let body = json!({ "provider": provider, "client_id": "rejected-client", "client_secret": SECRET });
+        let answer = service
+            .post("/sign-in-providers", Some(&ada), &body)
+            .await?;
+        refused(&answer, 400, "ProviderRefused");
+        let reason = answer.1["reason"].as_str().unwrap_or_default();
+        assert!(
+            reason.contains("The OAuth client was not found."),
+            "{reason}"
+        );
+    }
+    assert!(
+        rauthy.providers().is_empty(),
+        "a refused provider is never saved"
+    );
+    let (status, offered) = service.get("/sign-in/providers", None).await?;
+    assert_eq!(status, 200, "{offered}");
+    assert_eq!(offered["providers"], json!([]));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_saved_provider_is_offered_on_the_sign_in_page() -> TestResult {
+    let (service, _rauthy, ada) = table().await?;
+    let body =
+        json!({ "provider": "github", "client_id": "Iv1.contract", "client_secret": SECRET });
+    let (status, set) = service
+        .post("/sign-in-providers", Some(&ada), &body)
+        .await?;
+    assert_eq!(status, 200, "{set}");
+    let (status, offered) = service.get("/sign-in/providers", None).await?;
+    assert_eq!(status, 200, "{offered}");
+    let providers = offered["providers"].as_array().ok_or("a list")?;
+    assert_eq!(providers.len(), 1, "{offered}");
+    assert_eq!(providers[0]["name"], "GitHub");
+    assert_eq!(providers[0]["provider"], "github");
+    assert!(
+        !offered.to_string().contains("Iv1.contract"),
+        "the sign-in page is not given the client id: {offered}"
     );
     Ok(())
 }

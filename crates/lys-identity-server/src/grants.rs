@@ -16,6 +16,15 @@
 //! or identity the caller may not see is answered with its name and without
 //! the record.
 //!
+//! Every route that names a resource kind, issuing, passing on and every
+//! check, first asks the apps whether an approved app declares that kind:
+//! a kind no approved app declares is refused `kind_not_registered`, one of
+//! an app not yet approved `app_not_approved`, and one of a retired app
+//! `app_retired`, so a grant on a retired app's kind stays readable and is
+//! never exercised. A check on a resource of an app kind also reaches the
+//! resources it is placed in whose kinds its schema lists as parents,
+//! nearest first, so a relation held on a parent flows to its children.
+//!
 //! The cannot-give question, `GET /grants/cannot-give`, is asked from a
 //! source grant the caller holds, for a recipient the caller may name: any
 //! person, or an agent it may see. A source it does not hold is refused
@@ -30,27 +39,26 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::sync::{Arc, PoisonError};
+use std::sync::{Arc, PoisonError, RwLock};
 
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::admission::effective;
-use lys_identity::grants::{
-    ExerciseRequest, GrantError, GrantRecord, Grants, MemoryRelationships, Model,
-};
+use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
 use lys_identity::{IdentityError, IdentityId, PersonId};
 use lys_log_store::FileLeafStore;
 
+use crate::apps_store::AppStore;
 use crate::error::ServerError;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
-    ModelView, PAGE_MAX, PermitView, RecordedView, RefusedView, RevokeBody, RootBody, StandingView,
-    WhoBody, WhoPage, grant_id,
+    ModelView, PAGE_MAX, PermitView, RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
+    grant_id,
 };
+pub(crate) use crate::grant_sight::grant_view;
 use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -67,14 +75,28 @@ pub struct GrantSetup {
     pub log_origin: String,
     /// The file holding the service's event signing key seed.
     pub key_file: PathBuf,
-    /// The model grants are judged against.
-    pub model: Model,
+    /// Lys's own model, the app `lys`'s current schema, as the apps log
+    /// last gave it. The log is its only source once the app `lys` exists.
+    pub model: RwLock<Model>,
     /// The permission engine the grants are mirrored into, if one is named.
     pub spicedb: Option<SpiceDbSettings>,
 }
 
 impl GrantSetup {
-    fn open(&self, root_authority: PersonId) -> Result<GrantState, ServerError> {
+    /// Lys's own model as the apps log last gave it.
+    pub fn model(&self) -> Model {
+        self.model
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Hold `model` as Lys's own model from now on.
+    pub fn hold_model(&self, model: Model) {
+        *self.model.write().unwrap_or_else(PoisonError::into_inner) = model;
+    }
+
+    fn open(&self, root_authority: PersonId, model: Model) -> Result<GrantState, ServerError> {
         if !self.log_dir.exists() {
             FileLeafStore::create(&self.log_dir, &self.log_origin).map_err(|error| {
                 ServerError::ConfigInvalid {
@@ -84,14 +106,14 @@ impl GrantSetup {
         }
         let log_dir = self.log_dir.clone();
         let relationships = match &self.spicedb {
-            Some(settings) => Relationships::SpiceDb(SpiceDb::open(settings, &self.model)?),
+            Some(settings) => Relationships::SpiceDb(SpiceDb::open(settings, &model)?),
             None => Relationships::Memory(MemoryRelationships::default()),
         };
         let mut grants = Grants::open(
             Box::new(move || FileLeafStore::open(&log_dir)),
             load_service_key(&self.key_file)?,
             relationships,
-            self.model.clone(),
+            model,
             root_authority,
         )?;
         if self.spicedb.is_some() {
@@ -108,6 +130,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/grants/model", get(model))
         .route("/grants/roots", post(issue_root))
         .route("/grants/check", post(check))
+        .route("/grants/check/batch", post(crate::grants_batch::batch))
+        .route("/grants/which", post(crate::grants_batch::which))
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
         .route("/grants/cannot-give", get(cannot_give))
@@ -123,26 +147,38 @@ pub struct Judged<'a> {
     pub grants: &'a mut GrantState,
     /// The root authority.
     pub root: PersonId,
+    /// The apps, whose approved schemas say which kinds are judged at all.
+    pub apps: &'a mut AppStore,
 }
 
-/// Run `act` with the directory's projection and the grants, directory lock
-/// first, opening the grants on first use.
+/// Run `act` with the directory's projection, the apps and the grants, in
+/// that lock order, opening the grants on first use under the model the
+/// apps log gives.
 pub(crate) fn with_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = directory.projection()?;
+        let administrator =
+            state
+                .admission
+                .administrator_login()
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "no administrator is set up yet, so there is no root authority to judge a grant under",
+                })?;
         let root = projection
-            .person_for(state.admission.administrator_login())
+            .person_for(&administrator)
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;
+        let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
+        apps.settle()?;
         let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
         let grants = if let Some(grants) = &mut *slot {
             grants
         } else {
-            let opened = state.grant_setup.open(root)?;
+            let opened = state.grant_setup.open(root, apps.model()?)?;
             (state.say)(&format!("grant log {}", opened.ledger().start()));
             slot.insert(opened)
         };
@@ -150,6 +186,7 @@ pub(crate) fn with_grants<T>(
             directory: projection,
             grants,
             root,
+            apps: &mut apps,
         })
     })
 }
@@ -157,7 +194,7 @@ pub(crate) fn with_grants<T>(
 /// Refuse unless the permission engine, where one is named, gives the caller
 /// the action on the resource. The grants' own decision is made first and
 /// nothing is recorded, so a refusal the grants name is answered by its name.
-fn engine_permits(
+pub(crate) fn engine_permits(
     grants: &mut GrantState,
     directory: &Projection,
     request: &ExerciseRequest,
@@ -178,61 +215,57 @@ fn engine_permits(
     })
 }
 
-/// The grant a refusal names on the chain it was judged over, if any.
-fn named_grant(error: &GrantError) -> Option<String> {
-    match error {
-        GrantError::Revoked { grant }
-        | GrantError::Expired { grant, .. }
-        | GrantError::NotStarted { grant, .. }
-        | GrantError::OperationUnresolved { grant, .. } => Some(grant.clone()),
-        _ => None,
-    }
+/// Whether a decision is an exercise, recorded as a use, or a question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Decision {
+    /// The caller is about to act: a permit is recorded as a use.
+    Exercise,
+    /// A question: nothing is recorded.
+    Explain,
 }
 
-/// `record` as `caller` reads it at `at`: whether it stands, judged by
-/// admission over its whole chain, and the earliest end on that chain.
-pub(crate) fn grant_view(
-    judged: &Judged<'_>,
-    caller: IdentityId,
-    record: &GrantRecord,
+/// The grants' decision on `request`, reaching from its resource to each
+/// parent it is placed in that its schema lists, nearest first, answered
+/// with the permit and the resource whose grant permits it. The first
+/// resource's refusal is the one answered when none permits.
+pub(crate) fn decide(
+    judged: &mut Judged<'_>,
+    request: &ExerciseRequest,
     at: u64,
-) -> GrantView {
-    let id = record.grant().id();
-    let book = judged.grants.book();
-    let effective_ends_at = book
-        .lineage(id)
-        .ok()
-        .and_then(|lineage| lineage.ends)
-        .map(|(ends, _)| ends);
-    let standing = match effective(book, judged.directory, id, at) {
-        Ok(_) => StandingView {
-            stands: true,
-            refused: None,
-        },
-        Err(error) => {
-            let named = named_grant(&error);
-            let seen = as_seen_by(judged, caller, error);
-            let grant = if matches!(seen, ServerError::Withheld { .. }) {
-                None
-            } else {
-                named
-            };
-            StandingView {
-                stands: false,
-                refused: Some(RefusedView {
-                    refusal: seen.name(),
-                    grant,
-                    reason: seen.to_string(),
-                }),
+    at_least: Option<u64>,
+    decision: Decision,
+) -> Result<(lys_identity::grants::Permit, lys_identity::grants::Resource), GrantError> {
+    let mut first = None;
+    for resource in judged.apps.reach(&request.resource) {
+        let asked = ExerciseRequest {
+            resource: resource.clone(),
+            ..request.clone()
+        };
+        let decided =
+            engine_permits(judged.grants, judged.directory, &asked, at).and_then(
+                |()| match decision {
+                    Decision::Exercise => {
+                        judged.grants.check(judged.directory, &asked, at, at_least)
+                    }
+                    Decision::Explain => {
+                        judged
+                            .grants
+                            .explain(judged.directory, &asked, at, at_least)
+                    }
+                },
+            );
+        match decided {
+            Ok(permit) => return Ok((permit, resource)),
+            Err(error) => {
+                first.get_or_insert(error);
             }
         }
-    };
-    GrantView::new(
-        record,
-        judged.grants.unreported(id),
-        standing,
-        effective_ends_at,
-    )
+    }
+    Err(first.unwrap_or_else(|| GrantError::NotHeld {
+        identity: request.caller.to_string(),
+        resource: request.resource.to_string(),
+        action: request.action.to_string(),
+    }))
 }
 
 /// The identity the signed-in caller's login is bound to, person or agent.
@@ -279,7 +312,7 @@ async fn model(
     headers: HeaderMap,
 ) -> Result<Json<ModelView>, ServerError> {
     signed_in(&state, &headers)?;
-    Ok(Json(ModelView::from(&state.grant_setup.model)))
+    Ok(Json(ModelView::from(&state.grant_setup.model())))
 }
 
 async fn read(
@@ -307,6 +340,7 @@ async fn issue_root(
 ) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
         let request = body.request(caller(&state, &headers, judged.directory)?)?;
+        judged.apps.admit_kind(None, request.resource.kind())?;
         let recorded = judged
             .grants
             .issue_root(judged.directory, &request, now())?;
@@ -322,6 +356,7 @@ async fn delegate(
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
         let request = body.request(caller)?;
+        judged.apps.admit_kind(None, request.resource.kind())?;
         visible_or(
             &judged,
             caller,
@@ -370,19 +405,18 @@ async fn check(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
-    with_grants(&state, |judged| {
+    with_grants(&state, |mut judged| {
         let caller = caller(&state, &headers, judged.directory)?;
+        judged.apps.admit_kind(None, resource.kind())?;
+        judged.apps.admit_action(resource.kind(), action.as_str())?;
         let request = ExerciseRequest {
             caller,
             route,
             resource,
             action,
         };
-        let at = now();
-        let decided = engine_permits(&mut *judged.grants, judged.directory, &request, at)
-            .and_then(|()| judged.grants.check(judged.directory, &request, at, None));
-        match decided {
-            Ok(permit) => Ok(Json(PermitView::from(&permit))),
+        match decide(&mut judged, &request, now(), None, Decision::Exercise) {
+            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
@@ -394,19 +428,18 @@ async fn why(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
-    with_grants(&state, |judged| {
+    with_grants(&state, |mut judged| {
         let caller = caller(&state, &headers, judged.directory)?;
+        judged.apps.admit_kind(None, resource.kind())?;
+        judged.apps.admit_action(resource.kind(), action.as_str())?;
         let request = ExerciseRequest {
             caller,
             route,
             resource,
             action,
         };
-        match judged
-            .grants
-            .explain(judged.directory, &request, now(), None)
-        {
-            Ok(permit) => Ok(Json(PermitView::from(&permit))),
+        match decide(&mut judged, &request, now(), None, Decision::Explain) {
+            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
@@ -426,6 +459,8 @@ async fn who(
     let at = now();
     with_grants(&state, |judged| {
         let caller = caller(&state, &headers, judged.directory)?;
+        judged.apps.admit_kind(None, resource.kind())?;
+        judged.apps.admit_action(resource.kind(), action.as_str())?;
         let after = body.after.as_deref();
         let mut known = HashMap::new();
         let holders: BTreeSet<(String, IdentityId)> = judged

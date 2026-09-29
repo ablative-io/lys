@@ -1,7 +1,7 @@
 # The standalone identity product's three dependency processes for development:
 # the maintained Rauthy (ADR-009), SpiceDB, and one PostgreSQL service with one
-# durable database (ADR-005). Cambium, Manifold, Argus and Aion are not here and
-# are not needed.
+# durable database (ADR-005). No app the directory serves is here, and none is
+# needed: apps register themselves through the directory's API.
 #
 # Every value comes from the environment `lys identity prepare` renders into the
 # state directory; nothing here is a credential. A missing value is refused by
@@ -107,6 +107,9 @@ services:
       # origin asks for the session cookie without that flag.
       COOKIE_MODE: ${RAUTHY_COOKIE_MODE:?config_invalid RAUTHY_COOKIE_MODE}
       TRUSTED_PROXIES: ${RAUTHY_TRUSTED_PROXIES-}
+      # Named only when a proxy is trusted: the directory service's
+      # X-Forwarded-For, taken from the trusted proxies alone.
+      PEER_IP_HEADER_NAME: ${RAUTHY_PEER_IP_HEADER_NAME-}
       BOOTSTRAP_ADMIN_EMAIL: ${RAUTHY_BOOTSTRAP_ADMIN_EMAIL:?config_invalid RAUTHY_BOOTSTRAP_ADMIN_EMAIL}
       BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${RAUTHY_BOOTSTRAP_ADMIN_PASSWORD:?secret_missing RAUTHY_BOOTSTRAP_ADMIN_PASSWORD}
       BOOTSTRAP_API_KEY: ${RAUTHY_BOOTSTRAP_API_KEY:?config_invalid RAUTHY_BOOTSTRAP_API_KEY}
@@ -121,6 +124,16 @@ services:
         condition: service_healthy
         required: false
     restart: unless-stopped
+
+# The network's range is named, so its gateway, the one address the directory
+# service on this machine reaches the sign-in service from, is known and is the
+# only trusted proxy.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${IDENTITY_NETWORK:?config_invalid IDENTITY_NETWORK}
+          gateway: ${IDENTITY_GATEWAY:?config_invalid IDENTITY_GATEWAY}
 
 volumes:
   postgres-data:

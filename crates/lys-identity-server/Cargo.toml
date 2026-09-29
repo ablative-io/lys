@@ -16,6 +16,8 @@ lys-core.workspace = true
 lys-home.workspace = true
 lys-identity.workspace = true
 lys-log-store.workspace = true
+lys-openapi.workspace = true
+lys-runner.workspace = true
 openidconnect.workspace = true
 rand.workspace = true
 reqwest.workspace = true
@@ -25,6 +27,7 @@ sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 identity-contract = { path = "../../tests/identity_contract" }

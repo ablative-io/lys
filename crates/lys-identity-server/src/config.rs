@@ -46,8 +46,16 @@ pub struct Config {
     pub client_secret_file: PathBuf,
     /// The URL the issuer redirects back to after sign-in.
     pub redirect_url: String,
-    /// The step-1 administrator, by issuer and subject (P9).
-    pub administrator: ConfiguredLogin,
+    /// Where the issuer's own sign-in steps answer, over loopback, when that
+    /// is not the issuer's address itself: Lys's sign-in page is carried
+    /// there server-side.
+    #[serde(default)]
+    pub sign_in_api: Option<String>,
+    /// The step-1 administrator, by issuer and subject (P9), when the
+    /// install named one before the service started. Without it the
+    /// administrator is the one first-run setup records (`setup`).
+    #[serde(default)]
+    pub administrator: Option<ConfiguredLogin>,
     /// The authenticated link-audit source, by issuer and subject (R4).
     pub link_audit_source: ConfiguredLogin,
     /// How long a session lives, in seconds.
@@ -121,11 +129,29 @@ pub struct Config {
     /// `SignInProvidersUnavailable`.
     #[serde(default)]
     pub sign_in_providers: Option<crate::sign_in_providers::SignInProvidersSettings>,
+    /// Where the sign-in providers answer, when not at their public
+    /// origins: stand-ins, for a development or test service.
+    #[serde(default)]
+    pub provider_origins: Option<crate::sign_in_providers::ProviderOrigins>,
+    /// Lys as the `OpenID` provider products are registered with. Without it
+    /// the provider's routes answer `ProviderUnavailable`.
+    #[serde(default)]
+    pub provider: Option<crate::provider::ProviderSettings>,
+    /// First-run setup: where the one-time setup code's digest is read and
+    /// where the administrator it makes is recorded. Without it the setup
+    /// page's routes answer `SetupUnavailable`.
+    #[serde(default)]
+    pub setup: Option<crate::setup::SetupSettings>,
     /// The compiled screens the service serves at `/`, its own routes then
     /// answering under `/api`. Without it the routes answer at the root and
     /// no screen is served.
     #[serde(default)]
     pub surface_dir: Option<PathBuf>,
+    /// The Unix socket of this install's own runner, which a machine whose
+    /// record names Lys's runner is driven through. Without it such a
+    /// machine's sessions are refused `runner_unreachable`, by name.
+    #[serde(default)]
+    pub runner_socket: Option<PathBuf>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
@@ -160,7 +186,12 @@ impl Config {
 
     /// Refuse a configuration the service cannot run under.
     pub fn validate(&self) -> Result<(), ServerError> {
-        self.administrator_binding()?;
+        self.configured_administrator()?;
+        if self.administrator.is_none() && self.setup.is_none() {
+            return Err(invalid(
+                "neither an administrator nor first-run setup is configured, so nobody could ever administer the directory",
+            ));
+        }
         self.link_audit_binding()?;
         if self.session_seconds == 0 {
             return Err(invalid("session_seconds is zero"));
@@ -171,10 +202,33 @@ impl Config {
         Ok(())
     }
 
-    /// The configured administrator's login.
+    /// The configured administrator's login, when one is configured.
+    pub fn configured_administrator(&self) -> Result<Option<LoginBinding>, ServerError> {
+        self.administrator
+            .as_ref()
+            .map(|login| {
+                LoginBinding::new(&login.issuer, &login.subject)
+                    .map_err(|error| invalid(format!("administrator: {error}")))
+            })
+            .transpose()
+    }
+
+    /// The configured administrator's login, refused by name when the
+    /// configuration names none.
     pub fn administrator_binding(&self) -> Result<LoginBinding, ServerError> {
-        LoginBinding::new(&self.administrator.issuer, &self.administrator.subject)
-            .map_err(|error| invalid(format!("administrator: {error}")))
+        self.configured_administrator()?
+            .ok_or_else(|| invalid("no administrator is configured"))
+    }
+
+    /// Where the issuer's own sign-in steps answer, the ones a password is
+    /// carried to from this service: `sign_in_api` when it is configured, the
+    /// issuer's address otherwise.
+    pub fn sign_in_api(&self) -> String {
+        self.sign_in_api
+            .as_deref()
+            .unwrap_or(&self.issuer)
+            .trim_end_matches('/')
+            .to_owned()
     }
 
     /// The configured link-audit source's login.
@@ -186,7 +240,16 @@ impl Config {
         .map_err(|error| invalid(format!("link_audit_source: {error}")))
     }
 
-    /// The permission model, read from its file and checked.
+    /// The directory the apps are kept in: `apps`, beside the grant log.
+    /// The apps log is always kept, since it holds Lys's own model as the
+    /// schema of the app `lys`.
+    pub fn apps_dir(&self) -> PathBuf {
+        self.grant_log_dir.with_file_name("apps")
+    }
+
+    /// The permission model, read from its file and checked. It is read only
+    /// when the apps log does not yet hold the app `lys`, to record it there
+    /// once; afterwards the log is the only source and the file is not read.
     pub fn grant_model(&self) -> Result<Model, ServerError> {
         let path = &self.grant_model_file;
         let text = std::fs::read_to_string(path)

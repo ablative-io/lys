@@ -8,7 +8,8 @@ Three dependency processes, installed for development beside the platform door:
 - one PostgreSQL service with one durable database that both share, under separate
   roles and schemas (ADR-005).
 
-Cambium, Manifold, Argus and Aion servers are not runtime dependencies. Development
+No app the directory serves is a runtime dependency: apps register themselves
+through the directory's Apps API, and Lys never calls one. Development
 installs use test identities and test provider registrations only.
 
 | File | What it is |
@@ -55,7 +56,7 @@ ever in Git, in the configuration, in a log line lys prints, or in `health` outp
 
 `configure` registers exactly two clients beside Rauthy's built-in `rauthy` client,
 which it never creates, changes or deletes: the platform's confidential client with
-PKCE S256, and Cambium's confidential client with RS256 tokens. It applies both
+PKCE S256, and the one installed app's confidential client with RS256 tokens. It applies both
 themes, stores each client secret owner-only in `state_dir` as
 `<client id>-client-secret`, and prints a stable operation identifier per resource; a
 second run reports the same identifiers and changes nothing. A request whose

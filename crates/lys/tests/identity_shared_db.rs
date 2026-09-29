@@ -57,7 +57,7 @@ fn tables_in(deployment: &Deployment, schema: &str) -> TestResult<BTreeSet<Strin
 }
 
 fn written_state(deployment: &Deployment) -> TestResult<(serde_json::Value, bool)> {
-    let clients = rauthy_json(deployment, "GET", "/auth/v1/clients/cambium")?;
+    let clients = rauthy_json(deployment, "GET", "/auth/v1/clients/app")?;
     let relationships = spicedb(deployment, "/v1/relationships/read", FIXTURE_READ)?;
     Ok((clients, relationships.contains("\"reopened\"")))
 }

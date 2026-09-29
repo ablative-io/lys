@@ -9,7 +9,7 @@ pub const DOMAIN: &str = "lys/identity/review-decisions-state/v1";
 const FORMAT: &str = "lys-review-decisions-state/v1";
 
 /// A decision to keep a grant, as it is recorded.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Kept {
     /// The grant kept.

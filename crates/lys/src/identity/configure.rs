@@ -1,4 +1,4 @@
-//! `lys identity configure`: reconcile exactly the platform and Cambium
+//! `lys identity configure`: reconcile exactly the platform and, where named, app
 //! clients and their themes in Rauthy, idempotently.
 //!
 //! Every change has a stable operation identifier derived from what it
@@ -253,9 +253,30 @@ fn reconcile_theme(
     })
 }
 
+/// Each operation as the operations record writes it.
+fn record_of(operations: &[Operation]) -> Vec<Value> {
+    operations
+        .iter()
+        .map(|op| {
+            json!({"kind": op.kind, "resource": op.resource, "operation": op.id, "outcome": op.outcome})
+        })
+        .collect()
+}
+
 /// Runs `lys identity configure` against the configuration at `config_path`.
 pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     let config = DeploymentConfig::load(config_path)?;
+    let (api, mapping, operations) = reconcile(&config)?;
+    report(&config, &api, &mapping, &operations, json)
+}
+
+/// Registers the managed clients, their secrets and their themes as `config`
+/// declares them and records the operations, saying nothing: the API it
+/// spoke to, the theme mapping and the operations are answered for a
+/// caller to report.
+pub fn reconcile(
+    config: &DeploymentConfig,
+) -> IdentityResult<(RauthyApi, ThemeMapping, Vec<Operation>)> {
     let state_dir = config.state_dir();
     let credential = read_secret(&state_dir, API_KEY_SECRET)?;
     let api = RauthyApi::new(&config.issuer.admin_url, Some(credential))?;
@@ -266,10 +287,7 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
         operations.push(reconcile_secret(&api, &state_dir, client)?);
         operations.push(reconcile_theme(&api, &mapping, role, client)?);
     }
-    let record: Vec<Value> = operations
-        .iter()
-        .map(|op| json!({"kind": op.kind, "resource": op.resource, "operation": op.id, "outcome": op.outcome}))
-        .collect();
+    let record = record_of(&operations);
     let encoded = serde_json::to_vec_pretty(&record).map_err(|error| {
         IdentityError::new(
             ErrorKind::RenderFailed,
@@ -279,11 +297,24 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
         )
     })?;
     private_files::write(&state_dir.join(OPERATIONS_FILE), &encoded)?;
-    let managed = [
-        config.clients.platform.id.as_str(),
-        config.clients.cambium.id.as_str(),
-        "rauthy",
-    ];
+    Ok((api, mapping, operations))
+}
+
+/// Reports `operations` and every client `api` holds that is not managed.
+fn report(
+    config: &DeploymentConfig,
+    api: &RauthyApi,
+    mapping: &ThemeMapping,
+    operations: &[Operation],
+    json: bool,
+) -> IdentityResult<()> {
+    let record = record_of(operations);
+    let managed: Vec<&str> = config
+        .managed_clients()
+        .into_iter()
+        .map(|(_, client)| client.id.as_str())
+        .chain(["rauthy"])
+        .collect();
     let mut emitter = Emitter::new(json);
     let source = &mapping.source;
     emitter.field(
@@ -301,7 +332,7 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
             emitter.note(&format!("unmanaged client {id}: present, left untouched"));
         }
     }
-    for op in &operations {
+    for op in operations {
         emitter.note(&format!(
             "{} {}: {} (operation {})",
             op.kind, op.resource, op.outcome, op.id

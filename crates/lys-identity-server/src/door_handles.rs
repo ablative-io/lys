@@ -1,10 +1,10 @@
 //! The door's handle records, read over HTTP: the one production
 //! [`HandleRecords`] a start's credentials check reads through.
 //!
-//! SECRETS-002 R1 lands the handle-resolving endpoint in the door
-//! (crates/cambium-door/src/http/secrets_handle.rs in the door repository,
-//! door-owned). This client reads it as `GET /secrets/handles?holder=<agent>`
-//! and takes from the answer ids and validity only: an answer is
+//! SECRETS-002 R1 lands the handle-resolving endpoint in the door (its
+//! secrets-handle route, in the door repository, door-owned). This client
+//! reads it as `GET /secrets/handles?holder=<agent>` and takes from the
+//! answer ids and validity only: an answer is
 //! `{"holder": <agent>, "handles": [{"id": <id>, "state": <state>}]}`, a
 //! handle whose state is `active` is valid and any other state is not, and a
 //! `404` says the agent has no handle record.
