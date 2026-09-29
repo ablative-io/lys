@@ -17,7 +17,8 @@ use crate::serve::{MAX_BODY, Shared, on_broker};
 #[serde(deny_unknown_fields)]
 struct Save {
     app: String,
-    client_secret: String,
+    #[serde(default)]
+    client_secret: Option<String>,
     upstream: String,
 }
 
@@ -27,6 +28,7 @@ type Answer = Result<Json<Value>, (StatusCode, String)>;
 /// Values travel in the signed body and are never returned or logged.
 pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
     let (parts, body) = request.into_parts();
+    let preparing = parts.uri.path() == "/_lys/apps/prepare";
     let body: Bytes = axum::body::to_bytes(body, MAX_BODY)
         .await
         .map_err(|_error| {
@@ -49,8 +51,13 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
         )
     })?;
     if !valid_app(&asked.app)
-        || asked.client_secret.len() != 64
-        || !asked.client_secret.bytes().all(|b| b.is_ascii_hexdigit())
+        || if preparing {
+            asked.client_secret.is_some()
+        } else {
+            asked.client_secret.as_ref().is_none_or(|secret| {
+                secret.len() != 64 || !secret.bytes().all(|b| b.is_ascii_hexdigit())
+            })
+        }
     {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -80,16 +87,21 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
         let prefix = format!("lys-app-{}-{}", who.identity, asked.app);
         let client = format!("{prefix}-client");
         let api = format!("{prefix}-api");
-        // Each entry reconciles independently after a partial or lost response.
-        broker.seal_once(
-            &client,
-            EntryClass::Key,
-            &who.identity,
-            &Secret::from_slice(asked.client_secret.as_bytes()),
-        )?;
-        let credential =
-            Secret::from_slice(format!("lys-app.{}.{}", asked.app, asked.client_secret).as_bytes());
-        broker.seal_once(&api, EntryClass::Credential, &who.identity, &credential)?;
+        let digest = if preparing {
+            Some(broker.prepare_app(&asked.app, &who.identity)?)
+        } else {
+            let secret = asked.client_secret.as_deref().unwrap_or_default();
+            broker.seal_once(
+                &client,
+                EntryClass::Key,
+                &who.identity,
+                &Secret::from_slice(secret.as_bytes()),
+            )?;
+            let credential =
+                Secret::from_slice(format!("lys-app.{}.{secret}", asked.app).as_bytes());
+            broker.seal_once(&api, EntryClass::Credential, &who.identity, &credential)?;
+            None
+        };
         layout.add_route(
             &api,
             Route {
@@ -99,9 +111,12 @@ pub async fn save(State(shared): State<Arc<Shared>>, request: Request) -> Answer
                 spend_header: None,
             },
         )?;
-        Ok::<_, SecretsError>(Json(
-            json!({"app": asked.app, "client_secret_ref": client, "api_credential_ref": api}),
-        ))
+        let mut answer =
+            json!({"app": asked.app, "client_secret_ref": client, "api_credential_ref": api});
+        if let Some(digest) = digest {
+            answer["client_secret_sha256"] = json!(digest);
+        }
+        Ok::<_, SecretsError>(Json(answer))
     })
     .await
     .map_err(|error| refused(&error))?

@@ -310,6 +310,7 @@ impl Scratch {
         said: &mut Vec<String>,
     ) -> IdentityResult<BuildRecord> {
         let mut parts = Parts {
+            runner: None,
             units: &self.units,
             engine,
             render: &Fixed,

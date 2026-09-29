@@ -23,6 +23,7 @@ use crate::error::ServerError;
 use crate::grant_contract::RouteWire;
 use crate::grant_sight::sees_with;
 use crate::grants::with_grants;
+use crate::grants_batch::unanswered;
 use crate::session::now;
 
 /// The most resources one reach question names.
@@ -104,7 +105,7 @@ pub(crate) async fn reach(
             }
             asked.push((wire, Resource::new(&wire.kind, &wire.id)?, actions));
         }
-        let frame = judged.grants.frame(None)?;
+        let frame = judged.grants.frame(judged.directory, None)?;
         let mut known = HashMap::new();
         let mut resources = Vec::with_capacity(asked.len());
         for (wire, resource, actions) in asked {
@@ -125,23 +126,20 @@ pub(crate) async fn reach(
             }
             let mut permitted = Vec::new();
             for (text, (holder, held)) in holders {
-                let may: Vec<String> = actions
-                    .iter()
-                    .filter(|action| held.contains(action))
-                    .filter(|action| {
-                        let request = ExerciseRequest {
-                            caller: holder,
-                            route,
-                            resource: resource.clone(),
-                            action: (*action).clone(),
-                        };
-                        judged
-                            .grants
-                            .explain_in(&frame, judged.directory, &request, at)
-                            .is_ok()
-                    })
-                    .map(ToString::to_string)
-                    .collect();
+                let mut may = Vec::new();
+                for action in actions.iter().filter(|action| held.contains(action)) {
+                    let request = ExerciseRequest {
+                        caller: holder,
+                        route,
+                        resource: resource.clone(),
+                        action: action.clone(),
+                    };
+                    match judged.grants.explain_in(&frame, &request, at) {
+                        Ok(_) => may.push(action.to_string()),
+                        Err(error) if unanswered(&error) => return Err(error.into()),
+                        Err(_) => {}
+                    }
+                }
                 if !may.is_empty() {
                     permitted.push(ReachHolder {
                         holder: text,

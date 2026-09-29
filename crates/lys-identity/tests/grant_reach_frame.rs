@@ -29,11 +29,13 @@ const READ: Duration = Duration::from_millis(47);
 const REVISION: Duration = Duration::from_millis(4);
 
 /// An engine that answers as slowly as a local `SpiceDB` while `slow` is
-/// set, and counts every read of the relationships.
+/// set, counts every read of the relationships, and refuses that read
+/// alone while `broken` is set.
 #[derive(Debug, Clone, Default)]
 struct Measured {
     inner: MemoryRelationships,
     slow: Arc<AtomicBool>,
+    broken: Arc<AtomicBool>,
     reads: Arc<AtomicUsize>,
 }
 
@@ -63,6 +65,11 @@ impl RelationshipStore for Measured {
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
         self.wait(READ);
+        if self.broken.load(Ordering::SeqCst) {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: "the relationships could not be read".to_owned(),
+            });
+        }
         self.inner.read()
     }
 }
@@ -125,8 +132,8 @@ fn reach(
     world: &mut World<FileLeafStore, Measured>,
     resources: &[Resource],
 ) -> Result<Reach, Box<dyn Error>> {
-    let frame = world.grants.frame(None)?;
     let directory = world.directory.projection()?;
+    let frame = world.grants.frame(directory, None)?;
     let mut out = BTreeMap::new();
     for resource in resources {
         let holders: BTreeSet<IdentityId> = world
@@ -143,10 +150,7 @@ fn reach(
                     resource: resource.clone(),
                     action: Action::new(action)?,
                 };
-                if let Ok(permit) = world
-                    .grants
-                    .explain_in(&frame, directory, &request, world.now)
-                {
+                if let Ok(permit) = world.grants.explain_in(&frame, &request, world.now) {
                     out.insert((resource.clone(), holder, action), permit.grant);
                 }
             }
@@ -221,8 +225,9 @@ fn a_frame_answers_each_question_as_check_does_and_records_nothing() -> TestResu
     )?;
     let lent = world.request(dana, root, tom, "tern", PassOn::UseOnly, None)?;
     world.delegate(&lent)?;
-    let frame = world.grants.frame(None)?;
-    let before = world.events();
+    let directory = world.directory.projection()?;
+    let frame = world.grants.frame(directory, None)?;
+    let before = world.grants.revision();
     let mut answers = Vec::new();
     for caller in [dana, tom] {
         for action in actions(&["delete", "read", "write"])? {
@@ -232,20 +237,82 @@ fn a_frame_answers_each_question_as_check_does_and_records_nothing() -> TestResu
                 resource: alpha()?,
                 action: action.clone(),
             };
-            let directory = world.directory.projection()?;
             let answer = world
                 .grants
-                .explain_in(&frame, directory, &request, world.now)
+                .explain_in(&frame, &request, world.now)
                 .map(|permit| permit.path);
             answers.push((caller, action, answer));
         }
     }
-    assert_eq!(world.events(), before, "a question records nothing");
+    assert_eq!(
+        world.grants.revision(),
+        before,
+        "a question records nothing"
+    );
     for (caller, action, answer) in answers {
         let checked = world
             .exercise(caller, action.as_str(), Route::Browser)
             .map(|permit| permit.path);
         assert_eq!(answer, checked, "{caller} {action}");
     }
+    Ok(())
+}
+
+#[test]
+fn a_frame_over_a_failed_read_is_refused_and_a_moved_frame_is_stale() -> TestResult {
+    let engine = Measured::default();
+    let mut world = World::with(
+        Box::new(|path: &Path| -> Reopen<FileLeafStore> {
+            let path = path.to_owned();
+            Box::new(move || FileLeafStore::open(&path))
+        }),
+        engine.clone(),
+    )?;
+    let (dana, tom) = (
+        IdentityId::Person(world.dana),
+        IdentityId::Person(world.tom),
+    );
+    let root = world.root(
+        world.dana,
+        "kite",
+        pass(&["read"], &[RecipientKind::Person])?,
+        None,
+    )?;
+    engine.broken.store(true, Ordering::SeqCst);
+    let directory = world.directory.projection()?;
+    assert!(
+        matches!(
+            world.grants.frame(directory, None),
+            Err(GrantError::PermissionEngineUnavailable { .. })
+        ),
+        "no frame over a read that failed"
+    );
+    engine.broken.store(false, Ordering::SeqCst);
+    let request = ExerciseRequest {
+        caller: dana,
+        route: Route::Browser,
+        resource: alpha()?,
+        action: Action::new("read")?,
+    };
+    let directory = world.directory.projection()?.clone();
+    let frame = world.grants.frame(&directory, None)?;
+    let before = world.grants.explain_in(&frame, &request, world.now)?;
+    assert_eq!(before.grant, root);
+    let recorded = world.events();
+    let lent = world.request(dana, root, tom, "tern", PassOn::UseOnly, None)?;
+    let directory = world.directory.projection()?;
+    world.grants.delegate(directory, &lent, world.now)?;
+    assert!(
+        matches!(
+            world.grants.explain_in(&frame, &request, world.now),
+            Err(GrantError::StaleDecision { .. })
+        ),
+        "a frame is not mixed with a later grant event"
+    );
+    assert_eq!(
+        world.events(),
+        recorded + 1,
+        "the pass-on is the later event"
+    );
     Ok(())
 }

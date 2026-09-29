@@ -2,9 +2,12 @@
 //!
 //! A [`Frame`] settles the log, projects the relationships and reads them
 //! once, and every question put through [`Grants::explain_in`] is decided
-//! against that one reading. Asking who holds what across many resources is
-//! then one read of the permission engine rather than one read per holder,
-//! action and resource. Each answer is the one [`Grants::explain`] gives.
+//! against that one reading and the directory the frame was taken with.
+//! Asking who holds what across many resources is then one read of the
+//! permission engine rather than one read per holder, action and resource.
+//! Each answer is the one [`Grants::explain`] gives. A frame whose read
+//! failed is not made: the failure is the answer. A frame asked after the
+//! grants have moved on is refused `StaleDecision`, never mixed with them.
 
 use std::collections::BTreeSet;
 
@@ -22,13 +25,37 @@ use crate::projection::Projection;
 /// The relationships at one revision, read once, and what the log held
 /// unresolved when they were read.
 #[derive(Debug)]
-pub struct Frame {
+pub struct Frame<'d> {
+    directory: &'d Projection,
+    folded: u64,
     projected: u64,
-    held: Result<BTreeSet<Relationship>, GrantError>,
+    held: BTreeSet<Relationship>,
     unresolved: Option<(OperationId, GrantId)>,
 }
 
-impl Frame {
+/// A frame's log settled and relationships projected, before they are read.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Settled {
+    pub(super) projected: u64,
+    pub(super) unresolved: Option<(OperationId, GrantId)>,
+}
+
+impl<'d> Frame<'d> {
+    /// Read `grants`' relationships once, after `settled`, with `directory`.
+    pub(super) fn read<S: LeafStore, R: RelationshipStore>(
+        grants: &Grants<S, R>,
+        directory: &'d Projection,
+        settled: Settled,
+    ) -> Result<Self, GrantError> {
+        Ok(Frame {
+            directory,
+            folded: grants.folded,
+            projected: settled.projected,
+            held: grants.relationships.read()?,
+            unresolved: settled.unresolved,
+        })
+    }
+
     /// The revision every decision in this frame is made at.
     #[must_use]
     pub fn revision(&self) -> u64 {
@@ -40,7 +67,18 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Settle the log, project the relationships and read them, once, for
     /// every decision [`Grants::explain_in`] makes in the frame. `at_least`
     /// is a revision every decision must reflect.
-    pub fn frame(&mut self, at_least: Option<u64>) -> Result<Frame, GrantError> {
+    pub fn frame<'d>(
+        &mut self,
+        directory: &'d Projection,
+        at_least: Option<u64>,
+    ) -> Result<Frame<'d>, GrantError> {
+        let settled = self.settle(at_least)?;
+        Frame::read(self, directory, settled)
+    }
+
+    /// Settle the log and project the relationships, refusing a projection
+    /// older than `at_least`, and name the revocation held unresolved.
+    pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
         self.settle_log().ok();
         let projected = match self.project() {
             Ok(projected) => projected,
@@ -61,21 +99,33 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
                 GrantChange::Issue(_) | GrantChange::Use { .. } => None,
             });
-        Ok(Frame {
+        Ok(Settled {
             projected,
-            held: self.relationships.read(),
             unresolved,
         })
     }
 
-    /// The decision [`Grants::explain`] makes, against `frame`'s reading.
+    /// The decision [`Grants::explain`] makes, against `frame`'s reading,
+    /// refused `StaleDecision` when a grant event was recorded after it.
     pub fn explain_in(
         &self,
-        frame: &Frame,
-        directory: &Projection,
+        frame: &Frame<'_>,
         request: &ExerciseRequest,
         at: u64,
     ) -> Result<Permit, GrantError> {
+        if frame.folded != self.folded {
+            return Err(GrantError::StaleDecision {
+                required: self.folded,
+                projected: frame.projected,
+            });
+        }
+        self.unresolved_issue(request)?;
+        self.decide_in(frame, request, at)
+    }
+
+    /// Refuse by the held operation's name while the issue of the grant the
+    /// question rests on is unresolved.
+    pub(super) fn unresolved_issue(&self, request: &ExerciseRequest) -> Result<(), GrantError> {
         if let Some(held) = self.ledger.uncertain()
             && let GrantChange::Issue(grant) = held.event.change()
             && grant.holder() == request.caller
@@ -86,7 +136,15 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 grant: held.grant.to_string(),
             });
         }
-        let held = frame.held.as_ref().map_err(Clone::clone)?;
+        Ok(())
+    }
+
+    fn decide_in(
+        &self,
+        frame: &Frame<'_>,
+        request: &ExerciseRequest,
+        at: u64,
+    ) -> Result<Permit, GrantError> {
         let mut refusal = None;
         let candidates = self.book.on_resource(&request.resource).filter(|record| {
             record.grant().holder() == request.caller
@@ -94,19 +152,20 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         });
         for record in candidates {
             let grant = record.grant();
-            let decided = effective(&self.book, directory, grant.id(), at).and_then(|lineage| {
-                if let Some((operation, revoked)) = frame.unresolved
-                    && lineage.path.contains(&revoked)
-                {
-                    return Err(GrantError::OperationUnresolved {
-                        operation: operation.to_string(),
-                        grant: revoked.to_string(),
-                    });
-                }
-                self.fresh(&lineage.path, frame.projected)?;
-                confirm(held, &lineage.path, at)?;
-                Ok(lineage)
-            });
+            let decided =
+                effective(&self.book, frame.directory, grant.id(), at).and_then(|lineage| {
+                    if let Some((operation, revoked)) = frame.unresolved
+                        && lineage.path.contains(&revoked)
+                    {
+                        return Err(GrantError::OperationUnresolved {
+                            operation: operation.to_string(),
+                            grant: revoked.to_string(),
+                        });
+                    }
+                    self.fresh(&lineage.path, frame.projected)?;
+                    confirm(&frame.held, &lineage.path, at)?;
+                    Ok(lineage)
+                });
             match decided {
                 Ok(lineage) => {
                     return Ok(Permit {

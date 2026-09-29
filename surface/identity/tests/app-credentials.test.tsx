@@ -25,3 +25,22 @@ it('a malformed success never clears the only issued copy or claims saved',async
   await click(button('Approve Notes fixture'));await click(button('Save credentials in Lys secrets'));
   expect(text()).toContain('did not confirm');expect(text()).not.toContain('Credentials saved');expect(button('Save credentials in Lys secrets')).not.toBeNull();
 });
+
+it('broker-backed approval shows saved references without a second save or plaintext',async()=>{
+  const {posted}=await mount('#/apps',{...routes(),
+    'POST /apps/fixture_notes/approve':ok({app:{...pending,state:'approved'},client:null,credentials:{app:'fixture_notes',client_secret_ref:'sealed-client',api_credential_ref:'sealed-api'}})});
+  await click(button('Approve Notes fixture'));
+  expect(posted).toHaveLength(1);
+  expect(text()).toContain('Credentials saved in Lys secrets');
+  expect(text()).not.toContain(secret);
+  expect(button('Save credentials in Lys secrets')).toBeNull();
+});
+it('refused custody leaves approval available and never retries automatically',async()=>{
+  const {posted}=await mount('#/apps',{...routes(),
+    'POST /apps/fixture_notes/approve':refused(502,'SecretsUnavailable','custody not confirmed')});
+  await click(button('Approve Notes fixture'));
+  expect(posted).toHaveLength(1);
+  expect(text()).toContain('SecretsUnavailable');
+  expect(text()).not.toContain('Credentials saved');
+  expect(button('Approve Notes fixture')).not.toBeNull();
+});

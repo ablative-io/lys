@@ -146,12 +146,15 @@ pub(crate) fn typed(api: &mut Api) {
             (
                 POST,
                 "/apps/{app}/approve",
-                "Approve an app: its client, its secret once, its schema",
+                "Approve an app after configured broker credential custody",
             ),
             S,
             Some(decide.clone()),
             Some(api.schema::<Approval>()),
-            &[DECIDE, &["RequestMalformed"]],
+            &[
+                DECIDE,
+                &["RequestMalformed", "NoPerson", "SecretsUnavailable"],
+            ],
         ),
         route(
             (POST, "/apps/{app}/decline", "Decline an app"),

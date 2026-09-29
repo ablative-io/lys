@@ -20,18 +20,25 @@ use std::sync::{Arc, Mutex, PoisonError};
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 const PATH: &str = "/_lys/apps/save";
 fn signed(key: &Ed25519Identity, body: &[u8]) -> Result<Request, Box<dyn std::error::Error>> {
+    signed_path(key, body, PATH)
+}
+fn signed_path(
+    key: &Ed25519Identity,
+    body: &[u8],
+    path: &str,
+) -> Result<Request, Box<dyn std::error::Error>> {
     let proof = OnBehalf::sign(
         "identity",
         "person-fixture",
         &new_operation_id()?,
         now_ms(),
-        request_digest("POST", PATH, body)?,
+        request_digest("POST", path, body)?,
         key,
     )?;
     let [service, person, op, at, signature] = proof.to_wire();
     Ok(Request::builder()
         .method("POST")
-        .uri(PATH)
+        .uri(path)
         .header("lys-service", service)
         .header("lys-on-behalf-of", person)
         .header("lys-operation", op)
@@ -169,5 +176,82 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
     let received = axum::body::to_bytes(response.into_body(), 1024).await?;
     assert_eq!(received.as_ref(), b"authorised fixture");
     serving.abort();
+    Ok(())
+}
+
+#[tokio::test]
+async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let layout = Layout::new(&dir.path().join("broker"), &dir.path().join("keys"));
+    layout.prepare()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
+    layout.trust_service(ServiceKey {
+        name: "identity".to_owned(),
+        public_key: to_hex(&key.public_key_bytes()),
+    })?;
+    let grants = Grants::File(FileGrants::new(layout.grants()));
+    let broker = Broker::create(&layout.paths(), grants.clone(), Box::new(now_ms))?;
+    let shared = Arc::new(Shared {
+        broker: Mutex::new(broker),
+        layout: layout.clone(),
+        client: reqwest::Client::new(),
+        window: Mutex::new(ServiceWindow::new()),
+        permissions: Arc::new(grants.clone()),
+    });
+    let path = "/_lys/apps/prepare";
+    let body =
+        serde_json::to_vec(&json!({"app":"prepared_app","upstream":"http://127.0.0.1:8491/api"}))?;
+    let first = crate::save_app::save(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
+        .await
+        .map_err(|e| format!("{} {}", e.0, e.1))?
+        .0;
+    assert_eq!(first.as_object().ok_or("not object")?.len(), 4);
+    assert!(first.get("client_secret").is_none());
+    assert!(first.get("credential").is_none());
+    assert_eq!(
+        first["client_secret_sha256"]
+            .as_str()
+            .ok_or("no digest")?
+            .len(),
+        64
+    );
+    drop(shared);
+    let broker = Broker::open(&layout.paths(), grants.clone(), Box::new(now_ms))?;
+    let shared = Arc::new(Shared {
+        broker: Mutex::new(broker),
+        layout,
+        client: reqwest::Client::new(),
+        window: Mutex::new(ServiceWindow::new()),
+        permissions: Arc::new(grants),
+    });
+    let again = crate::save_app::save(State(Arc::clone(&shared)), signed_path(&key, &body, path)?)
+        .await
+        .map_err(|e| format!("{} {}", e.0, e.1))?
+        .0;
+    assert_eq!(first, again);
+    assert_eq!(
+        shared
+            .broker
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .store()
+            .entries()
+            .count(),
+        2
+    );
+    assert!(
+        shared
+            .layout
+            .routes()?
+            .contains_key(again["api_credential_ref"].as_str().ok_or("no api ref")?)
+    );
+    let forged = serde_json::to_vec(
+        &json!({"app":"prepared_app","upstream":"http://127.0.0.1:8491/api","client_secret":"ab".repeat(32)}),
+    )?;
+    assert!(
+        crate::save_app::save(State(shared), signed_path(&key, &forged, path)?)
+            .await
+            .is_err()
+    );
     Ok(())
 }

@@ -390,7 +390,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
         at_least: Option<u64>,
     ) -> Result<Permit, GrantError> {
-        let frame = self.frame(at_least)?;
-        self.explain_in(&frame, directory, request, at)
+        let settled = self.settle(at_least)?;
+        self.unresolved_issue(request)?;
+        let frame = super::frame::Frame::read(self, directory, settled)?;
+        self.explain_in(&frame, request, at)
     }
 }
