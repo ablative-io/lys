@@ -65,9 +65,8 @@ fn success_must_name_every_requested_operation_and_the_actual_account() {
 fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn std::error::Error>>
 {
     use std::io::{Read, Write};
-    use std::net::TcpListener;
+    use std::net::{TcpListener, TcpStream};
     use std::os::unix::fs::PermissionsExt;
-    use std::time::Duration;
     let temp = tempfile::tempdir()?;
     let key = temp.path().join("credential");
     std::fs::write(&key, format!("lys-registrar.{ACCOUNT}.{}", "ab".repeat(32)))?;
@@ -80,46 +79,51 @@ fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn
         temp.path().join("identity.json"),
         serde_json::to_vec(&json!({"listen":address,"surface_dir":temp.path().join("surface")}))?,
     )?;
-    let fixture = std::thread::spawn(move || -> Result<TcpListener, String> {
-        let (mut socket, _) = listener.accept().map_err(|e| e.to_string())?;
-        socket
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .map_err(|e| e.to_string())?;
-        let mut head = Vec::new();
-        while !head.ends_with(b"\r\n\r\n") {
-            let mut byte = [0];
-            socket.read_exact(&mut byte).map_err(|e| e.to_string())?;
-            head.push(byte[0]);
+    let fixture = std::thread::spawn(move || -> Result<usize, String> {
+        let mut requests = 0;
+        loop {
+            let (mut socket, _) = listener.accept().map_err(|e| e.to_string())?;
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                let mut byte = [0];
+                socket.read_exact(&mut byte).map_err(|e| e.to_string())?;
+                head.push(byte[0]);
+            }
+            let head = String::from_utf8(head).map_err(|e| e.to_string())?;
+            if head == "fixture complete\r\n\r\n" {
+                return Ok(requests);
+            }
+            assert!(head.starts_with("POST /api/identity/import HTTP/1.1"));
+            requests += 1;
+            let length = head
+                .lines()
+                .find_map(|line| {
+                    line.to_ascii_lowercase()
+                        .strip_prefix("content-length: ")
+                        .map(str::to_owned)
+                })
+                .ok_or("no length")?
+                .trim()
+                .parse::<usize>()
+                .map_err(|e| e.to_string())?;
+            let mut body = vec![0; length];
+            socket.read_exact(&mut body).map_err(|e| e.to_string())?;
+            let answer = r#"{"refusal":"ServiceAccountsUnavailable","reason":"fixture refusal","entry":"agents/fixture","completed":[]}"#;
+            write!(socket,"HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",answer.len()).map_err(|e|e.to_string())?;
         }
-        let head = String::from_utf8(head).map_err(|e| e.to_string())?;
-        assert!(head.starts_with("POST /api/identity/import HTTP/1.1"));
-        let length = head
-            .lines()
-            .find_map(|line| {
-                line.to_ascii_lowercase()
-                    .strip_prefix("content-length: ")
-                    .map(str::to_owned)
-            })
-            .ok_or("no length")?
-            .trim()
-            .parse::<usize>()
-            .map_err(|e| e.to_string())?;
-        let mut body = vec![0; length];
-        socket.read_exact(&mut body).map_err(|e| e.to_string())?;
-        let answer = r#"{"refusal":"ServiceAccountsUnavailable","reason":"fixture refusal","entry":"agents/fixture","completed":[]}"#;
-        write!(socket,"HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",answer.len()).map_err(|e|e.to_string())?;
-        Ok(listener)
     });
-    let error = super::run(&file, Some(temp.path().to_owned()), Some(key), None, true).unwrap_err();
+    let result = super::run(&file, Some(temp.path().to_owned()), Some(key), None, true);
+    let completed = TcpStream::connect(&address)
+        .and_then(|mut socket| socket.write_all(b"fixture complete\r\n\r\n"));
+    let requests = fixture
+        .join()
+        .map_err(|panic| format!("fixture panicked: {panic:?}"))??;
+    completed?;
+    let error = result.unwrap_err();
     assert_eq!(error.kind(), super::ErrorKind::ImportUncertain);
     assert!(error.to_string().contains("ServiceAccountsUnavailable"));
     assert!(error.to_string().contains("no retry was made"));
-    let listener = fixture.join().map_err(|_panic| "fixture panicked")??;
-    listener.set_nonblocking(true)?;
-    assert_eq!(
-        listener.accept().unwrap_err().kind(),
-        std::io::ErrorKind::WouldBlock
-    );
+    assert_eq!(requests, 1, "the completed import must send exactly once");
     Ok(())
 }
 

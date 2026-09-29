@@ -1,36 +1,32 @@
+#![cfg(test)]
 //! Upgrade starts from the old two-principal schema at a private HTTP fixture.
 //! The real `SpiceDb::open` path must write the new subject without losing old kinds.
 use super::{Model, SpiceDb, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
 use std::io::{Read, Write};
-use std::net::TcpListener;
-use std::time::Duration;
+use std::net::{TcpListener, TcpStream};
 
 #[test]
 fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
 -> Result<(), Box<dyn Error>> {
     let old = "definition person {}\ndefinition agent {}\ndefinition grant {\n relation holder: person | agent\n}\ndefinition service_account {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition directory {\n relation viewer: grant#holder\n permission view = viewer\n}\ndefinition fixture/doc {\n relation viewer: grant#holder\n permission view = viewer\n}";
+    let temp = tempfile::tempdir()?;
+    let key = temp.path().join("key");
+    std::fs::write(&key, "fixture-only")?;
+    let model = Model::new(
+        1,
+        [(
+            lys_identity::grants::Relation::new("viewer")?,
+            [lys_identity::grants::Action::new("view")?].into(),
+        )],
+    )?;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?.to_string();
-    listener.set_nonblocking(true)?;
     let fixture = std::thread::spawn(move || -> Result<String, String> {
-        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut schema = None;
         loop {
-            let (mut socket, _) = match listener.accept() {
-                Ok(accepted) => accepted,
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    if std::time::Instant::now() >= deadline {
-                        return Err("upgrade never wrote its schema".into());
-                    }
-                    std::thread::sleep(Duration::from_millis(5));
-                    continue;
-                }
-                Err(error) => return Err(error.to_string()),
-            };
-            socket
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .map_err(|e| e.to_string())?;
+            let (mut socket, _) = listener.accept().map_err(|error| error.to_string())?;
             let mut raw = Vec::new();
             let split = loop {
                 let mut byte = [0];
@@ -44,6 +40,10 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
                 }
             };
             let head = String::from_utf8(raw.clone()).map_err(|e| e.to_string())?;
+            if head == "fixture complete\r\n\r\n" {
+                return schema
+                    .ok_or_else(|| "upgrade returned without writing its schema".to_owned());
+            }
             let len: usize = head
                 .lines()
                 .find_map(|line| {
@@ -75,32 +75,29 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
             )
             .map_err(|e| e.to_string())?;
             if written {
-                return request["schema"]
-                    .as_str()
-                    .map(str::to_owned)
-                    .ok_or("no schema".into());
+                if schema.is_some() {
+                    return Err("upgrade wrote its schema more than once".to_owned());
+                }
+                schema = Some(request["schema"].as_str().ok_or("no schema")?.to_owned());
             }
         }
     });
-    let temp = tempfile::tempdir()?;
-    let key = temp.path().join("key");
-    std::fs::write(&key, "fixture-only")?;
-    let model = Model::new(
-        1,
-        [(
-            lys_identity::grants::Relation::new("viewer")?,
-            [lys_identity::grants::Action::new("view")?].into(),
-        )],
-    )?;
     let opened = SpiceDb::open(
         &SpiceDbSettings {
-            endpoint: address,
+            endpoint: address.clone(),
             key_file: key,
             mirror: "upgrade_fixture".to_owned(),
         },
         &model,
     );
-    let schema = fixture.join().map_err(|_panic| "fixture panicked")??;
+    // The synchronous call has returned: no further request belongs to it.
+    // Wake the blocking accept even when the upgrade wrote no schema.
+    let completed = TcpStream::connect(&address)
+        .and_then(|mut socket| socket.write_all(b"fixture complete\r\n\r\n"));
+    let schema = fixture
+        .join()
+        .map_err(|panic| format!("fixture panicked: {panic:?}"))??;
+    completed?;
     opened?;
     assert!(schema.contains("service_account with unexpired"));
     assert_eq!(schema.matches("definition service_account {").count(), 1);
