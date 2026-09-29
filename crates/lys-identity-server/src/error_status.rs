@@ -170,7 +170,8 @@ impl ServerError {
             | Self::BudgetRefused { .. }
             | Self::PolicyRefused { .. }
             | Self::McpCredentialInline { .. }
-            | Self::McpSettingUnrepresentable { .. } => StatusCode::BAD_REQUEST,
+            | Self::McpSettingUnrepresentable { .. }
+            | Self::ModelUnrepresentable { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,

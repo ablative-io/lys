@@ -22,6 +22,7 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         .ok_or(ServerError::HarnessUndeclared {
             version: start.version.number,
         })?;
+    crate::launch_fields::models(&harness, &settings.model_access)?;
     let mcp_servers = settings
         .mcp_servers
         .iter()

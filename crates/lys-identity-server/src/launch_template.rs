@@ -84,9 +84,13 @@ pub fn handle_variable(secret: &str, taken: &mut BTreeSet<String>) -> String {
 fn flags(version: &Version) -> Vec<String> {
     let settings = &version.settings;
     let mut flags = Vec::new();
-    if let Some(model) = settings.model_access.first() {
+    if let Some((model, further)) = settings.model_access.split_first() {
         flags.push("--model".to_owned());
         flags.push(model.clone());
+        if !further.is_empty() {
+            flags.push("--fallback-model".to_owned());
+            flags.push(further.join(","));
+        }
     }
     if !settings.tools.is_empty() {
         flags.push("--allowedTools".to_owned());
@@ -108,18 +112,6 @@ fn flags(version: &Version) -> Vec<String> {
 fn left_out(version: &Version) -> Vec<String> {
     let settings = &version.settings;
     let mut left = Vec::new();
-    if settings.model_access.len() > 1 {
-        left.push(format!(
-            "model_access after the first: {}",
-            settings
-                .model_access
-                .iter()
-                .skip(1)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
     if !settings.skills.is_empty() {
         left.push(format!(
             "skills, which no template slot carries: {}",

@@ -330,6 +330,16 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// A model the declared harness cannot carry.
+    #[error("ModelUnrepresentable: the harness `{harness}` cannot carry model `{model}`: {reason}")]
+    ModelUnrepresentable {
+        /// The declared harness kind.
+        harness: String,
+        /// The model.
+        model: String,
+        /// Why it cannot.
+        reason: String,
+    },
     /// The profile declares no harness build to start.
     #[error(
         "HarnessUndeclared: profile version {version} declares no harness build to start; declare the build's kind, program and package in the profile"
