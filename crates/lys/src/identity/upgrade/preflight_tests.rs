@@ -114,6 +114,28 @@ fn success_without_matching_receipt_is_refused() -> TestResult {
 }
 
 #[test]
+fn each_receipt_binding_is_required() -> TestResult {
+    for (format, build, digest) in [
+        ("wrong", B, "$digest"),
+        ("lys-config-check/1", "wrong", "$digest"),
+        ("lys-config-check/1", B, "wrong"),
+    ] {
+        refuses_untouched(
+            &format!(
+                r#"if [ "$1" = --check-config ]; then
+ digest=$(shasum -a 256 | cut -d ' ' -f 1)
+ printf '{{"format":"{format}","build":"{build}","config_sha256":"%s"}}\n' "{digest}"
+ exit 0
+fi"#
+            ),
+            &NeverRender,
+            "installed",
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
 fn unsupported_checker_fails_closed() -> TestResult {
     refuses_untouched(
         "if [ \"$1\" = --check-config ]; then exit 1; fi",

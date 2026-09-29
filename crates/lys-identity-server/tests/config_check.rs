@@ -15,8 +15,8 @@ fn config(root: &std::path::Path, listen: std::net::SocketAddr) -> Value {
         "event_key_file": root.join("missing-key"), "issuer": "http://127.0.0.1:1",
         "client_id": "test", "client_secret_file": root.join("missing-secret"),
         "redirect_url": "http://127.0.0.1:1/callback",
-        "administrator": {"issuer": "test", "subject": "admin"},
-        "link_audit_source": {"issuer": "test", "subject": "audit"},
+        "administrator": {"issuer": "http://127.0.0.1:1", "subject": "admin"},
+        "link_audit_source": {"issuer": "http://127.0.0.1:1", "subject": "audit"},
         "session_seconds": 60, "secure_cookie": false,
         "grant_log_dir": root.join("grants"), "grant_log_origin": "test",
         "grant_model_file": root.join("missing-model")
