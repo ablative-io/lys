@@ -243,8 +243,13 @@ async fn a_context_crossing_types_one_compaction() -> TestResult {
             json!({ "measure": "context_percent", "limit": 80, "act": "compact", "version": 0 }),
         )
         .await?;
-    let under = table.used(context("e1", &session, 60)).await?;
+    let path = format!("/agents/{}/usage", table.agent());
+    let (_, unreported) = table.call(reqwest::Method::GET, &path, None).await?;
+    assert!(unreported["last_reported_ms"].is_null(), "{unreported}");
+    let first = context("e1", &session, 60);
+    let under = table.used(first.clone()).await?;
     assert_eq!(under["receipts"], json!([]), "{under}");
+    assert_eq!(under["last_reported_ms"], first["at_ms"], "{under}");
     let crossed = table.used(context("e2", &session, 85)).await?;
     let receipt = &crossed["receipts"][0];
     assert_eq!(receipt["crossing"]["figure"], 85, "{crossed}");

@@ -56,6 +56,10 @@ pub struct UsageView {
     pub agent: String,
     /// Each crossing and what came of its act, in the order kept.
     pub receipts: Vec<Receipt>,
+    /// When the latest usage kept for the agent was measured, in
+    /// milliseconds since the Unix epoch; none while its runner has
+    /// reported none, so its budgets cannot yet be reached.
+    pub last_reported_ms: Option<i64>,
 }
 
 /// The usage routes.
@@ -132,6 +136,13 @@ fn view(state: &AppState, agent: &str) -> Result<Json<UsageView>, ServerError> {
         Ok(Json(UsageView {
             agent: agent.to_owned(),
             receipts: store.held().crossings.of_agent(agent),
+            last_reported_ms: store
+                .held()
+                .uses
+                .iter()
+                .filter(|usage| usage.agent == agent)
+                .map(|usage| usage.at_ms)
+                .max(),
         }))
     })
 }

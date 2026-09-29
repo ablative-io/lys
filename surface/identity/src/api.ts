@@ -34,12 +34,13 @@ async function refusalOf(response: Response): Promise<Refused> {
   });
 }
 
-export async function request<T>(path: string, body?: unknown): Promise<T> {
+/** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
+export async function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   let response: Response;
   const init: RequestInit =
     body === undefined
       ? { credentials: 'same-origin', headers: { accept: 'application/json' } }
-      : { method: 'POST', credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify(body) };
+      : { method, credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify(body) };
   try {
     response = await fetch(API + path, init);
   } catch (error) {

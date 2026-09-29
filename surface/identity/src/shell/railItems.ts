@@ -20,6 +20,7 @@ export const RAIL: RailItem[] = [
   {"t": "a", "title": "Connections (g n)", "label": "Connections", "svg": "<circle cx=\"6\" cy=\"12\" r=\"2.5\"/><circle cx=\"18\" cy=\"6\" r=\"2.5\"/><circle cx=\"18\" cy=\"18\" r=\"2.5\"/><path d=\"M8.3 11 15.7 7M8.3 13l7.4 4\"/>", "href": "#/connections", "nav": "connections", "kbd": "g n"},
   {"t": "a", "title": "Network (g t)", "label": "Network", "svg": "<rect x=\"3\" y=\"4\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"4\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"8.5\" y=\"15\" width=\"7\" height=\"5\" rx=\"1\"/><path d=\"M6.5 9v3h11V9M12 12v3\"/>", "href": "#/network", "nav": "network", "kbd": "g t"},
   {"t": "a", "title": "Sessions (g x)", "label": "Sessions", "svg": "<path d=\"M4 12h3l2-5 4 10 2-5h5\"/>", "href": "#/sessions", "nav": "sessions", "kbd": "g x"},
+  {"t": "a", "title": "Usage (g b)", "label": "Usage", "svg": "<path d=\"M4 19h16\"/><path d=\"M6 15l4-4 3 3 5-6\"/>", "href": "#/usage", "nav": "usage", "kbd": "g b"},
   {"t": "sep"},
   {"t": "a", "title": "Model (g m)", "label": "Model", "svg": "<circle cx=\"6\" cy=\"6\" r=\"2.2\"/><circle cx=\"18\" cy=\"6\" r=\"2.2\"/><circle cx=\"12\" cy=\"18\" r=\"2.2\"/><path d=\"M8 6.5h8M7 8l4 8M17 8l-4 8\"/>", "href": "#/model", "nav": "model", "kbd": "g m"},
   {"t": "grow"},
