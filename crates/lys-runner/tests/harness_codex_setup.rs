@@ -223,3 +223,27 @@ fn setup_cannot_substitute_home_or_a_different_binding() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn config_directory_uses_declared_read_authority_instead_of_writable_home() -> TestResult {
+    let plan = plan()?;
+    Configuration::begin(
+        "init",
+        "config",
+        Path::new("/runtime/lys-config"),
+        &plan,
+        &plan.binding,
+    )?;
+    assert!(
+        Configuration::begin(
+            "init",
+            "config",
+            Path::new("/agent/home/.codex"),
+            &plan,
+            &plan.binding
+        )
+        .is_err(),
+        "the writable home cannot establish immutable config authority"
+    );
+    Ok(())
+}
