@@ -67,6 +67,9 @@ async fn account_mutation(active: bool, password: bool) -> TestResult {
             json!({"email": "changed@example.test", "password": "Original-Password-12345"}),
         )
     };
+    let own = service.get("/me/account", Some(&cookie)).await?;
+    assert_eq!(own.0, 200, "{}", own.1);
+    assert_eq!(own.1["email"], "registered@example.test");
     let requests = rauthy.request_count();
     let users = rauthy.users();
     let bytes = stored(&service)?;

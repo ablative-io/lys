@@ -11,3 +11,6 @@ mod issuer;
 mod support;
 #[path = "registered/surface.rs"]
 mod surface;
+
+#[path = "registered/signed.rs"]
+mod signed;

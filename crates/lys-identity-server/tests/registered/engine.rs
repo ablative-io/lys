@@ -66,10 +66,10 @@ impl Drop for CountedEngine {
             let _ = stop.send(());
         }
         if let Some(server) = self.server.take() {
-            server
-                .join()
-                .expect("engine thread joins")
-                .expect("engine serves");
+            assert!(
+                matches!(server.join(), Ok(Ok(()))),
+                "engine server did not shut down cleanly"
+            );
         }
     }
 }
