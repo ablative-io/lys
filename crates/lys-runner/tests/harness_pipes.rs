@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Actual pipes, with a non-model echo child: one reader and a durable-write
 //! ordering seam. This proves no installed harness capability or protection.
 use std::collections::BTreeSet;
@@ -12,8 +13,16 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 struct Held(Child);
 impl Drop for Held {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        if let Err(error) = self.0.kill() {
+            assert_eq!(
+                error.kind(),
+                std::io::ErrorKind::InvalidInput,
+                "the fixture child could not be stopped: {error}"
+            );
+        }
+        self.0
+            .wait()
+            .expect("the fixture child's exit must be reaped");
     }
 }
 
