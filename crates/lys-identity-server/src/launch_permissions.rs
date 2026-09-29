@@ -13,14 +13,14 @@ use serde_json::{Value, json};
 
 use crate::error::ServerError;
 
-/// The permission modes Claude Code's settings take.
-const MODES: [&str; 7] = [
-    "default",
+/// The permission modes Claude Code takes, as `claude --help` lists the
+/// choices of `--permission-mode` in Claude Code 2.1.284.
+const MODES: [&str; 6] = [
     "acceptEdits",
     "auto",
     "bypassPermissions",
-    "dontAsk",
     "manual",
+    "dontAsk",
     "plan",
 ];
 
@@ -52,16 +52,25 @@ fn unrepresentable(rule: &str, reason: &str) -> ServerError {
     }
 }
 
-/// Whether `rule` is `Tool` or `Tool(specifier)` as the settings file reads it.
+/// Whether `rule` is `Tool` or `Tool(specifier)` as the settings file reads
+/// it: a specifier is closed, not empty, and holds no bracket of its own.
 fn expressible(rule: &str) -> bool {
-    let (tool, rest) = rule.split_once('(').unwrap_or((rule, ""));
-    let tool_ok = tool.starts_with(|c: char| c.is_ascii_alphabetic())
-        && tool
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-    let rest_ok = rest.is_empty()
-        || (rest.ends_with(')') && rest.len() > 1 && !rest[..rest.len() - 1].contains([')', '(']));
-    tool_ok && rest_ok && !rule.contains(|c: char| c.is_control())
+    let named = |tool: &str| {
+        tool.starts_with(|c: char| c.is_ascii_alphabetic())
+            && tool
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    };
+    let shaped = match rule.split_once('(') {
+        None => named(rule),
+        Some((tool, rest)) => {
+            named(tool)
+                && rest.strip_suffix(')').is_some_and(|specifier| {
+                    !specifier.is_empty() && !specifier.contains(['(', ')'])
+                })
+        }
+    };
+    shaped && !rule.contains(|c: char| c.is_control())
 }
 
 /// `given`, refused by the first rule, mode or directory the settings file

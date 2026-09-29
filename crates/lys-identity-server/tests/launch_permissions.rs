@@ -190,6 +190,9 @@ async fn a_profile_rule_the_settings_file_cannot_express_is_refused_by_name() ->
     let table = Table::set().await?;
     let cases = [
         (json!({ "deny": ["Bash(rm"] }), "Bash(rm"),
+        (json!({ "deny": ["Read("] }), "Read("),
+        (json!({ "deny": ["Read()"] }), "Read()"),
+        (json!({ "default_mode": "default" }), "default"),
         (json!({ "allow": ["two words"] }), "two words"),
         (json!({ "default_mode": "yolo" }), "yolo"),
         (json!({ "additional_directories": ["srv/a"] }), "srv/a"),
