@@ -7,6 +7,7 @@ use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
+use lys_home::harness::launch_fields::Channel;
 use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::error::ServerError;
@@ -112,7 +113,7 @@ async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> Test
     assert_eq!(set["profile"]["tools"], json!(["read", "edit"]));
     assert_eq!(
         set["profile"]["mcp_servers"],
-        json!([{ "name": "cambium", "url": "https://cambium.example.test/mcp" }])
+        json!([{ "name": "cambium", "url": "https://cambium.example.test/mcp", "channel": "off" }])
     );
     assert_eq!(
         set["profile"]["set_by"],
@@ -254,6 +255,8 @@ fn version(operation: &str, note: &str) -> Version {
             mcp_servers: vec![McpServer {
                 name: "cambium".to_owned(),
                 url: "https://cambium.example.test/mcp".to_owned(),
+                command: None,
+                channel: Channel::Off,
             }],
             instructions: String::new(),
             note: note.to_owned(),

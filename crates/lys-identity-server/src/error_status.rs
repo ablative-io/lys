@@ -137,6 +137,7 @@ impl ServerError {
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
+            | Self::McpHandleUnsupported { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }
             | Self::RuntimeReportReused { .. }
@@ -166,7 +167,9 @@ impl ServerError {
             | Self::CodeExpired
             | Self::VerifierWrong
             | Self::BudgetRefused { .. }
-            | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
+            | Self::PolicyRefused { .. }
+            | Self::McpCredentialInline { .. }
+            | Self::McpSettingUnrepresentable { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,

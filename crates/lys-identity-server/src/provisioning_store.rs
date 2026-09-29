@@ -12,22 +12,66 @@
 //! set over a version that is no longer the latest it is refused, so a late
 //! change never lands on a profile its setter did not see.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use lys_home::harness::launch_fields::{Channel, Literal};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 
-/// One MCP server an agent is given.
+/// One MCP server an agent is given: reached at an address, or started as
+/// a command. A version kept before commands has an address and no channel,
+/// which reads as off.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct McpServer {
     /// Its name.
     pub name: String,
-    /// Where it is reached.
+    /// Where it is reached; empty for a command.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub url: String,
+    /// The command it is started with; none for an address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<McpCommand>,
+    /// Whether its messages wake an idle seat: `off` or `wake`.
+    #[serde(default)]
+    #[schema(value_type = String)]
+    pub channel: Channel,
+}
+
+/// The command an MCP server is started with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct McpCommand {
+    /// The program.
+    pub program: String,
+    /// Its arguments, in order.
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// The directory it is started in, when one is named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    /// Its environment by name: a string, integer or boolean setting, or
+    /// `{"handle": "<secret>"}` for a secret the agent holds a handle on.
+    #[serde(default)]
+    #[schema(value_type = Object)]
+    pub env: BTreeMap<String, Setting>,
+}
+
+/// One environment setting of a command server.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Setting {
+    /// A secret, as the name of the secret whose handle the launch sets.
+    Handle {
+        /// The secret.
+        handle: String,
+    },
+    /// A setting that is not a secret.
+    Literal(Literal),
 }
 
 /// What an agent is set up with.
