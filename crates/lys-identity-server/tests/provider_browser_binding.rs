@@ -27,7 +27,8 @@ async fn callback_url(service: &Service, browser: &Client) -> Result<String, Box
         .send()
         .await?;
     assert_eq!(start.status(), 303);
-    let provider = browser.get(location(&start)?).send().await?;
+    let provider_url = location(&start)?;
+    let provider = browser.get(provider_url).send().await?;
     assert_eq!(provider.status(), 303);
     location(&provider)
 }
@@ -100,7 +101,8 @@ async fn the_bound_browser_can_finish_once_and_a_replay_cannot_sign_in() -> Test
     assert!(set.contains("; Path=/auth/v1/providers/callback"));
     assert!(!set.contains("Domain="));
     let cookie = set.split(';').next().ok_or("cookie pair")?;
-    let provider = browser.get(location(&start)?).send().await?;
+    let provider_url = location(&start)?;
+    let provider = browser.get(provider_url).send().await?;
     let callback = location(&provider)?;
     let answer = browser
         .get(&callback)
@@ -142,9 +144,11 @@ async fn duplicate_browser_cookies_are_refused_even_with_one_correct_value() -> 
         .ok_or("browser binding cookie")?
         .to_str()?;
     let cookie = set.split(';').next().ok_or("cookie pair")?;
-    let provider = browser.get(location(&start)?).send().await?;
+    let provider_url = location(&start)?;
+    let provider = browser.get(provider_url).send().await?;
+    let callback = location(&provider)?;
     let answer = browser
-        .get(location(&provider)?)
+        .get(callback)
         .header(header::COOKIE, format!("{cookie}; lys_provider=other"))
         .send()
         .await?;
