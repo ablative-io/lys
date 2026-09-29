@@ -343,6 +343,7 @@ async fn make_administrator(
     let (person, receipt) = with_directory(&state, |directory| {
         Ok(directory.setup_person(actor.clone(), operation, profile, now())?)
     })?;
+    crate::import_bootstrap::ensure(&state)?;
     spend(settings)?;
     drop(turn);
     let cookie = state.sessions.begin(actor)?;
@@ -413,11 +414,13 @@ pub async fn finish(
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let operation = OperationId::from_str(&body.operation)?;
     let profile = Profile::new(&body.display_name)?;
-    with_directory(&state, |directory| {
+    let answer = with_directory(&state, |directory| {
         let (person, receipt) = directory.setup_person(actor, operation, profile, now())?;
         Ok(Json(PersonRegistered {
             person: person.to_string(),
             receipt: receipt_view(&receipt),
         }))
-    })
+    })?;
+    crate::import_bootstrap::ensure(&state)?;
+    Ok(answer)
 }

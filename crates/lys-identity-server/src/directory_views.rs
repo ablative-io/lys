@@ -18,6 +18,12 @@ use crate::sessions_api::SessionLogin;
 /// The actor a receipt was signed for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReceiptActorView {
+    /// How the actor authenticated; a service account never claims an OIDC sign-in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication: Option<String>,
+    /// The independently authenticated service account, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_account: Option<String>,
     /// The issuer its login was authenticated at.
     pub issuer: String,
     /// The subject that login names.
@@ -68,6 +74,14 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
         version: receipt.version(),
         operation: receipt.operation().to_string(),
         actor: ReceiptActorView {
+            authentication: actor
+                .provenance()
+                .service_account()
+                .map(|_| "service_account_bearer".to_owned()),
+            service_account: actor
+                .provenance()
+                .service_account()
+                .map(|account| account.to_string()),
             issuer: actor.binding().issuer().to_owned(),
             subject: actor.binding().subject().to_owned(),
             authenticated_at: actor.provenance().authenticated_at(),

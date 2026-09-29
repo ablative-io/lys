@@ -26,6 +26,35 @@ pub(crate) fn typed(api: &mut Api) {
         route(
             (
                 POST,
+                "/identity/import",
+                "Import named entries as an independently authorised service account",
+            ),
+            A,
+            Some(api.schema::<crate::import_api::ImportDocument>()),
+            Some(api.schema::<crate::import_api::ImportAnswer>()),
+            &[
+                REGISTER,
+                crate::openapi_refusals::GRANT_MADE,
+                &[
+                    "NotSignedIn",
+                    "NotHeld",
+                    "NoPerson",
+                    "RootAuthorityRefused",
+                    "GrantNotVisible",
+                    "ServiceAccountUnknown",
+                    "app_operation_reused",
+                    "UseOnly",
+                    "ExpiryBeyondSource",
+                    "ActionsOutside",
+                    "RecipientRefused",
+                    "IdentityNotActive",
+                    "Revoked",
+                ],
+            ],
+        ),
+        route(
+            (
+                POST,
                 "/apps",
                 "Register an app: pending until the administrator approves it",
             ),

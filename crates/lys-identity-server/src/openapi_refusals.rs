@@ -38,6 +38,8 @@ pub(crate) const GRANT_ASKED: &[&str] = &[
 pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
 /// A registration.
 pub(crate) const REGISTER: &[&str] = &[
+    "NotHeld",
+    "ServiceAccountUnknown",
     "NotAdmitted",
     "RequestMalformed",
     "app_id_invalid",
@@ -45,6 +47,7 @@ pub(crate) const REGISTER: &[&str] = &[
     "app_exists",
     "redirect_invalid",
     "credential_refused",
+    "app_operation_reused",
 ];
 /// An app the caller may see.
 pub(crate) const APP_READ: &[&str] = &["NotSignedIn", "app_unknown", "credential_refused"];

@@ -38,6 +38,10 @@ pub struct Config {
     pub log_origin: String,
     /// The file holding the service's event signing key seed.
     pub event_key_file: PathBuf,
+    /// An installation-owned loader credential to provision once as an
+    /// ordinary person-owned service account. No runtime bypass is granted.
+    #[serde(default)]
+    pub import_credential_file: Option<PathBuf>,
     /// The OIDC issuer URL.
     pub issuer: String,
     /// The service's OIDC client id.

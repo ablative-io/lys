@@ -1578,6 +1578,7 @@ dependencies = [
  "chrono",
  "clap",
  "lys-core",
+ "lys-identity",
  "lys-log-store",
  "lys-runner",
  "mio",
@@ -1716,6 +1717,7 @@ dependencies = [
  "tokio",
  "tracing",
  "utoipa",
+ "zeroize",
 ]
 
 [[package]]

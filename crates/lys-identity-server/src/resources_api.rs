@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::error::ServerError;
 use crate::grant_sight::sees_with;
-use crate::grants::{caller, with_grants};
+use crate::grants::with_grants;
 use crate::reviews_api::stands;
 use crate::routes::AppState;
 use crate::session::now;
@@ -63,7 +63,7 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<ResourceList>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let at = now();
         let book = judged.grants.book();
         let mut known = HashMap::new();

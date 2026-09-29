@@ -79,6 +79,7 @@ pub fn render(
         "log_dir": dir("directory-log"),
         "log_origin": LOG_ORIGIN,
         "event_key_file": layout.service_key().display().to_string(),
+        "import_credential_file": super::super::import::credential_path(layout).display().to_string(),
         "issuer": issuer,
         "client_id": config.clients.platform.id,
         "client_secret_file": state

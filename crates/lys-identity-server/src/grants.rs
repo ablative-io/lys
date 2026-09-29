@@ -158,8 +158,17 @@ pub(crate) fn with_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
+    with_directory_grants(state, |_, judged| act(judged))
+}
+
+/// Hold the directory and grants together for a directory mutation whose
+/// caller must first exercise an ordinary grant. No lock is reacquired.
+pub(crate) fn with_directory_grants<T>(
+    state: &AppState,
+    act: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, Judged<'_>) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
     with_directory(state, |directory| {
-        let projection = directory.projection()?;
+        let projection = crate::service_account_grants::projection(state, directory.projection()?)?;
         let administrator =
             state
                 .admission
@@ -182,12 +191,15 @@ pub(crate) fn with_grants<T>(
             (state.say)(&format!("grant log {}", opened.ledger().start()));
             slot.insert(opened)
         };
-        act(Judged {
-            directory: projection,
-            grants,
-            root,
-            apps: &mut apps,
-        })
+        act(
+            directory,
+            Judged {
+                directory: &projection,
+                grants,
+                root,
+                apps: &mut apps,
+            },
+        )
     })
 }
 
@@ -289,7 +301,7 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<GrantList>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let at = now();
         let mut known = HashMap::new();
         let grants = judged
@@ -322,7 +334,7 @@ async fn read(
 ) -> Result<Json<GrantView>, ServerError> {
     let id = grant_id(&id)?;
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let record = judged
             .grants
             .book()
@@ -333,13 +345,15 @@ async fn read(
     })
 }
 
-async fn issue_root(
+pub(crate) async fn issue_root(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<RootBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
-        let request = body.request(caller(&state, &headers, judged.directory)?)?;
+        let request = body.request(crate::service_account_grants::caller(
+            &state, &headers, &judged,
+        )?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
         let recorded = judged
             .grants
@@ -348,13 +362,13 @@ async fn issue_root(
     })
 }
 
-async fn delegate(
+pub(crate) async fn delegate(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<DelegateBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let request = body.request(caller)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
         visible_or(
@@ -380,7 +394,7 @@ async fn revoke(
 ) -> Result<Json<RecordedView>, ServerError> {
     let id = grant_id(&id)?;
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let request = body.request(caller, id)?;
         visible_or(
             &judged,
@@ -406,7 +420,7 @@ async fn check(
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
     with_grants(&state, |mut judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         judged.apps.admit_kind(None, resource.kind())?;
         judged.apps.admit_action(resource.kind(), action.as_str())?;
         let request = ExerciseRequest {
@@ -429,7 +443,7 @@ async fn why(
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
     with_grants(&state, |mut judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         judged.apps.admit_kind(None, resource.kind())?;
         judged.apps.admit_action(resource.kind(), action.as_str())?;
         let request = ExerciseRequest {
@@ -458,7 +472,7 @@ async fn who(
     let (route, resource, action) = body.question.parts()?;
     let at = now();
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         judged.apps.admit_kind(None, resource.kind())?;
         judged.apps.admit_action(resource.kind(), action.as_str())?;
         let after = body.after.as_deref();
@@ -531,7 +545,7 @@ async fn cannot_give(
     Query(body): Query<CannotGiveBody>,
 ) -> Result<Json<CannotGiveAnswer>, ServerError> {
     with_grants(&state, |judged| {
-        let caller = caller(&state, &headers, judged.directory)?;
+        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let request = body.request(caller)?;
         judged
             .grants

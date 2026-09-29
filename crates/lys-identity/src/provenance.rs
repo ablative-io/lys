@@ -15,7 +15,7 @@
 //! answers for it, never in their place (P8).
 
 use crate::binding::LoginBinding;
-use crate::id::AgentId;
+use crate::id::{AgentId, ServiceAccountId};
 
 /// How the service authenticated the actor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -25,6 +25,9 @@ pub enum AuthMethod {
     /// A request signed by this agent, which the actor is responsible for,
     /// whose signature the service verified against the agent's certificate.
     AgentSignature(AgentId),
+    /// This person's service account presented its independently verified
+    /// bearer credential. This never asserts the person signed in.
+    ServiceAccountBearer(ServiceAccountId),
 }
 
 /// How and when the service authenticated the actor.
@@ -58,8 +61,16 @@ impl Provenance {
     /// actor signed in themselves.
     pub fn agent(&self) -> Option<AgentId> {
         match self.method {
-            AuthMethod::Oidc => None,
+            AuthMethod::Oidc | AuthMethod::ServiceAccountBearer(_) => None,
             AuthMethod::AgentSignature(agent) => Some(agent),
+        }
+    }
+
+    /// The independently authenticated service account, if any.
+    pub fn service_account(&self) -> Option<ServiceAccountId> {
+        match self.method {
+            AuthMethod::ServiceAccountBearer(account) => Some(account),
+            AuthMethod::Oidc | AuthMethod::AgentSignature(_) => None,
         }
     }
 

@@ -190,7 +190,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
         )?,
         &GrantError::PassOnOutside,
     );
-    for code in [0, 3, 99] {
+    for code in [0, 4, 99] {
         refused(
             &with(
                 8,

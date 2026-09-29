@@ -90,11 +90,13 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
         })?;
     match identity {
         IdentityId::Person(person) => Ok(person),
-        IdentityId::Agent(_) => record.responsible().ok_or_else(|| {
-            GrantError::from(IdentityError::IdentityUnknown {
-                identity: identity.to_string(),
+        IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => {
+            record.responsible().ok_or_else(|| {
+                GrantError::from(IdentityError::IdentityUnknown {
+                    identity: identity.to_string(),
+                })
             })
-        }),
+        }
     }
 }
 

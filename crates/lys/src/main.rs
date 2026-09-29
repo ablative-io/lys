@@ -54,6 +54,12 @@ fn main() -> ExitCode {
             ),
         },
         Command::Identity(identity_command) => match identity_command {
+            identity::IdentityCommand::Import {
+                file,
+                root,
+                credential_file,
+                address,
+            } => identity::import::run(&file, root, credential_file, &address, json),
             identity::IdentityCommand::Prepare { config } => identity::prepare::run(&config, json),
             identity::IdentityCommand::Configure { config } => {
                 identity::configure::run(&config, json)
