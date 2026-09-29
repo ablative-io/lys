@@ -826,7 +826,7 @@
         },
         {
           "id": "C191",
-          "text": "Command-started MCP servers, with secrets only as handles (HOME-037 R4).",
+          "text": "Command-started MCP servers with typed settings, secrets only as handles, and their channel policy (HOME-037 R4).",
           "done": false
         },
         {
