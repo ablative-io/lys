@@ -7,7 +7,7 @@ import type { ProvisioningAnswer, ProvisioningProfile } from '../src/features/pr
 
 beforeEach(() => sessionStorage.clear());
 const path = '/agents/' + SCRIBE + '/provisioning';
-const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat(32), instructions: 'Check every receipt', note: 'Initial profile', model_access: ['model-one'], tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010', channel: 'wake' }, { name: 'Excalidraw', command: { program: '/opt/mcp/excalidraw', args: ['--stdio'], env: { PORT: 3000, VERBOSE: false, TOKEN: { handle: 'excalidraw' } } }, channel: 'off' }], set_by: ADA, set_at: 1790000000,
+const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat(32), instructions: 'Check every receipt', note: 'Initial profile', model_access: ['model-one'], tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Cambium', url: 'http://localhost:6010', channel: 'wake' }, { name: 'Excalidraw', command: { program: '/opt/mcp/excalidraw', args: ['--stdio', '  spaced  ', ''], env: { PORT: 3000, VERBOSE: false, TOKEN: { handle: 'excalidraw' } } }, channel: 'off' }], set_by: ADA, set_at: 1790000000,
   harness: { kind: 'claude_code', program: '/opt/seat/bin/claude', package: 'claude-code-seat' },
   permissions: { allow: ['Read'], deny: ['Bash(rm:*)'], ask: ['Edit'], default_mode: 'acceptEdits', additional_directories: ['/srv/a', '/srv/b'] } };
 const answer: ProvisioningAnswer = { agent: SCRIBE, profile, versions: [{ version: 1, set_by: ADA, set_at: 1790000000, note: 'Initial profile' }], enforced: false };
@@ -63,7 +63,7 @@ describe('Agent provisioning', () => {
   it('shows the harness, each server as started and the permissions', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
     expect(text()).toContain('Claude Code · /opt/seat/bin/claude · package claude-code-seat');
-    expect(text()).toContain('/opt/mcp/excalidraw --stdio · PORT = 3000 · VERBOSE = false · TOKEN = the handle on excalidraw');
+    expect(text()).toContain('/opt/mcp/excalidraw ["--stdio","  spaced  ",""] · PORT = 3000 · VERBOSE = false · TOKEN = the handle on excalidraw');
     expect(text()).toContain('wakes the agent'); expect(text()).toContain('Bash(rm:*)'); expect(text()).toContain('Permission mode: acceptEdits.');
   });
   it('records no harness and no permissions when none are given, and refuses half a harness', async () => {

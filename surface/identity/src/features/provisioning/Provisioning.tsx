@@ -15,7 +15,7 @@ export interface ProvisioningProfile { reviewed_by?: string | null; reviewed_at?
 export interface ProvisioningAnswer { agent: string; recorded?: { operation: string; version: number } | null; profile: ProvisioningProfile | null; versions: { version: number; set_by: string; set_at: number; note: string }[]; enforced: boolean }
 const pathOf = (id: string) => '/agents/' + encodeURIComponent(id) + '/provisioning';
 const setting = (value: Setting) => typeof value === 'object' ? 'the handle on ' + value.handle : String(value);
-const serverLine = (server: McpServer) => server.command ? [server.command.program, ...(server.command.args ?? [])].join(' ') + (server.command.cwd ? ' in ' + server.command.cwd : '') + Object.entries(server.command.env ?? {}).map(([name, value]) => ' · ' + name + ' = ' + setting(value)).join('') : server.url ?? '';
+const serverLine = (server: McpServer) => server.command ? server.command.program + (server.command.args?.length ? ' ' + JSON.stringify(server.command.args) : '') + (server.command.cwd ? ' in ' + server.command.cwd : '') + Object.entries(server.command.env ?? {}).map(([name, value]) => ' · ' + name + ' = ' + setting(value)).join('') : server.url ?? '';
 const listed = (title: string, entries: string[] | undefined) => <div key={title}><h3>{title}</h3>{entries?.length ? <ul>{entries.map((entry, index) => <li key={index}>{entry}</li>)}</ul> : <p>None recorded.</p>}</div>;
 
 export function Provisioning({ id }: { id: string }) {
