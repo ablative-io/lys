@@ -162,6 +162,11 @@ async fn nested_api_authentication_precedes_json_extraction_while_static_screen_
     let answer: serde_json::Value = serde_json::from_str(&refused.text().await?)?;
     assert_eq!(answer["refusal"], "NotSignedIn");
     let (status, receipt) = service.get("/api/receipts/0", None).await?;
-    assert_eq!(status, 404, "the refused request wrote a leaf: {receipt}");
+    assert_eq!(status, 400, "the refused request wrote a leaf: {receipt}");
+    assert_eq!(receipt["refusal"], "RequestMalformed");
+    assert_eq!(
+        receipt["reason"],
+        "RequestMalformed: the log holds no leaf 0"
+    );
     Ok(())
 }
