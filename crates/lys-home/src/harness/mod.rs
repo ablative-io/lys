@@ -15,3 +15,7 @@ pub mod codex;
 /// handles and channel policy, and the kept skills (HOME-037).
 pub mod launch_fields;
 mod launch_fields_tests;
+/// Kept skills written into a session's own config directory, each checked
+/// against the hash Lys keeps it by (HOME-037 R3).
+pub mod skills;
+mod skills_tests;

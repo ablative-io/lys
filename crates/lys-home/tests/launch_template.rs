@@ -403,3 +403,87 @@ fn a_launch_whose_render_is_refused_stores_no_template_and_writes_nothing() -> G
     assert_eq!(events.len(), 1);
     Ok(())
 }
+
+fn with_skill(dir: &Path, name: &str, config: Option<&Path>) -> PathBuf {
+    let text = "Read the change against its brief.\n";
+    write_template(dir, name, |v| {
+        v["slots"]["skills"] =
+            json!([{ "name": "review", "text": text, "sha256": sha256_hex(text.as_bytes()) }]);
+        if let Some(config) = config {
+            v["slots"]["env"]["CLAUDE_CONFIG_DIR"] = json!(config);
+        }
+    })
+}
+
+#[test]
+fn a_kept_skill_is_written_into_the_sessions_own_config_directory_and_the_manifest() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let home = fresh_home(dir.path());
+    let config = dir.path().join("config");
+    let template = with_skill(dir.path(), "skill.json", Some(&config));
+    let out = dir.path().join("out");
+    std::fs::create_dir(&out)?;
+    let output = launch(&home, &template, &out);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout)?;
+    let text = "Read the change against its brief.\n";
+    let written = config.join("skills/review/SKILL.md");
+    assert_eq!(std::fs::read(&written)?, text.as_bytes());
+    assert_eq!(
+        report["skills"],
+        json!([{ "name": "review", "path": "skills/review/SKILL.md",
+                 "len": text.len(), "sha256": sha256_hex(text.as_bytes()) }])
+    );
+    let listed = report["files"].as_array().ok_or("no files")?;
+    assert!(listed.iter().any(|file| {
+        file["path"] == json!(written) && file["sha256"] == sha256_hex(text.as_bytes())
+    }));
+    Ok(())
+}
+
+#[test]
+fn a_kept_skill_with_no_config_directory_of_the_sessions_own_is_refused_and_not_written() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let home = fresh_home(dir.path());
+    let template = with_skill(dir.path(), "skill.json", None);
+    let out = dir.path().join("out");
+    std::fs::create_dir(&out)?;
+    let output = Command::new(BIN)
+        .args([
+            "render-launch",
+            "--home",
+            home.to_str().ok_or("home")?,
+            "--session",
+            "fixture",
+        ])
+        .args([
+            "--template",
+            template.to_str().ok_or("template")?,
+            "--uuid",
+            UUID,
+        ])
+        .args([
+            "--cwd",
+            "/fixture",
+            "--model",
+            "claude-fixture",
+            "--version",
+            "2.1.283",
+        ])
+        .args(["--out", out.to_str().ok_or("out")?])
+        .env("HOME", dir.path())
+        .env("LYS_FIXTURE_TOKEN", SECRET_VALUE)
+        .output()?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("CLAUDE_CONFIG_DIR"));
+    assert!(
+        !dir.path().join(".claude").exists(),
+        "nothing reaches the operator's home"
+    );
+    Ok(())
+}

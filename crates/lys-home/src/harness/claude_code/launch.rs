@@ -39,11 +39,14 @@ use serde_json::{Value, json};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::events::{ManifestFile, RenderManifest, template_render};
-use crate::harness::claude_code::given::{CONFIG_DIR_VARIABLE, ConfigDir, resolve_given};
+use crate::harness::claude_code::given::{
+    CONFIG_DIR_VARIABLE, ConfigDir, ConfigSource, resolve_given,
+};
 use crate::harness::claude_code::launch_env::{Judge, write_env_file, write_new};
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
+use crate::harness::skills;
 use crate::record::blocks::Hash;
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
 use crate::record::given::GivenRecord;
@@ -140,6 +143,16 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
         }
     }
+    let process_home = std::env::var_os("HOME").map(PathBuf::from);
+    let config_dir = ConfigDir::resolve(
+        template.env.get(CONFIG_DIR_VARIABLE).map(String::as_str),
+        process_home.as_deref(),
+    )?;
+    if !template.skills.is_empty() && config_dir.source != ConfigSource::Template {
+        return Err(HomeError::SkillDirectory {
+            path: config_dir.path,
+        });
+    }
     let session_head = session.head_hash()?;
     let head = session.head()?.map(str::to_owned);
     let target = RenderTarget {
@@ -154,7 +167,6 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     // The template is stored only once its render has succeeded, so a
     // refused render leaves the home's templates as they were.
     let stored = home.templates().put(&template_bytes)?;
-    let process_home = std::env::var_os("HOME").map(PathBuf::from);
     let mcp = Value::Object(std::mem::take(&mut template.mcp));
     let mcp_bytes = serde_json::to_vec_pretty(&mcp).map_err(|source| HomeError::Json {
         context: "the MCP configuration could not be serialised",
@@ -167,10 +179,20 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     };
     write_env_file(&template, judge.as_ref(), &env)?;
     write_new(&instructions, template.instructions.as_bytes())?;
+    let skills = if template.skills.is_empty() {
+        Vec::new()
+    } else {
+        skills::write(&config_dir.path, &template.skills)?
+    };
+    let skill_paths: Vec<PathBuf> = skills
+        .iter()
+        .map(|skill| config_dir.path.join(&skill.path))
+        .collect();
     let mut written: Vec<&Path> = vec![&rendered, &loss, &mcp_file, &env, &instructions];
     if let Some(seed) = &render.seed {
         written.push(seed);
     }
+    written.extend(skill_paths.iter().map(PathBuf::as_path));
     let mut files = Vec::with_capacity(written.len());
     for path in written {
         files.push(ManifestFile {
@@ -193,10 +215,6 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         &manifest_put.hash,
         manifest.files.len() as u64,
     );
-    let config_dir = ConfigDir::resolve(
-        template.env.get(CONFIG_DIR_VARIABLE).map(String::as_str),
-        process_home.as_deref(),
-    )?;
     let resolution = resolve_given(&args.cwd, config_dir, &out)?;
     let given = GivenRecord::claude_code(resolution, environment_names(&template));
     let event_id = session.append_beside(EntryBody::Custom {
@@ -235,6 +253,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         "given": given_id,
         "given_documents": given.documents.len(),
         "given_sha256": canonical.hash().as_str(),
+        "skills": skills,
         "signing": if signed.is_some() { "signed" } else { "unsigned" },
     });
     if let Some((entry, cose_file, data_file)) = signed {
