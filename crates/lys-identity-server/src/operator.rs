@@ -113,6 +113,16 @@ pub async fn guard(
     Ok(next.run(request).await)
 }
 
+/// Whether the managed install is still in its reversible upgrade window.
+/// Every writer of a form an older build cannot read must defer on `true`
+/// and refuse on an I/O error. An unmanaged service has no intent path.
+pub fn upgrade_pending(state: &AppState) -> std::io::Result<bool> {
+    state
+        .operator_upgrade_file
+        .as_deref()
+        .map_or(Ok(false), Path::try_exists)
+}
+
 /// The administrator, for a request carrying the operator token; none for
 /// a request that carries no `lys-operator` header. A header that does not
 /// match, or a service with no token or no administrator yet, is refused.
@@ -125,19 +135,17 @@ pub fn actor(state: &AppState, headers: &HeaderMap) -> Result<Option<Actor>, Ser
             reason: "the operator header must occur once",
         });
     }
-    if let Some(path) = &state.operator_upgrade_file {
-        match path.try_exists() {
-            Ok(false) => {}
-            Ok(true) => {
-                return Err(ServerError::OperatorRefused {
-                    reason: "the upgrade is still reversible",
-                });
-            }
-            Err(_) => {
-                return Err(ServerError::OperatorRefused {
-                    reason: "the upgrade state cannot be read",
-                });
-            }
+    match upgrade_pending(state) {
+        Ok(false) => {}
+        Ok(true) => {
+            return Err(ServerError::OperatorRefused {
+                reason: "the upgrade is still reversible",
+            });
+        }
+        Err(_) => {
+            return Err(ServerError::OperatorRefused {
+                reason: "the upgrade state cannot be read",
+            });
         }
     }
     let offered = value
