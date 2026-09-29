@@ -14,6 +14,7 @@ use lys_home::harness::claude_code::HARNESS;
 use lys_home::harness::claude_code::launch::shell_word;
 use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
 use lys_home::harness::launch_fields::{Channel, HarnessKind, LaunchFields, LaunchMcp, Transport};
+use lys_home::harness::skills::SkillFile;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
@@ -44,6 +45,8 @@ pub struct Start<'a> {
     pub runtime: &'a str,
     /// The profile version it starts from.
     pub version: &'a Version,
+    /// The text of each skill that version pinned.
+    pub skills: &'a [SkillFile],
 }
 
 /// A rendered start.
@@ -54,8 +57,6 @@ pub struct Rendered {
     pub template_sha256: String,
     /// The start command, as text.
     pub command: String,
-    /// What of the profile no slot of the template carries.
-    pub left_out: Vec<String>,
 }
 
 /// The variable a handle on `secret` is set in, unique among `taken`.
@@ -107,18 +108,6 @@ fn flags(version: &Version) -> Vec<String> {
         flags.extend(waking);
     }
     flags
-}
-
-fn left_out(version: &Version) -> Vec<String> {
-    let settings = &version.settings;
-    let mut left = Vec::new();
-    if !settings.skills.is_empty() {
-        left.push(format!(
-            "skills, which no template slot carries: {}",
-            settings.skills.join(", ")
-        ));
-    }
-    left
 }
 
 /// A server's Claude Code entry: its address, or its stdio command with
@@ -197,7 +186,11 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
             "the declared harness is Codex, whose render this start does not take yet".to_owned(),
         ));
     }
-    let bytes = serde_json::to_vec_pretty(&template(start, &fields, handles)?)
+    let mut body = template(start, &fields, handles)?;
+    if !start.skills.is_empty() {
+        body["slots"]["skills"] = json!(start.skills);
+    }
+    let bytes = serde_json::to_vec_pretty(&body)
         .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;
     let parsed = parse_template(&bytes).map_err(|error| unrenderable(error.to_string()))?;
     let template = String::from_utf8(bytes)
@@ -222,6 +215,5 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
         template,
         template_sha256,
         command,
-        left_out: left_out(start.version),
     })
 }

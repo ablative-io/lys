@@ -46,6 +46,7 @@ use serde_json::Value;
 
 use crate::error::ServerError;
 use crate::grants::caller;
+use crate::launch_harness::skill_files;
 use crate::launch_template::{HandleName, Start, handle_variable, render};
 use crate::network_api::with_network;
 use crate::network_store::{Machine, NetworkStore};
@@ -245,6 +246,7 @@ async fn start_command(
         .as_ref()
         .and_then(|session| session.accounts.clone());
     let handles = handles(&state, &headers, &agent).await?;
+    let skills = with_provisioning(&state, |store| skill_files(store, &version))?;
     let rendered = render(
         &Start {
             agent: &agent,
@@ -252,6 +254,7 @@ async fn start_command(
             machine: &machine,
             runtime: &runtime,
             version: &version,
+            skills: &skills,
         },
         &handles,
     )?;
@@ -266,7 +269,7 @@ async fn start_command(
         template: rendered.template,
         template_sha256: rendered.template_sha256.clone(),
         command: rendered.command,
-        left_out: rendered.left_out,
+        left_out: Vec::new(),
         executed: false,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {
