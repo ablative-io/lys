@@ -80,6 +80,13 @@ impl<T: Default> Watched<T> {
     pub fn write(&self, bytes: &[u8]) -> Result<(), SecretsError> {
         let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
         *held = None;
+        #[cfg(test)]
+        if crate::route_write_fault_tests::partial_write(&self.path, bytes)? {
+            return Err(SecretsError::Io {
+                context: format!("writing {}", self.path.display()),
+                source: std::io::Error::other("injected partial route write"),
+            });
+        }
         fs::write(&self.path, bytes).map_err(|source| SecretsError::Io {
             context: format!("writing {}", self.path.display()),
             source,

@@ -90,4 +90,49 @@ mod tests {
         assert_eq!(broker.store().entry("app-key"), before.as_ref());
         Ok(())
     }
+    #[test]
+    fn second_credential_index_failure_retry_survives_reopen()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let client = Secret::from_slice(b"fixture client only");
+        let api = Secret::from_slice(b"fixture api only");
+        broker.seal_once("app-client", EntryClass::Key, "person-a", &client)?;
+        let index = paths.store_dir.join("index.json");
+        let saved_index = paths.store_dir.join("saved-index.json");
+        std::fs::rename(&index, &saved_index)?;
+        // The sealed file is writable, but rename onto this directory must fail.
+        std::fs::create_dir(&index)?;
+        let failed = broker.seal_once("app-api", EntryClass::Credential, "person-a", &api);
+        std::fs::remove_dir(&index)?;
+        std::fs::rename(&saved_index, &index)?;
+        assert!(
+            matches!(failed, Err(SecretsError::Io { .. })),
+            "index rename fault did not fire"
+        );
+        broker.seal_once("app-client", EntryClass::Key, "person-a", &client)?;
+        broker.seal_once("app-api", EntryClass::Credential, "person-a", &api)?;
+        drop(broker);
+        let broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        for (name, class, expected) in [
+            ("app-client", EntryClass::Key, &client),
+            ("app-api", EntryClass::Credential, &api),
+        ] {
+            assert!(
+                broker.store().entry(name).is_some(),
+                "successful retry lost {name} on reopen"
+            );
+            let stored = broker.store.open_for_use(&broker.store_key, name, class)?;
+            assert_eq!(stored.expose(), expected.expose());
+        }
+        Ok(())
+    }
 }

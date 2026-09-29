@@ -120,11 +120,20 @@ async fn setup() -> Result<Setup, Box<dyn Error>> {
 }
 
 async fn setup_with_person(subject: &str) -> Result<Setup, Box<dyn Error>> {
+    setup_with_broker(subject, true).await
+}
+
+async fn setup_with_broker(subject: &str, running: bool) -> Result<Setup, Box<dyn Error>> {
     let log: Log = Arc::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let app = Router::new().fallback(broker).with_state(Arc::clone(&log));
-    tokio::spawn(async move { axum::serve(listener, app).await });
+    let serving = tokio::spawn(async move { axum::serve(listener, app).await });
+    if !running {
+        serving.abort();
+        let stopped = serving.await;
+        assert!(stopped.is_err_and(|error| error.is_cancelled()));
+    }
     let keys = tempfile::TempDir::new()?;
     let key_file = keys.path().join("secrets-service.key");
     let key = Ed25519Identity::load_or_generate(&key_file)?.public_key_bytes();
@@ -478,5 +487,43 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
         saved.get("owner").is_none(),
         "browser cannot supply an owner"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_broker(ADMINISTRATOR, false).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_save_unavailable";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    let held = ok(get(
+        &setup.service,
+        &format!("/apps/{app}"),
+        Auth::Cookie(&admin),
+    )
+    .await?)?;
+    // Inspect the retained state even when the response incorrectly claims success.
+    assert_eq!(
+        held["state"], "pending",
+        "broker-down approval activated the app without credential custody"
+    );
+    assert_eq!(answer.0, 503);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    assert!(answer.1.get("client").is_none());
     Ok(())
 }
