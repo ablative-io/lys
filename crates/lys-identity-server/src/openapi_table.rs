@@ -65,6 +65,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, &["NotHeld", "Revoked"]];
     POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, &["NotHeld"]];
     POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED];
+    POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED];
     GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown"]];
     GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]];
     POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, &["GrantUnknown", "RevokeRefused"]];

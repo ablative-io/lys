@@ -47,6 +47,7 @@ pub mod grant_contract;
 mod grant_sight;
 pub mod grants;
 pub mod grants_batch;
+pub mod grants_reach;
 pub mod grants_refusals;
 mod import_api;
 mod import_bootstrap;

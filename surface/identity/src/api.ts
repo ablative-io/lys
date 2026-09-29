@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AgentView, DirectoryRecord, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
-import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
+import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, ReachAnswer, ReachBody, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
 
 /** The service is reached through the page's own origin, under /api. */
 export const API = '/api';
@@ -86,6 +86,7 @@ export const api = {
   delegate: (body: DelegateBody) => get<Recorded>('/grants', body),
   why: (body: ActionBody) => get<Permit>('/grants/why', body),
   who: (body: WhoBody) => get<WhoAnswer>('/grants/who', body),
+  reach: (body: ReachBody) => get<ReachAnswer>('/grants/reach', body),
   revoke: (id: string, body: RevokeBody) => get<Recorded>('/grants/' + encodeURIComponent(id) + '/revoke', body),
   callback: (search: string) => get<SignedIn>('/callback' + search),
   authority: () => get<AuthorityAnswer>('/authority'),
