@@ -34,6 +34,13 @@ pub(crate) const GRANT_ASKED: &[&str] = &[
     "app_retired",
     "action_not_declared",
 ];
+/// A decision the permission engine or the grant log could not make.
+pub(crate) const UNANSWERED: &[&str] = &[
+    "PermissionEngineUnavailable",
+    "ProjectionPending",
+    "OperationUnresolved",
+    "StaleDecision",
+];
 /// An agent's signed request.
 pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
 /// A registration.

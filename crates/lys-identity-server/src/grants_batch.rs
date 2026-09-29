@@ -135,7 +135,7 @@ fn malformed(reason: impl Into<String>) -> ServerError {
 /// answering it no: `which` answers such a failure by its name instead of
 /// leaving the id out, so a list is never short because the engine, the log
 /// or the revision asked for was not there.
-fn unanswered(error: &GrantError) -> bool {
+pub(crate) fn unanswered(error: &GrantError) -> bool {
     matches!(
         error,
         GrantError::StaleDecision { .. }
