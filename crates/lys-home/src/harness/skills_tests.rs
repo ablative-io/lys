@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use super::skills::{SkillFile, check, write};
+use super::skills::{SkillFile, check, stage, write};
 use crate::error::HomeError;
 use crate::record::blocks::Hash;
 
@@ -140,6 +140,40 @@ fn a_config_path_through_a_symlink_is_refused_with_or_without_a_trailing_slash()
     assert!(
         !real.join("skills").exists(),
         "nothing was written through the link"
+    );
+    Ok(())
+}
+
+#[test]
+fn two_writers_staged_at_once_publish_one_text_and_the_other_never_replaces_it()
+-> Result<(), Box<dyn Error>> {
+    let (_config, config) = config_dir()?;
+    let own = config.join("skills/review");
+    std::fs::create_dir_all(&own)?;
+    let path = own.join("SKILL.md");
+    let first = stage(&path, b"Read the change against its brief.\n")?;
+    let second = stage(&path, b"Read the change twice.\n")?;
+    first.publish("review")?;
+    let loser = second.publish("review");
+    assert_eq!(
+        refused(loser),
+        "a different SKILL.md is already there",
+        "the second writer refuses"
+    );
+    assert_eq!(
+        std::fs::read(&path)?,
+        b"Read the change against its brief.\n",
+        "the first text stands"
+    );
+    let same = stage(&path, b"Read the change against its brief.\n")?;
+    same.publish("review")?;
+    let left: Vec<_> = std::fs::read_dir(&own)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(
+        left,
+        vec![std::ffi::OsString::from("SKILL.md")],
+        "no staged file is left"
     );
     Ok(())
 }
