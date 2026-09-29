@@ -204,6 +204,14 @@ pub(crate) fn unscoped_answer(scope: &str, body: &str) -> String {
     body.replace(&format!("\"{scope}/"), "\"")
 }
 
+/// The schema text a schema read answered with.
+fn text_of(body: &str) -> Result<String, GrantError> {
+    serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|value| value.get("schemaText")?.as_str().map(str::to_owned))
+        .ok_or_else(|| unavailable(format!("the schema answer carries no schemaText: {body}")))
+}
+
 impl SpiceDb {
     fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
         let answer =
@@ -216,12 +224,7 @@ impl SpiceDb {
         let (status, body) = self.raw("/v1/schema/read", &json!({}))?;
         match status {
             404 => Ok(String::new()),
-            200 => serde_json::from_str::<Value>(&body)
-                .ok()
-                .and_then(|value| value.get("schemaText")?.as_str().map(str::to_owned))
-                .ok_or_else(|| {
-                    unavailable(format!("the schema answer carries no schemaText: {body}"))
-                }),
+            200 => text_of(&body),
             _ => Err(unavailable(format!("the schema could not be read: {body}"))),
         }
     }
@@ -237,7 +240,7 @@ impl SpiceDb {
                 if status != 200 {
                     return Ok((status, answer));
                 }
-                let text = self.held_text()?;
+                let text = text_of(&answer)?;
                 Ok((200, json!({"schemaText": seen(scope, &text)}).to_string()))
             }
             "/v1/schema/write" => {
