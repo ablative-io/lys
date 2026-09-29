@@ -15,11 +15,13 @@ use lys_home::harness::claude_code::launch::shell_word;
 use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
 use lys_home::harness::launch_fields::{Channel, HarnessKind, LaunchFields, LaunchMcp, Transport};
 use lys_home::harness::skills::SkillFile;
+use lys_runner::judge::Policy;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::error::ServerError;
 use crate::launch_harness::fields;
+use crate::launch_permissions::settings as permissions;
 use crate::provisioning_store::Version;
 
 /// One handle the agent holds, as the start command names it.
@@ -47,6 +49,8 @@ pub struct Start<'a> {
     pub version: &'a Version,
     /// The text of each skill that version pinned.
     pub skills: &'a [SkillFile],
+    /// The agent's latest Tool policy, when it has one.
+    pub policy: Option<&'a Policy>,
 }
 
 /// A rendered start.
@@ -92,10 +96,6 @@ fn flags(version: &Version) -> Vec<String> {
             flags.push("--fallback-model".to_owned());
             flags.push(further.join(","));
         }
-    }
-    if !settings.tools.is_empty() {
-        flags.push("--allowedTools".to_owned());
-        flags.push(settings.tools.join(","));
     }
     let waking: Vec<String> = settings
         .mcp_servers
@@ -189,6 +189,16 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
     let mut body = template(start, &fields, handles)?;
     if !start.skills.is_empty() {
         body["slots"]["skills"] = json!(start.skills);
+    }
+    let settings = &start.version.settings;
+    let granted = permissions(settings.permissions.as_ref(), &settings.tools, start.policy)?;
+    let empty = granted.as_object().is_some_and(|members| {
+        members
+            .values()
+            .all(|value| value.as_array().is_some_and(Vec::is_empty))
+    });
+    if !empty {
+        body["slots"]["permissions"] = granted;
     }
     let bytes = serde_json::to_vec_pretty(&body)
         .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;

@@ -44,6 +44,7 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::agent_policy_api::with_policies;
 use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_harness::skill_files;
@@ -247,6 +248,10 @@ async fn start_command(
         .and_then(|session| session.accounts.clone());
     let handles = handles(&state, &headers, &agent).await?;
     let skills = with_provisioning(&state, |store| skill_files(store, &version))?;
+    let policy = match state.policies {
+        Some(_) => with_policies(&state, |store| Ok(store.held().latest(&agent).cloned()))?,
+        None => None,
+    };
     let rendered = render(
         &Start {
             agent: &agent,
@@ -255,6 +260,7 @@ async fn start_command(
             runtime: &runtime,
             version: &version,
             skills: &skills,
+            policy: policy.as_ref(),
         },
         &handles,
     )?;

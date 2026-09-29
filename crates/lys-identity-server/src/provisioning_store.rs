@@ -21,6 +21,7 @@ use lys_home::harness::launch_fields::{Channel, DeclaredHarness, Literal};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::launch_permissions::Permissions;
 
 /// One MCP server an agent is given: reached at an address, or started as
 /// a command. A version kept before commands has an address and no channel,
@@ -125,6 +126,9 @@ pub struct Settings {
     /// Each named skill's text as it was when this version was recorded.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skill_pins: Vec<SkillPin>,
+    /// The permissions its settings file carries, when the profile sets them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Permissions>,
 }
 
 /// How an agent's sessions are driven through a runner.

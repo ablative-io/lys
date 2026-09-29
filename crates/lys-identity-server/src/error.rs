@@ -336,6 +336,14 @@ pub enum ServerError {
         /// The skill.
         name: String,
     },
+    /// A permission rule, mode or directory the settings file cannot express.
+    #[error("PolicyUnrepresentable: the settings file cannot express `{rule}`: {reason}")]
+    PolicyUnrepresentable {
+        /// The rule, mode or directory, or the policy rule's id.
+        rule: String,
+        /// Why it cannot.
+        reason: String,
+    },
     /// A model the declared harness cannot carry.
     #[error("ModelUnrepresentable: the harness `{harness}` cannot carry model `{model}`: {reason}")]
     ModelUnrepresentable {

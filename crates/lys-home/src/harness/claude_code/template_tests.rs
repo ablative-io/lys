@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::HomeError;
-use crate::harness::claude_code::template::{SLOTS, parse_template};
+use crate::harness::claude_code::template::{OPTIONAL_SLOTS, SLOTS, parse_template};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -134,7 +134,8 @@ fn the_schema_file_names_exactly_the_slots_the_parser_accepts() {
         .map(String::as_str)
         .collect();
     let accepted: BTreeSet<&str> = SLOTS.iter().copied().collect();
-    assert_eq!(named, accepted);
+    let optional: BTreeSet<&str> = OPTIONAL_SLOTS.iter().copied().collect();
+    assert_eq!(named, &accepted | &optional);
     assert_eq!(slots["additionalProperties"], json!(false));
     let required: BTreeSet<&str> = slots["required"]
         .as_array()
@@ -162,4 +163,28 @@ fn the_template_hash_is_the_sha256_of_the_file_bytes() {
     });
     assert_eq!(template.hash.as_str(), hex);
     assert_eq!(hex.len(), 64);
+}
+
+#[test]
+fn a_permissions_slot_is_written_beside_env_and_a_member_off_its_shape_is_refused() {
+    let mut given = fixture_value();
+    let permissions = json!({ "allow": ["Read"], "deny": ["Bash"], "defaultMode": "plan" });
+    given["slots"]["permissions"] = permissions.clone();
+    let template = parse_value(&given).unwrap();
+    let written: Value = serde_json::from_slice(
+        &crate::harness::claude_code::launch_env::env_settings(&template).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(written["permissions"], permissions);
+    for (member, value) in [
+        ("allow", json!("Read")),
+        ("defaultMode", json!(["plan"])),
+        ("hooks", json!({})),
+    ] {
+        let mut off = fixture_value();
+        off["slots"]["permissions"] = json!({ member: value });
+        let err = parse_value(&off).unwrap_err();
+        assert!(matches!(err, HomeError::TemplateShape { .. }), "{err}");
+        assert!(err.to_string().contains(member), "{err}");
+    }
 }

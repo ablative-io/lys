@@ -172,6 +172,7 @@ impl ServerError {
             | Self::McpCredentialInline { .. }
             | Self::McpSettingUnrepresentable { .. }
             | Self::ModelUnrepresentable { .. }
+            | Self::PolicyUnrepresentable { .. }
             | Self::SkillUnknown { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
