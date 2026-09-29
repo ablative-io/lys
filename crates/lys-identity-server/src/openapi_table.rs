@@ -59,7 +59,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/directory/people" "Every person, for the administrator" S [ADMIN];
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
-    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, &["NoPerson"], &["UseOnly"]];
+    POST "/grants" "Pass on part of a grant" S [GRANT_MADE, &["NoPerson", "ExpiryBeyondSource"], &["UseOnly"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, &["RelationUnknown"], &["RootAuthorityRefused"]];
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, &["NotHeld", "Revoked"]];
