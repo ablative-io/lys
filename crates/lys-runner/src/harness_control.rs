@@ -4,6 +4,7 @@
 
 pub mod claude;
 pub mod codex;
+pub mod codex_setup;
 pub mod dispatcher;
 pub mod events;
 pub mod process;
