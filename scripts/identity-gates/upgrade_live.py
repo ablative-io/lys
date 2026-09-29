@@ -70,6 +70,24 @@ def require_free(number):
         held.bind(("127.0.0.1", number))
 
 
+def network_subnets(networks):
+    """Docker host/none networks have no IPAM allocation to reserve."""
+    used = set()
+    for network in networks:
+        ipam = network.get("IPAM")
+        if ipam is None:
+            continue
+        configurations = ipam.get("Config")
+        if configurations is None:
+            continue
+        for entry in configurations:
+            subnet = entry.get("Subnet")
+            if subnet is not None:
+                ipaddress.ip_network(subnet)
+                used.add(subnet)
+    return used
+
+
 def installation(root, old_source, project):
     layout = (old_source / "crates/lys/src/identity/install/layout.rs").read_text()
     ports = {}
@@ -83,8 +101,7 @@ def installation(root, old_source, project):
     held = []
     if networks:
         held = json.loads(subprocess.check_output(["docker", "network", "inspect", *networks]))
-    used = {entry["Subnet"] for network in held
-            for entry in network.get("IPAM", {}).get("Config", []) if "Subnet" in entry}
+    used = network_subnets(held)
     network = next((f"172.29.{i}.0/24" for i in range(48, 255)
                     if all(not ipaddress.ip_network(f"172.29.{i}.0/24").overlaps(
                         ipaddress.ip_network(subnet)) for subnet in used
