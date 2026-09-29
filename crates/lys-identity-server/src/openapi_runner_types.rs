@@ -10,7 +10,9 @@ use lys_openapi::Api;
 
 use crate::agent_policy_api::{PolicyBody, PolicyView};
 use crate::budgets_act::{UsageBody, UsageView};
-use crate::openapi_table::{GET, POST};
+use crate::budgets_api::{BudgetBody, BudgetsView, ConfirmBody as BudgetConfirmBody};
+use crate::budgets_state::Budget;
+use crate::openapi_table::{GET, POST, PUT};
 use crate::openapi_types::Entry;
 use crate::refusals_api::RefusalsView;
 use crate::runner_acts::ActReceipt;
@@ -25,6 +27,24 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     let usage = api.schema::<UsageView>();
     let policy = api.schema::<PolicyView>();
     vec![
+        (
+            POST,
+            "/budgets/person/{id}/confirm",
+            Some(api.schema::<BudgetConfirmBody>()),
+            Some(api.schema::<Budget>()),
+        ),
+        (
+            GET,
+            "/budgets/{kind}/{id}",
+            None,
+            Some(api.schema::<BudgetsView>()),
+        ),
+        (
+            PUT,
+            "/budgets/{kind}/{id}",
+            Some(api.schema::<BudgetBody>()),
+            Some(api.schema::<Budget>()),
+        ),
         (GET, "/agents/{id}/policy", None, Some(policy.clone())),
         (
             POST,

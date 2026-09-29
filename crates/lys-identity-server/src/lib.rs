@@ -25,6 +25,8 @@ pub mod apps_views;
 pub mod budgets_act;
 pub mod budgets_api;
 pub mod budgets_crossing;
+pub mod budgets_legacy;
+pub mod budgets_migration;
 pub mod budgets_state;
 pub mod budgets_store;
 pub mod caller_admission;

@@ -230,6 +230,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         say,
     });
     crate::teams_migration::at_start(&state)?;
+    crate::budgets_migration::advance(&state)?;
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);

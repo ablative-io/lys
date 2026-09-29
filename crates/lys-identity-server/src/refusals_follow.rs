@@ -13,7 +13,7 @@ use std::sync::Arc;
 use lys_runner::tracking_store::Body;
 use lys_runner::{Act, Answer};
 
-use crate::budgets_api::with_budgets;
+use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::routes::AppState;
@@ -85,7 +85,7 @@ async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) -> S
                 _ => None,
             })
             .collect();
-        if let Err(error) = with_budgets(state, |store| {
+        if let Err(error) = with_budgets_mut(state, |store| {
             store.read_feed(machine, refusals, page.cursor)
         }) {
             return error;

@@ -13,7 +13,7 @@ use std::sync::{Arc, PoisonError};
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, AgentId, IdentityId};
 use serde::{Deserialize, Serialize};
@@ -45,11 +45,15 @@ pub struct BudgetsView {
     pub holder: Holder,
     /// Its budgets, one for each measure set.
     pub budgets: Vec<Budget>,
+    /// Requested legacy values and the full budgets enforced pending confirmation.
+    pub unconfirmed: Vec<crate::budgets_legacy::Unconfirmed>,
 }
 
 /// The budget routes.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/budgets/{kind}/{id}", get(read).put(set))
+    Router::new()
+        .route("/budgets/{kind}/{id}", get(read).put(set))
+        .route("/budgets/person/{id}/confirm", post(confirm))
 }
 
 fn kind_of(kind: &str) -> Result<HolderKind, ServerError> {
@@ -145,16 +149,25 @@ async fn read(
         id,
     };
     authorised(&state, &actor, &holder)?;
-    let budgets = with_budgets(&state, |store| {
-        Ok(store
-            .held()
-            .budgets
-            .iter()
-            .filter(|budget| budget.holder == holder)
-            .cloned()
-            .collect())
-    })?;
-    Ok(Json(BudgetsView { holder, budgets }))
+    with_budgets(&state, |store| {
+        Ok(Json(BudgetsView {
+            budgets: store
+                .held()
+                .budgets
+                .iter()
+                .filter(|budget| budget.holder == holder)
+                .cloned()
+                .collect(),
+            unconfirmed: store
+                .held()
+                .unconfirmed
+                .iter()
+                .filter(|entry| entry.requested.holder == holder)
+                .cloned()
+                .collect(),
+            holder,
+        }))
+    })
 }
 
 async fn set(
@@ -196,5 +209,68 @@ async fn set(
         refusal: refused.refusal,
         words: refused.words,
     })?;
-    with_budgets(&state, |store| store.set(budget, body.version)).map(Json)
+    if budget.holder.kind == HolderKind::Person {
+        crate::budgets_migration::require_committed(&state)?;
+        with_budgets_mut(&state, |store| store.set_confirmed(budget, body.version)).map(Json)
+    } else {
+        with_budgets_mut(&state, |store| store.set(budget, body.version)).map(Json)
+    }
+}
+
+/// A mutation checks the shared upgrade state before allowing a new snapshot.
+pub(crate) fn with_budgets_mut<T>(
+    state: &AppState,
+    act: impl FnOnce(&mut BudgetStore) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    crate::budgets_migration::advance(state)?;
+    with_budgets(state, act)
+}
+
+/// The exact legacy budget version an administrator confirms.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConfirmBody {
+    measure: Measure,
+    version: u64,
+}
+
+async fn confirm(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Result<Json<ConfirmBody>, JsonRejection>,
+) -> Result<Json<Budget>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
+    crate::budgets_migration::require_committed(&state)?;
+    let Json(body) = body.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    let holder = Holder {
+        kind: HolderKind::Person,
+        id,
+    };
+    let by = authorised(&state, &actor, &holder)?;
+    with_budgets_mut(&state, |store| {
+        let budget = store
+            .held()
+            .budget(&holder, body.measure)
+            .cloned()
+            .ok_or_else(|| ServerError::BudgetRefused {
+                refusal: "budget_invalid",
+                words: format!(
+                    "person `{}` has no {:?} budget to confirm",
+                    holder.id, body.measure
+                ),
+            })?;
+        store.set_confirmed(
+            Budget {
+                by,
+                at: now(),
+                ..budget
+            },
+            body.version,
+        )
+    })
+    .map(Json)
 }

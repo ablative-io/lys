@@ -23,7 +23,7 @@ use lys_identity::{AgentId, IdentityId};
 use lys_runner::operations::{Operation, OperationRequest};
 use serde::{Deserialize, Serialize};
 
-use crate::budgets_api::with_budgets;
+use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_crossing::{Acted, Crossing, Receipt, Stands};
 use crate::budgets_state::{Act, Held, Measure, Standing, Usage, covered};
 use crate::error::ServerError;
@@ -113,7 +113,7 @@ async fn report(
         compact: crate::runner_api::session_settings(&state, &agent)?
             .and_then(|settings| settings.compact),
     };
-    with_budgets(&state, |store| {
+    with_budgets_mut(&state, |store| {
         let crossed = crossings(store.held(), &usage, &standings, &targets)?;
         store.charge(Usage { crossed, ..usage })
     })?;
@@ -299,7 +299,7 @@ pub async fn settle(state: &Arc<AppState>) -> Result<(), ServerError> {
     let unsettled = with_budgets(state, |store| Ok(store.held().crossings.unsettled()))?;
     for crossing in unsettled {
         if let Some(acted) = act(state, &crossing).await {
-            with_budgets(state, |store| store.acted(acted))?;
+            with_budgets_mut(state, |store| store.acted(acted))?;
         }
     }
     Ok(())

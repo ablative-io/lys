@@ -45,8 +45,6 @@ use std::collections::BTreeMap;
 
 use lys_openapi::{Api, Method};
 
-use crate::budgets_api::{BudgetBody, BudgetsView};
-use crate::budgets_state::Budget;
 use crate::certificates_api::CertificatesView;
 use crate::certificates_issue::{IssueBody, WithdrawBody};
 use crate::connections_api::ConnectionsView;
@@ -64,7 +62,7 @@ use crate::launch_api::{Launch, StartCommandView};
 use crate::link_audit_api::{Asked, Delivery};
 use crate::memory_api::MemoryView;
 use crate::network_api::{MachineView, NameBody, NetworkView};
-use crate::openapi_table::{GET, POST, PUT};
+use crate::openapi_table::{GET, POST};
 use crate::provisioning_api::{ProvisioningView, ReviewBody, SetBody as ProfileBody};
 use crate::read_views::{AgentView, MeView, PeopleView, ServiceAccountView, ServiceAccountsView};
 use crate::requests_api::AskBody;
@@ -364,18 +362,6 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             "/agents/{id}/stops",
             None,
             Some(api.schema::<StopsView>()),
-        ),
-        (
-            GET,
-            "/budgets/{kind}/{id}",
-            None,
-            Some(api.schema::<BudgetsView>()),
-        ),
-        (
-            PUT,
-            "/budgets/{kind}/{id}",
-            Some(api.schema::<BudgetBody>()),
-            Some(api.schema::<Budget>()),
         ),
         (
             POST,

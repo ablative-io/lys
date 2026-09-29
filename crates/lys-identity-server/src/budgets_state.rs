@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use crate::budgets_crossing::{Acted, Crossing, Crossings};
 
 /// The snapshot domain the budgets' folded state is sealed under.
-pub const DOMAIN: &str = "lys/identity/budgets-state/v1";
+pub const DOMAIN: &str = "lys/identity/budgets-state/v2";
 
-const FORMAT: &str = "lys-budgets-state/v1";
+const FORMAT: &str = "lys-budgets-state/v2";
 
 /// Who a budget is held on.
 #[derive(
@@ -151,6 +151,8 @@ pub struct Usage {
 pub enum Leaf {
     /// A budget set or changed.
     Set(Budget),
+    /// A version admitted under the administrator-only personal-budget rule.
+    Confirmed(Budget),
     /// A use charged.
     Used(Usage),
     /// What came of a crossing's act.
@@ -195,6 +197,8 @@ pub struct Standing {
 pub struct Held {
     /// Each budget at its latest version, by holder and measure.
     pub budgets: Vec<Budget>,
+    /// Legacy self-set personal budgets and what remains effective.
+    pub unconfirmed: Vec<crate::budgets_legacy::Unconfirmed>,
     /// The events already charged.
     pub charged: BTreeSet<String>,
     /// The uses charged, in the order kept.
@@ -295,8 +299,23 @@ impl Held {
     /// Fold one leaf. A budget whose version does not follow the one held
     /// is refused, since every kept version was checked before it was kept.
     pub fn hold(&mut self, leaf: Leaf) -> Result<(), String> {
+        let confirmed = matches!(&leaf, Leaf::Confirmed(_));
         match leaf {
-            Leaf::Set(budget) => {
+            Leaf::Set(budget) | Leaf::Confirmed(budget) => {
+                let expected = self
+                    .budget(&budget.holder, budget.measure)
+                    .map_or(1, |held| held.version + 1);
+                if budget.version != expected {
+                    return Err(format!(
+                        "budget version {} does not follow the one held",
+                        budget.version
+                    ));
+                }
+                if confirmed {
+                    self.confirmed(&budget);
+                } else {
+                    self.legacy_set(&budget);
+                }
                 let held = self
                     .budgets
                     .iter_mut()
@@ -338,6 +357,7 @@ impl Held {
     pub fn applying(&self, standing: &Standing, measure: Measure) -> Option<&Budget> {
         self.budgets
             .iter()
+            .map(|budget| self.effective(budget))
             .filter(|budget| {
                 budget.measure == measure
                     && match budget.holder.kind {

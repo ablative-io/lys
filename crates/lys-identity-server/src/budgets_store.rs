@@ -41,6 +41,7 @@ pub struct BudgetStore<S: LeafStore = FileLeafStore> {
     since_snapshot: u64,
     snapshot_failure: Option<String>,
     uncertain: bool,
+    snapshots_enabled: bool,
 }
 
 /// A log opened and folded: the log, what it folds to, and how it started.
@@ -64,7 +65,11 @@ impl BudgetStore<FileLeafStore> {
         let Some(dir) = config.budgets_dir.as_deref() else {
             return Ok(None);
         };
-        let store = Self::open(dir, key)?;
+        if !dir.exists() {
+            FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
+        }
+        let dir = dir.to_owned();
+        let store = Self::opening(Box::new(move || FileLeafStore::open(&dir)), key, false)?;
         say(&format!(
             "budgets log {}, holding {} budgets",
             store.start(),
@@ -88,6 +93,14 @@ impl<S: LeafStore> BudgetStore<S> {
     /// The budgets kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
+        Self::opening(reopen, key, true)
+    }
+
+    fn opening(
+        reopen: Reopen<S>,
+        key: Arc<Ed25519Identity>,
+        snapshots_enabled: bool,
+    ) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
             reopen,
@@ -98,9 +111,20 @@ impl<S: LeafStore> BudgetStore<S> {
             since_snapshot: 0,
             snapshot_failure: None,
             uncertain: false,
+            snapshots_enabled,
         };
         store.after_start(&start);
         Ok(store)
+    }
+
+    /// Permit snapshot v2 only after the shared upgrade-intent guard is clear.
+    pub fn finish_migration(&mut self) -> Result<(), ServerError> {
+        self.settle()?;
+        if !self.snapshots_enabled {
+            self.snapshots_enabled = true;
+            self.write_snapshot();
+        }
+        Ok(())
     }
 
     /// How the log was started: from its snapshot, or from every leaf and
@@ -127,6 +151,9 @@ impl<S: LeafStore> BudgetStore<S> {
     }
 
     fn write_snapshot(&mut self) {
+        if !self.snapshots_enabled {
+            return;
+        }
         let written = self.held.encode().and_then(|state| {
             self.log
                 .write_snapshot(DOMAIN, &state, &self.key)
@@ -192,6 +219,20 @@ impl<S: LeafStore> BudgetStore<S> {
     /// read (0 for none); refused `BudgetVersionConflict` when another
     /// change came between.
     pub fn set(&mut self, budget: Budget, expected: u64) -> Result<Budget, ServerError> {
+        self.set_version(budget, expected, false)
+    }
+
+    /// Set an authorized version, resolving any legacy pending confirmation.
+    pub fn set_confirmed(&mut self, budget: Budget, expected: u64) -> Result<Budget, ServerError> {
+        self.set_version(budget, expected, true)
+    }
+
+    fn set_version(
+        &mut self,
+        budget: Budget,
+        expected: u64,
+        confirmed: bool,
+    ) -> Result<Budget, ServerError> {
         self.settle()?;
         let held = self
             .held
@@ -204,7 +245,11 @@ impl<S: LeafStore> BudgetStore<S> {
             version: expected + 1,
             ..budget
         };
-        self.append(Leaf::Set(budget.clone()))?;
+        self.append(if confirmed {
+            Leaf::Confirmed(budget.clone())
+        } else {
+            Leaf::Set(budget.clone())
+        })?;
         Ok(budget)
     }
 

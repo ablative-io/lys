@@ -108,8 +108,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/found" "The sessions found" S [ADMIN];
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]];
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
+    POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's budgets" S [SIGNED, &["not_permitted"]];
-    PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid"], &["BudgetVersionConflict"]];
+    PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid", "BudgetsUnavailable"], &["BudgetVersionConflict"]];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
