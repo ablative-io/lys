@@ -458,20 +458,19 @@ async fn approve(
                 bound_by: by.clone(),
                 at,
             });
-        let (issued, digest, credentials) = match prepared {
-            Some((digest, saved)) => (None, digest, Some(saved)),
-            None => {
-                let (secret, digest) = new_secret()?;
-                (
-                    Some(ClientIssued {
-                        client_id: id.clone(),
-                        credential: format!("{APP_CREDENTIAL}.{id}.{secret}"),
-                        client_secret: secret,
-                    }),
-                    digest,
-                    None,
-                )
-            }
+        let (issued, digest, credentials) = if let Some((digest, saved)) = prepared {
+            (None, digest, Some(saved))
+        } else {
+            let (secret, digest) = new_secret()?;
+            (
+                Some(ClientIssued {
+                    client_id: id.clone(),
+                    credential: format!("{APP_CREDENTIAL}.{id}.{secret}"),
+                    client_secret: secret,
+                }),
+                digest,
+                None,
+            )
         };
         let client = Client {
             client_id: id.clone(),
