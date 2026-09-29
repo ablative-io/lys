@@ -94,4 +94,29 @@ describe('personal budgets', () => {
     expect(text()).toContain('Read budgets again');
   });
 
+  it('removes stale confirmation controls while the authoritative follow-up read is pending', async () => {
+    await mount('#/file/' + ADA + '/budgets', routes());
+    let answer: ((value: Response) => void) | undefined;
+    const pendingRead = new Promise<Response>((resolve) => { answer = resolve; });
+    const original = fetch;
+    let posts = 0;
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        posts += 1;
+        return Promise.resolve(new Response(JSON.stringify(requested), { status: 200 }));
+      }
+      if (String(input).endsWith(path)) return pendingRead;
+      return original(input, init);
+    });
+    await click(confirm());
+    expect(posts).toBe(1);
+    expect(confirm()).toBeNull();
+    expect(text()).not.toContain('Enforced budget');
+    if (!answer) throw new Error('fresh read resolver absent');
+    const release = answer;
+    await act(async () => release(new Response(JSON.stringify(pending), { status: 200 })));
+    expect(text()).toContain('Requested change');
+    expect(confirm()).not.toBeNull();
+  });
+
 });

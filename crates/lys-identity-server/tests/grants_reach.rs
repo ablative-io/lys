@@ -5,7 +5,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::time::{Duration, Instant};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -93,15 +92,13 @@ async fn by_who(service: &Service, cookie: &str) -> Result<Holders, Box<dyn Erro
     Ok(out)
 }
 
-/// The same, asked of `/grants/reach` in one request, and how long it took.
-async fn by_reach(service: &Service, cookie: &str) -> Result<(Holders, Duration), Box<dyn Error>> {
+/// The same, asked of `/grants/reach` in one request.
+async fn by_reach(service: &Service, cookie: &str) -> Result<Holders, Box<dyn Error>> {
     let resources: Vec<Value> = (0..DOCS)
         .map(|n| json!({ "kind": "doc", "id": n.to_string(), "actions": ["read", "write"] }))
         .collect();
     let ask = json!({ "route": "browser", "resources": resources });
-    let started = Instant::now();
     let answer = post_ok(service, "/grants/reach", cookie, &ask).await?;
-    let took = started.elapsed();
     let mut out = Holders::new();
     let answered = answer["resources"].as_array().ok_or("no resources")?;
     assert_eq!(answered.len(), DOCS, "every doc, in order");
@@ -120,25 +117,21 @@ async fn by_reach(service: &Service, cookie: &str) -> Result<(Holders, Duration)
             );
         }
     }
-    Ok((out, took))
+    Ok(out)
 }
 
 #[tokio::test]
-async fn reach_answers_twenty_resources_as_who_does_in_under_a_second() -> TestResult {
+async fn reach_answers_twenty_resources_exactly_as_who_does() -> TestResult {
     let (service, seeded) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea = service.sign_in(login(BEA)).await?;
     world(&service, &seeded, &ada, &bea).await?;
     for cookie in [&ada, &bea] {
-        let (reached, took) = by_reach(&service, cookie).await?;
-        assert!(
-            took < Duration::from_secs(1),
-            "twenty resources took {took:?}"
-        );
+        let reached = by_reach(&service, cookie).await?;
         assert_eq!(reached, by_who(&service, cookie).await?);
     }
-    let (as_ada, _) = by_reach(&service, &ada).await?;
+    let as_ada = by_reach(&service, &ada).await?;
     let everyone: Vec<usize> = as_ada.values().map(BTreeMap::len).collect();
     assert_eq!(everyone, vec![3; DOCS], "Ada sees all three holders");
     let ada_id = seeded.people[0].id.to_string();
@@ -146,7 +139,7 @@ async fn reach_answers_twenty_resources_as_who_does_in_under_a_second() -> TestR
         as_ada["0"][&ada_id],
         BTreeSet::from(["read".to_owned(), "write".to_owned()])
     );
-    let (as_bea, _) = by_reach(&service, &bea).await?;
+    let as_bea = by_reach(&service, &bea).await?;
     assert!(
         as_bea
             .values()

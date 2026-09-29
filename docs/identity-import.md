@@ -27,3 +27,21 @@ On opening the permission engine, upgrade writes the new service-account subject
 ## Verification status
 
 Source tests cover deterministic IDs, duplicate/ref invalidity, provenance and downgrade rejection, grant log reopen/repeat/revocation, credential refusal, missing grants, refusal audit reopen, older installation bootstrap and old-schema upgrade. The latest combined source is not yet compiled or gated. A private HTTP fixture tests the actual SpiceDb open/write protocol; it does not itself prove acceptance by a live SpiceDB. Heavy checks and live engine verification must run on Dean after the shared build hold is released.
+
+## Connecting the message service
+
+Use `lys identity install --message-service connection.json` for a new install,
+or add `--message-service connection.json` to `lys identity upgrade --from ...`
+when replacing an existing connection. The file contains the connection itself:
+`url`, the explicit session cookie name in `cookie`, and `bindings` entries with
+the message registry's `participant` and the corresponding Lys `identity`.
+The cookie value and other credentials do not belong in this file.
+
+The URL must use HTTPS or loopback HTTP. Participant and identity bindings must
+be unambiguous; names are never used to infer identity. Missing cookies and
+invalid bindings are refused before anything is stopped. Omitting the option
+keeps the stored connection. Existing legacy `<service>_messages` configuration
+is migrated to `message_service`, retaining its historical `<service>_session`
+cookie name; new connection files must state that name explicitly. There is no
+product-specific CLI alias. Message visibility remains the message service's
+decision, with Lys additionally checking the explicit identity binding.

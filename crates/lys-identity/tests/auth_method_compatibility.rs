@@ -96,3 +96,57 @@ fn malformed_code_three_principals_are_refused_by_name() -> TestResult {
     }
     Ok(())
 }
+
+fn hexadecimal(value: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    if !value.len().is_multiple_of(2) {
+        return Err("fixture hex has an incomplete byte".into());
+    }
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let text = std::str::from_utf8(pair)?;
+            Ok(u8::from_str_radix(text, 16)?)
+        })
+        .collect()
+}
+
+fn verify_historical(encoded: &str, source: &str, version: u64, method: AuthMethod) -> TestResult {
+    let vector: serde_json::Value = serde_json::from_str(encoded)?;
+    assert_eq!(vector["source_commit"], source);
+    assert_eq!(vector["version"], version);
+    let message = hexadecimal(vector["message"].as_str().ok_or("no signed fixture")?)?;
+    let key: [u8; 32] = hexadecimal(vector["public_key"].as_str().ok_or("no public key")?)?
+        .try_into()
+        .map_err(|_bytes| "fixture public key is not 32 bytes")?;
+    let verified = lys_identity::signer::verify_event(&message, &key)?;
+    assert_eq!(verified.bytes(), message);
+    assert_eq!(verified.event().version(), version);
+    assert_eq!(verified.event().actor().provenance().method(), method);
+    assert_eq!(verified.event().actor().provenance().agent(), None);
+    let mut changed = message;
+    let signature_byte = changed.last_mut().ok_or("empty signed fixture")?;
+    *signature_byte ^= 1;
+    assert!(lys_identity::signer::verify_event(&changed, &key).is_err());
+    Ok(())
+}
+
+#[test]
+fn historical_main_http_operator_signature_remains_verifiable() -> TestResult {
+    verify_historical(
+        include_str!("fixtures/operator-f8c4cb92.json"),
+        "f8c4cb929d2bd94643d329c36dd22e43f8cc862a",
+        1,
+        AuthMethod::Operator,
+    )
+}
+
+#[test]
+fn historical_release_http_bearer_signature_keeps_its_service_account() -> TestResult {
+    verify_historical(
+        include_str!("fixtures/bearer-1b568cd9.json"),
+        "1b568cd90578f5ed5d7d438e628b23724eef7f12",
+        2,
+        AuthMethod::ServiceAccountBearer(ServiceAccountId::from_bytes([0x91; 16])),
+    )
+}

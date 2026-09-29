@@ -11,18 +11,24 @@ type PersonalView = BudgetsView & { unconfirmed: Unconfirmed[] };
 export function PersonalBudgets({ id, name }: { id: string; name: string }) {
   const [revision, setRevision] = useState(0);
   const path = '/budgets/person/' + encodeURIComponent(id);
-  const load = useLoad(async () => {
-    const [view, people] = await Promise.all([request<PersonalView>(path), api.people()]);
-    return { view, administrator: people.scope === 'directory' };
-  }, 'personal-budgets:' + id + ':' + revision);
   return <section className="card" aria-label="Personal budgets">
     <h2>Budgets for {name}</h2>
     <p>These limits apply across this person’s agents. A requested change does not replace the enforced budget until an administrator confirms it.</p>
-    <Gate load={load} title="Personal budgets" ok={({ view, administrator }) =>
-      <BudgetReview key={id + ':' + revision} path={path} view={view} administrator={administrator} refresh={() => setRevision((value) => value + 1)} />
-    } />
-    {load.status === 'refused' ? <button className="btn" onClick={() => setRevision((value) => value + 1)}>Read budgets again</button> : null}
+    <PersonalBudgetRead key={id + ':' + revision} path={path} refresh={() => setRevision((value) => value + 1)} />
   </section>;
+}
+
+function PersonalBudgetRead({ path, refresh }: { path: string; refresh: () => void }) {
+  const load = useLoad(async () => {
+    const [view, people] = await Promise.all([request<PersonalView>(path), api.people()]);
+    return { view, administrator: people.scope === 'directory' };
+  }, path);
+  return <>
+    <Gate load={load} title="Personal budgets" ok={({ view, administrator }) =>
+      <BudgetReview path={path} view={view} administrator={administrator} refresh={refresh} />
+    } />
+    {load.status === 'refused' ? <button className="btn" onClick={refresh}>Read budgets again</button> : null}
+  </>;
 }
 
 function Details({ budget }: { budget: Budget }) {

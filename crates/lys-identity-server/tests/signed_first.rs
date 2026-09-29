@@ -132,3 +132,35 @@ async fn a_head_on_every_signed_in_get_route_is_refused_before_its_query_is_read
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn nested_api_authentication_precedes_json_extraction_while_static_screen_stays_public()
+-> TestResult {
+    let screens = tempfile::TempDir::new()?;
+    std::fs::write(screens.path().join("index.html"), PAGE)?;
+    let dir = screens.path().to_path_buf();
+    let (service, ()) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.surface_dir = Some(dir),
+        |_| Ok(()),
+    )
+    .await?;
+    let client = reqwest::Client::new();
+    let public = client.get(format!("{}/", service.base)).send().await?;
+    assert_eq!(public.status(), 200);
+    assert_eq!(public.text().await?, PAGE);
+    let refused = client
+        .post(format!("{}/api/people", service.base))
+        .header("content-type", "application/json")
+        .body("{")
+        .send()
+        .await?;
+    assert_eq!(refused.status(), 401);
+    let answer: serde_json::Value = serde_json::from_str(&refused.text().await?)?;
+    assert_eq!(answer["refusal"], "NotSignedIn");
+    assert_eq!(service.log_size().await?, 0);
+    Ok(())
+}
