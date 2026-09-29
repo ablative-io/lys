@@ -3,7 +3,7 @@
 .chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: 999px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-secondary); }
 .chk.on { border-color: rgba(212,151,90,.5); color: var(--accent); background: rgba(212,151,90,.07); }
 .graph-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
-.graph-wrap { position: relative; height: calc(100vh - 220px); min-height: 460px; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
+.graph-wrap { position: relative; height: calc(100vh - 330px); min-height: 420px; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
 .graph-wrap svg { display: block; width: 100%; height: 100%; }
 .gn { cursor: pointer; }
 .gn text { font-size: 11px; fill: var(--text-secondary); pointer-events: none; }

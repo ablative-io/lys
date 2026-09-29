@@ -20,7 +20,7 @@
   --rail: 48px; --rail-open: 196px;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overscroll-behavior: none; }
 body { background: var(--background); color: var(--text-primary); font: 13px/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
 .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
