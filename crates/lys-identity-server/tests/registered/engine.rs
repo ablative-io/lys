@@ -65,11 +65,11 @@ impl CountedEngine {
 
 impl Drop for CountedEngine {
     fn drop(&mut self) {
-        if let Some(stop) = self.stop.take() {
-            if stop.send(()).is_err() {
-                // The join below still checks and reports the server's actual outcome.
-                tracing::debug!("engine fixture server already stopped");
-            }
+        if let Some(stop) = self.stop.take()
+            && stop.send(()).is_err()
+        {
+            // The join below still checks and reports the server's actual outcome.
+            tracing::debug!("engine fixture server already stopped");
         }
         if let Some(server) = self.server.take() {
             assert!(
