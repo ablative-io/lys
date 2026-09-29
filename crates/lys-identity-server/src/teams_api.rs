@@ -1,6 +1,8 @@
 //! The team routes: a signed-in person creates a team they own, adds and
 //! removes its members and retires it; the administrator may change any
-//! team; every signed-in person reads every team.
+//! team; every signed-in person reads every team. An agent is added only by
+//! a caller who may operate it, and a person only by themselves or the
+//! administrator, because a team's goals and budgets act on its members.
 //!
 //! A team is a named group and nothing more: it carries no grant, and being
 //! in one confers no authority. Whether a team should hold grants its
@@ -294,6 +296,34 @@ fn change(
     })
 }
 
+/// Refuse, by name, a member the caller may not act for: an agent unless
+/// the caller may operate it, since a team's goals are typed into its
+/// members' sessions and its budgets stop them; a person unless it is the
+/// caller or the administrator adds them.
+fn may_add(
+    state: &AppState,
+    headers: &HeaderMap,
+    actor: &Actor,
+    member: &str,
+) -> Result<(), ServerError> {
+    if AgentId::from_str(member).is_ok() {
+        return crate::runner_sessions::operator(state, headers, member, "add to a team")
+            .map(|_caller| ());
+    }
+    if state.admission.administrator(actor).is_ok() {
+        return Ok(());
+    }
+    let own = with_directory(state, |directory| {
+        own_person(directory.projection()?, actor).map(|person| person.to_string())
+    })?;
+    if own == member {
+        return Ok(());
+    }
+    Err(ServerError::NotAdmitted {
+        reason: "a person joins a team only by their own act or the administrator's",
+    })
+}
+
 /// Refuse by name a member the directory does not hold or has retired.
 fn member_holds(
     projection: &lys_identity::projection::Projection,
@@ -337,6 +367,7 @@ async fn add(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;
     let member = body.member.trim().to_owned();
+    may_add(&state, &headers, &actor, &member)?;
     change(&state, &actor, &id, |team, by| {
         changed(&body.operation, team, member, by).map(Line::Added)
     })

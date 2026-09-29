@@ -1,5 +1,6 @@
 //! DIRECTORY-051 R2: budgets on agents, teams and people. A team's budget
-//! applies to each agent it covers, an agent's own applies before it, a
+//! applies to each agent it covers, the tightest budget that applies is the
+//! one applied, so a loose team budget never shadows a person's, a
 //! period is counted in the zone it names and no other, a usage event seen
 //! again charges nothing, and the folded budgets survive a restart.
 
@@ -64,7 +65,7 @@ fn a_team_budget_applies_to_each_agent_it_covers() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
-fn an_agents_own_budget_applies_before_its_teams() -> Result<(), Box<dyn Error>> {
+fn the_tightest_budget_that_applies_is_applied_whoever_holds_it() -> Result<(), Box<dyn Error>> {
     let mut held = Held::default();
     held.hold(Leaf::Set(budget(
         HolderKind::Person,
@@ -82,8 +83,31 @@ fn an_agents_own_budget_applies_before_its_teams() -> Result<(), Box<dyn Error>>
     let applying = held
         .applying(&scribe(), Measure::Tokens)
         .ok_or("no budget applies")?;
-    assert_eq!(applying.holder.kind, HolderKind::Agent);
-    assert_eq!(applying.limit, 5000);
+    assert_eq!(applying.holder.kind, HolderKind::Person);
+    assert_eq!(applying.limit, 100);
+    Ok(())
+}
+
+#[test]
+fn a_loose_team_budget_does_not_shadow_the_persons_own() -> Result<(), Box<dyn Error>> {
+    let mut held = Held::default();
+    held.hold(Leaf::Set(budget(
+        HolderKind::Person,
+        "person-ada",
+        100,
+        "UTC",
+    )))?;
+    held.hold(Leaf::Set(budget(
+        HolderKind::Team,
+        "team-docs",
+        u64::MAX,
+        "UTC",
+    )))?;
+    let applying = held
+        .applying(&scribe(), Measure::Tokens)
+        .ok_or("no budget applies")?;
+    assert_eq!(applying.holder.id, "person-ada");
+    assert_eq!(applying.limit, 100);
     Ok(())
 }
 

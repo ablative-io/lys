@@ -235,6 +235,11 @@ fn checked(body: &SetBody) -> Result<(), ServerError> {
             "words carry between 1 and {WORDS_MAX} characters"
         )));
     }
+    if words.chars().any(char::is_control) {
+        return Err(malformed(
+            "words are one line of text: a reminder types them into a session, so no newline or control character",
+        ));
+    }
     if body.reminders.len() > REMINDERS_MAX {
         return Err(malformed(format!(
             "an item carries at most {REMINDERS_MAX} reminders"

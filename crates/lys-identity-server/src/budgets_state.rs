@@ -3,9 +3,9 @@
 //! only the leaves after it.
 //!
 //! A budget names its holder (an agent, a team or a person), its measure,
-//! its limit and its act. A narrower holder's budget applies before a wider
-//! one's: an agent's own, then a team's it is in, then its responsible
-//! person's; among several teams the tightest limit applies. A budget over a
+//! its limit and its act. Of an agent's own budget, its teams' and its
+//! responsible person's, the tightest limit applies, so a team's owner cannot
+//! loosen the budget a person or administrator set. A budget over a
 //! period names the zone the period is counted in; there is no machine
 //! default. Usage is charged once per event: an event seen again adds
 //! nothing.
@@ -332,35 +332,21 @@ impl Held {
         Ok(())
     }
 
-    /// The budget that applies to `standing` for `measure`: the narrowest
-    /// holder's, and among its teams the tightest.
+    /// The budget that applies to `standing` for `measure`: the strictest of
+    /// its agent's, its teams' and its person's, so no holder's budget can
+    /// loosen a tighter one set on another.
     pub fn applying(&self, standing: &Standing, measure: Measure) -> Option<&Budget> {
-        let agent = Holder {
-            kind: HolderKind::Agent,
-            id: standing.agent.clone(),
-        };
-        if let Some(own) = self.budget(&agent, measure) {
-            return Some(own);
-        }
-        let teams = self
-            .budgets
+        self.budgets
             .iter()
             .filter(|budget| {
                 budget.measure == measure
-                    && budget.holder.kind == HolderKind::Team
-                    && standing.teams.contains(&budget.holder.id)
+                    && match budget.holder.kind {
+                        HolderKind::Agent => budget.holder.id == standing.agent,
+                        HolderKind::Team => standing.teams.contains(&budget.holder.id),
+                        HolderKind::Person => standing.person.as_ref() == Some(&budget.holder.id),
+                    }
             })
-            .min_by_key(|budget| budget.limit);
-        teams.or_else(|| {
-            let person = standing.person.clone()?;
-            self.budget(
-                &Holder {
-                    kind: HolderKind::Person,
-                    id: person,
-                },
-                measure,
-            )
-        })
+            .min_by_key(|budget| budget.limit)
     }
 
     /// What `agents` have used of `budget`'s measure in the period `at_ms`

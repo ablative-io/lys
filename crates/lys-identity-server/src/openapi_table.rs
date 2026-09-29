@@ -157,7 +157,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/teams" "Every team" S [SIGNED];
     POST "/teams" "Create a team" S [SIGNED_BODY];
     GET "/teams/{id}" "One team" S [SIGNED];
-    POST "/teams/{id}/members" "Add a team member" S [SIGNED_BODY];
+    POST "/teams/{id}/members" "Add a team member" S [SIGNED_BODY, &["AgentNotVisible", "NotAdmitted", "not_permitted"]];
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/retire" "Retire a team" S [SIGNED_BODY];
     GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]];

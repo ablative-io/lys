@@ -1,10 +1,10 @@
 //! Budgets on agents, teams and people, read and changed through the API.
 //!
 //! A budget is set by its holder's responsible person or an administrator:
-//! an agent's by the person responsible for it, a team's by its owner, a
-//! person's by that person. Reads are checked as changes are, so another
-//! person's budget is refused `not_permitted` and its values are never
-//! shown. A change names the version it was read at, and a change that
+//! an agent's by the person responsible for it, a team's by its owner. A
+//! person's budget limits that person, so only an administrator sets it; the
+//! person reads it. Another person's budget is refused `not_permitted` and
+//! its values are never shown. A change names the version it was read at, and a change that
 //! crossed another is refused `BudgetVersionConflict`.
 
 use std::str::FromStr;
@@ -173,6 +173,14 @@ async fn set(
         id,
     };
     let by = authorised(&state, &actor, &holder)?;
+    if holder.kind == HolderKind::Person && state.admission.administrator(&actor).is_err() {
+        return Err(ServerError::NotPermitted {
+            reason: format!(
+                "a person's budget limits that person, so only an administrator sets the budget on person {}",
+                holder.id
+            ),
+        });
+    }
     let budget = Budget {
         holder,
         measure: body.measure,
