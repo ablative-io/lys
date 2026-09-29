@@ -334,6 +334,27 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         at_ms: at_ms(),
         ended: None,
     };
+    if crossing.holder.kind == crate::budgets_state::HolderKind::Team {
+        match standing(state, &crossing.agent) {
+            Ok(standing) if standing.teams.contains(&crossing.holder.id) => {}
+            Ok(_) => {
+                return Some(kept(
+                    Stands::Refused,
+                    format!(
+                        "team_membership_held: agent `{}` is not an admitted member of team `{}`",
+                        crossing.agent, crossing.holder.id
+                    ),
+                ));
+            }
+            Err(error) => {
+                (state.say)(&format!(
+                    "budget crossing `{}` awaits membership read: {error}",
+                    crossing.operation
+                ));
+                return None;
+            }
+        }
+    }
     if let Some(session) = crossing.session.as_deref()
         && let Err(error) = usage_session(state, &crossing.agent, session)
     {

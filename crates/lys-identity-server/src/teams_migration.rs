@@ -38,7 +38,7 @@ fn pending(state: &AppState) -> Result<bool, ServerError> {
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
         return Err(unavailable(
-            "membership confirmation is refused while the upgrade is reversible",
+            "upgrade_pending: membership confirmation is refused while the upgrade is reversible",
         ));
     }
     Ok(())

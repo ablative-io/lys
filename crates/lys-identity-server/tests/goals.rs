@@ -89,6 +89,7 @@ struct Runner {
     sessions: Vec<String>,
     held: Mutex<BTreeMap<String, (String, OperationOutcome)>>,
     typed: AtomicUsize,
+    asked: AtomicUsize,
     lose_next: AtomicBool,
     answer: OperationState,
 }
@@ -99,6 +100,7 @@ impl Runner {
             sessions: vec!["session-1".to_owned()],
             held: Mutex::default(),
             typed: AtomicUsize::new(0),
+            asked: AtomicUsize::new(0),
             lose_next: AtomicBool::new(false),
             answer,
         }
@@ -116,6 +118,7 @@ impl Deliver for Runner {
 
     fn operate(&self, operation: Operation) -> Delivering<'_> {
         Box::pin(async move {
+            self.asked.fetch_add(1, Ordering::SeqCst);
             let OperationRequest::Reminder { text } = operation.request else {
                 return Err(Undelivered::Refused("not a reminder".to_owned()));
             };
@@ -716,4 +719,48 @@ async fn a_plain_text_form_cannot_mark_a_goal_with_the_owners_cookie() -> TestRe
 #[tokio::test]
 async fn a_json_request_from_another_origin_cannot_mark_a_goal() -> TestResult {
     forged_mark_is_refused("application/json", true).await
+}
+
+#[tokio::test]
+async fn a_pending_team_reminder_is_not_replayed_to_a_recipient_now_held() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let at = now()?;
+    let mut runner = Runner::new(OperationState::Delivered);
+    runner.lose_next.store(true, Ordering::SeqCst);
+    let goals = opened(dir.path())?;
+    let mut wanted = goal(
+        "op-team-replay",
+        Kind::Goal,
+        at,
+        at + 3600,
+        vec![Remind::Before { seconds: 7200 }],
+    );
+    wanted.holder = Holder {
+        kind: HolderKind::Team,
+        id: "op-team".to_owned(),
+    };
+    goals.with(|store| store.set(wanted))?;
+    remind(&goals, &runner, at).await?;
+    assert_eq!(runner.asked.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        item(&goals, "op-team-replay")?.fired[0].sent[0].state,
+        Delivery::Pending
+    );
+    drop(goals);
+    runner.sessions.clear();
+    let goals = opened(dir.path())?;
+    remind(&goals, &runner, at + 1).await?;
+    assert_eq!(
+        runner.asked.load(Ordering::SeqCst),
+        1,
+        "the replay must not reach the old recipient's runner"
+    );
+    let sent = item(&goals, "op-team-replay")?.fired[0].sent[0].clone();
+    assert_eq!(sent.state, Delivery::Refused);
+    assert!(
+        sent.words.contains("team_membership_held"),
+        "{}",
+        sent.words
+    );
+    Ok(())
 }

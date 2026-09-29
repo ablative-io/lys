@@ -22,7 +22,9 @@ pub fn pending(state: &AppState) -> Result<bool, ServerError> {
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
         return Err(ServerError::BudgetsUnavailable {
-            reason: "budget confirmation is refused while the upgrade is reversible".to_owned(),
+            reason:
+                "upgrade_pending: budget confirmation is refused while the upgrade is reversible"
+                    .to_owned(),
         });
     }
     Ok(())

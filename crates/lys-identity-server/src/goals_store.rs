@@ -452,7 +452,21 @@ impl Goals {
 /// own operation id, and every reminder due fires once.
 pub async fn remind(goals: &Goals, deliver: &dyn Deliver, at: u64) -> Result<(), ServerError> {
     let asks = goals.with(|store| {
-        let mut asks = store.held.unsettled();
+        let mut asks = Vec::new();
+        for (sent, text) in store.held.unsettled() {
+            let holder = store.held.items.iter().find(|item| item.fired.iter().any(|fired|
+                fired.sent.iter().any(|entry| entry.operation == sent.operation)))
+                .map(|item| item.goal.holder.clone()).ok_or(GoalError::Unknown)?;
+            if holder.kind == crate::goals_state::HolderKind::Team {
+                let sessions = deliver.sessions(&holder).map_err(unavailable)?;
+                if !sessions.contains(&sent.session) {
+                    store.answer(Answered { operation: sent.operation, state: Delivery::Refused,
+                        words: format!("team_membership_held: session `{}` is not a current admitted recipient of team `{}`", sent.session, holder.id), at })?;
+                    continue;
+                }
+            }
+            asks.push((sent, text));
+        }
         for due in store.held.due(at) {
             let holder = match store.held.item(&due.goal) {
                 Some(item) => item.goal.holder.clone(),

@@ -269,7 +269,14 @@ async fn reversible_start_enforces_holds_without_writing_legacy_logs_or_snapshot
             &json!({"operation":OperationId::generate()?.to_string()}),
         )
         .await?;
-    assert_eq!(status, 500, "{refusal}");
+    assert_eq!(status, 503, "{refusal}");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("upgrade_pending"),
+        "{refusal}"
+    );
     assert_eq!(refusal["refusal"], "TeamsUnavailable");
     let budget_path = format!("/budgets/person/{}/confirm", fixture.person);
     let (status, refusal) = fixture
@@ -280,7 +287,14 @@ async fn reversible_start_enforces_holds_without_writing_legacy_logs_or_snapshot
             &json!({"measure":"tokens", "version":2}),
         )
         .await?;
-    assert_eq!(status, 500, "{refusal}");
+    assert_eq!(status, 503, "{refusal}");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("upgrade_pending"),
+        "{refusal}"
+    );
     assert_eq!(refusal["refusal"], "BudgetsUnavailable");
     assert_eq!(files(&fixture.teams)?, fixture.old_teams);
     assert_eq!(files(&fixture.budgets)?, fixture.old_budgets);
@@ -347,5 +361,39 @@ async fn a_restart_after_intent_clears_completes_each_migration_once() -> Result
     fixture.service.restart().await?;
     assert_eq!(files(&fixture.teams)?, teams);
     assert_eq!(files(&fixture.budgets)?, budgets);
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unreadable_intent_refuses_both_confirmation_writes_by_path() -> ResultOf {
+    let fixture = Fixture::open().await?;
+    let cookie = fixture.admin().await?;
+    std::fs::remove_file(&fixture.intent)?;
+    std::os::unix::fs::symlink(&fixture.intent, &fixture.intent)?;
+    let paths = [
+        (
+            format!("/teams/{}/members/{}/confirm", fixture.team, fixture.member),
+            json!({"operation":OperationId::generate()?.to_string()}),
+            "TeamsUnavailable",
+        ),
+        (
+            format!("/budgets/person/{}/confirm", fixture.person),
+            json!({"measure":"tokens", "version":2}),
+            "BudgetsUnavailable",
+        ),
+    ];
+    for (path, body, kind) in paths {
+        let (status, refusal) = fixture.service.post(&path, Some(&cookie), &body).await?;
+        assert_eq!(status, 503, "{refusal}");
+        assert_eq!(refusal["refusal"], kind);
+        let reason = refusal["reason"].as_str().ok_or("no reason")?;
+        assert!(reason.contains("cannot read upgrade intent"), "{reason}");
+        assert!(
+            reason.contains(&fixture.intent.display().to_string()),
+            "{reason}"
+        );
+    }
+    assert_eq!(files(&fixture.teams)?, fixture.old_teams);
+    assert_eq!(files(&fixture.budgets)?, fixture.old_budgets);
     Ok(())
 }
