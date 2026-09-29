@@ -116,7 +116,7 @@ async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> Test
     assert_eq!(set["profile"]["tools"], json!(["read", "edit"]));
     assert_eq!(
         set["profile"]["mcp_servers"],
-        json!([{ "name": "cambium", "url": "https://cambium.example.test/mcp", "channel": "off" }])
+        json!([{ "name": "cambium", "url": "https://cambium.example.test/mcp" }])
     );
     assert_eq!(
         set["profile"]["set_by"],
