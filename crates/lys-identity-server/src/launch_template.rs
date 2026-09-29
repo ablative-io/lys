@@ -13,12 +13,13 @@ use std::collections::BTreeSet;
 use lys_home::harness::claude_code::HARNESS;
 use lys_home::harness::claude_code::launch::shell_word;
 use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
-use lys_home::harness::launch_fields::Channel;
+use lys_home::harness::launch_fields::{Channel, HarnessKind, LaunchFields, LaunchMcp, Transport};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::error::ServerError;
-use crate::provisioning_store::{McpServer, Setting, Version};
+use crate::launch_harness::fields;
+use crate::provisioning_store::Version;
 
 /// One handle the agent holds, as the start command names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
@@ -130,46 +131,44 @@ fn left_out(version: &Version) -> Vec<String> {
 
 /// A server's Claude Code entry: its address, or its stdio command with
 /// each setting as its text and each secret as the agent's handle id on it.
-fn server_entry(server: &McpServer, handles: &[HandleName]) -> Result<Value, ServerError> {
-    let Some(command) = &server.command else {
-        return Ok(json!({ "type": "http", "url": server.url }));
-    };
-    if command.cwd.is_some() {
-        return Err(ServerError::McpSettingUnrepresentable {
-            server: server.name.clone(),
-            member: "cwd".to_owned(),
-            reason: "Claude Code starts a stdio server with no directory of its own".to_owned(),
-        });
-    }
-    let mut env = Map::new();
-    for (variable, setting) in &command.env {
-        let text = match setting {
-            Setting::Literal(literal) => literal.text(),
-            Setting::Handle { handle: secret } => handles
-                .iter()
-                .find(|held| &held.secret == secret)
-                .map(|held| held.id.clone())
-                .ok_or_else(|| ServerError::McpHandleUnsupported {
+fn server_entry(server: &LaunchMcp) -> Result<Value, ServerError> {
+    match &server.transport {
+        Transport::Http { url } => Ok(json!({ "type": "http", "url": url })),
+        Transport::Stdio {
+            program,
+            args,
+            cwd,
+            env,
+            handles,
+        } => {
+            if cwd.is_some() {
+                return Err(ServerError::McpSettingUnrepresentable {
                     server: server.name.clone(),
-                    member: format!("env `{variable}`"),
-                    secret: secret.clone(),
-                })?,
-        };
-        env.insert(variable.clone(), Value::String(text));
+                    member: "cwd".to_owned(),
+                    reason: "Claude Code starts a stdio server with no directory of its own"
+                        .to_owned(),
+                });
+            }
+            let mut vars = Map::new();
+            for one in env {
+                vars.insert(one.name.clone(), Value::String(one.text.clone()));
+            }
+            for one in handles {
+                vars.insert(one.name.clone(), Value::String(one.handle_id.clone()));
+            }
+            Ok(json!({ "type": "stdio", "command": program, "args": args, "env": vars }))
+        }
     }
-    Ok(json!({
-        "type": "stdio",
-        "command": command.program,
-        "args": command.args,
-        "env": env,
-    }))
 }
 
-fn template(start: &Start<'_>, handles: &[HandleName]) -> Result<Value, ServerError> {
-    let settings = &start.version.settings;
+fn template(
+    start: &Start<'_>,
+    fields: &LaunchFields,
+    handles: &[HandleName],
+) -> Result<Value, ServerError> {
     let mut servers = Map::new();
-    for server in &settings.mcp_servers {
-        servers.insert(server.name.clone(), server_entry(server, handles)?);
+    for server in &fields.mcp_servers {
+        servers.insert(server.name.clone(), server_entry(server)?);
     }
     Ok(json!({
         "harness": HARNESS,
@@ -191,7 +190,7 @@ fn template(start: &Start<'_>, handles: &[HandleName]) -> Result<Value, ServerEr
                 "readable": [],
                 "reader": "",
             },
-            "instructions": settings.instructions,
+            "instructions": fields.instructions,
         },
     }))
 }
@@ -200,7 +199,13 @@ fn template(start: &Start<'_>, handles: &[HandleName]) -> Result<Value, ServerEr
 /// and keeps by hash, and the command a machine's runtime is given.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
-    let bytes = serde_json::to_vec_pretty(&template(start, handles)?)
+    let fields = fields(start, handles)?;
+    if fields.harness.kind != HarnessKind::ClaudeCode {
+        return Err(unrenderable(
+            "the declared harness is Codex, whose render this start does not take yet".to_owned(),
+        ));
+    }
+    let bytes = serde_json::to_vec_pretty(&template(start, &fields, handles)?)
         .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;
     let parsed = parse_template(&bytes).map_err(|error| unrenderable(error.to_string()))?;
     let template = String::from_utf8(bytes)

@@ -327,6 +327,14 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// The profile declares no harness build to start.
+    #[error(
+        "HarnessUndeclared: profile version {version} declares no harness build to start; declare the build's kind, program and package in the profile"
+    )]
+    HarnessUndeclared {
+        /// The profile version.
+        version: u32,
+    },
     /// The launch template the profile renders to is not one the home takes.
     #[error("LaunchUnrenderable: {reason}")]
     LaunchUnrenderable {

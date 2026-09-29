@@ -261,6 +261,7 @@ fn version(operation: &str, note: &str) -> Version {
             instructions: String::new(),
             note: note.to_owned(),
             session: None,
+            harness: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

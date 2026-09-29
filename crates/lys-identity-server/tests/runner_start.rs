@@ -124,6 +124,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": [], "instructions": "", "note": "",
+            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
         });
         self.ok(&path, &body).await?;
         self.ok(

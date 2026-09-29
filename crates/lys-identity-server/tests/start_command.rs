@@ -116,6 +116,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
+            "harness": { "kind": "claude_code", "program": "/opt/seat/bin/claude", "package": "claude-code-seat" },
             "instructions": "Build what the brief says.", "note": "First setup.",
         });
         let path = format!("/agents/{}/provisioning", self.agent());
