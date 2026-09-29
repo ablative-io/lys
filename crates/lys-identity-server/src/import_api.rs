@@ -5,7 +5,7 @@
 //! remain administrator-only; a loader never becomes its owner to issue one.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 
 use axum::Json;
 use axum::extract::State;
@@ -99,6 +99,45 @@ fn refusal(entry: Option<&Entry>, completed: &[Value], error: ServerError) -> Re
         })),
     )
         .into_response()
+}
+
+fn recorded_refusal(
+    state: &AppState,
+    account: &str,
+    entry: &Entry,
+    completed: &[Value],
+    error: ServerError,
+) -> Response {
+    let record = crate::service_accounts_state::ImportRefused {
+        account: account.to_owned(),
+        operation: entry.operation.to_string(),
+        entry: format!("{}/{}", entry.kind.section(), entry.name),
+        refusal: error.name().to_owned(),
+        at: crate::session::now(),
+    };
+    let recorded = state
+        .service_accounts
+        .as_ref()
+        .ok_or_else(|| ServerError::ServiceAccountsUnavailable {
+            reason: "service account log is not configured".to_owned(),
+        })
+        .and_then(|store| {
+            store
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .record_import_refusal(record)
+        });
+    let (audit, audit_failure, status) = match recorded {
+        Ok(record) => (Some(record), None, error.status()),
+        Err(failure) => (
+            None,
+            Some(failure.name()),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+        ),
+    };
+    (status, Json(json!({"refusal":error.name(), "reason":error.to_string(), "fields":error.fields(),
+        "entry":format!("{}/{}",entry.kind.section(),entry.name), "operation":entry.operation.to_string(),
+        "completed":completed, "audit":audit, "audit_failure":audit_failure}))).into_response()
 }
 
 fn resolve(body: &mut Value, names: &BTreeMap<String, String>) -> Result<(), ServerError> {
@@ -223,7 +262,7 @@ pub(crate) async fn import(
         }
         let answer = match apply(&state, &headers, entry, body).await {
             Ok(answer) => answer,
-            Err(error) => return refusal(Some(entry), &completed, error),
+            Err(error) => return recorded_refusal(&state, &account, entry, &completed, error),
         };
         let reference = match entry.kind {
             Kind::Agent => answer

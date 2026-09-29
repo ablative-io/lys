@@ -329,7 +329,7 @@ impl SpiceDb {
             .lines()
             .filter_map(|line| line.strip_prefix("definition "))
             .filter_map(|rest| rest.split([' ', '{']).next())
-            .filter(|name| !FIXED.contains(name))
+            .filter(|name| *name == "service_account" || !FIXED.contains(name))
             .map(|name| name.replacen('/', ".", 1))
             .collect())
     }
@@ -548,3 +548,7 @@ impl RelationshipStore for Relationships {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "spicedb_upgrade_tests.rs"]
+mod upgrade_tests;

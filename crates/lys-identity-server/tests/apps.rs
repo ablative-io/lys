@@ -469,7 +469,17 @@ async fn a_schema_fault_is_refused_at_its_pointer_and_a_bad_redirect_by_name() -
 
 #[tokio::test]
 async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not() -> TestResult {
-    let (service, _) = seeded().await?;
+    let (service, seeded) = identity_contract::harness::Service::start_judging(
+        r#"{"version":1,"relations":{"editor":["view","edit"],"viewer":["view"]}}"#,
+        None,
+        |config| {
+            Ok(lys_identity_server::dev_seed::seed_configured(
+                config,
+                [ADMINISTRATOR, BEA],
+            )?)
+        },
+    )
+    .await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let account = op()?;
     let made = json!({"operation": account, "name": "registrar fixture"});
@@ -486,6 +496,19 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
         .as_str()
         .ok_or("no credential")?
         .to_owned();
+
+    let probe = registration(NOTES, &workspace_schema(NOTES))?;
+    let missing = post(&service, "/apps", Auth::Bearer(&credential), &probe).await?;
+    assert_eq!(missing.1["refusal"], "NotHeld", "{}", missing.1);
+    let owner = seeded.people[0].id.to_string();
+    let root = ok(post(&service, "/grants/roots", Auth::Cookie(&admin), &json!({
+        "operation":op()?,"route":"api","holder":owner,"resource":{"kind":"directory","id":"apps"},"relation":"editor",
+        "pass_on":{"kind":"to","actions":["view","edit"],"recipients":["service_account"]},"window":{"starts_at":0,"ends_at":null}
+    })).await?)?;
+    ok(post(&service, "/grants", Auth::Cookie(&admin), &json!({
+        "operation":op()?,"route":"api","source":root["grant"],"recipient":account,"responsible":owner,
+        "resource":{"kind":"directory","id":"apps"},"relation":"editor","pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}
+    })).await?)?;
 
     let body = registration(NOTES, &workspace_schema(NOTES))?;
     let pending = ok(post(&service, "/apps", Auth::Bearer(&credential), &body).await?)?;

@@ -59,3 +59,87 @@ fn success_must_name_every_requested_operation_and_the_actual_account() {
         );
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn server_error_is_uncertain_and_sent_once_without_retry() -> Result<(), Box<dyn std::error::Error>>
+{
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::Duration;
+    let temp = tempfile::tempdir()?;
+    let key = temp.path().join("credential");
+    std::fs::write(&key, format!("lys-registrar.{ACCOUNT}.{}", "ab".repeat(32)))?;
+    std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
+    let file = temp.path().join("import.json");
+    std::fs::write(&file, r#"{"agents":[{"display_name":"fixture"}]}"#)?;
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let address = listener.local_addr()?.to_string();
+    let fixture = std::thread::spawn(move || -> Result<TcpListener, String> {
+        let (mut socket, _) = listener.accept().map_err(|e| e.to_string())?;
+        socket
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .map_err(|e| e.to_string())?;
+        let mut head = Vec::new();
+        while !head.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            socket.read_exact(&mut byte).map_err(|e| e.to_string())?;
+            head.push(byte[0]);
+        }
+        let head = String::from_utf8(head).map_err(|e| e.to_string())?;
+        assert!(head.starts_with("POST /identity/import HTTP/1.1"));
+        let length = head
+            .lines()
+            .find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length: ")
+                    .map(str::to_owned)
+            })
+            .ok_or("no length")?
+            .trim()
+            .parse::<usize>()
+            .map_err(|e| e.to_string())?;
+        let mut body = vec![0; length];
+        socket.read_exact(&mut body).map_err(|e| e.to_string())?;
+        let answer = r#"{"refusal":"ServiceAccountsUnavailable","reason":"fixture refusal","entry":"agents/fixture","completed":[]}"#;
+        write!(socket,"HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",answer.len()).map_err(|e|e.to_string())?;
+        Ok(listener)
+    });
+    let error = super::run(
+        &file,
+        Some(temp.path().to_owned()),
+        Some(key),
+        &address,
+        true,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), super::ErrorKind::ImportUncertain);
+    assert!(error.to_string().contains("ServiceAccountsUnavailable"));
+    assert!(error.to_string().contains("no retry was made"));
+    let listener = fixture.join().map_err(|_| "fixture panicked")??;
+    listener.set_nonblocking(true)?;
+    assert_eq!(
+        listener.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn installation_preserves_existing_private_bearer_and_refuses_open_modes()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir()?;
+    let layout = super::Layout::at(temp.path().to_owned());
+    super::prepare_credential(&layout)?;
+    let path = super::credential_path(&layout);
+    let before = std::fs::read(&path)?;
+    super::prepare_credential(&layout)?;
+    assert_eq!(std::fs::read(&path)?, before);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
+    assert!(super::prepare_credential(&layout).is_err());
+    assert_eq!(std::fs::read(&path)?, before);
+    Ok(())
+}

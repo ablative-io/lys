@@ -122,6 +122,7 @@ fn view(account: &Account) -> ServiceAccountView {
         created_at: created.at,
         retired_by: account.retired.as_ref().map(|retired| retired.by.clone()),
         retired_at: account.retired.as_ref().map(|retired| retired.at),
+        import_refusals: account.import_refusals.clone(),
     }
 }
 

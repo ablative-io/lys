@@ -107,7 +107,8 @@ pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
     Err(refused(
         ErrorKind::PrivateFileModeOpen,
         "loader credentials require owner-only file modes",
-    ).at(&credential_path(layout)))
+    )
+    .at(&credential_path(layout)))
 }
 
 fn credential(bytes: &[u8]) -> IdentityResult<&str> {
@@ -205,6 +206,9 @@ pub fn run(
         )
     })?;
     if answer.status != 200 {
+        if json {
+            println!("{body}");
+        }
         let entry = body
             .get("entry")
             .and_then(serde_json::Value::as_str)

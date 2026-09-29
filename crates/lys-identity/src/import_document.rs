@@ -134,6 +134,29 @@ pub fn parse(bytes: &[u8], account: &str) -> Result<Vec<Entry>, Invalid> {
             });
         }
     }
+    let mut available = BTreeSet::from(["@self".to_owned(), "@owner".to_owned()]);
+    for entry in &entries {
+        for field in ["holder", "source", "recipient", "responsible"] {
+            if let Some(reference) = entry.body.get(field).and_then(Value::as_str)
+                && reference.starts_with('@')
+                && !available.contains(reference)
+            {
+                return Err(invalid(
+                    format!("{}/{}", entry.kind.section(), entry.name),
+                    "reference is unknown or names a later entry",
+                ));
+            }
+        }
+        match entry.kind {
+            Kind::Agent => {
+                available.insert(format!("@agent/{}", entry.name));
+            }
+            Kind::Root | Kind::Delegation => {
+                available.insert(format!("@grant/{}", entry.name));
+            }
+            Kind::App => {}
+        }
+    }
     Ok(entries)
 }
 

@@ -461,7 +461,10 @@ impl Service {
 
     /// Restart an existing installation with the configuration an upgrade
     /// writes, retaining every durable log and credential.
-    pub async fn restart_adjusted(&mut self, adjust: impl FnOnce(&mut Config)) -> Result<(), Box<dyn Error>> {
+    pub async fn restart_adjusted(
+        &mut self,
+        adjust: impl FnOnce(&mut Config),
+    ) -> Result<(), Box<dyn Error>> {
         adjust(&mut self.config);
         self.restart().await
     }
