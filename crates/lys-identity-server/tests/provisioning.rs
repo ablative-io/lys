@@ -266,6 +266,7 @@ fn version(operation: &str, note: &str) -> Version {
             session: None,
             harness: None,
             skill_pins: Vec::new(),
+            permissions: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

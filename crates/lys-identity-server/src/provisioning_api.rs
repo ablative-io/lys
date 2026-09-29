@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
+use crate::launch_permissions::{Permissions, checked};
 use crate::provisioning_store::{
     McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, SkillPin, Version,
 };
@@ -68,6 +69,8 @@ pub struct VersionView {
     /// The harness build it is started with, null when none is declared.
     #[schema(value_type = Option<Object>)]
     pub harness: Option<DeclaredHarness>,
+    /// The permissions its settings file carries, null when none are set.
+    pub permissions: Option<Permissions>,
     /// The person who set it.
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
@@ -142,6 +145,8 @@ pub(crate) struct SetBody {
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
     harness: Option<DeclaredHarness>,
+    #[serde(default)]
+    permissions: Option<Permissions>,
 }
 
 /// The provisioning routes.
@@ -203,6 +208,7 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         session: body.session.clone().map(session).transpose()?,
         harness: body.harness.map(harness).transpose()?,
         skill_pins: Vec::new(),
+        permissions: body.permissions.map(checked).transpose()?,
     };
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
@@ -271,6 +277,7 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
             note: version.settings.note.clone(),
             skill_pins: version.settings.skill_pins.clone(),
             harness: version.settings.harness.clone(),
+            permissions: version.settings.permissions.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
             reviewed_by: version.reviewed.as_ref().map(|review| review.by.clone()),

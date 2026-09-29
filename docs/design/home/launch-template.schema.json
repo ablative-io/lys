@@ -91,6 +91,66 @@
         "instructions": {
           "description": "The text appended to the system prompt.",
           "type": "string"
+        },
+        "skills": {
+          "description": "Optional (HOME-037 R3). Each kept skill written at skills/<name>/SKILL.md under the session's config directory, refused unless its text hashes to sha256; the launch refuses skills when no config directory is set.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "text",
+              "sha256"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9_][a-z0-9._-]{0,63}$"
+              },
+              "text": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "permissions": {
+          "description": "Optional (HOME-037 R5). Written as the settings file's permissions beside env: the profile's rules with its tools allowed and each hard Tool policy rule denied. Absent, the settings file carries env only.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "deny": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ask": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "additionalDirectories": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "defaultMode": {
+              "type": "string"
+            }
+          }
         }
       }
     }

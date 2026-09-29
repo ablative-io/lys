@@ -1,6 +1,7 @@
 //! The environment file of a launch (HOME-002 R6): a Claude Code settings
-//! file whose only member is `env`, holding each of the template's variables
-//! with its value and each use-only secret's variable with its handle. No
+//! file whose member is `env`, holding each of the template's variables
+//! with its value and each use-only secret's variable with its handle, and
+//! the template's `permissions` beside it when it sets them (HOME-037 R5). No
 //! secret's value is read, the process environment is not read, and a
 //! readable secret never reaches here (the parser refuses it). Keys are
 //! written in sorted order, so one template writes one sequence of bytes.
@@ -15,7 +16,8 @@ use crate::error::HomeError;
 use crate::harness::claude_code::template::Template;
 use crate::record::blocks::Hash;
 
-/// The settings file's bytes: `{"env": {...}}`, keys sorted, one trailing
+/// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
+/// template's `permissions` beside `env` when it sets them; one trailing
 /// newline.
 pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     let mut env: BTreeMap<&str, &str> = template
@@ -26,11 +28,14 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     for secret in &template.use_only {
         env.insert(secret.env.as_str(), secret.handle.as_str());
     }
-    let mut bytes =
-        serde_json::to_vec_pretty(&json!({ "env": env })).map_err(|source| HomeError::Json {
-            context: "the environment file could not be serialised",
-            source,
-        })?;
+    let mut value = json!({ "env": env });
+    if let Some(permissions) = &template.permissions {
+        value["permissions"] = serde_json::Value::Object(permissions.clone());
+    }
+    let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
+        context: "the environment file could not be serialised",
+        source,
+    })?;
     bytes.push(b'\n');
     Ok(bytes)
 }

@@ -38,6 +38,7 @@ pub mod grants_batch;
 pub mod launch_api;
 pub mod launch_fields;
 pub mod launch_harness;
+pub mod launch_permissions;
 pub mod launch_template;
 pub mod link_audit_api;
 mod mcp_record;
