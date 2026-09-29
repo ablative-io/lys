@@ -34,6 +34,7 @@ pub mod certificates_store;
 pub mod config;
 pub mod configuration_api;
 pub mod connections_api;
+pub mod delegation;
 pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
