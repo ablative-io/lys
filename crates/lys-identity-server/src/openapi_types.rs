@@ -45,6 +45,8 @@ use std::collections::BTreeMap;
 
 use lys_openapi::{Api, Method};
 
+use crate::budgets_api::{BudgetBody, BudgetsView};
+use crate::budgets_state::Budget;
 use crate::certificates_api::CertificatesView;
 use crate::certificates_issue::{IssueBody, WithdrawBody};
 use crate::connections_api::ConnectionsView;
@@ -52,6 +54,8 @@ use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
     ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
 };
+use crate::goals_api::{GoalsView, MarkBody, SetBody as GoalBody};
+use crate::goals_state::Item as GoalItem;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
@@ -60,7 +64,7 @@ use crate::launch_api::{Launch, StartCommandView};
 use crate::link_audit_api::{Asked, Delivery};
 use crate::memory_api::MemoryView;
 use crate::network_api::{MachineView, NameBody, NetworkView};
-use crate::openapi_table::{GET, POST};
+use crate::openapi_table::{GET, POST, PUT};
 use crate::provisioning_api::{ProvisioningView, ReviewBody, SetBody as ProfileBody};
 use crate::read_views::{AgentView, MeView, PeopleView, ServiceAccountView, ServiceAccountsView};
 use crate::requests_api::AskBody;
@@ -97,6 +101,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(machines_and_runtime(api));
     entries.extend(accounts_teams_and_sessions(api));
     entries.extend(crate::openapi_runner_types::runner(api));
+    entries.extend(goals(api));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))
@@ -355,6 +360,18 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<StopsView>()),
         ),
         (
+            GET,
+            "/budgets/{kind}/{id}",
+            None,
+            Some(api.schema::<BudgetsView>()),
+        ),
+        (
+            PUT,
+            "/budgets/{kind}/{id}",
+            Some(api.schema::<BudgetBody>()),
+            Some(api.schema::<Budget>()),
+        ),
+        (
             POST,
             "/sign-in",
             Some(api.schema::<crate::sign_in::SignInBody>()),
@@ -408,6 +425,24 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::accounts::Reset>()),
             None,
         ),
+    ]
+}
+
+/// The goals, expectations and deliverables on agents and teams.
+fn goals(api: &mut Api) -> Vec<Entry> {
+    let (list, item) = (api.schema::<GoalsView>(), api.schema::<GoalItem>());
+    let (set, mark) = (api.schema::<GoalBody>(), api.schema::<MarkBody>());
+    vec![
+        (GET, "/agents/{id}/goals", None, Some(list.clone())),
+        (
+            POST,
+            "/agents/{id}/goals",
+            Some(set.clone()),
+            Some(item.clone()),
+        ),
+        (GET, "/teams/{id}/goals", None, Some(list)),
+        (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
+        (POST, "/goals/{goal}/mark", Some(mark), Some(item)),
     ]
 }
 

@@ -227,6 +227,7 @@ pub fn ended_in(answer: &Answer) -> Option<&Ended> {
     match answer {
         Answer::Ended { ended, .. } => Some(ended),
         Answer::Output { output } => output.ended.as_ref(),
+        Answer::Bytes { output } => output.ended.as_ref(),
         Answer::Status { status } => status
             .sessions
             .first()
@@ -241,9 +242,13 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Started { .. } => "started",
         Answer::Delivered { .. } => "delivered",
         Answer::Output { .. } => "output",
+        Answer::Bytes { .. } => "bytes",
         Answer::Matched { .. } => "matched",
         Answer::Ended { .. } => "ended",
         Answer::Status { .. } => "status",
+        Answer::Judged { .. } => "judged",
+        Answer::Collected { .. } => "collected",
+        Answer::Operation { .. } => "operation",
         Answer::Refused { .. } => "refused",
     }
 }
@@ -408,6 +413,10 @@ impl Launcher for DirectoryLauncher {
                 Ok(settings) => settings.and_then(|settings| settings.accounts),
                 Err(refused) => return Some(Err(refused)),
             };
+            let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
+                Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
@@ -426,6 +435,7 @@ impl Launcher for DirectoryLauncher {
                 columns: COLUMNS,
                 rows: ROWS,
                 rotation,
+                policy,
             };
             run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch)
                 .await

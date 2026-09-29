@@ -45,9 +45,14 @@ pub struct Digested {
 impl Digested {
     /// `text`'s length and digest.
     pub fn of(text: &str) -> Self {
+        Self::bytes(text.as_bytes())
+    }
+
+    /// Exact terminal input's length and digest, without lossy decoding or payload logging.
+    pub fn bytes(data: &[u8]) -> Self {
         Self {
-            length: text.len(),
-            sha256: hex(&Sha256::digest(text.as_bytes())),
+            length: data.len(),
+            sha256: hex(&Sha256::digest(data)),
         }
     }
 }

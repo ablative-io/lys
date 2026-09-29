@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
+use lys_runner::operations::{Operation, OperationOutcome, OperationRequest, OperationState};
 use lys_runner::protocol::{Greeting, Reply, Request, hex, signed_bytes};
 use lys_runner::{Act, Answer, Client, Key, Launch, Options, PROTOCOL_VERSION, Runner, Serving};
 
@@ -101,6 +102,7 @@ fn shell(id: &str) -> Launch {
         columns: 80,
         rows: 24,
         rotation: None,
+        policy: None,
     }
 }
 
@@ -363,6 +365,15 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         .ok_or("the section names no acts")?;
     let id = "published".to_owned();
     let every_act = [
+        Act::ReadBytes {
+            session: id.clone(),
+            cursor: None,
+            follow: false,
+        },
+        Act::InputBytes {
+            session: id.clone(),
+            data: vec![0xff],
+        },
         Act::Start { launch: shell(&id) },
         Act::Input {
             session: id.clone(),
@@ -395,6 +406,16 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             session: id.clone(),
         },
         Act::Status { session: None },
+        Act::Operate {
+            operation: Operation {
+                operation: "op".to_owned(),
+                session: id.clone(),
+                request: OperationRequest::Stop,
+            },
+        },
+        Act::Outcome {
+            operation: "op".to_owned(),
+        },
     ];
     let mut named = 0;
     for act in &every_act {
@@ -417,6 +438,16 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         .as_array()
         .ok_or("the section names no answers")?;
     let every_answer = [
+        Answer::Bytes {
+            output: lys_runner::terminal_bytes::ByteOutput {
+                session: id.clone(),
+                from: 0,
+                cursor: 1,
+                oldest: 0,
+                data: vec![0xff],
+                ended: None,
+            },
+        },
         Answer::Started {
             session: id.clone(),
             pid: 1,
@@ -426,9 +457,21 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             session: id.clone(),
         },
         Answer::Matched {
-            session: id,
+            session: id.clone(),
             matched: String::new(),
             cursor: 0,
+        },
+        Answer::Operation {
+            outcome: OperationOutcome {
+                operation: "op".to_owned(),
+                session: id,
+                request: "stop".to_owned(),
+                state: OperationState::Accepted,
+                at: 0,
+                words: String::new(),
+                text: None,
+                ended: None,
+            },
         },
         Answer::Refused {
             refusal: "r".to_owned(),

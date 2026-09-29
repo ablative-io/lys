@@ -138,7 +138,7 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn with_teams<T>(
+pub(crate) fn with_teams<T>(
     state: &AppState,
     act: impl FnOnce(&mut TeamStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {

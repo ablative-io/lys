@@ -123,6 +123,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         )
         .route("/runner/protocol", get(protocol))
         .merge(crate::runner_dial::routes())
+        .merge(crate::runner_bytes_api::routes())
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -138,14 +139,14 @@ fn body<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
 
 /// What a receipt keeps of an act beside its name.
 #[derive(Default)]
-struct Carried {
-    text: Option<Digested>,
-    keys: Vec<String>,
+pub(crate) struct Carried {
+    pub(crate) text: Option<Digested>,
+    pub(crate) keys: Vec<String>,
 }
 
 /// Ask `act` of `driven`'s runner for `caller`, keep its receipt whatever
 /// the runner answered, and answer the runner's answer beside it.
-async fn perform(
+pub(crate) async fn perform(
     state: &Arc<AppState>,
     (driven, caller, name): (&Driven, String, &str),
     carried: Carried,
@@ -182,7 +183,7 @@ async fn perform(
 }
 
 /// The session `id` and the caller admitted to operate it for `name`.
-fn admitted(
+pub(crate) fn admitted(
     state: &AppState,
     headers: &HeaderMap,
     id: &str,
@@ -353,7 +354,7 @@ async fn end(
 
 /// The sessions of `agent` not confirmed stopped, newest first, each on a
 /// machine that names a runner.
-fn open_sessions(state: &AppState, agent: &str) -> Result<Vec<Driven>, ServerError> {
+pub(crate) fn open_sessions(state: &AppState, agent: &str) -> Result<Vec<Driven>, ServerError> {
     if state.runtime.is_none() {
         return Ok(Vec::new());
     }

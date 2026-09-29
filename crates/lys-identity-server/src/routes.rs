@@ -74,8 +74,15 @@ pub struct AppState {
     pub reviews: Option<Mutex<ReviewStore>>,
     /// The teams, when the configuration names their directory.
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
+    /// The budgets, when the configuration names their directory.
+    pub budgets: Option<Mutex<crate::budgets_store::BudgetStore>>,
+    /// The agents' tool-boundary policies, when the configuration names
+    /// their directory.
+    pub policies: Option<Mutex<crate::agent_policy_store::PolicyStore>>,
     /// The emergency stops, when the configuration names their directory.
     pub stops: Option<Mutex<crate::stops_store::StopStore>>,
+    /// The goals and their reminders, when the configuration names their directory.
+    pub goals: Option<crate::goals_store::Goals>,
     /// The apps, kept beside the grant log: always open, holding at least
     /// the app `lys`.
     pub apps: Mutex<crate::apps_store::AppStore>,
@@ -132,6 +139,10 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
+    let budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    let policies =
+        crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
+    let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
         Arc::clone(&key),
@@ -184,6 +195,9 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         reviews: reviews.map(Mutex::new),
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
+        budgets: budgets.map(Mutex::new),
+        policies: policies.map(Mutex::new),
+        goals: goals.map(crate::goals_store::Goals::new),
         apps: Mutex::new(apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),
@@ -204,6 +218,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts: Mutex::new(acts),
         say,
     });
+    crate::goals_api::remind_from(&state);
+    crate::budgets_act::settle_at_start(&state);
     let configured = crate::configuration_api::routes(config)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
@@ -284,6 +300,10 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::runtime_api::routes())
         .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
+        .merge(crate::budgets_api::routes())
+        .merge(crate::budgets_act::routes())
+        .merge(crate::agent_policy_api::routes())
+        .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())
         .merge(crate::resources_api::routes())

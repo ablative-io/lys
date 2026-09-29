@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 
+use crate::admitted::Admitted;
 use crate::error::RunnerError;
 use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request};
 use crate::scrollback::whole_text;
@@ -236,7 +237,11 @@ fn answer_one(
         flag.store(true, Ordering::SeqCst);
         woken.wake();
     });
-    let answer = dispatch(sessions, server, &greeting, &line, &left);
+    let answer = if crate::peer::is_peer(&line) {
+        crate::peer::answer(sessions, stream, line.trim_end(), &left)
+    } else {
+        dispatch(sessions, server, &greeting, &line, &left)
+    };
     writer.write_all(reply_line(answer).as_bytes())?;
     writer.write_all(b"\n")?;
     writer.flush()?;
@@ -260,9 +265,22 @@ pub fn dispatch(
 
 fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answer, RunnerError> {
     match act {
+        Act::ReadBytes {
+            session,
+            cursor,
+            follow,
+        } => crate::terminal_bytes::read(sessions, &session, cursor, follow, left),
+        Act::InputBytes { session, data } => sessions
+            .write(&session, &data)
+            .map(|()| Answer::Delivered { session }),
         Act::Start { launch } => {
             let session = launch.session.clone();
-            let (pid, started_at) = sessions.start(launch)?;
+            let policy = launch
+                .policy
+                .clone()
+                .map(|admitted| Admitted::verified(*admitted))
+                .transpose()?;
+            let (pid, started_at) = sessions.begin(launch, policy, None)?;
             Ok(Answer::Started {
                 session,
                 pid,
@@ -306,6 +324,12 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
         Act::Status { session } => Ok(Answer::Status {
             status: sessions.status(session.as_deref())?,
         }),
+        Act::Operate { operation } => sessions
+            .operate(operation)
+            .map(|outcome| Answer::Operation { outcome }),
+        Act::Outcome { operation } => sessions
+            .outcome(&operation)
+            .map(|outcome| Answer::Operation { outcome }),
     }
 }
 

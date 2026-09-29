@@ -36,6 +36,7 @@ use std::collections::BTreeMap;
 use lys_core::Ed25519Identity;
 use serde::{Deserialize, Serialize};
 
+use crate::admitted::{Admitted, JudgedUnder};
 use crate::error::RunnerError;
 use crate::rotation::{Move, Rotation};
 
@@ -139,12 +140,32 @@ pub struct Launch {
     /// The accounts the session moves between at a usage limit, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<Rotation>,
+    /// The agent's tool-boundary policy and the digest it was admitted
+    /// under, when the session is judged at its tool boundary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<Box<Admitted>>,
 }
 
 /// One act a request asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "act", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Act {
+    /// Read the exact PTY bytes without UTF-8 replacement or boundary trimming.
+    ReadBytes {
+        /// The session.
+        session: String,
+        /// The next byte cursor, or the oldest retained byte when absent.
+        cursor: Option<u64>,
+        /// Wait for output or an observed process exit.
+        follow: bool,
+    },
+    /// Deliver exact terminal input, including escape sequences and binary replies.
+    InputBytes {
+        /// The session.
+        session: String,
+        /// Exact bytes; no implicit newline or character decoding.
+        data: Vec<u8>,
+    },
     /// Start a session in its own pseudo-terminal.
     Start {
         /// What it is started with.
@@ -221,6 +242,17 @@ pub enum Act {
         #[serde(default)]
         session: Option<String>,
     },
+    /// Accept an operation under the server's stable id, answering how it
+    /// stands; asked again under that id it is answered, never done twice.
+    Operate {
+        /// The operation.
+        operation: crate::operations::Operation,
+    },
+    /// How an operation stands, as the runner's record keeps it.
+    Outcome {
+        /// The operation's id.
+        operation: String,
+    },
 }
 
 /// How a session ended.
@@ -293,6 +325,10 @@ pub struct SessionView {
     pub moves: Vec<Move>,
     /// Its end, once it has ended.
     pub ended: Option<Ended>,
+    /// The policy its tool boundary is judged under, when its launch
+    /// carried one; none for a session a restarted runner reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<JudgedUnder>,
 }
 
 /// What a runner is and holds.
@@ -311,6 +347,11 @@ pub struct StatusView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Answer {
+    /// Exact bytes from a terminal, with byte cursors and observed end evidence.
+    Bytes {
+        /// The byte window.
+        output: crate::terminal_bytes::ByteOutput,
+    },
     /// The session's process is up.
     Started {
         /// The session.
@@ -350,6 +391,21 @@ pub enum Answer {
     Status {
         /// The status.
         status: StatusView,
+    },
+    /// The judge's verdict on a tool call a harness asked about.
+    Judged {
+        /// The verdict.
+        verdict: crate::refusals::Verdict,
+    },
+    /// A hook, status line or notice from a harness was recorded.
+    Collected {
+        /// What was recorded, in words.
+        words: String,
+    },
+    /// How an operation stands.
+    Operation {
+        /// Its outcome.
+        outcome: crate::operations::OperationOutcome,
     },
     /// The act was refused, by name.
     Refused {

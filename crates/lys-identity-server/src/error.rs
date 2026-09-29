@@ -17,6 +17,9 @@ pub enum ServerError {
     /// An apps refusal: a registration, a schema, a kind or an app's credential.
     #[error(transparent)]
     App(#[from] crate::apps_error::AppError),
+    /// A goals refusal: an item, its judgement or its reminders.
+    #[error(transparent)]
+    Goal(#[from] crate::goals_state::GoalError),
     /// The caller has no live session.
     #[error("NotSignedIn: sign in through the configured issuer first")]
     NotSignedIn,
@@ -404,6 +407,56 @@ pub enum ServerError {
     /// No team by that id was ever created.
     #[error("TeamUnknown: no team by that id was ever created")]
     TeamUnknown,
+    /// The budgets cannot be kept or read.
+    #[error("BudgetsUnavailable: {reason}")]
+    BudgetsUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// Another change to the budget came between the caller's read and its
+    /// change.
+    #[error(
+        "BudgetVersionConflict: the budget is at version {held}, not {expected}: read it again and send the change on the version read"
+    )]
+    BudgetVersionConflict {
+        /// The version held.
+        held: u64,
+        /// The version the caller read.
+        expected: u64,
+    },
+    /// A budget of the wrong shape, refused by name.
+    #[error("{refusal}: {words}")]
+    BudgetRefused {
+        /// The refusal's name.
+        refusal: &'static str,
+        /// Why, in words.
+        words: String,
+    },
+    /// The agent policies cannot be kept or read.
+    #[error("PolicyUnavailable: {reason}")]
+    PolicyUnavailable {
+        /// Why.
+        reason: String,
+    },
+    /// Another change to the policy came between the caller's read and its
+    /// change.
+    #[error(
+        "PolicyVersionConflict: the policy is at version {held}, not {expected}: read it again and send the change on the version read"
+    )]
+    PolicyVersionConflict {
+        /// The version held.
+        held: u64,
+        /// The version the caller read.
+        expected: u64,
+    },
+    /// A policy of the wrong shape, refused by name.
+    #[error("{refusal}: {words}")]
+    PolicyRefused {
+        /// The refusal's name.
+        refusal: &'static str,
+        /// Why, in words.
+        words: String,
+    },
     /// The emergency stops cannot be kept or read.
     #[error("StopsUnavailable: {reason}")]
     StopsUnavailable {

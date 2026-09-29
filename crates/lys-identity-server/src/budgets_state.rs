@@ -1,0 +1,444 @@
+//! What the budgets' log folds to: each budget at its latest version, and
+//! the usage each has been charged, so a start reads the sealed state and
+//! only the leaves after it.
+//!
+//! A budget names its holder (an agent, a team or a person), its measure,
+//! its limit and its act. A narrower holder's budget applies before a wider
+//! one's: an agent's own, then a team's it is in, then its responsible
+//! person's; among several teams the tightest limit applies. A budget over a
+//! period names the zone the period is counted in; there is no machine
+//! default. Usage is charged once per event: an event seen again adds
+//! nothing.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use jiff::civil::Weekday;
+use jiff::tz::TimeZone;
+use jiff::{Timestamp, ToSpan, Zoned};
+use serde::{Deserialize, Serialize};
+
+use crate::budgets_crossing::{Acted, Crossing, Crossings};
+
+/// The snapshot domain the budgets' folded state is sealed under.
+pub const DOMAIN: &str = "lys/identity/budgets-state/v1";
+
+const FORMAT: &str = "lys-budgets-state/v1";
+
+/// Who a budget is held on.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum HolderKind {
+    /// One agent.
+    Agent,
+    /// Each agent of a team.
+    Team,
+    /// Each agent a person is responsible for.
+    Person,
+}
+
+/// A budget's holder.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Holder {
+    /// Its kind.
+    pub kind: HolderKind,
+    /// Its id.
+    pub id: String,
+}
+
+/// What a budget measures.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Measure {
+    /// The session's context, in percent of its window; no period.
+    ContextPercent,
+    /// Tokens used in a period.
+    Tokens,
+    /// Running time in a period, in milliseconds.
+    RunningMs,
+}
+
+/// What a reached budget does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Act {
+    /// Ask the harness to compact at its next turn boundary.
+    Compact,
+    /// Type a notice into the session at its next turn boundary.
+    Notice,
+    /// End the session.
+    Stop,
+    /// Tell the responsible person.
+    Tell,
+}
+
+/// How long a period is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Length {
+    /// From midnight to midnight.
+    Day,
+    /// From Monday's midnight to the next.
+    Week,
+}
+
+/// The period a budget counts over, in a named zone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Period {
+    /// Its length.
+    pub length: Length,
+    /// The IANA zone it is counted in.
+    pub zone: String,
+}
+
+/// One version of a budget.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Budget {
+    /// Its holder.
+    pub holder: Holder,
+    /// What it measures.
+    pub measure: Measure,
+    /// Its limit, in the measure's unit.
+    pub limit: u64,
+    /// The period, for a measure counted over one.
+    pub period: Option<Period>,
+    /// What it does when reached.
+    pub act: Act,
+    /// Its version, from 1.
+    pub version: u64,
+    /// Who set it.
+    pub by: String,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
+/// A measured use one agent made, as the runner's feed reported it.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Usage {
+    /// The feed event's stable id: an event seen again charges nothing.
+    pub event: String,
+    /// The agent.
+    pub agent: String,
+    /// When, in milliseconds since the Unix epoch.
+    pub at_ms: i64,
+    /// Tokens used.
+    pub tokens: u64,
+    /// Running time, in milliseconds.
+    pub running_ms: u64,
+    /// The session it was measured in, when one is named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+    /// The session's context, in percent of its window, when measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_percent: Option<u64>,
+    /// The budgets this use crossed, kept with it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crossed: Vec<Crossing>,
+}
+
+/// One leaf of the budgets' log.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Leaf {
+    /// A budget set or changed.
+    Set(Budget),
+    /// A use charged.
+    Used(Usage),
+    /// What came of a crossing's act.
+    Acted(Acted),
+}
+
+/// Why a budget was refused, by name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refused {
+    /// The refusal's name.
+    pub refusal: &'static str,
+    /// Why, in words.
+    pub words: String,
+}
+
+fn refused(refusal: &'static str, words: impl Into<String>) -> Refused {
+    Refused {
+        refusal,
+        words: words.into(),
+    }
+}
+
+/// Where an agent stands: its own id, the teams it is in, its responsible
+/// person.
+#[derive(Debug, Clone, Default)]
+pub struct Standing {
+    /// The agent.
+    pub agent: String,
+    /// The teams it is in.
+    pub teams: BTreeSet<String>,
+    /// Its responsible person.
+    pub person: Option<String>,
+}
+
+/// The budgets as their log folds them.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Held {
+    /// Each budget at its latest version, by holder and measure.
+    pub budgets: Vec<Budget>,
+    /// The events already charged.
+    pub charged: BTreeSet<String>,
+    /// The uses charged, in the order kept.
+    pub uses: Vec<Usage>,
+    /// The crossings and what came of their acts.
+    #[serde(default)]
+    pub crossings: Crossings,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Sealed {
+    format: String,
+    held: Held,
+}
+
+impl Budget {
+    /// The budget, refused by name when its shape is wrong: a measure over
+    /// a period without one, a period without its zone, a zone that is not
+    /// known, or a context budget over 100 percent.
+    pub fn checked(self) -> Result<Self, Refused> {
+        if self.holder.id.is_empty() {
+            return Err(refused("budget_invalid", "a budget names its holder"));
+        }
+        match (self.measure, &self.period) {
+            (Measure::ContextPercent, Some(_)) => {
+                return Err(refused(
+                    "budget_invalid",
+                    "a context budget holds at every moment and has no period",
+                ));
+            }
+            (Measure::ContextPercent, None) if self.limit > 100 => {
+                return Err(refused(
+                    "budget_invalid",
+                    "a context budget is a percent, from 0 to 100",
+                ));
+            }
+            (Measure::Tokens | Measure::RunningMs, None) => {
+                return Err(refused(
+                    "period_missing",
+                    "a budget of tokens or running time names its period",
+                ));
+            }
+            (_, Some(period)) if period.zone.trim().is_empty() => {
+                return Err(refused(
+                    "zone_missing",
+                    "a period names the zone it is counted in; there is no default zone",
+                ));
+            }
+            (_, Some(period)) => {
+                TimeZone::get(&period.zone).map_err(|error| {
+                    refused(
+                        "zone_unknown",
+                        format!("{} is not a known zone: {error}", period.zone),
+                    )
+                })?;
+            }
+            (Measure::ContextPercent, None) => {}
+        }
+        Ok(self)
+    }
+}
+
+impl Period {
+    /// The start of the period `at_ms` falls in, in milliseconds since the
+    /// Unix epoch, counted in the period's zone.
+    pub fn start_of(&self, at_ms: i64) -> Result<i64, String> {
+        let zone = TimeZone::get(&self.zone).map_err(|error| error.to_string())?;
+        let instant = Timestamp::from_millisecond(at_ms).map_err(|error| error.to_string())?;
+        let local: Zoned = instant.to_zoned(zone);
+        let day = local.date();
+        let first = match self.length {
+            Length::Day => day,
+            Length::Week => {
+                let back = i64::from(day.weekday().since(Weekday::Monday));
+                day.checked_sub(back.days())
+                    .map_err(|error| error.to_string())?
+            }
+        };
+        let start = first
+            .to_zoned(local.time_zone().clone())
+            .map_err(|error| error.to_string())?;
+        Ok(start.timestamp().as_millisecond())
+    }
+}
+
+impl Held {
+    /// The budget held on `holder` for `measure`.
+    pub fn budget(&self, holder: &Holder, measure: Measure) -> Option<&Budget> {
+        self.budgets
+            .iter()
+            .find(|budget| budget.holder == *holder && budget.measure == measure)
+    }
+
+    /// Fold one leaf. A budget whose version does not follow the one held
+    /// is refused, since every kept version was checked before it was kept.
+    pub fn hold(&mut self, leaf: Leaf) -> Result<(), String> {
+        match leaf {
+            Leaf::Set(budget) => {
+                let held = self
+                    .budgets
+                    .iter_mut()
+                    .find(|held| held.holder == budget.holder && held.measure == budget.measure);
+                match held {
+                    None if budget.version == 1 => self.budgets.push(budget),
+                    Some(held) if budget.version == held.version + 1 => *held = budget,
+                    _ => {
+                        return Err(format!(
+                            "budget version {} does not follow the one held",
+                            budget.version
+                        ));
+                    }
+                }
+            }
+            Leaf::Used(mut usage) => {
+                if self.charged.insert(usage.event.clone()) {
+                    for crossing in std::mem::take(&mut usage.crossed) {
+                        self.crossings.hold(crossing);
+                    }
+                    if let (Some(session), Some(figure)) = (&usage.session, usage.context_percent) {
+                        self.crossings.context.insert(session.clone(), figure);
+                    }
+                    self.uses.push(usage);
+                }
+            }
+            Leaf::Acted(acted) => {
+                self.crossings.acted.insert(acted.operation.clone(), acted);
+            }
+        }
+        Ok(())
+    }
+
+    /// The budget that applies to `standing` for `measure`: the narrowest
+    /// holder's, and among its teams the tightest.
+    pub fn applying(&self, standing: &Standing, measure: Measure) -> Option<&Budget> {
+        let agent = Holder {
+            kind: HolderKind::Agent,
+            id: standing.agent.clone(),
+        };
+        if let Some(own) = self.budget(&agent, measure) {
+            return Some(own);
+        }
+        let teams = self
+            .budgets
+            .iter()
+            .filter(|budget| {
+                budget.measure == measure
+                    && budget.holder.kind == HolderKind::Team
+                    && standing.teams.contains(&budget.holder.id)
+            })
+            .min_by_key(|budget| budget.limit);
+        teams.or_else(|| {
+            let person = standing.person.clone()?;
+            self.budget(
+                &Holder {
+                    kind: HolderKind::Person,
+                    id: person,
+                },
+                measure,
+            )
+        })
+    }
+
+    /// What `agents` have used of `budget`'s measure in the period `at_ms`
+    /// falls in.
+    pub fn spent(
+        &self,
+        budget: &Budget,
+        agents: &BTreeSet<String>,
+        at_ms: i64,
+    ) -> Result<u64, String> {
+        let Some(period) = &budget.period else {
+            return Ok(0);
+        };
+        let start = period.start_of(at_ms)?;
+        let mut total = 0_u64;
+        for usage in &self.uses {
+            if !agents.contains(&usage.agent) || usage.at_ms < start || usage.at_ms > at_ms {
+                continue;
+            }
+            let figure = match budget.measure {
+                Measure::Tokens => usage.tokens,
+                Measure::RunningMs => usage.running_ms,
+                Measure::ContextPercent => 0,
+            };
+            total = total.saturating_add(figure);
+        }
+        Ok(total)
+    }
+
+    /// Fold every leaf of `tail`, in order.
+    pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
+        for (index, bytes) in (tail.from..).zip(&tail.leaves) {
+            let leaf = serde_json::from_slice(bytes)
+                .map_err(|error| format!("leaf {index} is not a budget leaf: {error}"))?;
+            self.hold(leaf)
+                .map_err(|reason| format!("leaf {index}: {reason}"))?;
+        }
+        Ok(())
+    }
+
+    /// The state a snapshot seals.
+    pub fn encode(&self) -> Result<Vec<u8>, String> {
+        serde_json::to_vec(&Sealed {
+            format: FORMAT.to_owned(),
+            held: self.clone(),
+        })
+        .map_err(|error| format!("budgets state: {error}"))
+    }
+
+    /// The state a snapshot sealed, refused by reason unless it reads whole
+    /// in this format.
+    pub fn decode(bytes: &[u8]) -> Result<Self, String> {
+        let sealed: Sealed =
+            serde_json::from_slice(bytes).map_err(|error| format!("budgets state: {error}"))?;
+        if sealed.format != FORMAT {
+            return Err(format!(
+                "budgets state is in format {}, not {FORMAT}",
+                sealed.format
+            ));
+        }
+        Ok(sealed.held)
+    }
+}
+
+/// Every agent `budget` covers, among the `standings` given.
+pub fn covered<'a>(
+    budget: &Budget,
+    standings: impl IntoIterator<Item = &'a Standing>,
+) -> BTreeSet<String> {
+    standings
+        .into_iter()
+        .filter(|standing| match budget.holder.kind {
+            HolderKind::Agent => standing.agent == budget.holder.id,
+            HolderKind::Team => standing.teams.contains(&budget.holder.id),
+            HolderKind::Person => standing.person.as_deref() == Some(budget.holder.id.as_str()),
+        })
+        .map(|standing| standing.agent.clone())
+        .collect()
+}
+
+/// The budgets by holder, for reads that group them.
+pub fn by_holder(budgets: &[Budget]) -> BTreeMap<Holder, Vec<Budget>> {
+    let mut out: BTreeMap<Holder, Vec<Budget>> = BTreeMap::new();
+    for budget in budgets {
+        out.entry(budget.holder.clone())
+            .or_default()
+            .push(budget.clone());
+    }
+    out
+}

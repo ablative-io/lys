@@ -112,6 +112,15 @@ pub struct Config {
     /// `ServiceAccountsUnavailable` and `GET /me` lists none.
     #[serde(default)]
     pub service_accounts_dir: Option<PathBuf>,
+    /// The directory the budgets are kept in, created when it does not
+    /// exist. Without it the budget routes answer `BudgetsUnavailable`.
+    #[serde(default)]
+    pub budgets_dir: Option<PathBuf>,
+    /// The directory the agents' tool-boundary policies are kept in, created
+    /// when it does not exist. Without it the policy routes answer
+    /// `PolicyUnavailable`.
+    #[serde(default)]
+    pub policies_dir: Option<PathBuf>,
     /// The directory the teams are kept in, created when it does not exist.
     /// Without it the team routes answer `TeamsUnavailable`.
     #[serde(default)]
@@ -120,6 +129,11 @@ pub struct Config {
     /// not exist. Without it the stop route answers `StopsUnavailable`.
     #[serde(default)]
     pub stops_dir: Option<PathBuf>,
+    /// The directory the goals, expectations and deliverables are kept in,
+    /// created when it does not exist. Without it the goal routes answer
+    /// `goals_unavailable`.
+    #[serde(default)]
+    pub goals_dir: Option<PathBuf>,
     /// The directory the review decisions are kept in, created when it does
     /// not exist. Without it keeping a grant answers `ReviewsUnavailable`.
     #[serde(default)]

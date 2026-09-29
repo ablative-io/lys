@@ -1,0 +1,23 @@
+"approval_policy" = "never"
+"default_permissions" = "lys-bound"
+
+[permissions.lys-bound.filesystem]
+"/" = "deny"
+"/agent/home" = "write"
+"/agent/work" = "write"
+"/runner/control" = "deny"
+"/runtime" = "read"
+
+[permissions.lys-bound.network]
+enabled = true
+mode = "full"
+enable_socks5 = false
+enable_socks5_udp = false
+allow_upstream_proxy = false
+dangerously_allow_non_loopback_proxy = false
+dangerously_allow_all_unix_sockets = false
+allow_local_binding = false
+
+[permissions.lys-bound.network.domains]
+"allowed.example" = "allow"
+"denied.example" = "deny"
