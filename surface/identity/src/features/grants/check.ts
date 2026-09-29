@@ -74,12 +74,11 @@ export async function whoAll(resource: ResourceRef, action: string): Promise<(Pe
 /** For each resource the caller can see, which of its actions each holder can exercise, from /grants/who. */
 export async function reachMap(resources: { resource: ResourceRef; actions: string[] }[]): Promise<Map<string, Map<string, string[]>>> {
   const out = new Map<string, Map<string, string[]>>();
-  for (const { resource, actions } of resources) {
+  await Promise.all(resources.map(async ({ resource, actions }) => {
     const byHolder = new Map<string, string[]>();
-    for (const action of actions) {
-      for (const h of await whoAll(resource, action)) byHolder.set(h.holder, [...(byHolder.get(h.holder) ?? []), action]);
-    }
+    const answers = await Promise.all(actions.map(async (action) => ({ action, holders: await whoAll(resource, action) })));
+    for (const { action, holders } of answers) for (const h of holders) byHolder.set(h.holder, [...(byHolder.get(h.holder) ?? []), action]);
     out.set(resourceText(resource), byHolder);
-  }
+  }));
   return out;
 }

@@ -17,8 +17,8 @@ interface Node { id: string; label: string; kind: Kind; active: boolean; x: numb
 interface Edge { a: string; b: string; kind: 'grant' | 'void' | 'answers' | 'installed'; label: string }
 type Show = { grants: boolean; answers: boolean; installed: boolean };
 
-const W = 1000;
-const H = 600;
+const W = 1400;
+const H = 820;
 
 async function readGraph() {
   const world = await readGrantWorld();
@@ -34,7 +34,8 @@ function model(world: GrantWorld, installed: Installed[], show: Show): { nodes: 
   for (const [id, who] of world.who) add(id, who.name, who.kind, who.state === 'active');
   const edges: Edge[] = [];
   for (const grant of world.list.grants) {
-    add(grant.holder, nameOf(world, grant.holder), 'agent', false);
+    if (!world.who.has(grant.holder) && !show.installed) continue;
+    add(grant.holder, nameOf(world, grant.holder), world.who.has(grant.holder) ? 'agent' : 'app', true);
     const kind = grant.resource.kind.toLowerCase(), id = grant.resource.id.toLowerCase();
     const members = world.who.has(grant.resource.id) ? [grant.resource.id]
       : kind === 'agents' || id === 'agents' || (kind === 'agent' && id === '*') ? [...world.who].filter(([, w]) => w.kind === 'agent').map(([k]) => k)
@@ -62,23 +63,24 @@ function layout(nodes: Node[], edges: Edge[]) {
   let seed = 7;
   const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
   const at = new Map(nodes.map((node) => [node.id, node]));
-  for (const node of nodes) { node.x = W / 2 + (rnd() - 0.5) * W * 0.6; node.y = H / 2 + (rnd() - 0.5) * H * 0.6; }
+  const column = (node: Node) => node.kind === 'person' ? W * 0.14 : node.kind === 'agent' ? W * 0.42 : node.kind === 'app' ? W * 0.9 : W * 0.72;
+  for (const node of nodes) { node.x = column(node) + (rnd() - 0.5) * 80; node.y = H / 2 + (rnd() - 0.5) * H * 0.8; }
   for (let it = 0; it < 420; it++) {
     const k = 1 - it / 420;
     for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j];
       let dx = a.x - b.x, dy = a.y - b.y;
-      const d2 = dx * dx + dy * dy + 0.01, f = 5200 / d2, d = Math.sqrt(d2);
+      const d2 = dx * dx + dy * dy + 0.01, f = 9000 / d2, d = Math.sqrt(d2);
       dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
     }
     for (const edge of edges) {
       const a = at.get(edge.a), b = at.get(edge.b);
       if (!a || !b) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 120) * 0.02 * d * 0.05;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 200) * 0.0008 * d;
       a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f;
     }
     for (const node of nodes) {
-      node.vx += (W / 2 - node.x) * 0.004; node.vy += (H / 2 - node.y) * 0.004;
+      node.vx += (column(node) - node.x) * 0.08; node.vy += (H / 2 - node.y) * 0.003;
       node.x += Math.max(-12, Math.min(12, node.vx * k)); node.y += Math.max(-12, Math.min(12, node.vy * k));
       node.vx *= 0.6; node.vy *= 0.6;
       node.x = Math.max(40, Math.min(W - 40, node.x)); node.y = Math.max(30, Math.min(H - 30, node.y));
@@ -110,14 +112,14 @@ function Drawing({ world, reach, installed, focus }: { world: GrantWorld; reach:
   const svg = useRef<SVGSVGElement>(null);
   const scale = () => { const box = svg.current?.getBoundingClientRect(); return box && box.width ? view.w / box.width : 1; };
   const zoom = (factor: number, cx = view.x + view.w / 2, cy = view.y + view.h / 2) => setView((v) => {
-    const w = Math.min(W * 4, Math.max(W / 8, v.w * factor)); const k = w / v.w;
+    const w = Math.min(W * 1.6, Math.max(W / 6, v.w * factor)); const k = w / v.w;
     return { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w, h: v.h * k };
   });
   const onWheel = (event: WheelEvent<SVGSVGElement>) => {
     const box = svg.current?.getBoundingClientRect();
     if (!box) return;
     const cx = view.x + (event.clientX - box.left) * scale(), cy = view.y + (event.clientY - box.top) * scale();
-    zoom(event.deltaY > 0 ? 1.15 : 1 / 1.15, cx, cy);
+    zoom(Math.min(1.08, Math.max(1 / 1.08, Math.exp(event.deltaY * 0.0015))), cx, cy);
   };
   const onDown = (event: PointerEvent<SVGSVGElement>) => { event.preventDefault(); window.getSelection()?.removeAllRanges(); drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
   const onMove = (event: PointerEvent<SVGSVGElement>) => {
