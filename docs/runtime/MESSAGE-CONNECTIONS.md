@@ -34,7 +34,7 @@ page. Refresh starts a new read; this is not a snapshot or background watcher.
 
 Verification targets written with this change: Cambium `message_edges`; Lys
 server `message_edges` plus `message_edges_tests`; surface
-`message-connections.test.ts` and `session-canvas.test.tsx`. Their addition does
+`message-connections.test.tsx` and `session-canvas.test.tsx`. Their addition does
 not claim execution. A final end-to-end check requires both installed routes,
 actual bindings and a caller with both sessions. Scripted transport rendering
 proof is separate from that authenticated installed-service proof.

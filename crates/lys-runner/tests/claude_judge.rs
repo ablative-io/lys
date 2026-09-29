@@ -110,7 +110,14 @@ fn a_missing_runner_or_unreadable_input_denies() -> TestResult {
         unreachable["hookSpecificOutput"]["permissionDecision"],
         "deny"
     );
-    assert!(unreachable.to_string().contains("claude_judge_unavailable"));
+    let reason = unreachable["hookSpecificOutput"]["permissionDecisionReason"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(
+        reason.contains("Lys could not complete this policy check"),
+        "{reason}"
+    );
+    assert!(reason.contains("runner_unreachable"), "{reason}");
     assert!(!unreachable.to_string().contains("sensitive command"));
     let malformed = output(&socket, "not-json-secret").to_string();
     assert!(malformed.contains("claude_hook_malformed"));

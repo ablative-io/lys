@@ -47,7 +47,7 @@ fn the_feed_pages_from_its_start_and_from_a_cursor_it_gave() -> TestResult {
         scrollback: 1 << 16,
     };
     let serving = Runner::open(&options)?.spawn();
-    let client = Client::new(options.socket.clone(), Arc::clone(&key));
+    let client = Client::new(options.socket, Arc::clone(&key));
 
     let (entries, cursor) = feed(&client, None)?.map_err(|refusal| format!("refused {refusal}"))?;
     assert_eq!(entries, 0, "a fresh runner's feed is empty");

@@ -203,9 +203,8 @@ impl Sessions {
             .iter()
             .find(|(_, entry)| entry.id == id)
             .map(|(key, entry)| (key.clone(), belongs(&entry.actor)));
-        let key = match key {
-            Some((key, true)) => key,
-            Some((_, false)) | None => return Err(ServerError::SessionUnknown),
+        let Some((key, true)) = key else {
+            return Err(ServerError::SessionUnknown);
         };
         let ended = live.remove(&key).ok_or(ServerError::SessionUnknown)?;
         if let Err(error) = self.keep(&live) {

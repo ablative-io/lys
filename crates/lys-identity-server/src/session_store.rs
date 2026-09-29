@@ -13,6 +13,7 @@
 //! A session whose end has passed is dropped as the file is read.
 
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -146,7 +147,10 @@ pub fn load(path: &Path, now: u64) -> Result<HashMap<String, SessionEntry>, Serv
 }
 
 /// Replace the file at `path` with `live`, owner-only.
-pub fn save(path: &Path, live: &HashMap<String, SessionEntry>) -> Result<(), ServerError> {
+pub fn save<S: BuildHasher>(
+    path: &Path,
+    live: &HashMap<String, SessionEntry, S>,
+) -> Result<(), ServerError> {
     let mut sessions: Vec<StoredSession> = live
         .iter()
         .map(|(key, entry)| StoredSession {

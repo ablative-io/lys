@@ -246,9 +246,9 @@ pub fn routes(config: &Config) -> Result<Router<Arc<AppState>>, ServerError> {
 fn cookie(headers: &HeaderMap) -> Result<String, EdgeError> {
     let mut values = Vec::new();
     for value in headers.get_all(header::COOKIE) {
-        let text = value
-            .to_str()
-            .map_err(|_| unavailable("Cambium cookie header is unreadable"))?;
+        let text = value.to_str().map_err(|error| {
+            unavailable(format!("Cambium cookie header is unreadable: {error}"))
+        })?;
         for part in text.split(';') {
             if let Some((name, value)) = part.trim().split_once('=') {
                 if name == "cambium_session" {
@@ -277,10 +277,10 @@ async fn read(
         let administrator = state.admission.administrator(&actor).is_ok();
         let visible: BTreeSet<String> = directory
             .records()
-            .filter_map(|(id, record)| {
-                (administrator || *id == caller || record.responsible() == Some(person))
-                    .then(|| id.to_string())
+            .filter(|(id, record)| {
+                administrator || **id == caller || record.responsible() == Some(person)
             })
+            .map(|(id, _)| id.to_string())
             .collect();
         Ok((caller.to_string(), visible))
     })?;
@@ -301,21 +301,30 @@ async fn read(
         .map_err(|error| unavailable(format!("Cambium message read failed: {error}")))?;
     if !response.status().is_success() {
         let status = response.status();
-        let refusal = response.json::<UpstreamRefusal>().await.map_err(|error| {
-            unavailable(format!(
-                "Cambium answered HTTP {status} with an unreadable refusal: {error}"
-            ))
-        })?;
+        let refusal = read_json::<UpstreamRefusal>(response)
+            .await
+            .map_err(|error| {
+                unavailable(format!(
+                    "Cambium answered HTTP {status} with an unreadable refusal: {error}"
+                ))
+            })?;
         return Err(EdgeError::Refused {
             status,
             reason: format!("Cambium {}: {}", refusal.kind, refusal.reason),
         });
     }
-    let page: UpstreamPage = response
-        .json()
+    let page: UpstreamPage = read_json(response)
         .await
         .map_err(|error| unavailable(format!("Cambium message page is unreadable: {error}")))?;
     map_page(page, bridge, &caller, &visible).map(Json)
+}
+
+/// The body of `response`, read whole, as `T`.
+async fn read_json<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> Result<T, String> {
+    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
 }
 
 fn map_page(

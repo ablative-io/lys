@@ -8,7 +8,8 @@ use std::error::Error;
 #[tokio::test]
 async fn unconfigured_messages_refuse_by_name_after_sign_in() -> Result<(), Box<dyn Error>> {
     let (service, _) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, "bea-subject"])?))
+            .await?;
     let (status, _) = service.get("/runtime/message-edges", None).await?;
     assert_eq!(status, 401);
     let cookie = service

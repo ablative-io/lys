@@ -156,7 +156,7 @@ pub enum Leaf {
     /// What came of a crossing's act.
     Acted(Acted),
     /// A tool call a runner's judge denied.
-    Refused(lys_runner::refusals::RefusalRecord),
+    Refused(Box<lys_runner::refusals::RefusalRecord>),
     /// How far a runner's feed has been read.
     FeedRead(crate::refusals_store::FeedRead),
 }
@@ -326,7 +326,7 @@ impl Held {
             Leaf::Acted(acted) => {
                 self.crossings.acted.insert(acted.operation.clone(), acted);
             }
-            Leaf::Refused(record) => self.refusals.hold(record),
+            Leaf::Refused(record) => self.refusals.hold(*record),
             Leaf::FeedRead(read) => self.refusals.read_to(read),
         }
         Ok(())
