@@ -445,3 +445,27 @@ fn a_new_install_registers_no_product_and_names_no_administrator() -> Result<(),
     assert_eq!(config.deployment.admin_email, None);
     Ok(())
 }
+
+#[test]
+fn an_earlier_builds_state_gains_what_this_service_reads_and_keeps_the_rest()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let root = dir.path().join("root");
+    let layout = Layout::at(root.clone());
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
+    crate::identity::prepare::materialise_all(&config)?;
+    std::fs::create_dir_all(layout.grant_model().parent().ok_or("no parent")?)?;
+    std::fs::write(layout.grant_model(), "an earlier build's model")?;
+    let provider = config.state_dir().join(server_config::PROVIDER_KEY_FILE);
+    assert!(!provider.exists());
+    super::server_state(&layout, &config)?;
+    let key = std::fs::read(&provider)?;
+    assert_eq!(
+        std::fs::read_to_string(layout.grant_model())?,
+        "an earlier build's model"
+    );
+    assert!(layout.service_key().is_file());
+    super::server_state(&layout, &config)?;
+    assert_eq!(std::fs::read(&provider)?, key, "an existing key is kept");
+    Ok(())
+}

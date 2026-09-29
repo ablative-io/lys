@@ -98,6 +98,8 @@
 
 **S148.** As someone using the identity screens and API all day, I want every read to do its work once, so that the service stays light while it runs beside everything else.
 
+**S180.** As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -119,6 +121,8 @@
 **S138.** As an agent's responsible person, I want my agent's own machine account accepted as its binding and kept as the agent's, so that the agent has its own service account without holding anyone's sign-in.
 
 **S139.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
+
+**S182.** As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave.
 
 ## Directory administrator — Resolves a refused act
 
@@ -234,11 +238,17 @@
 
 **S160.** As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself.
 
+**S183.** As a person setting up Lys with no terminal, I want to connect my message service and bind its participants to my people and agents on a screen, so that the canvas shows who has spoken.
+
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 
 **S151.** As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.
 
 **S152.** As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen.
+
+**S179.** As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs.
+
+**S181.** As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has.
 
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 

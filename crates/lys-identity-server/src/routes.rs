@@ -90,6 +90,10 @@ pub struct AppState {
     pub operator_token: Option<zeroize::Zeroizing<String>>,
     /// The managed install's durable upgrade intent, checked on each operator request.
     pub operator_upgrade_file: Option<std::path::PathBuf>,
+    /// How machines' runners are reached.
+    pub runners: crate::runner_client::Runners,
+    /// The acts on sessions through a runner, each kept as its receipt.
+    pub acts: Mutex<crate::runner_acts::ActStore>,
     /// Where the service says how a thing it keeps was started.
     pub say: Say,
 }
@@ -133,7 +137,16 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
-    let apps = crate::apps_api::opened(config, key, &*say)?;
+    let acts = crate::runner_acts::ActStore::open(
+        &config.log_dir.with_file_name("runner-acts"),
+        Arc::clone(&key),
+    )?;
+    say(&format!(
+        "runner-acts log {}, holding {} acts",
+        acts.start(),
+        acts.len()
+    ));
+    let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
     let state = Arc::new(AppState {
         directory: Mutex::new(directory),
@@ -194,6 +207,8 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         agent_nonces: Mutex::default(),
         operator_token,
         operator_upgrade_file: config.operator_upgrade_file.clone(),
+        runners: crate::runner_client::Runners::new(key, config.runner_socket.clone()),
+        acts: Mutex::new(acts),
         say,
     });
     let configured = crate::configuration_api::routes(config)
@@ -279,6 +294,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::provisioning_api::routes())
         .merge(crate::launch_api::routes())
         .merge(crate::runtime_api::routes())
+        .merge(crate::runner_api::routes())
         .merge(crate::stop_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())

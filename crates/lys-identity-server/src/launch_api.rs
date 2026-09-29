@@ -21,6 +21,13 @@
 //! the command. Each refusal is by name: an agent the directory does not
 //! hold, a caller who does not answer for it, an agent with no profile, and
 //! a machine unknown, retired, without a runtime or not listing the agent.
+//!
+//! On a machine whose record names a runner, the kept start is then run by
+//! that runner, as `/bin/sh -c` and the command, and the answer carries the
+//! runner's word beside the command: the session is kept running once the
+//! runner says its process is up. On a machine that names none, the command
+//! is answered as it always was, and nothing runs. The service itself
+//! never runs anything: it asks the runner over its socket.
 
 use std::collections::BTreeSet;
 use std::str::FromStr;
@@ -74,7 +81,8 @@ pub struct StartCommandView {
     pub command: String,
     /// What of the profile the template does not carry.
     pub left_out: Vec<String>,
-    /// Whether the service ran it: never.
+    /// Whether the service ran it: never. A runner may have; its word is
+    /// the answer's `runner` member.
     pub executed: bool,
 }
 
@@ -189,7 +197,7 @@ async fn start_command(
             });
         }
         if let Some(kept) = admitted(&state, &session, &agent)? {
-            return Ok(Admission::Kept(kept));
+            return Ok(Admission::Kept(kept, admitted_by));
         }
         if record.state() != LifecycleState::Active {
             return Err(ServerError::AgentNotActive {
@@ -219,9 +227,23 @@ async fn start_command(
         Ok(Admission::New(Box::new(version), runtime, admitted_by))
     })?;
     let (version, runtime, admitted_by) = match admission {
-        Admission::Kept(kept) => return Ok(Json(kept)),
+        Admission::Kept(kept, admitted_by) => {
+            let rotation = with_provisioning(&state, |store| {
+                Ok(store
+                    .profile(&agent)
+                    .and_then(|profile| profile.versions.last())
+                    .and_then(|version| version.settings.session.as_ref())
+                    .and_then(|session| session.accounts.clone()))
+            })?;
+            return run(&state, kept, &admitted_by, rotation).await;
+        }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
+    let rotation = version
+        .settings
+        .session
+        .as_ref()
+        .and_then(|session| session.accounts.clone());
     let handles = handles(&state, &headers, &agent).await?;
     let rendered = render(
         &Start {
@@ -259,15 +281,59 @@ async fn start_command(
             state: Reported::Starting,
             what: format!("start admitted, template {}", rendered.template_sha256),
             confirmation: String::new(),
-            reported_by: admitted_by,
+            reported_by: admitted_by.clone(),
             at: now(),
             launch: Some(view),
         })
     })?;
-    kept.first()
+    let kept = kept
+        .first()
         .and_then(|first| first.launch.clone())
-        .map(Json)
-        .ok_or(ServerError::RuntimeReportReused { operation: session })
+        .ok_or(ServerError::RuntimeReportReused { operation: session })?;
+    run(&state, kept, &admitted_by, rotation).await
+}
+
+/// Run the start `view` answers on its machine's runner, when the machine
+/// names one, and answer the view with the runner's word on it beside it;
+/// a machine that names none is answered the view as it is, and nothing
+/// runs. The service spawns nothing: it asks the runner.
+async fn run(
+    state: &Arc<AppState>,
+    view: Value,
+    admitted_by: &str,
+    rotation: Option<lys_runner::Rotation>,
+) -> Result<Json<Value>, ServerError> {
+    let member = |name: &str| {
+        view.get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| ServerError::LaunchUnrenderable {
+                reason: format!("the kept start names no {name}"),
+            })
+    };
+    let (agent, machine, session, command) = (
+        member("agent")?,
+        member("machine")?,
+        member("session")?,
+        member("command")?,
+    );
+    let launch = lys_runner::Launch {
+        session,
+        program: SHELL.to_owned(),
+        arguments: vec!["-c".to_owned(), command],
+        directory: String::new(),
+        environment: std::collections::BTreeMap::new(),
+        columns: crate::runner_sessions::COLUMNS,
+        rows: crate::runner_sessions::ROWS,
+        rotation,
+    };
+    let ran = crate::runner_sessions::run_on_runner(state, (&agent, &machine, admitted_by), launch)
+        .await?;
+    let mut view = view;
+    if let Some(runner) = ran {
+        view["runner"] = runner;
+    }
+    Ok(Json(view))
 }
 
 /// Refuse by name the first host a server of `version` is reached at that
@@ -298,9 +364,12 @@ fn url_host(url: &str) -> Option<String> {
     (!host.is_empty()).then_some(host)
 }
 
+/// The shell a runner runs a start command with.
+const SHELL: &str = "/bin/sh";
+
 /// A start already admitted, or what a new one is rendered from.
 enum Admission {
-    Kept(Value),
+    Kept(Value, String),
     New(Box<Version>, String, String),
 }
 

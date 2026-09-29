@@ -1640,6 +1640,71 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Approved apps sign in and inactive people are refused (DIRECTORY-067)",
+      "items": [
+        {
+          "id": "C449",
+          "text": "An approved app's client is a provider client (DIRECTORY-067 R1).",
+          "done": false
+        },
+        {
+          "id": "C450",
+          "text": "A retired app's codes and tokens stop at once (DIRECTORY-067 R2).",
+          "done": false
+        },
+        {
+          "id": "C451",
+          "text": "A suspended or retired person gets no code, no token and no answer (DIRECTORY-067 R3).",
+          "done": false
+        },
+        {
+          "id": "C452",
+          "text": "A code presented twice ends the tokens it bought (DIRECTORY-067 R4).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Sign-out ends app access and apps may read email (DIRECTORY-068)",
+      "items": [
+        {
+          "id": "C453",
+          "text": "A code or token dies with the Lys session it came from (DIRECTORY-068 R1).",
+          "done": false
+        },
+        {
+          "id": "C454",
+          "text": "An app signs the person out through Lys's end-session endpoint (DIRECTORY-068 R2).",
+          "done": false
+        },
+        {
+          "id": "C455",
+          "text": "An app that asks for the email scope receives the person's email (DIRECTORY-068 R3).",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "The message service is set on the screen (DIRECTORY-069)",
+      "items": [
+        {
+          "id": "C456",
+          "text": "The setting is Lys's own record, set on the Connections screen (DIRECTORY-069 R1).",
+          "done": false
+        },
+        {
+          "id": "C457",
+          "text": "An install's configured setting becomes the first line, once (DIRECTORY-069 R2).",
+          "done": false
+        },
+        {
+          "id": "C458",
+          "text": "The screen shows whether the service answers (DIRECTORY-069 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

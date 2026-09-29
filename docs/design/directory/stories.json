@@ -206,6 +206,10 @@
         {
           "id": "S148",
           "text": "As someone using the identity screens and API all day, I want every read to do its work once, so that the service stays light while it runs beside everything else."
+        },
+        {
+          "id": "S180",
+          "text": "As an administrator, I want a person I suspend and an app I retire to stop signing in at once, so that my decision takes effect everywhere."
         }
       ]
     },
@@ -254,6 +258,10 @@
         {
           "id": "S139",
           "text": "As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request."
+        },
+        {
+          "id": "S182",
+          "text": "As a person who signs in, I want signing out of Lys to end every app I signed in to, so that nothing keeps acting as me after I leave."
         }
       ]
     },
@@ -526,6 +534,10 @@
         {
           "id": "S160",
           "text": "As someone who has never used a terminal, I want to download Lys, open it and be guided in my browser until I am signed in, so that I can set it up for my team myself."
+        },
+        {
+          "id": "S183",
+          "text": "As a person setting up Lys with no terminal, I want to connect my message service and bind its participants to my people and agents on a screen, so that the canvas shows who has spoken."
         }
       ]
     },
@@ -540,6 +552,14 @@
         {
           "id": "S152",
           "text": "As an administrator, I want to approve each app and see its schema on a Lys screen before it takes effect, so that no app gives itself power I have not seen."
+        },
+        {
+          "id": "S179",
+          "text": "As the developer of an app an administrator approved, I want people to sign in to it through Lys with the client I was issued, so that approval is all my app needs."
+        },
+        {
+          "id": "S181",
+          "text": "As the developer of an app that signs in with Lys, I want to sign a person out through Lys and to read their email when I ask for it, so that my app matches people as it always has."
         }
       ]
     },
