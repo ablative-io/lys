@@ -43,7 +43,10 @@ def populate(browser, root):
         "email": email, "password": password,
     })
     browser.ask("POST", "/sign-in", {"email": email, "password": password})
-    owner = browser.ask("GET", "/me")["person"]["id"]
+    signed_in = browser.ask("GET", "/me")["person"]
+    if signed_in["state"] != "registered":
+        raise RuntimeError("old setup fixture must exercise a Registered administrator")
+    owner = signed_in["id"]
     person = browser.ask("POST", "/people", {
         "operation": operation(), "display_name": "Preserved Person",
     })["person"]
@@ -86,6 +89,7 @@ def populate(browser, root):
 
 def observe(browser, ids):
     paths = {
+        "me": "/me",
         "people": "/directory/people",
         "person": f"/identities/{ids['person']}",
         "agent": f"/agents/{ids['agent']}",
@@ -118,3 +122,14 @@ def same_records(before, after):
             raise RuntimeError(f"upgrade changed the {name} readback")
     if not before["sessions"]["sessions"]:
         raise RuntimeError("the old install had no session to preserve")
+
+
+def admitted_after_upgrade(browser):
+    """The original Registered administrator's session can still make a real change."""
+    person = browser.ask("POST", "/people", {
+        "operation": operation(), "display_name": "Created After Upgrade",
+    })["person"]
+    kept = browser.ask("GET", f"/identities/{person}")
+    if kept["id"] != person or kept["display_name"] != "Created After Upgrade":
+        raise RuntimeError("old Registered administrator cannot write and read after upgrade")
+    return person

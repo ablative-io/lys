@@ -12,7 +12,7 @@ import socket
 import subprocess
 import sys
 
-from upgrade_fixture import Browser, observe, populate, same_records
+from upgrade_fixture import Browser, admitted_after_upgrade, observe, populate, same_records
 
 OLD_COMMIT = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
@@ -195,7 +195,8 @@ def exercise(args):
                 raise RuntimeError(f"upgrade changed or removed configuration member {key}")
         if "cambium_messages" in new_config:
             raise RuntimeError("upgrade retained the legacy message key")
-        receipt = {"old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
+        admitted_person = admitted_after_upgrade(browser)
+        receipt = {"registered_admin_wrote": admitted_person, "old": OLD_COMMIT, "candidate": args.candidate_commit, "versions": versions,
                    "surfaces": surfaces, "domains": list(before), "old_app_leaves": len(leaves),
                    "config_keys_preserved": list(expected), "passed": True}
     except BaseException as error:
