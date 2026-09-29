@@ -319,9 +319,8 @@ async fn authorize(
         Err(error) => return Err(error),
     };
     let person = with_directory(&state, |directory| {
-        Ok(directory.projection()?.person_for(session.actor.binding()))
-    })?
-    .ok_or(ServerError::NoPerson)?;
+        crate::read_api::own_person(directory.projection()?, &session.actor)
+    })?;
     let code = random::<32>()?;
     let at = now();
     {

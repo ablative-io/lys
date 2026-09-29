@@ -301,7 +301,7 @@ async fn finish(
         .sign_in
         .finish_provider(&state.oidc, &code, &upstream, address)
         .await?;
-    state.sessions.begin(actor)
+    crate::session_admission::begin(state, actor)
 }
 
 async fn callback(

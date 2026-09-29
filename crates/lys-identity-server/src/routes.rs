@@ -235,12 +235,17 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let starts = start::routes(start_service(config, &state)?);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
-    let api = router(state).merge(configured).merge(starts);
+    let api = router(Arc::clone(&state)).merge(configured).merge(starts);
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
     };
-    Ok(served.merge(provider_callback))
+    Ok(served
+        .merge(provider_callback)
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            crate::session_admission::guard,
+        )))
 }
 
 /// The start route's service over the directory `state` holds. The route
@@ -389,7 +394,7 @@ async fn callback(
 ) -> Result<Response, ServerError> {
     let actor = state.oidc.finish(answer.code, &answer.state).await?;
     if wants_page(&headers) {
-        let cookie = state.sessions.begin(actor)?;
+        let cookie = crate::session_admission::begin(&state, actor)?;
         return Ok((
             StatusCode::SEE_OTHER,
             [
@@ -558,6 +563,17 @@ async fn transition(
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
     with_directory(&state, |directory| {
         let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
+        if matches!(moved, Transition::Suspend | Transition::Retire) {
+            let projection = directory.projection()?;
+            state.sessions.end_matching(|actor| {
+                projection
+                    .person_for(actor.binding())
+                    .map(IdentityId::Person)
+                    == Some(id)
+                    || projection.agent_for(actor.binding()).map(IdentityId::Agent) == Some(id)
+                    || actor.provenance().agent().map(IdentityId::Agent) == Some(id)
+            })?;
+        }
         Ok(Json(ReceiptAnswer {
             receipt: receipt_view(&receipt),
         }))

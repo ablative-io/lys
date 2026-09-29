@@ -43,7 +43,8 @@ pub(crate) fn route(
             named.push(name);
         }
     }
-    if auth.contains(&Auth::AgentSignature) && !named.contains(&"inactive") {
+    // The common ingress check can refuse any inactive authenticated caller.
+    if !named.contains(&"inactive") {
         named.push("inactive");
     }
     Route {

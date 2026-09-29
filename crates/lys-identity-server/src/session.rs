@@ -189,6 +189,20 @@ impl Sessions {
             .collect()
     }
 
+    /// End every matching session in one durable write. A failed write leaves
+    /// the previous in-memory set intact; lifecycle admission still refuses it.
+    pub fn end_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
+        let mut live = self.pruned();
+        let mut remaining = live.clone();
+        remaining.retain(|_, entry| !belongs(&entry.actor));
+        let ended = live.len() - remaining.len();
+        if ended > 0 {
+            self.keep(&remaining)?;
+            *live = remaining;
+        }
+        Ok(ended)
+    }
+
     /// End the live session with public id `id`, if `belongs` admits its
     /// actor, answering the ended session. A session that is not live, or
     /// whose actor `belongs` does not admit, is refused `SessionUnknown`

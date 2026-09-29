@@ -452,7 +452,7 @@ pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response,
         },
         authority: AUTHORITY.to_owned(),
     };
-    let cookie = state.sessions.begin(actor.clone())?;
+    let cookie = crate::session_admission::begin(state, actor.clone())?;
     Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
 }
 
