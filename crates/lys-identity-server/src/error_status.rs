@@ -95,7 +95,8 @@ impl ServerError {
             | Self::DialRefused { .. }
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
-            Self::NotAdmitted { .. }
+            Self::Inactive { .. }
+            | Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
             | Self::Withheld { .. }

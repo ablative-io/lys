@@ -27,6 +27,7 @@ pub mod budgets_api;
 pub mod budgets_crossing;
 pub mod budgets_state;
 pub mod budgets_store;
+pub mod caller_admission;
 pub mod certificates_api;
 mod certificates_issue;
 pub mod certificates_store;
