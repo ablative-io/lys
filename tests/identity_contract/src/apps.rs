@@ -65,7 +65,7 @@ pub async fn seeded() -> Result<(Service, Seeded), Box<dyn Error>> {
                 broker,
                 service: "identity".to_owned(),
                 service_key_file: config.event_key_file.clone(),
-            })
+            });
         },
         |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )

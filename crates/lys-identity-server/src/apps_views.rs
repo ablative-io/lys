@@ -128,8 +128,8 @@ pub struct ClientIssued {
 pub struct Approval {
     /// The app as it now stands.
     pub app: AppView,
-    /// The client created, the one time it is answered; absent when the
-    /// same approval is sent again, since the secret is shown only once.
+    /// Retained wire field; approval now keeps credentials in the broker
+    /// and returns no plaintext client secret.
     pub client: Option<ClientIssued>,
     /// Durable broker references, when approval saved the credentials.
     pub credentials: Option<crate::apps_credentials::Saved>,

@@ -89,7 +89,10 @@ pub enum SecretsError {
     },
     /// The persisted index has not yet been reconciled and durably synced.
     #[error("IndexUnresolved: {reason} (act: reconcile the index before confirming custody)")]
-    IndexUnresolved { reason: String },
+    IndexUnresolved {
+        /// Why persisted custody could not be confirmed.
+        reason: String,
+    },
     /// The store's index could not be read.
     #[error("StoreCorrupt: {reason} (act: restore the store from its current copy)")]
     StoreCorrupt {

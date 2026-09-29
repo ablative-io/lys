@@ -280,6 +280,9 @@ pub(crate) async fn register(
             }
         };
         let id = app_id(&body.id).map_err(AppError::from)?.to_owned();
+        if judged.apps.app(&id).is_some() && judged.apps.held().operation(&operation).is_none() {
+            return Err(AppError::AppExists { app: id }.into());
+        }
         let name = words("name", &body.name)?;
         if name.is_empty() {
             return Err(malformed("an app has a name"));

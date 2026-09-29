@@ -283,7 +283,7 @@ async fn the_bench_asks_a_scratch_scope_of_the_engine_and_leaves_none_behind() -
                 broker,
                 service: "identity".to_owned(),
                 service_key_file: config.event_key_file.clone(),
-            })
+            });
         },
         |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
