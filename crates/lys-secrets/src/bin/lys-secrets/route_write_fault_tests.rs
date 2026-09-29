@@ -50,7 +50,7 @@ fn partial_routes_write_preserves_existing_routes_after_reopen()
     let layout = Layout::new(&root, &keys);
     layout.prepare()?;
     layout.add_route("existing-api", route("http://127.0.0.1:6010/api"))?;
-    let before = serde_json::to_value(layout.routes()?.as_ref())?;
+    let before = std::fs::read(root.join("routes.json"))?;
     // Match only this test's path; parallel tests cannot consume the fault.
     FAIL_PATH.with(|held| *held.borrow_mut() = Some(root.join("routes.json")));
     let answer = layout.add_route("new-api", route("http://127.0.0.1:8490/api"));
@@ -67,6 +67,7 @@ fn partial_routes_write_preserves_existing_routes_after_reopen()
         after.is_ok(),
         "refused new route corrupted existing routes on reopen: {after:?}"
     );
-    assert_eq!(serde_json::to_value(after?.as_ref())?, before);
+    assert_eq!(after?.len(), 1);
+    assert_eq!(std::fs::read(root.join("routes.json"))?, before);
     Ok(())
 }
