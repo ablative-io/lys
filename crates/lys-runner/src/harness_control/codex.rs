@@ -83,6 +83,11 @@ impl Request {
         &self.frame
     }
 
+    /// Whether this request requires actual compaction evidence before release.
+    pub fn is_compaction(&self) -> bool {
+        self.compact
+    }
+
     /// Correlate the native response to this request. Empty compact success is
     /// admission alone; it never manufactures a turn or compaction evidence.
     pub fn admission(&self, source: &Source, response: &Value) -> Result<Event, RunnerError> {

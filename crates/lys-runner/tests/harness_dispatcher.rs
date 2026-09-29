@@ -241,3 +241,55 @@ fn another_operations_compaction_is_never_recorded_as_this_flight() -> TestResul
     assert_eq!(dispatcher.boundary(), &Boundary::Active("turn-one".into()));
     Ok(())
 }
+
+#[test]
+fn compact_flight_waits_for_actual_compaction_after_terminal_notification() -> TestResult {
+    let (_child, source, mut dispatcher) = setup()?;
+    dispatcher.observe(&event(&source, Kind::IdleReconciled), &mut |_| Ok(()))?;
+    let mut journal = Journal::default();
+    let compact = Prepared::Codex(codex::Request::compact(
+        "compact-1",
+        "thread",
+        &Boundary::Idle,
+    )?);
+    dispatcher.dispatch("compact-1", &compact, &mut journal, &mut |_| Ok(()))?;
+    for kind in [
+        Kind::Admitted {
+            operation: "compact-1".into(),
+            turn: None,
+        },
+        Kind::TurnStarted {
+            turn: "compact-turn".into(),
+        },
+        Kind::TurnCompleted {
+            turn: "compact-turn".into(),
+        },
+    ] {
+        dispatcher.observe(&event(&source, kind), &mut |_| Ok(()))?;
+    }
+    assert_eq!(dispatcher.boundary(), &Boundary::Idle);
+    assert!(
+        dispatcher.flight().is_some(),
+        "terminal alone must not discard the compaction correlation"
+    );
+    assert!(
+        dispatcher
+            .dispatch("next", &request("next")?, &mut journal, &mut |_| Ok(()))
+            .is_err()
+    );
+    dispatcher.observe(
+        &event(
+            &source,
+            Kind::Compacted {
+                operation: "compact-1".into(),
+                turn: "compact-turn".into(),
+                item: "native-item".into(),
+            },
+        ),
+        &mut |_| Ok(()),
+    )?;
+    assert!(dispatcher.flight().is_none());
+    dispatcher.dispatch("next", &request("next")?, &mut journal, &mut |_| Ok(()))?;
+    assert_eq!(journal.0, ["compact-1", "next"]);
+    Ok(())
+}

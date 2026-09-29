@@ -305,3 +305,34 @@ fn unretained_foreign_or_conflicting_evidence_cannot_change_the_receipt() -> Out
     assert_eq!(operations.get("reminder-1"), before.as_ref());
     Ok(())
 }
+
+#[test]
+fn legacy_hook_cannot_confirm_a_managed_compaction() -> Outcome {
+    let dir = tempfile::tempdir()?;
+    let mut operations = accepted(dir.path())?;
+    operations.held[0].request = "compact".into();
+    (&mut operations, &source("session")).before_write("reminder-1", b"compact request")?;
+    let mut feed = Feed::open(dir.path())?;
+    let before = operations.keep_control(&mut feed, "reminder-1", &admission())?;
+    drop(feed);
+    drop(operations);
+    let sessions = crate::session::Sessions::open(dir.path(), 1024)?;
+    super::super::compacting(&mut sessions.lock(), "session");
+    assert_eq!(sessions.outcome("reminder-1")?, before);
+    assert_eq!(
+        sessions
+            .reconcile_control("reminder-1", "not-retained")
+            .expect_err("gap")
+            .name(),
+        "control_event_gap"
+    );
+    assert_eq!(
+        sessions.reconcile_control("reminder-1", &admission().source_id)?,
+        before
+    );
+    assert_eq!(
+        sessions.outcome("reminder-1")?.state,
+        OperationState::Delivered
+    );
+    Ok(())
+}

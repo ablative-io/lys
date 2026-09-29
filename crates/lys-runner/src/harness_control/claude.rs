@@ -145,6 +145,11 @@ impl Request {
         &self.frame
     }
 
+    /// Whether this envelope asks for native compaction rather than saved words.
+    pub fn is_compaction(&self) -> bool {
+        self.compact
+    }
+
     /// Observe only the bound session. The dispatcher must serialize all input
     /// and route approval requests to the existing policy owner separately.
     pub fn observe(&mut self, frame: &Value) -> Result<Option<Observation>, RunnerError> {

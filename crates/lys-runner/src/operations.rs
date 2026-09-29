@@ -438,6 +438,7 @@ pub(crate) fn compacting(table: &mut Table, id: &str) {
             held.session == id
                 && held.request == "compact"
                 && held.state == OperationState::Delivered
+                && held.control.is_none()
         })
         .map(|held| held.operation.clone())
         .collect();

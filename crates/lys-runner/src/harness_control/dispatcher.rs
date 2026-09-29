@@ -20,6 +20,13 @@ pub enum Prepared {
 }
 
 impl Prepared {
+    fn is_compaction(&self) -> bool {
+        match self {
+            Self::Codex(request) => request.is_compaction(),
+            Self::Claude(request) => request.is_compaction(),
+        }
+    }
+
     fn frame(&self) -> &Value {
         match self {
             Self::Codex(request) => request.frame(),
@@ -53,6 +60,10 @@ pub struct Flight {
     pub admitted: bool,
     /// Matching native terminal observed and durably kept.
     pub terminal: bool,
+    /// This flight requires actual compaction evidence, not merely a result.
+    pub compact: bool,
+    /// Matching compaction evidence was durably retained.
+    pub compacted: bool,
 }
 
 /// Per-session writer authority. It borrows no PTY or other session's input.
@@ -137,6 +148,8 @@ impl Dispatcher {
             turn: None,
             admitted: false,
             terminal: false,
+            compact: request.is_compaction(),
+            compacted: false,
         });
         // Even a journal failure leaves the flight reserved. The existing
         // receipt owner distinguishes safely unsent from possibly sent; this
@@ -168,13 +181,14 @@ impl Dispatcher {
                     }
                 }
                 Kind::TurnCompleted { .. } => flight.terminal = true,
+                Kind::Compacted { .. } => flight.compacted = true,
                 Kind::Exited => {
                     self.flight = None;
                     return Ok(());
                 }
                 _ => {}
             }
-            if flight.admitted && flight.terminal {
+            if flight.admitted && flight.terminal && (!flight.compact || flight.compacted) {
                 self.flight = None;
             }
         }
@@ -208,7 +222,10 @@ impl Dispatcher {
             Kind::Compacted {
                 operation, turn, ..
             } => {
-                if operation != &flight.operation || flight.turn.as_ref() != Some(turn) {
+                if !flight.compact
+                    || operation != &flight.operation
+                    || flight.turn.as_ref() != Some(turn)
+                {
                     return Err(refuse(
                         "control_operation_mismatch",
                         "compaction evidence does not name the reserved operation and turn",
