@@ -1578,6 +1578,7 @@ dependencies = [
  "chrono",
  "clap",
  "lys-core",
+ "lys-identity",
  "lys-log-store",
  "lys-runner",
  "mio",
@@ -1683,11 +1684,13 @@ dependencies = [
  "lys-identity",
  "lys-log-store",
  "rand 0.9.5",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.19",
  "tracing",
+ "url",
  "x509-parser",
 ]
 

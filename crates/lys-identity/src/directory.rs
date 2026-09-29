@@ -193,7 +193,11 @@ impl<S: LeafStore> Directory<S> {
             return Ok(None);
         };
         let same_identity = identity.is_none_or(|identity| identity == event.identity());
-        if event.actor() == actor && event.change() == change && same_identity {
+        let same_actor = event.actor() == actor
+            || (actor.provenance().service_account().is_some()
+                && event.actor().binding() == actor.binding()
+                && event.actor().provenance().method() == actor.provenance().method());
+        if same_actor && event.change() == change && same_identity {
             Ok(Some((event.identity(), receipt)))
         } else {
             Err(IdentityError::OperationReused {

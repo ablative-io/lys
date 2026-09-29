@@ -74,6 +74,25 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
                 .collect(),
             body: body.to_vec(),
         });
+    if path == "/_lys/apps/save" || path == "/_lys/apps/prepare" {
+        let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        let owner = parts
+            .headers
+            .get("lys-on-behalf-of")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("missing");
+        let app = asked["app"].as_str().unwrap_or("missing");
+        let prefix = format!("lys-app-{owner}-{app}");
+        let mut answer = json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")});
+        if path == "/_lys/apps/prepare" {
+            answer["client_secret_sha256"] =
+                json!(format!("{:x}", Sha256::digest("ab".repeat(32).as_bytes())));
+        }
+        if app == "fixture_bad_custody" {
+            answer["client_secret_ref"] = json!("another-app");
+        }
+        return axum::Json(answer).into_response();
+    }
     answer(&path, &body)
 }
 
@@ -105,11 +124,24 @@ struct Setup {
 }
 
 async fn setup() -> Result<Setup, Box<dyn Error>> {
+    setup_with_person(ADA).await
+}
+
+async fn setup_with_person(subject: &str) -> Result<Setup, Box<dyn Error>> {
+    setup_with_broker(subject, true).await
+}
+
+async fn setup_with_broker(subject: &str, running: bool) -> Result<Setup, Box<dyn Error>> {
     let log: Log = Arc::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let app = Router::new().fallback(broker).with_state(Arc::clone(&log));
-    tokio::spawn(async move { axum::serve(listener, app).await });
+    let serving = tokio::spawn(async move { axum::serve(listener, app).await });
+    if !running {
+        serving.abort();
+        let stopped = serving.await;
+        assert!(stopped.is_err_and(|error| error.is_cancelled()));
+    }
     let keys = tempfile::TempDir::new()?;
     let key_file = keys.path().join("secrets-service.key");
     let key = Ed25519Identity::load_or_generate(&key_file)?.public_key_bytes();
@@ -120,7 +152,7 @@ async fn setup() -> Result<Setup, Box<dyn Error>> {
     };
     // The service reads its key once, at start, so the key file may go after.
     let (service, seeded) = Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-        Ok(seed_configured(config, [ADA, BEA])?)
+        Ok(seed_configured(config, [subject, BEA])?)
     })
     .await?;
     drop(keys);
@@ -388,5 +420,213 @@ async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
     let (status, body) = service.get("/secrets", Some(&cookie)).await?;
     assert_eq!(status, 502, "{body}");
     assert_eq!(body["refusal"], "SecretsUnavailable");
+    Ok(())
+}
+
+#[tokio::test]
+async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_signed_body()
+-> TestResult {
+    use identity_contract::apps::{Auth, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_person(ADMINISTRATOR).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = setup.service.sign_in(login(BEA)).await?;
+    let app = "fixture_save";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let approval_operation = op()?;
+    let approved = ok(post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":approval_operation}),
+    )
+    .await?)?;
+    assert!(approved["client"].is_null());
+    assert_eq!(approved["credentials"]["app"], app);
+    // The stand-in has custody of this fixed fixture value; it was not returned
+    // by approval. Manual save remains available for already-issued credentials.
+    let fixture = "ab".repeat(32);
+    let secret = fixture.as_str();
+    let prepared = received(&setup.log);
+    assert_eq!(prepared.len(), 1);
+    assert_eq!(prepared[0].path, "/_lys/apps/prepare");
+    signed_as_received(&prepared[0], &setup.key)?;
+    assert!(!String::from_utf8_lossy(&prepared[0].body).contains(secret));
+    setup
+        .log
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clear();
+    let replay = ok(post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":approval_operation}),
+    )
+    .await?)?;
+    assert!(replay["client"].is_null());
+    assert!(!replay.to_string().contains(secret));
+    assert!(
+        received(&setup.log).is_empty(),
+        "replay must not prepare again"
+    );
+    let path = format!("/apps/{app}/credentials/save");
+    let body = json!({"client_secret":secret});
+    assert_eq!(
+        post(&setup.service, &path, Auth::Cookie(&bea), &body)
+            .await?
+            .0,
+        403
+    );
+    assert_ne!(
+        post(
+            &setup.service,
+            &path,
+            Auth::Cookie(&admin),
+            &json!({"client_secret":"wrong"})
+        )
+        .await?
+        .0,
+        200
+    );
+    let malformed = post(
+        &setup.service,
+        &path,
+        Auth::Cookie(&admin),
+        &json!({"client_secret": secret, "owner":"person-other"}),
+    )
+    .await?;
+    assert_eq!(malformed.0, 400);
+    assert_eq!(malformed.1["refusal"], "RequestMalformed");
+    assert!(!malformed.1.to_string().contains(secret));
+    assert!(
+        received(&setup.log).is_empty(),
+        "refusals never reached the broker"
+    );
+    let answer = ok(post(&setup.service, &path, Auth::Cookie(&admin), &body).await?)?;
+    assert!(!answer.to_string().contains(secret));
+    let calls = received(&setup.log);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].path, "/_lys/apps/save");
+    signed_as_received(&calls[0], &setup.key)?;
+    let saved: Value = serde_json::from_slice(&calls[0].body)?;
+    assert_eq!(saved["app"], app);
+    assert_eq!(saved["client_secret"], secret);
+    assert!(
+        saved.get("owner").is_none(),
+        "browser cannot supply an owner"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_broker(ADMINISTRATOR, false).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_save_unavailable";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    let held = ok(get(
+        &setup.service,
+        &format!("/apps/{app}"),
+        Auth::Cookie(&admin),
+    )
+    .await?)?;
+    // Inspect the retained state even when the response incorrectly claims success.
+    assert_eq!(
+        held["state"], "pending",
+        "broker-down approval activated the app without credential custody"
+    );
+    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    assert!(answer.1.get("client").is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn wrong_broker_custody_receipt_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_person(ADMINISTRATOR).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_bad_custody";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    let held = ok(get(
+        &setup.service,
+        &format!("/apps/{app}"),
+        Auth::Cookie(&admin),
+    )
+    .await?)?;
+    assert_eq!(held["state"], "pending");
+    assert!(held["client_id"].is_null());
+    Ok(())
+}
+
+#[tokio::test]
+async fn approval_without_configured_broker_keeps_app_pending() -> TestResult {
+    use identity_contract::apps::{Auth, get, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let (service, _seeded) =
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let app = "fixture_save_unavailable";
+    ok(post(
+        &service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let answer = post(
+        &service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?;
+    let held = ok(get(&service, &format!("/apps/{app}"), Auth::Cookie(&admin)).await?)?;
+    // Inspect the retained state even when the response incorrectly claims success.
+    assert_eq!(
+        held["state"], "pending",
+        "missing-broker approval activated the app without credential custody"
+    );
+    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.1["refusal"], "SecretsUnavailable");
+    assert!(answer.1.get("client").is_none());
     Ok(())
 }

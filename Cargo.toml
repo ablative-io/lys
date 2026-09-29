@@ -79,6 +79,8 @@ openidconnect = { version = "=4.0.1", default-features = false, features = ["req
 tokio = { version = "=1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
 # The contract tests' HTTP client, the version openidconnect already carries, with no TLS.
 reqwest = { version = "=0.12.28", default-features = false }
+# The Cambium message connection's base URL, the version reqwest already carries.
+url = "=2.5.8"
 
 # The service's OpenAPI document: schemas derived from the route types,
 # pinned, with the derive macros and nothing else.

@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "display_name": "Gypsy"
+    },
+    {
+      "display_name": "Apollo Biscuit"
+    },
+    {
+      "display_name": "Waffles the Terrible"
+    },
+    {
+      "display_name": "Archie"
+    },
+    {
+      "display_name": "Vesper Lynd"
+    },
+    {
+      "display_name": "Chippy"
+    }
+  ],
+  "resources": [
+    {
+      "kind": "cambium.channel",
+      "id": "general",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: ZsyINpqyCXB6owuUllyqPVbjZOwd32JcrQf81osTqjU; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.channel",
+      "id": "ablative-stack",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: mHyUs0FppSFqSzfT5kjBzZk23asX6tgScUEKNwJawq0; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.channel",
+      "id": "pipeline",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: m1pva6_HI_YlXYZBLuVINw8pkFALc1n8JoKChWUA4Jo; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.channel",
+      "id": "lys",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: GEdX81orTWCaSCwn2Zvk1eRAu-qwk9GKH-AvDzM78-Q; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.channel",
+      "id": "tutorials",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: CpY1TJzrlgqwLSptodP9ipKQbRpnJKlKUystZuYJ388; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.topic",
+      "id": "cambium",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: igHmE8IUowC6yNLsz1PHwOuI05pnOpTGoaeTsFBnj3Y; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.topic",
+      "id": "aion",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: to4w4m5Lp4pcyOAF6g__X7v2WLLpZWdUsnLMgnTDpd0; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.topic",
+      "id": "haematite-studio",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: YM3C_WOIEuJesvZkizFPC4IxeYD8u6aamjG-6-amJoA; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "cambium.topic",
+      "id": "design-system",
+      "relation": "participant",
+      "actions": [
+        "read",
+        "send"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Cambium /conversation/places 2026-09-29 10:36 Melbourne: 84oCn9dKBiqOGXrlflhM7J2_ha6uxfJ8e7h6BQ7ZcNw; workspace ablative. WorkspaceOpen admits enrolled non-retired participants to shared streams; DMs excluded."
+    },
+    {
+      "kind": "aion.namespace",
+      "id": "default",
+      "relation": "reader",
+      "actions": [
+        "read"
+      ],
+      "seats": [
+        "Gypsy",
+        "Apollo Biscuit",
+        "Waffles the Terrible",
+        "Archie",
+        "Vesper Lynd",
+        "Chippy"
+      ],
+      "evidence": "Live GET /namespaces lists default; GET /whoami at 10:35 answers auth_enabled=false, all_namespaces=true. Read only here; shared operator capability is not a separate per-seat credential."
+    },
+    {
+      "kind": "aion.workflow",
+      "id": "default.src_land",
+      "relation": "operator",
+      "actions": [
+        "read",
+        "run"
+      ],
+      "seats": [
+        "Gypsy",
+        "Waffles the Terrible",
+        "Vesper Lynd"
+      ],
+      "evidence": "Gypsy PR21 approved run f195a086; live Waffles PR102 de176573; Vesper live aion265 0123e67e. Non-model source workflow only; no paid developer/reviewer runs authorised."
+    },
+    {
+      "kind": "aion.workflow",
+      "id": "default.src_update",
+      "relation": "operator",
+      "actions": [
+        "read",
+        "run"
+      ],
+      "seats": [
+        "Archie",
+        "Vesper Lynd"
+      ],
+      "evidence": "Archie Cambium post bf285ed0 names 55e83b8f, confirmed Completed by live list; Vesper aion265 fcc929a8. Non-model source workflow only; no paid developer/reviewer runs authorised."
+    },
+    {
+      "kind": "aion.workflow",
+      "id": "default.src_pr",
+      "relation": "operator",
+      "actions": [
+        "read",
+        "run"
+      ],
+      "seats": [
+        "Gypsy"
+      ],
+      "evidence": "Waffles importer assignment explicitly says Jev then src_pr/src_land. Live list confirms deployed src_pr run 8da5a7c6. Non-model source workflow only; no paid developer/reviewer runs authorised."
+    },
+    {
+      "kind": "aion.repository",
+      "id": "github.com.ablative-io.lys",
+      "relation": "contributor",
+      "actions": [
+        "read",
+        "commit",
+        "open_pr"
+      ],
+      "seats": [
+        "Gypsy",
+        "Archie",
+        "Chippy"
+      ],
+      "evidence": "Current direct importer branch Gypsy 210d2a35; Archie direct/051 30da565c; Chippy canvas source 4dd6eb42. Tom authorised direct development."
+    },
+    {
+      "kind": "aion.repository",
+      "id": "github.com.ablative-io.lys",
+      "relation": "integrator",
+      "actions": [
+        "read",
+        "commit",
+        "open_pr",
+        "land"
+      ],
+      "seats": [
+        "Waffles the Terrible"
+      ],
+      "evidence": "Waffles explicitly owns integration/installation; live src_land PR102 de176573 and PR101 56901d3b. No landing right inferred for the other seats."
+    }
+  ]
+}

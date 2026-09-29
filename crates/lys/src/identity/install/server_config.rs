@@ -7,6 +7,8 @@
 //! already written, so an upgrade renders the new build's configuration
 //! without asking Rauthy.
 
+use std::path::Path;
+
 use serde_json::{Value, json};
 
 use super::super::config::DeploymentConfig;
@@ -89,6 +91,7 @@ pub fn render(
         "event_key_file": layout.service_key().display().to_string(),
         "operator_token_file": state.join(OPERATOR_TOKEN_FILE).display().to_string(),
         "operator_upgrade_file": layout.upgrade_intent().display().to_string(),
+        "import_credential_file": super::super::import::credential_path(layout).display().to_string(),
         "issuer": issuer,
         "client_id": config.clients.platform.id,
         "client_secret_file": state
@@ -225,4 +228,22 @@ fn message_service(earlier: &Value, path: &std::path::Path) -> IdentityResult<Op
         Value::String(format!("{service}_session")),
     );
     Ok(Some(Value::Object(carried)))
+}
+
+/// The message service connection in the JSON file at `path`, checked as
+/// the service checks it when it starts, so a wrong one is refused before
+/// anything is stopped.
+pub fn messages_from(path: &Path) -> IdentityResult<Value> {
+    let refused = |reason: String| {
+        IdentityError::new(ErrorKind::ConfigInvalid, "read", "message_service", reason).at(path)
+    };
+    let bytes = std::fs::read(path).map_err(|error| refused(error.to_string()))?;
+    let value: Value =
+        serde_json::from_slice(&bytes).map_err(|error| refused(error.to_string()))?;
+    lys_identity::message_service::Settings::from_value(value.clone()).map_err(|reason| {
+        refused(format!(
+            "must be the connection itself, an object of url, cookie and bindings: {reason}"
+        ))
+    })?;
+    Ok(value)
 }

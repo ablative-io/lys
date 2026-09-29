@@ -124,11 +124,18 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
     let state = layout.root.join("state");
     let prepared = std::fs::read(state.join(COMPOSE_ENV))?;
     let recorded = std::fs::read(layout.service_config())?;
-    let files = Templates.render(&layout, &own_build(), true)?;
+    let files = Templates::default().render(&layout, &own_build(), true)?;
     let by_name: BTreeMap<&str, &RenderedFile> =
         files.iter().map(|file| (file.name, file)).collect();
-    assert_eq!(by_name.len(), 4);
+    assert_eq!(by_name.len(), 5);
     let file = |name: &str| by_name.get(name).copied().ok_or(format!("no {name}"));
+    let estate = file("estate-approval.json")?;
+    assert_eq!(estate.bytes.as_slice(), layout::ESTATE_PLAN.as_bytes());
+    assert_eq!(
+        estate.target,
+        layout.data_dir().join("estate-approval.json")
+    );
+    assert!(estate.private && !estate.compose);
     let compose = file("compose.yaml")?;
     assert_eq!(compose.bytes.as_slice(), layout::COMPOSE_YAML.as_bytes());
     assert_eq!(compose.target, layout.deploy_dir().join("compose.yaml"));
@@ -175,7 +182,7 @@ fn the_templates_refuse_to_render_for_another_build() -> TestResult {
     let layout = installed_root(dir.path())?;
     let mut other = own_build();
     other.insert(BINARIES[1].to_string(), "0".repeat(40));
-    let refused = Templates
+    let refused = Templates::default()
         .render(&layout, &other, false)
         .err()
         .ok_or("rendered for a build other than this lys")?;
@@ -190,7 +197,7 @@ fn a_missing_credential_is_refused_and_never_generated() -> TestResult {
     let layout = installed_root(dir.path())?;
     let missing = layout.root.join("state").join(SECRETS[0].file);
     std::fs::remove_file(&missing)?;
-    let refused = Templates
+    let refused = Templates::default()
         .render(&layout, &own_build(), false)
         .err()
         .ok_or("rendered without a credential")?;
@@ -203,7 +210,7 @@ fn a_missing_credential_is_refused_and_never_generated() -> TestResult {
 fn a_rendered_file_names_its_length_never_its_bytes() -> TestResult {
     let dir = tempfile::tempdir()?;
     let layout = installed_root(dir.path())?;
-    let files = Templates.render(&layout, &own_build(), false)?;
+    let files = Templates::default().render(&layout, &own_build(), false)?;
     let shown = format!("{files:?}");
     let credential = std::fs::read_to_string(layout.root.join("state").join(SECRETS[3].file))?;
     assert!(!credential.is_empty());
@@ -230,7 +237,7 @@ fn an_install_whose_bridge_has_its_earlier_name_upgrades_to_the_named_bridge() -
         layout.service_config(),
         serde_json::to_vec_pretty(&earlier)?,
     )?;
-    let files = Templates.render(&layout, &own_build(), true)?;
+    let files = Templates::default().render(&layout, &own_build(), true)?;
     let service = files
         .iter()
         .find(|file| file.name == "identity.json")
@@ -244,7 +251,7 @@ fn an_install_whose_bridge_has_its_earlier_name_upgrades_to_the_named_bridge() -
         "the earlier name is not written again"
     );
     std::fs::write(layout.service_config(), &*service.bytes)?;
-    let again = Templates.render(&layout, &own_build(), true)?;
+    let again = Templates::default().render(&layout, &own_build(), true)?;
     let second = again
         .iter()
         .find(|file| file.name == "identity.json")
@@ -264,7 +271,7 @@ fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_ca
     let config = DeploymentConfig::load(&layout.deployment_config())?;
     let fresh = server_config::render(&layout, &config, &server_config::Carried::default(), false);
     assert!(fresh.get("trusted_proxies").is_none());
-    for file in Templates.render(&layout, &own_build(), false)? {
+    for file in Templates::default().render(&layout, &own_build(), false)? {
         if file.name == "identity.json" {
             let value: serde_json::Value = serde_json::from_slice(&file.bytes)?;
             assert!(value.get("trusted_proxies").is_none());
@@ -279,7 +286,7 @@ fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_ca
     )?;
     let before = std::fs::read(layout.service_config())?;
     let mut checked = 0;
-    for file in Templates.render(&layout, &own_build(), false)? {
+    for file in Templates::default().render(&layout, &own_build(), false)? {
         if file.name == "identity.json" {
             let value: serde_json::Value = serde_json::from_slice(&file.bytes)?;
             assert_eq!(value["trusted_proxies"], explicitly_set["trusted_proxies"]);
@@ -291,6 +298,45 @@ fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_ca
         std::fs::read(layout.service_config())?,
         before,
         "render never edits the old configuration"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_given_cambium_message_connection_is_written_with_the_recorded_choices_and_only_read()
+-> TestResult {
+    let dir = tempfile::tempdir()?;
+    let layout = installed_root(dir.path())?;
+    let credentials_before = credentials(&layout)?;
+    let recorded = std::fs::read(layout.service_config())?;
+    let messages = serde_json::json!({"url": "http://127.0.0.1:4000", "cookie": "cambium_session", "bindings": []});
+    let templates = Templates {
+        messages: Some(messages.clone()),
+    };
+    let files = templates.render(&layout, &own_build(), true)?;
+    let service = files
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    let written: serde_json::Value = serde_json::from_slice(&service.bytes)?;
+    assert_eq!(written["message_service"], messages);
+    assert_eq!(written["administrator"]["subject"], "recorded-subject");
+    assert!(written["sessions_file"].is_string(), "{written}");
+    assert_eq!(
+        credentials(&layout)?,
+        credentials_before,
+        "no credential written"
+    );
+    assert_eq!(std::fs::read(layout.service_config())?, recorded);
+    let carried = Templates::default().render(&layout, &own_build(), true)?;
+    let carried = carried
+        .iter()
+        .find(|file| file.name == "identity.json")
+        .ok_or("no identity.json")?;
+    let carried: serde_json::Value = serde_json::from_slice(&carried.bytes)?;
+    assert!(
+        carried.get("cambium_messages").is_none(),
+        "none given, none recorded"
     );
     Ok(())
 }

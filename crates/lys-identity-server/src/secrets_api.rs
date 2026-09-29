@@ -87,7 +87,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// The person the session speaks for, as the broker names people.
-fn person(state: &AppState, headers: &HeaderMap) -> Result<String, ServerError> {
+pub(crate) fn person(state: &AppState, headers: &HeaderMap) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;

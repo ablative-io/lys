@@ -10,7 +10,7 @@
 use lys_core::merkle::{InclusionProof, RootHash, raw_leaf_hash, verify_inclusion_raw};
 
 use crate::error::IdentityError;
-use crate::event::{EVENT_VERSION, IdentityEvent, wire};
+use crate::event::{IdentityEvent, wire};
 use crate::id::IdentityId;
 use crate::log::Coordinate;
 use crate::operation::OperationId;
@@ -34,7 +34,7 @@ impl Receipt {
     pub fn of(signed: &SignedEvent, coordinate: Coordinate) -> Self {
         let event = signed.event();
         Self {
-            version: EVENT_VERSION,
+            version: event.version(),
             operation: event.operation(),
             actor: event.actor().clone(),
             identity: event.identity(),
@@ -98,7 +98,7 @@ pub fn verify_receipt(
     proof: &InclusionProof,
 ) -> Result<(), IdentityError> {
     let signed = verify_event(message, service_key)?;
-    if receipt.version != EVENT_VERSION {
+    if receipt.version != signed.event().version() {
         return Err(IdentityError::ReceiptInvalid {
             reason: "the receipt names another envelope version",
         });

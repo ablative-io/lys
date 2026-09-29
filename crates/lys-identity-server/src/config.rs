@@ -38,6 +38,10 @@ pub struct Config {
     pub log_origin: String,
     /// The file holding the service's event signing key seed.
     pub event_key_file: PathBuf,
+    /// An installation-owned loader credential to provision once as an
+    /// ordinary person-owned service account. No runtime bypass is granted.
+    #[serde(default)]
+    pub import_credential_file: Option<PathBuf>,
     /// The OIDC issuer URL.
     pub issuer: String,
     /// The service's OIDC client id.
@@ -221,7 +225,7 @@ impl Config {
     /// Refuse a configuration the service cannot run under.
     pub fn validate(&self) -> Result<(), ServerError> {
         if let Some(settings) = &self.message_service {
-            settings.validate()?;
+            crate::message_edges::validate(settings)?;
         }
         self.configured_administrator()?;
         if self.administrator.is_none() && self.setup.is_none() {

@@ -54,6 +54,12 @@ fn main() -> ExitCode {
             ),
         },
         Command::Identity(identity_command) => match identity_command {
+            identity::IdentityCommand::Import {
+                file,
+                root,
+                credential_file,
+                address,
+            } => identity::import::run(&file, root, credential_file, address.as_deref(), json),
             identity::IdentityCommand::Prepare { config } => identity::prepare::run(&config, json),
             identity::IdentityCommand::Configure { config } => {
                 identity::configure::run(&config, json)
@@ -66,11 +72,13 @@ fn main() -> ExitCode {
                 root,
                 admin_email,
                 surface,
+                message_service,
             } => identity::install::run(
                 &identity::install::Options {
                     root,
                     admin_email,
                     surface,
+                    message_service,
                 },
                 json,
             ),
@@ -78,11 +86,13 @@ fn main() -> ExitCode {
                 from,
                 surface,
                 root,
+                message_service,
             } => identity::upgrade::run(
                 &identity::upgrade::Options {
                     from,
                     surface,
                     root,
+                    message_service,
                 },
                 json,
             ),

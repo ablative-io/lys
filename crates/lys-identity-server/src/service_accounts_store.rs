@@ -28,7 +28,7 @@ use lys_log_store::{
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::routes::Say;
-use crate::service_accounts_state::{Account, Created, DOMAIN, Held, Line, Retired};
+use crate::service_accounts_state::{Account, Created, DOMAIN, Held, ImportRefused, Line, Retired};
 
 /// How the leaf store is opened again after an append whose outcome is not known.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
@@ -251,6 +251,27 @@ impl<S: LeafStore> ServiceAccountStore<S> {
                 self.standing(&id)
             }
         }
+    }
+
+    /// Record an import refusal once per account, operation and named outcome.
+    /// It never consumes the requested operation or prevents a later success.
+    pub fn record_import_refusal(
+        &mut self,
+        refused: ImportRefused,
+    ) -> Result<ImportRefused, ServerError> {
+        self.settle()?;
+        let account = self
+            .account(&refused.account)
+            .ok_or(ServerError::ServiceAccountUnknown)?;
+        if let Some(kept) = account
+            .import_refusals
+            .iter()
+            .find(|kept| kept.operation == refused.operation && kept.refusal == refused.refusal)
+        {
+            return Ok(kept.clone());
+        }
+        self.append(Line::ImportRefused(refused.clone()))?;
+        Ok(refused)
     }
 
     fn standing(&self, id: &str) -> Result<Account, ServerError> {

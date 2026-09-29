@@ -54,7 +54,7 @@ struct Estate {
 
 impl Drop for Estate {
     fn drop(&mut self) {
-        for pid in ["identity.pid", "secrets.pid"] {
+        for pid in ["runner.pid", "identity.pid", "secrets.pid"] {
             if let Ok(text) = std::fs::read_to_string(self.root.path().join("run").join(pid)) {
                 let stopped = Command::new("kill").arg(text.trim()).status();
                 if let Err(error) = stopped {

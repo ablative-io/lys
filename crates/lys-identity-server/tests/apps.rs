@@ -81,7 +81,7 @@ async fn a_pending_app_has_no_client_and_its_kinds_answer_app_not_approved() -> 
 }
 
 #[tokio::test]
-async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_check_pass()
+async fn approval_confirms_custody_without_returning_secrets_and_a_sign_in_and_check_pass()
 -> TestResult {
     let (service, seeded) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -93,21 +93,17 @@ async fn approval_creates_the_client_shows_its_secret_once_and_a_sign_in_and_che
     let approval = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(approval["app"]["state"], "approved", "{approval}");
     assert_eq!(approval["app"]["version"], 1);
-    let secret = approval["client"]["client_secret"]
-        .as_str()
-        .ok_or("no secret")?
-        .to_owned();
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?
-        .to_owned();
-    assert_eq!(secret.len(), 64);
+    assert!(approval["client"].is_null());
+    assert_eq!(approval["credentials"]["app"], NOTES);
+    let secret = identity_contract::app_custody::secret();
+    let credential = identity_contract::app_custody::credential(NOTES);
+    assert!(!approval.to_string().contains(&secret));
 
     let again = ok(post(&service, &path, Auth::Cookie(&admin), &body).await?)?;
     assert_eq!(
         again["client"],
         Value::Null,
-        "the secret is shown once: {again}"
+        "approval never returns the secret: {again}"
     );
     let other = json!({"operation": op()?});
     refused(
@@ -469,7 +465,17 @@ async fn a_schema_fault_is_refused_at_its_pointer_and_a_bad_redirect_by_name() -
 
 #[tokio::test]
 async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not() -> TestResult {
-    let (service, _) = seeded().await?;
+    let (service, seeded) = identity_contract::harness::Service::start_judging(
+        r#"{"version":1,"relations":{"editor":["view","edit"],"viewer":["view"]}}"#,
+        None,
+        |config| {
+            Ok(lys_identity_server::dev_seed::seed_configured(
+                config,
+                [ADMINISTRATOR, BEA],
+            )?)
+        },
+    )
+    .await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let account = op()?;
     let made = json!({"operation": account, "name": "registrar fixture"});
@@ -486,6 +492,19 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
         .as_str()
         .ok_or("no credential")?
         .to_owned();
+
+    let probe = registration(NOTES, &workspace_schema(NOTES))?;
+    let missing = post(&service, "/apps", Auth::Bearer(&credential), &probe).await?;
+    assert_eq!(missing.1["refusal"], "NotHeld", "{}", missing.1);
+    let owner = seeded.people[0].id.to_string();
+    let root = ok(post(&service, "/grants/roots", Auth::Cookie(&admin), &json!({
+        "operation":op()?,"route":"api","holder":owner,"resource":{"kind":"directory","id":"apps"},"relation":"editor",
+        "pass_on":{"kind":"to","actions":["view","edit"],"recipients":["service_account"]},"window":{"starts_at":0,"ends_at":null}
+    })).await?)?;
+    ok(post(&service, "/grants", Auth::Cookie(&admin), &json!({
+        "operation":op()?,"route":"api","source":root["grant"],"recipient":account,"responsible":owner,
+        "resource":{"kind":"directory","id":"apps"},"relation":"editor","pass_on":{"kind":"use_only"},"window":{"starts_at":0,"ends_at":null}
+    })).await?)?;
 
     let body = registration(NOTES, &workspace_schema(NOTES))?;
     let pending = ok(post(&service, "/apps", Auth::Bearer(&credential), &body).await?)?;
@@ -552,10 +571,9 @@ async fn approval_binds_the_service_account_the_registration_names() -> TestResu
         account.as_str(),
         "{approval}"
     );
-    let credential = approval["client"]["credential"]
-        .as_str()
-        .ok_or("no credential")?;
-    let me = ok(get(&service, "/apps/me", Auth::Bearer(credential)).await?)?;
+    assert!(approval["client"].is_null());
+    let credential = identity_contract::app_custody::credential(NOTES);
+    let me = ok(get(&service, "/apps/me", Auth::Bearer(&credential)).await?)?;
     assert_eq!(me["service_account"], account.as_str());
     Ok(())
 }

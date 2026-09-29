@@ -42,6 +42,7 @@ mod owner;
 pub use owner::OwnerChanged;
 mod records;
 mod restart;
+mod seal_once;
 pub use restart::{SNAPSHOT_EVERY, SnapshotReport};
 mod revocation;
 use revocation::Upstream;
