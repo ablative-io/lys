@@ -149,7 +149,7 @@ pub struct OperationOutcome {
     pub ended: Option<Ended>,
     /// Bound native delivery metadata; absent for legacy/manual operations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub control: Option<control::Delivery>,
+    pub control: Option<Box<control::Delivery>>,
 }
 
 #[derive(Serialize, Deserialize)]

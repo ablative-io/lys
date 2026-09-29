@@ -47,13 +47,13 @@ impl WriteAhead for (&mut Operations, &Source) {
                 "operation is no longer safely unsent; reconcile its existing receipt",
             ));
         }
-        held.control = Some(Delivery {
+        held.control = Some(Box::new(Delivery {
             source: (*source).clone(),
             frame: TextDigest {
                 length: encoded.len(),
                 sha256: crate::protocol::hex(&Sha256::digest(encoded)),
             },
-        });
+        }));
         // If persistence fails, the flight remains reserved and no pipe write
         // follows. In memory, this operation is fenced against any new send.
         operations.set(operation, OperationState::Delivering,
