@@ -86,11 +86,13 @@ fn main() -> ExitCode {
                 from,
                 surface,
                 root,
+                cambium_messages,
             } => identity::upgrade::run(
                 &identity::upgrade::Options {
                     from,
                     surface,
                     root,
+                    cambium_messages,
                 },
                 json,
             ),

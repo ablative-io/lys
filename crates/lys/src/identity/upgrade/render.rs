@@ -77,8 +77,12 @@ pub trait Render {
 }
 
 /// The templates compiled into this `lys`.
-#[derive(Debug)]
-pub struct Templates;
+#[derive(Debug, Default)]
+pub struct Templates {
+    /// The Cambium message connection to write in place of the one the
+    /// install carries, when the upgrade was given one.
+    pub messages: Option<serde_json::Value>,
+}
 
 fn rendering_failed(resource: &str, error: &impl ToString) -> IdentityError {
     IdentityError::new(
@@ -115,7 +119,7 @@ impl Render for Templates {
             credentials.push((spec, read_secret(&state, spec)?));
         }
         let environment = prepare::render_env(&config, &credentials)?;
-        let carried = server_config::carried(layout)?.ok_or_else(|| {
+        let mut carried = server_config::carried(layout)?.ok_or_else(|| {
             IdentityError::new(
                 ErrorKind::NotInstalled,
                 "read recorded choices",
@@ -124,6 +128,9 @@ impl Render for Templates {
             )
             .at(&layout.service_config())
         })?;
+        if let Some(messages) = &self.messages {
+            carried.messages = Some(messages.clone());
+        }
         let service = server_config::render(layout, &config, &carried, screens);
         let service = serde_json::to_vec_pretty(&service)
             .map_err(|error| rendering_failed("identity.json", &error))?;
