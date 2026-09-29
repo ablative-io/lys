@@ -24,7 +24,7 @@ async fn unconfigured_messages_refuse_by_name_after_sign_in() -> Result<(), Box<
     assert!(
         body["reason"]
             .as_str()
-            .is_some_and(|reason| reason.contains("cambium_messages")),
+            .is_some_and(|reason| reason.contains("message_service")),
         "{body}"
     );
     Ok(())

@@ -1,4 +1,4 @@
-//! Cambium alone judges message visibility; this bridge additionally requires explicit Lys identity bindings.
+//! The message service alone judges message visibility; this bridge additionally requires explicit Lys identity bindings.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -26,28 +26,30 @@ use crate::{
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Settings {
-    /// Cambium's trusted absolute base URL; HTTPS, or HTTP on loopback.
+    /// The message service's trusted absolute base URL; HTTPS, or HTTP on loopback.
     pub url: String,
+    /// The name of the message service's session cookie, forwarded alone.
+    pub cookie: String,
     /// Explicit bindings, never guessed from matching display names.
     pub bindings: Vec<Binding>,
 }
 
-/// One Cambium registry identity and the Lys directory identity it represents.
+/// One message service registry identity and the Lys directory identity it represents.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Binding {
-    /// Cambium participant registry id.
+    /// The message service's participant registry id.
     pub participant: String,
     /// Enduring Lys person or agent id.
     pub identity: String,
 }
 
-/// Opaque page request passed to Cambium, whose configured page bound applies.
+/// Opaque page request passed to the message service, whose configured page bound applies.
 #[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EdgeQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Cambium stream id, absent when listing places.
+    /// The message service's stream id, absent when listing places.
     pub stream: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Thread root id, absent when listing root posts.
@@ -60,9 +62,9 @@ pub struct EdgeQuery {
 /// Addressed message metadata; no message body or credential crosses into the graph.
 #[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct MessageEdge {
-    /// Recorded Cambium post id.
+    /// The recorded post id.
     pub message: String,
-    /// Cambium stream containing this post.
+    /// The stream containing this post.
     pub stream: String,
     /// Explicitly mapped Lys author identity.
     pub source: String,
@@ -70,7 +72,7 @@ pub struct MessageEdge {
     pub recipients: Vec<String>,
     /// Direct address or explicit mention, never proof of consumption.
     pub addressing: String,
-    /// Cambium creation timestamp in seconds.
+    /// The creation timestamp in seconds.
     pub at: u64,
 }
 
@@ -89,7 +91,7 @@ struct UpstreamPage {
     next: Option<String>,
 }
 
-/// One Cambium-filtered page, then restricted to identities visible in Lys.
+/// One page filtered by the message service, then restricted to identities visible in Lys.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct EdgePage {
     /// Caller-visible places to page.
@@ -100,7 +102,7 @@ pub struct EdgePage {
     pub roots: Vec<String>,
     /// Continuation for this scope, absent at its end.
     pub next: Option<String>,
-    /// Caller-visible Cambium identities that have no explicit Lys binding.
+    /// Caller-visible message service identities that have no explicit Lys binding.
     pub unmapped: Vec<String>,
 }
 
@@ -134,6 +136,7 @@ fn unavailable(reason: impl Into<String>) -> EdgeError {
 
 struct Bridge {
     url: reqwest::Url,
+    cookie: String,
     bindings: BTreeMap<String, String>,
     client: reqwest::Client,
 }
@@ -157,7 +160,7 @@ impl Settings {
 
     fn bridge(&self) -> Result<Bridge, ServerError> {
         let invalid = |reason: String| ServerError::ConfigInvalid {
-            reason: format!("cambium_messages: {reason}"),
+            reason: format!("message_service: {reason}"),
         };
         let mut url = reqwest::Url::parse(&self.url).map_err(|error| invalid(error.to_string()))?;
         let loopback = url.host_str().is_some_and(|host| {
@@ -180,6 +183,16 @@ impl Settings {
         if !url.path().ends_with('/') {
             url.set_path(&format!("{}/", url.path()));
         }
+        if self.cookie.is_empty()
+            || !self
+                .cookie
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(invalid(
+                "cookie must name one session cookie: letters, digits, '-', '_' or '.'".to_owned(),
+            ));
+        }
         let mut bindings = BTreeMap::new();
         let mut identities = BTreeSet::new();
         for binding in &self.bindings {
@@ -191,9 +204,7 @@ impl Settings {
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
             {
-                return Err(invalid(
-                    "participant must be a Cambium registry id".to_owned(),
-                ));
+                return Err(invalid("participant must be a registry id".to_owned()));
             }
             if bindings
                 .insert(binding.participant.clone(), binding.identity.clone())
@@ -212,6 +223,7 @@ impl Settings {
             .map_err(|error| invalid(error.to_string()))?;
         Ok(Bridge {
             url,
+            cookie: self.cookie.clone(),
             bindings,
             client,
         })
@@ -225,7 +237,7 @@ impl Settings {
 pub fn routes(config: &Config) -> Result<Router<Arc<AppState>>, ServerError> {
     let bridge = Arc::new(
         config
-            .cambium_messages
+            .message_service
             .as_ref()
             .map(Settings::bridge)
             .transpose()?,
@@ -243,24 +255,24 @@ pub fn routes(config: &Config) -> Result<Router<Arc<AppState>>, ServerError> {
     ))
 }
 
-fn cookie(headers: &HeaderMap) -> Result<String, EdgeError> {
+fn cookie(headers: &HeaderMap, wanted: &str) -> Result<String, EdgeError> {
     let mut values = Vec::new();
     for value in headers.get_all(header::COOKIE) {
-        let text = value.to_str().map_err(|error| {
-            unavailable(format!("Cambium cookie header is unreadable: {error}"))
-        })?;
+        let text = value
+            .to_str()
+            .map_err(|error| unavailable(format!("the cookie header is unreadable: {error}")))?;
         for part in text.split(';') {
             if let Some((name, value)) = part.trim().split_once('=') {
-                if name == "cambium_session" {
+                if name == wanted {
                     values.push(value);
                 }
             }
         }
     }
     if values.len() != 1 || values[0].is_empty() {
-        return Err(EdgeError::Refused { status: StatusCode::UNAUTHORIZED, reason: "Sign into Cambium on this host before reading message connections; exactly one Cambium session is required".to_owned() });
+        return Err(EdgeError::Refused { status: StatusCode::UNAUTHORIZED, reason: "Sign into the message service on this host before reading message connections; exactly one session with it is required".to_owned() });
     }
-    Ok(format!("cambium_session={}", values[0]))
+    Ok(format!("{wanted}={}", values[0]))
 }
 
 async fn read(
@@ -285,7 +297,7 @@ async fn read(
         Ok((caller.to_string(), visible))
     })?;
     let bridge = bridge.ok_or_else(|| {
-        unavailable("cambium_messages endpoint and explicit identity bindings are not configured")
+        unavailable("message_service endpoint and explicit identity bindings are not configured")
     })?;
     let url = bridge
         .url
@@ -295,27 +307,30 @@ async fn read(
         .client
         .get(url)
         .query(&query)
-        .header(header::COOKIE, cookie(headers)?)
+        .header(header::COOKIE, cookie(headers, &bridge.cookie)?)
         .send()
         .await
-        .map_err(|error| unavailable(format!("Cambium message read failed: {error}")))?;
+        .map_err(|error| unavailable(format!("the message service read failed: {error}")))?;
     if !response.status().is_success() {
         let status = response.status();
         let refusal = read_json::<UpstreamRefusal>(response)
             .await
             .map_err(|error| {
                 unavailable(format!(
-                    "Cambium answered HTTP {status} with an unreadable refusal: {error}"
+                    "the message service answered HTTP {status} with an unreadable refusal: {error}"
                 ))
             })?;
         return Err(EdgeError::Refused {
             status,
-            reason: format!("Cambium {}: {}", refusal.kind, refusal.reason),
+            reason: format!(
+                "the message service refused, {}: {}",
+                refusal.kind, refusal.reason
+            ),
         });
     }
     let page: UpstreamPage = read_json(response)
         .await
-        .map_err(|error| unavailable(format!("Cambium message page is unreadable: {error}")))?;
+        .map_err(|error| unavailable(format!("the message service page is unreadable: {error}")))?;
     map_page(page, bridge, &caller, &visible).map(Json)
 }
 
@@ -336,7 +351,8 @@ fn map_page(
     if bridge.bindings.get(&page.caller).map(String::as_str) != Some(caller) {
         return Err(EdgeError::Refused {
             status: StatusCode::FORBIDDEN,
-            reason: "The Cambium session is not bound to this signed-in Lys identity".to_owned(),
+            reason: "The message service session is not bound to this signed-in Lys identity"
+                .to_owned(),
         });
     }
     let mut unmapped = BTreeSet::new();
@@ -344,7 +360,7 @@ fn map_page(
     for mut message in page.messages {
         if !matches!(message.addressing.as_str(), "direct" | "mentioned") {
             return Err(unavailable(format!(
-                "Cambium message {} has an unknown addressing kind",
+                "message {} has an unknown addressing kind",
                 message.message
             )));
         }

@@ -10,13 +10,15 @@ The canvas uses distinct identity and terminal-session nodes.
 Both services must serve the new routes: Cambium's
 `GET /conversation/message-edges` and Lys's `GET /runtime/message-edges`.
 The browser must be signed into both on the same host. Lys forwards only the
-`cambium_session` cookie, never its own cookie or a service credential. A
+message service's session cookie, named by `cookie` in the configuration (for
+Cambium, `cambium_session`), never its own cookie or a service credential. A
 Cambium caller not explicitly bound to the signed-in Lys person is refused.
 Different-host deployments need an authenticated bridge before this read works;
 missing authentication is not bypassed.
 
-Add `cambium_messages` to Lys's existing configuration. The value has `url`
-(the trusted Cambium base URL) and `bindings` (an array of records with
+Add `message_service` to Lys's existing configuration. The value has `url`
+(the trusted Cambium base URL), `cookie` (the name of its session cookie) and
+`bindings` (an array of records with
 `participant`, the actual Cambium registry id, and `identity`, the actual
 enduring Lys person or agent id). Obtain ids from each service's own directory;
 do not copy display names. Bind the signed-in person as well as the agents.

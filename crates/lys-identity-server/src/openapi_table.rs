@@ -99,7 +99,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
     GET "/runtime/sessions" "Every runtime session" S [ADMIN];
-    GET "/runtime/message-edges" "Caller-visible Cambium message addresses mapped to Lys identities" S [PERSON, &["MessageEdgesUnavailable"]];
+    GET "/runtime/message-edges" "Caller-visible message addresses from the message service, mapped to Lys identities" S [PERSON, &["MessageEdgesUnavailable"]];
     POST "/runtime/found/{session}/reports" "Report a found session" S [ADMIN_BODY, &["MachineUnknown"], &["RuntimeSessionStopped", "RuntimeSessionUnknown"]];
     GET "/runtime/found" "The sessions found" S [ADMIN];
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]];

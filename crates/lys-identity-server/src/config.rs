@@ -170,9 +170,9 @@ pub struct Config {
     /// machine's sessions are refused `runner_unreachable`, by name.
     #[serde(default)]
     pub runner_socket: Option<PathBuf>,
-    /// Cambium message reads use the caller's cookie and explicit cross-product identity bindings.
+    /// Message reads from the message service use the caller's session cookie and explicit identity bindings.
     #[serde(default)]
-    pub cambium_messages: Option<crate::message_edges::Settings>,
+    pub message_service: Option<crate::message_edges::Settings>,
 }
 
 /// The permission model as its file writes it: a version, and each relation
@@ -207,7 +207,7 @@ impl Config {
 
     /// Refuse a configuration the service cannot run under.
     pub fn validate(&self) -> Result<(), ServerError> {
-        if let Some(settings) = &self.cambium_messages {
+        if let Some(settings) = &self.message_service {
             settings.validate()?;
         }
         self.configured_administrator()?;

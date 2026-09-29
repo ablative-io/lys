@@ -10,6 +10,7 @@ const AGENT: &str = "agent-22222222222222222222222222222222";
 fn settings() -> Settings {
     Settings {
         url: "http://localhost:6010/".to_owned(),
+        cookie: "cambium_session".to_owned(),
         bindings: vec![
             Binding {
                 participant: "alice".to_owned(),
@@ -135,14 +136,17 @@ fn only_one_cambium_cookie_is_forwarded() -> Result<(), Box<dyn Error>> {
             "lys_session=lys-secret; cambium_session=cambium-secret; unrelated=private",
         ),
     );
-    assert_eq!(cookie(&headers)?, "cambium_session=cambium-secret");
+    assert_eq!(
+        cookie(&headers, "cambium_session")?,
+        "cambium_session=cambium-secret"
+    );
     headers.append(
         header::COOKIE,
         HeaderValue::from_static("cambium_session=second"),
     );
-    assert!(cookie(&headers).is_err());
+    assert!(cookie(&headers, "cambium_session").is_err());
     headers.clear();
-    assert!(cookie(&headers).is_err());
+    assert!(cookie(&headers, "cambium_session").is_err());
     Ok(())
 }
 

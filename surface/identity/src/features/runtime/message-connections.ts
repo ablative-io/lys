@@ -1,4 +1,4 @@
-/** Paged message evidence from Cambium through Lys; cursors are scoped, and reads never imply delivery to a terminal. */
+/** Paged message evidence from the message service through Lys; cursors are scoped, and reads never imply delivery to a terminal. */
 import { request } from '../../api';
 
 export interface MessageConnection {

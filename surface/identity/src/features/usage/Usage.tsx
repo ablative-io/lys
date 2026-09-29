@@ -1,4 +1,4 @@
-/** Plain controls for an agent's budgets and goals; graphs and analytics stay in Argus. */
+/** Plain controls for an agent's budgets and goals; graphs and analytics stay with the monitoring app. */
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { api, request, useLoad } from '../../api';
@@ -13,7 +13,7 @@ import './usage.css';
 export function Usage() {
   const { agent } = useParams();
   const people = useLoad(api.people, 'usage-people');
-  return <section className="usage"><div className="head"><div><h2>Usage</h2><p>Each agent's budgets and goals, and where each stands. Graphs and analytics are in Argus.</p></div></div>
+  return <section className="usage"><div className="head"><div><h2>Usage</h2><p>Each agent's budgets and goals, and where each stands. Graphs and analytics are in the monitoring app.</p></div></div>
     <Gate load={people} title="Usage" ok={(view) => {
       const agents = entries(view).filter((entry) => entry.kind === 'agent');
       return <>

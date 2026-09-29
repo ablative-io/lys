@@ -1,4 +1,4 @@
-/* Plain budget and goal controls, drawn from the shared tokens. No charts: analytics stay in Argus. */
+/* Plain budget and goal controls, drawn from the shared tokens. No charts: analytics stay with the monitoring app. */
 .usage { display: flex; flex-direction: column; gap: 16px; }
 .usage-agents { display: flex; flex-wrap: wrap; gap: 8px; }
 .usage-agents a { padding: 6px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); text-decoration: none; }

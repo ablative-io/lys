@@ -384,7 +384,7 @@ impl Service {
             subject: subject.to_owned(),
         };
         let mut config = Config {
-            cambium_messages: None,
+            message_service: None,
             listen,
             log_dir: dir.path().join("log"),
             log_origin: ORIGIN.to_owned(),

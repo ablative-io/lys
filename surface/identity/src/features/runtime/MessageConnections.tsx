@@ -14,8 +14,8 @@ export function MessageConnections({ value, change }: { value: MessageRead; chan
     finally { setBusy(false); }
   };
   return <section aria-label="Message connections">
-    <p className="note">{value.messages.length} addressed messages read from Cambium. {value.pending.length ? 'More pages remain.' : 'All pages in this read have been read.'} These identify recipients, not whether a person read the message or an agent consumed it.</p>
-    {value.unmapped.length ? <p className="why-not" role="status">Identity bindings missing for Cambium participants: {value.unmapped.join(', ')}. Their connections are not drawn.</p> : null}
+    <p className="note">{value.messages.length} addressed messages read from the message service. {value.pending.length ? 'More pages remain.' : 'All pages in this read have been read.'} These identify recipients, not whether a person read the message or an agent consumed it.</p>
+    {value.unmapped.length ? <p className="why-not" role="status">Identity bindings missing for message service participants: {value.unmapped.join(', ')}. Their connections are not drawn.</p> : null}
     {value.pending.length ? <button className="btn" disabled={busy} onClick={() => void more()}>{busy ? 'Reading message connections…' : 'Load more message connections'}</button> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </section>;
