@@ -194,13 +194,7 @@ async fn read(
         let person = crate::read_api::own_person(directory, &actor)?;
         let caller = IdentityId::Person(person);
         let administrator = state.admission.administrator(&actor).is_ok();
-        let visible: BTreeSet<String> = directory
-            .records()
-            .filter(|(id, record)| {
-                administrator || **id == caller || record.responsible() == Some(person)
-            })
-            .map(|(id, _)| id.to_string())
-            .collect();
+        let visible = crate::identity_sight::visible(directory, person, administrator);
         Ok((caller.to_string(), visible))
     })?;
     let bridge = bridge.ok_or_else(|| {
