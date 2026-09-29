@@ -8,25 +8,42 @@ struct CountedEngine {
     address: std::net::SocketAddr,
     calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     key: tempfile::TempDir,
-    server: tokio::task::JoinHandle<std::io::Result<()>>,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    server: Option<std::thread::JoinHandle<std::io::Result<()>>>,
 }
 
 impl CountedEngine {
-    async fn start() -> Result<Self, Box<dyn Error>> {
+    fn start() -> Result<Self, Box<dyn Error>> {
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        listener.set_nonblocking(true)?;
         let address = listener.local_addr()?;
         let router = axum::Router::new()
             .fallback(counted_engine_answer)
             .with_state(std::sync::Arc::clone(&calls));
-        let server = tokio::spawn(async move { axum::serve(listener, router).await });
+        let (stop, stopped) = tokio::sync::oneshot::channel();
+        // The production gateway client blocks on TCP: its stand-in needs independent I/O.
+        let server = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::from_std(listener)?;
+                axum::serve(listener, router)
+                    .with_graceful_shutdown(async {
+                        let _ = stopped.await;
+                    })
+                    .await
+            })
+        });
         let key = tempfile::TempDir::new()?;
         std::fs::write(key.path().join("key"), "local-regression-key")?;
         Ok(Self {
             address,
             calls,
             key,
-            server,
+            stop: Some(stop),
+            server: Some(server),
         })
     }
 
@@ -45,7 +62,15 @@ impl CountedEngine {
 
 impl Drop for CountedEngine {
     fn drop(&mut self) {
-        self.server.abort();
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(server) = self.server.take() {
+            server
+                .join()
+                .expect("engine thread joins")
+                .expect("engine serves");
+        }
     }
 }
 
@@ -69,7 +94,7 @@ async fn counted_engine_answer(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn registered_caller_is_refused_before_any_permission_engine_request() -> TestResult {
-    let engine = CountedEngine::start().await?;
+    let engine = CountedEngine::start()?;
     let (service, person, _) = fixture_judging(PERSON, false, Some(engine.settings())).await?;
     let cookie = service.sign_in(login(PERSON)).await?;
     let before = engine.count();
@@ -87,7 +112,7 @@ async fn registered_caller_is_refused_before_any_permission_engine_request() -> 
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn active_control_reaches_the_permission_engine_and_reads_grants() -> TestResult {
-    let engine = CountedEngine::start().await?;
+    let engine = CountedEngine::start()?;
     let (service, _, _) = fixture_judging(PERSON, true, Some(engine.settings())).await?;
     let cookie = service.sign_in(login(PERSON)).await?;
     let before = engine.count();
