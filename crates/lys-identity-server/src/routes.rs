@@ -167,7 +167,12 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
             .transpose()?,
         setup: config.setup.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
-        sessions: Sessions::new(config.session_seconds, config.secure_cookie),
+        sessions: match &config.sessions_file {
+            Some(file) => {
+                Sessions::open(file.clone(), config.session_seconds, config.secure_cookie)?
+            }
+            None => Sessions::new(config.session_seconds, config.secure_cookie),
+        },
         admission: Admission::new(
             crate::setup::administrator(config)?,
             config.link_audit_binding()?,

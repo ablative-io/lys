@@ -5,17 +5,24 @@
 //! The session holds the actor the service authenticated, when it started and
 //! when it ends, and a public id of 16 further random bytes. The public id is
 //! what every answer names a session by; the cookie secret never leaves this
-//! module except in the Set-Cookie header that begins the session. Sessions
-//! are kept in memory: a restart signs everyone out, which is the safe
-//! direction.
+//! module except in the Set-Cookie header that begins the session.
+//!
+//! Sessions are looked up by the SHA-256 of the cookie secret, never the
+//! secret itself. When the service names a sessions file they are kept there
+//! too, in the stored form [`crate::session_store`] writes, so a restart of
+//! the service leaves everyone signed in: a session ends when it expires, is
+//! ended, or its person signs out, not because the service restarted. Each
+//! begin and end is written before it is answered.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lys_identity::Actor;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
+use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
 
@@ -45,8 +52,15 @@ pub struct SessionEntry {
 /// The live sessions.
 pub struct Sessions {
     live: Mutex<HashMap<String, SessionEntry>>,
+    file: Option<PathBuf>,
     seconds: u64,
     secure: bool,
+}
+
+/// The key a session is kept and looked up under: the SHA-256 of its
+/// cookie secret, as lowercase hex.
+fn key_of(secret: &str) -> String {
+    crate::routes::hex(&Sha256::digest(secret.as_bytes()))
 }
 
 /// `N` bytes from the secure random source, as lowercase hex.
@@ -72,12 +86,33 @@ fn cookie_secret(cookie_header: Option<&str>) -> Result<&str, ServerError> {
 }
 
 impl Sessions {
-    /// No sessions, each to live `seconds`.
+    /// No sessions, each to live `seconds`, kept in memory alone.
     pub fn new(seconds: u64, secure: bool) -> Self {
         Self {
             live: Mutex::new(HashMap::new()),
+            file: None,
             seconds,
             secure,
+        }
+    }
+
+    /// The sessions kept in `file` that have not yet ended, each new one to
+    /// live `seconds`; every begin and end is written back to `file`.
+    pub fn open(file: PathBuf, seconds: u64, secure: bool) -> Result<Self, ServerError> {
+        let live = crate::session_store::load(&file, now())?;
+        Ok(Self {
+            live: Mutex::new(live),
+            file: Some(file),
+            seconds,
+            secure,
+        })
+    }
+
+    /// Write `live` to the sessions file, when there is one.
+    fn keep(&self, live: &HashMap<String, SessionEntry>) -> Result<(), ServerError> {
+        match &self.file {
+            Some(file) => crate::session_store::save(file, live),
+            None => Ok(()),
         }
     }
 
@@ -111,7 +146,13 @@ impl Sessions {
             started_at,
             ends_at: started_at.saturating_add(self.seconds),
         };
-        self.pruned().insert(secret.clone(), entry);
+        let key = key_of(&secret);
+        let mut live = self.pruned();
+        live.insert(key.clone(), entry);
+        if let Err(error) = self.keep(&live) {
+            live.remove(&key);
+            return Err(error);
+        }
         Ok(self.cookie(&secret, self.seconds))
     }
 
@@ -119,7 +160,7 @@ impl Sessions {
     fn entry(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
         let secret = cookie_secret(cookie_header)?;
         self.pruned()
-            .get(secret)
+            .get(&key_of(secret))
             .cloned()
             .ok_or(ServerError::NotSignedIn)
     }
@@ -158,13 +199,19 @@ impl Sessions {
         belongs: impl FnOnce(&Actor) -> bool,
     ) -> Result<SessionEntry, ServerError> {
         let mut live = self.pruned();
-        let secret = live
+        let key = live
             .iter()
             .find(|(_, entry)| entry.id == id)
-            .map(|(secret, entry)| (secret.clone(), belongs(&entry.actor)));
-        match secret {
-            Some((secret, true)) => live.remove(&secret).ok_or(ServerError::SessionUnknown),
-            Some((_, false)) | None => Err(ServerError::SessionUnknown),
+            .map(|(key, entry)| (key.clone(), belongs(&entry.actor)));
+        let key = match key {
+            Some((key, true)) => key,
+            Some((_, false)) | None => return Err(ServerError::SessionUnknown),
+        };
+        let ended = live.remove(&key).ok_or(ServerError::SessionUnknown)?;
+        if let Err(error) = self.keep(&live) {
+            live.insert(key, ended);
+            return Err(error);
         }
+        Ok(ended)
     }
 }

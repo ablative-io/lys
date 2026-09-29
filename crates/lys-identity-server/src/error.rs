@@ -175,6 +175,12 @@ pub enum ServerError {
         /// The operation id.
         machine: String,
     },
+    /// The signed-in sessions could not be kept or read back.
+    #[error("SessionsUnavailable: {reason}")]
+    SessionsUnavailable {
+        /// What failed.
+        reason: String,
+    },
     /// The memory of an agent cannot be read.
     #[error("MemoryUnavailable: {reason}")]
     MemoryUnavailable {

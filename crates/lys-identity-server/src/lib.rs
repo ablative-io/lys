@@ -98,6 +98,7 @@ pub mod service_accounts_api;
 pub mod service_accounts_state;
 pub mod service_accounts_store;
 pub mod session;
+pub mod session_store;
 pub mod sessions_api;
 pub mod setup;
 pub mod sign_in;

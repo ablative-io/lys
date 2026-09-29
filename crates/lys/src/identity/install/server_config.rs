@@ -94,6 +94,7 @@ pub fn render(
         },
         "link_audit_source": {"issuer": issuer, "subject": LINK_AUDIT_SUBJECT},
         "session_seconds": SESSION_SECONDS,
+        "sessions_file": state.join("sessions.json").display().to_string(),
         "secure_cookie": false,
         "grant_log_dir": dir("grant-log"),
         "grant_log_origin": GRANT_LOG_ORIGIN,

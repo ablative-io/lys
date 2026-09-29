@@ -175,6 +175,7 @@ impl ServerError {
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
+            | Self::SessionsUnavailable { .. }
             | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }

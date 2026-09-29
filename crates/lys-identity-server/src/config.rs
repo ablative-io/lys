@@ -60,6 +60,10 @@ pub struct Config {
     pub link_audit_source: ConfiguredLogin,
     /// How long a session lives, in seconds.
     pub session_seconds: u64,
+    /// The file the signed-in sessions are kept in, so a restart leaves
+    /// everyone signed in; without it they are kept in memory alone.
+    #[serde(default)]
+    pub sessions_file: Option<PathBuf>,
     /// Whether the session cookie is marked Secure.
     pub secure_cookie: bool,
     /// The directory the grant log is kept in.
