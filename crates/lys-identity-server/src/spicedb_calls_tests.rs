@@ -12,9 +12,12 @@ use super::SpiceDb;
 
 const HELD: &str = "definition grant {}\n\ndefinition lys/b0123456789abcdef/grant {}\n\ndefinition lys/b0123456789abcdef/fixture/doc {}\n\ndefinition fixture/doc {}";
 
+/// Each request's path, in the order the engine heard them.
+type Heard = Arc<Mutex<Vec<String>>>;
+
 /// An engine on a local port that answers every schema read with [`HELD`]
 /// and records each request's path.
-fn engine() -> Result<(String, Arc<Mutex<Vec<String>>>), Box<dyn Error>> {
+fn engine() -> Result<(String, Heard), Box<dyn Error>> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?.to_string();
     let paths = Arc::new(Mutex::new(Vec::new()));
@@ -54,7 +57,7 @@ fn engine() -> Result<(String, Arc<Mutex<Vec<String>>>), Box<dyn Error>> {
                 answer.len()
             );
             if written.is_err() {
-                continue;
+                break;
             }
         }
     });
