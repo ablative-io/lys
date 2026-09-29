@@ -1959,6 +1959,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-133",
+      "title": "The launch is everything Lys records for the seat, for Claude Code and our Codex build",
+      "status": "decided",
+      "scope": "home",
+      "date": "2026-09-29",
+      "decided_by": "Tom via Waffles at 11:57 and 11:58 Melbourne. Recorded by Archie.",
+      "context": "launch_template.rs renders only Claude Code, carries one model, reports skills and further models as left out, takes MCP servers only as addresses, and writes a settings file with environment only. Every seat's real MCP servers are command-started. Stock Codex cannot reach the estate; our own Codex build can.",
+      "decision": "A provisioning profile declares its harness build; the launch renders every field for that build or the profile is refused by name when it is recorded. Command MCP servers carry secrets only as handles. Claude Code permissions come from the profile and the Tool policy; Codex permissions are DIRECTORY-065's render of the same policy.",
+      "quote": "what Tom sets in Lys must be everything Claude Code gets; get Codex right, otherwise the Codex seats can't speak to anybody; nothing hard-coded about the harness or the Codex build",
+      "consequences": [
+        "No field is reported as left out and dropped.",
+        "No harness, program, config directory, version or build is written in code.",
+        "A start whose program no longer answers the declared build is refused before launch."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

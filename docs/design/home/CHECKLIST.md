@@ -208,3 +208,13 @@
 
 - [ ] **C186** — Records decode without a deep copy (HOME-036 R1).
 - [ ] **C187** — Recall scans epilogues once for all lanterns (HOME-036 R2).
+
+## The launch carries every profile field (HOME-037)
+
+- [ ] **C188** — The harness and its build are declared in Lys, never in code (HOME-037 R1).
+- [ ] **C189** — Every model the profile lists is carried or refused by name (HOME-037 R2).
+- [ ] **C190** — Skills reach the session's own config directory (HOME-037 R3).
+- [ ] **C191** — Command-started MCP servers with typed settings, secrets only as handles, and their channel policy (HOME-037 R4).
+- [ ] **C192** — The settings file carries the permissions from the profile and the Tool policy (HOME-037 R5).
+- [ ] **C193** — A Codex launch renders for our declared Codex build (HOME-037 R6).
+- [ ] **C194** — Proof: a real seat's setup recorded, rendered and compared (HOME-037 R7).

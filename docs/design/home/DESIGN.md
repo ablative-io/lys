@@ -68,6 +68,7 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 - ADR-110 — The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, its hash kept in the render manifest, written only when render-launch is given a key — The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data. The SHA-256 of those bytes, the given hash, is recorded in every render's manifest block as given_sha256 and printed in the render-launch report; the template_render event keeps the shape ADR-012 decided and names the manifest by hash. The statement is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event's detail, which changes the shape ADR-012 decided; recording it only in the report, where a stranger reading the session cannot find it; keeping the COSE bytes inline as hex in the entry rather than as a block; and adding the file's path to lys verify's one failure message, which would change the published lys for every user.
 - ADR-072 — The given statement is a lys/attestation/v2 over the RFC 8785 bytes of lys.given's data, written only when render-launch is given a key — The given statement is lys-core's existing lys/attestation/v2 over the RFC 8785 (JSON Canonicalization Scheme) bytes of the lys.given entry's data, so its signed payload hash is the given hash render-launch reports as given_sha256. It is written only when render-launch is given a key: kept as a block named by a lys.given_statement entry hung under the lys.given entry, and as given-statement.cose and given-data.json under --out for lys verify. Rejected: serialising the record in struct field order, which a stranger cannot rebuild without the Rust type; signing the 64-hex hash string, whose attested hash would be SHA-256 of the hex and not the given hash; adding the given hash to the template_render event, which HOME-003 keeps unaltered; and changing lys verify's one failure message to name the file, which would change the published lys for every user.
 - ADR-112 — Lys hot paths do each piece of work once: no replay, no whole-state read for a sliver, no clone to read, no blocking on an async worker — Work on a request, append or open path is done once and scales with what the caller touches, not with history: lookups by index instead of scans, a checkpoint or cursor instead of a replay, a filtered read instead of the whole set, borrowed data instead of a clone made to read, one fsync per batch instead of per entry, and blocking I/O and std mutexes kept off async workers. Each fix is proved by counting the work done in a test that fails before it, never by a clock.
+- ADR-133 — The launch is everything Lys records for the seat, for Claude Code and our Codex build — A provisioning profile declares its harness build; the launch renders every field for that build or the profile is refused by name when it is recorded. Command MCP servers carry secrets only as handles. Claude Code permissions come from the profile and the Tool policy; Codex permissions are DIRECTORY-065's render of the same policy.
 
 ## Goals
 
@@ -412,6 +413,29 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/given.rs` | touched by HOME-035 R4: Rendering a launch moves data once and hashes what it writes as it writes | HOME-035 |
 | `crates/lys-home/src/record/call/parts.rs` | touched by HOME-035 R5: Call parts are borrowed and each body file read once | HOME-035 |
 | `docs/design/home/briefs/HOME-033.json` | the first draft of the Codex translation brief, written as HOME-004 and renumbered; HOME-009 is the translation that landed | HOME-033 |
+| `crates/lys-identity-server/src/launch_harness.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/tests/launch_harness.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/src/launch_template.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/src/lib.rs` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `surface/identity/src/features/provisioning/Provisioning.tsx` | HOME-037 R1: the harness and its build are declared in lys, never in code | HOME-037 |
+| `crates/lys-identity-server/src/launch_fields.rs` | HOME-037 R2: every model the profile lists is carried or refused by name | HOME-037 |
+| `crates/lys-identity-server/tests/launch_models.rs` | HOME-037 R2: every model the profile lists is carried or refused by name | HOME-037 |
+| `crates/lys-home/src/harness/skills.rs` | HOME-037 R3: skills reach the session's own config directory | HOME-037 |
+| `crates/lys-home/src/harness/skills_tests.rs` | HOME-037 R3: skills reach the session's own config directory | HOME-037 |
+| `crates/lys-identity-server/tests/launch_skills.rs` | HOME-037 R3: skills reach the session's own config directory | HOME-037 |
+| `crates/lys-identity-server/src/launch_mcp.rs` | HOME-037 R4: command-started mcp servers, with secrets only as handles | HOME-037 |
+| `crates/lys-identity-server/tests/launch_mcp.rs` | HOME-037 R4: command-started mcp servers, with secrets only as handles | HOME-037 |
+| `crates/lys-identity-server/src/launch_permissions.rs` | HOME-037 R5: the settings file carries the permissions from the profile and the tool policy | HOME-037 |
+| `crates/lys-identity-server/tests/launch_permissions.rs` | HOME-037 R5: the settings file carries the permissions from the profile and the tool policy | HOME-037 |
+| `crates/lys-home/src/harness/codex/launch.rs` | HOME-037 R6: a codex launch renders for our declared codex build | HOME-037 |
+| `crates/lys-home/src/harness/codex/launch_tests.rs` | HOME-037 R6: a codex launch renders for our declared codex build | HOME-037 |
+| `crates/lys-identity-server/tests/launch_codex.rs` | HOME-037 R6: a codex launch renders for our declared codex build | HOME-037 |
+| `scripts/identity-gates/launch-all.sh` | HOME-037 R7: proof: a real seat's setup recorded, rendered and compared | HOME-037 |
+| `docs/design/home/PROOF-LAUNCH-ALL.md` | HOME-037 R7: proof: a real seat's setup recorded, rendered and compared | HOME-037 |
+| `docs/design/project.json` | HOME-037 R7: proof: a real seat's setup recorded, rendered and compared | HOME-037 |
+| `docs/design/home/briefs/HOME-037.json` | the launch carries every profile field to Claude Code and our Codex build, or refuses it by name | HOME-037 |
 
 ## Inventory
 
