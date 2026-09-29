@@ -1,0 +1,94 @@
+{
+  "apps": [
+    {
+      "id": "cambium",
+      "name": "Cambium",
+      "redirects": [],
+      "schema": {
+        "kinds": {
+          "cambium.channel": {
+            "actions": [
+              "read",
+              "send"
+            ],
+            "relations": {
+              "participant": [
+                "read",
+                "send"
+              ]
+            },
+            "parents": []
+          },
+          "cambium.topic": {
+            "actions": [
+              "read",
+              "send"
+            ],
+            "relations": {
+              "participant": [
+                "read",
+                "send"
+              ]
+            },
+            "parents": []
+          }
+        }
+      }
+    },
+    {
+      "id": "aion",
+      "name": "aion",
+      "redirects": [],
+      "schema": {
+        "kinds": {
+          "aion.namespace": {
+            "actions": [
+              "read"
+            ],
+            "relations": {
+              "reader": [
+                "read"
+              ]
+            },
+            "parents": []
+          },
+          "aion.workflow": {
+            "actions": [
+              "read",
+              "run"
+            ],
+            "relations": {
+              "operator": [
+                "read",
+                "run"
+              ]
+            },
+            "parents": []
+          },
+          "aion.repository": {
+            "actions": [
+              "read",
+              "commit",
+              "open_pr",
+              "land"
+            ],
+            "relations": {
+              "contributor": [
+                "read",
+                "commit",
+                "open_pr"
+              ],
+              "integrator": [
+                "read",
+                "commit",
+                "open_pr",
+                "land"
+              ]
+            },
+            "parents": []
+          }
+        }
+      }
+    }
+  ]
+}
