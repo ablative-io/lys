@@ -119,12 +119,38 @@ fn address(name: &str, given: &str) -> Result<String, ServerError> {
     if url.password().is_some() || !url.username().is_empty() {
         return Err(inline(name, "its url".to_owned()));
     }
+    if let Some((key, _)) = url
+        .query_pairs()
+        .find(|(key, value)| names_secret(key) || credential_shaped(value))
+    {
+        return Err(inline(name, format!("its url's query `{key}`")));
+    }
     Ok(url.to_string())
+}
+
+/// `given` exactly as the operator wrote it, refused when surrounding space
+/// or a NUL would make the started program differ from the recorded one.
+fn exact(name: &str, member: &str, given: &str) -> Result<(), ServerError> {
+    if given.trim().is_empty() || given.trim() != given || given.contains('\0') {
+        return Err(unrepresentable(
+            name,
+            member.to_owned(),
+            "it is given exactly, not empty, without surrounding space or a NUL",
+        ));
+    }
+    Ok(())
 }
 
 fn arguments(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
     let mut after_secret_flag = false;
     for (at, arg) in given.iter().enumerate() {
+        if arg.contains('\0') {
+            return Err(unrepresentable(
+                name,
+                format!("argument {at}"),
+                "an argument holds no NUL",
+            ));
+        }
         let (flag, value) = arg.split_once('=').unwrap_or((arg, ""));
         let secret_flag = flag.starts_with('-') && names_secret(flag);
         if after_secret_flag || credential_shaped(arg) || (secret_flag && !value.is_empty()) {
@@ -179,9 +205,10 @@ fn setting(name: &str, variable: &str, given: Value) -> Result<Setting, ServerEr
 }
 
 fn command(name: &str, given: CommandBody) -> Result<McpCommand, ServerError> {
-    let program = given.program.trim().to_owned();
-    if program.is_empty() {
-        return Err(malformed(format!("MCP server `{name}` names no program")));
+    let program = given.program;
+    exact(name, "its program", &program)?;
+    if let Some(cwd) = &given.cwd {
+        exact(name, "cwd", cwd)?;
     }
     if credential_shaped(&program) {
         return Err(inline(name, "its program".to_owned()));
@@ -210,10 +237,7 @@ fn command(name: &str, given: CommandBody) -> Result<McpCommand, ServerError> {
     Ok(McpCommand {
         program,
         args: arguments(name, &given.args)?,
-        cwd: given
-            .cwd
-            .map(|cwd| cwd.trim().to_owned())
-            .filter(|cwd| !cwd.is_empty()),
+        cwd: given.cwd,
         env,
     })
 }
