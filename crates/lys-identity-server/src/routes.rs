@@ -259,12 +259,13 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let starts = start::routes(start_service(config, &state)?);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
-    let api = router(state).merge(configured).merge(starts);
+    let api = router(Arc::clone(&state)).merge(configured).merge(starts);
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir.clone(), api),
         None => api,
-    };
-    Ok(served.merge(provider_callback))
+    }
+    .merge(provider_callback);
+    Ok(crate::signed_first::guarded(served, state))
 }
 
 /// The start route's service over the directory `state` holds. The route

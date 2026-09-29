@@ -110,6 +110,7 @@ pub mod sessions_api;
 pub mod setup;
 pub mod sign_in;
 pub mod sign_in_providers;
+mod signed_first;
 pub mod spicedb;
 mod spicedb_apps;
 mod spicedb_http;
