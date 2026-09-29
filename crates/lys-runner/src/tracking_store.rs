@@ -28,6 +28,8 @@ use crate::operations::OperationOutcome;
 use crate::refusals::RefusalRecord;
 use serde_json::Value;
 
+mod control;
+
 use crate::tracking::{Figures, Unavailable, UsageRecord, count, note};
 
 /// The feed's format.
@@ -145,6 +147,9 @@ pub struct Commit {
     /// A refusal's attempt, so a repeat reuses it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempt: Option<String>,
+    /// Stable managed source/event identity committed with its observation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control: Option<String>,
 }
 
 /// Where a session's coverage stands.
@@ -260,6 +265,8 @@ struct Index {
     next_seq: u64,
     sources: BTreeMap<String, SourceState>,
     attempts: BTreeMap<String, u64>,
+    #[serde(default)]
+    controls: BTreeMap<String, u64>,
 }
 
 /// The feed, open for appending and reading.
@@ -532,6 +539,9 @@ impl Feed {
 
 /// Fold a unit's commit, the unit beginning at byte `unit`.
 fn fold(index: &mut Index, session: &str, commit: Commit, unit: u64) {
+    if let Some(control) = commit.control {
+        index.controls.entry(control).or_insert(unit);
+    }
     if let Some(source) = commit.source {
         index.sources.insert(session.to_owned(), source);
     }

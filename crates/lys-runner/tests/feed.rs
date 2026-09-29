@@ -29,6 +29,7 @@ fn unit(offset: u64) -> Commit {
     Commit {
         source: Some(source(offset)),
         attempt: None,
+        control: None,
     }
 }
 

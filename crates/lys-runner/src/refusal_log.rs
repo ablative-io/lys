@@ -187,6 +187,7 @@ fn keep(sessions: &Sessions, session: &str, attempt: &str, record: &RefusalRecor
     let commit = Commit {
         source: None,
         attempt: Some(attempt.to_owned()),
+        control: None,
     };
     let appended = table.feed.append(
         session,
