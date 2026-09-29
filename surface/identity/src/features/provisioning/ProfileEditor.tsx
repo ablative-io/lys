@@ -26,7 +26,10 @@ function server(data: FormData, draft: Draft): McpServer {
   try { env = JSON.parse(envText); } catch { throw new Error('The environment of MCP server ' + name + ' is not JSON.'); }
   if (!env || typeof env !== 'object' || Array.isArray(env)) throw new Error('The environment of MCP server ' + name + ' is not a JSON object.');
   if (!program) throw new Error('MCP server ' + name + ' needs the program it is started with.');
-  return { name, command: { program, args: lines(data, 'server-args-' + draft.key), ...(cwd ? { cwd } : {}), env: env as NonNullable<McpServer['command']>['env'] }, channel };
+  let args: unknown;
+  try { args = JSON.parse(field(data, 'server-args-' + draft.key) || '[]'); } catch { throw new Error('The arguments of MCP server ' + name + ' are not JSON.'); }
+  if (!Array.isArray(args) || !args.every((arg) => typeof arg === 'string')) throw new Error('The arguments of MCP server ' + name + ' are not a JSON array of strings.');
+  return { name, command: { program, args, ...(cwd ? { cwd } : {}), env: env as NonNullable<McpServer['command']>['env'] }, channel };
 }
 
 function permissions(data: FormData): Permissions | null {
@@ -75,7 +78,7 @@ export function ProfileEditor({ id, path, person, profile, changed }: { id: stri
           <label className="field">Started as<select value={draft.kind} onChange={(event) => kind(draft.key, event.target.value === 'command' ? 'command' : 'address')}><option value="address">An address</option><option value="command">A command</option></select></label>
           {draft.kind === 'address' ? <label className="field">Server address<input name={'server-url-' + draft.key} type="url" defaultValue={draft.url ?? ''} required /></label> : <>
             <label className="field">Program<input name={'server-program-' + draft.key} defaultValue={draft.command?.program ?? ''} required /></label>
-            <label className="field">Arguments, one per line<textarea name={'server-args-' + draft.key} defaultValue={draft.command?.args?.join('\n') ?? ''} /></label>
+            <label className="field">Arguments (a JSON array of strings, exactly as passed)<textarea name={'server-args-' + draft.key} defaultValue={JSON.stringify(draft.command?.args ?? [])} /></label>
             <label className="field">Directory<input name={'server-cwd-' + draft.key} defaultValue={draft.command?.cwd ?? ''} /></label>
             <label className="field">Environment (a JSON object; a secret as {'{"handle": "<secret name>"}'})<textarea name={'server-env-' + draft.key} defaultValue={JSON.stringify(draft.command?.env ?? {}, null, 2)} /></label>
           </>}
