@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, State};
-use axum::http::{Extensions, StatusCode, header};
+use axum::http::{Extensions, HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -87,6 +87,7 @@ fn unreachable_issuer(error: reqwest::Error) -> ServerError {
 /// through a provider it has begun and not finished.
 pub struct IssuerSignIn {
     api: String,
+    trusted_proxies: Vec<IpAddr>,
     callback: String,
     http: reqwest::Client,
     upstream: Mutex<Flights<upstream::Upstream>>,
@@ -285,6 +286,7 @@ impl IssuerSignIn {
             .map_err(|error| failed(error.to_string()))?;
         Ok(Self {
             api,
+            trusted_proxies: Vec::new(),
             callback,
             http,
             upstream: Mutex::new(Flights::default()),
@@ -295,10 +297,20 @@ impl IssuerSignIn {
 
     /// The issuer's sign-in API as `config` names it.
     pub fn configured(config: &Config) -> Result<Self, ServerError> {
-        Self::new(
+        let mut service = Self::new(
             config.sign_in_api(),
             provider_callback(&config.redirect_url)?,
-        )
+        )?;
+        service.trusted_proxies.clone_from(&config.trusted_proxies);
+        Ok(service)
+    }
+
+    pub(crate) fn address(
+        &self,
+        extensions: &Extensions,
+        headers: &HeaderMap,
+    ) -> Result<IpAddr, ServerError> {
+        crate::sign_in_address::resolve(person_address(extensions)?, headers, &self.trusted_proxies)
     }
 
     /// The address a sign-in provider sends a person back to.
@@ -464,6 +476,7 @@ pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response,
 async fn sign_in(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
+    headers: HeaderMap,
     body: Result<Json<SignInBody>, JsonRejection>,
 ) -> Result<Response, ServerError> {
     let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
@@ -476,7 +489,7 @@ async fn sign_in(
     let attempt = Attempt {
         email,
         password: &body.password,
-        address: person_address(&extensions)?,
+        address: state.sign_in.address(&extensions, &headers)?,
     };
     let actor = state.sign_in.password(&state.oidc, &attempt).await?;
     begin_session(&state, &actor)

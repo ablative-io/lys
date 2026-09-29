@@ -149,6 +149,7 @@ fn the_templates_render_from_the_recorded_choices_and_only_read() -> TestResult 
             serde_json::json!({"issuer": "http://localhost:18080/auth/v1/", "subject": "recorded-subject"}),
         ),
         products: None,
+        trusted_proxies: None,
     };
     let expected = server_config::render(&layout, &config, &carried, true);
     let service = file("identity.json")?;
@@ -210,5 +211,44 @@ fn a_rendered_file_names_its_length_never_its_bytes() -> TestResult {
         "a credential reached Debug"
     );
     assert!(shown.contains("compose.env"));
+    Ok(())
+}
+
+#[test]
+fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_carried() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let layout = installed_root(dir.path())?;
+    let config = DeploymentConfig::load(&layout.deployment_config())?;
+    let fresh = server_config::render(&layout, &config, &server_config::Carried::default(), false);
+    assert!(fresh.get("trusted_proxies").is_none());
+    for file in Templates.render(&layout, &own_build(), false)? {
+        if file.name == "identity.json" {
+            let value: serde_json::Value = serde_json::from_slice(&file.bytes)?;
+            assert!(value.get("trusted_proxies").is_none());
+        }
+    }
+    let original = std::fs::read(layout.service_config())?;
+    let mut explicitly_set: serde_json::Value = serde_json::from_slice(&original)?;
+    explicitly_set["trusted_proxies"] = serde_json::json!(["127.0.0.1", "::1"]);
+    private_files::write(
+        &layout.service_config(),
+        &serde_json::to_vec(&explicitly_set)?,
+    )?;
+    let before = std::fs::read(layout.service_config())?;
+    let mut checked = 0;
+    for file in Templates.render(&layout, &own_build(), false)? {
+        if file.name == "identity.json" {
+            let value: serde_json::Value = serde_json::from_slice(&file.bytes)?;
+            assert_eq!(value["trusted_proxies"], explicitly_set["trusted_proxies"]);
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 1);
+    assert_eq!(
+        std::fs::read(layout.service_config())?,
+        before,
+        "render never edits the old configuration"
+    );
     Ok(())
 }

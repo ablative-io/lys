@@ -51,6 +51,10 @@ pub struct Config {
     /// there server-side.
     #[serde(default)]
     pub sign_in_api: Option<String>,
+    /// Front proxies allowed to supply X-Forwarded-For; empty means trust
+    /// socket peers alone. These are distinct from the issuer's proxies.
+    #[serde(default)]
+    pub trusted_proxies: Vec<std::net::IpAddr>,
     /// The file holding the install's operator token. A request carrying it
     /// in the `lys-operator` header acts as the administrator, recorded as
     /// authenticated by the operator token. Without it no request may.

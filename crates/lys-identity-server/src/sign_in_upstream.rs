@@ -38,8 +38,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::{
-    IssuerSignIn, Opened, SIGN_IN_SCREEN, accepted, failed, person_address, query_value,
-    request_fields, unreachable_issuer,
+    IssuerSignIn, Opened, SIGN_IN_SCREEN, accepted, failed, query_value, request_fields,
+    unreachable_issuer,
 };
 use crate::error::ServerError;
 use crate::oidc::Oidc;
@@ -272,6 +272,7 @@ async fn begin(
     state: &AppState,
     extensions: &Extensions,
     id: &str,
+    headers: &HeaderMap,
 ) -> Result<(String, String), ServerError> {
     if id.is_empty()
         || !id
@@ -280,7 +281,7 @@ async fn begin(
     {
         return Err(failed("that sign-in provider is not set up"));
     }
-    let address = person_address(extensions)?;
+    let address = state.sign_in.address(extensions, headers)?;
     let (cookie, digest) =
         crate::provider_browser::begin(state.sign_in.callback().starts_with("https://"))?;
     let location = state
@@ -294,8 +295,9 @@ async fn start(
     State(state): State<Arc<AppState>>,
     extensions: Extensions,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Response {
-    match begin(&state, &extensions, &id).await {
+    match begin(&state, &extensions, &id, &headers).await {
         Ok((location, cookie)) => (
             StatusCode::SEE_OTHER,
             [(header::LOCATION, location), (header::SET_COOKIE, cookie)],
@@ -321,7 +323,7 @@ async fn finish(
     let (Some(code), Some(upstream)) = (back.code, back.state) else {
         return Err(failed("the provider did not sign the person in"));
     };
-    let address = person_address(extensions)?;
+    let address = state.sign_in.address(extensions, headers)?;
     let actor = state
         .sign_in
         .finish_provider(

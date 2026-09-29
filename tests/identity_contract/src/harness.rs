@@ -393,6 +393,7 @@ impl Service {
             client_secret_file: dir.path().join("client.secret"),
             redirect_url: format!("{base}/callback"),
             sign_in_api: Some(issuer.api().to_owned()),
+            trusted_proxies: Vec::new(),
             operator_token_file: None,
             operator_upgrade_file: None,
             administrator: Some(configured(ADMINISTRATOR)),
