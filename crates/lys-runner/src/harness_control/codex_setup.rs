@@ -1,6 +1,6 @@
 //! Setup frames for the existing single managed connection. This codec opens
 //! no connection and makes no package, containment or launch-capability claim.
-//! Shapes are pinned to bd3798fa, protocol/v1 Initialize and v2/config ConfigRead.
+//! Shapes are pinned to bd3798fa, protocol/v1 Initialize and v2/config `ConfigRead`.
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
