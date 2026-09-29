@@ -69,4 +69,28 @@ pub enum RunnerCommand {
         #[arg(long)]
         machine_key: PathBuf,
     },
+    /// Judge one tool call for a session's harness: the `PreToolUse` hook
+    /// command. Reads the hook's input on standard input, asks the runner on
+    /// --socket, and writes the harness's answer on standard output. Any
+    /// failure, from malformed input to a runner that cannot be reached, is
+    /// written as a deny with its reason; the command itself exits zero so
+    /// the harness reads that deny.
+    Judge {
+        /// The runner's Unix socket.
+        #[arg(long)]
+        socket: PathBuf,
+
+        /// The harness whose hook wire is read and written.
+        #[arg(long, value_enum)]
+        harness: JudgeHarness,
+    },
+}
+
+/// The harnesses `lys runner judge` speaks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum JudgeHarness {
+    /// Claude Code.
+    Claude,
+    /// Codex.
+    Codex,
 }

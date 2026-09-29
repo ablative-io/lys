@@ -32,6 +32,7 @@
 //! against any runner given its socket.
 
 pub mod admitted;
+pub mod claude_judge;
 pub mod client;
 pub mod codex_judge;
 pub mod codex_judge_client;

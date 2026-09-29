@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::codex_judge::{request, response};
 use crate::error::RunnerError;
+use crate::peer::PeerRequest;
 use crate::protocol::{Answer, read_reply};
 use crate::refusals::Verdict;
 
@@ -15,16 +16,21 @@ use crate::refusals::Verdict;
 /// choose a server-side identity: the connection itself is authenticated by
 /// the runner's existing peer ancestry checks. No second collector is started.
 pub fn ask(socket: &Path, stdin: &str) -> Result<Verdict, RunnerError> {
-    let request = request(stdin)?;
-    let line = serde_json::to_string(&request).map_err(|error| RunnerError::Malformed {
-        reason: format!("Codex judge request could not be encoded: {error}"),
+    exchange(socket, &request(stdin)?)
+}
+
+/// Send one judge request over the peer socket and read its verdict. Any
+/// harness's adapter shares this one exchange.
+pub fn exchange(socket: &Path, request: &PeerRequest) -> Result<Verdict, RunnerError> {
+    let line = serde_json::to_string(request).map_err(|error| RunnerError::Malformed {
+        reason: format!("the judge request could not be encoded: {error}"),
     })?;
     let mut connection = crate::connect(socket)?;
     connection.greeting()?;
     match read_reply(&connection.exchange(&line)?)? {
         Answer::Judged { verdict } => Ok(verdict),
         _ => Err(RunnerError::ReplyMalformed {
-            reason: "Codex judge received an answer for another act".to_owned(),
+            reason: "the judge received an answer for another act".to_owned(),
         }),
     }
 }
