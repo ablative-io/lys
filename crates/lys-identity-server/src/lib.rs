@@ -114,6 +114,7 @@ pub mod setup;
 pub mod sign_in;
 pub mod sign_in_providers;
 mod signed_first;
+pub mod skills_api;
 pub mod spicedb;
 mod spicedb_apps;
 mod spicedb_http;

@@ -64,6 +64,9 @@ impl Table {
                 .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
+        let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
+        let (status, kept) = service.post("/skills", Some(&ada), &skill).await?;
+        assert_eq!(status, 200, "{kept}");
         Ok(Self {
             service,
             seeded,
@@ -262,6 +265,7 @@ fn version(operation: &str, note: &str) -> Version {
             note: note.to_owned(),
             session: None,
             harness: None,
+            skill_pins: Vec::new(),
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

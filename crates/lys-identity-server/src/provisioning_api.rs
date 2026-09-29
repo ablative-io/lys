@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
 use crate::provisioning_store::{
-    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, Version,
+    McpServer, Profile, ProvisioningStore, Review, SessionSettings, Settings, SkillPin, Version,
 };
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -63,6 +63,8 @@ pub struct VersionView {
     pub instructions: String,
     /// Why this version was set.
     pub note: String,
+    /// Each named skill's text as this version was recorded with it.
+    pub skill_pins: Vec<SkillPin>,
     /// The harness build it is started with, null when none is declared.
     #[schema(value_type = Option<Object>)]
     pub harness: Option<DeclaredHarness>,
@@ -145,6 +147,7 @@ pub(crate) struct SetBody {
 /// The provisioning routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(crate::skills_api::routes())
         .route("/agents/{id}/provisioning", get(read).post(set))
         .route("/agents/{id}/provisioning/{version}/review", post(review))
 }
@@ -199,6 +202,7 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
         harness: body.harness.map(harness).transpose()?,
+        skill_pins: Vec::new(),
     };
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
@@ -265,6 +269,7 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
             mcp_servers: version.settings.mcp_servers.clone(),
             instructions: version.settings.instructions.clone(),
             note: version.settings.note.clone(),
+            skill_pins: version.settings.skill_pins.clone(),
             harness: version.settings.harness.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
@@ -327,6 +332,8 @@ async fn set(
         let agent = agent.to_string();
         with_provisioning(&state, |store| {
             let operation = version.operation.clone();
+            let mut version = version;
+            version.settings.skill_pins = store.pins(&version.settings.skills)?;
             let version = store.set(&agent, from_version, version)?;
             let recorded = Recorded { operation, version };
             Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))

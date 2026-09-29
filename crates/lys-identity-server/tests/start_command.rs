@@ -112,6 +112,12 @@ impl Table {
     }
 
     async fn profile(&self) -> TestResult {
+        let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
+        let (status, kept) = self
+            .service
+            .post("/skills", Some(&self.ada), &skill)
+            .await?;
+        assert_eq!(status, 200, "{kept}");
         let body = json!({
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
