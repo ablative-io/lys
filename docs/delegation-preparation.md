@@ -34,6 +34,12 @@ consent and revoke action. A pending-decision proof cannot revoke. The person ma
 revoke from a later authenticated session, even after the app binding has changed.
 The same authenticated revocation operation reads back its original receipt.
 
+Approve and decline have separate proofs because each nonce binds its choice.
+The future store must consume both proofs for the pending request atomically
+when either decision settles. The consent lookup then prevents the opposite
+proof, even under a new operation ID, from reopening that settled request.
+Proof expiry uses the existing session/request lifetime; no new TTL is introduced.
+
 These are pure plans, not a transactional nonce/consent store. A future caller
 must look up both operation and consent, compare and append atomically with nonce
 consumption, and prove durable readback before reporting success. It must never

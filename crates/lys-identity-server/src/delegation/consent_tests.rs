@@ -271,3 +271,21 @@ fn changed_revocation_retry_never_appends_again() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn opposite_choice_proof_cannot_reopen_a_settled_request() -> TestResult {
+    let request = request()?;
+    let (_, record) = approved(&request)?;
+    let command = DecisionCommand::new(
+        "decide-2".to_owned(),
+        request.clone(),
+        Choice::Decline,
+        "decline-proof",
+    )?;
+    let nonce = ActionNonce::for_decision(request.clone(), Choice::Decline, "decline-proof", 90)?;
+    assert_eq!(
+        plan_decision(&command, Some(&record), Some(&nonce), &current(&request)),
+        Err(Refusal::OperationReused)
+    );
+    Ok(())
+}
