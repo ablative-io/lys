@@ -3,9 +3,8 @@
  * checked here. An app registers itself through the API and nothing it
  * registers takes effect until the administrator approves it on this screen,
  * which shows its name, its redirect addresses and its whole schema in words
- * before the button. Approval shows the app's client secret once, here, and
- * it is kept nowhere; a schema change an app proposes waits here the same
- * way. The permission template is built and edited here too, and saved
+ * before the button. Approval offers to save the app's credentials directly
+ * in Lys secrets. A proposed schema change waits here the same way. The permission template is built and edited here too, and saved
  * through the same routes an upload uses.
  */
 import { useState } from 'react';
@@ -14,6 +13,8 @@ import { Gate } from '../signin/Gate';
 import { SchemaBuilder, send } from './SchemaBuilder';
 import type { SchemaJson } from './SchemaBuilder';
 import './apps.css';
+import { SaveCredentials, SavedCredentials } from './SaveCredentials';
+import type { StoredCredentials } from './SaveCredentials';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
@@ -51,8 +52,9 @@ export function Apps() {
   const [notice, setNotice] = useState('');
   const [registering, setRegistering] = useState(false);
   // An approval's secret is held here, above the list the approval reloads,
-  // and only in memory: it is shown once and kept nowhere.
+  // and only in memory until explicitly saved to the encrypted broker.
   const [issued, setIssued] = useState<Record<string, ClientIssued>>({});
+  const [stored, setStored] = useState<Record<string, StoredCredentials>>({});
   const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
   const changed = (message: string) => { setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
   return <section className="apps">
@@ -60,11 +62,11 @@ export function Apps() {
       <button type="button" className="btn" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
     {notice ? <p role="status">{notice}</p> : null}
     {registering ? <Register changed={changed} /> : null}
-    <Gate load={load} title="Apps" ok={(answer) => (answer.apps.length ? <>{answer.apps.map((app) => <AppCard key={app.id + ':' + revision} app={app} issued={issued[app.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [app.id]: client }))} changed={changed} />)}</> : <p>No app is registered.</p>)} />
+    <Gate load={load} title="Apps" ok={(answer) => (answer.apps.length ? <>{answer.apps.map((app) => <AppCard key={app.id + ':' + revision} app={app} stored={stored[app.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[app.id]:answer})); setIssued((held)=>{const next={...held};delete next[app.id];return next;}); }} issued={issued[app.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [app.id]: client }))} changed={changed} />)}</> : <p>No app is registered.</p>)} />
   </section>;
 }
 
-function AppCard({ app, issued, issue, changed }: { app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
+function AppCard({ app, issued, issue, changed, stored, saved }: { stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState('');
   const [refusal, setRefusal] = useState('');
@@ -80,10 +82,8 @@ function AppCard({ app, issued, issue, changed }: { app: AppRecord; issued: Clie
     <p className="note">Registered by {who(app.registered_by)}{app.version ? ', schema version ' + app.version : ''}{app.client_id ? ', sign-in client ' + app.client_id : ''}{app.service_account ? ', acting as ' + app.service_account : ''}.</p>
     {app.redirects.length ? <div><b>Redirect addresses</b><ul className="app-list">{app.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul></div> : null}
     <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><ul className="app-list" aria-label={'Schema of ' + app.id}>{words.map((line) => <li key={line}>{line}</li>)}</ul></div>
-    {issued ? <div className="app-secret" role="status" aria-label="Client secret, shown once">
-      <b>Copy these now. The secret is shown this once and kept nowhere.</b>
-      <dl><dt>Client id</dt><dd className="mono">{issued.client_id}</dd><dt>Client secret</dt><dd className="mono">{issued.client_secret}</dd><dt>API credential</dt><dd className="mono">{issued.credential}</dd></dl>
-    </div> : null}
+    {issued ? <SaveCredentials app={app.id} client={issued} saved={saved} /> : null}
+    {stored ? <SavedCredentials answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions">
       <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
       <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', {}, (answer) => { const client = (answer as { client: ClientIssued | null }).client; if (client) issue(client); changed(app.name + ' is approved: its sign-in client and its schema now take effect.'); }); }}>Approve {app.name}</button>

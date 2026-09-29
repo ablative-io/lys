@@ -109,17 +109,17 @@ pub(crate) fn caller(
     if !headers.contains_key(header::AUTHORIZATION) {
         return crate::grants::caller(state, headers, judged.directory);
     }
-    let account = match acting(state, judged.apps.held(), headers)? {
-        Acting::Registrar { service_account } => service_account,
-        Acting::App {
-            service_account: Some(service_account),
-            ..
-        } => service_account,
-        _ => {
-            return Err(ServerError::NotAdmitted {
-                reason: "the credential names no service account",
-            });
-        }
+    let (Acting::Registrar {
+        service_account: account,
+    }
+    | Acting::App {
+        service_account: Some(account),
+        ..
+    }) = acting(state, judged.apps.held(), headers)?
+    else {
+        return Err(ServerError::NotAdmitted {
+            reason: "the credential names no service account",
+        });
     };
     let identity = IdentityId::ServiceAccount(ServiceAccountId::from_str(&account)?);
     let record = judged

@@ -3,7 +3,7 @@
 //! log must retain its kind, and narrowing, retirement and revocation must
 //! apply through the same evaluator used for people and agents.
 
-mod support;
+use super::support;
 
 use std::error::Error;
 

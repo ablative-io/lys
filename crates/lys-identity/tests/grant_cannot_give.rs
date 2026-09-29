@@ -556,7 +556,7 @@ fn cannot_give_precedence() -> TestResult {
 #[test]
 fn cannot_give_order_table() {
     let mut cases = 0;
-    for mask in 1u8..64 {
+    for mask in 1u8..128 {
         let subset: Vec<CannotGiveReason> = CannotGiveReason::ALL
             .into_iter()
             .enumerate()
@@ -571,7 +571,7 @@ fn cannot_give_order_table() {
         );
         cases += 1;
     }
-    assert_eq!(cases, 63);
+    assert_eq!(cases, 127);
     assert_eq!(
         CannotGiveReason::ALL.map(CannotGiveReason::name),
         [
@@ -580,7 +580,8 @@ fn cannot_give_order_table() {
             "lent_to_you",
             "use_only",
             "people_only",
-            "agents_only"
+            "agents_only",
+            "recipient_kind_excluded"
         ]
     );
     assert_eq!(CannotGiveReason::first([]), None);

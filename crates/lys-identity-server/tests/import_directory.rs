@@ -268,3 +268,56 @@ async fn installed_estate_flow_is_admin_only_and_runs_as_real_loader() -> Outcom
     assert_eq!(extents(&service)?, after);
     Ok(())
 }
+
+#[tokio::test]
+async fn estate_without_installed_plan_names_configuration_refusal() -> Outcome {
+    let service = upgraded().await?;
+    let admin = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let before = extents(&service)?;
+    let answer = get(&service, "/identity/estate-plan", Auth::Cookie(&admin)).await?;
+    assert_eq!(answer.1["refusal"], "ConfigInvalid");
+    assert_ne!(answer.0, 200);
+    assert_eq!(extents(&service)?, before);
+    Ok(())
+}
+
+#[tokio::test]
+async fn import_preserves_named_action_and_recipient_refusals_without_grant_writes() -> Outcome {
+    let service = upgraded().await?;
+    let admin = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let me = ok(get(&service, "/me", Auth::Cookie(&admin)).await?)?;
+    let owner = me["person"]["id"].as_str().ok_or("no owner")?;
+    let people = ok(get(&service, "/directory/people", Auth::Cookie(&admin)).await?)?;
+    let person = people["people"]
+        .as_array()
+        .ok_or("no people")?
+        .iter()
+        .find(|p| p["id"] == owner)
+        .ok_or("owner missing")?;
+    let agent = person["agents"]
+        .as_array()
+        .ok_or("no agents")?
+        .iter()
+        .find(|a| a["state"] == "active")
+        .ok_or("no active agent")?["id"]
+        .as_str()
+        .ok_or("no agent id")?;
+    let resource = json!({"kind":"directory","id":"agents"});
+    let root=ok(post(&service,"/grants/roots",Auth::Cookie(&admin),&json!({"operation":op()?,"route":"browser","holder":owner,"resource":resource,"relation":"editor","window":{"starts_at":0,"ends_at":null},"pass_on":{"kind":"to","actions":["view","edit"],"recipients":["service_account","agent"]}})).await?)?;
+    let given=ok(post(&service,"/grants",Auth::Cookie(&admin),&json!({"operation":op()?,"route":"browser","source":root["grant"],"recipient":ACCOUNT,"responsible":owner,"resource":resource,"relation":"editor","window":{"starts_at":0,"ends_at":null},"pass_on":{"kind":"to","actions":["view"],"recipients":["agent"]}})).await?)?;
+    let before = extents(&service)?;
+    for (recipient, relation, name) in [
+        (agent, "editor", "ActionsOutside"),
+        (owner, "viewer", "RecipientRefused"),
+    ] {
+        let answer=post(&service,"/identity/import",Auth::Bearer(&credential()),&json!({"delegations":[{"name":name,"route":"api","source":given["grant"],"recipient":recipient,"responsible":owner,"resource":resource,"relation":relation,"window":{"starts_at":0,"ends_at":null},"pass_on":{"kind":"use_only"}}]})).await?;
+        assert_eq!(answer.1["refusal"], name, "{}", answer.1);
+        assert_ne!(answer.0, 200);
+        assert_eq!(extents(&service)?, before);
+    }
+    Ok(())
+}

@@ -52,7 +52,7 @@ export function EstateApproval() {
       const parsed=planOf(answer.plan);
       if(!/^op-[0-9a-f]{32}$/.test(answer.loader))throw new Error('The installed loader was not identified');
       if(current){setPlan(parsed);setAccount(answer.loader);}
-    }).catch((error)=>{if(current)setStatus(String(error));});
+    }).catch((error)=>{if(current)setStatus(error instanceof Refused ? error.refusal.refusal+': '+error.refusal.reason : String(error));});
     return ()=>{current=false;};
   },[]);
   const approve = async () => {

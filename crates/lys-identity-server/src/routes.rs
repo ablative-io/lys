@@ -49,6 +49,8 @@ pub struct AppState {
     pub setup_lock: tokio::sync::Mutex<()>,
     /// The private loader credential provisioned by install or upgrade.
     pub import_credential_file: Option<PathBuf>,
+    /// The fixed local destination for app credentials held by the broker.
+    pub identity_upstream: String,
     /// The estate plan placed beside the directory log by install or upgrade.
     pub estate_plan_file: PathBuf,
     /// Live sessions.
@@ -162,6 +164,20 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
     let state = Arc::new(AppState {
         import_credential_file: config.import_credential_file.clone(),
         estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
+        identity_upstream: format!(
+            "http://{}:{}{}",
+            if config.listen.is_ipv6() {
+                "[::1]"
+            } else {
+                "127.0.0.1"
+            },
+            config.listen.port(),
+            if config.surface_dir.is_some() {
+                "/api"
+            } else {
+                ""
+            }
+        ),
         directory: Mutex::new(directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,

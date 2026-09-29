@@ -256,7 +256,10 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
     server_state(&layout, &config)?;
-    private_files::write(&layout.data_dir().join("estate-approval.json"), layout::ESTATE_PLAN.as_bytes())?;
+    private_files::write(
+        &layout.data_dir().join("estate-approval.json"),
+        layout::ESTATE_PLAN.as_bytes(),
+    )?;
     let mut carried = server_config::carried(&layout)?.unwrap_or_default();
     if let Some(path) = &options.cambium_messages {
         carried.messages = Some(server_config::messages_from(path)?);

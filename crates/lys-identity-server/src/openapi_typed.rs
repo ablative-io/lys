@@ -25,6 +25,53 @@ pub(crate) fn typed(api: &mut Api) {
     let routes = [
         route(
             (
+                GET,
+                "/identity/estate-plan",
+                "Read the installed estate plan",
+            ),
+            S,
+            None,
+            Some(api.schema::<crate::estate_api::EstatePlanAnswer>()),
+            &[
+                APP_READ,
+                &[
+                    "NotAdmitted",
+                    "ConfigInvalid",
+                    "ServiceAccountUnknown",
+                    "RequestMalformed",
+                ],
+            ],
+        ),
+        route(
+            (
+                POST,
+                "/identity/estate-apply",
+                "Apply grants through the installed loader",
+            ),
+            S,
+            Some(api.schema::<crate::import_api::ImportDocument>()),
+            Some(api.schema::<crate::import_api::ImportAnswer>()),
+            &[
+                REGISTER,
+                &["ConfigInvalid", "ServiceAccountUnknown", "NotHeld"],
+            ],
+        ),
+        route(
+            (
+                POST,
+                "/apps/{app}/credentials/save",
+                "Save app credentials in Lys secrets",
+            ),
+            S,
+            Some(api.schema::<crate::apps_credentials::SaveBody>()),
+            Some(api.schema::<crate::apps_credentials::Saved>()),
+            &[
+                ADMIN_BODY,
+                &["credential_refused", "app_retired", "SecretsUnavailable"],
+            ],
+        ),
+        route(
+            (
                 POST,
                 "/identity/import",
                 "Import named entries as an independently authorised service account",

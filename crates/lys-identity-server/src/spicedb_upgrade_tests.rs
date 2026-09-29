@@ -1,5 +1,5 @@
 //! Upgrade starts from the old two-principal schema at a private HTTP fixture.
-//! The real SpiceDb::open path must write the new subject without losing old kinds.
+//! The real `SpiceDb::open` path must write the new subject without losing old kinds.
 use super::{Model, SpiceDb, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
@@ -100,7 +100,7 @@ fn opening_an_old_model_writes_service_account_subject_and_preserves_resources()
         },
         &model,
     );
-    let schema = fixture.join().map_err(|_| "fixture panicked")??;
+    let schema = fixture.join().map_err(|_panic| "fixture panicked")??;
     opened?;
     assert!(schema.contains("service_account with unexpired"));
     assert_eq!(schema.matches("definition service_account {").count(), 1);

@@ -448,8 +448,7 @@ fn an_earlier_builds_state_gains_what_this_service_reads_and_keeps_the_rest()
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("root");
     let layout = Layout::at(root.clone());
-    let config =
-        DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root.clone())?;
+    let config = DeploymentConfig::parse(&render_deployment(Some("owner@example.test")), root)?;
     crate::identity::prepare::materialise_all(&config)?;
     std::fs::create_dir_all(layout.grant_model().parent().ok_or("no parent")?)?;
     std::fs::write(layout.grant_model(), "an earlier build's model")?;

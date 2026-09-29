@@ -74,6 +74,17 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
                 .collect(),
             body: body.to_vec(),
         });
+    if path == "/_lys/apps/save" {
+        let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        let owner = parts
+            .headers
+            .get("lys-on-behalf-of")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("missing");
+        let app = asked["app"].as_str().unwrap_or("missing");
+        let prefix = format!("lys-app-{owner}-{app}");
+        return axum::Json(json!({"app":app,"client_secret_ref":format!("{prefix}-client"),"api_credential_ref":format!("{prefix}-api")})).into_response();
+    }
     answer(&path, &body)
 }
 
@@ -105,6 +116,10 @@ struct Setup {
 }
 
 async fn setup() -> Result<Setup, Box<dyn Error>> {
+    setup_with_person(ADA).await
+}
+
+async fn setup_with_person(subject: &str) -> Result<Setup, Box<dyn Error>> {
     let log: Log = Arc::default();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
@@ -120,7 +135,7 @@ async fn setup() -> Result<Setup, Box<dyn Error>> {
     };
     // The service reads its key once, at start, so the key file may go after.
     let (service, seeded) = Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-        Ok(seed_configured(config, [ADA, BEA])?)
+        Ok(seed_configured(config, [subject, BEA])?)
     })
     .await?;
     drop(keys);
@@ -388,5 +403,80 @@ async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
     let (status, body) = service.get("/secrets", Some(&cookie)).await?;
     assert_eq!(status, 502, "{body}");
     assert_eq!(body["refusal"], "SecretsUnavailable");
+    Ok(())
+}
+
+#[tokio::test]
+async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_signed_body()
+-> TestResult {
+    use identity_contract::apps::{Auth, ok, op, post, registration, workspace_schema};
+    use identity_contract::harness::ADMINISTRATOR;
+    let setup = setup_with_person(ADMINISTRATOR).await?;
+    let admin = setup.service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea = setup.service.sign_in(login(BEA)).await?;
+    let app = "fixture_save";
+    ok(post(
+        &setup.service,
+        "/apps",
+        Auth::Cookie(&admin),
+        &registration(app, &workspace_schema(app))?,
+    )
+    .await?)?;
+    let approved = ok(post(
+        &setup.service,
+        &format!("/apps/{app}/approve"),
+        Auth::Cookie(&admin),
+        &json!({"operation":op()?}),
+    )
+    .await?)?;
+    let secret = approved["client"]["client_secret"]
+        .as_str()
+        .ok_or("no secret")?;
+    let path = format!("/apps/{app}/credentials/save");
+    let body = json!({"client_secret":secret});
+    assert_eq!(
+        post(&setup.service, &path, Auth::Cookie(&bea), &body)
+            .await?
+            .0,
+        403
+    );
+    assert_ne!(
+        post(
+            &setup.service,
+            &path,
+            Auth::Cookie(&admin),
+            &json!({"client_secret":"wrong"})
+        )
+        .await?
+        .0,
+        200
+    );
+    let malformed = post(
+        &setup.service,
+        &path,
+        Auth::Cookie(&admin),
+        &json!({"client_secret": secret, "owner":"person-other"}),
+    )
+    .await?;
+    assert_eq!(malformed.0, 400);
+    assert_eq!(malformed.1["refusal"], "RequestMalformed");
+    assert!(!malformed.1.to_string().contains(secret));
+    assert!(
+        received(&setup.log).is_empty(),
+        "refusals never reached the broker"
+    );
+    let answer = ok(post(&setup.service, &path, Auth::Cookie(&admin), &body).await?)?;
+    assert!(!answer.to_string().contains(secret));
+    let calls = received(&setup.log);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].path, "/_lys/apps/save");
+    signed_as_received(&calls[0], &setup.key)?;
+    let saved: Value = serde_json::from_slice(&calls[0].body)?;
+    assert_eq!(saved["app"], app);
+    assert_eq!(saved["client_secret"], secret);
+    assert!(
+        saved.get("owner").is_none(),
+        "browser cannot supply an owner"
+    );
     Ok(())
 }
