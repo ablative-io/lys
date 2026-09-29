@@ -58,6 +58,8 @@ pub struct Options {
     pub admin_email: Option<String>,
     /// A compiled screens package to verify and place.
     pub surface: Option<PathBuf>,
+    /// The Cambium message connection to keep in the configuration.
+    pub cambium_messages: Option<PathBuf>,
 }
 
 fn write_plain(path: &Path, text: &str) -> IdentityResult<()> {
@@ -254,7 +256,11 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     }
     let surface_present = layout.surface_dir().join("index.html").is_file();
     server_state(&layout, &config)?;
-    let carried = server_config::carried(&layout)?.unwrap_or_default();
+    let mut carried = server_config::carried(&layout)?.unwrap_or_default();
+    if let Some(path) = &options.cambium_messages {
+        carried.messages = Some(server_config::messages_from(path)?);
+        emitter.note("Cambium message connection kept");
+    }
     let rendered = server_config::render(&layout, &config, &carried, surface_present);
     let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {
         IdentityError::new(

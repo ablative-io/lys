@@ -63,6 +63,12 @@ pub enum IdentityCommand {
         /// A compiled screens package to verify, place and serve.
         #[arg(long)]
         surface: Option<PathBuf>,
+        /// A JSON file holding the Cambium message connection: its `url`
+        /// and the `bindings` of each Cambium registry id to its Lys
+        /// identity. Kept in the service's configuration, and carried by
+        /// every later install and upgrade until another file replaces it.
+        #[arg(long)]
+        cambium_messages: Option<PathBuf>,
     },
 
     /// Upgrade a running install to the binaries in a folder, run with the
