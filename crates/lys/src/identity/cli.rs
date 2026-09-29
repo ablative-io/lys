@@ -19,9 +19,9 @@ pub enum IdentityCommand {
         /// A private file containing the account's bearer credential.
         #[arg(long)]
         credential_file: Option<PathBuf>,
-        /// The loopback listener; credentials are never sent off this machine.
-        #[arg(long, default_value = "127.0.0.1:8490")]
-        address: String,
+        /// Override the installed loopback listener; the route prefix still follows identity.json.
+        #[arg(long)]
+        address: Option<String>,
     },
     /// Validate the deployment configuration and materialise its private
     /// artifacts: generated or provided credentials and the compose
