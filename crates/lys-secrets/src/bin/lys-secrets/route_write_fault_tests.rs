@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! A partial route-file write must preserve existing routes when the layout reopens.
 use std::cell::RefCell;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use lys_secrets::SecretsError;
@@ -13,7 +14,11 @@ thread_local! {
 
 /// Model one underlying write accepting a prefix and then returning an I/O error.
 /// This seam exists only in test builds, on the actual file-write path.
-pub(crate) fn partial_write(path: &Path, bytes: &[u8]) -> Result<bool, SecretsError> {
+pub(crate) fn partial_write(
+    path: &Path,
+    destination: &mut std::fs::File,
+    bytes: &[u8],
+) -> Result<bool, SecretsError> {
     let fired = FAIL_PATH.with(|held| {
         let mut held = held.borrow_mut();
         if held.as_deref() == Some(path) {
@@ -24,10 +29,12 @@ pub(crate) fn partial_write(path: &Path, bytes: &[u8]) -> Result<bool, SecretsEr
         }
     });
     if fired {
-        std::fs::write(path, &bytes[..bytes.len() / 2]).map_err(|source| SecretsError::Io {
-            context: format!("injecting partial write to {}", path.display()),
-            source,
-        })?;
+        destination
+            .write_all(&bytes[..bytes.len() / 2])
+            .map_err(|source| SecretsError::Io {
+                context: format!("injecting partial write to {}", path.display()),
+                source,
+            })?;
     }
     Ok(fired)
 }
