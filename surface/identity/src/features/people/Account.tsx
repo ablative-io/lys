@@ -78,13 +78,13 @@ function samePasswords(form: FormData): string {
 }
 
 /** The signed-in person's own Lys account, on the You screen. */
-export function OwnAccount() {
+export function OwnAccount({ readOnly = false }: { readOnly?: boolean }) {
   const { account, setAccount, unavailable } = useAccount('/me/account');
   if (unavailable) return <div className="card" id="lys-account"><h2>Your Lys account</h2><p className="note">{unavailable}</p></div>;
   return <div className="card" id="lys-account">
     <h2>Your Lys account</h2>
     <p className="note">You sign in to Lys with {account?.email ?? 'your email'}.</p>
-    <Change label="Change your email" action="Change email" submit={async (form) => {
+    {readOnly ? null : <><Change label="Change your email" action="Change email" submit={async (form) => {
       const changed = await request<AccountView>('/me/account/email', { email: text(form, 'account-email').trim(), password: text(form, 'account-password') });
       setAccount(changed);
       return `You now sign in with ${changed.email ?? 'your new email'}.`;
@@ -99,7 +99,7 @@ export function OwnAccount() {
       <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
       <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
       <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-    </Change>
+    </Change></>}
   </div>;
 }
 

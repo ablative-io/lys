@@ -151,7 +151,7 @@ async fn me(
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
-        let person = match own_person(projection, &actor) {
+        let person = match crate::caller_admission::own_account_person(projection, &actor) {
             Err(ServerError::NoPerson) if state.admission.administrator(&actor).is_ok() => {
                 return Err(ServerError::SetupRequired);
             }

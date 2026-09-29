@@ -133,6 +133,15 @@ async fn bea(service: &Service, rauthy: &FakeRauthy, ada: &str) -> Result<String
         .post(&format!("/people/{id}/logins"), Some(ada), &bound)
         .await?;
     assert_eq!(status, 200, "{answer}");
+    // This test exercises an Active non-administrator's account permissions.
+    let (status, answer) = service
+        .post(
+            &format!("/identities/{id}/transitions"),
+            Some(ada),
+            &json!({ "operation": OperationId::generate()?.to_string(), "transition": "activate" }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
     Ok(id)
 }
 
