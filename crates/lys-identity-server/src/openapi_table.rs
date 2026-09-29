@@ -97,9 +97,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
-    POST "/agents/{id}/provisioning" "Set an agent's profile" S [ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"]];
+    POST "/agents/{id}/provisioning" "Set an agent's profile" S [ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable"]];
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [ADMIN_BODY];
-    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["runner_protocol_mismatch"]];
+    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["McpHandleUnsupported", "McpSettingUnrepresentable"], &["runner_protocol_mismatch"]];
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
     GET "/runtime/sessions" "Every runtime session" S [ADMIN];

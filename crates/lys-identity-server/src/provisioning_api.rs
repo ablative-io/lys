@@ -22,7 +22,6 @@ use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{AgentId, IdentityId, OperationId};
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 use crate::agent_sight::seen_agent;
@@ -129,7 +128,7 @@ pub(crate) struct SetBody {
     model_access: Vec<String>,
     tools: Vec<String>,
     skills: Vec<String>,
-    mcp_servers: Vec<McpServer>,
+    mcp_servers: Vec<crate::mcp_record::McpServerBody>,
     instructions: String,
     note: String,
     #[serde(default)]
@@ -183,42 +182,12 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
     Ok(kept)
 }
 
-fn servers(given: &[McpServer]) -> Result<Vec<McpServer>, ServerError> {
-    if given.len() > LIST_MAX {
-        return Err(malformed(format!(
-            "mcp_servers holds more than {LIST_MAX} servers"
-        )));
-    }
-    let mut kept: Vec<McpServer> = Vec::new();
-    for server in given {
-        let name = named("mcp_servers", &server.name)?;
-        let url = Url::parse(server.url.trim()).map_err(|error| {
-            malformed(format!(
-                "the URL of MCP server `{name}` does not read: {error}"
-            ))
-        })?;
-        if !matches!(url.scheme(), "http" | "https") {
-            return Err(malformed(format!(
-                "the URL of MCP server `{name}` is not http or https"
-            )));
-        }
-        if kept.iter().any(|other| other.name == name) {
-            return Err(malformed(format!("MCP server `{name}` is named twice")));
-        }
-        kept.push(McpServer {
-            name,
-            url: url.to_string(),
-        });
-    }
-    Ok(kept)
-}
-
-fn settings(body: &SetBody) -> Result<Settings, ServerError> {
+fn settings(body: SetBody) -> Result<Settings, ServerError> {
     Ok(Settings {
         model_access: names("model_access", &body.model_access)?,
         tools: names("tools", &body.tools)?,
         skills: names("skills", &body.skills)?,
-        mcp_servers: servers(&body.mcp_servers)?,
+        mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
@@ -321,10 +290,11 @@ async fn set(
         if directory.record(IdentityId::Agent(agent)).is_none() {
             return Err(ServerError::AgentNotVisible);
         }
+        let from_version = body.from_version;
         let version = Version {
             number: 0,
             operation: OperationId::from_str(&body.operation)?.to_string(),
-            settings: settings(&body)?,
+            settings: settings(body)?,
             set_by: own_person(directory, &actor)?.to_string(),
             set_at: now(),
             reviewed: None,
@@ -332,7 +302,7 @@ async fn set(
         let agent = agent.to_string();
         with_provisioning(&state, |store| {
             let operation = version.operation.clone();
-            let version = store.set(&agent, body.from_version, version)?;
+            let version = store.set(&agent, from_version, version)?;
             let recorded = Recorded { operation, version };
             Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))
         })

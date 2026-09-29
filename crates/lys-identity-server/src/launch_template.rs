@@ -13,11 +13,12 @@ use std::collections::BTreeSet;
 use lys_home::harness::claude_code::HARNESS;
 use lys_home::harness::claude_code::launch::shell_word;
 use lys_home::harness::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
+use lys_home::harness::launch_fields::Channel;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::error::ServerError;
-use crate::provisioning_store::Version;
+use crate::provisioning_store::{McpServer, Setting, Version};
 
 /// One handle the agent holds, as the start command names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
@@ -90,6 +91,16 @@ fn flags(version: &Version) -> Vec<String> {
         flags.push("--allowedTools".to_owned());
         flags.push(settings.tools.join(","));
     }
+    let waking: Vec<String> = settings
+        .mcp_servers
+        .iter()
+        .filter(|server| server.channel == Channel::Wake)
+        .map(|server| format!("server:{}", server.name))
+        .collect();
+    if !waking.is_empty() {
+        flags.push("--channels".to_owned());
+        flags.extend(waking);
+    }
     flags
 }
 
@@ -117,16 +128,50 @@ fn left_out(version: &Version) -> Vec<String> {
     left
 }
 
-fn template(start: &Start<'_>, handles: &[HandleName]) -> Value {
+/// A server's Claude Code entry: its address, or its stdio command with
+/// each setting as its text and each secret as the agent's handle id on it.
+fn server_entry(server: &McpServer, handles: &[HandleName]) -> Result<Value, ServerError> {
+    let Some(command) = &server.command else {
+        return Ok(json!({ "type": "http", "url": server.url }));
+    };
+    if command.cwd.is_some() {
+        return Err(ServerError::McpSettingUnrepresentable {
+            server: server.name.clone(),
+            member: "cwd".to_owned(),
+            reason: "Claude Code starts a stdio server with no directory of its own".to_owned(),
+        });
+    }
+    let mut env = Map::new();
+    for (variable, setting) in &command.env {
+        let text = match setting {
+            Setting::Literal(literal) => literal.text(),
+            Setting::Handle { handle: secret } => handles
+                .iter()
+                .find(|held| &held.secret == secret)
+                .map(|held| held.id.clone())
+                .ok_or_else(|| ServerError::McpHandleUnsupported {
+                    server: server.name.clone(),
+                    member: format!("env `{variable}`"),
+                    secret: secret.clone(),
+                })?,
+        };
+        env.insert(variable.clone(), Value::String(text));
+    }
+    Ok(json!({
+        "type": "stdio",
+        "command": command.program,
+        "args": command.args,
+        "env": env,
+    }))
+}
+
+fn template(start: &Start<'_>, handles: &[HandleName]) -> Result<Value, ServerError> {
     let settings = &start.version.settings;
     let mut servers = Map::new();
     for server in &settings.mcp_servers {
-        servers.insert(
-            server.name.clone(),
-            json!({ "type": "http", "url": server.url }),
-        );
+        servers.insert(server.name.clone(), server_entry(server, handles)?);
     }
-    json!({
+    Ok(json!({
         "harness": HARNESS,
         "flags": flags(start.version),
         "slots": {
@@ -148,14 +193,14 @@ fn template(start: &Start<'_>, handles: &[HandleName]) -> Value {
             },
             "instructions": settings.instructions,
         },
-    })
+    }))
 }
 
 /// Render `start` with the agent's `handles`: the template the home checks
 /// and keeps by hash, and the command a machine's runtime is given.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
-    let bytes = serde_json::to_vec_pretty(&template(start, handles))
+    let bytes = serde_json::to_vec_pretty(&template(start, handles)?)
         .map_err(|error| unrenderable(format!("the template does not write: {error}")))?;
     let parsed = parse_template(&bytes).map_err(|error| unrenderable(error.to_string()))?;
     let template = String::from_utf8(bytes)

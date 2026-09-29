@@ -38,6 +38,7 @@ pub mod grants_batch;
 pub mod launch_api;
 pub mod launch_template;
 pub mod link_audit_api;
+mod mcp_record;
 pub mod memory_api;
 pub mod network_api;
 pub mod network_store;

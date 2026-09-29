@@ -333,6 +333,40 @@ pub enum ServerError {
         /// What the home refused.
         reason: String,
     },
+    /// An MCP server's program, argument, setting or address carries a
+    /// credential where only a handle may; the value is never repeated.
+    #[error(
+        "McpCredentialInline: MCP server `{server}` carries a credential in {member}; give the secret as a handle"
+    )]
+    McpCredentialInline {
+        /// The server.
+        server: String,
+        /// Where in it.
+        member: String,
+    },
+    /// An MCP server's setting is not one the launch can carry.
+    #[error("McpSettingUnrepresentable: MCP server `{server}` {member}: {reason}")]
+    McpSettingUnrepresentable {
+        /// The server.
+        server: String,
+        /// Which setting.
+        member: String,
+        /// Why it cannot be carried.
+        reason: String,
+    },
+    /// An MCP server's setting names a secret the agent holds no handle on,
+    /// so nothing could resolve it at start.
+    #[error(
+        "McpHandleUnsupported: MCP server `{server}` {member} names secret `{secret}`, on which the agent holds no handle for the secrets broker to resolve"
+    )]
+    McpHandleUnsupported {
+        /// The server.
+        server: String,
+        /// Which setting.
+        member: String,
+        /// The secret it names.
+        secret: String,
+    },
     /// The runtime reports are not configured, or their log could not be read or written.
     #[error("RuntimeUnavailable: {reason}")]
     RuntimeUnavailable {

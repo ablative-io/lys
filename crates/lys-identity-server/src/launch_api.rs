@@ -337,9 +337,15 @@ async fn run(
 }
 
 /// Refuse by name the first host a server of `version` is reached at that
-/// `machine`'s egress list does not name.
+/// `machine`'s egress list does not name. A command server is started on
+/// the machine and reached over its own streams, so it names no host here.
 fn reaches(machine: &Machine, version: &Version) -> Result<(), ServerError> {
-    for server in &version.settings.mcp_servers {
+    for server in version
+        .settings
+        .mcp_servers
+        .iter()
+        .filter(|server| server.command.is_none())
+    {
         let host = url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
             reason: format!(
                 "server `{}` is reached at `{}`, which names no host",
