@@ -405,25 +405,7 @@ async fn approve(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     // Authenticate and check pending state before doing any broker work. Never
     // hold directory/apps locks across a network wait; recheck after custody.
-    let pending = with_apps(&state, |apps| {
-        administrator(&state, apps, &headers)?;
-        if let Some(line) = apps.held().operation(&operation) {
-            return match line {
-                Line::Approved(approved) if approved.app == id => Ok(false),
-                _ => Err(AppError::AppOperationReused {
-                    operation: operation.clone(),
-                }
-                .into()),
-            };
-        }
-        let app = apps
-            .app(&id)
-            .ok_or_else(|| AppError::AppUnknown { app: id.clone() })?;
-        if app.standing() != Standing::Pending {
-            return Err(AppError::AppDecided { app: id.clone() }.into());
-        }
-        Ok(true)
-    })?;
+    let pending = crate::apps_credentials::pending(&state, &headers, &id, &operation)?;
     let prepared = if pending && state.secrets.is_some() {
         Some(crate::apps_credentials::prepare(&state, &headers, &id).await?)
     } else {

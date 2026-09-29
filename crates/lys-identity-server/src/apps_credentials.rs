@@ -10,6 +10,8 @@ use serde_json::json;
 
 use crate::apps_api::with_apps;
 use crate::apps_binding::{acting, app_acting, sha256_hex};
+use crate::apps_error::AppError;
+use crate::apps_state::{Line, Standing};
 use crate::error::ServerError;
 use crate::routes::AppState;
 
@@ -114,4 +116,32 @@ pub(crate) async fn prepare(
         return Err(invalid());
     }
     Ok((digest, saved))
+}
+
+/// Check the approval's authority, operation and standing before broker custody.
+pub(crate) fn pending(
+    state: &AppState,
+    headers: &HeaderMap,
+    id: &str,
+    operation: &str,
+) -> Result<bool, ServerError> {
+    with_apps(state, |apps| {
+        acting(state, apps.held(), headers)?.administrator()?;
+        if let Some(line) = apps.held().operation(operation) {
+            return match line {
+                Line::Approved(approved) if approved.app == id => Ok(false),
+                _ => Err(AppError::AppOperationReused {
+                    operation: operation.to_owned(),
+                }
+                .into()),
+            };
+        }
+        let app = apps
+            .app(id)
+            .ok_or_else(|| AppError::AppUnknown { app: id.to_owned() })?;
+        if app.standing() != Standing::Pending {
+            return Err(AppError::AppDecided { app: id.to_owned() }.into());
+        }
+        Ok(true)
+    })
 }
