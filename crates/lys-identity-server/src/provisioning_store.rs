@@ -17,7 +17,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use lys_home::harness::launch_fields::{Channel, Literal};
+use lys_home::harness::launch_fields::{Channel, DeclaredHarness, Literal};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -93,6 +93,9 @@ pub struct Settings {
     /// How its sessions are driven through a runner, when the profile says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<SessionSettings>,
+    /// The harness build it is started with, as the operator declared it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness: Option<DeclaredHarness>,
 }
 
 /// How an agent's sessions are driven through a runner.

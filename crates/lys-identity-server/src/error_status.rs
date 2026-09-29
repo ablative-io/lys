@@ -137,6 +137,7 @@ impl ServerError {
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
             | Self::LaunchUnrenderable { .. }
+            | Self::HarnessUndeclared { .. }
             | Self::McpHandleUnsupported { .. }
             | Self::RuntimeSessionStarted { .. }
             | Self::RuntimeSessionStopped { .. }

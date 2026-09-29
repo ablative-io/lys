@@ -21,6 +21,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use lys_home::harness::launch_fields::DeclaredHarness;
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +63,9 @@ pub struct VersionView {
     pub instructions: String,
     /// Why this version was set.
     pub note: String,
+    /// The harness build it is started with, null when none is declared.
+    #[schema(value_type = Option<Object>)]
+    pub harness: Option<DeclaredHarness>,
     /// The person who set it.
     pub set_by: String,
     /// When it was set, in seconds since the Unix epoch.
@@ -133,6 +137,9 @@ pub(crate) struct SetBody {
     note: String,
     #[serde(default)]
     session: Option<SessionSettings>,
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    harness: Option<DeclaredHarness>,
 }
 
 /// The provisioning routes.
@@ -191,7 +198,20 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
+        harness: body.harness.map(harness).transpose()?,
     })
+}
+
+/// The declared build, refused when its program is not an absolute path or
+/// it names no package to verify the program against.
+fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
+    if !declared.program.starts_with('/') || declared.program.contains('\0') {
+        return Err(malformed("harness.program is not an absolute path"));
+    }
+    if declared.package.trim().is_empty() {
+        return Err(malformed("harness.package names no package"));
+    }
+    Ok(declared)
 }
 
 /// The session settings, each refused by name when a runner could not use it.
@@ -241,6 +261,7 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
             mcp_servers: version.settings.mcp_servers.clone(),
             instructions: version.settings.instructions.clone(),
             note: version.settings.note.clone(),
+            harness: version.settings.harness.clone(),
             set_by: version.set_by.clone(),
             set_at: version.set_at,
             reviewed_by: version.reviewed.as_ref().map(|review| review.by.clone()),
