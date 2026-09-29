@@ -174,6 +174,7 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
     use crate::identity::install::services;
     use lys_core::Ed25519Identity;
     use lys_runner::{Act, Answer, Client};
+    use std::os::unix::fs::PermissionsExt;
     use std::sync::Arc;
 
     struct RunnerCleanup(std::path::PathBuf);
@@ -183,7 +184,6 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
         }
     }
     let scratch = Scratch::new()?;
-    use std::os::unix::fs::PermissionsExt;
     for directory in [
         scratch.layout.run_dir(),
         scratch.layout.logs_dir(),
@@ -233,7 +233,7 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
         program: "/bin/cat".into(),
         arguments: vec![],
         directory: scratch.work().display().to_string(),
-        environment: Default::default(),
+        environment: std::collections::BTreeMap::default(),
         columns: 80,
         rows: 24,
         rotation: None,

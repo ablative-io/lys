@@ -302,7 +302,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         emitter.field("build", "build", build);
     }
     start_runner(&layout, &key, &services::sibling("lys")?, &mut |line| {
-        emitter.note(line)
+        emitter.note(line);
     })?;
     emitter.field("open", "url", Layout::service_url());
     emitter.field("sign-in for products", "issuer", Layout::service_url());
