@@ -6,6 +6,13 @@
 //! and nothing more. It is created under the operation id that names it, its
 //! members are added and removed one line at a time, and it is retired once.
 //! Every operation id names one line only.
+//!
+//! A membership kept before the rule that an agent joins only by its
+//! operator's act, and a person only by their own or the administrator's, is
+//! checked once under that rule. One the rule would refuse is held: it stays
+//! on the record, its member is sent no team goal, and the administrator
+//! confirms or removes it. The check is recorded once, so it never runs
+//! again.
 
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +57,32 @@ pub struct Changed {
     pub at: u64,
 }
 
+/// A membership held because the rule would now refuse how it was added.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Hold {
+    /// The operation id the hold was kept under.
+    pub operation: String,
+    /// The team.
+    pub team: String,
+    /// The person or agent held.
+    pub member: String,
+    /// Why the rule refuses how it was added.
+    pub reason: String,
+    /// When it was held, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
+/// The one check of the memberships kept before the rule.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Checked {
+    /// The operation id it was kept under.
+    pub operation: String,
+    /// When it was made, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
 /// One line of the log.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "line", rename_all = "snake_case")]
@@ -62,6 +95,12 @@ pub enum Line {
     Removed(Changed),
     /// A team retired.
     Retired(Changed),
+    /// A membership held under the rule.
+    Held(Hold),
+    /// A held membership the administrator confirmed.
+    Confirmed(Changed),
+    /// The memberships kept before the rule were checked.
+    Checked(Checked),
 }
 
 impl Line {
@@ -69,9 +108,12 @@ impl Line {
     pub fn operation(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
-            Self::Added(changed) | Self::Removed(changed) | Self::Retired(changed) => {
-                &changed.operation
-            }
+            Self::Added(changed)
+            | Self::Removed(changed)
+            | Self::Retired(changed)
+            | Self::Confirmed(changed) => &changed.operation,
+            Self::Held(hold) => &hold.operation,
+            Self::Checked(checked) => &checked.operation,
         }
     }
 
@@ -79,7 +121,12 @@ impl Line {
     pub fn team(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
-            Self::Added(changed) | Self::Removed(changed) | Self::Retired(changed) => &changed.team,
+            Self::Added(changed)
+            | Self::Removed(changed)
+            | Self::Retired(changed)
+            | Self::Confirmed(changed) => &changed.team,
+            Self::Held(hold) => &hold.team,
+            Self::Checked(_) => "",
         }
     }
 
@@ -89,9 +136,12 @@ impl Line {
         let mut line = self.clone();
         match &mut line {
             Self::Created(created) => created.at = at,
-            Self::Added(changed) | Self::Removed(changed) | Self::Retired(changed) => {
-                changed.at = at;
-            }
+            Self::Added(changed)
+            | Self::Removed(changed)
+            | Self::Retired(changed)
+            | Self::Confirmed(changed) => changed.at = at,
+            Self::Held(hold) => hold.at = at,
+            Self::Checked(checked) => checked.at = at,
         }
         line
     }
@@ -99,7 +149,12 @@ impl Line {
     fn received(&self) -> u64 {
         match self {
             Self::Created(created) => created.at,
-            Self::Added(changed) | Self::Removed(changed) | Self::Retired(changed) => changed.at,
+            Self::Added(changed)
+            | Self::Removed(changed)
+            | Self::Retired(changed)
+            | Self::Confirmed(changed) => changed.at,
+            Self::Held(hold) => hold.at,
+            Self::Checked(checked) => checked.at,
         }
     }
 
@@ -119,6 +174,9 @@ pub struct Team {
     pub members: Vec<String>,
     /// How it was retired, null while it is in use.
     pub retired: Option<Changed>,
+    /// Its memberships held under the rule, until confirmed or removed.
+    #[serde(default)]
+    pub held: Vec<Hold>,
     /// Every line kept on it after its creation, in order.
     pub changes: Vec<Line>,
 }
@@ -129,6 +187,9 @@ pub struct Team {
 pub struct Held {
     /// The teams.
     pub teams: Vec<Team>,
+    /// The one check of the memberships kept before the rule, once made.
+    #[serde(default)]
+    pub checked: Option<Checked>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -149,6 +210,10 @@ pub enum Refused {
     Held,
     /// The member is not in the team.
     Absent,
+    /// The membership is not held, so there is nothing to confirm.
+    NotHeld,
+    /// The memberships were already checked.
+    Checked,
 }
 
 impl Held {
@@ -159,21 +224,33 @@ impl Held {
 
     /// The line kept under `operation`, whichever kind it is.
     pub fn operation(&self, operation: &str) -> Option<Line> {
-        self.teams.iter().find_map(|team| {
-            if team.created.id == operation {
-                return Some(Line::Created(team.created.clone()));
-            }
-            team.changes
-                .iter()
-                .find(|line| line.operation() == operation)
-                .cloned()
-        })
+        self.teams
+            .iter()
+            .find_map(|team| {
+                if team.created.id == operation {
+                    return Some(Line::Created(team.created.clone()));
+                }
+                team.changes
+                    .iter()
+                    .find(|line| line.operation() == operation)
+                    .cloned()
+            })
+            .or_else(|| {
+                self.checked
+                    .as_ref()
+                    .filter(|checked| checked.operation == operation)
+                    .cloned()
+                    .map(Line::Checked)
+            })
     }
 
     /// Whether `line` may be kept on the teams as they stand, by reason.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
-        if let Line::Created(_) = line {
-            return Ok(());
+        match line {
+            Line::Created(_) => return Ok(()),
+            Line::Checked(_) if self.checked.is_some() => return Err(Refused::Checked),
+            Line::Checked(_) => return Ok(()),
+            _ => {}
         }
         let team = self.team(line.team()).ok_or(Refused::Unknown)?;
         if team.retired.is_some() {
@@ -183,6 +260,15 @@ impl Held {
             Line::Added(changed) if team.members.contains(&changed.member) => Err(Refused::Held),
             Line::Removed(changed) if !team.members.contains(&changed.member) => {
                 Err(Refused::Absent)
+            }
+            Line::Held(hold) if !team.members.contains(&hold.member) => Err(Refused::Absent),
+            Line::Held(hold) if team.held.iter().any(|held| held.member == hold.member) => {
+                Err(Refused::Held)
+            }
+            Line::Confirmed(changed)
+                if !team.held.iter().any(|held| held.member == changed.member) =>
+            {
+                Err(Refused::NotHeld)
             }
             _ => Ok(()),
         }
@@ -204,14 +290,22 @@ impl Held {
                 line.team()
             )
         })?;
-        if let Line::Created(created) = line {
-            self.teams.push(Team {
-                created,
-                members: Vec::new(),
-                retired: None,
-                changes: Vec::new(),
-            });
-            return Ok(());
+        match line {
+            Line::Created(created) => {
+                self.teams.push(Team {
+                    created,
+                    members: Vec::new(),
+                    retired: None,
+                    held: Vec::new(),
+                    changes: Vec::new(),
+                });
+                return Ok(());
+            }
+            Line::Checked(checked) => {
+                self.checked = Some(checked);
+                return Ok(());
+            }
+            _ => {}
         }
         let team = self
             .teams
@@ -220,9 +314,14 @@ impl Held {
             .ok_or_else(|| format!("team `{}` was never created", line.team()))?;
         match &line {
             Line::Added(changed) => team.members.push(changed.member.clone()),
-            Line::Removed(changed) => team.members.retain(|member| *member != changed.member),
+            Line::Removed(changed) => {
+                team.members.retain(|member| *member != changed.member);
+                team.held.retain(|held| held.member != changed.member);
+            }
             Line::Retired(changed) => team.retired = Some(changed.clone()),
-            Line::Created(_) => {}
+            Line::Held(hold) => team.held.push(hold.clone()),
+            Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
+            Line::Created(_) | Line::Checked(_) => {}
         }
         team.changes.push(line);
         Ok(())
