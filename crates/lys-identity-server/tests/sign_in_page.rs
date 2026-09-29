@@ -371,3 +371,30 @@ async fn the_served_sign_in_page_loads_nothing_from_the_issuer() -> TestResult {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn lys_limits_attempts_even_when_the_issuer_accepts_every_password() -> TestResult {
+    let service = Service::start().await?;
+    service.issuer.hold(account("person", EMAIL, false));
+    let browser = reqwest::Client::new();
+    for _ in 0..10 {
+        let answer = browser
+            .post(format!("{}/sign-in", service.base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(sign_in_body(EMAIL, PASSWORD))
+            .send()
+            .await?;
+        assert_eq!(answer.status(), 200);
+    }
+    let answer = browser
+        .post(format!("{}/sign-in", service.base))
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(sign_in_body(EMAIL, PASSWORD))
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 429);
+    assert!(answer.headers().get(reqwest::header::SET_COOKIE).is_none());
+    let body: Value = serde_json::from_str(&answer.text().await?)?;
+    assert_eq!(body["refusal"], "SignInThrottled");
+    Ok(())
+}
