@@ -60,6 +60,7 @@ fn replay_after_restart_reuses_sequence_and_cursor() -> Outcome {
 fn stale_index_recovers_control_identity_from_committed_log() -> Outcome {
     let dir = tempfile::tempdir()?;
     let mut feed = Feed::open(dir.path())?;
+    feed.append("session", 1, Vec::new(), Default::default())?;
     let index_path = dir.path().join("feed.index.json");
     let before = std::fs::read(&index_path)?;
     let source = source();
