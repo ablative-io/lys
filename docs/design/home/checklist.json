@@ -805,6 +805,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The launch carries every profile field (HOME-037)",
+      "items": [
+        {
+          "id": "C188",
+          "text": "The harness and its build are declared in Lys, never in code (HOME-037 R1).",
+          "done": false
+        },
+        {
+          "id": "C189",
+          "text": "Every model the profile lists is carried or refused by name (HOME-037 R2).",
+          "done": false
+        },
+        {
+          "id": "C190",
+          "text": "Skills reach the session's own config directory (HOME-037 R3).",
+          "done": false
+        },
+        {
+          "id": "C191",
+          "text": "Command-started MCP servers with typed settings, secrets only as handles, and their channel policy (HOME-037 R4).",
+          "done": false
+        },
+        {
+          "id": "C192",
+          "text": "The settings file carries the permissions from the profile and the Tool policy (HOME-037 R5).",
+          "done": false
+        },
+        {
+          "id": "C193",
+          "text": "A Codex launch renders for our declared Codex build (HOME-037 R6).",
+          "done": false
+        },
+        {
+          "id": "C194",
+          "text": "Proof: a real seat's setup recorded, rendered and compared (HOME-037 R7).",
+          "done": false
+        }
+      ]
     }
   ]
 }

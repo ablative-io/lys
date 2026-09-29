@@ -80,7 +80,8 @@
     "ADR-108",
     "ADR-110",
     "ADR-072",
-    "ADR-112"
+    "ADR-112",
+    "ADR-133"
   ],
   "goals": [
     "A few-shot session file written by hand resumes Claude Code by path, from a directory outside the config root, with the file preserved and the demonstration marked authored.",
@@ -1608,6 +1609,121 @@
       "path": "docs/design/home/briefs/HOME-033.json",
       "note": "the first draft of the Codex translation brief, written as HOME-004 and renumbered; HOME-009 is the translation that landed",
       "brief": "HOME-033"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_harness.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_harness.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_store.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_api.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_template.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "surface/identity/src/features/provisioning/Provisioning.tsx",
+      "note": "HOME-037 R1: the harness and its build are declared in lys, never in code",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_fields.rs",
+      "note": "HOME-037 R2: every model the profile lists is carried or refused by name",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_models.rs",
+      "note": "HOME-037 R2: every model the profile lists is carried or refused by name",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-home/src/harness/skills.rs",
+      "note": "HOME-037 R3: skills reach the session's own config directory",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-home/src/harness/skills_tests.rs",
+      "note": "HOME-037 R3: skills reach the session's own config directory",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_skills.rs",
+      "note": "HOME-037 R3: skills reach the session's own config directory",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_mcp.rs",
+      "note": "HOME-037 R4: command-started mcp servers, with secrets only as handles",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_mcp.rs",
+      "note": "HOME-037 R4: command-started mcp servers, with secrets only as handles",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_permissions.rs",
+      "note": "HOME-037 R5: the settings file carries the permissions from the profile and the tool policy",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_permissions.rs",
+      "note": "HOME-037 R5: the settings file carries the permissions from the profile and the tool policy",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/launch.rs",
+      "note": "HOME-037 R6: a codex launch renders for our declared codex build",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/launch_tests.rs",
+      "note": "HOME-037 R6: a codex launch renders for our declared codex build",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/launch_codex.rs",
+      "note": "HOME-037 R6: a codex launch renders for our declared codex build",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "scripts/identity-gates/launch-all.sh",
+      "note": "HOME-037 R7: proof: a real seat's setup recorded, rendered and compared",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "docs/design/home/PROOF-LAUNCH-ALL.md",
+      "note": "HOME-037 R7: proof: a real seat's setup recorded, rendered and compared",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "docs/design/project.json",
+      "note": "HOME-037 R7: proof: a real seat's setup recorded, rendered and compared",
+      "brief": "HOME-037"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-037.json",
+      "note": "the launch carries every profile field to Claude Code and our Codex build, or refuses it by name",
+      "brief": "HOME-037"
     }
   ],
   "inventory": [
