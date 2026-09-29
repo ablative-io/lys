@@ -1,9 +1,12 @@
 //! The person who holds the link-audit source login answers for every
 //! link-audit request, whether they signed in themselves or their agent
 //! signed the request. While that person is suspended, or once they are
-//! retired, neither path is admitted: the request is refused `NotAdmitted`
-//! naming the state, and nothing is recorded. A reinstated person answers
-//! again.
+//! retired, signed requests are refused `inactive` and ended sessions are
+//! refused `NotSignedIn`; nothing is recorded. DIRECTORY checklist C40 and
+//! caller_lifecycle.rs require this suspended/retired lifecycle boundary.
+//! Reinstatement permits a fresh session, never revives the ended one.
+//! Active non-source refusal remains covered by link_audit_lookup.rs
+//! `only_the_configured_source_may_ask`. Registered behavior is unchanged.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -169,8 +172,8 @@ impl Table {
             .ok_or("the checkpoint names no tree size")?)
     }
 
-    /// Both routes by both paths are refused, each naming `state`, and
-    /// nothing is recorded.
+    /// Both signed routes name the inactive state; both ended-cookie routes
+    /// refuse sign-in. Tree size measures no write, not pure admission calls.
     async fn refuses_all(&self, state: &str, seed: u8) -> TestResult {
         let before = self.recorded().await?;
         let signed_delivery = self
@@ -179,20 +182,23 @@ impl Table {
         let signed_question = self.signed(ASK, self.question(), &nonce(seed + 1)).await?;
         let session_delivery = self.in_session(DELIVER, self.delivery("op-1")).await?;
         let session_question = self.in_session(ASK, self.question()).await?;
-        let answers = [
-            signed_delivery,
-            signed_question,
-            session_delivery,
-            session_question,
-        ];
-        for answer in answers {
+        for answer in [signed_delivery, signed_question] {
             assert_eq!(answer.0, 403, "{}", answer.1);
-            assert_eq!(answer.1["refusal"], "NotAdmitted", "{}", answer.1);
+            assert_eq!(answer.1["refusal"], "inactive", "{}", answer.1);
             assert!(answer.1.get("receipt").is_none(), "{}", answer.1);
             assert!(answer.1.get("person").is_none(), "{}", answer.1);
             let said = answer.1.to_string();
             assert!(said.contains(state), "{said}");
-            assert!(said.contains("act: "), "{said}");
+            assert!(
+                said.contains(&self.seeded.people[1].id.to_string()),
+                "{said}"
+            );
+        }
+        for answer in [session_delivery, session_question] {
+            assert_eq!(answer.0, 401, "{}", answer.1);
+            assert_eq!(answer.1["refusal"], "NotSignedIn", "{}", answer.1);
+            assert!(answer.1.get("receipt").is_none(), "{}", answer.1);
+            assert!(answer.1.get("person").is_none(), "{}", answer.1);
         }
         assert_eq!(self.recorded().await?, before);
         Ok(())
@@ -201,7 +207,7 @@ impl Table {
 
 #[tokio::test]
 async fn a_suspended_holder_answers_for_nothing_until_reinstated() -> TestResult {
-    let table = Table::set().await?;
+    let mut table = Table::set().await?;
     table.moved("suspend").await?;
     table.refuses_all("suspended", 40).await?;
 
@@ -210,6 +216,10 @@ async fn a_suspended_holder_answers_for_nothing_until_reinstated() -> TestResult
         .signed(DELIVER, table.delivery("op-1"), &nonce(50))
         .await?;
     assert_eq!(answer.0, 200, "{}", answer.1);
+    let ended = table.in_session(ASK, table.question()).await?;
+    assert_eq!(ended.0, 401, "{}", ended.1);
+    assert_eq!(ended.1["refusal"], "NotSignedIn", "{}", ended.1);
+    table.source = table.service.sign_in(login(LINK_AUDIT_SOURCE)).await?;
     let answer: Answer = table.in_session(ASK, table.question()).await?;
     assert_eq!(answer.0, 200, "{}", answer.1);
     let expected: Value = json!({ "person": table.seeded.people[0].id.to_string() });
