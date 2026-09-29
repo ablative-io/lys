@@ -46,6 +46,7 @@ use crate::state::{Kept, KeptSession, StateFile};
 use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
+mod control;
 mod lifecycle;
 
 pub use crate::refusal_log::AuditGap;

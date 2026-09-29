@@ -20,7 +20,7 @@ pub enum RejectedItem {
 }
 
 /// The source of this evidence, distinct from a Lys judge or OS denial.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Source {
     /// Codex's typed item lifecycle event.
@@ -28,7 +28,7 @@ pub enum Source {
 }
 
 /// The pinned harness does not distinguish setup rejection from policy denial.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Cause {
     /// No structured authority identified why the item was declined.
@@ -38,7 +38,8 @@ pub enum Cause {
 /// A safe rejection projection. The transport owner must append it and its
 /// source cursor together through the existing durable refusal store before
 /// acknowledging the source. Producing this value is not a persistence receipt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "StoredRejection")]
 pub struct Rejection {
     source_id: String,
     source: Source,
@@ -49,11 +50,60 @@ pub struct Rejection {
     item_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredRejection {
+    source_id: String,
+    source: Source,
+    cause: Cause,
+    item: RejectedItem,
+    thread: String,
+    turn: String,
+    item_id: String,
+}
+
+fn source_id(thread: &str, turn: &str, id: &str, kind: RejectedItem) -> String {
+    let identity = json!(["lys-codex-rejection/v1", thread, turn, id, kind]).to_string();
+    hex(&Sha256::digest(identity.as_bytes()))
+}
+
+impl TryFrom<StoredRejection> for Rejection {
+    type Error = RunnerError;
+
+    fn try_from(stored: StoredRejection) -> Result<Self, Self::Error> {
+        if [&stored.thread, &stored.turn, &stored.item_id]
+            .into_iter()
+            .any(|id| id.trim().is_empty())
+            || source_id(&stored.thread, &stored.turn, &stored.item_id, stored.item)
+                != stored.source_id
+        {
+            return Err(RunnerError::refused(
+                "codex_rejection_record_invalid",
+                "stored rejection identity does not match its native item",
+            ));
+        }
+        Ok(Self {
+            source_id: stored.source_id,
+            source: stored.source,
+            cause: stored.cause,
+            item: stored.item,
+            thread: stored.thread,
+            turn: stored.turn,
+            item_id: stored.item_id,
+        })
+    }
+}
+
 impl Rejection {
     /// Stable across replay of the same thread, turn and item. Domain and
     /// item kind participate, preventing unrelated evidence from collapsing.
     pub fn source_id(&self) -> &str {
         &self.source_id
+    }
+
+    /// Native thread identity, for comparison with the durable event's source.
+    pub fn thread_id(&self) -> &str {
+        &self.thread
     }
 
     /// Plain, safe wording; it never says a person or policy denied the act.
@@ -129,9 +179,8 @@ pub fn rejection(thread: &str, notification: &Value) -> Result<Option<Rejection>
     }
     let turn = text(params, "turnId")?;
     let id = text(item, "id")?;
-    let identity = json!(["lys-codex-rejection/v1", thread, turn, id, kind]).to_string();
     Ok(Some(Rejection {
-        source_id: hex(&Sha256::digest(identity.as_bytes())),
+        source_id: source_id(thread, turn, id, kind),
         source: Source::CodexReported,
         cause: Cause::Unavailable,
         item: kind,

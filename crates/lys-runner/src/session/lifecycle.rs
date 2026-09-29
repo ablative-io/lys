@@ -315,6 +315,7 @@ impl Sessions {
         let commit = Commit {
             source: Some(source),
             attempt: None,
+            control: None,
         };
         if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
             crate::error::said(&format!(
@@ -340,6 +341,7 @@ pub(crate) fn append(table: &mut Table, id: &str, bodies: Vec<Body>, source: Opt
     let commit = Commit {
         source,
         attempt: None,
+        control: None,
     };
     if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
         crate::error::said(&format!("session {id}: coverage_incomplete: {error}"));

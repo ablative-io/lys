@@ -136,6 +136,7 @@ impl Deliver for Runner {
                 words: "typed into the session".to_owned(),
                 text: None,
                 ended: None,
+                control: None,
             };
             held.insert(operation.operation, (text, outcome.clone()));
             if self.lose_next.swap(false, Ordering::SeqCst) {

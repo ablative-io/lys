@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Native rejection fixtures distinguish unknown cause, failure and forged notify.
 
-use lys_runner::codex_refusals::rejection;
+use lys_runner::codex_refusals::{Rejection, rejection};
 use serde_json::{Value, json};
 use std::error::Error;
 
@@ -90,4 +90,33 @@ fn new_status_cannot_disappear_as_a_non_refusal() {
             );
         }
     }
+}
+
+#[test]
+fn durable_projection_roundtrips_without_losing_its_identity() -> TestResult {
+    let record =
+        rejection("bound-thread", &event("fileChange", "declined"))?.ok_or("no rejection")?;
+    let restored: Rejection = serde_json::from_value(serde_json::to_value(&record)?)?;
+    assert_eq!(restored, record);
+    assert_eq!(restored.thread_id(), "bound-thread");
+    Ok(())
+}
+
+#[test]
+fn a_stored_record_cannot_change_its_source_or_claim_a_known_cause() -> TestResult {
+    let record =
+        rejection("bound-thread", &event("commandExecution", "declined"))?.ok_or("no rejection")?;
+    let original = serde_json::to_value(record)?;
+    for (field, value) in [
+        ("thread", "other"),
+        ("source_id", "forged"),
+        ("cause", "lys_policy"),
+        ("source", "kernel"),
+        ("item_id", ""),
+    ] {
+        let mut changed = original.clone();
+        changed[field] = json!(value);
+        assert!(serde_json::from_value::<Rejection>(changed).is_err());
+    }
+    Ok(())
 }
