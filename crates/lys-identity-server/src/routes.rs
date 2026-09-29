@@ -6,9 +6,8 @@
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::extract::{Path, State};
+use axum::http::{HeaderMap, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{
@@ -230,6 +229,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         acts: Mutex::new(acts),
         say,
     });
+    crate::teams_migration::at_start(&state)?;
     crate::goals_api::remind_from(&state);
     crate::budgets_act::settle_at_start(&state);
     crate::refusals_follow::follow_at_start(&state);
@@ -298,7 +298,7 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
 /// The service's routes over `state`.
 pub fn router(state: Shared) -> Router {
     Router::new()
-        .route("/callback", get(callback))
+        .route("/callback", get(crate::sign_in_callback::callback))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
         .route("/identities", get(list))
@@ -394,45 +394,6 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
     PersonId::from_str(text)
         .map(IdentityId::Person)
         .map_err(ServerError::from)
-}
-
-#[derive(Deserialize)]
-struct Answer {
-    code: String,
-    state: String,
-}
-
-async fn callback(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Query(answer): Query<Answer>,
-) -> Result<Response, ServerError> {
-    let actor = state.oidc.finish(answer.code, &answer.state).await?;
-    if wants_page(&headers) {
-        let cookie = crate::session_admission::begin(&state, actor)?;
-        return Ok((
-            StatusCode::SEE_OTHER,
-            [
-                (header::SET_COOKIE, cookie),
-                (header::LOCATION, "/".to_owned()),
-            ],
-        )
-            .into_response());
-    }
-    crate::sign_in::begin_session(&state, &actor)
-}
-
-/// Whether the caller is a browser following the sign-in, which is taken to the
-/// screens, rather than a program, which is answered the signed-in JSON.
-fn wants_page(headers: &HeaderMap) -> bool {
-    headers
-        .get(header::ACCEPT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|accept| {
-            accept
-                .split(',')
-                .any(|kind| kind.trim().starts_with("text/html"))
-        })
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]

@@ -154,7 +154,11 @@ fn standing(state: &AppState, agent: &str) -> Result<Standing, ServerError> {
             Ok(store
                 .teams()
                 .iter()
-                .filter(|team| team.retired.is_none() && team.members.iter().any(|m| m == agent))
+                .filter(|team| {
+                    team.retired.is_none()
+                        && team.members.iter().any(|m| m == agent)
+                        && !team.held.iter().any(|held| held.member == agent)
+                })
                 .map(|team| team.created.id.clone())
                 .collect())
         })?

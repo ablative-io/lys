@@ -501,6 +501,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             Some(retire_team.clone()),
             Some(changed.clone()),
         ),
+        (
+            POST,
+            "/teams/{id}/members/{member}/confirm",
+            Some(retire_team.clone()),
+            Some(changed.clone()),
+        ),
         (POST, "/teams/{id}/retire", Some(retire_team), Some(changed)),
         (GET, "/resources", None, Some(api.schema::<ResourceList>())),
         (GET, "/secrets", None, None),

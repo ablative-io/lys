@@ -56,6 +56,8 @@ pub struct TeamView {
     pub description: String,
     /// Its members, people and agents, in the order added.
     pub members: Vec<String>,
+    /// Memberships excluded from team actions until an administrator confirms them.
+    pub held: Vec<crate::teams_state::Hold>,
     /// `active`, or `retired` once retired.
     pub state: String,
     /// The login that created it.
@@ -132,6 +134,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/teams/{id}/members", post(add))
         .route("/teams/{id}/members/{member}/remove", post(remove))
         .route("/teams/{id}/retire", post(retire))
+        .route("/teams/{id}/members/{member}/confirm", post(confirm))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -163,6 +166,7 @@ fn view(team: &Team) -> TeamView {
         name: created.name.clone(),
         description: created.description.clone(),
         members: team.members.clone(),
+        held: team.held.clone(),
         state: if team.retired.is_some() {
             "retired"
         } else {
@@ -175,26 +179,41 @@ fn view(team: &Team) -> TeamView {
     }
 }
 
-fn recorded(line: &Line) -> Recorded {
+fn recorded(line: &Line) -> Result<Recorded, ServerError> {
     let (act, member) = match line {
         Line::Created(_) => ("created", None),
         Line::Added(changed) => ("added", Some(changed.member.clone())),
         Line::Removed(changed) => ("removed", Some(changed.member.clone())),
         Line::Retired(_) => ("retired", None),
+        Line::Confirmed(changed) => ("confirmed", Some(changed.member.clone())),
+        Line::Held(_) | Line::Checked(_) => {
+            return Err(ServerError::TeamsUnavailable {
+                reason: format!(
+                    "operation `{}` records a system migration, not a caller act",
+                    line.operation()
+                ),
+            });
+        }
     };
     let (by, at) = match line {
         Line::Created(created) => (created.by.clone(), created.at),
-        Line::Added(changed) | Line::Removed(changed) | Line::Retired(changed) => {
-            (changed.by.clone(), changed.at)
+        Line::Added(changed)
+        | Line::Removed(changed)
+        | Line::Retired(changed)
+        | Line::Confirmed(changed) => (changed.by.clone(), changed.at),
+        Line::Held(_) | Line::Checked(_) => {
+            return Err(ServerError::TeamsUnavailable {
+                reason: "a system migration has no authenticated caller".to_owned(),
+            });
         }
     };
-    Recorded {
+    Ok(Recorded {
         operation: line.operation().to_owned(),
         act: act.to_owned(),
         member,
         by,
         at,
-    }
+    })
 }
 
 /// Keep `line` and answer the team as it stands beside the line its
@@ -209,7 +228,7 @@ fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
         })?;
     Ok(TeamChanged {
         team: view(&team),
-        recorded: recorded(&first),
+        recorded: recorded(&first)?,
     })
 }
 
@@ -245,6 +264,7 @@ async fn create(
         return Err(malformed("a team has a name"));
     }
     let description = words("description", &body.description, DESCRIPTION_MAX)?;
+    crate::teams_migration::advance(&state)?;
     with_directory(&state, |directory| {
         let owner = own_person(directory.projection()?, &actor)?;
         let line = Line::Created(Created {
@@ -269,6 +289,7 @@ fn change(
     id: &str,
     made: impl FnOnce(String, Login) -> Result<Line, ServerError>,
 ) -> Result<TeamChanged, ServerError> {
+    crate::teams_migration::advance(state)?;
     let administrator = state.admission.administrator(actor).is_ok();
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -426,6 +447,23 @@ async fn one(
     let id = team_id(&id)?;
     with_teams(&state, |store| {
         store.team(&id).map(view).ok_or(ServerError::TeamUnknown)
+    })
+    .map(Json)
+}
+
+async fn confirm(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((id, member)): Path<(String, String)>,
+    body: Result<Json<RetireBody>, JsonRejection>,
+) -> Result<Json<TeamChanged>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
+    crate::teams_migration::require_committed(&state)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let id = team_id(&id)?;
+    change(&state, &actor, &id, |team, by| {
+        changed(&body.operation, team, member, by).map(Line::Confirmed)
     })
     .map(Json)
 }

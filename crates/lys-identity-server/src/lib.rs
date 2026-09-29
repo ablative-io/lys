@@ -106,6 +106,7 @@ pub mod session_store;
 pub mod sessions_api;
 pub mod setup;
 pub mod sign_in;
+mod sign_in_callback;
 pub mod sign_in_providers;
 pub mod spicedb;
 mod spicedb_apps;
@@ -115,6 +116,7 @@ pub mod stops_state;
 pub mod stops_store;
 pub mod surface;
 pub mod teams_api;
+pub mod teams_migration;
 pub mod teams_state;
 pub mod teams_store;
 

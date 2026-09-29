@@ -175,11 +175,18 @@ fn team(state: &AppState, id: &str) -> Result<crate::teams_state::Team, ServerEr
 fn judged(state: &AppState, holder: &Holder) -> Result<Vec<String>, ServerError> {
     match holder.kind {
         HolderKind::Agent => Ok(vec![holder.id.clone()]),
-        HolderKind::Team => Ok(team(state, &holder.id)?
-            .members
-            .into_iter()
-            .filter(|member| AgentId::from_str(member).is_ok())
-            .collect()),
+        HolderKind::Team => {
+            let team = team(state, &holder.id)?;
+            Ok(team
+                .members
+                .iter()
+                .filter(|member| {
+                    AgentId::from_str(member).is_ok()
+                        && !team.held.iter().any(|held| held.member == **member)
+                })
+                .cloned()
+                .collect())
+        }
     }
 }
 
