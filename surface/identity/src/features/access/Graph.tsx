@@ -1,6 +1,6 @@
 /** Every person, agent and resource, and the relations between them, laid out by a small force simulation. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent, WheelEvent } from 'react';
+import type { PointerEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
@@ -130,12 +130,22 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
     const w = Math.min(bounds.w * 3, Math.max(bounds.w / 8, v.w * factor)); const k = w / v.w;
     return { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w, h: v.h * k };
   });
-  const onWheel = (event: WheelEvent<SVGSVGElement>) => {
+  const onWheel = (event: globalThis.WheelEvent) => {
+    event.preventDefault();
     const box = svg.current?.getBoundingClientRect();
     if (!box) return;
     const cx = view.x + (event.clientX - box.left) * scale(), cy = view.y + (event.clientY - box.top) * scale();
     zoom(Math.min(1.08, Math.max(1 / 1.08, Math.exp(event.deltaY * 0.0015))), cx, cy);
   };
+  const wheel = useRef(onWheel);
+  wheel.current = onWheel;
+  useEffect(() => {
+    const node = svg.current;
+    if (!node) return;
+    const listen = (event: globalThis.WheelEvent) => wheel.current(event);
+    node.addEventListener('wheel', listen, { passive: false });
+    return () => node.removeEventListener('wheel', listen);
+  }, []);
   const onDown = (event: PointerEvent<SVGSVGElement>) => { event.preventDefault(); window.getSelection()?.removeAllRanges(); drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
   const onMove = (event: PointerEvent<SVGSVGElement>) => {
     const start = drag.current;
@@ -162,7 +172,7 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
       <div className="graph-wrap">
         <div className="graph-zoom"><button className="btn" onClick={() => zoom(1 / 1.3)} aria-label="Zoom in">+</button><button className="btn" onClick={() => zoom(1.3)} aria-label="Zoom out">−</button><button className="btn" onClick={() => setView(bounds)}>Fit</button></div>
         <svg ref={svg} onClick={clear} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} role="img" aria-label="Permission graph"
-          onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { drag.current = null; }}>
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { drag.current = null; }}>
           {edges.map((edge, index) => {
             const a = at.get(edge.a), b = at.get(edge.b);
             if (!a || !b) return null;

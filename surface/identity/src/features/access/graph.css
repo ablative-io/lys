@@ -26,3 +26,4 @@
 .graph-wrap, .graph-wrap * { user-select: none; -webkit-user-select: none; } .graph-wrap svg:active { cursor: grabbing; }
 .graph-zoom { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; z-index: 1; }
 .graph-wrap svg:focus, .graph-wrap svg:focus-visible { outline: none; }
+.graph-wrap { overscroll-behavior: contain; }
