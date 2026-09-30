@@ -28,13 +28,14 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, mpsc};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
 
 use crate::admitted::Admitted;
 use crate::error::RunnerError;
+use crate::input::Input;
 use crate::judge::Policy;
 use crate::operations::Operations;
 use crate::peer::Leader;
@@ -47,6 +48,7 @@ use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
 mod lifecycle;
+mod restart;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
@@ -66,10 +68,14 @@ pub fn now_ms() -> u64 {
 
 /// The live ends of a running process.
 pub(crate) struct Live {
-    pub(crate) writer: Box<dyn Write + Send>,
+    pub(crate) writer: Input,
     master: Box<dyn MasterPty + Send>,
     pid: u32,
 }
+
+#[cfg(test)]
+#[path = "../tests/input_no_screen/shared_lock.rs"]
+mod input_no_screen;
 
 impl Live {
     /// End the process and everything it started, naming a failure in the
@@ -172,6 +178,7 @@ impl Session {
 
 /// The table every thread shares.
 pub(crate) struct Table {
+    pub(crate) owner: Weak<Sessions>,
     pub(crate) sessions: BTreeMap<String, Session>,
     stopping: bool,
     pub(crate) feed: Feed,
@@ -234,6 +241,7 @@ impl Sessions {
         let state = StateFile::open(state_dir)?;
         let found_at = now_ms();
         let mut table = Table {
+            owner: Weak::new(),
             sessions: BTreeMap::new(),
             stopping: false,
             feed: Feed::open(state_dir)?,
@@ -270,14 +278,18 @@ impl Sessions {
                 },
             );
         }
-        let sessions = Arc::new(Self {
-            table: Mutex::new(table),
-            changed: Condvar::new(),
-            state,
-            state_dir: state_dir.canonicalize().map_err(|error| {
-                RunnerError::refused("launch_config_refused", error.to_string())
-            })?,
-            scrollback,
+        let state_dir = state_dir.canonicalize().map_err(|error| {
+            RunnerError::refused("launch_config_refused", error.to_string())
+        })?;
+        let sessions = Arc::new_cyclic(|owner| {
+            table.owner = owner.clone();
+            Self {
+                table: Mutex::new(table),
+                changed: Condvar::new(),
+                state,
+                state_dir,
+                scrollback,
+            }
         });
         let table = sessions.lock();
         sessions.persist(&table)?;
@@ -442,13 +454,12 @@ impl Sessions {
 
     /// Type `bytes` into session `id`.
     pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
-        let mut table = self.lock();
-        let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        let live = session.live(id)?;
-        live.writer
-            .write_all(bytes)
-            .and_then(|()| live.writer.flush())
-            .map_err(|error| RunnerError::refused("write_failed", error.to_string()))
+        let writer = {
+            let mut table = self.lock();
+            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+            session.live(id)?.writer.clone()
+        };
+        writer.write(bytes.to_vec())
     }
 
     /// Type `text`, then Enter when asked.

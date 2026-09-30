@@ -50,6 +50,7 @@ pub mod containment_policy;
 pub mod containment_stdio;
 pub mod dial;
 pub mod error;
+mod input;
 pub mod judge;
 pub mod launch_config;
 pub mod operations;

@@ -5110,6 +5110,36 @@
       "brief": "DIRECTORY-075"
     },
     {
+      "path": "crates/lys-runner/src/input.rs",
+      "note": "Per-session ordered writes complete by signal without holding the shared session table (DIRECTORY-073 R3)",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/input_no_screen/shared_lock.rs",
+      "note": "A full input pipe leaves a second session answering without a clock (DIRECTORY-073 R3)",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/src/session/restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/src/operations/restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/peer_restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/peer_restart/cases.rs",
+      "note": "Peer proof, held launch and operation replay through an injected process tree",
+      "brief": "DIRECTORY-073"
+    },
+    {
       "path": "crates/lys-identity-server/src/harness_catalogue.rs",
       "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
       "brief": "DIRECTORY-076"

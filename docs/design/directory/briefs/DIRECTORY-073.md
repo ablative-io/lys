@@ -2,10 +2,10 @@
 type: brief
 id: DIRECTORY-073
 cluster: directory
-title: Lys restarts a seat from its latest reviewed profile version, a seat can ask to restart itself, and prompts reach a seat with no screen open
+title: Operators restart reviewed profiles, proved peers restart their held launch, and prompts reach unwatched sessions
 ---
 
-# DIRECTORY-073: Lys restarts a seat from its latest reviewed profile version, a seat can ask to restart itself, and prompts reach a seat with no screen open
+# DIRECTORY-073: Operators restart reviewed profiles, proved peers restart their held launch, and prompts reach unwatched sessions
 
 > **Cluster:** directory
 > **Design anchor:**
@@ -25,7 +25,7 @@ Lys can start a seat and end it (runner end, runner_acts.rs), and a budget alrea
 
 ## Task
 
-Add a restart: end the agent's live session, wait on its end event, and start it again from its latest reviewed profile version through the existing start path. Let a session restart itself by presenting its own session credential, and only itself. Prove that a compaction request and a goal reminder reach a session that no screen is reading, after reading Manifold's send-keys to take over what it gets right. Out: new kinds of prompt.
+Add an operator restart that ends a selected live session, waits on its end event and starts a new session from the latest reviewed profile through the existing start path. Add a runner peer restart that proves the caller by socket credentials and ancestry and restarts only its own held signed launch, with unchanged credentials and no call to the identity server. Prove compaction, notices and reminders reach unwatched sessions without blocking another session. No new prompt kind.
 
 ## Requirements
 
@@ -44,6 +44,10 @@ Behavioural. WHEN a person or lead with the start right restarts an agent, THE S
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/runner_acts.rs
+- modify: crates/lys-identity-server/src/launch_api.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
 
 **Checklist:**
 - C466 — A restart ends the live session and starts it from the latest reviewed version. (DIRECTORY-073 R1).
@@ -51,17 +55,24 @@ Behavioural. WHEN a person or lead with the start right restarts an agent, THE S
 **Stories:**
 - S187 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As the person setting agent context and reminders, I want Lys to restart a seat onto its new settings and prompt a seat nobody is watching, so that Argus and Manifold are no longer needed for either.
 
-### R2: A seat restarts itself, and only itself
+### R2: A proved peer restarts its own held launch
 
-Behavioural. WHEN a session asks for a restart presenting its own session credential, THE SYSTEM SHALL restart that session's agent as in R1, and SHALL refuse a session asking to restart any other agent as restart_not_self naming both.
+Behavioural. WHEN a peer on the runner socket asks for a restart, THE RUNNER SHALL prove it by socket credentials and ancestry through peer.rs, SHALL restart only the proved session from its held signed Launch with the same credentials, and SHALL record the operation under its stable id without calling the identity server. A session claim in the request SHALL be ignored. An unproved peer SHALL be refused as not_a_session and a session with no held Launch SHALL be refused by name.
 
 **Acceptance:**
-- A seat asking for its own restart comes back on its latest reviewed version.
-- A seat asking to restart another is refused by name.
+- The proved session exits and restarts from its held Launch with unchanged credentials.
+- A request naming another session affects only the proved session.
+- An unproved peer is refused as not_a_session.
+- A replayed operation id answers its kept outcome and never restarts twice.
 
 **Files:**
-- modify: crates/lys-identity-server/src/restart_api.rs
-- modify: crates/lys-identity-server/tests/restart_api.rs
+- create: crates/lys-runner/src/session/restart.rs
+- create: crates/lys-runner/src/operations/restart.rs
+- create: crates/lys-runner/tests/peer_restart.rs
+- create: crates/lys-runner/tests/peer_restart/cases.rs
+- modify: crates/lys-runner/src/peer.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/operations.rs
 
 **Checklist:**
 - C467 — A seat can restart itself and no other. (DIRECTORY-073 R2).
@@ -71,17 +82,24 @@ Behavioural. WHEN a session asks for a restart presenting its own session creden
 
 ### R3: Compaction and reminders reach a session no screen is reading
 
-Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits.
+Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits. Each session has its own ordered write path. A full input pipe never holds the shared session table; completion arrives by signal, with no timeout.
 
 **Acceptance:**
 - A compaction request reaches a session with no viewer and the session compacts.
 - A goal reminder reaches a session with no viewer.
 - A second session keeps answering while the first is being written to.
+- A signal-controlled full input pipe leaves the shared session table available and a second session answers before that pipe is released.
 
 **Files:**
 - create: crates/lys-identity-server/tests/input_no_screen.rs
+- create: crates/lys-runner/src/input.rs
+- create: crates/lys-runner/tests/input_no_screen/shared_lock.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/operations.rs
+- modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/session/lifecycle.rs
 
 **Checklist:**
 - C468 — Compaction requests and reminders reach a session nobody is watching without blocking another. (DIRECTORY-073 R3).

@@ -18,17 +18,20 @@
 //! exit is seen. The record keeps each outcome and a digest of its text,
 //! never the text itself.
 
-use std::collections::BTreeMap;
-use std::io::Write;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::RunnerError;
 use crate::protocol::{Ended, Key};
-use crate::session::{Session, Sessions, Table, now_ms};
+use crate::session::{Sessions, Table, now_ms};
 use crate::tracking_store::{Body, Commit};
+
+mod restart;
+pub(crate) use restart::{begin_restart, finish_restart};
 
 /// The format of the record of operations.
 pub const FORMAT: &str = "lys-runner-operations/v1";
@@ -160,6 +163,7 @@ pub(crate) struct Operations {
     path: PathBuf,
     held: Vec<OperationOutcome>,
     texts: BTreeMap<String, String>,
+    compacting: BTreeSet<String>,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> RunnerError {
@@ -205,6 +209,7 @@ impl Operations {
             path,
             held,
             texts: BTreeMap::new(),
+            compacting: BTreeSet::new(),
         };
         operations.persist()?;
         Ok(operations)
@@ -369,11 +374,6 @@ pub(crate) fn deliver(table: &mut Table, id: &str) {
     let Some(operation) = next else {
         return;
     };
-    let text = table
-        .operations
-        .texts
-        .remove(&operation)
-        .unwrap_or_default();
     let marked = table.operations.set(
         &operation,
         OperationState::Delivering,
@@ -383,24 +383,72 @@ pub(crate) fn deliver(table: &mut Table, id: &str) {
         crate::error::said(&format!(
             "operation {operation} was not typed: its delivery could not be recorded first: {error}"
         ));
+        finish(table, &operation, Err(error));
         return;
     }
-    let typed = table
+    let submitted = enqueue(table, id, &operation);
+    if let Err(error) = submitted {
+        finish(table, &operation, Err(error));
+    }
+}
+
+fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<(), RunnerError> {
+    let text = table.operations.texts.remove(operation).ok_or_else(|| {
+        RunnerError::refused(
+            "operation_text_missing",
+            format!("operation {operation} has no text"),
+        )
+    })?;
+    let session = table
         .sessions
         .get_mut(id)
-        .ok_or_else(|| RunnerError::refused("session_unknown", format!("no session {id}")))
-        .and_then(|session| type_text(session, id, &text));
-    let (state, words) = match typed {
+        .ok_or_else(|| RunnerError::refused("session_unknown", format!("no session {id}")))?;
+    let writer = session.live(id)?.writer.clone();
+    session.guard.idle = false;
+    let mut bytes = text.into_bytes();
+    bytes.extend_from_slice(Key::Enter.bytes());
+    let owner = table.owner.clone();
+    let operation = operation.to_owned();
+    writer.submit(bytes, move |result| {
+        let Some(sessions) = owner.upgrade() else {
+            crate::error::said(&format!(
+                "operation {operation}: input completed after the runner ended"
+            ));
+            return;
+        };
+        let mut table = sessions.lock();
+        finish(&mut table, &operation, result);
+        drop(table);
+        sessions.wake();
+    })
+}
+
+fn finish(table: &mut Table, operation: &str, result: Result<(), RunnerError>) {
+    if !table
+        .operations
+        .get(operation)
+        .is_some_and(|outcome| outcome.state == OperationState::Delivering)
+    {
+        if let Err(error) = result {
+            crate::error::said(&format!(
+                "operation {operation}: input ended after its outcome changed: {error}"
+            ));
+        }
+        return;
+    }
+    let compacting = table.operations.compacting.remove(operation);
+    let (state, words) = match result {
+        Ok(()) if compacting => (
+            OperationState::Confirmed,
+            "the harness said it is compacting".to_owned(),
+        ),
         Ok(()) => (
             OperationState::Delivered,
             "typed into the session".to_owned(),
         ),
         Err(error) => (OperationState::Refused, error.to_string()),
     };
-    if let Some(session) = table.sessions.get_mut(id) {
-        session.guard.idle = false;
-    }
-    match table.operations.set(&operation, state, words) {
+    match table.operations.set(operation, state, words) {
         Ok(outcome) => feed(table, &outcome),
         Err(error) => crate::error::said(&format!(
             "operation {operation}: its delivery was not recorded, and it stays uncertain: {error}"
@@ -408,30 +456,27 @@ pub(crate) fn deliver(table: &mut Table, id: &str) {
     }
 }
 
-fn type_text(session: &mut Session, id: &str, text: &str) -> Result<(), RunnerError> {
-    let live = session.live(id)?;
-    let mut bytes = text.as_bytes().to_vec();
-    bytes.extend_from_slice(Key::Enter.bytes());
-    live.writer
-        .write_all(&bytes)
-        .and_then(|()| live.writer.flush())
-        .map_err(|error| RunnerError::refused("write_failed", error.to_string()))
-}
-
 /// The harness says it is compacting: a delivered compaction is confirmed.
 pub(crate) fn compacting(table: &mut Table, id: &str) {
-    let delivered: Vec<String> = table
+    let delivered: Vec<(String, OperationState)> = table
         .operations
         .held
         .iter()
         .filter(|held| {
             held.session == id
                 && held.request == "compact"
-                && held.state == OperationState::Delivered
+                && matches!(
+                    held.state,
+                    OperationState::Delivering | OperationState::Delivered
+                )
         })
-        .map(|held| held.operation.clone())
+        .map(|held| (held.operation.clone(), held.state))
         .collect();
-    for operation in delivered {
+    for (operation, state) in delivered {
+        if state == OperationState::Delivering {
+            table.operations.compacting.insert(operation);
+            continue;
+        }
         match table.operations.set(
             &operation,
             OperationState::Confirmed,
@@ -450,7 +495,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
         .operations
         .held
         .iter()
-        .filter(|held| held.session == id)
+        .filter(|held| held.session == id && held.request != "restart")
         .map(|held| (held.operation.clone(), held.state, held.request.clone()))
         .collect();
     for (operation, state, request) in open {
@@ -470,6 +515,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
             _ => continue,
         };
         table.operations.texts.remove(&operation);
+        table.operations.compacting.remove(&operation);
         let changed = table
             .operations
             .set(&operation, next, words)
@@ -503,10 +549,19 @@ impl Sessions {
     /// Accept `operation` under its stable id, answering how it stands.
     pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
         let mut table = self.lock();
-        let outcome = accept(&mut table, operation);
+        let outcome = accept(&mut table, operation)?;
         drop(table);
         self.wake();
-        outcome
+        if outcome.state != OperationState::Delivering {
+            return Ok(outcome);
+        }
+        self.until_any(&AtomicBool::new(false), |table| {
+            table
+                .operations
+                .get(&outcome.operation)
+                .filter(|held| held.state != OperationState::Delivering)
+                .cloned()
+        })
     }
 
     /// How operation `operation` stands, as the record keeps it.

@@ -1120,6 +1120,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
 | `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-runner/src/input.rs` | Per-session ordered writes complete by signal without holding the shared session table (DIRECTORY-073 R3) | DIRECTORY-073 |
+| `crates/lys-runner/tests/input_no_screen/shared_lock.rs` | A full input pipe leaves a second session answering without a clock (DIRECTORY-073 R3) | DIRECTORY-073 |
+| `crates/lys-runner/src/session/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/src/operations/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/tests/peer_restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/tests/peer_restart/cases.rs` | Peer proof, held launch and operation replay through an injected process tree | DIRECTORY-073 |
 | `crates/lys-identity-server/src/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `crates/lys-identity-server/tests/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `docs/harness/catalogue/claude-code.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |

@@ -113,3 +113,34 @@ pub(crate) const WHICH: &[&str] = &[
 
 /// A profile review that can approve only the latest recorded version.
 pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
+
+/// An operator restart shares the start and runner's named refusals.
+pub(crate) const RESTART: &[&str] = &[
+    "AgentNotVisible",
+    "AgentNotActive",
+    "NotAdmitted",
+    "NoPerson",
+    "RuntimeSessionUnknown",
+    "RuntimeReportReused",
+    "RuntimeUnavailable",
+    "ProvisioningUnavailable",
+    "profile_version_unreviewed",
+    "MachineCannotReach",
+    "MachineNotForAgent",
+    "MachineRetired",
+    "MachineUnknown",
+    "MachineWithoutRuntime",
+    "HarnessUndeclared",
+    "LaunchUnrenderable",
+    "McpHandleUnsupported",
+    "McpSettingUnrepresentable",
+    "ModelUnrepresentable",
+    "PolicyUnrepresentable",
+    "SkillUnknown",
+    "SecretsUnavailable",
+    "runner_absent",
+    "runner_protocol_mismatch",
+    "runner_unreachable",
+    "runner_reply_malformed",
+    "session_unknown",
+];
