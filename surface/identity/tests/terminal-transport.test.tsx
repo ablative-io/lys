@@ -41,6 +41,36 @@ describe('Raw terminal transport', () => {
     expect(sent).toEqual([{ data: [0, 255] }]);
   });
 
+  it('sends input queued behind a request in the next single request, in order, keeping only the newest pointer motion', async () => {
+    const encode = (value: string) => Array.from(new TextEncoder().encode(value));
+    const motion = (x: number) => encode('\u001b[<35;' + x + ';5M');
+    const press = encode('\u001b[<0;9;5M');
+    const sent: number[][] = [];
+    const answers: (() => void)[] = [];
+    let arrived = () => {};
+    vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
+      if (path.endsWith('/read-bytes')) return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('read closed'))));
+      sent.push((JSON.parse(String(init?.body)) as { data: number[] }).data);
+      arrived();
+      return new Promise<Response>((resolve) => answers.push(() => resolve(new Response(JSON.stringify({ session, answer: { kind: 'delivered', session }, receipt: { index: sent.length } })))));
+    });
+    const request = () => new Promise<void>((resolve) => { arrived = resolve; });
+    const controller = new AbortController();
+    const writer = terminalStreams(session, controller, () => {}).writable.getWriter();
+    const first = request();
+    const writes = [motion(1), encode('l'), motion(2), press, motion(3), encode('s'), motion(4)].map((bytes) => writer.write(new Uint8Array(bytes)));
+    await first;
+    expect(sent).toEqual([motion(1)]);
+    const second = request();
+    answers[0]();
+    await second;
+    expect(sent).toEqual([motion(1), [...encode('l'), ...press, ...encode('s'), ...motion(4)]]);
+    answers[1]();
+    await Promise.all(writes);
+    expect(sent).toHaveLength(2);
+    controller.abort();
+  });
+
   it('does not send input after the runner reports the process ended', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ ...envelope({ data: [], cursor: 0, ended: { how: 'exited', at: 1, status: 0, signal: null } }), receipt: { index: 1 } })));
     vi.stubGlobal('fetch', fetcher);
