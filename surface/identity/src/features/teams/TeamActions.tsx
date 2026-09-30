@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { operationId } from '../../api';
 import type { Login } from '../../generated';
 import { useRoleChange } from '../roles/useRoleChange';
-import { ChangeStatus } from '../roles/ChangeStatus';
+import { DirectoryChangeStatus as ChangeStatus } from '../roles/ChangeStatus';
 import { sameLogin } from './contract';
 import type { Member, Team, TeamChanged } from './contract';
 type Action = { act: 'added' | 'removed' | 'retired' | 'confirmed'; member: string | null };
@@ -19,12 +19,12 @@ function held(key: string, id: string): Action | null {
   if (value.path.startsWith(prefix) && value.path.endsWith('/confirm')) return { act: 'confirmed', member: decodeURIComponent(value.path.slice(prefix.length, -'/confirm'.length)) };
   throw new Error('The retained team change names an unexpected route. Resolve its outcome before another change.');
 }
-export function TeamActions({ team, person, login, members, administrator, changed }: { team: Team; person: string; login: Login; members: Member[]; administrator: boolean; changed: (message: string) => void }) {
+export function TeamActions({ team, person, login, members, administrator, changed }: { team: Team; person: string; login: Login; members: Member[]; administrator: boolean; changed: (answer: TeamChanged, message: string) => void }) {
   const key = 'lys.pending.team.' + person + '.' + team.id;
   const [initial] = useState(() => { try { return { action: held(key, team.id), error: '' }; } catch (error) { return { action: null, error: String(error) }; } });
   const [action, setAction] = useState<Action | null>(initial.action);
   const [member, setMember] = useState('');
-  const label = (id: string) => members.find((entry) => entry.id === id)?.display_name ?? id;
+  const label = (id: string) => members.find((entry) => entry.id === id)?.display_name ?? 'Name unavailable';
   if (initial.error) return <p role="alert">{initial.error}</p>;
   if (action) return <Act team={team} login={login} action={action} memberName={action.member ? label(action.member) : null} storageKey={key} changed={changed} cancel={() => setAction(null)} />;
   if (team.state === 'retired') return null;
@@ -35,8 +35,8 @@ export function TeamActions({ team, person, login, members, administrator, chang
     <button className="btn danger" onClick={() => setAction({ act: 'retired', member: null })}>Retire team</button>
   </>;
 }
-function Act({ team, login, action, memberName, storageKey, changed, cancel }: { team: Team; login: Login; action: Action; memberName: string | null; storageKey: string; changed: (message: string) => void; cancel: () => void }) {
-  const change = useRoleChange<TeamChanged>(storageKey, pathOf(team.id, action), (answer, body) => answer.id === team.id && answer.recorded?.operation === body.operation && answer.recorded.act === action.act && answer.recorded.member === action.member && sameLogin(answer.recorded.by, login), () => changed('Your team change was recorded. The list shows the team as it stands now.'));
+function Act({ team, login, action, memberName, storageKey, changed, cancel }: { team: Team; login: Login; action: Action; memberName: string | null; storageKey: string; changed: (answer: TeamChanged, message: string) => void; cancel: () => void }) {
+  const change = useRoleChange<TeamChanged>(storageKey, pathOf(team.id, action), (answer, body) => answer.id === team.id && answer.recorded?.operation === body.operation && answer.recorded.act === action.act && answer.recorded.member === action.member && sameLogin(answer.recorded.by, login), (answer) => changed(answer, 'Your team change was recorded. The list shows the team returned with that change.'));
   const word = action.act === 'added' ? 'add member' : action.act === 'removed' ? 'remove member' : action.act === 'confirmed' ? 'allow member to take part' : 'retire team';
   const question = action.act === 'confirmed' ? 'Allow ' + memberName + ' to take part in ' + team.name + '?' : action.act === 'added' ? 'Add ' + memberName + ' to ' + team.name + '?' : action.act === 'removed' ? 'Remove ' + memberName + ' from ' + team.name + '?' : 'Retire ' + team.name + '?';
   return <section aria-label="Confirm team change"><p>{question} This does not grant or revoke access.</p>

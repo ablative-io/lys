@@ -1,6 +1,6 @@
 /** The permission model actually in force, read from the service. */
 import { api, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 export function Model() {
   const load = useLoad(api.model, 'permission-model');

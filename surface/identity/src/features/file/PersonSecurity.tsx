@@ -1,7 +1,7 @@
 /** A person's credentials are sign-in bindings; their sessions are browser sign-ins, never agent runtimes. */
 import { api, useLoad } from '../../api';
 import { SessionList } from '../sessions/Sessions';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 export function PersonCredentials({ id }: { id: string }) {
   const load = useLoad(async () => {

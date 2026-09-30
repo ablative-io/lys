@@ -12,7 +12,7 @@ import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, useLoad } from '../../api';
 import type { ReceiptAnswer } from '../../generated';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';

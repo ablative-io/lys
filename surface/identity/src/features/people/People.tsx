@@ -8,7 +8,7 @@ import type { Scope } from '../../generated';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import type { KindFilter } from '../../shell/ShellContext';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from './Words';
 import { entries, needsNewPerson } from './directory';
 import type { Entry } from './directory';
 import { Reach, readDirectoryReach } from './reach';

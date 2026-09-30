@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
 import { keyable } from '../../shell/keyable';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { reachMap } from '../grants/check';
 import { CheckBox, resourcesSeen } from '../grants/CheckBox';
 import { grantNo, lastUsedText, lastsText, nameOf, onText, passText, readGrantWorld, resourceLabel, voidOf } from '../grants/model';
