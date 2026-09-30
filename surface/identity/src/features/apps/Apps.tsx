@@ -28,6 +28,29 @@ export interface AppRecord {
 /** The client an approval creates, answered once. */
 export interface ClientIssued { client_id: string; client_secret: string; credential: string }
 
+interface ApprovalAnswer { app: AppRecord; client: ClientIssued | null; credentials: StoredCredentials | null }
+function approvalAnswer(value: unknown, id: string): ApprovalAnswer {
+  const answer = value as Partial<ApprovalAnswer> | null;
+  const app = answer?.app;
+  const client = answer?.client ?? null;
+  const credentials = answer?.credentials ?? null;
+  const strings = (values: unknown): values is string[] => Array.isArray(values) && values.every((entry) => typeof entry === 'string');
+  const pending = app?.pending;
+  const validPending = pending === null || (pending && typeof pending.operation === 'string' && Number.isSafeInteger(pending.replaces) && typeof pending.schema === 'object' && pending.by && typeof pending.by.kind === 'string' && Number.isSafeInteger(pending.at));
+  const validApp = app && app.id === id && app.state === 'approved' && typeof app.name === 'string'
+    && strings(app.redirects) && typeof app.version === 'number' && Number.isSafeInteger(app.version)
+    && Array.isArray(app.versions) && app.versions.every((version) => Number.isSafeInteger(version))
+    && app.schema !== null && typeof app.schema === 'object' && !Array.isArray(app.schema) && validPending
+    && (app.client_id === null || typeof app.client_id === 'string')
+    && (app.service_account === null || typeof app.service_account === 'string')
+    && app.registered_by && ['person', 'operator', 'service_account', 'start'].includes(app.registered_by.kind)
+    && typeof app.registered_at === 'number';
+  const validClient = client === null || (client && typeof client.client_id === 'string' && typeof client.client_secret === 'string' && typeof client.credential === 'string');
+  const validCredentials = credentials === null || (credentials && credentials.app === id && typeof credentials.client_secret_ref === 'string' && typeof credentials.api_credential_ref === 'string');
+  if (!app || !validApp || !validClient || !validCredentials) throw new Error('Lys answered, but did not confirm this app’s approval. Open Apps again to check its saved state before approving again.');
+  return { app, client: client ?? null, credentials: credentials ?? null };
+}
+
 const LYS = 'lys';
 const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
 const listed = (items: string[]) => (items.length ? items.join(', ') : 'nothing');
@@ -49,24 +72,24 @@ export function schemaWords(app: string, schema: unknown): string[] {
 
 export function Apps() {
   const [revision, setRevision] = useState(0);
+  const [approved, setApproved] = useState<Record<string, AppRecord>>({});
   const [notice, setNotice] = useState('');
   const [registering, setRegistering] = useState(false);
-  // An approval's secret is held here, above the list the approval reloads,
-  // and only in memory until explicitly saved to the encrypted broker.
+  // An approval's secret stays only in memory until the encrypted broker confirms it.
   const [issued, setIssued] = useState<Record<string, ClientIssued>>({});
   const [stored, setStored] = useState<Record<string, StoredCredentials>>({});
   const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
-  const changed = (message: string) => { setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
+  const changed = (message: string) => { setApproved({}); setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
   return <section className="apps">
     <div className="head"><div><h2>Apps</h2><p>Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
       <button type="button" className="btn" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
     {notice ? <p role="status">{notice}</p> : null}
     {registering ? <Register changed={changed} /> : null}
-    <Gate load={load} title="Apps" ok={(answer) => (answer.apps.length ? <>{answer.apps.map((app) => <AppCard key={app.id + ':' + revision} app={app} stored={stored[app.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[app.id]:answer})); setIssued((held)=>{const next={...held};delete next[app.id];return next;}); }} issued={issued[app.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [app.id]: client }))} changed={changed} />)}</> : <p>No app is registered.</p>)} />
+    <Gate load={load} title="Apps" ok={(answer) => (answer.apps.length ? <>{answer.apps.map((app) => <AppCard key={app.id + ':' + revision} app={approved[app.id] ?? app} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[app.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[app.id]:answer})); setIssued((held)=>{const next={...held};delete next[app.id];return next;}); }} issued={issued[app.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [app.id]: client }))} changed={changed} />)}</> : <p>No app is registered.</p>)} />
   </section>;
 }
 
-function AppCard({ app, issued, issue, changed, stored, saved }: { stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
+function AppCard({ app, issued, issue, changed, stored, saved, approved }: { approved: (answer: AppRecord) => void; stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState('');
   const [refusal, setRefusal] = useState('');
@@ -86,7 +109,7 @@ function AppCard({ app, issued, issue, changed, stored, saved }: { stored:Stored
     {stored ? <SavedCredentials answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions">
       <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', {}, (answer) => { const approval = answer as { client: ClientIssued | null; credentials?: StoredCredentials | null }; if (approval.client) issue(approval.client); if (approval.credentials) saved(approval.credentials); changed(app.name + ' is approved: its sign-in client and its schema now take effect.'); }); }}>Approve {app.name}</button>
+      <button type="button" className="btn primary" disabled={busy} onClick={() => { void act('/approve', {}, (answer) => { const approval = approvalAnswer(answer, app.id); if (approval.client) issue(approval.client); if (approval.credentials) saved(approval.credentials); approved(approval.app); }); }}>Approve {app.name}</button>
       <button type="button" className="btn danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }}>Decline {app.name}</button>
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>

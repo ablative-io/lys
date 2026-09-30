@@ -94,7 +94,9 @@ describe('People and agents', () => {
       '/directory/people': refused(403, 'NotAdmitted', 'NotAdmitted: x'),
       '/people': refused(403, 'NoPerson', 'NoPerson: your login is bound to no person'),
     });
-    expect($('.why-not b')?.textContent).toBe('NoPerson');
+    expect($('.why-not p')?.textContent).toContain('Ask the administrator to connect it');
+    expect($('.why-not details')?.textContent).toContain('NoPerson');
+    expect($('.why-not details')?.hasAttribute('open')).toBe(false);
     expect(text()).toContain('your login is bound to no person');
     expect(ADA).toMatch(/^person-/);
   });

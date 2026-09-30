@@ -9,7 +9,7 @@ describe("An agent's file", () => {
     expect(requests).toContain('/directory/agents/' + SCRIBE);
     expect($('.file h1')?.textContent).toBe("Scribe");
     expect($('.file')?.dataset.tab).toBe('agent file · A/00000000');
-    expect($('#state')?.textContent).toBe('active');
+    expect($('#state')?.textContent).toBe('Active');
     expect($('.file .head .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
     expect($('.file .head')?.textContent).toContain('since 22 Sep');
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Provisioning', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets']);
@@ -32,9 +32,9 @@ describe("An agent's file", () => {
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Stop this agent now') ?? null);
     expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
-    expect(text()).toContain('the agent is suspended');
-    expect(text()).toContain('Credential handles were not ended: SecretsUnavailable');
-    expect(text()).toContain('stays unconfirmed until its runtime reports it stopped');
+    expect(text()).toContain('The agent’s access is suspended.');
+    expect(text()).toContain('The credential service did not confirm that credentials ended.');
+    expect(text()).toContain('Other sessions remain unconfirmed');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
   });
 
@@ -51,9 +51,9 @@ describe("An agent's file", () => {
     unmountAll(); document.body.innerHTML = '';
     const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
     expect($('[data-act="stop"]')).toBeNull();
-    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check original change') ?? null);
+    await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it') ?? null);
     expect(later.posted).toEqual(first.posted);
-    expect(text()).toContain('Credential handles were not ended: Broker unavailable');
+    expect(text()).toContain('Broker unavailable');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.stop.' + SCRIBE)).toBeNull();
   });
@@ -109,7 +109,8 @@ describe("An agent's file", () => {
   it('answers an agent that is not visible as not found, with the refusal', async () => {
     await mount('#/file/agent-' + 'f'.repeat(32), { ...SERVICE, ['/directory/agents/agent-' + 'f'.repeat(32)]: refused(404, 'AgentNotVisible', 'AgentNotVisible: no such agent is yours to see') });
     expect($('.page h1')?.textContent).toBe('Not found');
-    expect($('.why-not b')?.textContent).toBe('AgentNotVisible');
+    expect($('.why-not details')?.textContent).toContain('AgentNotVisible');
+    expect($('.why-not p')?.textContent).toContain('Ask its responsible person');
   });
 });
 

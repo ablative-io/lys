@@ -115,7 +115,7 @@ describe('What you hold', () => {
     [tr.querySelector('td')?.firstChild?.textContent, ...[...tr.querySelectorAll('td .mono')].map((span) => span.textContent), tr.querySelectorAll('td')[1].textContent]);
 
   it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
-    await mount('#/me', withInstallGrants());
+    await mount('#/me?tab=account', withInstallGrants());
     expect(rows()).toEqual([
       ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root'],
       ['You can view project ledger.', 'viewer', 'project:ledger', 'root'],

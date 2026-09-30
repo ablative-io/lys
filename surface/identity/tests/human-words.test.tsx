@@ -188,3 +188,39 @@ it('shows the kept review and its person from the confirmed answer without rerea
   expect(reads).toBe(1);
   expect(view.textContent).toContain('Last kept by ' + ME.person.display_name);
 });
+
+
+it('refuses an approval answer for a different app without displaying success or reading again', async () => {
+  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: [], schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+  let reads = 0;
+  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') return Response.json({ app: { ...pending, id: 'another_app', state: 'approved', version: 1, versions: [1] }, client: null, credentials: null });
+    reads += 1;
+    return Response.json({ apps: [pending] });
+  });
+  const view = await show(<Apps />);
+  await clickNamed(view, 'Approve Notes');
+  expect(reads).toBe(1);
+  expect(view.querySelector('[role="alert"]')?.textContent).toContain('did not confirm this app’s approval');
+  expect(view.querySelector('article')?.textContent).toContain('pending');
+  expect(view.querySelector('article')?.textContent).not.toContain('is approved');
+});
+
+it('does not let the saved approval hide a later retirement answer', async () => {
+  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: [], schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+  const approved = { ...pending, state: 'approved', version: 1, versions: [1] };
+  let retired = false;
+  let reads = 0;
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    if (init?.method === 'POST' && String(url).endsWith('/approve')) return Response.json({ app: approved, client: null, credentials: null });
+    if (init?.method === 'POST') { retired = true; return Response.json({ ...approved, state: 'retired' }); }
+    reads += 1;
+    return Response.json({ apps: [retired ? { ...approved, state: 'retired' } : pending] });
+  });
+  const view = await show(<Apps />);
+  await clickNamed(view, 'Approve Notes');
+  expect(reads).toBe(1);
+  await clickNamed(view, 'Retire Notes');
+  expect(view.querySelector('article .app-state')?.textContent).toBe('retired');
+  expect([...view.querySelectorAll('button')].some((entry) => entry.textContent === 'Retire Notes')).toBe(false);
+});

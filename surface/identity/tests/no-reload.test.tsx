@@ -42,17 +42,17 @@ describe('No read-again buttons', () => {
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await click($$('form[aria-label="Confirm emergency stop"] button[type="submit"]')[0] ?? null);
-    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(2);
-    expect($('#state')?.textContent).toBe('suspended');
+    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(1);
+    expect($('#state')?.textContent).toBe('Suspended in this stop answer');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
     expect(reloaders()).toEqual([]);
   });
-  it('re-reads budgets after a refused confirmation and keeps the reason on screen', async () => {
+  it('keeps a refused confirmation\'s reason on screen without reading the budgets again', async () => {
     const effective = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: null, act: 'stop', version: 1, by: 'administrator', at: 1 };
     const requested = { ...effective, limit: 200, version: 2, by: ADA, at: 2 };
     const { requests } = await mount('#/file/' + ADA + '/budgets', { ...agentRoutes, [budget]: ok({ holder: effective.holder, budgets: [requested], unconfirmed: [{ requested, effective, reason: 'waiting' }] }), ['POST ' + budget + '/confirm']: refused(409, 'BudgetVersionConflict', 'budget changed') });
     await click($('section[aria-label="Personal budgets"] button.primary'));
-    expect(requests.filter((entry) => entry === budget)).toHaveLength(2);
+    expect(requests.filter((entry) => entry === budget)).toHaveLength(1);
     expect(text()).toContain('budget changed');
     expect(reloaders()).toEqual([]);
   });

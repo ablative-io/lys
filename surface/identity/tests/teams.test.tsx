@@ -26,7 +26,7 @@ describe('Teams', () => {
     const path = '/teams/' + team.id + '/members/' + SCRIBE + '/remove'; const first = await open({ ...routes, ['POST ' + path]: refused(503, 'TeamsUnavailable', 'Unknown outcome') });
     first.posted.length = 0; await click(button('Remove Scribe')); await click(button('Confirm remove member')); unmountAll(); document.body.innerHTML = '';
     const changed = { ...team, members: [] }; const later = await open({ ...routes, '/teams': ok({ teams: [changed] }), ['POST ' + path]: (body) => receipt(body, 'removed', SCRIBE, changed) });
-    later.posted.length = 0; await click(button('Check original change')); expect(later.posted).toEqual(first.posted); expect(text()).toContain('Your team change was recorded');
+    later.posted.length = 0; await click(button('Check whether Lys saved it')); expect(later.posted).toEqual(first.posted); expect(text()).toContain('Your team change was recorded');
   });
   it('keeps a mismatched act unresolved', async () => {
     const path = '/teams/' + team.id + '/retire'; await open({ ...routes, ['POST ' + path]: (body) => receipt(body, 'removed', SCRIBE) }); await click(button('Retire team')); await click(button('Confirm retire team')); expect(text()).toContain('original request is retained'); expect(sessionStorage.length).toBe(1);

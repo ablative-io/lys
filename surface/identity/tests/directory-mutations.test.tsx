@@ -160,7 +160,7 @@ describe('Uncertain directory change recovery', () => {
   const key = 'lys.pending.register-agent';
   const retained = JSON.stringify({ path: '/agents', body: { display_name: 'Original agent' }, operation });
   async function recover() {
-    const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check original change');
+    const button = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check whether Lys saved it');
     if (!button) throw new Error('No recovery button');
     await click(button);
     await settle();
@@ -180,7 +180,7 @@ describe('Uncertain directory change recovery', () => {
     await recover();
     expect(sessionStorage.getItem(key)).toBe(retained);
     expect(text()).toContain('NotAdmitted');
-    expect(text()).toContain('Check original change');
+    expect(text()).toContain('Check whether Lys saved it');
   });
   it.each(['not JSON', JSON.stringify({ path: '/people', body: {}, operation })])('refuses damaged or wrong-form pending evidence without modifying it', async (saved) => {
     sessionStorage.setItem(key, saved);
@@ -188,6 +188,6 @@ describe('Uncertain directory change recovery', () => {
     await submit(form('Register an agent'));
     expect(posted).toHaveLength(0);
     expect(sessionStorage.getItem(key)).toBe(saved);
-    expect(text()).not.toContain('Check original change');
+    expect(text()).not.toContain('Check whether Lys saved it');
   });
 });
