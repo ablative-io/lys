@@ -1,6 +1,6 @@
 /** Saved emergency-stop outcomes are history, never a claim that a runtime has stopped. */
 import { Refused, request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 interface StopRecord {
   agent: string;

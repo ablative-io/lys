@@ -41,3 +41,5 @@ export function roleWordsOf(body: Record<string, unknown>): RoleWords | null {
   }
   return { responsibilities, goals, practice, profile, note, grant_templates: templates };
 }
+
+export type RoleAnswer = Role | { role: string; holder: RoleHolder; from: RoleVersion; to: RoleVersion };

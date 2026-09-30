@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { IssueCertificate, WithdrawCertificate } from './CertificateChanges';
 /** Certificate records expose issuance claims and offline proof material without claiming current permission or verified trust. */
 import { api, request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from './time';
 export interface AgentCertificate {
   serial: string; person: string; claims: unknown; der: string; issued_at: number;

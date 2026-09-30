@@ -1,7 +1,7 @@
 import { DropHandle } from './DropHandle';
 /** Broker handle metadata is discoverability-filtered; this screen never receives or displays a credential value. */
 import { api, request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from './time';
 
 interface HeldHandle { id: string; secret: string; max_uses: number; used: number; not_after_ms: number; dropped: boolean; spend_cap: number | null; settled: number; parent: string | null }

@@ -13,7 +13,7 @@ function read(key: string, allowed: string): Saved | null {
   }
   return { path: allowed, body: value.body as Record<string, unknown> };
 }
-export function useRoleChange<T>(key: string, path: string, accepts: (answer: T, body: Record<string, unknown>) => boolean, changed: () => void) {
+export function useRoleChange<T>(key: string, path: string, accepts: (answer: T, body: Record<string, unknown>) => boolean, changed: (answer: T) => void) {
   const [initial] = useState(() => { try { return { saved: read(key, path), error: '' }; } catch (error) { return { saved: null, error: String(error) }; } });
   const [saved, setSaved] = useState(initial.saved);
   const [failure, setFailure] = useState(initial.error);
@@ -27,7 +27,7 @@ export function useRoleChange<T>(key: string, path: string, accepts: (answer: T,
       sessionStorage.setItem(key, JSON.stringify({ path, body })); setSaved({ path, body });
       const answer = await request<T>(path, body);
       if (!accepts(answer, body)) throw new Error('The answer did not confirm this recorded change. Its original request is retained.');
-      sessionStorage.removeItem(key); setSaved(null); setDone(true); changed();
+      sessionStorage.removeItem(key); setSaved(null); setDone(true); changed(answer);
     } catch (error) {
       if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) { sessionStorage.removeItem(key); setSaved(null); }
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));

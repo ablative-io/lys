@@ -1,6 +1,6 @@
 /** The tool calls an agent was refused, newest first, with the runners whose refusals have been read. */
 import { request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import type { RefusalRecord, RefusalsView } from './policyContract';
 
 const when = (ms: number) => new Date(ms).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', timeZoneName: 'short' });

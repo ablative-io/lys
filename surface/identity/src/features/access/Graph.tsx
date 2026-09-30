@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { readGrantWorld, nameOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { resourcesSeen } from '../grants/CheckBox';

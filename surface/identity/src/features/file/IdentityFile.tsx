@@ -5,7 +5,7 @@ import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
 import { EmergencyStop, StopReceipt } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';

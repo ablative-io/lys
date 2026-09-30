@@ -1,6 +1,6 @@
 /** Agent home metadata shows provenance and context receipts without exposing memory notes or transcripts. */
 import { request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 export interface MemoryAnswer {
   agent: string;
