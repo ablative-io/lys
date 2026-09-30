@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, BEA, GRANT_MODEL, Service};
 use lys_home::harness::description::Description;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
@@ -110,7 +110,7 @@ fn expected() -> Result<Value, Box<dyn Error>> {
 
 async fn table() -> Result<(Service, Seeded, String), Box<dyn Error>> {
     let (service, seeded) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
@@ -150,7 +150,7 @@ async fn descriptions_exist_without_a_configured_profile_store() -> TestResult {
         None,
         None,
         |config| config.provisioning_file = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
     drop(seeded);
