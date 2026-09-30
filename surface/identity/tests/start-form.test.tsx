@@ -116,7 +116,7 @@ describe('The route-backed start form', () => {
     expect(next.posted[1].path).toBe(start);
   });
   it('does not claim a process started when the endpoint only returns a command', async () => {
-    await open({ ...routes(profile), ['POST ' + start]: (body) => ok({ agent: SCRIBE, machine: machine.id, session: (body as Record<string, unknown>).operation, executed: false, command: 'claude', left_out: [] }) });
+    await open({ ...routes(profile), ['POST ' + start]: (body) => ok({ agent: SCRIBE, machine: machine.id, session: (body as Record<string, unknown>).operation, provisioning_version: 1, executed: false, command: 'claude', left_out: [] }) });
     await click(button());
     expect(text()).toContain('RunnerStartUnconfirmed');
     expect(text()).not.toContain('Its Lys runner has it running');
@@ -193,6 +193,16 @@ describe('The route-backed start form', () => {
     await click(button());
     expect(text()).toContain('Version 1 of these settings is approved');
     expect(text()).toContain('AgentNotActive');
+  });
+
+  it('does not claim the selected profile started when the receipt names another version', async () => {
+    await open({ ...routes(profile), ['POST ' + start]: (body) => {
+      const operation = (body as Record<string, unknown>).operation;
+      return ok({ agent: SCRIBE, machine: machine.id, session: operation, provisioning_version: 2, executed: false, command: 'claude', left_out: [], runner: { session: operation, state: 'running' } });
+    } });
+    await click(button());
+    expect(text()).toContain('StartVersionChanged');
+    expect(text()).not.toContain('Its Lys runner has it running');
   });
 
 });

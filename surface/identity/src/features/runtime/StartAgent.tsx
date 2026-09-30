@@ -137,6 +137,7 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
         if (current.stage === 'start') {
           const receipt: StartAnswer = await request<StartAnswer>(current.path, current.body);
           if (receipt.agent !== agent || receipt.machine !== current.machine || receipt.session !== current.body.operation || receipt.executed !== false || typeof receipt.command !== 'string' || !receipt.command || !Array.isArray(receipt.left_out)) fail('StartReceiptMismatch', 'The start answer did not confirm the retained request.');
+          if (receipt.provisioning_version !== current.version) fail('StartVersionChanged', 'The runner start names a different profile version; check that session before another start.');
           const runner = receipt.runner;
           if (!runner) fail('RunnerStartUnconfirmed', 'Lys returned a command but no runner confirmed this agent started. The same request is retained.');
           if (runner.session !== receipt.session || !['running', 'ended'].includes(runner.state)) fail('StartReceiptMismatch', 'The runner answer did not name this session and its state.');
