@@ -1,6 +1,13 @@
 /** The Sessions screen: every running agent session the caller may see, as its runner says, each opened to its live terminal with a line to type into, common keys and Stop. A session its runner saw end is not listed; nothing is inferred from a clock. */
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
+import { Listing } from '../../shell/Listing';
+import type { Column } from '../../shell/Listing';
+import { groupByTeam, inWhose } from '../../shell/org';
+import type { Held } from '../../shell/org';
+import { useWhose, WhoseSelect } from '../../shell/Whose';
+import { problemWords } from '../people/Words';
+import { readTeams } from '../teams/Teams';
 import { api, request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { clock } from '../file/time';
@@ -11,40 +18,60 @@ import './terminal.css';
 /** A session whose runner did not answer when it was asked, named with the refusal. */
 export interface Unanswered { session: string; machine: string; refusal: string; reason: string }
 
-function SessionName({ entry }: { entry: RuntimeSession }) {
-  const name = useLoad(async () => entry.agent ? (await api.agent(entry.agent)).display_name : 'Unattached session', 'session-name:' + entry.session);
-  return <strong>{name.status === 'ok' ? name.data : entry.agent ?? entry.session}</strong>;
+/** Everything the screen reads at once: the sessions, and the names and teams to group them by. */
+async function readRunning() {
+  const answer = await request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live');
+  if (!Array.isArray(answer.sessions)) throw new Error('The service did not answer a session list.');
+  if (!Array.isArray(answer.unanswered)) throw new Error('The service did not say which runners did not answer.');
+  if (answer.sessions.some((entry) => entry.shown === 'stopped')) throw new Error('The service listed a stopped session as running.');
+  const people = await api.people();
+  const me = await api.me();
+  const teams = await readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) }));
+  return { ...answer, people, me, teams };
 }
 
 export function RunningSessions() {
   const { session } = useParams();
   const [revision, setRevision] = useState(0);
-  const load = useLoad(async () => {
-    const answer = await request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live');
-    if (!Array.isArray(answer.sessions)) throw new Error('The service did not answer a session list.');
-    if (!Array.isArray(answer.unanswered)) throw new Error('The service did not say which runners did not answer.');
-    if (answer.sessions.some((entry) => entry.shown === 'stopped')) throw new Error('The service listed a stopped session as running.');
-    return answer;
-  }, 'runtime-live:' + revision);
-  const open = load.status === 'ok' ? load.data.sessions.find((entry) => entry.session === session) : undefined;
-  return <div className="page runner-sessions">
-    <h1>Running sessions</h1>
-    <p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p>
-    <a className="btn" href="#/runtime/canvas">Open agent canvas</a>
-    <button type="button" className="btn" onClick={() => setRevision((value) => value + 1)}>Ask the runners again</button>
-    <Gate load={load} title="Running sessions" ok={({ sessions, unanswered }) => <>
-      {unanswered.length ? <div className="why-not" role="alert"><h3>Runners that did not answer</h3><ul>{unanswered.map((entry) => <li key={entry.session}><span className="mono">{entry.session}</span> on {entry.machine}: {entry.refusal}: {entry.reason}</li>)}</ul></div> : null}
-      {sessions.length ? <div className="session-workspace">
-        <nav className="session-switcher" aria-label="Running agents">{sessions.map((entry) =>
-          <a className="session-choice" key={entry.session} aria-current={entry.session === session ? 'page' : undefined} href={'#/runtime/' + encodeURIComponent(entry.session)}>
-            <SessionName entry={entry} />
-            <span>{entry.machine_name ?? entry.machine}</span>
-            <span className="note">{unanswered.some((silent) => silent.session === entry.session) ? 'Its runner did not answer; last reported ' + entry.last_reported : entry.shown === 'running' ? 'Running' : 'Starting, not yet confirmed'}</span>
-            <span className="note">Since {clock(entry.first_report_at)}</span>
-          </a>)}</nav>
-        <div className="session-stage">{open ? <Terminal key={open.session} session={open.session} agent={open.agent} />
-          : <div className="session-empty"><h2>{session ? 'Session not returned' : 'Choose a running agent'}</h2><p>{session ? 'This session is not in the current list. Ask the runners again to refresh it.' : 'Its terminal will open here. Your input and controls use your existing permissions.'}</p></div>}</div>
-      </div> : <p>No running session was returned.</p>}
-    </>} />
+  const load = useLoad(readRunning, 'runtime-live:' + revision);
+  return <div className="page fill">
+    <div className="head">
+      <div><div className="eyebrow">Running now</div><h1>Running sessions</h1><p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p></div>
+      <div className="chain"><a className="btn" href="#/runtime/canvas">Open agent canvas</a><button type="button" className="btn" onClick={() => setRevision((value) => value + 1)}>Ask the runners again</button></div>
+    </div>
+    <Gate load={load} title="Running sessions" ok={(data) => <Running {...data} session={session} />} />
   </div>;
+}
+
+function Running({ sessions, unanswered, people, me, teams, session }: Awaited<ReturnType<typeof readRunning>> & { session: string | undefined }) {
+  const admin = people.scope === 'directory';
+  const [whose, setWhose] = useWhose(admin);
+  const navigate = useNavigate();
+  const agents = new Map(people.people.flatMap((person) => person.agents.map((agent) => [agent.id, { name: agent.display_name, person: person.id }] as const)));
+  const names = new Map([...people.people.map((person) => [person.id, person.display_name] as const), ...[...agents].map(([id, agent]) => [id, agent.name] as const)]);
+  const held = (entry: RuntimeSession): Held => ({ id: entry.agent ?? entry.session, person: entry.agent ? agents.get(entry.agent)?.person ?? null : null });
+  const scoped = sessions.filter((entry) => inWhose(whose, teams.list, me.person.id, held(entry)));
+  const groups = groupByTeam(scoped, held, teams.list, whose, (id) => names.get(id) ?? 'someone outside your view');
+  const open = sessions.find((entry) => entry.session === session);
+  const silent = (entry: RuntimeSession) => unanswered.some((each) => each.session === entry.session);
+  const name = (entry: RuntimeSession) => entry.agent ? names.get(entry.agent) ?? 'An agent outside your view' : 'Unattached session';
+  const columns: Column<RuntimeSession>[] = [
+    { head: 'Agent', cell: (entry) => <a href={'#/runtime/' + encodeURIComponent(entry.session)} aria-current={entry.session === session ? 'page' : undefined}>{name(entry)}</a> },
+    { head: 'Computer', cell: (entry) => <span className="sec">{entry.machine_name ?? entry.machine}</span> },
+    { head: 'State', cell: (entry) => silent(entry) ? <span className="why-not">Its runner did not answer; last reported {entry.last_reported}</span> : entry.shown === 'running' ? <><span className="dot s-active" />Running</> : 'Starting, not yet confirmed' },
+    { head: 'Since', cell: (entry) => <span className="sec">{clock(entry.first_report_at)}</span> },
+  ];
+  return <>
+    {unanswered.length ? <div className="why-not" role="alert"><h3>Runners that did not answer</h3><ul>{unanswered.map((entry) => <li key={entry.session}><span className="mono">{entry.session}</span> on {entry.machine}: {entry.refusal}: {entry.reason}</li>)}</ul></div> : null}
+    {teams.refused ? <p className="why-not">Teams cannot be read, so sessions are listed without their team. {teams.refused}</p> : null}
+    <div className="body">
+      <Listing<RuntimeSession> groups={groups} columns={columns} id={(entry) => entry.session} href={(entry) => '#/runtime/' + encodeURIComponent(entry.session)}
+        words={(entry) => name(entry) + ' ' + (entry.machine_name ?? entry.machine)} noun="running sessions"
+        holds={(items) => items.length.toLocaleString('en-AU') + (items.length === 1 ? ' running' : ' running')}
+        selected={open?.session ?? null} select={() => undefined} open={(entry) => navigate('/runtime/' + encodeURIComponent(entry.session))}
+        tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
+      <div className="detail">{open ? <Terminal key={open.session} session={open.session} agent={open.agent} />
+        : <div className="card"><h2>{session ? 'Session not returned' : sessions.length ? 'Choose a running agent' : 'No running session was returned.'}</h2><p className="sec">{session ? 'This session is not in the current list. Ask the runners again to refresh it.' : 'Its terminal opens here. Your input and controls use your existing permissions.'}</p></div>}</div>
+    </div>
+  </>;
 }

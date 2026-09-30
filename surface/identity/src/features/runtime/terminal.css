@@ -17,20 +17,9 @@
 .terminal-stop .actions { display: flex; gap: 8px; }
 .terminal .why-not { color: var(--danger); }
 /* One selected terminal stays beside the permitted live sessions, using Lys tokens. */
-.session-workspace { display: grid; grid-template-columns: minmax(180px, 250px) minmax(0, 1fr); gap: 18px; margin-top: 18px; }
-.session-switcher { display: flex; flex-direction: column; gap: 4px; align-self: start; }
-.session-choice { display: flex; flex-direction: column; gap: 3px; padding: 12px; border-radius: var(--radius-md); text-decoration: none; border: 1px solid transparent; }
-.session-choice:hover { background: var(--surface-hover); }
-.session-choice[aria-current="page"] { background: var(--accent-wash); border-color: var(--accent-deep); }
-.session-stage { min-width: 0; }
-.session-stage .terminal { margin-top: 0; }
-.session-empty { padding: 24px; color: var(--text-secondary); }
 .terminal-display { min-width: 0; position: relative; }
 .terminal-renderer { margin: 0 0 6px; color: var(--text-secondary); }
 .terminal-display .terminal-screen { height: 55vh; min-height: 320px; max-height: none; padding: 0; position: relative; white-space: normal; overflow: hidden; }
 @media (max-width: 760px) {
-  .session-workspace { grid-template-columns: minmax(0, 1fr); }
-  .session-switcher { flex-direction: row; overflow-x: auto; }
-  .session-choice { flex: 0 0 180px; }
   .terminal-head { align-items: flex-start; flex-wrap: wrap; }
 }
