@@ -210,7 +210,7 @@ async fn descriptions_exist_without_a_configured_profile_store() -> TestResult {
         .await?;
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
     assert_eq!(status, 200, "{answer}");
-    assert_eq!(reviewed_view(answer.clone())?, expected()?);
+    assert_eq!(reviewed_view(answer)?, expected()?);
     Ok(())
 }
 
