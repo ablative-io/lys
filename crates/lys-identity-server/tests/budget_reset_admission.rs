@@ -28,7 +28,7 @@ struct Table {
 impl Table {
     async fn with_usage(uses: Vec<Usage>) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
-            let seed = seed_configured(config, [ADMINISTRATOR])?;
+            let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
             let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
             let mut store = BudgetStore::open(
@@ -115,7 +115,7 @@ impl Table {
 async fn a_mid_period_cost_reset_keeps_an_exhausted_cap_and_counts_the_new_total() -> TestResult {
     let at_ms = jiff::Timestamp::now().as_millisecond();
     let mut source = SourceState::default();
-    let mut uses = Vec::new();
+    let mut observations = Vec::new();
     for (event, total) in [
         ("cap", 50_000_000),
         ("reset", 10_000_000),
@@ -127,7 +127,7 @@ async fn a_mid_period_cost_reset_keeps_an_exhausted_cap_and_counts_the_new_total
         };
         let mut notes = Vec::new();
         cost_delta(&mut source, &mut figures, &mut notes);
-        uses.push(Usage {
+        observations.push(Usage {
             event: event.to_owned(),
             at_ms,
             session: Some("provider-session".to_owned()),
@@ -137,9 +137,12 @@ async fn a_mid_period_cost_reset_keeps_an_exhausted_cap_and_counts_the_new_total
             ..Usage::default()
         });
     }
-    let deltas: Vec<_> = uses.iter().map(|usage| usage.dollars_micros).collect();
-    let reset_notes = uses[1].unavailable.clone();
-    let table = Table::with_usage(uses).await?;
+    let deltas: Vec<_> = observations
+        .iter()
+        .map(|usage| usage.dollars_micros)
+        .collect();
+    let reset_notes = observations[1].unavailable.clone();
+    let table = Table::with_usage(observations).await?;
     for route in ["start-command", "start"] {
         let (status, answer) = table.start(route).await?;
         assert_eq!(status, 409, "{route}: {answer}");
