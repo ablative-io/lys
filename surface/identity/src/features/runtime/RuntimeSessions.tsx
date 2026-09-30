@@ -1,6 +1,6 @@
 /** Runtime observations are displayed as reported; absence and copied commands never imply a process state. */
-import { useState } from 'react';
-import { request, useLoad } from '../../api';
+import { api, request, useLoad } from '../../api';
+import { entries } from '../people/directory';
 import { Gate } from '../signin/Gate';
 import { clock } from '../file/time';
 export interface RuntimeSession {
@@ -9,7 +9,6 @@ export interface RuntimeSession {
   what: string; stopped: null | { at: number; confirmation: string }; reported_by: string; stop_asked_at?: number | null;
 }
 export function RuntimeSessions({ agent, found = false }: { agent?: string; found?: boolean }) {
-  const [revision, setRevision] = useState(0);
   const path = agent ? '/agents/' + encodeURIComponent(agent) + '/runtime/sessions' : found ? '/runtime/found' : '/runtime/sessions';
   const load = useLoad(async () => {
     const answer = await request<{ sessions: RuntimeSession[] }>(path);
@@ -18,14 +17,15 @@ export function RuntimeSessions({ agent, found = false }: { agent?: string; foun
       if ((agent && session.agent !== agent) || (found && session.agent !== null)) throw new Error('The runtime answered a session outside this view.');
       if (!['unconfirmed', 'running', 'stopped'].includes(session.shown) || (session.shown === 'stopped' && !session.stopped?.confirmation)) throw new Error('The runtime did not give a valid status and stop confirmation.');
     }
-    return answer;
-  }, path + ':' + revision);
-  return <section className="card"><div className="head"><div><h2>{found ? 'Found sessions' : 'Agent runtime sessions'}</h2><p>{found ? 'Sessions reported without an identity. A report does not register an agent or grant access.' : 'The latest reports from runtimes. A copied start command is not confirmation that an agent is running.'}</p></div><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh runtime reports</button></div>
-    <Gate load={load} title="Runtime reports" ok={({ sessions }) => sessions.length ? <table><thead><tr><th>Session</th><th>Machine</th><th>Reported state</th><th>Latest report</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.session}>
-      <td><span className="mono">{session.session}</span>{session.agent ? <p><a href={'#/file/' + session.agent}>Agent file</a></p> : <p>No identity attached</p>}</td>
-      <td>{session.machine_name ?? session.machine}<p className="note">{session.runtime ?? 'Runtime name not recorded'}</p></td>
-      <td>{session.shown === 'running' ? 'Reported running' : session.shown === 'stopped' ? 'Stop confirmed' : 'Unconfirmed'}{session.stopped ? <p>{session.stopped.confirmation}</p> : null}{session.stop_asked_at && !session.stopped ? <p className="why-not">Emergency stop asked {clock(session.stop_asked_at)}; the runtime has not confirmed it ended.</p> : null}</td>
-      <td>{clock(session.last_report_at)}<p>{session.what}</p><details><summary>Report evidence</summary><dl className="facts"><dt>Reported by</dt><dd>{session.reported_by}</dd><dt>First report</dt><dd>{clock(session.first_report_at)}</dd><dt>Last state</dt><dd>{session.last_reported}</dd><dt>Machine identifier</dt><dd>{session.machine}</dd></dl></details></td>
-    </tr>)}</tbody></table> : <p>No runtime reports were returned. This does not establish whether a process is running.</p>} />
+    const names = new Map(entries(await api.people()).map((entry) => [entry.id, entry.display_name]));
+    return { ...answer, names };
+  }, path);
+  return <section className="card"><p>{found ? 'Sessions a runner reported that belong to no agent in the directory. A report does not add an agent or give access.' : 'What each computer\'s Lys runner last reported about these sessions.'}</p>
+    <Gate load={load} title="Sessions" ok={({ sessions, names }) => sessions.length ? <table><thead><tr><th>Agent</th><th>Computer</th><th>State</th><th>Last report</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.session}>
+      <td>{session.agent ? <a href={'#/file/' + session.agent}>{names.get(session.agent) ?? session.agent}</a> : 'No agent attached'}<details><summary>Session id</summary><span className="mono">{session.session}</span></details></td>
+      <td>{session.machine_name ?? session.machine}</td>
+      <td>{session.shown === 'running' ? 'Running, as its runner reported' : session.shown === 'stopped' ? 'Stopped, as its runner confirmed' : 'Not yet confirmed by its runner'}{session.stopped ? <p>{session.stopped.confirmation}</p> : null}{session.stop_asked_at && !session.stopped ? <p className="why-not">Emergency stop asked {clock(session.stop_asked_at)}; its runner has not confirmed it ended.</p> : null}</td>
+      <td>{clock(session.last_report_at)}<p>{session.what}</p><details><summary>Report details</summary><dl className="facts"><dt>Reported by</dt><dd>{names.get(session.reported_by) ?? session.reported_by}</dd><dt>First report</dt><dd>{clock(session.first_report_at)}</dd><dt>Last state</dt><dd>{session.last_reported}</dd><dt>Computer id</dt><dd>{session.machine}</dd></dl></details></td>
+    </tr>)}</tbody></table> : <p>No runner has reported a session here. That does not show whether a process is running.</p>} />
   </section>;
 }
