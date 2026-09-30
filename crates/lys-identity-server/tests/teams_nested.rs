@@ -340,7 +340,11 @@ async fn plain_creation_keeps_the_old_event_while_nesting_refuses_a_reversible_u
         |config| config.operator_upgrade_file = Some(intent.clone()),
         |config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, "another-subject"])?;
-            assert_eq!(seeded.people.len(), 1);
+            assert_eq!(
+                seeded.people.len(),
+                1,
+                "the fixture counts seeded people before any team write"
+            );
             Ok((
                 config.teams_dir.clone().ok_or("no teams directory")?,
                 config.event_key_file.clone(),

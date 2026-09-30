@@ -184,7 +184,10 @@ async fn invalid_placement_or_folder_is_refused_before_a_version_is_written() ->
         given[member] = json!(invalid);
         let (status, answer) = service.post(&route, Some(&cookie), &given).await?;
         assert_eq!(status, 400, "{member}: {answer}");
-        assert_eq!(answer["refusal"], "ProvisioningMalformed", "{answer}");
+        assert_eq!(
+            answer["refusal"], "ProvisioningMalformed",
+            "{member} = {invalid:?}: {answer}"
+        );
         let (status, seen) = service.get(&route, Some(&cookie)).await?;
         assert_eq!(status, 200, "{seen}");
         assert!(seen["profile"].is_null(), "{seen}");
