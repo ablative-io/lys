@@ -2,14 +2,12 @@
 //! its answer, with signed snapshots for restart and read-back after uncertain writes.
 
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
 use lys_log_store::{
-    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, Tail,
-    open_with_snapshot,
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
 use serde::{Deserialize, Serialize};
 
@@ -213,17 +211,17 @@ impl<S: LeafStore> McpRequestStore<S> {
         }
         let mut next = self.held.clone();
         next.push_request(request.clone())?;
-        self.append(signed_request(request.clone(), &self.key)?, next)?;
+        self.append(&signed_request(request.clone(), &self.key)?, next)?;
         Ok(request)
     }
 
-    fn append(&mut self, bytes: Vec<u8>, next: Held) -> Result<(), ServerError> {
+    fn append(&mut self, bytes: &[u8], next: Held) -> Result<(), ServerError> {
         let index = self.log.len();
-        if let Err(failure) = self.log.append(&bytes) {
+        if let Err(failure) = self.log.append(bytes) {
             self.uncertain = true;
             self.settle()?;
             match self.log.leaf_bytes(index).map_err(unavailable)? {
-                Some(held) if held == bytes => return Ok(()),
+                Some(held) if held.as_slice() == bytes => return Ok(()),
                 Some(_) => {
                     return Err(unavailable(format!(
                         "leaf {index} belongs to another writer: {failure}"
@@ -247,7 +245,7 @@ impl<S: LeafStore> McpRequestStore<S> {
         self.settle()?;
         let mut next = self.held.clone();
         next.push_event(event.clone())?;
-        self.append(signed_event(event, &self.key)?, next)
+        self.append(&signed_event(event, &self.key)?, next)
     }
 
     pub(crate) fn pending(&self, agent: &str) -> Vec<Intended> {
@@ -308,6 +306,7 @@ mod tests {
     use super::*;
     use lys_core::attestation::sign_attestation;
     use lys_identity::{AgentId, OperationId, PersonId};
+    use lys_log_store::Tail;
 
     #[derive(Serialize)]
     struct Signed {

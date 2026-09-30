@@ -229,9 +229,9 @@ impl Held {
                 }
             }
             Event::Withdrawn { request, operation } => {
-                if !self
+                if self
                     .intent(request)
-                    .is_some_and(|record| &record.operation == operation)
+                    .is_none_or(|record| &record.operation != operation)
                 {
                     return Err(unavailable("withdrawal names no retained intent"));
                 }
@@ -308,10 +308,10 @@ pub(crate) fn decoded(bytes: &[u8], count: u64) -> Result<Held, ServerError> {
 
 pub(crate) fn fold(held: &mut Held, tail: &Tail, key: &Ed25519Identity) -> Result<(), ServerError> {
     for (index, bytes) in (tail.from..).zip(&tail.leaves) {
-        let signed: Signed = serde_json::from_slice(bytes)
+        let envelope: Signed = serde_json::from_slice(bytes)
             .map_err(|error| unavailable(format!("leaf {index} is not an MCP record: {error}")))?;
         let signer = key.public_key_bytes();
-        match signed {
+        match envelope {
             Signed::Request(record) => {
                 verify_attestation_bytes_by_signer(
                     &record.attestation,
