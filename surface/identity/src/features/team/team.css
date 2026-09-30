@@ -1,0 +1,36 @@
+/* A tree of names beside the chosen agents' terminals, at the page's own gutter, with the rail's own mark for the chosen one. */
+.team-page { height: 100%; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; padding-bottom: 26px; }
+.team-tree { overflow: auto; min-width: 0; }
+.tree-team { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 12px 0 4px calc(var(--depth, 0) * 14px); white-space: nowrap; }
+.tree-root { padding-top: 0; color: var(--text-secondary); }
+.tree-line { display: flex; align-items: center; gap: 4px; padding-left: calc(var(--depth, 0) * 14px); }
+.tree-name { display: flex; align-items: center; min-width: 0; flex: 1; padding: 5px 8px 5px 0; color: var(--text-secondary); text-decoration: none; font-size: 12.5px; position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-name:hover { color: var(--text-primary); }
+.tree-name[aria-current="page"] { color: var(--text-primary); }
+.tree-name[aria-current="page"]::before { content: ""; position: absolute; left: -10px; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--accent); }
+.tree-add, .tree-gear { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px; opacity: 0; }
+.tree-line:hover .tree-add, .tree-line:hover .tree-gear, .tree-gear:focus-visible, .tree-add:focus-visible, .tree-name[aria-current="page"] ~ .tree-gear { opacity: 1; }
+.tree-add:hover, .tree-gear:hover { color: var(--text-primary); }
+.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.team-empty { margin: 0; }
+.team-scroll { flex: 1; min-height: 0; overflow: auto; }
+.team-panes { flex: 1; min-height: 0; display: grid; gap: 12px; }
+.team-panes[data-n="1"] { grid-template-columns: 1fr; }
+.team-panes[data-n="2"] { grid-template-columns: 1fr 1fr; }
+.team-panes[data-n="3"], .team-panes[data-n="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.team-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.pane-close { position: absolute; top: 10px; right: 10px; z-index: 1; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); }
+.pane-close:hover:not(:disabled) { color: var(--text-primary); background: var(--surface-hover); }
+.pane-close:disabled { opacity: .35; }
+.team-pane .terminal { flex: 1; min-height: 0; margin: 0; }
+.team-panes[data-n="1"] .terminal-head h2, .team-panes[data-n="1"] .terminal-head .mono { display: none; }
+.team-pane .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.team-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }
+.team-stopped { display: flex; flex-direction: column; gap: 10px; }
+.team-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.team-foot { margin: 12px 0 0; border-bottom: 0; border-top: 1px solid var(--border-default); flex: none; }
+.team-foot a { border-bottom: 0; border-top: 2px solid transparent; margin: -1px 0 0; }
+.team-foot a.on { border-top-color: var(--accent); }
+.team-settings h2 { margin-top: 0; }
+.team-settings .card { margin-top: 12px; }
+@media (max-width: 760px) { .team-page { grid-template-columns: 1fr; } }

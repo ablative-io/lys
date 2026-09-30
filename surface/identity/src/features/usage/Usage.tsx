@@ -24,7 +24,7 @@ export function Usage() {
   </section>;
 }
 
-function AgentUsage({ agent }: { agent: string }) {
+export function AgentUsage({ agent }: { agent: string }) {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
   const path = encodeURIComponent(agent);
