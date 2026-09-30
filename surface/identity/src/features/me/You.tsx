@@ -120,7 +120,7 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
 }
 
 function Waiting({ waiting }: { waiting: ActiveData['waiting'] }) {
-  if (!waiting.requests && !waiting.reviews) return <p className="you-line you-quiet">Nothing is waiting for you.</p>;
+  if (!waiting.requests && !waiting.reviews) return <p className="you-line you-quiet">Nothing waiting.</p>;
   return <p className="you-line you-waiting">
     {waiting.requests ? <a href="#/requests">{waiting.requests === 1 ? '1 request to decide' : waiting.requests + ' requests to decide'}</a> : null}
     {waiting.requests && waiting.reviews ? ' · ' : null}
@@ -241,7 +241,7 @@ function Agents({ data }: { data: ActiveData }) {
               <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={() => toggleWatch(session, name)}>{watching(session.session) ? 'Watching' : 'Watch'}</button>
             </div>;
           })}</div>
-          : <p className="note you-quiet">None of your agents is running.</p>}
+          : <p className="note you-quiet">Nothing running.</p>}
       </div>
     </div>
   </div>;
