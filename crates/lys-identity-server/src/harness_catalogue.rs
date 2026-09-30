@@ -43,6 +43,8 @@ pub struct ModeChoice {
 struct ProgramFile {
     name: String,
     command: String,
+    #[serde(default)]
+    commands: Option<Vec<String>>,
     line: String,
     models: Vec<ModelChoice>,
     modes: Vec<ModeChoice>,
@@ -81,6 +83,8 @@ pub struct ProgramView {
     pub name: String,
     /// The standard command, resolved by the machine that runs it.
     pub command: String,
+    /// Executable names to discover, with the standard command first.
+    pub commands: Vec<String>,
     /// One line saying what it is.
     pub line: String,
     /// Named models, with the default first.
@@ -132,8 +136,13 @@ impl Catalogue {
     pub fn read(sources: &[(&str, &str)]) -> Result<Self, ServerError> {
         let mut programs: Vec<ProgramView> = Vec::new();
         for &(file, text) in sources {
-            let parsed: ProgramFile =
+            let mut parsed: ProgramFile =
                 serde_json::from_str(text).map_err(|error| unreadable(file, error.to_string()))?;
+            let commands = match parsed.commands.take() {
+                Some(commands) => commands,
+                None => vec![parsed.command.clone()],
+            };
+            parsed.commands = Some(commands.clone());
             validate(&parsed).map_err(|reason| unreadable(file, reason))?;
             if programs.iter().any(|kept| {
                 kept.name == parsed.name
@@ -147,6 +156,7 @@ impl Catalogue {
             programs.push(ProgramView {
                 name: parsed.name,
                 command: parsed.command,
+                commands,
                 line: parsed.line,
                 models: parsed.models,
                 modes: parsed.modes,
@@ -186,20 +196,26 @@ impl Catalogue {
             .map_err(|error| unreadable("installed_copies", error.to_string()))?;
         let mut programs = self.programs.clone();
         for program in &mut programs {
-            let executable = match installed::resolve(&program.command, path) {
-                Ok(executable) => executable,
-                Err(reason) => {
-                    program.not_found = Some(reason);
-                    continue;
+            let mut reasons = Vec::new();
+            for command in &program.commands {
+                let executable = match installed::resolve(command, path) {
+                    Ok(executable) => executable,
+                    Err(reason) => {
+                        reasons.push(reason);
+                        continue;
+                    }
+                };
+                let key = (command.clone(), executable.key.clone());
+                let found = cache
+                    .entry(key)
+                    .or_insert_with(|| installed::version(command, &executable, path));
+                match found {
+                    Ok(copy) => program.builds.push(copy.clone()),
+                    Err(reason) => reasons.push(reason.clone()),
                 }
-            };
-            let key = (program.command.clone(), executable.key.clone());
-            let found = cache
-                .entry(key)
-                .or_insert_with(|| installed::version(&program.command, &executable, path));
-            match found {
-                Ok(copy) => program.builds.push(copy.clone()),
-                Err(reason) => program.not_found = Some(reason.clone()),
+            }
+            if program.builds.is_empty() {
+                program.not_found = Some(reasons.join("; "));
             }
         }
         Ok(CatalogueView { programs })
@@ -267,10 +283,15 @@ fn validate(program: &ProgramFile) -> Result<(), &'static str> {
         "codex/template-v1" => Some("codex"),
         _ => None,
     };
-    if !matches!(program.command.as_str(), "claude" | "codex")
+    let commands = program.commands.as_deref().ok_or("commands are absent")?;
+    if commands.first() != Some(&program.command)
         || expected_command.is_some_and(|command| command != program.command)
+        || !distinct_lines(commands.iter().map(String::as_str))
+        || commands
+            .iter()
+            .any(|command| !installed::command_name(command))
     {
-        return Err("command must be the standard command matching the rendering contract");
+        return Err("commands must be distinct executable names with the standard command first");
     }
     if program.models.is_empty()
         || !distinct_lines(program.models.iter().map(|model| model.id.as_str()))
