@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { choose, click, mount, text, unmountAll } from './harness';
+import { choose, click, mount, text, type, unmountAll } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
@@ -26,6 +26,23 @@ const open = (extra: Record<string, Route>) => mount('#/file/' + SCRIBE + '/prov
 beforeEach(() => sessionStorage.clear());
 
 describe('The route-backed start form', () => {
+  it('offers a typed path last, saves it and reads the chosen path back', async () => {
+    const service = routes();
+    const { posted } = await open(service);
+    const copies = field('build');
+    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another program…');
+    await choose(copies, 'another');
+    const input = document.querySelector('input[name="program-path"]');
+    expect(input).not.toBeNull();
+    await type(input, '/opt/forks/claude-fork');
+    await click(button());
+    const saved = posted.find((entry) => entry.path === path)?.body as Record<string, unknown>;
+    expect(saved).toMatchObject({ harness: { name: program.name, program: '/opt/forks/claude-fork', description }, model_access: ['default'], permissions: { default_mode: 'default' } });
+    expect(posted.at(-1)).toMatchObject({ path: start, body: { machine: machine.id } });
+    unmountAll(); document.body.innerHTML = '';
+    await open(routes({ ...saved, version: 1, reviewed_by: ADA, session: null }));
+    expect(document.querySelector<HTMLInputElement>('input[name="program-path"]')?.value).toBe('/opt/forks/claude-fork');
+  });
   it('offers known values with defaults, no required text and one submit button', async () => {
     const { posted } = await open(routes());
     expect(field('program')?.value).toBe('Claude Code');
