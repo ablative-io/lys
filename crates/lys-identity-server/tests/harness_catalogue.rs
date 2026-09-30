@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, BEA, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_home::harness::description::Description;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
@@ -12,6 +12,7 @@ use lys_identity_server::harness_catalogue::Catalogue;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+const BEA: &str = "bea-subject";
 
 fn named_refusal(answer: Result<Catalogue, ServerError>, file: &str) -> TestResult {
     let Err(error) = answer else {
