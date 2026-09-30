@@ -12,22 +12,25 @@ beforeEach(() => sessionStorage.clear());
 describe('Profile reviews', () => {
   it('reviews the displayed version only through an explicit action', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + review]: (body) => ok({ ...answer, recorded: { operation: (body as Record<string, unknown>).operation, version: 1 } }) });
-    expect(posted).toEqual([]); await click(button('I have reviewed version 1'));
-    expect(posted).toEqual([{ path: review, body: { operation: expect.stringMatching(/^op-/) } }]); expect(text()).toContain('Your review of version 1 was recorded');
+    expect(posted).toEqual([]); await click(button('Approve these settings'));
+    expect(posted).toEqual([{ path: review, body: { operation: expect.stringMatching(/^op-/) } }]); expect(text()).toContain('Version 1 of these settings is approved');
   });
   it('does not claim another person’s prior review as this operation', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + review]: ok({ ...answer, recorded: { operation: 'op-' + 'b'.repeat(32), version: 1 } }) });
-    await click(button('I have reviewed version 1')); expect(text()).toContain('was already reviewed'); expect(text()).not.toContain('Your review of version 1 was recorded'); expect(sessionStorage.length).toBe(0);
+    await click(button('Approve these settings')); expect(text()).toContain('was already approved'); expect(text()).not.toContain('Version 1 of these settings is approved'); expect(sessionStorage.length).toBe(0);
   });
-  it('recovers the original version after a newer profile is published', async () => {
-    const first = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + review]: refused(503, 'ProvisioningUnavailable', 'Unknown outcome') });
-    await click(button('I have reviewed version 1')); unmountAll(); document.body.innerHTML = '';
+  it('shows an unconfirmed approval of a replaced version as replaced, never sends it again, and offers only the newest (#119)', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + review]: refused(503, 'ProvisioningUnavailable', 'Unknown outcome') });
+    await click(button('Approve these settings')); unmountAll(); document.body.innerHTML = '';
     const later = { ...answer, profile: { ...profile, version: 2, instructions: 'Newer profile' } };
-    const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok(later), ['POST ' + review]: (body) => ok({ ...later, recorded: { operation: (body as Record<string, unknown>).operation, version: 1 } }) });
-    await click(button('Check original change')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('Newer profile'); expect(text()).toContain('Your review of version 1 was recorded');
+    const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok(later), ['POST ' + path + '/2/review']: (body) => ok({ ...later, recorded: { operation: (body as Record<string, unknown>).operation, version: 2 } }) });
+    expect(button('Check original change')).toBeNull(); expect(next.posted).toEqual([]);
+    expect(text()).toContain('version 2 has replaced it'); expect(sessionStorage.length).toBe(0);
+    await click(button('Approve these settings'));
+    expect(next.posted).toEqual([{ path: path + '/2/review', body: { operation: expect.stringMatching(/^op-/) } }]); expect(text()).toContain('Version 2 of these settings is approved');
   });
   it('keeps an answer for another version unresolved', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + review]: (body) => ok({ ...answer, recorded: { operation: (body as Record<string, unknown>).operation, version: 2 } }) });
-    await click(button('I have reviewed version 1')); expect(text()).toContain('original request is retained'); expect(sessionStorage.length).toBe(1);
+    await click(button('Approve these settings')); expect(text()).toContain('original request is retained'); expect(sessionStorage.length).toBe(1);
   });
 });

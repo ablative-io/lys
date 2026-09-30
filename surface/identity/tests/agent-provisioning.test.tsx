@@ -14,7 +14,7 @@ const answer: ProvisioningAnswer = { agent: SCRIBE, profile, versions: [{ versio
 const routes = { ...SERVICE, [path]: ok(answer) };
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
 async function submitProfile() {
-  const form = $('form[aria-label="Record provisioning profile"]');
+  const form = $('form[aria-label="This agent\'s settings"]');
   if (!form) throw new Error('Profile form missing');
   const note = form.querySelector<HTMLInputElement>('[name="note"]');
   if (!note) throw new Error('Change reason missing');
@@ -43,47 +43,44 @@ describe('Agent credential handles', () => {
 });
 
 describe('Agent provisioning', () => {
-  it('shows actual profile words, history and recorded-only status', async () => {
+  const saved = (body: unknown) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 } });
+  it('shows the settings once, as the form they are changed in, with no refresh button', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    expect(text()).toContain('Check every receipt'); expect(text()).toContain('Initial profile');
-    expect(text()).toContain('no runtime is applying'); expect(posted).toEqual([]);
+    expect(document.querySelector<HTMLTextAreaElement>('[name="instructions"]')?.value).toBe('Check every receipt');
+    expect(document.querySelector<HTMLTextAreaElement>('[name="allow"]')?.value).toBe('Read\nreader');
+    expect(button('Refresh profile')).toBeNull(); expect(text()).toContain('added to the end of the program\'s own system prompt');
+    expect(posted).toEqual([]);
   });
-  it('records a new version with the reviewed from_version and explicit declarations', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: (body) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 } }) });
+  it('records a new version with its from_version, the tools folded into the allow rules', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: saved });
     await submitProfile();
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toMatchObject({ path, body: { from_version: 1, operation: expect.stringMatching(/^op-/), model_access: ['model-one'], tools: ['reader'], skills: ['review'], instructions: 'Check every receipt', note: 'Review profile' } });
-    expect(text()).toContain('Provisioning profile recorded.');
+    expect(posted[0]).toMatchObject({ path, body: { from_version: 1, operation: expect.stringMatching(/^op-/), model_access: ['model-one'], tools: [], skills: ['review'], instructions: 'Check every receipt', note: 'Review profile' } });
+    expect((posted[0].body as { permissions: { allow: string[] } }).permissions.allow).toEqual(['Read', 'reader']);
+    expect(text()).toContain('Settings saved as a new version');
   });
-  it('records again every member the start carries, as it was recorded', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: (body) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 } }) });
+  it('records again every member the start carries, exactly as it was recorded', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: saved });
     await submitProfile();
-    expect(posted[0]).toMatchObject({ path, body: { harness: profile.harness, mcp_servers: profile.mcp_servers, permissions: profile.permissions } });
+    expect(posted[0]).toMatchObject({ path, body: { harness: profile.harness, mcp_servers: profile.mcp_servers, permissions: { ...profile.permissions, allow: ['Read', 'reader'] } } });
   });
-  it('shows the harness, each server as started and the permissions', async () => {
+  it('shows each connected service as it is started, with its secret by name', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    expect(text()).toContain('Claude Code · /opt/seat/bin/claude · package claude-code-seat');
-    expect(text()).toContain('/opt/mcp/excalidraw ["--stdio","  spaced  ",""] · PORT = 3000 · VERBOSE = false · TOKEN = the handle on excalidraw');
-    expect(text()).toContain('wakes the agent'); expect(text()).toContain('Bash(rm:*)'); expect(text()).toContain('Permission mode: acceptEdits.');
+    const values = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('fieldset input, fieldset textarea')].map((entry) => entry.value);
+    expect(values).toContain('/opt/mcp/excalidraw'); expect(values).toContain('--stdio\n  spaced  \n'); expect(values).toContain('http://localhost:6010');
+    expect(text()).toContain('wake the agent when it is idle');
   });
-  it('records no harness and no permissions when none are given, and refuses half a harness', async () => {
-    const bare = { ...profile, harness: null, permissions: null, mcp_servers: [] };
+  it('records no program and no permissions when none are given', async () => {
+    const bare = { ...profile, harness: null, permissions: null, tools: [], mcp_servers: [] };
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok({ ...answer, profile: bare }), ['POST ' + path]: (body) => ok({ ...answer, profile: { ...bare, ...(body as Record<string, unknown>), version: 2 } }) });
     await submitProfile();
     expect(posted[0]).toMatchObject({ body: { harness: null, permissions: null, mcp_servers: [] } });
-    unmountAll(); document.body.innerHTML = ''; sessionStorage.clear();
-    const half = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok({ ...answer, profile: bare }) });
-    const program = document.querySelector<HTMLInputElement>('[name="harness-program"]');
-    if (!program) throw new Error('Harness program missing');
-    program.value = '/opt/seat/bin/claude';
-    await submitProfile();
-    expect(half.posted).toEqual([]); expect(text()).toContain('both its program and its package');
   });
   it('retries the original operation and version after an uncertain answer and remount', async () => {
     const first = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: refused(503, 'ProvisioningUnavailable', 'Result uncertain') });
     await submitProfile();
     unmountAll(); document.body.innerHTML = '';
-    const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: (body) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 } }) });
+    const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: saved });
     expect(text()).toContain('original details are retained');
     await click(button('Check original change'));
     expect(next.posted).toEqual(first.posted);
@@ -94,16 +91,16 @@ describe('Agent provisioning', () => {
     const later = { ...answer, profile: { ...profile, version: 3, operation: 'op-' + 'b'.repeat(32), instructions: 'Later profile instructions' } };
     const next = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok(later), ['POST ' + path]: (body) => ok({ ...later, recorded: { operation: (body as Record<string, unknown>).operation, version: 2 } }) });
     await click(button('Check original change'));
-    expect(next.posted).toEqual(first.posted); expect(text()).toContain('Provisioning profile recorded.');
-    expect(text()).toContain('Later profile instructions'); expect(sessionStorage.length).toBe(0);
+    expect(next.posted).toEqual(first.posted); expect(text()).toContain('Settings saved as a new version');
+    expect(document.querySelector<HTMLTextAreaElement>('[name="instructions"]')?.value).toBe('Later profile instructions'); expect(sessionStorage.length).toBe(0);
   });
   it('holds an inconsistent receipt even when its latest profile matches the operation', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, ['POST ' + path]: (body) => ok({ ...answer, profile: { ...profile, ...(body as Record<string, unknown>), version: 2 }, recorded: { operation: 'op-' + 'f'.repeat(32), version: 2 } }) });
-    await submitProfile(); expect(text()).not.toContain('Provisioning profile recorded.'); expect(sessionStorage.length).toBe(1);
+    await submitProfile(); expect(text()).not.toContain('Settings saved as a new version'); expect(sessionStorage.length).toBe(1);
   });
-  it('leaves the edit form absent for a non-administrator', async () => {
+  it('shows the settings unchangeable to a non-administrator', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
-    expect($('form[aria-label="Record provisioning profile"]')).toBeNull();
-    expect(text()).toContain('Check every receipt');
+    expect(button('Save these settings')).toBeNull();
+    expect(document.querySelector<HTMLTextAreaElement>('[name="instructions"]')?.value).toBe('Check every receipt');
   });
 });

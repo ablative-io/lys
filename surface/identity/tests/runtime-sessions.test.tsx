@@ -8,29 +8,38 @@ const session: RuntimeSession = { session: 'reported-session', agent: SCRIBE, ma
 describe('Runtime sessions', () => {
   it('shows unconfirmed without assuming a launch succeeded', async () => {
     const { posted, requests } = await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [session] }) });
-    expect(requests).toContain(path); expect(posted).toEqual([]); expect(text()).toContain('Unconfirmed'); expect(text()).toContain('Dean laptop'); expect(text()).not.toContain('Reported running');
+    expect(requests).toContain(path); expect(posted).toEqual([]); expect(text()).toContain('Not yet confirmed by its runner'); expect(text()).toContain('Dean laptop'); expect(text()).not.toContain('Running, as its runner reported');
   });
   it('shows the runtime’s explicit stop evidence', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [{ ...session, shown: 'stopped', last_reported: 'stopped', stopped: { at: 1790000010, confirmation: 'Process exited with status 0' } }] }) });
-    expect(text()).toContain('Stop confirmed'); expect(text()).toContain('Process exited with status 0');
+    expect(text()).toContain('Stopped, as its runner confirmed'); expect(text()).toContain('Process exited with status 0');
   });
   it('refuses a stopped claim without confirmation', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [{ ...session, shown: 'stopped' }] }) });
-    expect(text()).toContain('valid status and stop confirmation'); expect(text()).not.toContain('Stop confirmed');
+    expect(text()).toContain('valid status and stop confirmation'); expect(text()).not.toContain('Stopped, as its runner confirmed');
   });
   it('does not turn no reports into not running', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [] }) });
-    expect(text()).toContain('does not establish whether a process is running');
+    expect(text()).toContain('does not show whether a process is running');
   });
   it('shows found sessions without registering an identity', async () => {
     const { requests, posted } = await mount('#/people', { ...SERVICE, '/runtime/found': ok({ sessions: [{ ...session, agent: null, shown: 'running' }] }) });
     posted.length = 0;
     await click($('button[data-kind="found"]'));
     expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
-    expect(text()).toContain('No identity attached'); expect(text()).toContain('Reported running');
+    expect(text()).toContain('No agent attached'); expect(text()).toContain('Running, as its runner reported');
+  });
+  it('names each session by its agent and computer, with the session id behind a toggle (#124)', async () => {
+    await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [session] }) });
+    const row = $('tbody tr');
+    expect(row?.querySelector('td')?.textContent).toContain('Scribe');
+    expect(row?.querySelector('td a')?.textContent).toBe('Scribe');
+    expect(row?.querySelector('td details summary')?.textContent).toBe('Session id');
+    expect(row?.querySelector('td > .mono')).toBeNull();
+    expect(text()).not.toContain('Refresh runtime reports');
   });
   it('names an unavailable runtime store', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: refused(503, 'RuntimeUnavailable', 'Store unavailable') });
-    expect(text()).toContain('RuntimeUnavailable'); expect(text()).not.toContain('No runtime reports were returned');
+    expect(text()).toContain('RuntimeUnavailable'); expect(text()).not.toContain('No runner has reported');
   });
 });
