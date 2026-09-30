@@ -14,6 +14,6 @@ describe('Secrets listing renderer', () => {
     for (const sensitive of ['private-value', 'bearer-handle', 'private-digest', 'upstream-password']) expect(html).not.toContain(sensitive);
   });
   it('names an empty discovery scope without claiming the whole store is empty', () => {
-    expect(renderToStaticMarkup(<SecretRows listing={{ secrets: [] }} />)).toContain('within your discovery scope');
+    expect(renderToStaticMarkup(<SecretRows listing={{ secrets: [] }} />)).toContain('No secrets were returned for this account.');
   });
 });
