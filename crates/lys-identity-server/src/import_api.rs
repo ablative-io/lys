@@ -76,7 +76,7 @@ fn validate(entry: &Entry) -> Result<(), ServerError> {
             decode::<crate::apps_api::RegisterBody>(entry.body.clone())?;
         }
         Kind::Agent => {
-            decode::<crate::routes::Named>(entry.body.clone())?;
+            decode::<crate::routes::AgentRegistration>(entry.body.clone())?;
         }
         Kind::Root => {
             decode::<crate::grant_contract::RootBody>(entry.body.clone())?;

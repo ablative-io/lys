@@ -72,7 +72,7 @@ use crate::reviews_api::{KeepBody, ReviewView};
 use crate::reviews_state::Kept;
 use crate::roles_api::{AssignBody, EndBody, MakeBody, MoveBody, VersionBody};
 use crate::roles_views::{MovedView, RoleList, RoleView};
-use crate::routes::{Bound, Moved, Named};
+use crate::routes::{AgentRegistration, Bound, Moved, Named};
 use crate::runtime_api::{ReportBody, SessionView as RuntimeSession, SessionsView as RuntimeList};
 use crate::setup::SetupRequest;
 use crate::sign_in_providers::{ProvidersView, SetBody as ProviderBody};
@@ -110,6 +110,7 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         api.schema::<PersonRegistered>(),
     );
     let agent_made = api.schema::<AgentRegistered>();
+    let agent_registration = api.schema::<AgentRegistration>();
     let named = api.schema::<Named>();
     let (moved, bound) = (api.schema::<Moved>(), api.schema::<Bound>());
     let receipt = api.schema::<ReceiptAnswer>();
@@ -124,7 +125,7 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         (GET, "/callback", None, None),
         (POST, "/setup", Some(setup), Some(made.clone())),
         (POST, "/people", Some(named.clone()), Some(made)),
-        (POST, "/agents", Some(named.clone()), Some(agent_made)),
+        (POST, "/agents", Some(agent_registration), Some(agent_made)),
         (GET, "/identities", None, Some(identities)),
         (GET, "/identities/{id}", None, Some(identity)),
         (
