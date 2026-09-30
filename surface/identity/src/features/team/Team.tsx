@@ -1,6 +1,6 @@
 /** The terminal is the screen: the open agents' terminals fill it edge to edge, split like a multiplexer, with one status bar at the foot. The tree of names is the dock on the right; settings open as the drawer over the terminal. */
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Refused, request } from '../../api';
 import { useShell } from '../../shell/ShellContext';
 import type { Entry } from '../people/directory';
@@ -62,9 +62,12 @@ export function Team() {
   const open = openAgents(pathname, search);
   const [revision, setRevision] = useState(0);
   const load = useWorld(revision);
+  const navigate = useNavigate();
+  useEffect(() => { shell.openDock('team'); }, []);
+  const first = load.status === 'ok' ? agentsOf(load.data.tree).find((entry) => liveOf(load.data.sessions, entry.id)) ?? agentsOf(load.data.tree)[0] : undefined;
   useEffect(() => {
-    if (shell.dockMode !== 'team') shell.toggleDock('team');
-  }, []);
+    if (!open.length && first) navigate('/team/' + encodeURIComponent(first.id), { replace: true });
+  }, [open.length, first?.id]);
   if (load.status === 'loading') return <div className="team-screen" />;
   if (load.status === 'refused') {
     const { status, refusal } = load.refused;

@@ -14,6 +14,8 @@ export interface Shell {
   toggleDockSide: () => void;
   dockMode: DockMode;
   toggleDock: (mode: Exclude<DockMode, null>) => void;
+  /** Open the dock on a panel, leaving it open if it already shows that panel. */
+  openDock: (mode: Exclude<DockMode, null>) => void;
   closeDock: () => void;
   helpSel: string | null;
   showHelp: (id: string | null) => void;
@@ -91,6 +93,10 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     });
     setHelpSel(null);
   }, []);
+  const openDock = useCallback((mode: Exclude<DockMode, null>) => {
+    setPref('dock-panel', mode);
+    setDockMode(mode);
+  }, []);
   const closeDock = useCallback(() => {
     setPref('dock-panel', '');
     setDockMode(null);
@@ -143,12 +149,12 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Shell>(
     () => ({
       labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide,
-      dockMode, toggleDock, closeDock, helpSel, showHelp,
+      dockMode, toggleDock, openDock, closeDock, helpSel, showHelp,
       paletteOpen, openPalette, explaining, explainOn, explainOff, closeAll,
       toastText, toastShown, toast, rows, cursor, setRows, setCursor, filterKind, setFilterKind,
       drawer, openDrawer,
     }),
-    [labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide, dockMode, toggleDock,
+    [labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide, dockMode, toggleDock, openDock,
       closeDock, helpSel, showHelp, paletteOpen, openPalette, explaining, explainOn, explainOff,
       closeAll, toastText, toastShown, toast, rows, cursor, filterKind, drawer, openDrawer],
   );
