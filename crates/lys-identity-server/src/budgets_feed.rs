@@ -97,17 +97,15 @@ pub fn convert(
             .filter(|usage| usage.at_ms <= at_ms && usage.reported_running_ms.is_some())
             .max_by_key(|usage| usage.at_ms)
             .and_then(|usage| usage.reported_running_ms);
-        match current.checked_sub(previous.unwrap_or(0)) {
-            Some(delta) => delta,
-            None => {
-                unavailable.push(Unavailable {
-                    figure: "running_ms".to_owned(),
-                    reason:
-                        "native cumulative running time reset; the interval spend is unavailable"
-                            .to_owned(),
-                });
-                0
-            }
+        if let Some(delta) = current.checked_sub(previous.unwrap_or(0)) {
+            delta
+        } else {
+            unavailable.push(Unavailable {
+                figure: "running_ms".to_owned(),
+                reason: "native cumulative running time reset; the interval spend is unavailable"
+                    .to_owned(),
+            });
+            0
         }
     } else {
         0

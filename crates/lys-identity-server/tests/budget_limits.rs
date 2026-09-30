@@ -384,12 +384,10 @@ fn a_stored_organisation_setting_without_a_version_is_named_and_refused() -> Tes
     let bytes =
         serde_json::to_vec(&json!({"zone": "UTC", "version": 0, "by": "host_setup", "at": 1}))?;
     log.append(&bytes)?;
-    log.write_snapshot("lys/identity/organisation-zone/v1", &bytes, &*key)?;
-    match lys_identity_server::configuration_store::ConfigurationStore::open(&store, key) {
-        Ok(_) => Err("an invalid stored version was accepted".into()),
-        Err(error) => {
-            assert_eq!(error.name(), "ConfigurationUnavailable");
-            Ok(())
-        }
-    }
+    log.write_snapshot("lys/identity/organisation-zone/v1", &bytes, &key)?;
+    let error = lys_identity_server::configuration_store::ConfigurationStore::open(&store, key)
+        .err()
+        .ok_or("an invalid stored version was accepted")?;
+    assert_eq!(error.name(), "ConfigurationUnavailable");
+    Ok(())
 }

@@ -110,7 +110,7 @@ impl ConfigurationStore {
             };
             let bytes = serde_json::to_vec(&zone).map_err(unavailable)?;
             log.append(&bytes).map_err(unavailable)?;
-            log.write_snapshot(DOMAIN, &bytes, &*key)
+            log.write_snapshot(DOMAIN, &bytes, &key)
                 .map_err(unavailable)?;
             zone
         };
@@ -134,12 +134,12 @@ impl ConfigurationStore {
     }
 
     /// The settled organisation setting.
-    pub fn zone(&self) -> &Zone {
+    pub const fn zone(&self) -> &Zone {
         &self.zone
     }
 
     /// Name any refused snapshot that required a full-log rebuild.
-    pub fn start(&self) -> &lys_log_store::Start {
+    pub const fn start(&self) -> &lys_log_store::Start {
         &self.start
     }
 
@@ -175,7 +175,7 @@ impl ConfigurationStore {
         } else {
             self.zone = next.clone();
         }
-        if let Err(error) = self.log.write_snapshot(DOMAIN, &bytes, &*self.key) {
+        if let Err(error) = self.log.write_snapshot(DOMAIN, &bytes, &self.key) {
             self.uncertain = true;
             return Err(unavailable(error));
         }

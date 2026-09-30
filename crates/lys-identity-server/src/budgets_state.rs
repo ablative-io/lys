@@ -70,7 +70,7 @@ pub enum Measure {
 
 impl Measure {
     /// Its wire name.
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::ContextPercent => "context_percent",
             Self::Tokens => "tokens",
@@ -111,7 +111,7 @@ pub enum Length {
 
 impl Length {
     /// Its wire name.
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Day => "day",
             Self::Week => "week",

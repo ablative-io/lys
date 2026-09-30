@@ -55,7 +55,7 @@ pub enum BudgetError {
 }
 
 impl BudgetError {
-    pub(crate) fn status(&self) -> StatusCode {
+    pub(crate) const fn status(&self) -> StatusCode {
         match self {
             Self::BudgetsUnavailable { .. } | Self::ConfigurationUnavailable { .. } => {
                 StatusCode::SERVICE_UNAVAILABLE

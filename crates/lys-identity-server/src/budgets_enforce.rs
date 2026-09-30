@@ -24,10 +24,7 @@ pub fn checked(usage: &Usage) -> Result<(), ServerError> {
     if usage.event.is_empty()
         || usage.at_ms < 0
         || usage.context_percent.is_some_and(|value| value > 100)
-        || usage
-            .account
-            .as_ref()
-            .is_some_and(|account| account.is_empty())
+        || usage.account.as_ref().is_some_and(String::is_empty)
     {
         return Err(ServerError::RequestMalformed { reason: "usage names an event and nonnegative observation instant, context is 0 to 100, and a reported account is nonempty".to_owned() });
     }
