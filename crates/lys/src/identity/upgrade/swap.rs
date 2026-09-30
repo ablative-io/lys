@@ -30,6 +30,7 @@ use super::super::install::surface;
 use super::super::private_files;
 use super::intent::{Intent, Kept, Step};
 use super::render::RenderedFile;
+use super::runner::Restart;
 use super::{Engine, Unit, adopt, launch, record_build};
 
 fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityError {
@@ -312,10 +313,19 @@ pub fn forward(
     intent: &mut Intent,
     units: &[Unit],
     engine: &mut dyn Engine,
+    mut restart: Option<&mut Restart>,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
+    if let Some(restart) = restart.as_deref_mut() {
+        restart.stop(say).map_err(|error| error.to_string())?;
+    }
     swap_in(layout, plan, intent, units, engine, say).map_err(|error| error.to_string())?;
     start_all(layout, units, say)?;
+    if let Some(restart) = restart {
+        restart
+            .start(layout, say, "started")
+            .map_err(|error| error.to_string())?;
+    }
     intent
         .done(layout, Step::Started)
         .map_err(|error| error.to_string())
@@ -328,8 +338,12 @@ pub fn back(
     intent: &Intent,
     units: &[Unit],
     engine: &mut dyn Engine,
+    mut restart: Option<&mut Restart>,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<()> {
+    if let Some(restart) = restart.as_deref_mut() {
+        restart.stop(say)?;
+    }
     stop_all(units, say)?;
     let (bin, kept_bin) = (layout.bin_dir(), layout.bin_previous_dir());
     if kept_bin.exists() && (intent.has(Step::BinariesKept) || !bin.exists()) {
@@ -356,7 +370,11 @@ pub fn back(
     }
     start_all(layout, units, say).map_err(|failure| {
         IdentityError::new(ErrorKind::UpgradeFailed, "put back", "install", failure)
-    })
+    })?;
+    if let Some(restart) = restart {
+        restart.start(layout, say, "restored and ready")?;
+    }
+    Ok(())
 }
 
 /// Ends an upgrade that stopped part-way, before anything else is done: one
@@ -371,6 +389,47 @@ pub fn recover(
     let Some(intent) = Intent::read(layout)? else {
         return Ok(());
     };
+    let mut restart = if intent.from.contains_key("lys") || intent.to.contains_key("lys") {
+        Some(Restart::prepare(layout)?)
+    } else {
+        None
+    };
+    recover_intent(layout, &intent, units, engine, restart.as_mut(), say)
+}
+
+/// Recovers with the runner already checked before any upgrade mutation.
+pub fn recover_with_runner(
+    layout: &Layout,
+    units: &[Unit],
+    engine: &mut dyn Engine,
+    restart: &mut Restart,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<()> {
+    let Some(intent) = Intent::read(layout)? else {
+        return Ok(());
+    };
+    recover_intent(layout, &intent, units, engine, Some(restart), say)
+}
+
+fn recover_intent(
+    layout: &Layout,
+    intent: &Intent,
+    units: &[Unit],
+    engine: &mut dyn Engine,
+    mut restart: Option<&mut Restart>,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<()> {
+    let mut names: Vec<&str> = units.iter().map(|unit| unit.binary).collect();
+    if let Some(restart) = restart.as_deref_mut() {
+        names.push("lys");
+        if !intent.from.contains_key("lys") && !intent.to.contains_key("lys") {
+            adopt::installed(layout, std::slice::from_ref(&restart.unit), say)?;
+            let kept = layout.bin_previous_dir();
+            if !intent.has(Step::Started) && kept.is_dir() && !kept.join("lys").is_file() {
+                place_binary(&layout.binary("lys"), &kept, "lys")?;
+            }
+        }
+    }
     if intent.has(Step::Started) {
         say(&format!(
             "an unfinished upgrade {} had started its new build: finishing it",
@@ -379,14 +438,17 @@ pub fn recover(
         for unit in units {
             launch(layout, unit, false)?;
         }
+        if let Some(restart) = restart {
+            restart.stop(say)?;
+            restart.start(layout, say, "recovered and ready")?;
+        }
     } else {
         say(&format!(
             "an unfinished upgrade {} stopped part-way: putting the previous build back",
             intent.describe()
         ));
-        back(layout, &intent, units, engine, say)?;
+        back(layout, intent, units, engine, restart, say)?;
     }
-    let names: Vec<&str> = units.iter().map(|unit| unit.binary).collect();
     record_build(layout, &names, say)?;
     Intent::clear(layout)
 }
