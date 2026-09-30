@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Refused, request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
+import { ReadFailure, failureWords } from '../signin/words';
 
 import { GUIDES } from './provider-guides';
 import type { Provider } from './provider-guides';
@@ -34,8 +35,8 @@ function RedirectAddress({ address }: { address: string }) {
 }
 
 export function SignInProviders() {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(readProviders, 'sign-in-providers-' + revision);
+  const load = useLoad(readProviders, 'sign-in-providers');
+  const [confirmed, setConfirmed] = useState<ProvidersView | null>(null);
   const [provider, setProvider_] = useState<Provider>('google');
   const [clientId, setClientId] = useState('');
   const [secret, setSecret] = useState('');
@@ -50,10 +51,10 @@ export function SignInProviders() {
     const body: SetBody = { provider, client_id: clientId.trim(), client_secret: secret };
     if (provider === 'microsoft') body.tenant = tenant.trim();
     try {
-      await setProvider(body);
+      const answer = await setProvider(body);
+      setConfirmed(answer);
       setSecret('');
       setOutcome({ kind: 'set', name: NAMES[provider] });
-      setRevision((value) => value + 1);
     } catch (error) {
       setOutcome({ kind: 'refused', refused: error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) }) });
     } finally {
@@ -66,7 +67,8 @@ export function SignInProviders() {
   return <section className="card providers" aria-label="Sign-in providers">
     <h2>Sign-in providers</h2>
     <p className="sub">The accounts people can sign in to Lys with. Set each one up once here; its client secret is sent to the sign-in service and never shown again.</p>
-    <Gate load={load} title="Sign-in providers" ok={(data) => {
+    <Gate load={load} title="the sign-in settings" renderError={(error) => <ReadFailure error={error} subject="sign-in settings" administrator />} ok={(loaded) => {
+      const data = confirmed ?? loaded;
       const held = (id: Provider) => data.providers.find((entry) => entry.provider === id);
       return <>
         <div className="provider-picker" role="radiogroup" aria-label="Provider">
@@ -115,7 +117,7 @@ export function SignInProviders() {
           </li>
         </ol>
         {outcome?.kind === 'set' ? <p className="notice ok" role="status">{outcome.name} is set. It is a button on Lys's sign-in page now.</p> : null}
-        {outcome?.kind === 'refused' ? <p className="notice bad" role="alert">{outcome.refused.refusal.refusal}: {outcome.refused.refusal.reason}</p> : null}
+        {outcome?.kind === 'refused' ? <p className="notice bad" role="alert">{failureWords(outcome.refused, 'Check the settings issued by the provider before trying again. Nothing is sent again on its own.', [secret])}</p> : null}
       </>;
     }} />
   </section>;

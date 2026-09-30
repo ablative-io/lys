@@ -101,7 +101,7 @@ describe('Requests', () => {
     });
     await click(button('Approve access'));
     expect(mounted.posted).toHaveLength(0);
-    expect(text()).not.toContain('Issue directly as root authority');
+    expect(text()).not.toContain('Give access directly as the administrator');
     await choose($('select[name="source"]'), 'grant-source');
     const note = document.querySelector<HTMLTextAreaElement>('textarea[name="note"]');
     if (!note) throw new Error('Decision note missing');
@@ -118,7 +118,7 @@ describe('Requests', () => {
     const asked: Ask = { operation: 'op-' + '3'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' };
     await mount('#/requests', { ...routes, '/requests': ok({ requests: [{ ...kept(asked), can_issue_root: true }] }) });
     await click(button('Approve access'));
-    expect(text()).toContain('Issue directly as root authority');
+    expect(text()).toContain('Give access directly as the administrator');
   });
 
   it('honours an explicit decision capability without inferring grant authority', async () => {
@@ -179,6 +179,7 @@ describe('Held approval recovery', () => {
     const entry = { ...kept({ operation: id, resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review' }), held_by: ADA, can_decide: true };
     await mount('#/requests', { ...routes, '/requests': ok({ requests: [entry] }), ['POST /requests/' + id + '/reconcile']: refused(409, 'RequestHeld', 'grant outcome uncertain') });
     await click(button('Check pending approval'));
-    expect(text()).toContain('RequestHeld'); expect(button('Decline request')).toBeNull();
+    expect(text()).toContain('An earlier approval still has no confirmed result');
+    expect(text()).not.toContain('RequestHeld'); expect(button('Decline request')).toBeNull();
   });
 });
