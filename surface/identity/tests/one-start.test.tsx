@@ -8,8 +8,8 @@ describe('one start', () => {
     const answer = { agent: SCRIBE, profile: null, versions: [], enforced: false };
     await mount('#/file/' + SCRIBE + '/start', { ...SERVICE, ['/agents/' + SCRIBE + '/provisioning']: ok(answer), '/network': ok({ machines: [], reports_served: false }), '/roles': ok({ roles: [] }) });
     expect(location.hash).toBe('#/file/' + SCRIBE + '/provisioning');
-    expect(text()).toContain('Before this agent can start');
+    expect(text()).toContain('MachineUnavailable');
     expect(text()).not.toContain('Start ' + SCRIBE);
-    expect($('form[aria-label="This agent\'s settings"]')).not.toBeNull();
+    expect($('section[aria-label="Start this agent"]')).not.toBeNull();
   });
 });

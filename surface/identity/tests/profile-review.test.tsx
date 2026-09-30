@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { ReviewProfile } from '../src/features/provisioning/ReviewProfile';
@@ -27,8 +27,12 @@ async function mount(hash: string, supplied: Record<string, Route>) {
   const element = document.createElement('div');
   document.body.appendChild(element);
   root = createRoot(element);
-  await act(async () => { root?.render(<ReviewProfile agent={SCRIBE} person={ADA} profile={latest} changed={() => {}} />); });
+  await act(async () => { root?.render(<Reviewed profile={latest} />); });
   return { posted };
+}
+function Reviewed({ profile }: { profile: ProvisioningProfile }) {
+  const [notice, setNotice] = useState('');
+  return <>{notice ? <p role="status">{notice}</p> : null}<ReviewProfile agent={SCRIBE} person={ADA} profile={profile} changed={setNotice} /></>;
 }
 beforeEach(() => sessionStorage.clear());
 describe('Profile reviews', () => {
