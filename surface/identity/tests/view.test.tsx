@@ -1,6 +1,7 @@
 /** The watched terminals follow the person from page to page as a small picture, open into a multiplexer, hide without losing the set, and never resize a session while small. */
 import { describe, expect, it, vi } from 'vitest';
-import { $, $$, click, mount, text } from './harness';
+import { act } from 'react';
+import { $, $$, click, mount, settle, text } from './harness';
 import { ADA, SCRIBE, SERVICE, ok } from './fixtures';
 import { mockTerminal } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
@@ -53,10 +54,12 @@ describe('Watched view', () => {
     expect(grip).not.toBeNull();
     grip.setPointerCapture = () => undefined;
     grip.releasePointerCapture = () => undefined;
-    grip.dispatchEvent(new PointerEvent('pointerdown', { clientX: 1000, bubbles: true, pointerId: 1 }));
-    grip.dispatchEvent(new PointerEvent('pointermove', { clientX: 600, bubbles: true, pointerId: 1 }));
-    grip.dispatchEvent(new PointerEvent('pointerup', { clientX: 600, bubbles: true, pointerId: 1 }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await act(async () => {
+      grip.dispatchEvent(new PointerEvent('pointerdown', { clientX: 1000, bubbles: true, pointerId: 1 }));
+      grip.dispatchEvent(new PointerEvent('pointermove', { clientX: 600, bubbles: true, pointerId: 1 }));
+      grip.dispatchEvent(new PointerEvent('pointerup', { clientX: 600, bubbles: true, pointerId: 1 }));
+    });
+    await settle();
     expect(localStorage.getItem('iam.view-width')).toBe('740');
     expect($('.view-real')).not.toBeNull();
     expect($('.view-picture')).toBeNull();
