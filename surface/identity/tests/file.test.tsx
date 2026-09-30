@@ -10,17 +10,21 @@ describe("An agent's file", () => {
     expect($('.file h1')?.textContent).toBe("Scribe");
     expect($('.file')?.dataset.tab).toBe('agent file · A/00000000');
     expect($('#state')?.textContent).toBe('Active');
-    expect($('.file .head .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
-    expect($('.file .head')?.textContent).toContain('since 22 Sep');
+    expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
+    expect($('.agent-details')?.textContent).toContain('since 22 Sep');
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Role', 'Access1', 'Start', 'Memory and context', 'Credentials', 'Sessions', 'Certificate', 'Tool policy', 'Record2', 'Budgets and goals']);
   });
 
-  it('puts Start… after the lifecycle acts, just before Emergency stop', async () => {
+  it('explains three next steps, keeps lifecycle controls in Details and preserves Emergency stop', async () => {
     await mount('#/file/' + SCRIBE);
-    const acts = $$('.file .head button, .file .head a[data-act]').map((b) => b.dataset.act);
-    expect(acts.slice(-2)).toEqual(['start', 'stop']);
-    expect(acts.indexOf('suspend')).toBeLessThan(acts.indexOf('start'));
-    expect($('.file .head a[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    const next = $$('nav[aria-label="Next steps"] a');
+    expect(next.map((entry) => entry.querySelector('strong')?.textContent)).toEqual(['Start', 'Set limits', 'Give access']);
+    expect(next.map((entry) => entry.getAttribute('href'))).toEqual(['provisioning', 'budgets', 'access'].map((tab) => '#/file/' + SCRIBE + '/' + tab));
+    expect(next.every((entry) => Boolean(entry.querySelector('span')?.textContent))).toBe(true);
+    expect($('.agent-next a[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect($('.agent-details [data-act="suspend"]')?.getAttribute('href')).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
+    expect($('.file .head button[data-act="stop"]')).not.toBeNull();
+    expect($('.agent-details [data-act="stop"]')).toBeNull();
   });
 
   it('stops an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
@@ -60,6 +64,9 @@ describe("An agent's file", () => {
 
   it('shows role and version as not recorded, never a sample role', async () => {
     await mount('#/file/' + SCRIBE);
+    const details = $('.agent-details');
+    if (!(details instanceof HTMLDetailsElement)) throw new Error('Agent details missing');
+    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); });
     const facts = $('.facts')?.textContent ?? '';
     expect(text()).toContain('No role is currently assigned');
     expect(facts).toContain('Ada (test person)');
@@ -68,7 +75,7 @@ describe("An agent's file", () => {
 
   it('flags an agent whose person is retired', async () => {
     await mount('#/file/' + REVIEWER);
-    expect($('.file .head')?.textContent).toContain('retired: needs a new person');
+    expect($('[aria-label="About this agent"]')?.textContent).toContain('retired: needs a new person');
   });
 
   it('switches sections with keys 1 to 7, each its own address', async () => {
@@ -94,6 +101,9 @@ describe("An agent's file", () => {
 
   it('opens the lifecycle form without changing identity state before submission', async () => {
     const { posted } = await mount('#/file/' + SCRIBE);
+    const details = $('.agent-details');
+    if (!(details instanceof HTMLDetailsElement)) throw new Error('Agent details missing');
+    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); });
     await click($('[data-act="suspend"]'));
     expect(location.hash).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
     expect(document.querySelector<HTMLInputElement>('input[type="hidden"][name="identity"]')?.value).toBe(SCRIBE);

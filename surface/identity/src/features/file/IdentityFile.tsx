@@ -14,6 +14,7 @@ import { ACTIONS, TABS } from './tabs';
 import { day } from './time';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
+import { AgentOverview } from './AgentOverview';
 
 /** Everything a file shows, all of it read from the service. */
 export interface FileData {
@@ -30,9 +31,9 @@ export interface FileData {
 
 async function readAgent(id: string): Promise<FileData> {
   const agent = await api.agent(id);
-  const [receipts, grants] = await Promise.all([Promise.all(agent.provenance.events.map((index) => api.receipt(index))), readGrantWorld()]);
+  const grants = await readGrantWorld();
   const x: Entry = { id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person };
-  return { x, agent, agents: [], receipts, grants };
+  return { x, agent, agents: [], receipts: [], grants };
 }
 
 async function readPerson(id: string): Promise<FileData> {
@@ -46,6 +47,42 @@ async function readPerson(id: string): Promise<FileData> {
 }
 
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
+
+function AgentEvidence({ data, tab, reload }: { data: FileData; tab: string; reload: () => void }) {
+  const load = useLoad(async () => {
+    const receipts = await Promise.all((data.agent?.provenance.events ?? []).map((index) => api.receipt(index)));
+    return { ...data, receipts };
+  }, 'agent-evidence:' + data.x.id + ':' + (data.agent?.provenance.events.join(',') ?? ''));
+  return <Gate load={load} title="recorded changes" ok={(answered) => <>
+    <TabBody tab={tab} data={answered} reload={reload} />
+    {tab === 'profile' ? <TabBody tab="record" data={answered} reload={reload} /> : null}
+  </>} />;
+}
+
+function FileTabs({ data, tab }: { data: FileData; tab: string }) {
+  return <nav className="tabs" aria-label="Agent sections">{TABS.map(([key, label]) => <a key={key} href={`#/file/${data.x.id}/${key}`} className={tab === key ? 'on' : ''}>
+    {label}{key === 'record' && data.agent ? <span className="n">{data.agent.provenance.events.length}</span> : key === 'access' ? <span className="n">{data.grants.list.grants.filter((grant) => grant.holder === data.x.id).length}</span> : null}
+  </a>)}</nav>;
+}
+
+function AgentDetails({ data, tab, reload, problems = [] }: { data: FileData; tab: string; reload: () => void; problems?: Refused[] }) {
+  const [opened, setOpened] = useState(tab !== 'profile');
+  const x = data.x;
+  return <details className="agent-details" open={tab !== 'profile' || undefined} onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
+    <summary>Details</summary>
+    {problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null}
+    <p className="identity-id">Identity: <code>{x.id}</code></p>
+    <p>Access status: <span className={'state ' + x.state} id="state">{STATUS[x.state]}</span>. This says whether its identity may be used; it does not say a process is running.</p>
+    {data.agent?.provenance.registration ? <p>Registered since {day(data.agent.provenance.registration.actor.authenticated_at)}.</p> : null}
+    <div className="agent-detail-acts">
+      <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
+      {ACTIONS[x.state].map((action) => <a key={action} className={'btn ' + (action === 'suspend' || action === 'retire' ? 'danger' : '')} data-act={action} href={'#/directory/manage?action=status&identity=' + encodeURIComponent(x.id)}>{ACTION[action]}</a>)}
+      <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a>
+    </div>
+    <FileTabs data={data} tab={tab} />
+    {opened ? tab === 'profile' || tab === 'record' ? <AgentEvidence data={data} tab={tab} reload={reload} /> : <TabBody tab={tab} data={data} reload={reload} /> : null}
+  </details>;
+}
 
 function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void }) {
   const { agent } = data;
@@ -62,11 +99,11 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
       <div className="eyebrow">
         <a href="#/people">People and agents</a> / {x.display_name}
       </div>
-      <div className="file" data-tab={`${kind} file · ${fileNo(x.id)}`}>
+      <div className={'file' + (agent ? ' agent-page' : '')} data-tab={`${kind} file · ${fileNo(x.id)}`}>
         <div className="head">
           <div>
             <h1 style={{ fontSize: 24, marginTop: 0 }}>{x.display_name}</h1>
-            <div className="sec">
+            {agent ? <p className="sec">{x.state === 'active' ? x.display_name + ' is added. Choose Start to finish setting it up.' : x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}</p> : <div className="sec">
               {kind}
               {person ? (
                 <>
@@ -76,27 +113,25 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
                 </>
               ) : null}{' '}
               {since ? <span className="dim">· since {day(since)}</span> : null}
-            </div>
+            </div>}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
+            {agent ? null : <><a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             {ACTIONS[x.state].map((a) => (
               <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>
                 {ACTION[a]}
               </button>
-            ))}
-            {kind === 'agent' ? <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a> : null}
-            {kind === 'agent' && x.state === 'active' ? (
-              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Start this agent">Start this agent</a>
-            ) : null}
+            ))}</>}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
           </div>
         </div>
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
-        <nav className="tabs">
+        {agent ? <div className="pane">
+          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <AgentDetails data={{ ...data, x }} tab={tab} reload={reload} problems={problems} />} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p><AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} /></>}
+        </div> : <><nav className="tabs">
           {TABS.map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''}>
               {l}
@@ -104,7 +139,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
             </a>
           ))}
         </nav>
-        <div className="pane"><TabBody tab={tab} data={data} reload={reload} /></div>
+        <div className="pane"><TabBody tab={tab} data={data} reload={reload} /></div></>}
       </div>
     </div>
   );
