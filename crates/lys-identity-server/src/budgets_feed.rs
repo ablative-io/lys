@@ -50,7 +50,7 @@ pub async fn keep_page(
                         .ok_or_else(|| refused("runner feed usage has no tracked agent"))
                 })?;
                 let usage = with_budgets(state, |store| {
-                    convert(machine, &agent, &record, &store.held().uses)
+                    convert(machine, &agent, &record, store.held())
                 })?;
                 crate::budgets_enforce::keep(state, usage).await?;
             }
@@ -71,7 +71,7 @@ pub fn convert(
     machine: &str,
     agent: &str,
     record: &UsageRecord,
-    prior: &[Usage],
+    prior: &crate::budgets_state::Held,
 ) -> Result<Usage, ServerError> {
     if record.version != RECORD_VERSION || record.id.is_empty() || record.session.is_empty() {
         return Err(refused(
@@ -90,15 +90,24 @@ pub fn convert(
     let reported_running_ms = snapshot.then_some(record.figures.running_ms).flatten();
     let running_ms = if let Some(current) = reported_running_ms {
         let previous = prior
-            .iter()
-            .filter(|usage| {
+            .index
+            .baseline(agent, &record.session, at_ms)
+            .map(|position| {
                 #[cfg(test)]
                 crate::budgets_work::visit(crate::budgets_work::Work::Running);
-                usage.agent == agent && usage.session.as_deref() == Some(record.session.as_str())
+                prior
+                    .uses
+                    .get(position)
+                    .ok_or_else(|| {
+                        refused(format!("running index names missing record {position}"))
+                    })
+                    .and_then(|usage| {
+                        usage.reported_running_ms.ok_or_else(|| {
+                            refused("running index names a record without a cumulative report")
+                        })
+                    })
             })
-            .filter(|usage| usage.at_ms <= at_ms && usage.reported_running_ms.is_some())
-            .max_by_key(|usage| usage.at_ms)
-            .and_then(|usage| usage.reported_running_ms);
+            .transpose()?;
         if let Some(delta) = current.checked_sub(previous.unwrap_or(0)) {
             delta
         } else {

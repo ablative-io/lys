@@ -317,23 +317,42 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let held = with_budgets(state, |store| {
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
-        Ok(store.held().clone())
-    })?;
-    let at_ms = jiff::Timestamp::now().as_millisecond();
+    let teams = if holder.kind == HolderKind::Agent && state.teams.is_some() {
+        crate::teams_api::with_teams(state, |store| Ok(store.teams().to_vec()))?
+    } else {
+        Vec::new()
+    };
+    with_budgets(state, |store| {
+        view_held(
+            store.held(),
+            holder,
+            &zone,
+            &standings,
+            &teams,
+            jiff::Timestamp::now().as_millisecond(),
+        )
+    })
+}
+
+pub(crate) fn view_held(
+    held: &crate::budgets_state::Held,
+    holder: &Holder,
+    zone: &str,
+    standings: &[crate::budgets_state::Standing],
+    teams: &[crate::teams_state::Team],
+    at_ms: i64,
+) -> Result<BudgetsView, ServerError> {
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
-    let agents = crate::budgets_members::covered(holder, &standings);
+    let agents = crate::budgets_members::covered(holder, standings);
     let used = effective
         .iter()
         .map(|limit| {
-            crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
+            crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
                 .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
+    let unavailable = source_gaps(held, &agents, zone, at_ms)?;
     let unconfirmed: Vec<_> = held
         .unconfirmed
         .iter()
@@ -341,11 +360,6 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
         .cloned()
         .collect();
     let within = if holder.kind == HolderKind::Agent {
-        let teams = if state.teams.is_some() {
-            crate::teams_api::with_teams(state, |store| Ok(store.teams().to_vec()))?
-        } else {
-            Vec::new()
-        };
         let standing = standings
             .iter()
             .find(|standing| standing.agent == holder.id);
@@ -359,14 +373,14 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                     kind: HolderKind::Team,
                     id: team.created.id.clone(),
                 };
-                let agents = crate::budgets_members::covered(&holder, &standings);
+                let agents = crate::budgets_members::covered(&holder, standings);
                 let limits = held
                     .limit_set(&holder)
                     .map_or_else(Vec::new, |limits| held.effective_limits(limits));
                 let used = limits
                     .iter()
                     .map(|limit| {
-                        crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
+                        crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
                             .map_err(|reason| {
                                 ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
                             })
@@ -387,7 +401,7 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
         holder: holder.clone(),
         limits: collection.map_or_else(Vec::new, |limits| limits.limits.clone()),
         warn_at: collection.and_then(|limits| limits.warn_at.clone()),
-        zone,
+        zone: zone.to_owned(),
         version: collection.map_or(0, |limits| limits.version),
         by: collection.map(|limits| limits.by.clone()),
         at: collection.map(|limits| limits.at),

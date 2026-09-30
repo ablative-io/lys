@@ -123,9 +123,22 @@ pub fn figure(
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
     let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
-    let uses: Vec<_> = held
-        .uses
-        .iter()
+    let since = if matches!(limit.unit, Measure::PlanPercent | Measure::ContextPercent) {
+        None
+    } else {
+        start(limit, zone, at_ms)?
+    };
+    let selected = held.index.positions(agents, limit.unit, at_ms);
+    let uses = selected
+        .into_iter()
+        .map(|position| {
+            held.uses
+                .get(position)
+                .ok_or_else(|| format!("usage index names missing record {position}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let uses: Vec<_> = uses
+        .into_iter()
         .chain(incoming)
         .filter(|usage| {
             #[cfg(test)]
@@ -139,41 +152,49 @@ pub fn figure(
     if limit.unit == Measure::ContextPercent {
         return context(limit, &uses);
     }
-    let since = start(limit, zone, at_ms)?;
-    if let Some(reason) = spend_gap(limit, agents, &uses, since) {
-        return Ok(unavailable(limit, since, reason));
+    let mut spend = held
+        .index
+        .spend(&held.uses, agents, limit, zone, since, at_ms)?;
+    if let Some(incoming) = incoming.filter(|usage| {
+        agents.contains(&usage.agent)
+            && usage.at_ms <= at_ms
+            && since.is_none_or(|since| usage.at_ms >= since)
+    }) {
+        spend.add(limit.unit, incoming, held.uses.len())?;
     }
-    if limit.unit == Measure::Tokens
-        && let Some(gap) = uses
-            .iter()
-            .filter(|usage| since.is_none_or(|start| usage.at_ms >= start))
-            .flat_map(|usage| &usage.unavailable)
-            .find(|gap| gap.figure == "tokens")
-    {
-        return Ok(unavailable(limit, since, &gap.reason));
-    }
-    let mut total = 0_u64;
-    for usage in uses {
-        if since.is_some_and(|start| usage.at_ms < start) {
-            continue;
-        }
-        let amount = match limit.unit {
-            Measure::Tokens => usage.tokens,
-            Measure::RunningMs => usage.running_ms,
-            Measure::Dollars => {
-                let Some(amount) = usage.dollars_micros else {
-                    continue;
-                };
-                amount
-            }
-            Measure::ContextPercent | Measure::PlanPercent => {
+    if let Some(position) = spend.gap {
+        let usage = if position == held.uses.len() {
+            incoming.ok_or("period gap names no incoming record")?
+        } else {
+            held.uses
+                .get(position)
+                .ok_or("period gap names a missing record")?
+        };
+        let field = match limit.unit {
+            Measure::Tokens => "tokens",
+            Measure::RunningMs => "running_ms",
+            Measure::Dollars => "dollars_micros",
+            Measure::PlanPercent | Measure::ContextPercent => {
                 return Err("a level reached spend summation".to_owned());
             }
         };
-        total = total
-            .checked_add(amount)
-            .ok_or("budget spend overflows its reported unit")?;
+        let gap = usage
+            .unavailable
+            .iter()
+            .find(|gap| {
+                gap.figure == field
+                    && (limit.unit == Measure::Tokens || gap.reason.contains("reset"))
+            })
+            .ok_or("period gap names a record without its source refusal")?;
+        return Ok(unavailable(limit, since, &gap.reason));
     }
+    if let Some(reason) = spend_gap(limit, agents, &uses, since) {
+        return Ok(unavailable(limit, since, reason));
+    }
+    let total = spend
+        .total
+        .and_then(|total| u64::try_from(total).ok())
+        .ok_or("budget spend overflows its reported unit")?;
     present(limit, since, total)
 }
 
