@@ -49,6 +49,11 @@ struct Folders {
     dir: TempDir,
 }
 
+struct Seed {
+    folders: Folders,
+    appends: u64,
+}
+
 impl Folders {
     fn root(&self) -> PathBuf {
         self.dir.path().join("broker")
@@ -94,7 +99,7 @@ fn refusal(index: u64) -> AuditLine {
 
 /// Makes a broker, fills its log to `LINES` signed lines, and opens it once
 /// so its snapshot is written at the full log.
-fn build(folders: &Folders) -> TestResult {
+fn build(folders: &Folders) -> Result<u64, Box<dyn Error>> {
     fs::create_dir_all(folders.root())?;
     fs::create_dir_all(folders.keys())?;
     let paths = folders.paths();
@@ -107,23 +112,26 @@ fn build(folders: &Folders) -> TestResult {
     let audit_key = StoreKey::load(&paths.audit_key, &guarded)?;
     let signer = Ed25519Identity::load(&paths.audit_key)?;
     let mut audit = AuditLog::open(&paths.log_dir, &paths.anchor, &guarded, &audit_key)?.0;
+    let mut appends = 0;
     while audit.len() + 1 < LINES {
         audit.append_unanchored(&refusal(audit.len()), &signer)?;
+        appends += 1;
     }
     audit.append(&refusal(audit.len()), &signer)?;
+    appends += 1;
     drop(audit);
     let broker = folders.open()?;
     let len = broker.audit().len();
     if len != LINES {
         return Err(format!("the built log holds {len} lines, not {LINES}").into());
     }
-    Ok(())
+    Ok(appends)
 }
 
 /// The 10,000-line broker, written once per run under the target's
 /// temporary folder.
-fn built() -> Result<&'static Folders, Box<dyn Error>> {
-    static BUILT: OnceLock<Result<Folders, String>> = OnceLock::new();
+fn built() -> Result<&'static Seed, Box<dyn Error>> {
+    static BUILT: OnceLock<Result<Seed, String>> = OnceLock::new();
     BUILT
         .get_or_init(|| {
             let dir = tempfile::Builder::new()
@@ -131,8 +139,9 @@ fn built() -> Result<&'static Folders, Box<dyn Error>> {
                 .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
                 .map_err(|error| format!("making the fixture folder: {error}"))?;
             let folders = Folders { dir };
-            build(&folders).map_err(|error| format!("building the 10,000-line log: {error}"))?;
-            Ok(folders)
+            let appends = build(&folders)
+                .map_err(|error| format!("building the 10,000-line log: {error}"))?;
+            Ok(Seed { folders, appends })
         })
         .as_ref()
         .map_err(|error| error.as_str().into())
@@ -158,9 +167,19 @@ fn ten_thousand() -> Result<Folders, Box<dyn Error>> {
     let copy = Folders {
         dir: tempfile::tempdir()?,
     };
-    copy_tree(&built.root(), &copy.root())?;
-    copy_tree(&built.keys(), &copy.keys())?;
+    copy_tree(&built.folders.root(), &copy.root())?;
+    copy_tree(&built.folders.keys(), &copy.keys())?;
     Ok(copy)
+}
+
+#[test]
+fn the_large_fixture_requires_no_runtime_store_appends() -> TestResult {
+    let seed = built()?;
+    assert_eq!(
+        seed.appends, 0,
+        "the large fixture must load recorded bytes without appending to the store"
+    );
+    Ok(())
 }
 
 /// One printed page: each row's index and the index its outcome names,
