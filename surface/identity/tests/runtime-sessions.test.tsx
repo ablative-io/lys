@@ -29,6 +29,15 @@ describe('Runtime sessions', () => {
     expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
     expect(text()).toContain('No identity attached'); expect(text()).toContain('Reported running');
   });
+  it('names each session by its agent and computer, with the session id behind a toggle (#124)', async () => {
+    await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [session] }) });
+    const row = $('tbody tr');
+    expect(row?.querySelector('td')?.textContent).toContain('Scribe');
+    expect(row?.querySelector('td a')?.textContent).toBe('Scribe');
+    expect(row?.querySelector('td details summary')?.textContent).toBe('Session id');
+    expect(row?.querySelector('td > .mono')).toBeNull();
+    expect(text()).not.toContain('Refresh runtime reports');
+  });
   it('names an unavailable runtime store', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: refused(503, 'RuntimeUnavailable', 'Store unavailable') });
     expect(text()).toContain('RuntimeUnavailable'); expect(text()).not.toContain('No runtime reports were returned');
