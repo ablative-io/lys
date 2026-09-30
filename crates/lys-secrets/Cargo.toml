@@ -13,6 +13,10 @@ publish = false
 name = "lys-secrets-demo"
 path = "src/bin/lys-secrets-demo.rs"
 
+[[example]]
+name = "log_window_pack"
+path = "examples/log_window_pack.rs"
+
 [dependencies]
 axum.workspace = true
 clap.workspace = true
