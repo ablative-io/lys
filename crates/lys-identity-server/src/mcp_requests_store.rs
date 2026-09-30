@@ -182,7 +182,11 @@ impl<S: LeafStore> McpRequestStore<S> {
         by: &str,
     ) -> Result<Option<McpRequest>, ServerError> {
         self.settle()?;
-        match self.held.requests.iter().find(|request| request.id == id) {
+        match self.held.requests.iter().find(|request| {
+            #[cfg(test)]
+            self.held.visit();
+            request.id == id
+        }) {
             Some(request)
                 if request.agent == agent && request.server == server && request.asked_by == by =>
             {
@@ -332,6 +336,69 @@ mod tests {
             asked_by: PersonId::generate()?.to_string(),
             asked_at: 1,
         })
+    }
+
+    fn retained() -> Result<Held, Box<dyn Error>> {
+        let mut held = Held::default();
+        for _ in 0..32 {
+            let asked = request()?;
+            let operation = OperationId::generate()?.to_string();
+            let record = Intended {
+                operation: operation.clone(),
+                request: asked.id.clone(),
+                by: asked.asked_by.clone(),
+                note: String::new(),
+                from_version: 1,
+                at: 2,
+                version: serde_json::from_value(serde_json::json!({
+                    "number": 2, "operation": operation, "set_by": asked.asked_by, "set_at": 2,
+                    "reviewed": {"operation": operation, "by": asked.asked_by, "at": 2},
+                    "settings": {"model_access": [], "tools": [], "skills": [],
+                        "mcp_servers": [{"name": asked.server, "url": "https://tools.example.test/mcp"}],
+                        "instructions": "", "note": ""}
+                }))?,
+            };
+            held.push_request(asked)?;
+            held.push_event(Event::Intended(record.clone()))?;
+            held.push_event(Event::Decided(record))?;
+        }
+        Ok(held)
+    }
+
+    #[test]
+    fn an_unrelated_append_does_not_visit_or_copy_retained_records() -> TestResult {
+        let harness = Harness::new(29)?;
+        let key = Arc::new(Ed25519Identity::load(
+            &harness.dir.path().join("service.key"),
+        )?);
+        let mut store = McpRequestStore::over(harness.leaves(), key)?;
+        // Seed the projection directly to isolate append work from durable fixture setup.
+        store.held = retained()?;
+        let before = store.held.work();
+        let asked = request()?;
+        assert_eq!(store.ask(asked.clone())?, asked);
+        assert_eq!(
+            store.held.work() - before,
+            0,
+            "append touched retained history"
+        );
+        assert_eq!(store.log.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn decision_and_intent_lookups_visit_at_most_one_record_each() -> TestResult {
+        let held = retained()?;
+        let before = held.work();
+        for asked in &held.requests {
+            assert!(held.decision(&asked.id).is_some());
+            assert!(held.intent(&asked.id).is_none());
+        }
+        assert!(
+            held.work() - before <= 2 * held.requests.len(),
+            "lookups rescanned history"
+        );
+        Ok(())
     }
 
     #[test]

@@ -87,12 +87,30 @@ struct Sealed {
 }
 
 /// Requests retain their original signed shape; later records carry decisions.
-#[derive(Clone, Default)]
+#[cfg_attr(not(test), derive(Clone))]
+#[derive(Default)]
 pub(crate) struct Held {
     /// The unchanged signed requests in recording order.
     pub requests: Vec<McpRequest>,
     /// Approval events in their original order, including withdrawals.
     pub events: Vec<Event>,
+    #[cfg(test)]
+    visits: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[cfg(test)]
+impl Clone for Held {
+    fn clone(&self) -> Self {
+        self.visits.fetch_add(
+            self.requests.len() + self.events.len(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        Self {
+            requests: self.requests.clone(),
+            events: self.events.clone(),
+            visits: std::sync::Arc::clone(&self.visits),
+        }
+    }
 }
 
 pub(crate) fn unavailable(reason: impl std::fmt::Display) -> ServerError {
@@ -148,14 +166,33 @@ pub(crate) fn signed_event(event: Event, key: &Ed25519Identity) -> Result<Vec<u8
 }
 
 impl Held {
+    #[cfg(test)]
+    pub(crate) fn visit(&self) {
+        self.visits
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn work(&self) -> usize {
+        self.visits.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub(crate) fn request(&self, id: &str) -> Option<&McpRequest> {
-        self.requests.iter().find(|request| request.id == id)
+        self.requests.iter().find(|request| {
+            #[cfg(test)]
+            self.visit();
+            request.id == id
+        })
     }
 
     pub(crate) fn decision(&self, id: &str) -> Option<&Intended> {
-        self.events.iter().find_map(|event| match event {
-            Event::Decided(record) if record.request == id => Some(record),
-            _ => None,
+        self.events.iter().find_map(|event| {
+            #[cfg(test)]
+            self.visit();
+            match event {
+                Event::Decided(record) if record.request == id => Some(record),
+                _ => None,
+            }
         })
     }
 
@@ -163,9 +200,13 @@ impl Held {
         self.events
             .iter()
             .rev()
-            .find(|event| match event {
-                Event::Intended(record) | Event::Decided(record) => record.request == id,
-                Event::Withdrawn { request, .. } => request == id,
+            .find(|event| {
+                #[cfg(test)]
+                self.visit();
+                match event {
+                    Event::Intended(record) | Event::Decided(record) => record.request == id,
+                    Event::Withdrawn { request, .. } => request == id,
+                }
             })
             .and_then(|event| match event {
                 Event::Intended(record) => Some(record),
@@ -176,9 +217,15 @@ impl Held {
     pub(crate) fn push_request(&mut self, request: McpRequest) -> Result<(), ServerError> {
         validate(&request).map_err(unavailable)?;
         if self.request(&request.id).is_some()
-            || self.events.iter().any(|event| match event {
-                Event::Intended(record) | Event::Decided(record) => record.operation == request.id,
-                Event::Withdrawn { operation, .. } => operation == &request.id,
+            || self.events.iter().any(|event| {
+                #[cfg(test)]
+                self.visit();
+                match event {
+                    Event::Intended(record) | Event::Decided(record) => {
+                        record.operation == request.id
+                    }
+                    Event::Withdrawn { operation, .. } => operation == &request.id,
+                }
             })
         {
             return Err(unavailable("the log repeats an MCP request operation"));
@@ -249,12 +296,16 @@ impl Held {
         note: &str,
     ) -> Result<(), ServerError> {
         if self.request(operation).is_some()
-            || self.events.iter().any(|event| match event {
-                Event::Intended(record) | Event::Decided(record) => {
-                    record.operation == operation
-                        && (record.request != request || record.by != by || record.note != note)
+            || self.events.iter().any(|event| {
+                #[cfg(test)]
+                self.visit();
+                match event {
+                    Event::Intended(record) | Event::Decided(record) => {
+                        record.operation == operation
+                            && (record.request != request || record.by != by || record.note != note)
+                    }
+                    Event::Withdrawn { .. } => false,
                 }
-                Event::Withdrawn { .. } => false,
             })
         {
             return Err(ServerError::RequestReused {
