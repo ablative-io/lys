@@ -327,17 +327,20 @@ async fn a_plan_window_becomes_unavailable_at_its_reported_reset() -> TestResult
     assert_eq!(status, 200, "{used}");
     let unknown = table.get(&path).await?;
     assert!(unknown["used"][0]["figure"].is_null(), "{unknown}");
+    let note = format!("the plan window reset at {}; no report since", at - 1);
     assert!(
         unknown["used"][0]["unavailable"]
             .as_str()
-            .is_some_and(|reason| reason.contains("expired")),
+            .is_some_and(|reason| reason == note),
         "{unknown}"
     );
+    assert_eq!(unknown["used"][0]["since_ms"], at - 1, "{unknown}");
     assert_eq!(metadata(&known), metadata(&unknown));
-    let (_, body) = table.start().await?;
+    let (status, body) = table.start().await?;
+    assert_eq!(status, 404, "{body}");
     assert_eq!(
         body["refusal"], "LaunchRecordMissing",
-        "unknown is not treated as exhausted: {body}"
+        "a recorded reset admits the fresh plan window: {body}"
     );
     Ok(())
 }

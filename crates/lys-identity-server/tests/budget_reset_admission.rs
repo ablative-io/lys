@@ -13,7 +13,7 @@ use lys_identity_server::budgets_state::{
 use lys_identity_server::budgets_store::BudgetStore;
 use lys_identity_server::dev_seed::seed_configured;
 use lys_runner::tracking::{Figures, Unavailable};
-use lys_runner::tracking_budget::cost_delta;
+use lys_runner::tracking_budget::{PlanWindow, cost_delta};
 use lys_runner::tracking_store::SourceState;
 use serde_json::{Value, json};
 
@@ -27,6 +27,10 @@ struct Table {
 
 impl Table {
     async fn with_usage(uses: Vec<Usage>) -> TestResult<Self> {
+        Self::with_measure(Measure::Dollars, uses).await
+    }
+
+    async fn with_measure(measure: Measure, uses: Vec<Usage>) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
             let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
@@ -44,7 +48,7 @@ impl Table {
                         kind: HolderKind::Agent,
                         id: agent.clone(),
                     },
-                    measure: Measure::Dollars,
+                    measure,
                     limit: 50,
                     period: Some(Period {
                         length: Length::Week,
@@ -96,6 +100,10 @@ impl Table {
     }
 
     async fn figure(&self) -> TestResult<Value> {
+        self.figure_in("dollars").await
+    }
+
+    async fn figure_in(&self, unit: &str) -> TestResult<Value> {
         let (status, body) = self
             .service
             .get(
@@ -106,7 +114,7 @@ impl Table {
         assert_eq!(status, 200, "{body}");
         let used = body["used"].as_array().ok_or("no used figures")?;
         assert_eq!(used.len(), 1, "{body}");
-        assert_eq!(used[0]["unit"], "dollars", "{body}");
+        assert_eq!(used[0]["unit"], unit, "{body}");
         Ok(used[0].clone())
     }
 }
@@ -231,5 +239,88 @@ async fn a_fresh_agent_has_explicit_zero_spend_and_passes_start_admission() -> T
             .all(|refusal| refusal["refusal"] == "check_record_missing"),
         "{answer}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_recorded_plan_reset_admits_both_starts_and_names_the_fresh_window() -> TestResult {
+    let at_ms = jiff::Timestamp::now().as_millisecond();
+    let boundary = u64::try_from(at_ms.checked_sub(1).ok_or("no prior reset instant")?)?;
+    let observed_at = at_ms.checked_sub(2).ok_or("no prior observation instant")?;
+    let table = Table::with_measure(
+        Measure::PlanPercent,
+        vec![
+            Usage {
+                event: "plan-before-reset".to_owned(),
+                at_ms: observed_at,
+                session: Some("provider-session".to_owned()),
+                account: Some("shared-account".to_owned()),
+                plan_windows: Some(vec![PlanWindow {
+                    duration_minutes: 10_080,
+                    used_percent: 50.into(),
+                    resets_at_ms: boundary,
+                }]),
+                native_snapshot: true,
+                ..Usage::default()
+            },
+            Usage {
+                event: "plan-after-reset".to_owned(),
+                at_ms,
+                session: Some("provider-session".to_owned()),
+                account: Some("shared-account".to_owned()),
+                plan_windows: Some(Vec::new()),
+                native_snapshot: true,
+                unavailable: vec![Unavailable {
+                    figure: "plan_windows".to_owned(),
+                    reason: "10080_minute_window_expired".to_owned(),
+                }],
+                ..Usage::default()
+            },
+        ],
+    )
+    .await?;
+    let (command_status, command) = table.start("start-command").await?;
+    let (start_status, answer) = table.start("start").await?;
+    let used = table.figure_in("plan_percent").await?;
+    assert_eq!(command_status, 404, "{command}");
+    assert_eq!(command["refusal"], "LaunchRecordMissing", "{command}");
+    assert_eq!(start_status, 409, "{answer}");
+    let checks = answer["checks"].as_array().ok_or("no start checks")?;
+    assert_eq!(checks.len(), 5, "admitted past the budget check: {answer}");
+    assert_eq!(checks[0]["result"], "passed", "{answer}");
+    for check in &checks[1..] {
+        assert_eq!(check["result"], "check_record_missing", "{answer}");
+    }
+    let refused = answer["refused"].as_array().ok_or("no start refusals")?;
+    assert_eq!(refused.len(), 4, "{answer}");
+    assert!(
+        refused
+            .iter()
+            .all(|refusal| refusal["refusal"] == "check_record_missing"),
+        "{answer}"
+    );
+    assert_eq!(used["figure"], Value::Null, "{used}");
+    assert_eq!(used["since_ms"], boundary, "{used}");
+    assert_eq!(
+        used["unavailable"],
+        format!("the plan window reset at {boundary}; no report since"),
+        "{used}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unreported_plan_stop_refuses_both_starts_with_the_source_reason() -> TestResult {
+    let table = Table::with_measure(Measure::PlanPercent, Vec::new()).await?;
+    let used = table.figure_in("plan_percent").await?;
+    let reason = format!("plan window unreported for agent {}", table.agent);
+    assert_eq!(used["figure"], Value::Null, "{used}");
+    assert_eq!(used["unavailable"], reason, "{used}");
+    for route in ["start-command", "start"] {
+        let (status, answer) = table.start(route).await?;
+        assert_eq!(status, 503, "{route}: {answer}");
+        assert_eq!(answer["refusal"], "BudgetsUnavailable", "{route}: {answer}");
+        assert_eq!(answer["reason"], reason, "{route}: {answer}");
+    }
     Ok(())
 }
