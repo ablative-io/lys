@@ -103,3 +103,4 @@ tr.more td { border-bottom: 0; }
 @media (max-width: 900px) { .fill > .body { grid-template-columns: minmax(0, 1fr); } .fill .detail { display: none; } }
 .fill > .file { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .fill > .file > .pane { flex: 1; min-height: 0; }
+.fill > .pane { flex: 1; min-height: 0; }

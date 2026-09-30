@@ -1,5 +1,12 @@
 /** Metadata-only secrets listing; authentication and visibility belong to the broker adapter. */
 import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { Listing } from '../../shell/Listing';
+import type { Column } from '../../shell/Listing';
+import { groupByTeam, inWhose } from '../../shell/org';
+import type { Held, OrgTeam, Whose } from '../../shell/org';
+import { useWhose, WhoseSelect } from '../../shell/Whose';
+import { readTeams } from '../teams/Teams';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { entries } from '../people/directory';
@@ -18,30 +25,46 @@ export interface SecretListing {
   }[];
 }
 
+type Secret = SecretListing['secrets'][number];
+
 export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
   const load = useLoad(read, 'secrets');
-  const people = useLoad(api.people, 'secret-people');
-  return <div className="page">
-    <div className="head"><div>
-      <p className="sub">Find the secrets you are allowed to see. Their values stay in Lys secret storage.</p></div>
-    </div>
+  const people = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().catch(() => []) }), 'secret-people');
+  const admin = people.status === 'ok' && people.data.view.scope === 'directory';
+  const [whose, setWhose] = useWhose(admin);
+  return <>
+    <p className="sub">Find the secrets you are allowed to see. Their values stay in Lys secret storage.</p>
     {people.status === 'refused' ? <ReadFailure error={people.refused} subject="secret owners’ names" /> : null}
-    <Gate load={load} title="your secrets" renderError={(error) => <ReadFailure error={error} subject="your secrets" administrator={people.status === 'ok' && people.data.scope === 'directory'} />} ok={(listing) => <SecretRows listing={listing} people={people.status === 'ok' ? people.data : undefined} />} />
-  </div>;
+    <Gate load={load} title="your secrets" renderError={(error) => <ReadFailure error={error} subject="your secrets" administrator={admin} />} ok={(listing) => people.status === 'ok'
+      ? <SecretRows listing={listing} people={people.data.view} teams={people.data.teams} me={people.data.me.person.id} whose={whose}
+        tools={<WhoseSelect whose={whose} set={setWhose} teams={people.data.teams} admin={admin} />} />
+      : <SecretRows listing={listing} />} />
+  </>;
 }
 
-export function SecretRows({ listing, people }: { listing: SecretListing; people?: PeopleView }) {
-  const [filter, setFilter] = useState('');
+/** The secrets as the shared list: grouped by their owner's team, searched by name, kind or owner. */
+export function SecretRows({ listing, people, teams = [], me = '', whose = { kind: 'all' }, tools }: { listing: SecretListing; people?: PeopleView; teams?: OrgTeam[]; me?: string; whose?: Whose; tools?: ReactNode }) {
+  const [picked, setPicked] = useState<string | null>(null);
   const names = new Map(people ? entries(people).map((entry) => [entry.id, entry.display_name]) : []);
-  const visible = listing.secrets.filter((entry) => (entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')).toLowerCase().includes(filter.toLowerCase()));
-  return <>
-    <label className="field">Find a secret<input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Name, kind or owner" /></label>
-    <table><thead><tr><th>Name</th><th>Kind</th><th>Owner</th><th>Recorded sequence</th></tr></thead>
-      <tbody>{visible.map((entry) => <tr key={entry.name}>
-        <td>{entry.name}</td><td>{entry.class}</td><td><IdentityName id={entry.owner} people={people} /></td><td><details><summary>Storage details</summary>Recorded change: {entry.sequence}</details></td>
-      </tr>)}</tbody>
-    </table>
-    {!visible.length ? <p className="note">{listing.secrets.length ? 'No visible entry matches this search.' : 'No secrets were returned for this account.'}</p> : null}
-    <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
-  </>;
+  const owners = new Map(people ? people.people.flatMap((person) => person.agents.map((agent) => [agent.id, person.id] as const)) : []);
+  const held = (entry: Secret): Held => ({ id: entry.owner, person: owners.get(entry.owner) ?? null });
+  const scoped = listing.secrets.filter((entry) => inWhose(whose, teams, me, held(entry)));
+  const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
+  const open = listing.secrets.find((entry) => entry.name === picked) ?? null;
+  const columns: Column<Secret>[] = [
+    { head: 'Name', cell: (entry) => entry.name },
+    { head: 'Kind', cell: (entry) => <span className="sec">{entry.class}</span> },
+    { head: 'Owner', cell: (entry) => <IdentityName id={entry.owner} people={people} /> },
+    { head: 'Recorded change', cell: (entry) => <span className="sec">{entry.sequence}</span> },
+  ];
+  return <div className="body">
+    <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
+      words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
+      selected={open?.name ?? null} select={() => undefined} open={(entry) => setPicked(entry.name)} tools={tools} />
+    <div className="detail">
+      {!listing.secrets.length ? <p className="note">No secrets were returned for this account.</p> : null}
+      {open ? <section className="card"><h2>{open.name}</h2><p className="sec">{open.class} · owned by <IdentityName id={open.owner} people={people} /></p><p className="note">Recorded change {open.sequence}.</p></section> : null}
+      <p className="note">Seeing a secret here does not give permission to use it or share that permission. Its value is never shown.</p>
+    </div>
+  </div>;
 }
