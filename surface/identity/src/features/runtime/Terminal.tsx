@@ -22,7 +22,8 @@ function endWords(ended: SessionEnd): string {
   return `${how}${status}, ${clock(Math.floor(ended.at / 1000))}.`;
 }
 
-export function Terminal({ session, agent }: { session: string; agent: string | null }) {
+/** bare: the screen, the line and the keys only; the caller shows the name, the state and Stop itself. */
+export function Terminal({ session, agent, bare = false }: { session: string; agent: string | null; bare?: boolean }) {
   const base = '/runtime/sessions/' + encodeURIComponent(session);
   const [ended, setEnded] = useState<SessionEnd | null>(null);
   const [refused, setRefused] = useState<Refused | null>(null);
@@ -58,11 +59,11 @@ export function Terminal({ session, agent }: { session: string; agent: string | 
   };
 
   return <section className="terminal" aria-label={'Terminal of ' + name}>
-    <div className="terminal-head">
+    {bare ? null : <div className="terminal-head">
       <div><h2>{name}</h2><p className="mono">{session}</p></div>
       <p className="terminal-state" role="status" data-ended={ended ? 'true' : 'false'}>{ended ? endWords(ended) : 'Runner session'}</p>
       {!ended ? <button type="button" className="btn" data-act="stop" disabled={busy} onClick={() => setConfirming(true)}>Stop</button> : null}
-    </div>
+    </div>}
     {confirming ? <div className="terminal-stop" role="alertdialog" aria-label={'Stop ' + name}>
       <p>Stop {name}? This ends its session on the machine it runs on. What it has not saved is lost.</p>
       <div className="actions">

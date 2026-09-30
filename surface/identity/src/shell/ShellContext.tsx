@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import type { ReactNode } from 'react';
 import { pref, setPref } from './prefs';
 
-export type DockMode = 'help' | 'assistant' | null;
+export type DockMode = 'help' | 'assistant' | 'team' | null;
 export type KindFilter = 'all' | 'person' | 'agent' | 'teams' | 'found';
 
 export interface Shell {
