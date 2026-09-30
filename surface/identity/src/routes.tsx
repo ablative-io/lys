@@ -24,7 +24,6 @@ import { Apps } from './features/apps/Apps';
 import { RunningSessions } from './features/runtime/Sessions';
 import { Usage } from './features/usage/Usage';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
-import { Team } from './features/team/Team';
 
 /** Every screen and tab has its own address (conformance 9.1). */
 export function AppRoutes() {
@@ -47,7 +46,6 @@ export function AppRoutes() {
       <Route path="/runtime/:session?" element={<RunningSessions />} />
       <Route path="/usage/:agent?" element={<Usage />} />
       <Route path="/runtime/canvas" element={<SessionCanvas />} />
-      <Route path="/team/:agent?" element={<Team />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />
