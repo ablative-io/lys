@@ -1,3 +1,5 @@
+//! Reported cost deltas and account windows retain precision, attribution and replay safety.
+
 use std::error::Error;
 
 use lys_runner::tracking::{
@@ -9,7 +11,7 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn status(cost: Value, limits: Value) -> Value {
+fn status(cost: &Value, limits: &Value) -> Value {
     json!({
         "session_id": "native-session",
         "cost": {"total_cost_usd": cost, "total_duration_ms": 100},
@@ -53,7 +55,7 @@ fn the_native_versions_are_admitted_without_losing_the_codex_suffix() -> TestRes
 
 #[test]
 fn reported_dollars_retain_microdollar_precision() -> TestResult {
-    let (figures, _) = status_figures(&status(json!(400.123456), Value::Null));
+    let (figures, _) = status_figures(&status(&json!(400.123_456), &Value::Null));
     let encoded = serde_json::to_value(figures)?;
     assert_eq!(encoded["dollars_micros"], 400_123_456, "{encoded}");
     Ok(())
@@ -74,7 +76,7 @@ fn dollars_are_differences_of_reported_session_totals_and_replays_add_nothing() 
         now: 1_800_000_000_000,
     };
     let mut source = SourceState::default();
-    let first = status(json!(400), Value::Null);
+    let first = status(&json!(400), &Value::Null);
     let initial = usage(
         reading
             .status(&mut source, &first, "first".to_owned())
@@ -89,7 +91,7 @@ fn dollars_are_differences_of_reported_session_totals_and_replays_add_nothing() 
             .status(&mut source, &first, "repeat".to_owned())
             .is_none()
     );
-    let changed = status(json!(500), Value::Null);
+    let changed = status(&json!(500), &Value::Null);
     let next = usage(
         reading
             .status(&mut source, &changed, "next".to_owned())
@@ -114,8 +116,8 @@ fn dollars_are_differences_of_reported_session_totals_and_replays_add_nothing() 
 #[test]
 fn plan_windows_are_reported_account_levels_with_their_reset_instants() -> TestResult {
     let input = status(
-        json!(0),
-        json!({
+        &json!(0),
+        &json!({
             "five_hour": {"used_percentage": 42.5, "resets_at": 1_800_003_600},
             "seven_day": {"used_percentage": 50, "resets_at": 1_800_604_800}
         }),
@@ -126,7 +128,7 @@ fn plan_windows_are_reported_account_levels_with_their_reset_instants() -> TestR
         encoded["plan_windows"],
         json!([
             {"duration_minutes": 300, "used_percent": 42.5, "resets_at_ms": 1_800_003_600_000_i64},
-            {"duration_minutes": 10080, "used_percent": 50, "resets_at_ms": 1_800_604_800_000_i64}
+            {"duration_minutes": 10_080, "used_percent": 50, "resets_at_ms": 1_800_604_800_000_i64}
         ]),
         "{encoded}"
     );
@@ -135,7 +137,7 @@ fn plan_windows_are_reported_account_levels_with_their_reset_instants() -> TestR
 
 #[test]
 fn absent_currency_and_plan_reports_are_named_unavailable_instead_of_zero() -> TestResult {
-    let (figures, unavailable) = status_figures(&status(Value::Null, Value::Null));
+    let (figures, unavailable) = status_figures(&status(&Value::Null, &Value::Null));
     let encoded = serde_json::to_value(figures)?;
     assert_eq!(encoded["dollars_micros"], Value::Null, "{encoded}");
     assert_eq!(encoded["plan_windows"], json!([]), "{encoded}");
@@ -168,14 +170,14 @@ fn an_omitted_cost_report_does_not_erase_the_previous_cumulative_baseline() -> T
     reading
         .status(
             &mut source,
-            &status(json!(400), Value::Null),
+            &status(&json!(400), &Value::Null),
             "first".to_owned(),
         )
         .ok_or("no first report")?;
     reading
         .status(
             &mut source,
-            &status(Value::Null, Value::Null),
+            &status(&Value::Null, &Value::Null),
             "omitted".to_owned(),
         )
         .ok_or("no omitted report")?;
@@ -184,7 +186,7 @@ fn an_omitted_cost_report_does_not_erase_the_previous_cumulative_baseline() -> T
         reading
             .status(
                 &mut restored,
-                &status(json!(500), Value::Null),
+                &status(&json!(500), &Value::Null),
                 "next".to_owned(),
             )
             .ok_or("no next report")?,
@@ -211,7 +213,7 @@ fn a_cost_reset_is_named_and_never_becomes_a_negative_or_repeated_charge() -> Te
     reading
         .status(
             &mut source,
-            &status(json!(400), Value::Null),
+            &status(&json!(400), &Value::Null),
             "first".to_owned(),
         )
         .ok_or("no first report")?;
@@ -219,7 +221,7 @@ fn a_cost_reset_is_named_and_never_becomes_a_negative_or_repeated_charge() -> Te
         reading
             .status(
                 &mut source,
-                &status(json!(10), Value::Null),
+                &status(&json!(10), &Value::Null),
                 "reset".to_owned(),
             )
             .ok_or("no reset report")?,
@@ -237,7 +239,7 @@ fn a_cost_reset_is_named_and_never_becomes_a_negative_or_repeated_charge() -> Te
         reading
             .status(
                 &mut source,
-                &status(json!(15), Value::Null),
+                &status(&json!(15), &Value::Null),
                 "next".to_owned(),
             )
             .ok_or("no next report")?,
@@ -261,8 +263,8 @@ fn expired_windows_are_unavailable_even_when_the_source_repeats_them() -> TestRe
         now: 1_800_000_000_000,
     };
     let input = status(
-        json!(0),
-        json!({"seven_day": {"used_percentage": 50, "resets_at": 1_800_000_000}}),
+        &json!(0),
+        &json!({"seven_day": {"used_percentage": 50, "resets_at": 1_800_000_000}}),
     );
     let record = usage(
         reading
@@ -301,7 +303,7 @@ fn codex_reads_explicit_window_durations_without_a_token_increase() -> TestResul
         now: 1_800_000_000_000,
     };
     let input = json!({"type": "event_msg", "payload": {"type": "token_count", "info": null, "rate_limits": {
-        "primary": {"used_percent": 50, "window_minutes": 10080, "resets_at": 1_800_604_800},
+        "primary": {"used_percent": 50, "window_minutes": 10_080, "resets_at": 1_800_604_800},
         "secondary": {"used_percent": 25, "window_minutes": 300, "resets_at": 1_800_003_600}
     }}});
     let mut source = SourceState::default();
@@ -310,7 +312,7 @@ fn codex_reads_explicit_window_durations_without_a_token_increase() -> TestResul
     let record = usage(bodies.into_iter().next().ok_or("no plan record")?)?;
     assert_eq!(
         record["figures"]["plan_windows"][0]["duration_minutes"],
-        10080
+        10_080
     );
     assert_eq!(
         record["figures"]["plan_windows"][1]["duration_minutes"],
