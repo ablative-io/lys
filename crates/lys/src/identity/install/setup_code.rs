@@ -130,11 +130,13 @@ pub fn hand_over(
         path.display(),
         Layout::setup_url()
     ));
-    emitter.field(
-        "setup code file",
-        "setup_code_file",
-        path.display().to_string(),
-    );
+    if emitter.is_json() {
+        emitter.field(
+            "setup code file",
+            "setup_code_file",
+            path.display().to_string(),
+        );
+    }
     Ok(())
 }
 

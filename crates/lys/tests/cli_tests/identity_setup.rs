@@ -180,6 +180,11 @@ fn the_setup_code_is_never_printed_and_is_kept_only_as_its_digest() -> TestResul
         .filter(|line| line.contains(&headless.display().to_string()))
         .collect();
     assert_eq!(naming.len(), 1, "one line names the code's file: {said}");
+    assert!(naming[0].contains("only you can read it"), "{said}");
+    assert!(
+        naming[0].contains("enter it in the Setup code field"),
+        "{said}"
+    );
     assert!(said.contains("http://localhost:8490/setup"), "{said}");
 
     let pending: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
