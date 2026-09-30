@@ -226,7 +226,7 @@ fn a_cost_reset_is_named_and_never_becomes_a_negative_or_repeated_charge() -> Te
             )
             .ok_or("no reset report")?,
     )?;
-    assert_eq!(reset["figures"]["dollars_micros"], Value::Null);
+    assert_eq!(reset["figures"]["dollars_micros"], 10_000_000);
     assert!(
         reset["unavailable"]
             .as_array()

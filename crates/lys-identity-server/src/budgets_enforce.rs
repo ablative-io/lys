@@ -312,7 +312,7 @@ fn measured_crossings(
     Ok(crossed)
 }
 
-/// Fresh starts are refused at a known periodic stop limit before runner admission.
+/// Fresh starts require an available figure below every periodic stop limit.
 pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerError> {
     if state.budgets.is_none() {
         return Ok(());
@@ -332,9 +332,13 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                 let used =
                     crate::budgets_usage::figure(store.held(), &limit, &agents, &zone, at_ms, None)
                         .map_err(unavailable)?;
-                if let Some(figure) = used.figure
-                    && reached(limit.unit, &figure, &limit.amount).map_err(unavailable)?
-                {
+                let figure = used.figure.ok_or_else(|| {
+                    unavailable(match used.unavailable.as_deref() {
+                        Some(reason) => reason,
+                        None => "a periodic Stop limit has no figure and no source reason",
+                    })
+                })?;
+                if reached(limit.unit, &figure, &limit.amount).map_err(unavailable)? {
                     let reset = if limit.unit == Measure::PlanPercent {
                         used.since_ms.and_then(|start| {
                             start.checked_add(

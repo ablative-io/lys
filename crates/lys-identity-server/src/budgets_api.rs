@@ -268,7 +268,7 @@ async fn set(
             }
             if matches!(limit.unit, Measure::Dollars | Measure::PlanPercent) {
                 let used =
-                    crate::budgets_usage::figure(store.held(), limit, &agents, &zone, at_ms, None)
+                    crate::budgets_usage::source_figure(store.held(), limit, &agents, &zone, at_ms)
                         .map_err(|reason| {
                             ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
                         })?;
@@ -491,7 +491,7 @@ fn source_gaps(
                     act: Act::Stop,
                     zone: None,
                 };
-                crate::budgets_usage::figure(held, &limit, agents, zone, at_ms, None).map_err(
+                crate::budgets_usage::source_figure(held, &limit, agents, zone, at_ms).map_err(
                     |reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }),
                 )
             })
