@@ -46,7 +46,7 @@ export function ProfileEditor({ id, path, person, profile, choices, changed, rea
       const empty = !mode && [permissions.allow, permissions.deny, permissions.ask, permissions.additional_directories].every((list) => !list.length);
       const runsOn = text('runs_on'); const writable = text('writable');
       setError('');
-      change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: models, tools: [], skills, mcp_servers,
+      change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: models.length || !program?.models.length ? models : [program.models[0].id], tools: [], skills, mcp_servers,
         instructions: text('instructions'), note: text('note'), harness: harness(), permissions: empty ? null : permissions,
         ...(runsOn ? { runs_on: runsOn } : {}), ...(writable ? { writable } : {}) });
     } catch (failure) { setError(String(failure)); }
@@ -67,7 +67,7 @@ export function ProfileEditor({ id, path, person, profile, choices, changed, rea
         <select value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose</option>{program.builds.map((entry) => <option key={entry.program + entry.package} value={entry.program + '\n' + entry.package}>{entry.program} · {entry.package}</option>)}</select>
         {!program.builds.length ? <span className="hint">No computer has reported where {program.name} is installed yet.</span> : null}</label> : null}
       <label className="field">Model<span className="hint">Which AI model it uses, passed to the program as --model.</span>
-        <select value={models[0] ?? ''} onChange={(event) => setModels(unique([event.target.value, ...models.slice(1)].filter(Boolean)))}><option value="">The program's default</option>{modelChoices.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}</select></label>
+        <select value={models[0] ?? (program?.models[0]?.id ?? '')} onChange={(event) => setModels(unique([event.target.value, ...models.slice(1)].filter(Boolean)))}>{program ? null : <option value="">The program's default</option>}{modelChoices.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}</select></label>
       {models[0] ? <div className="field">Backup models<span className="hint">Used in order if the first is unavailable, passed as --fallback-model.</span>
         {modelChoices.filter((model) => model.id !== models[0]).map((model) => <label key={model.id}><input type="checkbox" checked={models.slice(1).includes(model.id)} onChange={(event) => setModels([models[0], ...toggle(models.slice(1), model.id, event.target.checked)])} /> {model.label}</label>)}</div> : null}
       <label className="field">Standing instructions<span className="hint">Written to instructions.md and added to the end of the program's own system prompt each time the agent starts. They do not replace it.</span>
@@ -83,7 +83,7 @@ export function ProfileEditor({ id, path, person, profile, choices, changed, rea
       <label className="field">Never allowed<span className="hint">Written as its deny rules: refused even when asked.</span>
         <textarea name="deny" rows={2} defaultValue={held?.deny?.join('\n') ?? ''} /></label>
       <label className="field">How much it decides alone<span className="hint">The program's permission mode.</span>
-        <select name="mode" defaultValue={held?.default_mode ?? ''}><option value="">The program's default</option>
+        <select name="mode" key={program?.name ?? ''} defaultValue={held?.default_mode ?? program?.modes[0]?.id ?? ''}>{program ? null : <option value="">The program's default</option>}
           {(program?.modes ?? (held?.default_mode ? [{ id: held.default_mode, meaning: '' }] : [])).map((mode) => <option key={mode.id} value={mode.id}>{mode.meaning ? mode.id + ' — ' + mode.meaning : mode.id}</option>)}</select></label>
       <label className="field">Other folders it may work in<span className="hint">Folders outside its own it can open and use, one per line. Written into its settings file as additional directories.</span>
         <textarea name="folders" rows={2} defaultValue={held?.additional_directories?.join('\n') ?? ''} /></label>
