@@ -98,13 +98,14 @@ fn described() -> Result<Vec<Value>, Box<dyn Error>> {
                 .ok_or("sources absent")?,
         );
         program["builds"] = json!([]);
+        program["instructions_modes"] = json!(["keep", "append", "replace"]);
         programs.push(program);
     }
     Ok(programs)
 }
 
 fn expected() -> Result<Value, Box<dyn Error>> {
-    let programs: Vec<Value> = described()?.into_iter().take(1).collect();
+    let programs = described()?;
     Ok(json!({ "programs": programs }))
 }
 
@@ -137,7 +138,7 @@ async fn a_fresh_install_answers_named_models_modes_and_descriptions() -> TestRe
             .as_array()
             .ok_or("programs is not an array")?
             .len(),
-        1
+        2
     );
     Ok(())
 }
@@ -178,7 +179,15 @@ async fn the_programmes_read_has_a_typed_openapi_answer() -> TestResult {
         "#/components/schemas/CatalogueView"
     );
     let schemas = &document["components"]["schemas"];
-    for member in ["name", "line", "models", "modes", "description", "builds"] {
+    for member in [
+        "name",
+        "line",
+        "models",
+        "modes",
+        "instructions_modes",
+        "description",
+        "builds",
+    ] {
         assert!(
             !schemas["ProgramView"]["properties"][member].is_null(),
             "{member}"
@@ -189,7 +198,7 @@ async fn the_programmes_read_has_a_typed_openapi_answer() -> TestResult {
 }
 
 #[tokio::test]
-async fn an_unregistered_contract_is_kept_as_data_but_not_offered() -> TestResult {
+async fn codex_is_offered_with_all_native_instruction_modes() -> TestResult {
     let data = described()?;
     assert_eq!(data[1]["name"], "Codex");
     assert_eq!(data[1]["models"][0]["id"], "gpt-6.1-sol");
@@ -199,7 +208,7 @@ async fn an_unregistered_contract_is_kept_as_data_but_not_offered() -> TestResul
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer, expected()?);
     assert!(
-        !answer["programs"]
+        answer["programs"]
             .as_array()
             .ok_or("programs is not an array")?
             .iter()
@@ -286,8 +295,8 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
                 )
                 .await?;
             assert_eq!(status, 200, "{answer}");
-            if program == 0 && from < 2 {
-                wanted["programs"][0]["builds"].as_array_mut().ok_or("builds is not an array")?.push(
+            if from < 3 {
+                wanted["programs"][program]["builds"].as_array_mut().ok_or("builds is not an array")?.push(
                     json!({"name": name, "program": path, "package": package, "from": "profile"})
                 );
             }
