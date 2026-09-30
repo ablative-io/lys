@@ -5,7 +5,7 @@ import type { HarnessDescription } from './Provisioning';
 
 /** One program Lys can start, as GET /harnesses answers it (DIRECTORY-076 R1). */
 export interface Program {
-  name: string; line: string;
+  name: string; line: string; not_found?: string;
   models: { id: string; label: string }[];
   modes: { id: string; meaning: string }[];
   instructions_modes?: ('keep' | 'append' | 'replace')[];

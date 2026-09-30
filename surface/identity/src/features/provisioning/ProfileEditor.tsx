@@ -22,7 +22,7 @@ export function ProfileEditor({ id, profile, choices, readOnly = false }: {
   let refusal = '';
   if (choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
   else if (!program) refusal = choices.programs.length ? 'Choose the program this agent will use.' : 'ProgramUnavailable: Lys lists no startable programs.';
-  else if (!selected) refusal = 'ProgramBuildUnavailable: Lys has no selected installed copy of this program.';
+  else if (!selected) refusal = builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'ModelUnavailable: choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = 'ModeUnavailable: choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'PromptReplacementUnavailable: this program does not list that prompt choice.';
