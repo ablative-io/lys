@@ -165,6 +165,18 @@ pub enum ServerError {
         /// The server requested.
         server: String,
     },
+    /// The caller cannot pass this server to the requesting agent.
+    #[error(
+        "mcp_beyond_remit: approver `{approver}` cannot approve MCP server `{server}` for agent `{agent}`"
+    )]
+    McpBeyondRemit {
+        /// The approver's identity.
+        approver: String,
+        /// The requesting agent.
+        agent: String,
+        /// The server requested.
+        server: String,
+    },
     /// The request is not one the caller may see: none is kept by that id, or it is another's.
     #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
     RequestUnknown,

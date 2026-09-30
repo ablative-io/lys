@@ -315,7 +315,13 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             POST,
             "/agents/{id}/mcp-requests",
             Some(api.schema::<crate::mcp_requests_api::McpAskBody>()),
-            Some(api.schema::<crate::mcp_requests_store::McpRequest>()),
+            Some(api.schema::<crate::mcp_requests_api::McpRequestView>()),
+        ),
+        (
+            POST,
+            "/agents/{id}/mcp-requests/{request}/approve",
+            Some(api.schema::<crate::mcp_requests_api::McpApproveBody>()),
+            Some(api.schema::<crate::mcp_requests_api::McpRequestView>()),
         ),
         (
             GET,

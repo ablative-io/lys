@@ -306,7 +306,7 @@ impl ProvisioningStore {
     }
 
     /// The agent and the version `operation` names, if it names one.
-    fn named(&self, operation: &str) -> Option<(&str, &Version)> {
+    pub(crate) fn named(&self, operation: &str) -> Option<(&str, &Version)> {
         self.kept.profiles.iter().find_map(|profile| {
             profile
                 .versions

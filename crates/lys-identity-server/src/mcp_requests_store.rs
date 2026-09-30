@@ -1,14 +1,12 @@
 //! Requests grant no access. Each operation keeps one signed leaf, pinned before
 //! its answer, with signed snapshots for restart and read-back after uncertain writes.
 
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
-use lys_core::attestation::{sign_attestation, verify_attestation_bytes_by_signer};
-use lys_identity::{AgentId, OperationId, PersonId, SNAPSHOT_EVERY};
+use lys_identity::SNAPSHOT_EVERY;
 use lys_log_store::{
     FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, Tail,
     open_with_snapshot,
@@ -17,18 +15,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::error::ServerError;
+use crate::mcp_requests_state::{
+    DOMAIN, Event, Held, Intended, decoded, fold, signed_event, signed_request, unavailable,
+    validate,
+};
 use crate::routes::Say;
 
 const ORIGIN: &str = "lys/identity/mcp-requests";
-const DOMAIN: &str = "lys/identity/mcp-requests-state/v1";
-const RECORD_DOMAIN: &str = "lys/identity/mcp-request/v1";
 
-/// A request has no approval or grant attached to it.
+/// The state presented when a request is read back.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpRequestState {
     /// The request has been recorded and awaits a decision.
     Pending,
+    /// The profile write and its signed decision are confirmed.
+    Approved,
 }
 
 /// One request against an already reviewed provisioning version.
@@ -51,39 +53,19 @@ pub struct McpRequest {
     pub asked_at: u64,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Signed {
-    request: McpRequest,
-    attestation: Vec<u8>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Sealed {
-    format: String,
-    requests: Vec<McpRequest>,
-}
-
 /// Reopen a leaf store after an append whose outcome is uncertain.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
-type Opened<S> = (FrontierLog<S>, Vec<McpRequest>, Start);
+type Opened<S> = (FrontierLog<S>, Held, Start);
 
 /// The signed, append-only requests, kept separately from provisioning profiles.
 pub struct McpRequestStore<S: LeafStore = FileLeafStore> {
     reopen: Reopen<S>,
     key: Arc<Ed25519Identity>,
     log: FrontierLog<S>,
-    requests: Vec<McpRequest>,
+    held: Held,
     start: Start,
     since_snapshot: u64,
     uncertain: bool,
-}
-
-fn unavailable(reason: impl std::fmt::Display) -> ServerError {
-    ServerError::McpRequestsUnavailable {
-        reason: reason.to_string(),
-    }
 }
 
 /// Validate the same bounded names provisioning declarations carry.
@@ -95,27 +77,6 @@ pub(crate) fn server_name(name: &str) -> Result<String, ServerError> {
         });
     }
     Ok(name.to_owned())
-}
-
-fn validate(request: &McpRequest) -> Result<(), ServerError> {
-    OperationId::from_str(&request.id).map_err(unavailable)?;
-    AgentId::from_str(&request.agent).map_err(unavailable)?;
-    if PersonId::from_str(&request.asked_by).is_err() {
-        AgentId::from_str(&request.asked_by).map_err(unavailable)?;
-    }
-    if request.profile_version == 0 || server_name(&request.server)? != request.server {
-        return Err(unavailable(
-            "the request has no reviewed version or canonical server name",
-        ));
-    }
-    Ok(())
-}
-
-fn payload(request: &McpRequest) -> Result<Vec<u8>, ServerError> {
-    let mut bytes = RECORD_DOMAIN.as_bytes().to_vec();
-    bytes.push(0);
-    bytes.extend(serde_json::to_vec(request).map_err(unavailable)?);
-    Ok(bytes)
 }
 
 impl McpRequestStore<FileLeafStore> {
@@ -132,7 +93,7 @@ impl McpRequestStore<FileLeafStore> {
         say(&format!(
             "mcp-requests log {}, holding {} requests",
             store.start,
-            store.requests.len()
+            store.held.requests.len()
         ));
         Ok(Some(store))
     }
@@ -155,12 +116,12 @@ impl<S: LeafStore> McpRequestStore<S> {
 
     /// Open pinned leaves and their signed snapshot, verifying every replayed record.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
-        let (log, requests, start) = opened(&reopen, &key)?;
+        let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
             reopen,
             key,
             log,
-            requests,
+            held,
             start,
             since_snapshot: 0,
             uncertain: false,
@@ -181,11 +142,7 @@ impl<S: LeafStore> McpRequestStore<S> {
     }
 
     fn write_snapshot(&mut self) -> Result<(), ServerError> {
-        let bytes = serde_json::to_vec(&Sealed {
-            format: DOMAIN.to_owned(),
-            requests: self.requests.clone(),
-        })
-        .map_err(unavailable)?;
+        let bytes = self.held.encode()?;
         self.log
             .write_snapshot(DOMAIN, &bytes, &self.key)
             .map_err(unavailable)?;
@@ -196,9 +153,9 @@ impl<S: LeafStore> McpRequestStore<S> {
     /// Resolve an uncertain append before answering any read or write from memory.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (log, requests, start) = opened(&self.reopen, &self.key)?;
+            let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
-            self.requests = requests;
+            self.held = held;
             self.start = start;
             self.after_start()?;
             self.uncertain = false;
@@ -210,6 +167,7 @@ impl<S: LeafStore> McpRequestStore<S> {
     pub fn listed(&mut self, agent: &str) -> Result<Vec<McpRequest>, ServerError> {
         self.settle()?;
         Ok(self
+            .held
             .requests
             .iter()
             .filter(|request| request.agent == agent)
@@ -226,7 +184,7 @@ impl<S: LeafStore> McpRequestStore<S> {
         by: &str,
     ) -> Result<Option<McpRequest>, ServerError> {
         self.settle()?;
-        match self.requests.iter().find(|request| request.id == id) {
+        match self.held.requests.iter().find(|request| request.id == id) {
             Some(request)
                 if request.agent == agent && request.server == server && request.asked_by == by =>
             {
@@ -235,7 +193,10 @@ impl<S: LeafStore> McpRequestStore<S> {
             Some(_) => Err(ServerError::RequestReused {
                 request: id.to_owned(),
             }),
-            None => Ok(None),
+            None => {
+                self.held.check_operation(id, id, by, "")?;
+                Ok(None)
+            }
         }
     }
 
@@ -250,18 +211,19 @@ impl<S: LeafStore> McpRequestStore<S> {
         )? {
             return Ok(kept);
         }
-        let attestation = sign_attestation(&payload(&request)?, &self.key).to_cose_bytes();
-        let bytes = serde_json::to_vec(&Signed {
-            request: request.clone(),
-            attestation,
-        })
-        .map_err(unavailable)?;
+        let mut next = self.held.clone();
+        next.push_request(request.clone())?;
+        self.append(signed_request(request.clone(), &self.key)?, next)?;
+        Ok(request)
+    }
+
+    fn append(&mut self, bytes: Vec<u8>, next: Held) -> Result<(), ServerError> {
         let index = self.log.len();
         if let Err(failure) = self.log.append(&bytes) {
             self.uncertain = true;
             self.settle()?;
             match self.log.leaf_bytes(index).map_err(unavailable)? {
-                Some(held) if held == bytes => return Ok(request),
+                Some(held) if held == bytes => return Ok(()),
                 Some(_) => {
                     return Err(unavailable(format!(
                         "leaf {index} belongs to another writer: {failure}"
@@ -270,60 +232,32 @@ impl<S: LeafStore> McpRequestStore<S> {
                 None => return Err(unavailable(failure)),
             }
         }
-        self.requests.push(request.clone());
+        self.held = next;
         self.since_snapshot += 1;
         if self.since_snapshot >= SNAPSHOT_EVERY.get() {
             self.write_snapshot()?;
         }
-        Ok(request)
+        Ok(())
     }
-}
+    pub(crate) fn held(&self) -> &Held {
+        &self.held
+    }
 
-fn fold(
-    requests: &mut Vec<McpRequest>,
-    tail: &Tail,
-    key: &Ed25519Identity,
-) -> Result<(), ServerError> {
-    for (index, bytes) in (tail.from..).zip(&tail.leaves) {
-        let signed: Signed = serde_json::from_slice(bytes)
-            .map_err(|error| unavailable(format!("leaf {index} is not an MCP request: {error}")))?;
-        verify_attestation_bytes_by_signer(
-            &signed.attestation,
-            &payload(&signed.request)?,
-            &key.public_key_bytes(),
-        )
-        .map_err(|error| unavailable(format!("leaf {index} signature: {error}")))?;
-        validate(&signed.request).map_err(unavailable)?;
-        if requests
+    pub(crate) fn event(&mut self, event: Event) -> Result<(), ServerError> {
+        self.settle()?;
+        let mut next = self.held.clone();
+        next.push_event(event.clone())?;
+        self.append(signed_event(event, &self.key)?, next)
+    }
+
+    pub(crate) fn pending(&self, agent: &str) -> Vec<Intended> {
+        self.held
+            .requests
             .iter()
-            .any(|request| request.id == signed.request.id)
-        {
-            return Err(unavailable(format!(
-                "leaf {index} repeats an MCP request operation"
-            )));
-        }
-        requests.push(signed.request);
+            .filter(|request| request.agent == agent)
+            .filter_map(|request| self.held.intent(&request.id).cloned())
+            .collect()
     }
-    Ok(())
-}
-
-fn decoded(bytes: &[u8], count: u64) -> Result<Vec<McpRequest>, ServerError> {
-    let sealed: Sealed = serde_json::from_slice(bytes).map_err(unavailable)?;
-    if sealed.format != DOMAIN
-        || u64::try_from(sealed.requests.len()).map_err(unavailable)? != count
-    {
-        return Err(unavailable(
-            "the snapshot's MCP request format or count differs from its log",
-        ));
-    }
-    let mut ids = BTreeSet::new();
-    for request in &sealed.requests {
-        validate(request).map_err(unavailable)?;
-        if !ids.insert(&request.id) {
-            return Err(unavailable("the snapshot repeats an MCP request operation"));
-        }
-    }
-    Ok(sealed.requests)
 }
 
 fn opened<S: LeafStore>(
@@ -341,12 +275,12 @@ fn opened<S: LeafStore>(
         .as_deref()
         .map(|bytes| decoded(bytes, started.tail.from))
     {
-        None => Vec::new(),
+        None => Held::default(),
         Some(Ok(requests)) => requests,
         Some(Err(reason)) => {
             let (log, tail) =
                 FrontierLog::open(reopen().map_err(unavailable)?).map_err(unavailable)?;
-            let mut requests = Vec::new();
+            let mut requests = Held::default();
             fold(&mut requests, &tail, key)?;
             let replayed = log.len();
             return Ok((
@@ -372,6 +306,20 @@ mod tests {
     use identity_contract::harness::{Fault, Harness};
 
     use super::*;
+    use lys_core::attestation::sign_attestation;
+    use lys_identity::{AgentId, OperationId, PersonId};
+
+    #[derive(Serialize)]
+    struct Signed {
+        request: McpRequest,
+        attestation: Vec<u8>,
+    }
+
+    fn payload(request: &McpRequest) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut bytes = b"lys/identity/mcp-request/v1\0".to_vec();
+        bytes.extend(serde_json::to_vec(request)?);
+        Ok(bytes)
+    }
 
     type TestResult = Result<(), Box<dyn Error>>;
 
@@ -483,13 +431,71 @@ mod tests {
                 from: 0,
                 leaves: vec![serde_json::to_vec(&signed)?],
             };
-            let mut kept = Vec::new();
+            let mut kept = Held::default();
             assert!(matches!(
                 fold(&mut kept, &tail, &key),
                 Err(ServerError::McpRequestsUnavailable { .. })
             ));
-            assert!(kept.is_empty());
+            assert!(kept.requests.is_empty());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn an_old_install_reads_its_original_signed_leaf_and_snapshot() -> TestResult {
+        let harness = Harness::new(23)?;
+        let key = Arc::new(Ed25519Identity::load(
+            &harness.dir.path().join("service.key"),
+        )?);
+        let mut store = McpRequestStore::over(harness.leaves(), Arc::clone(&key))?;
+        let asked = request()?;
+        let attestation = sign_attestation(&payload(&asked)?, &key).to_cose_bytes();
+        store.log.append(&serde_json::to_vec(&Signed {
+            request: asked.clone(),
+            attestation,
+        })?)?;
+        let snapshot = serde_json::to_vec(
+            &serde_json::json!({"format": "lys/identity/mcp-requests-state/v1", "requests": [asked.clone()]}),
+        )?;
+        store.log.write_snapshot(DOMAIN, &snapshot, &key)?;
+        drop(store);
+        let mut reopened = McpRequestStore::over(harness.leaves(), Arc::clone(&key))?;
+        assert!(matches!(reopened.start(), Start::Resumed { .. }));
+        assert_eq!(reopened.listed(&asked.agent)?, vec![asked.clone()]);
+        let operation = OperationId::generate()?.to_string();
+        let intended = Intended {
+            operation: operation.clone(),
+            request: asked.id.clone(),
+            by: asked.asked_by.clone(),
+            note: String::new(),
+            from_version: 1,
+            at: 2,
+            version: serde_json::from_value(serde_json::json!({
+                "number": 2, "operation": operation, "set_by": asked.asked_by, "set_at": 2,
+                "reviewed": {"operation": operation, "by": asked.asked_by, "at": 2},
+                "settings": {"model_access": [], "tools": [], "skills": [],
+                    "mcp_servers": [{"name": asked.server, "url": "https://tools.example.test/mcp"}],
+                    "instructions": "", "note": ""}
+            }))?,
+        };
+        reopened.event(Event::Intended(intended))?;
+        reopened.write_snapshot()?;
+        drop(reopened);
+        let mut reopened = McpRequestStore::over(harness.leaves(), Arc::clone(&key))?;
+        assert!(matches!(reopened.start(), Start::Resumed { .. }));
+        assert_eq!(reopened.pending(&asked.agent).len(), 1);
+        reopened.event(Event::Withdrawn {
+            request: asked.id.clone(),
+            operation,
+        })?;
+        reopened.log.write_snapshot(DOMAIN, b"not a state", &key)?;
+        drop(reopened);
+        let mut rebuilt = McpRequestStore::over(harness.leaves(), key)?;
+        assert!(matches!(
+            rebuilt.start(),
+            Start::Rebuilt { replayed: 3, .. }
+        ));
+        assert_eq!(rebuilt.listed(&asked.agent)?, vec![asked]);
         Ok(())
     }
 }
