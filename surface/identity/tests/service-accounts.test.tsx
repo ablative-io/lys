@@ -22,13 +22,13 @@ describe('Service-account management', () => {
     const first = await mount('#/service-accounts', { ...routes, 'POST /service-accounts': refused(503, 'ServiceAccountsUnavailable', 'Unknown outcome') });
     await fillName(); await click(button('Register account')); unmountAll(); document.body.innerHTML = '';
     const next = await mount('#/service-accounts', { ...routes, 'POST /service-accounts': created });
-    await click(button('Check original change')); expect(next.posted).toEqual(first.posted);
+    await click(button('Check whether Lys saved it')); expect(next.posted).toEqual(first.posted);
   });
   it('requires confirmation to retire and does not imply the provider was closed', async () => {
     const path = '/service-accounts/' + account.id + '/retire';
     const { posted } = await mount('#/service-accounts', { ...routes, ['POST ' + path]: ok({ ...account, state: 'retired', retired_at: 1790000001, retired_by: ME.signed_in }) });
-    await click(button('Retire record')); expect(posted).toEqual([]); expect(text()).toContain('does not close its provider account');
-    await click(button('Confirm retirement')); expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/) } }]);
+    await click(button('Retire this service account')); expect(posted).toEqual([]); expect(text()).toContain('does not close its provider account');
+    await click(button('Yes, retire ' + account.name)); expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/) } }]);
   });
   it('shows an unavailable registry as a refusal instead of an empty list', async () => {
     await mount('#/service-accounts', { ...routes, '/service-accounts': refused(503, 'ServiceAccountsUnavailable', 'No registry configured') });
