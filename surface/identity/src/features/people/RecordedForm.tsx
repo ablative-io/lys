@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { operationId, Refused, request } from '../../api';
 import { confirmReceipt } from './recorded-receipt';
+import { ErrorWords } from './Words';
 import './recorded-form.css';
 
 export interface Change {
@@ -39,6 +40,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
   success?: (change: Change) => string;
 }) {
   const key = 'lys.pending.' + name;
+  const directory = name !== 'root-grant';
   const [pending, setPending] = useState(() => {
     const saved = sessionStorage.getItem(key);
     if (!saved) return null;
@@ -109,15 +111,15 @@ export function RecordedForm({ name, title, heading, description, submitLabel, c
     }
   };
   return <form className="card recorded-form" onSubmit={submit} aria-label={title}>
-    <h2>{heading ?? title}</h2>
+    {heading !== '' ? <h2>{heading ?? title}</h2> : null}
     {description ? <p className="recorded-description">{description}</p> : null}
     <fieldset disabled={pending !== null} style={{ border: 0, padding: 0 }}>
       {children}
       <button className="btn primary" type="submit">{submitLabel ?? title}</button>
     </fieldset>
-    {pending ? <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
-    {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>Check original change</button> : null}
-    {failure ? <p className="why-not" role="alert">{failure}</p> : null}
+    {pending ? directory ? <div role="status"><p>Lys has not confirmed whether it saved this change. Do not submit this change again. Use the button below to check the saved request.</p><details><summary>Saved request details</summary><code>{typeof pending === 'string' ? pending : pending.operation}</code></details></div> : <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
+    {pending && typeof pending !== 'string' ? <button className="btn" type="button" onClick={recover}>{directory ? 'Check whether Lys saved it' : 'Check original change'}</button> : null}
+    {failure ? directory ? <ErrorWords problem={failure} /> : <p className="why-not" role="alert">{failure}</p> : null}
     {message ? <p role="status">{message}</p> : null}
     {answer ? <details><summary>Recorded receipt</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
   </form>;
