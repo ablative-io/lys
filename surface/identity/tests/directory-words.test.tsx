@@ -63,11 +63,12 @@ describe('Directory words and write answers', () => {
       const asked = body as Record<string, unknown>;
       return ok({ ...team, id: asked.operation, name: asked.name, description: asked.description, members: [], recorded: { operation: asked.operation, act: 'created', member: null, by: ME.signed_in, at: 1790000001 } });
     } });
+    await click('+ Create a team');
     await fill('form[aria-label="Create team"] input', 'Reviewers');
     await click('Create team');
     expect(world.posted).toHaveLength(1);
     expect(world.requests.filter((path) => path === '/teams')).toHaveLength(1);
-    expect(document.querySelectorAll('h3').length).toBeGreaterThan(1);
+    expect(document.querySelectorAll('.team-tree [data-team]').length).toBe(2);
     expect(visibleWords()).toContain('Reviewers');
     expect(visibleWords()).not.toContain(ADA);
   });

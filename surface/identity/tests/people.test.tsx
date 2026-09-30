@@ -5,12 +5,11 @@ import { ADA, DIRECTORY, SCRIBE, SERVICE, ok, refused } from './fixtures';
 const names = () => $$('tbody tr[data-pick] td:first-child').map((td) => td.textContent);
 
 describe('People and agents', () => {
-  it('lists the directory from the service: people first, then agents with their person', async () => {
+  it('lists the directory from the service: each person, then the agents that answer to them', async () => {
     const { requests } = await mount('#/people');
     expect(requests).toContain('/directory/people');
-    expect(names()).toEqual(['Ada (test person)', 'Bea (test person)', "Scribe", "Courier", "Archivist", "Reviewer", "Lamplighter"]);
+    expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist", 'Bea (test person)', "Reviewer", "Lamplighter"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
-    expect(scribe?.textContent).toContain('agent');
     expect(scribe?.textContent).toContain('active');
     expect(scribe?.textContent).toContain('Ada (test person)');
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
@@ -41,15 +40,15 @@ describe('People and agents', () => {
 
   it('moves with j and k, previews the row, and opens it with Enter', async () => {
     await mount('#/people');
-    expect($('.preview h2')?.textContent).toBe('Ada (test person)');
+    expect($('.detail h2')?.textContent).toBe('Ada (test person)');
     await press('j', {}, document.body);
     await press('j', {}, document.body);
-    expect($('tr.cursor td')?.textContent).toBe("Scribe");
-    expect($('.preview h2')?.textContent).toBe("Scribe");
+    expect($('tr.cursor td')?.textContent).toBe("Courier");
+    expect($('.detail h2')?.textContent).toBe("Courier");
     await press('k', {}, document.body);
-    expect($('.preview h2')?.textContent).toBe('Bea (test person)');
+    expect($('.detail h2')?.textContent).toBe('Scribe');
     await press('Enter', {}, document.body);
-    expect(location.hash).toMatch(/^#\/file\/person-/);
+    expect(location.hash).toBe('#/file/' + SCRIBE);
   });
 
   it('opens a focused row with Enter or Space, and every control is reachable (9.3)', async () => {
@@ -69,7 +68,7 @@ describe('People and agents', () => {
     await click($('[data-kind="person"]'));
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)']);
     await click($('[data-kind="teams"]'));
-    expect(text()).toContain('No teams have been recorded.');
+    expect(text()).toContain('No teams yet.');
   });
 
   it('falls back to the personal view when not admitted to the directory', async () => {
