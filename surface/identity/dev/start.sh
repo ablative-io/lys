@@ -9,7 +9,9 @@
 # OIDC exchange. On first start the directory is filled by
 # lys-identity-dev-seed, and dev/seed-grants.sh then gives grants through the
 # grant routes. Never point <state-dir> at records that matter.
-# Binaries are read from CARGO_TARGET_DIR (default <repo>/target), release profile.
+# LYS_DEV_BIN selects existing binaries; by default the release profile is used.
+# LYS_DEV_SKIP_BUILD=1 keeps a screen the caller has already built.
+# Readiness comes from each service's listening line or its process ending.
 set -eu
 
 if [ $# -ne 2 ]; then
@@ -22,7 +24,11 @@ SERVICE_PORT=${SERVICE_PORT:-8471}
 ISSUER_PORT=${ISSUER_PORT:-8472}
 SURFACE=$(cd "$(dirname "$0")/.." && pwd)
 REPO=$(cd "$SURFACE/../.." && pwd)
-BIN=${CARGO_TARGET_DIR:-$REPO/target}/release
+BIN=${LYS_DEV_BIN:-${CARGO_TARGET_DIR:-$REPO/target}/release}
+case ${LYS_DEV_SKIP_BUILD:-0} in
+  0|1) ;;
+  *) echo "LYS_DEV_SKIP_BUILD must be 0 or 1" >&2; exit 2 ;;
+esac
 mkdir -p "$1" "$2"
 STATE=$(cd "$1" && pwd)
 LOGS=$(cd "$2" && pwd)
@@ -85,19 +91,54 @@ if [ ! -d "$STATE/log" ]; then
   "$BIN/lys-identity-dev-seed" "$STATE/config.json" ada bea >"$LOGS/seed.log" 2>&1
 fi
 
-nohup "$BIN/dev_issuer" "0.0.0.0:$ISSUER_PORT" "$ISSUER" "$STATE/issuer.key" ada ada@example.test >"$LOGS/issuer.log" 2>&1 &
-echo $! >"$STATE/issuer.pid"
-sleep 1
-nohup "$BIN/lys-identity-server" "$STATE/config.json" >"$LOGS/service.log" 2>&1 &
-echo $! >"$STATE/service.pid"
-sleep 1
+start_ready() {
+  name=$1
+  shift
+  ready_dir=$(mktemp -d)
+  mkfifo "$ready_dir/output" "$ready_dir/ready"
+  awk -v ready="$ready_dir/ready" '
+    {
+      print
+      fflush()
+      if (!said && index($0, "listening on ")) {
+        print "ready" > ready
+        close(ready)
+        said = 1
+      }
+    }
+    END {
+      if (!said) {
+        print "ended" > ready
+        close(ready)
+      }
+    }
+  ' <"$ready_dir/output" >"$LOGS/$name.log" 2>&1 &
+  logger=$!
+  nohup "$@" >"$ready_dir/output" 2>&1 &
+  pid=$!
+  echo "$pid" >"$STATE/$name.pid"
+  IFS= read -r readiness <"$ready_dir/ready"
+  rm -f "$ready_dir/output" "$ready_dir/ready"
+  rmdir "$ready_dir"
+  if [ "$readiness" != ready ]; then
+    if wait "$pid"; then code=0; else code=$?; fi
+    wait "$logger"
+    echo "$name ended before its ready line (exit $code); see $LOGS/$name.log" >&2
+    return 1
+  fi
+}
+
+start_ready issuer "$BIN/dev_issuer" "0.0.0.0:$ISSUER_PORT" "$ISSUER" "$STATE/issuer.key" ada ada@example.test
+start_ready service "$BIN/lys-identity-server" "$STATE/config.json"
 if [ ! -f "$STATE/grants.seeded" ]; then
   "$SURFACE/dev/seed-grants.sh" "http://127.0.0.1:$SERVICE_PORT" "$LOGS/seed.log" >"$LOGS/seed-grants.log" 2>&1
   touch "$STATE/grants.seeded"
 fi
 
 cd "$SURFACE"
-npm run build >"$LOGS/app-build.log" 2>&1
+if [ "${LYS_DEV_SKIP_BUILD:-0}" = 0 ]; then
+  npm run build >"$LOGS/app-build.log" 2>&1
+fi
 LYS_IDENTITY_SERVICE="http://127.0.0.1:$SERVICE_PORT" nohup node node_modules/vite/bin/vite.js preview --host 0.0.0.0 --port "$APP_PORT" --strictPort >"$LOGS/app.log" 2>&1 &
 echo $! >"$STATE/app.pid"
 echo "open http://$HOST:$APP_PORT/"
