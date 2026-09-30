@@ -267,12 +267,9 @@ pub struct Held {
     /// The refusals read from the runners' feeds.
     #[serde(default)]
     pub refusals: crate::refusals_store::Refusals,
-    /// Current context availability, derived once on open and updated with each usage leaf.
+    /// Derived record positions, rebuilt on open and excluded from signed state.
     #[serde(skip)]
-    pub context_availability: crate::budgets_context::Availability,
-    /// Derived record positions shared by copies and excluded from signed state.
-    #[serde(skip)]
-    pub index: Arc<crate::budgets_index::Index>,
+    pub index: crate::budgets_index::Index,
 }
 
 impl Clone for Held {
@@ -287,8 +284,7 @@ impl Clone for Held {
             uses: self.uses.clone(),
             crossings: self.crossings.clone(),
             refusals: self.refusals.clone(),
-            context_availability: self.context_availability.clone(),
-            index: Arc::clone(&self.index),
+            index: self.index.clone(),
         }
     }
 }
@@ -302,23 +298,22 @@ impl PartialEq for Held {
             && self.uses == other.uses
             && self.crossings == other.crossings
             && self.refusals == other.refusals
-            && self.context_availability == other.context_availability
     }
 }
 
 impl Eq for Held {}
-
-#[derive(Serialize)]
-struct Sealing<'a> {
-    format: &'static str,
-    held: &'a Held,
-}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Sealed {
     format: String,
     held: Held,
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 impl Budget {
@@ -480,8 +475,7 @@ impl Held {
                     if let (Some(session), Some(figure)) = (&usage.session, usage.context_percent) {
                         self.crossings.context.insert(session.clone(), figure);
                     }
-                    self.context_availability.keep(&usage)?;
-                    Arc::make_mut(&mut self.index).insert(&usage, self.uses.len())?;
+                    self.index.insert(&usage, self.uses.len())?;
                     self.uses.push(usage);
                 }
             }
@@ -559,11 +553,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("budgets state: {error}"))
     }
@@ -595,6 +587,7 @@ impl Held {
                 held.merge_budget(&budget, budget.version)?;
             }
         }
+        held.index = crate::budgets_index::Index::from_uses(&held.uses)?;
         Ok(held)
     }
 }

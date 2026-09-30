@@ -239,6 +239,11 @@ impl<S: LeafStore> TeamStore<S> {
         })
     }
 
+    /// Committed and staged operations both invalidate derived membership coverage.
+    pub fn revision(&self) -> (u64, usize) {
+        (self.log.len(), self.pending.len())
+    }
+
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
         self.overlay

@@ -302,41 +302,42 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let held = with_budgets(state, |store| {
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
-        Ok(store.held().clone())
-    })?;
-    let at_ms = jiff::Timestamp::now().as_millisecond();
+    let teams = if holder.kind == HolderKind::Agent && state.teams.is_some() {
+        crate::teams_api::with_teams(state, |store| Ok(store.teams().to_vec()))?
+    } else {
+        Vec::new()
+    };
+    with_budgets(state, |store| {
+        view_held(
+            store.held(),
+            holder,
+            &zone,
+            &standings,
+            &teams,
+            jiff::Timestamp::now().as_millisecond(),
+        )
+    })
+}
+
+pub(crate) fn view_held(
+    held: &crate::budgets_state::Held,
+    holder: &Holder,
+    zone: &str,
+    standings: &[crate::budgets_state::Standing],
+    teams: &[crate::teams_state::Team],
+    at_ms: i64,
+) -> Result<BudgetsView, ServerError> {
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
     let agents = crate::budgets_members::covered(holder, standings);
     let used = effective
         .iter()
         .map(|limit| {
-            crate::budgets_usage::figure_with_sessions(
-                &held,
-                limit,
-                &agents,
-                &zone,
-                at_ms,
-                None,
-                sessions.as_deref(),
-            )
-            .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+            crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
+                .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut unavailable = source_gaps(held, &agents, zone, at_ms)?;
-    if let Some(reason) = used.iter().find_map(|used| {
-        (used.unit == Measure::ContextPercent)
-            .then_some(used.unavailable.as_ref())
-            .flatten()
-    }) {
-        unavailable.push(UnitUnavailable {
-            unit: Measure::ContextPercent,
-            reason: reason.clone(),
-        });
-    }
+    let unavailable = source_gaps(held, &agents, zone, at_ms)?;
     let unconfirmed: Vec<_> = held
         .unconfirmed
         .iter()
@@ -364,18 +365,10 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                 let used = limits
                     .iter()
                     .map(|limit| {
-                        crate::budgets_usage::figure_with_sessions(
-                            &held,
-                            limit,
-                            &agents,
-                            &zone,
-                            at_ms,
-                            None,
-                            sessions.as_deref(),
-                        )
-                        .map_err(|reason| {
-                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
-                        })
+                        crate::budgets_usage::figure(held, limit, &agents, zone, at_ms, None)
+                            .map_err(|reason| {
+                                ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                            })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {

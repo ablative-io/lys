@@ -37,10 +37,6 @@ pub mod budgets_context;
 pub mod budgets_crossing;
 pub mod budgets_enforce;
 pub mod budgets_feed;
-mod budgets_giving;
-pub mod budgets_holding;
-#[cfg(test)]
-mod budgets_holding_tests;
 pub mod budgets_index;
 pub mod budgets_legacy;
 pub mod budgets_limits;

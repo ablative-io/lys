@@ -13,7 +13,6 @@ struct Session {
     baseline: Timeline,
     plan: Timeline,
     context: Timeline,
-    windows: BTreeMap<(Option<String>, u64), Timeline>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -25,7 +24,7 @@ struct Agent {
 }
 
 /// Rebuilt from retained records on open; never part of signed state.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Index {
     agents: BTreeMap<String, Agent>,
 }
@@ -34,38 +33,14 @@ fn insert(timeline: &mut Timeline, usage: &Usage, position: usize) {
     timeline.insert((usage.at_ms, position), position);
 }
 
-fn latest(timeline: &Timeline, since: Option<i64>, at_ms: i64) -> Option<usize> {
-    if since.is_some_and(|since| since > at_ms) {
-        return None;
-    }
+fn latest(timeline: &Timeline, at_ms: i64) -> Option<usize> {
     timeline
-        .range((since.unwrap_or(i64::MIN), 0)..=(at_ms, usize::MAX))
+        .range(..=(at_ms, usize::MAX))
         .next_back()
         .map(|(_, position)| *position)
 }
 
-impl Clone for Index {
-    fn clone(&self) -> Self {
-        #[cfg(test)]
-        crate::budgets_work::visit(crate::budgets_work::Work::IndexCopy);
-        Self {
-            agents: self.agents.clone(),
-        }
-    }
-}
-
 impl Index {
-    pub(crate) fn last_reported(&self, agent: &str) -> Option<i64> {
-        self.agents
-            .get(agent)
-            .and_then(|agent| agent.periods.last_key_value())
-            .map(|((at, _), _)| *at)
-    }
-
-    pub(crate) fn has_usage(&self, agent: &str) -> bool {
-        self.agents.contains_key(agent)
-    }
-
     pub(crate) fn from_uses(uses: &[Usage]) -> Result<Self, String> {
         let mut index = Self::default();
         for (position, usage) in uses.iter().enumerate() {
@@ -92,16 +67,9 @@ impl Index {
         agents: &BTreeSet<String>,
         unit: Measure,
         at_ms: i64,
-        since: Option<i64>,
     ) -> BTreeSet<usize> {
         let mut positions = BTreeSet::new();
-        if unit == Measure::Tokens {
-            return positions;
-        }
         for agent in agents.iter().filter_map(|agent| self.agents.get(agent)) {
-            if unit == Measure::Dollars {
-                positions.extend(latest(&agent.periods, since, at_ms));
-            }
             for session in agent
                 .sessions
                 .values()
@@ -114,12 +82,7 @@ impl Index {
                     Measure::ContextPercent => &session.context,
                     Measure::Tokens => continue,
                 };
-                positions.extend(latest(timeline, since, at_ms));
-                if unit == Measure::PlanPercent {
-                    for timeline in session.windows.values() {
-                        positions.extend(latest(timeline, None, at_ms));
-                    }
-                }
+                positions.extend(latest(timeline, at_ms));
             }
         }
         positions
@@ -159,7 +122,7 @@ impl Index {
         self.agents
             .get(agent)
             .and_then(|agent| agent.sessions.get(session))
-            .and_then(|session| latest(&session.baseline, None, at_ms))
+            .and_then(|session| latest(&session.baseline, at_ms))
     }
 }
 
@@ -193,17 +156,8 @@ impl Session {
         if usage.reported_running_ms.is_some() {
             insert(&mut self.baseline, usage, position);
         }
-        if let Some(windows) = &usage.plan_windows {
+        if usage.plan_windows.is_some() {
             insert(&mut self.plan, usage, position);
-            for window in windows {
-                insert(
-                    self.windows
-                        .entry((usage.account.clone(), window.duration_minutes))
-                        .or_default(),
-                    usage,
-                    position,
-                );
-            }
         }
         if usage.context_percent.is_some() {
             insert(&mut self.context, usage, position);

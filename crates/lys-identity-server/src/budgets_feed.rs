@@ -90,11 +90,22 @@ pub fn convert(
     let reported_running_ms = snapshot.then_some(record.figures.running_ms).flatten();
     let running_ms = if let Some(current) = reported_running_ms {
         let previous = prior
-            .iter()
-            .filter(|usage| {
+            .index
+            .baseline(agent, &record.session, at_ms)
+            .map(|position| {
                 #[cfg(test)]
                 crate::budgets_work::visit(crate::budgets_work::Work::Running);
-                usage.agent == agent && usage.session.as_deref() == Some(record.session.as_str())
+                prior
+                    .uses
+                    .get(position)
+                    .ok_or_else(|| {
+                        refused(format!("running index names missing record {position}"))
+                    })
+                    .and_then(|usage| {
+                        usage.reported_running_ms.ok_or_else(|| {
+                            refused("running index names a record without a cumulative report")
+                        })
+                    })
             })
             .transpose()?;
         if let Some(delta) = current.checked_sub(previous.unwrap_or(0)) {
