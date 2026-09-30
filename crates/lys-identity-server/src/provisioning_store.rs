@@ -129,6 +129,12 @@ pub struct Settings {
     /// The permissions its settings file carries, when the profile sets them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Permissions>,
+    /// The machine the reviewed version starts on when no machine is requested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs_on: Option<String>,
+    /// The single folder the reviewed version permits the seat to write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub writable: Option<String>,
 }
 
 /// How an agent's sessions are driven through a runner.
