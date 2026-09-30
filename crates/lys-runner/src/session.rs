@@ -277,9 +277,9 @@ impl Sessions {
                 },
             );
         }
-        let state_dir = state_dir.canonicalize().map_err(|error| {
-            RunnerError::refused("launch_config_refused", error.to_string())
-        })?;
+        let state_dir = state_dir
+            .canonicalize()
+            .map_err(|error| RunnerError::refused("launch_config_refused", error.to_string()))?;
         let sessions = Arc::new_cyclic(|owner| {
             table.owner = owner.clone();
             Self {

@@ -45,8 +45,6 @@ use std::collections::BTreeMap;
 
 use lys_openapi::{Api, Method};
 
-use crate::certificates_api::CertificatesView;
-use crate::certificates_issue::{IssueBody, WithdrawBody};
 use crate::connections_api::ConnectionsView;
 use crate::directory_views::{
     AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
@@ -61,15 +59,13 @@ use crate::grant_contract::{
 use crate::grants_reach::{ReachAnswer, ReachBody};
 use crate::launch_api::{Launch, StartCommandView};
 use crate::link_audit_api::{Asked, Delivery};
-use crate::memory_api::MemoryView;
 use crate::network_api::{MachineView, NameBody, NetworkView};
 use crate::openapi_table::{GET, POST};
 use crate::provisioning_api::{ProvisioningView, ReviewBody, SetBody as ProfileBody};
-use crate::read_views::{AgentView, MeView, PeopleView, ServiceAccountView, ServiceAccountsView};
+use crate::read_views::{AgentView, MeView, PeopleView};
 use crate::requests_api::AskBody;
 use crate::requests_decide::{ApproveBody, DeclineBody};
 use crate::requests_views::{RequestList, RequestView};
-use crate::resources_api::ResourceList;
 use crate::restart_api::openapi as restart_types;
 use crate::reviews_api::{KeepBody, ReviewView};
 use crate::reviews_state::Kept;
@@ -77,16 +73,10 @@ use crate::roles_api::{AssignBody, EndBody, MakeBody, MoveBody, VersionBody};
 use crate::roles_views::{MovedView, RoleList, RoleView};
 use crate::routes::{Bound, Moved, Named};
 use crate::runtime_api::{ReportBody, SessionView as RuntimeSession, SessionsView as RuntimeList};
-use crate::service_accounts_api::{CreateBody as AccountBody, RetireBody as AccountRetireBody};
-use crate::sessions_api::{EndedView, SessionsView};
 use crate::setup::SetupRequest;
 use crate::sign_in_providers::{ProvidersView, SetBody as ProviderBody};
 use crate::skills_api::{SkillBody, SkillsView};
 use crate::stop_api::{StopBody, StopView, StopsView};
-use crate::teams_api::{
-    CreateBody as TeamBody, MemberBody, RetireBody as TeamRetireBody, TeamChanged, TeamView,
-    TeamsView,
-};
 
 /// A schema's name in the document, or none where a route names none.
 pub(crate) type Schema = Option<Cow<'static, str>>;
@@ -101,7 +91,9 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(grants_and_reviews(api));
     entries.extend(roles_and_requests(api));
     entries.extend(machines_and_runtime(api));
-    entries.extend(accounts_teams_and_sessions(api));
+    entries.extend(crate::openapi_accounts_types::accounts_teams_and_sessions(
+        api,
+    ));
     entries.extend(crate::openapi_runner_types::runner(api));
     entries.extend(goals(api));
     entries
@@ -459,126 +451,5 @@ fn goals(api: &mut Api) -> Vec<Entry> {
         (GET, "/teams/{id}/goals", None, Some(list)),
         (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
         (POST, "/goals/{goal}/mark", Some(mark), Some(item)),
-    ]
-}
-
-/// The service accounts, the teams, the resources grants are on, the
-/// secrets this service brokers, the live sessions and the certificates.
-fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
-    let account = api.schema::<ServiceAccountView>();
-    let (create, retire) = (
-        api.schema::<AccountBody>(),
-        api.schema::<AccountRetireBody>(),
-    );
-    let changed = api.schema::<TeamChanged>();
-    let (team, member) = (api.schema::<TeamBody>(), api.schema::<MemberBody>());
-    let retire_team = api.schema::<TeamRetireBody>();
-    let nesting = api.schema::<crate::teams_nesting::NestingBody>();
-    let sessions = api.schema::<SessionsView>();
-    let ended = api.schema::<EndedView>();
-    let certificates = api.schema::<CertificatesView>();
-    let (issue, withdraw) = (api.schema::<IssueBody>(), api.schema::<WithdrawBody>());
-    vec![
-        (
-            GET,
-            "/service-accounts",
-            None,
-            Some(api.schema::<ServiceAccountsView>()),
-        ),
-        (
-            POST,
-            "/service-accounts",
-            Some(create),
-            Some(account.clone()),
-        ),
-        (
-            POST,
-            "/service-accounts/{id}/retire",
-            Some(retire),
-            Some(account),
-        ),
-        (
-            GET,
-            "/tree",
-            None,
-            Some(api.schema::<crate::tree_views::TreeView>()),
-        ),
-        (GET, "/teams", None, Some(api.schema::<TeamsView>())),
-        (POST, "/teams", Some(team), Some(changed.clone())),
-        (GET, "/teams/{id}", None, Some(api.schema::<TeamView>())),
-        (
-            POST,
-            "/teams/{id}/members",
-            Some(member),
-            Some(changed.clone()),
-        ),
-        (
-            POST,
-            "/teams/{id}/members/{member}/remove",
-            Some(retire_team.clone()),
-            Some(changed.clone()),
-        ),
-        (
-            POST,
-            "/teams/{id}/members/{member}/confirm",
-            Some(retire_team.clone()),
-            Some(changed.clone()),
-        ),
-        (
-            POST,
-            "/teams/{id}/nesting",
-            Some(nesting),
-            Some(changed.clone()),
-        ),
-        (POST, "/teams/{id}/retire", Some(retire_team), Some(changed)),
-        (GET, "/resources", None, Some(api.schema::<ResourceList>())),
-        (GET, "/secrets", None, None),
-        (GET, "/secrets/grants", None, None),
-        (GET, "/secrets/audit", None, None),
-        (GET, "/secrets/revocation", None, None),
-        (GET, "/secrets/settings", None, None),
-        (GET, "/secrets/handles", None, None),
-        (POST, "/secrets/scope", None, None),
-        (POST, "/secrets/recipients", None, None),
-        (POST, "/secrets/drop", None, None),
-        (GET, "/sessions", None, Some(sessions.clone())),
-        (POST, "/sessions/{id}/end", None, Some(ended.clone())),
-        (GET, "/directory/people/{id}/sessions", None, Some(sessions)),
-        (
-            POST,
-            "/directory/people/{id}/sessions/{session}/end",
-            None,
-            Some(ended),
-        ),
-        (GET, "/configuration", None, None),
-        (
-            GET,
-            "/agents/{id}/memory",
-            None,
-            Some(api.schema::<MemoryView>()),
-        ),
-        (
-            GET,
-            "/agents/{id}/certificates",
-            None,
-            Some(certificates.clone()),
-        ),
-        (
-            POST,
-            "/agents/{id}/certificates",
-            Some(issue),
-            Some(certificates.clone()),
-        ),
-        (
-            POST,
-            "/agents/{id}/certificates/{serial}/withdrawal",
-            Some(withdraw),
-            Some(certificates),
-        ),
-        (POST, "/agents/{id}/start", None, None),
-        (POST, "/launch-records/{id}/start-again", None, None),
-        (POST, "/launch-records/{id}/withdraw", None, None),
-        (GET, "/launch-records/{id}/state", None, None),
-        (GET, "/openapi.json", None, None),
     ]
 }
