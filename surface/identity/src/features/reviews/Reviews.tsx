@@ -23,8 +23,7 @@ export function Reviews() {
   const load = useLoad(async () => ({ view: await request<ReviewsView>('/reviews'), me: await api.me() }), 'reviews:' + revision);
   return <div className="page">
     <div className="head"><div><div className="eyebrow">Access</div><h1>Review agent access</h1>
-      <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div>
-      <button className="btn" disabled={load.status === 'loading'} onClick={() => setRevision((value) => value + 1)}>Refresh</button></div>
+      <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Reviews" ok={({ view, me }) => <>
       <p className="note">{view.scope === 'directory' ? 'All agents in the directory.' : 'Agents you are responsible for.'} Checked {clock(view.judged_at)}.</p>

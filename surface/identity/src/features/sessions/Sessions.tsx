@@ -53,19 +53,20 @@ export function SessionList({ person }: { person: string }) {
     setProblem('');
     try {
       const answer = await request<{ ended: string }>(path + '/' + encodeURIComponent(session.id) + '/end', {});
-      if (answer.ended !== session.id) throw new Error('The answer did not confirm this session was ended. Refresh the session list before trying again.');
+      if (answer.ended !== session.id) throw new Error('Lys answered, but its answer named a different session.');
       setConfirm(null);
       if (session.current) setEnded(true);
       else setRevision((value) => value + 1);
     } catch (error) {
+      setConfirm(null);
       setBlocked({ id: session.id, revision });
       setProblem(error instanceof Error ? error.message : String(error));
+      setRevision((value) => value + 1);
     } finally { sending.current = false; setBusy(false); }
   }
   if (ended) return <SignIn />;
   return <>
-    <button className="btn" disabled={busy || load.status === 'loading'} onClick={() => { setConfirm(null); setRevision((value) => value + 1); }}>Refresh sessions</button>
-    {problem ? <div role="alert" className="why-not"><b>The session end could not be confirmed.</b><p>{problem}</p><p>Refresh to see whether it is still signed in. This request will not be repeated automatically.</p></div> : null}
+    {problem ? <div role="alert" className="why-not"><b>The end of that session could not be confirmed.</b><p>Lys has read your sessions again below. If that session is still listed, it can still be used: choose End session to try again. Nothing is sent again on its own.</p><p className="sec">Lys said: {problem}</p></div> : null}
     {confirm ? <section aria-label="Confirm session end" className="card">
       <h2>{confirm.current ? 'Sign out of this session?' : 'End this session?'}</h2>
       <p>{confirm.current ? 'You will need to sign in again to continue.' : 'That session will need to sign in again. Your current session stays open.'}</p>

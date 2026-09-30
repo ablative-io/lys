@@ -25,16 +25,17 @@ describe('Sessions', () => {
     expect(text()).not.toContain('Another signed-in session');
   });
 
-  it('does not repeat an uncertain end until an authoritative refresh completes', async () => {
-    const { posted } = await mount('#/sessions', { ...SERVICE, '/sessions': ok(sessions),
+  it('never repeats an uncertain end, and reads the list again itself instead of offering Refresh', async () => {
+    const { posted, requests } = await mount('#/sessions', { ...SERVICE, '/sessions': ok(sessions),
       'POST /sessions/session-other/end': refused(503, 'Unavailable', 'Outcome not confirmed'),
     });
+    expect(button('Refresh sessions')).toBeNull();
     await click(button('End session'));
     await click(button('Confirm end session'));
-    await click(button('Confirm end session'));
+    expect(button('Confirm end session')).toBeNull();
     expect(posted).toHaveLength(1);
     expect(text()).toContain('could not be confirmed');
-    await click(button('Refresh sessions'));
+    expect(requests.filter((path) => path === '/sessions')).toHaveLength(2);
     expect(button('End session')?.hasAttribute('disabled')).toBe(false);
     expect(posted).toHaveLength(1);
   });

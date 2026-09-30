@@ -17,7 +17,7 @@ it('saves without copying and removes credential values after broker confirmatio
 it('a refused save keeps the issued credential only in memory and makes no automatic retry',async()=>{
   const {posted}=await mount('#/apps',{...routes(),'POST /apps/fixture_notes/credentials/save':refused(503,'SecretsUnavailable','unknown outcome')});
   await click(button('Approve Notes fixture'));await click(button('Save credentials in Lys secrets'));
-  expect(posted).toHaveLength(2);expect(text()).toContain('SecretsUnavailable');expect(text()).toContain('No automatic retry');expect(text()).not.toContain('Credentials saved');
+  expect(posted).toHaveLength(2);expect(text()).toContain('The save was not confirmed');expect(text()).toContain('unknown outcome');expect(text()).toContain('Nothing is tried again on its own');expect(text()).not.toContain('Credentials saved');
   await click(button('Save credentials in Lys secrets'));expect(posted).toHaveLength(3);expect(posted[2]).toEqual(posted[1]);
 });
 it('a malformed success never clears the only issued copy or claims saved',async()=>{
@@ -43,4 +43,11 @@ it('refused custody leaves approval available and never retries automatically',a
   expect(text()).toContain('SecretsUnavailable');
   expect(text()).not.toContain('Credentials saved');
   expect(button('Approve Notes fixture')).not.toBeNull();
+});
+it('never puts an issued secret value on the screen, not even behind a toggle',async()=>{
+  await mount('#/apps',{...routes(),'POST /apps/fixture_notes/credentials/save':refused(503,'SecretsUnavailable','unknown outcome')});
+  await click(button('Approve Notes fixture'));
+  for(const toggle of document.querySelectorAll('details'))toggle.open=true;
+  expect(document.body.innerHTML).not.toContain(secret);
+  expect(text()).not.toContain('Show credentials once');
 });

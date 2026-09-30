@@ -1,5 +1,4 @@
 /** The configured integrations served by Lys, with configuration kept apart from health. */
-import { useState } from 'react';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { SignInProviders } from './SignInProviders';
@@ -16,12 +15,10 @@ const readConnections = () => request<ConnectionsView>('/connections');
 const labels = { configured: 'Configured', local: 'Local to Lys', unconfigured: 'Not configured' };
 
 export function Connections() {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(readConnections, 'connections-' + revision);
+  const load = useLoad(readConnections, 'connections');
   return <div className="page">
     <div className="head"><div><div className="eyebrow">Runtime</div><h1>Connections</h1>
       <p className="sub">The services this Lys installation is configured to use.</p></div>
-      <button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh</button>
     </div>
     <Gate load={load} title="Connections" ok={(data) => <div className="stack">
       <p className="note">Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>

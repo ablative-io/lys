@@ -16,12 +16,10 @@ export interface SecretListing {
 }
 
 export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(read, 'secrets:' + revision);
+  const load = useLoad(read, 'secrets');
   return <div className="page">
     <div className="head"><div><div className="eyebrow">Runtime</div><h1>Secrets</h1>
       <p className="sub">Entries the broker permits you to discover. Credentials stay in the broker.</p></div>
-      <button className="btn" disabled={load.status === 'loading'} onClick={() => setRevision((value) => value + 1)}>Refresh</button>
     </div>
     <Gate load={load} title="Secrets" ok={(listing) => <SecretRows listing={listing} />} />
   </div>;

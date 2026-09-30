@@ -163,7 +163,7 @@ describe('the permission template builder', () => {
 });
 
 describe('the Apps screen', () => {
-  it('shows a pending app in words before approval and its secret once after', async () => {
+  it('shows a pending app in words before approval and never its secret after', async () => {
     const pending = { id: APP, name: 'Notes fixture', state: 'pending', redirects: ['https://app.example.test/signed-in'], schema: uploadedWorkspace, version: 0, versions: [], pending: null, client_id: null, service_account: null, registered_by: { kind: 'service_account', id: 'op-1' }, registered_at: 1 };
     let approved = false;
     const calls = stub({
@@ -175,7 +175,8 @@ describe('the Apps screen', () => {
     expect(text()).toContain('fixture_notes.channel: its actions are read, write. poster may read, write. What is held on fixture_notes.workspace reaches it.');
     await click(button('Approve Notes fixture'));
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ operation: expect.stringMatching(/^op-/) });
-    expect(labelled('Client secret, shown once')?.textContent).toContain('f'.repeat(64));
+    expect(labelled('Save app credentials')).not.toBeNull();
+    expect(document.body.innerHTML).not.toContain('f'.repeat(64));
     expect(text()).toContain('approved');
     expect(sessionStorage.getItem('lys.schema-draft.' + APP)).toBeNull();
     expect(JSON.stringify(Object.entries(localStorage))).not.toContain('f'.repeat(64));
