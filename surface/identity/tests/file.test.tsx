@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable, unmountAll } from './harness';
-import { ADA, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
+import { ADA, COURIER, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 
 describe("An agent's file", () => {
   it('shows its person, state and registration from the service', async () => {
@@ -99,6 +99,11 @@ describe("An agent's file", () => {
     expect(document.querySelector<HTMLSelectElement>('select[name="identity"]')?.value).toBe(SCRIBE);
     expect($('form[aria-label="Record lifecycle change"]')).not.toBeNull();
     expect(posted).toHaveLength(0);
+  });
+
+  it('offers a registered identity only activation, since the directory retires only an active or suspended one', async () => {
+    await mount('#/directory/manage?action=status&identity=' + COURIER);
+    expect($$('select[name="transition"] option').map((option) => option.getAttribute('value')).filter(Boolean)).toEqual(['activate']);
   });
 
   it('answers an agent that is not visible as not found, with the refusal', async () => {
