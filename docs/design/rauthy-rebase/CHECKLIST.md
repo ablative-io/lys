@@ -30,3 +30,11 @@
 ## Records
 
 - [ ] **C16** — The copied exception lines are gone from the deployment report, which names the new release, its tag commit and its advisory check; the rebase report records the upstream commit, the rebased diff, the regression results and the installed hash; the card's landing record, written after the lys gate passes, holds the gate result as evidence for IDENTITY-001-UPSTREAM-AUTH-STATE; the rebase report names the separate decision to lift it and the later move of the kept development data as acts this card does not perform.
+
+## The fork gate's verdict (RAUTHYREBASE-002)
+
+- [ ] **C17** — The base wrapper's pass on a detached, still-running builder is shown red against real Docker (RAUTHYREBASE-002 R1).
+- [ ] **C18** — A result comes only from a stopped container, and Running true with ExitCode 0 is refused by name (RAUTHYREBASE-002 R2).
+- [ ] **C19** — Success needs a completed verdict bound to this invocation and commit, and missing, truncated, stale or wrong-commit verdicts are refused by name (RAUTHYREBASE-002 R3).
+- [ ] **C20** — Cancellation reaches everything the gate owns, keeps its result, and cleanup never overwrites the outcome (RAUTHYREBASE-002 R4).
+- [ ] **C21** — The venue's generic gate receipt is surveyed for the same defect (RAUTHYREBASE-002 R5).

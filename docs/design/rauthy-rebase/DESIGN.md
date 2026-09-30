@@ -65,6 +65,11 @@ The lys pull request changes four paths: the vendor/rauthy gitlink, the Rauthy e
 | `deploy/identity/versions.json` | pinned releases and digests of the standalone install; the Rauthy entry's image field takes the rebuilt image's value | DIRECTORY-002 |
 | `docs/design/identity/reports/IDENTITY-001-deployment.md` | the deployment report; its v0.36.2 exception lines are replaced by the new release and its advisory check | DIRECTORY-002 |
 | `docs/design/identity/reports/IDENTITY-002-rebase.md` | the rebase report: trigger facts, migration lists, fork commits, every step's command and result, the installed hash and the evidence handed on | RAUTHYREBASE-001 |
+| `vendor/rauthy/.land/test.sh` | the fork's tests leg: takes a result only from a stopped builder and requires the completed verdict | RAUTHYREBASE-002 |
+| `vendor/rauthy/.land/identity-link-gate.sh` | the in-container gate: writes the completed verdict after its last leg | RAUTHYREBASE-002 |
+| `vendor/rauthy/.land/tests/interrupted-gate.sh` | the real-Docker regression for detached, cancelled and unverdicted gates | RAUTHYREBASE-002 |
+| `vendor/rauthy/.land/tests/fixture/identity-link-gate.sh` | the fixture in-container gate the regression drives through its legs | RAUTHYREBASE-002 |
+| `docs/design/identity/reports/RAUTHYREBASE-002-gate-verdict.md` | the gate verdict report: red and green runs and the src_gate survey | RAUTHYREBASE-002 |
 
 ## Inventory
 

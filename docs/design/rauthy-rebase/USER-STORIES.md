@@ -16,6 +16,8 @@
 
 **S5.** As the reviewer, I want the account-status, redirect and logout guards proved at the release tag, so that a release without the hardening can never be taken as the base.
 
+**S7.** As the reviewer deciding whether a fork change may land, I want a gate that was interrupted or cut short to say so by name and never read as a pass, so that I never land a tree nobody finished testing.
+
 ## Person — Signs in with two linked providers
 
 **S6.** As a person who linked two sign-in providers, I want both to still resolve to me after the rebase, so that the upgrade never splits my identity.

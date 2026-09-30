@@ -89,6 +89,31 @@
       "path": "docs/design/identity/reports/IDENTITY-002-rebase.md",
       "note": "the rebase report: trigger facts, migration lists, fork commits, every step's command and result, the installed hash and the evidence handed on",
       "brief": "RAUTHYREBASE-001"
+    },
+    {
+      "path": "vendor/rauthy/.land/test.sh",
+      "note": "the fork's tests leg: takes a result only from a stopped builder and requires the completed verdict",
+      "brief": "RAUTHYREBASE-002"
+    },
+    {
+      "path": "vendor/rauthy/.land/identity-link-gate.sh",
+      "note": "the in-container gate: writes the completed verdict after its last leg",
+      "brief": "RAUTHYREBASE-002"
+    },
+    {
+      "path": "vendor/rauthy/.land/tests/interrupted-gate.sh",
+      "note": "the real-Docker regression for detached, cancelled and unverdicted gates",
+      "brief": "RAUTHYREBASE-002"
+    },
+    {
+      "path": "vendor/rauthy/.land/tests/fixture/identity-link-gate.sh",
+      "note": "the fixture in-container gate the regression drives through its legs",
+      "brief": "RAUTHYREBASE-002"
+    },
+    {
+      "path": "docs/design/identity/reports/RAUTHYREBASE-002-gate-verdict.md",
+      "note": "the gate verdict report: red and green runs and the src_gate survey",
+      "brief": "RAUTHYREBASE-002"
     }
   ],
   "inventory": [

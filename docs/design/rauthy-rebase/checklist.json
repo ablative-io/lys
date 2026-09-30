@@ -105,6 +105,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The fork gate's verdict (RAUTHYREBASE-002)",
+      "items": [
+        {
+          "id": "C17",
+          "text": "The base wrapper's pass on a detached, still-running builder is shown red against real Docker (RAUTHYREBASE-002 R1).",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "A result comes only from a stopped container, and Running true with ExitCode 0 is refused by name (RAUTHYREBASE-002 R2).",
+          "done": false
+        },
+        {
+          "id": "C19",
+          "text": "Success needs a completed verdict bound to this invocation and commit, and missing, truncated, stale or wrong-commit verdicts are refused by name (RAUTHYREBASE-002 R3).",
+          "done": false
+        },
+        {
+          "id": "C20",
+          "text": "Cancellation reaches everything the gate owns, keeps its result, and cleanup never overwrites the outcome (RAUTHYREBASE-002 R4).",
+          "done": false
+        },
+        {
+          "id": "C21",
+          "text": "The venue's generic gate receipt is surveyed for the same defect (RAUTHYREBASE-002 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }
