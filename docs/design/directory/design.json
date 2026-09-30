@@ -5138,6 +5138,41 @@
       "path": "crates/lys-runner/tests/peer_restart/cases.rs",
       "note": "Peer proof, held launch and operation replay through an injected process tree",
       "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-identity-server/src/harness_catalogue.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/harness_catalogue.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "docs/harness/catalogue/claude-code.json",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "docs/harness/catalogue/codex.json",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-runner/src/installed.rs",
+      "note": "Each computer's runner reports where each described program is installed (DIRECTORY-076 R2)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-runner/tests/installed.rs",
+      "note": "Each computer's runner reports where each described program is installed (DIRECTORY-076 R2)",
+      "brief": "DIRECTORY-076"
     }
   ],
   "inventory": [

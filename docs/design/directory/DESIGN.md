@@ -1126,6 +1126,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/operations/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/tests/peer_restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/tests/peer_restart/cases.rs` | Peer proof, held launch and operation replay through an injected process tree | DIRECTORY-073 |
+| `crates/lys-identity-server/src/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/tests/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/claude-code.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/codex.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-runner/src/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
+| `crates/lys-runner/tests/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
 
 ## Inventory
 
