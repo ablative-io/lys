@@ -147,6 +147,26 @@ fn a_failed_spawn_can_retry_only_identical_kept_config() -> TestResult {
 }
 
 #[test]
+fn an_interrupted_staging_directory_is_replaced_before_publication() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 1024)?;
+    let own = dir.path().join("sessions/config-session");
+    let staged = own.join("config-writing");
+    std::fs::create_dir_all(staged.join("partial"))?;
+    std::fs::write(staged.join("settings.json"), b"incomplete settings")?;
+    std::fs::write(staged.join("partial/unfinished"), b"unpublished")?;
+    sessions.start(launch())?;
+    sessions.stop_all();
+    assert_eq!(
+        std::fs::read(own.join("config/settings.json"))?,
+        b"exact settings"
+    );
+    assert!(!staged.exists());
+    assert!(!own.join("config/partial").exists());
+    Ok(())
+}
+
+#[test]
 fn the_signature_covers_config_files_and_bindings() -> TestResult {
     let dir = tempfile::tempdir()?;
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
