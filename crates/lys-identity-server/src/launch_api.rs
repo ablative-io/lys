@@ -40,7 +40,7 @@ use axum::http::{HeaderMap, Method};
 use axum::routing::post;
 use axum::{Json, Router};
 use lys_identity::LifecycleState;
-use lys_identity::{AgentId, IdentityId, OperationId};
+use lys_identity::{Actor, AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -180,16 +180,28 @@ async fn start_command(
         body.map_err(|refused| ServerError::RequestMalformed {
             reason: refused.body_text(),
         })?;
-    let session = OperationId::from_str(&operation)?.to_string();
+    start_for(&state, &headers, &actor, agent, &machine, &operation).await
+}
+
+/// Give every admitted start the same checks, kept report and runner call.
+pub(crate) async fn start_for(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    actor: &Actor,
+    agent: AgentId,
+    machine: &str,
+    operation: &str,
+) -> Result<Json<Value>, ServerError> {
+    let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
-    let admission = with_directory(&state, |directory| {
+    let admission = with_directory(state, |directory| {
         let directory = directory.projection()?;
-        let admitted_by = caller(&state, &headers, directory)?.to_string();
+        let admitted_by = caller(state, headers, directory)?.to_string();
         let parsed = AgentId::from_str(&agent)?;
         let record = directory
             .record(IdentityId::Agent(parsed))
             .ok_or(ServerError::AgentNotVisible)?;
-        let answers = state.admission.administrator(&actor).is_ok()
+        let answers = state.admission.administrator(actor).is_ok()
             || directory
                 .person_for(actor.binding())
                 .is_some_and(|person| record.responsible() == Some(person));
@@ -198,7 +210,7 @@ async fn start_command(
                 reason: "only the administrator or the person responsible for the agent is given its start command",
             });
         }
-        if let Some(kept) = admitted(&state, &session, &agent)? {
+        if let Some(kept) = admitted(state, &session, &agent)? {
             return Ok(Admission::Kept(kept, admitted_by));
         }
         if record.state() != LifecycleState::Active {
@@ -206,7 +218,7 @@ async fn start_command(
                 state: record.state().to_string(),
             });
         }
-        let version = with_provisioning(&state, |store| {
+        let version = with_provisioning(state, |store| {
             store
                 .profile(&agent)
                 .and_then(|profile| profile.versions.last().cloned())
@@ -217,9 +229,9 @@ async fn start_command(
                 version: version.number,
             });
         }
-        let held = crate::roles_api::held_roles(&state, &agent, now())?;
-        let runtime = with_network(&state, |store| {
-            let machine = placed(store, &machine, (&agent, &held))?;
+        let held = crate::roles_api::held_roles(state, &agent, now())?;
+        let runtime = with_network(state, |store| {
+            let machine = placed(store, machine, (&agent, &held))?;
             reaches(machine, &version)?;
             machine
                 .runtime
@@ -230,14 +242,14 @@ async fn start_command(
     })?;
     let (version, runtime, admitted_by) = match admission {
         Admission::Kept(kept, admitted_by) => {
-            let rotation = with_provisioning(&state, |store| {
+            let rotation = with_provisioning(state, |store| {
                 Ok(store
                     .profile(&agent)
                     .and_then(|profile| profile.versions.last())
                     .and_then(|version| version.settings.session.as_ref())
                     .and_then(|session| session.accounts.clone()))
             })?;
-            return run(&state, kept, &admitted_by, rotation).await;
+            return run(state, kept, &admitted_by, rotation).await;
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
@@ -246,17 +258,17 @@ async fn start_command(
         .session
         .as_ref()
         .and_then(|session| session.accounts.clone());
-    let handles = handles(&state, &headers, &agent).await?;
-    let skills = with_provisioning(&state, |store| skill_files(store, &version))?;
+    let handles = handles(state, headers, &agent).await?;
+    let skills = with_provisioning(state, |store| skill_files(store, &version))?;
     let policy = match state.policies {
-        Some(_) => with_policies(&state, |store| Ok(store.held().latest(&agent).cloned()))?,
+        Some(_) => with_policies(state, |store| Ok(store.held().latest(&agent).cloned()))?,
         None => None,
     };
     let rendered = render(
         &Start {
             agent: &agent,
             session: &session,
-            machine: &machine,
+            machine,
             runtime: &runtime,
             version: &version,
             skills: &skills,
@@ -266,7 +278,7 @@ async fn start_command(
     )?;
     let view = serde_json::to_value(StartCommandView {
         agent: agent.clone(),
-        machine: machine.clone(),
+        machine: machine.to_owned(),
         runtime,
         session: session.clone(),
         provisioning_version: version.number,
@@ -281,12 +293,12 @@ async fn start_command(
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
     })?;
-    let kept = with_runtime(&state, |store| {
+    let kept = with_runtime(state, |store| {
         store.report(Report {
             operation: session.clone(),
             session: session.clone(),
             agent: Some(agent.clone()),
-            machine: machine.clone(),
+            machine: machine.to_owned(),
             state: Reported::Starting,
             what: format!("start admitted, template {}", rendered.template_sha256),
             confirmation: String::new(),
@@ -299,7 +311,7 @@ async fn start_command(
         .first()
         .and_then(|first| first.launch.clone())
         .ok_or(ServerError::RuntimeReportReused { operation: session })?;
-    run(&state, kept, &admitted_by, rotation).await
+    run(state, kept, &admitted_by, rotation).await
 }
 
 /// Run the start `view` answers on its machine's runner, when the machine
