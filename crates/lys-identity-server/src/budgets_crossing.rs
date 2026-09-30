@@ -147,11 +147,11 @@ pub struct Crossings {
 impl Crossings {
     /// Keep `crossing` unless its operation is kept already.
     pub fn hold(&mut self, crossing: Crossing) {
-        if !self
-            .crossed
-            .iter()
-            .any(|held| held.operation == crossing.operation)
-        {
+        if !self.crossed.iter().any(|held| {
+            #[cfg(test)]
+            crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
+            held.operation == crossing.operation
+        }) {
             self.crossed.push(crossing);
         }
     }
@@ -161,11 +161,15 @@ impl Crossings {
     pub fn unsettled(&self) -> Vec<Crossing> {
         self.crossed
             .iter()
-            .filter(|crossing| match self.acted.get(&crossing.operation) {
-                None => true,
-                Some(acted) => {
-                    acted.stands == Stands::Accepted
-                        || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+            .filter(|crossing| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Pending);
+                match self.acted.get(&crossing.operation) {
+                    None => true,
+                    Some(acted) => {
+                        acted.stands == Stands::Accepted
+                            || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+                    }
                 }
             })
             .cloned()

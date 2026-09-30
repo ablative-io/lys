@@ -127,7 +127,11 @@ pub fn figure(
         .uses
         .iter()
         .chain(incoming)
-        .filter(|usage| agents.contains(&usage.agent) && usage.at_ms <= at_ms)
+        .filter(|usage| {
+            #[cfg(test)]
+            crate::budgets_work::visit(crate::budgets_work::Work::Usage);
+            agents.contains(&usage.agent) && usage.at_ms <= at_ms
+        })
         .collect();
     if limit.unit == Measure::PlanPercent {
         return plan(limit, agents, &uses, at_ms);
