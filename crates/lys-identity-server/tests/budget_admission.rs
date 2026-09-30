@@ -62,6 +62,7 @@ impl CountedRunner {
                     answer: Answer::Refused {
                         refusal: "no_live_session".to_owned(),
                         words: "the counted runner starts no process".to_owned(),
+                        oldest: None,
                     },
                 };
                 let line = serde_json::to_string(&reply).map_err(|error| error.to_string())?;
@@ -153,7 +154,7 @@ async fn control(path: &Path, key: Arc<Ed25519Identity>) -> TestResult {
     let client = lys_runner::client::Client::new(path.to_owned(), key);
     let answer = tokio::task::spawn_blocking(move || {
         client.ask(&RunnerAct::Status {
-            session: "control".to_owned(),
+            session: Some("control".to_owned()),
         })
     })
     .await?;
