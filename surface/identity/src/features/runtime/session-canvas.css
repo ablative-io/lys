@@ -17,3 +17,4 @@
 .session-canvas-lines path[data-standing="false"] { stroke-dasharray: 5 4; opacity: .6; }
 .canvas-connections { margin-top: 16px; }
 .canvas-connections li { margin: 8px 0; overflow-wrap: anywhere; }
+.fill > .session-canvas-scroll { flex: 1; min-height: 0; margin-top: 12px; }

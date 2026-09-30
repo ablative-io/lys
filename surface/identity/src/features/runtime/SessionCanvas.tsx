@@ -74,16 +74,15 @@ export function SessionCanvas() {
   const [revision, setRevision] = useState(0);
   const load = useLoad(readSessionGraph, 'session-canvas:' + revision);
   const messages = useLoad(firstMessagePage, 'canvas-message-edges:' + revision);
-  return <div className="page session-canvas-page">
-    <h1>Agent canvas</h1>
-    <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running.</p>
-    <div className="actions"><a className="btn" href="#/runtime">Session list</a><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh connections</button></div>
+  return <div className="page fill session-canvas-page">
+    <div className="head"><div><div className="eyebrow">Running</div><h1>Agent canvas</h1>
+      <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p></div>
+    <div className="actions"><a className="btn" href="#/runtime">Session list</a><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh connections</button></div></div>
     <Gate load={load} title="Agent canvas" ok={(graph) => <>
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
       {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
       {graph.nodes.some((node) => node.session) ? messages.status === 'ok' ? <MessageCanvas key={revision} graph={graph} first={messages.data} /> : <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
-      <p className="note">Team membership does not grant access. Dashed grant connections no longer stand. Terminal actions are checked by the service each time.</p>
     </>} />
   </div>;
 }
