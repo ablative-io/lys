@@ -32,16 +32,17 @@ export function RefusalLine({ refused }: { refused: Refused }) {
   return <div className="why-not"><b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span></div>;
 }
 
-function Head({ title, sub }: { title: string; sub: string }) {
-  return <div className="head"><div><div className="eyebrow">Secrets</div><h1>{title}</h1><p className="sub">{sub}</p></div></div>;
+/** The tab already names the view; this says what it holds. */
+function Head({ sub }: { sub: string }) {
+  return <p className="sub">{sub}</p>;
 }
 
 /* Grants */
 
 export function SecretGrants({ read }: { read: () => Promise<SecretGrantListing> }) {
   const load = useLoad(read, 'secret-grants');
-  return <div className="page">
-    <Head title="Who may use what" sub="Grants on the secrets you can see." />
+  return <div className="secrets-view">
+    <Head sub="Grants on the secrets you can see." />
     <Gate load={load} title="Secret grants" ok={(listing) => <GrantRows listing={listing} />} />
   </div>;
 }
@@ -66,8 +67,8 @@ export function GrantRows({ listing }: { listing: SecretGrantListing }) {
 
 export function SecretAudit({ read }: { read: () => Promise<SecretAuditLog> }) {
   const load = useLoad(read, 'secret-audit');
-  return <div className="page">
-    <Head title="What happened" sub="The broker's checked record of the secrets you can see, newest first." />
+  return <div className="secrets-view">
+    <Head sub="The broker's checked record of the secrets you can see, newest first." />
     <Gate load={load} title="Secret audit" ok={(log) => <AuditRows log={log} />} />
   </div>;
 }
@@ -124,9 +125,8 @@ export function RevocationLookup({ check }: { check: (handle: string) => Promise
       asking.current = false;
     }
   };
-  return <div className="page">
-    <div className="head"><div><div className="eyebrow">Secrets</div><h1>Has a handle been stopped?</h1>
-      <p className="sub">Whether use has stopped here, and whether the provider has been asked to withdraw its access too.</p></div></div>
+  return <div className="secrets-view">
+    <Head sub="Whether use has stopped here, and whether the provider has been asked to withdraw its access too." />
     <form onSubmit={submit}>
       <label className="field">Handle id<input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder="The id from the audit record" /></label>
       <button className="btn primary" type="submit" disabled={outcome.at === 'checking' || !handle.trim()}>Check</button>

@@ -1,5 +1,6 @@
 /** Owners choose a discovered secret by name before entering the detailed access controls. */
 import { useState } from 'react';
+import { Picker } from '../../shell/Picker';
 import { useSearchParams } from 'react-router';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
@@ -14,13 +15,10 @@ export function SecretControls() {
   const [revision, setRevision] = useState(0);
   const changed = () => setRevision((value) => value + 1);
   const load = useLoad(() => request<SecretListing>('/secrets'), 'secret-controls');
-  return <div className="page">
-    <div className="head"><div><div className="eyebrow">Advanced · Secrets</div><h1>Manage secret access</h1>
-      <p className="sub">Choose a secret, then change its visibility or who may receive it. Only its owner can save these changes.</p></div></div>
+  return <div className="secrets-view">
+    <p className="sub">Choose a secret, then change its visibility or who may receive it. Only its owner can save these changes.</p>
     <Gate load={load} title="Secret controls" ok={(listing) => <>
-      <label className="field">Secret<select value={selected} onChange={(event) => setParams(event.target.value ? { secret: event.target.value } : {})}>
-        <option value="">Choose a secret</option>{listing.secrets.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
-      </select></label>
+      <div className="field">Secret<Picker key={selected} name="secret" label="Find a secret" options={listing.secrets.map((entry) => ({ id: entry.name, name: entry.name }))} initial={selected ? [selected] : []} onChange={(ids) => setParams(ids[0] ? { secret: ids[0] } : {})} /></div>
       {listing.secrets.some((entry) => entry.name === selected) ? <div className="grid2" key={selected}>
         <CurrentSettings secret={selected} revision={revision} />
         <section className="card"><ScopeChange secret={selected} change={secretsApi.scope} changed={changed} /></section>
