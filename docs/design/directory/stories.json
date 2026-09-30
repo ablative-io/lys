@@ -596,6 +596,26 @@
         {
           "id": "S158",
           "text": "As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford."
+        },
+        {
+          "id": "S185",
+          "text": "As the person running a team of agents, I want one tree of my teams and agents with each one's session and settings, so that I can see and open any of them in one place."
+        },
+        {
+          "id": "S186",
+          "text": "As the person running a team of agents, I want a seat's request for a tool approved only by someone whose remit covers it, so that permissions flow down my tree and never widen on the way."
+        },
+        {
+          "id": "S187",
+          "text": "As the person setting agent context and reminders, I want Lys to restart a seat onto its new settings and prompt a seat nobody is watching, so that Argus and Manifold are no longer needed for either."
+        },
+        {
+          "id": "S188",
+          "text": "As the person running a team of agents, I want each seat confined to its own folders, so that no seat can write anywhere else on my machine."
+        },
+        {
+          "id": "S189",
+          "text": "As the person running a team of agents, I want every setting an agent can have listed and checked, and a list of approved MCP servers, so that I can see an agent's whole configuration and a mistyped setting is refused before it starts."
         }
       ]
     },

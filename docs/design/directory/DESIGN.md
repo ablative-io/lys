@@ -1093,6 +1093,33 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `scripts/identity-gates/UPGRADE.md` | touched by DIRECTORY-070 R2: how the upgrade gate finds the old install's ports | DIRECTORY-070 |
 | `crates/lys/tests/identity_install.rs` | The first-install test on ports the operating system hands it, in folders it removes, built into the workspace target | DIRECTORY-070 |
 | `crates/lys/tests/cli_tests/identity_setup.rs` | touched by DIRECTORY-070 R3: the setup test takes its service port from the operating system | DIRECTORY-070 |
+| `crates/lys-identity-server/tests/teams_nested.rs` | Teams nest under a parent team and name a lead (DIRECTORY-071 R1) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_store.rs` | Teams nest under a parent team and name a lead (DIRECTORY-071 R1) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_api.rs` | Teams nest under a parent team and name a lead (DIRECTORY-071 R1) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_migration.rs` | Teams nest under a parent team and name a lead (DIRECTORY-071 R1) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/tree_api.rs` | One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2) | DIRECTORY-071 |
+| `crates/lys-identity-server/tests/tree_api.rs` | One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/routes_table.rs` | One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/openapi_types.rs` | One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2) | DIRECTORY-071 |
+| `crates/lys-identity-server/src/mcp_requests_api.rs` | A seat asks for a declared MCP server by name (DIRECTORY-072 R1) | DIRECTORY-072 |
+| `crates/lys-identity-server/tests/mcp_requests.rs` | A seat asks for a declared MCP server by name (DIRECTORY-072 R1) | DIRECTORY-072 |
+| `crates/lys-identity-server/src/restart_api.rs` | A restart ends the session and starts it from the latest reviewed version (DIRECTORY-073 R1) | DIRECTORY-073 |
+| `crates/lys-identity-server/tests/restart_api.rs` | A restart ends the session and starts it from the latest reviewed version (DIRECTORY-073 R1) | DIRECTORY-073 |
+| `crates/lys-identity-server/tests/input_no_screen.rs` | Compaction and reminders reach a session no screen is reading (DIRECTORY-073 R3) | DIRECTORY-073 |
+| `crates/lys-runner/tests/launch_folders.rs` | The Launch carries the profile's writable folders (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/launch_template.rs` | The Launch carries the profile's writable folders (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-runner/src/containment_paths.rs` | The runner confines the session to those folders (DIRECTORY-074 R2) | DIRECTORY-074 |
+| `crates/lys-harness-settings/Cargo.toml` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `crates/lys-harness-settings/src/lib.rs` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `crates/lys-harness-settings/src/claude_code.rs` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `crates/lys-harness-settings/src/codex.rs` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `crates/lys-harness-settings/tests/generated.rs` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `scripts/harness-settings/generate.py` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `docs/harness/claude-code.md` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `docs/harness/codex.md` | Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1) | DIRECTORY-075 |
+| `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
+| `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 
 ## Inventory
 

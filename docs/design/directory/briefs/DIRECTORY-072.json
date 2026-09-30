@@ -1,0 +1,89 @@
+{
+  "id": "DIRECTORY-072",
+  "cluster": "directory",
+  "title": "A seat asks for a declared MCP server, a lead approves it within their remit, and the approval makes a new reviewed profile version",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C464",
+    "C465"
+  ],
+  "stories": [
+    "S186"
+  ],
+  "design_anchor": [
+    "ADR-087",
+    "ADR-089",
+    "ADR-133"
+  ],
+  "purpose": "A profile version already declares MCP servers (provisioning_store.rs McpServer, line 31, and mcp_servers, line 115), and grant delegation already refuses anything beyond what the delegator may pass on (lys-identity grants/admission.rs line 237). Nothing joins them: a seat cannot ask for a server, a lead cannot approve one, and adding a server today means a person editing a profile by hand. Tom's example is Pikelet asking for the Dot server and Archie approving it.",
+  "task": "Let an agent ask for an MCP server declared in the estate by name. Let a person or lead agent approve the request only when they hold that server within their own remit for that agent; the approval writes a new profile version, the latest reviewed one plus that server, recorded as reviewed by the approver, keeping the previous version. Out: restarting the seat onto it (DIRECTORY-073) and the screen.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A seat asks for a declared MCP server by name",
+      "spec": "Behavioural. WHEN an agent asks for an MCP server by name, THE SYSTEM SHALL record the request against that agent's latest reviewed profile version, SHALL refuse a server the estate does not declare as mcp_server_unknown naming it, and SHALL refuse a server the version already carries as mcp_server_held.",
+      "acceptance": [
+        "Pikelet's request for the Dot server is recorded and read back pending.",
+        "A request for an undeclared server is refused by name.",
+        "A request for a server the version carries is refused by name."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/mcp_requests_api.rs",
+          "crates/lys-identity-server/tests/mcp_requests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C464"
+      ],
+      "stories": [
+        "S186"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "An approval within remit makes a new reviewed profile version",
+      "spec": "Behavioural. WHEN a person or agent approves a pending request, THE SYSTEM SHALL check through the existing grant admission that the approver holds that server passable for that agent, SHALL refuse otherwise as mcp_beyond_remit naming the approver, the agent and the server, and on success SHALL write a new profile version equal to the latest reviewed version plus that server, recorded as reviewed by the approver, with the previous version kept unchanged.",
+      "acceptance": [
+        "Archie's approval of the Dot server for Pikelet writes a new version naming it, reviewed by Archie.",
+        "Waffles approving a server outside her remit is refused as mcp_beyond_remit.",
+        "The previous version reads back unchanged.",
+        "The launch rendered from the new version names the server in its MCP configuration."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/provisioning_store.rs",
+          "crates/lys-identity-server/src/mcp_requests_api.rs",
+          "crates/lys-identity-server/tests/mcp_requests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C465"
+      ],
+      "stories": [
+        "S186"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT poll, sleep, add a timer, timeout, deadline, watchdog or background loop; every wait ends on the event it waits for, and an idle page and an idle service use no CPU.",
+    "SHALL NOT add unsafe, an ignored test, an allow attribute, an underscore rename or a discarded result.",
+    "SHALL NOT change a stored shape without a migration tested from an old install, and SHALL NOT edit an installed configuration by hand.",
+    "SHALL NOT make Lys depend on Cambium or name a harness detail in code; harness details are data.",
+    "SHALL NOT widen any grant, and SHALL NOT let an approver approve for an agent outside their own reach."
+  ],
+  "verification": [
+    "Handwritten main brief passes the design gate on its exit code.",
+    "Built directly by the assigned seat on its own branch in its registered worktree: red first, then green, with fmt, Clippy pedantic, tests and ast-grep.",
+    "The full src_gate runs on Dean at the exact head that lands; the lead reviews that head and gives the landing word.",
+    "Shown to Tom on the dev server at 127.0.0.1:5190 against the live Lys as one step of the night's demonstration."
+  ]
+}
