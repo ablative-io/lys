@@ -157,9 +157,9 @@ impl TreeState {
         id: &str,
         standings: &[Standing],
     ) -> Result<Option<TreeAgent>, ServerError> {
-        let Some(standing) = standings.iter().find(|standing| standing.agent == id) else {
+        if !standings.iter().any(|standing| standing.agent == id) {
             return Ok(None);
-        };
+        }
         let Some(record) = self
             .directory
             .records()
@@ -251,7 +251,7 @@ impl TreeState {
         standings: &[Standing],
     ) -> Result<TreeBudget, ServerError> {
         let agents = crate::budgets_members::covered(holder, standings);
-        let used = crate::budgets_usage::figure(
+        let mut used = crate::budgets_usage::figure(
             &self.budgets,
             limit,
             &agents,
@@ -260,6 +260,19 @@ impl TreeState {
             None,
         )
         .map_err(|reason| ServerError::BudgetsUnavailable { reason })?;
+        if used.figure.is_some()
+            && !self.budgets.uses.iter().any(|usage| {
+                agents.contains(&usage.agent)
+                    && usage.at_ms <= self.at_ms
+                    && used.since_ms.is_none_or(|since| usage.at_ms >= since)
+            })
+        {
+            used.figure = None;
+            used.unavailable = Some(format!(
+                "{} has not been reported in this period",
+                limit.unit.name()
+            ));
+        }
         Ok(TreeBudget {
             holder: holder.clone(),
             measure: limit.unit,

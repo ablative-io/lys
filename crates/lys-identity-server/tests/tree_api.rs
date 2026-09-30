@@ -405,7 +405,23 @@ async fn summaries_use_reviewed_versions_reported_sessions_and_every_applicable_
             .ok_or("missing measure")?;
         assert_eq!(budget["spent"], spent);
     }
-    assert_eq!(answer["teams"][0]["members"][1]["budgets"][0]["spent"], 42);
+    assert_eq!(
+        answer["teams"][0]["members"][1]["budgets"][0]["spent"],
+        Value::Null
+    );
+    let other_budgets = answer["teams"][0]["members"][1]["budgets"]
+        .as_array()
+        .ok_or("no other member budgets")?;
+    let own = other_budgets
+        .iter()
+        .find(|budget| budget["holder"]["kind"] == "agent" && budget["holder"]["id"] == other)
+        .ok_or("no individual budget")?;
+    assert!(own["unavailable"].as_str().is_some());
+    let aggregate = other_budgets
+        .iter()
+        .find(|budget| budget["holder"]["kind"] == "team" && budget["holder"]["id"] == team)
+        .ok_or("no other member team budget")?;
+    assert_eq!(aggregate["spent"], 42);
     assert!(
         !member
             .as_object()

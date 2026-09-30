@@ -180,7 +180,7 @@ pub struct Usage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reported_running_ms: Option<u64>,
     /// A native snapshot updates availability and account levels, even without spend.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub native_snapshot: bool,
     /// Each unavailable figure and its reported reason.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -566,8 +566,4 @@ pub fn by_holder(budgets: &[Budget]) -> BTreeMap<Holder, Vec<Budget>> {
             .push(budget.clone());
     }
     out
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
 }

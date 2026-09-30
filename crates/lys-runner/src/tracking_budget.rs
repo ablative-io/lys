@@ -62,7 +62,7 @@ fn projection(number: &Number, places: i32, rounded: bool) -> Option<u64> {
         let divisor = 10_u128.checked_pow(shift.unsigned_abs())?;
         if rounded {
             digits.checked_add(divisor / 2)?.checked_div(divisor)?
-        } else if digits % divisor == 0 {
+        } else if digits.is_multiple_of(divisor) {
             digits / divisor
         } else {
             return None;
@@ -214,10 +214,7 @@ pub fn compare(left: &Number, right: &Number) -> Result<std::cmp::Ordering, Stri
         let fraction = mantissa
             .split_once('.')
             .map_or(0, |(_, fraction)| fraction.len());
-        let digits: String = mantissa
-            .chars()
-            .filter(|character| character.is_ascii_digit())
-            .collect();
+        let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
         let digits = digits.trim_start_matches('0');
         if digits.is_empty() {
             return Ok((String::new(), 0));

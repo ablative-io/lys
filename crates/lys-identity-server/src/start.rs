@@ -170,17 +170,8 @@ type Shared = Arc<StartService>;
 
 /// The start route over `service`.
 pub fn routes(service: Shared) -> Router {
-    agent_route(Arc::clone(&service)).merge(record_routes(service))
-}
-
-pub(crate) fn agent_route(service: Shared) -> Router {
     Router::new()
         .route("/agents/{id}/start", post(start))
-        .with_state(service)
-}
-
-pub(crate) fn record_routes(service: Shared) -> Router {
-    Router::new()
         .route("/launch-records/{id}/start-again", post(start_again))
         .route("/launch-records/{id}/withdraw", post(withdrawn))
         .route("/launch-records/{id}/state", get(state))

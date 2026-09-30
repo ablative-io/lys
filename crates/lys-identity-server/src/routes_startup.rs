@@ -162,13 +162,11 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let start_service = start_service(config, &state)?;
+    let starts = start::routes(start_service(config, &state)?);
     let starts = crate::start_budget::guarded(
-        start::agent_route(Arc::clone(&start_service))
-            .merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
+        starts.merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
         Arc::clone(&state),
     );
-    let start_records = start::record_routes(start_service);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
     // Authenticate the inner API/provider routes before body extraction. Static
@@ -183,7 +181,6 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         crate::routes_table::router(Arc::clone(&state))
             .merge(configured)
             .merge(starts)
-            .merge(start_records)
             .layer(axum::Extension(catalogue))
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );

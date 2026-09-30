@@ -32,7 +32,7 @@ pub fn number(unit: Measure, amount: u64) -> Result<Number, String> {
     match unit {
         Measure::Tokens | Measure::RunningMs => Ok(amount.into()),
         Measure::Dollars | Measure::PlanPercent | Measure::ContextPercent => {
-            if amount % 1_000_000 == 0 {
+            if amount.is_multiple_of(1_000_000) {
                 return Ok((amount / 1_000_000).into());
             }
             let text = format!("{}.{:06}", amount / 1_000_000, amount % 1_000_000);

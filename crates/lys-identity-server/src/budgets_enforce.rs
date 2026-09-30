@@ -213,7 +213,7 @@ fn crossings(
                         limit,
                         index,
                         figure: &figure,
-                        account: &account,
+                        account: account.as_deref(),
                         act,
                         is_warning,
                         mark: &mark,
@@ -360,7 +360,7 @@ struct Dispatch<'a> {
     limit: &'a Limit,
     index: usize,
     figure: &'a Number,
-    account: &'a Option<String>,
+    account: Option<&'a str>,
     act: Act,
     is_warning: bool,
     mark: &'a str,
@@ -393,12 +393,12 @@ fn dispatch(
         let target = targets
             .get(&agent)
             .ok_or_else(|| unavailable("a covered agent has no target snapshot"))?;
-        let sessions = if act == Act::Tell {
+        let sessions = if act == Act::Tell
+            || (limit.unit != Measure::ContextPercent && target.live.is_empty())
+        {
             vec![None]
         } else if limit.unit == Measure::ContextPercent {
             vec![usage.session.clone()]
-        } else if target.live.is_empty() {
-            vec![None]
         } else {
             target.live.iter().cloned().map(Some).collect()
         };
@@ -421,9 +421,7 @@ fn dispatch(
             }
             let text = match act {
                 Act::Compact => target.compact.clone(),
-                Act::Notice => {
-                    Some(notice(limit, figure, account.as_deref()).map_err(unavailable)?)
-                }
+                Act::Notice => Some(notice(limit, figure, account).map_err(unavailable)?),
                 Act::Stop | Act::Tell => None,
             };
             crossed.push(Crossing {
@@ -435,7 +433,7 @@ fn dispatch(
                 figure: figure.clone(),
                 limit_index: u64::try_from(index).map_err(unavailable)?,
                 warning: is_warning,
-                account: account.clone(),
+                account: account.map(str::to_owned),
                 act,
                 agent: agent.clone(),
                 session,

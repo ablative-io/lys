@@ -8,6 +8,7 @@ use crate::budgets_state::{Act, Budget, Held, Holder, HolderKind, Length, Measur
 /// A limit's period and action belong to that limit, including migrated values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = BudgetLimit)]
 pub struct Limit {
     /// The reported unit.
     pub unit: Measure,
@@ -93,14 +94,15 @@ impl Limit {
             ));
         }
         match (self.unit, self.period) {
-            (Measure::ContextPercent, None) => {}
+            (Measure::ContextPercent, None)
+            | (Measure::PlanPercent, Some(Length::FiveHour | Length::Week))
+            | (Measure::Tokens | Measure::RunningMs | Measure::Dollars, Some(_)) => {}
             (Measure::ContextPercent, Some(_)) => {
                 return Err(refused(
                     "BudgetPeriodRefused",
                     "context_percent is a level and has no period",
                 ));
             }
-            (Measure::PlanPercent, Some(Length::FiveHour | Length::Week)) => {}
             (Measure::PlanPercent, _) => {
                 return Err(refused(
                     "BudgetPeriodRefused",
@@ -113,7 +115,6 @@ impl Limit {
                     "spend names a five_hour, day, week or month period",
                 ));
             }
-            (_, Some(_)) => {}
         }
         if let Some(zone) = &self.zone {
             let known = jiff::tz::TimeZone::get(zone).map_err(|error| {

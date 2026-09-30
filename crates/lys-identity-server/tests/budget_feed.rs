@@ -139,10 +139,10 @@ fn page(session: &str, agent: &str, at: u64) -> TestResult<FeedPage> {
 }
 
 async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<(), String> {
-    for (index, expected) in [None, Some("cursor-five"), Some("cursor-five")]
-        .into_iter()
-        .enumerate()
-    {
+    let expected = [None, Some("cursor-five"), Some("cursor-five")];
+    let mut index = 0;
+    let mut grant_seen = false;
+    while index < expected.len() || !grant_seen {
         let (socket, _) = listener.accept().await.map_err(|error| error.to_string())?;
         let (read, mut write) = socket.into_split();
         let greeting = Greeting::fresh("0123456789abcdef0123456789abcdef");
@@ -157,26 +157,35 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
             .map_err(|error| error.to_string())?
             .ok_or("missing feed request")?;
         let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
-        if act
-            != (Act::Feed {
-                cursor: expected.map(str::to_owned),
-                follow: true,
-            })
-        {
-            return Err(format!("unexpected feed request: {act:?}"));
-        }
-        let answer = if index < 2 {
-            Answer::Feed { page: page.clone() }
-        } else {
-            let mut invalid = page.clone();
-            invalid.cursor = "cursor-bad".to_owned();
-            invalid.entries.truncate(1);
-            invalid.entries[0].session = "untracked-session".to_owned();
-            let Body::Usage(record) = &mut invalid.entries[0].body else {
-                return Err("missing fixture usage".to_owned());
-            };
-            record.session = "untracked-session".to_owned();
-            Answer::Feed { page: invalid }
+        let answer = match act {
+            Act::GrantChannel if !grant_seen => {
+                grant_seen = true;
+                Answer::GrantChannel
+            }
+            Act::Feed { cursor, follow } => {
+                let next = expected.get(index).ok_or("extra feed request")?;
+                if !follow || cursor.as_deref() != *next {
+                    return Err(format!(
+                        "unexpected feed cursor {cursor:?}, follow {follow}"
+                    ));
+                }
+                let answer = if index < 2 {
+                    Answer::Feed { page: page.clone() }
+                } else {
+                    let mut invalid = page.clone();
+                    invalid.cursor = "cursor-bad".to_owned();
+                    invalid.entries.truncate(1);
+                    invalid.entries[0].session = "untracked-session".to_owned();
+                    let Body::Usage(record) = &mut invalid.entries[0].body else {
+                        return Err("missing fixture usage".to_owned());
+                    };
+                    record.session = "untracked-session".to_owned();
+                    Answer::Feed { page: invalid }
+                };
+                index += 1;
+                answer
+            }
+            other => return Err(format!("unexpected feed fixture request: {other:?}")),
         };
         let reply = Reply {
             version: lys_runner::protocol::PROTOCOL_VERSION,

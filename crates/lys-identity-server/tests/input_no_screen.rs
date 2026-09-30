@@ -198,8 +198,7 @@ async fn budget_compaction_and_notice_reach_a_session_before_any_viewer_opens() 
     let second = held.start().await?;
     let other = second["session"].as_str().ok_or("no second session")?;
     let path = format!("/budgets/agent/{}", held.agent());
-    let budget =
-        json!({ "measure": "context_percent", "limit": 50, "act": "compact", "version": 0 });
+    let budget = json!({"limits": [{"unit": "context_percent", "amount": 50, "period": null, "act": "compact"}], "warn_at": null, "version": 0});
     let (status, set) = send(
         &held.service,
         reqwest::Method::PUT,
@@ -215,8 +214,7 @@ async fn budget_compaction_and_notice_reach_a_session_before_any_viewer_opens() 
         "{compacted}"
     );
     assert!(held.status(other)?.ended.is_none());
-    let budget =
-        json!({ "measure": "context_percent", "limit": 80, "act": "notice", "version": 1 });
+    let budget = json!({"limits": [{"unit": "context_percent", "amount": 80, "period": null, "act": "notice"}], "warn_at": null, "version": 1});
     let (status, set) = send(
         &held.service,
         reqwest::Method::PUT,

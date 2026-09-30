@@ -157,7 +157,7 @@ fn tokens(record: &UsageRecord, unavailable: &mut Vec<Unavailable>) -> Result<u6
             Some(count) => {
                 total = total
                     .checked_add(count)
-                    .ok_or_else(|| refused("native token spend overflows"))?
+                    .ok_or_else(|| refused("native token spend overflows"))?;
             }
             None if index == 2 && record.adapter == lys_runner::tracking::CODEX_ADAPTER => {}
             None => {

@@ -537,15 +537,26 @@ pub enum ServerError {
     },
     /// The organisation setting cannot be kept or read.
     #[error("ConfigurationUnavailable: {reason}")]
-    ConfigurationUnavailable { reason: String },
+    ConfigurationUnavailable {
+        /// Why.
+        reason: String,
+    },
     /// A zone changed after the administrator read it.
     #[error(
         "ConfigurationVersionConflict: the setting is at version {held}, not {expected}; read it again"
     )]
-    ConfigurationVersionConflict { held: u64, expected: u64 },
+    ConfigurationVersionConflict {
+        /// The version held.
+        held: u64,
+        /// The version the caller read.
+        expected: u64,
+    },
     /// A current stop limit prevents a fresh start before runner admission.
     #[error("BudgetExhausted: {words}")]
-    BudgetExhausted { words: String },
+    BudgetExhausted {
+        /// The exhausted limit and its reported figure and reset.
+        words: String,
+    },
     /// Another change to the budget came between the caller's read and its
     /// change.
     #[error(
