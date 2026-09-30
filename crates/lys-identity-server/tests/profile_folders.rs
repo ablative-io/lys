@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, BEA, Service};
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
 use lys_identity_server::provisioning_store::{ProvisioningStore, Version};
@@ -123,7 +123,7 @@ fn placement_and_folder_survive_a_store_reopen_without_changing_old_versions() -
 #[tokio::test]
 async fn profile_routes_keep_placement_and_folder_in_the_reviewed_version() -> TestResult {
     let (service, seeded) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
@@ -155,7 +155,7 @@ async fn profile_routes_keep_placement_and_folder_in_the_reviewed_version() -> T
 #[tokio::test]
 async fn invalid_placement_or_folder_is_refused_before_a_version_is_written() -> TestResult {
     let (service, seeded) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
