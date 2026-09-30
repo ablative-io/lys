@@ -32,8 +32,8 @@ interface ApprovalAnswer { app: AppRecord; client: ClientIssued | null; credenti
 function approvalAnswer(value: unknown, id: string): ApprovalAnswer {
   const answer = value as Partial<ApprovalAnswer> | null;
   const app = answer?.app;
-  const client = answer?.client;
-  const credentials = answer?.credentials;
+  const client = answer?.client ?? null;
+  const credentials = answer?.credentials ?? null;
   const strings = (values: unknown): values is string[] => Array.isArray(values) && values.every((entry) => typeof entry === 'string');
   const pending = app?.pending;
   const validPending = pending === null || (pending && typeof pending.operation === 'string' && Number.isSafeInteger(pending.replaces) && typeof pending.schema === 'object' && pending.by && typeof pending.by.kind === 'string' && Number.isSafeInteger(pending.at));
