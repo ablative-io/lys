@@ -23,13 +23,16 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::grants::caller;
-use crate::network_store::{Machine, NetworkStore, Retirement};
+use crate::network_store::{Machine, NetworkStore, Retirement, TeamRecorded};
 use crate::read_api::own_person;
 use crate::read_views::AgentSummary;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::last_reports;
 use crate::session::now;
+use crate::teams_api::{team_id, with_teams};
+use crate::teams_state::Team;
 
 /// The most characters a machine's name, kind or runtime carries.
 const WORDS_MAX: usize = 100;
@@ -47,6 +50,8 @@ pub struct MachineView {
     pub kind: String,
     /// The runtime installed on it, null for none.
     pub runtime: Option<String>,
+    /// The owning team, null while unowned.
+    pub team: Option<String>,
     /// How many agents it runs at once.
     pub slots: u32,
     /// The agents that may run on it, as the directory holds them now.
@@ -77,7 +82,7 @@ pub struct NetworkView {
     pub reports_served: bool,
 }
 
-/// A machine to name. Every member is required; `runtime` may be null.
+/// A machine to name; an omitted team leaves it unowned.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NameBody {
@@ -85,11 +90,38 @@ pub(crate) struct NameBody {
     name: String,
     kind: String,
     runtime: Option<String>,
+    #[serde(default)]
+    team: Option<String>,
     slots: u32,
     may_run: Vec<String>,
     #[serde(default)]
     may_run_roles: Vec<String>,
     may_reach: Vec<String>,
+}
+
+/// An ownership assignment; an explicit null clears the team.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TeamBody {
+    operation: String,
+    #[serde(deserialize_with = "required_team")]
+    #[schema(required = true)]
+    team: Option<String>,
+}
+
+/// The current computer beside the original ownership receipt.
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct MachineTeamChanged {
+    /// The computer as it stands now.
+    pub machine: MachineView,
+    /// The act this operation first recorded.
+    pub recorded: TeamRecorded,
+}
+
+fn required_team<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(deserializer)
 }
 
 /// The network routes.
@@ -98,6 +130,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/network", get(list))
         .route("/network/machines", post(name))
         .route("/network/machines/{id}/retire", post(retire))
+        .route("/network/machines/{id}/team", post(assign_team))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -166,6 +199,7 @@ fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) 
         name: machine.name.clone(),
         kind: machine.kind.clone(),
         runtime: machine.runtime.clone(),
+        team: machine.team.clone(),
         slots: machine.slots,
         may_run,
         may_reach: machine.may_reach.clone(),
@@ -254,6 +288,8 @@ fn named(
         name: words("name", &body.name)?,
         kind: words("kind", &body.kind)?,
         runtime,
+        team: body.team.clone(),
+        creation_team: body.team.clone(),
         slots: body.slots,
         may_run,
         may_run_roles,
@@ -271,19 +307,95 @@ async fn name(
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    body.team = body.team.as_deref().map(team_id).transpose()?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();
         let known = crate::roles_api::role_ids(&state)?;
         let machine = named(directory, &body, (&known, by, now()))?;
+        let team = owning_team(&state, body.team.as_deref())?;
         let last = last_reports(&state)?;
         with_network(&state, |store| {
+            if store.machine(&machine.id).is_none() {
+                active_team(team.as_ref())?;
+            }
             store.name(machine.clone())?;
             let kept = store
                 .machine(&machine.id)
                 .ok_or(ServerError::MachineUnknown)?;
             Ok(Json(view(directory, kept, last.get(&kept.id).copied())))
+        })
+    })
+}
+
+fn owning_team(state: &AppState, id: Option<&str>) -> Result<Option<Team>, ServerError> {
+    id.map(|id| {
+        with_teams(state, |store| {
+            store
+                .team(id)
+                .cloned()
+                .ok_or(ServerError::Team(TeamError::Unknown))
+        })
+    })
+    .transpose()
+}
+
+fn active_team(team: Option<&Team>) -> Result<(), ServerError> {
+    if let Some(team) = team.filter(|team| team.retired.is_some()) {
+        return Err(ServerError::Team(TeamError::Retired {
+            team: team.created.id.clone(),
+        }));
+    }
+    Ok(())
+}
+
+async fn assign_team(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Result<Json<TeamBody>, JsonRejection>,
+) -> Result<Json<MachineTeamChanged>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let administrator = state.admission.administrator(&actor).is_ok();
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let id = OperationId::from_str(&id)
+        .map_err(|error| malformed(format!("computer id does not read: {error}")))?
+        .to_string();
+    let operation = OperationId::from_str(&body.operation)?.to_string();
+    let team = body.team.as_deref().map(team_id).transpose()?;
+    with_directory(&state, |directory| {
+        let directory = directory.projection()?;
+        let by = own_person(directory, &actor)?.to_string();
+        let owning = owning_team(&state, team.as_deref())?;
+        let last = last_reports(&state)?;
+        with_network(&state, |store| {
+            let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
+            let first = store.team_recorded(&operation);
+            let repeating = first
+                .is_some_and(|first| first.machine == id && first.team == team && first.by == by);
+            let claiming = machine.team.is_none()
+                && owning.as_ref().is_some_and(|team| team.created.owner == by);
+            if !administrator && !repeating && !claiming {
+                return Err(ServerError::NotAdmitted {
+                    reason: "only the directory administrator changes computer ownership; a team's owner may claim an unowned computer for their own team",
+                });
+            }
+            if first.is_none() {
+                active_team(owning.as_ref())?;
+            }
+            let recorded = store.assign_team(TeamRecorded {
+                operation,
+                machine: id.clone(),
+                team,
+                by,
+                at: now(),
+            })?;
+            let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
+            Ok(Json(MachineTeamChanged {
+                machine: view(directory, machine, last.get(&id).copied()),
+                recorded,
+            }))
         })
     })
 }

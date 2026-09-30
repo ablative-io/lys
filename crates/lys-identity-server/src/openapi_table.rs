@@ -97,8 +97,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED];
     GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]];
-    POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed"]];
+    POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
+    POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];

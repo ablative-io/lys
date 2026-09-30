@@ -148,6 +148,8 @@ fn the_machines_are_read_back_from_one_file_as_they_were_kept() -> TestResult {
         named_by: "person-a".to_owned(),
         named_at: 5,
         retired: None,
+        team: None,
+        creation_team: None,
     };
     let mut store = NetworkStore::open(&path)?;
     assert!(store.machines().is_empty());

@@ -480,7 +480,7 @@ fn the_ownership_route_describes_its_body_answer_and_conflict() -> TestResult {
     let route = &document["paths"]["/network/machines/{id}/team"]["post"];
     assert!(route["requestBody"].is_object(), "{route}");
     assert!(route["responses"]["200"].is_object(), "{route}");
-    assert!(route["responses"]["409"].is_object(), "{route}");
+    assert!(route["responses"]["default"].is_object(), "{route}");
     let schemas = &document["components"]["schemas"];
     assert!(schemas["MachineView"]["properties"].get("team").is_some());
     assert!(route.to_string().contains("MachineTeamReused"), "{route}");
