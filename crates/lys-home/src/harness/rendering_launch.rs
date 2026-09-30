@@ -65,9 +65,8 @@ pub fn render(
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
-    let mcp = serde_json::to_string_pretty(&serde_json::json!({"mcpServers": template.mcp}))
-        .map_err(|error| error.to_string())?
-        + "\n";
+    let mcp =
+        serde_json::to_string_pretty(&template.mcp).map_err(|error| error.to_string())? + "\n";
     let mut files = vec![
         file("mcp.json", mcp),
         file("settings.json", settings),
