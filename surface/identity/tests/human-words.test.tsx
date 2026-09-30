@@ -7,7 +7,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { Refused } from '../src/api';
 import { SignInProviders } from '../src/features/connections/SignInProviders';
 import { Secrets } from '../src/features/secrets/Secrets';
-import { SecretRows } from '../src/features/secrets/Secrets';
+import { ADA, DIRECTORY } from './fixtures';
 
 const roots: Root[] = [];
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
@@ -53,19 +53,25 @@ it('shows the provider write answer even when a later read would be stale', asyn
 });
 
 it('explains a secrets read failure and the next step without its refusal code', async () => {
+  vi.stubGlobal('fetch', async () => Response.json(DIRECTORY));
   const view = await show(<Secrets read={async () => { throw new Refused(503, { refusal: 'SecretsUnavailable', reason: 'no secrets broker is configured for this service' }); }} />);
-  expect(view.textContent).toContain('Ask your administrator');
+  expect(view.textContent).toContain('Lys has no secrets store set up');
+  expect(view.textContent).toContain('service configuration');
+  expect(view.textContent).toContain('restart Lys');
+  expect(view.textContent).not.toContain('Ask your administrator');
   expect(view.textContent).not.toContain('SecretsUnavailable');
   expect(view.textContent).not.toContain('scope');
 });
 
 it('puts a secret owner identifier behind a details toggle', async () => {
-  const owner = 'person-' + 'a'.repeat(32);
-  const view = await show(<SecretRows listing={{ secrets: [{ name: 'Calendar', class: 'credential', owner, sequence: 2, upstream: null, header: null }] }} />);
+  const owner = ADA;
+  vi.stubGlobal('fetch', async () => Response.json(DIRECTORY));
+  const view = await show(<Secrets read={async () => ({ secrets: [{ name: 'Calendar', class: 'credential', owner, sequence: 2, upstream: null, header: null }] })} />);
   const details = view.querySelectorAll('details');
-  expect(details).toHaveLength(1);
-  expect(details[0].textContent).toContain(owner);
-  expect(details[0].open).toBe(false);
+  const account = [...details].find((detail) => detail.textContent?.includes(owner));
+  expect(account).toBeDefined();
+  expect(view.textContent).toContain(DIRECTORY.people[0].display_name);
+  expect(account?.open).toBe(false);
   for (const detail of details) detail.remove();
   expect(view.textContent).not.toContain(owner);
 });
