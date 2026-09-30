@@ -126,10 +126,15 @@ pub fn hand_over(
     let path = layout.headless_setup_code();
     private_files::write(&path, code.as_bytes())?;
     emitter.note(&format!(
-        "no browser could be opened: the setup code is in {} (only you can read it); open {} and enter it",
+        "no browser could be opened: the setup code is in {} (only you can read it); open {} and enter it in the Setup code field",
         path.display(),
         Layout::setup_url()
     ));
+    emitter.field(
+        "setup code file",
+        "setup_code_file",
+        path.display().to_string(),
+    );
     Ok(())
 }
 

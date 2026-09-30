@@ -79,12 +79,45 @@ describe('Personal scope', () => {
     await mount('#/me', routes);
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
     const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
-      const cells = tr.querySelectorAll('td');
-      return `${cells[0].textContent} of ${cells[1].textContent}`;
+      const exactly = tr.querySelectorAll('td .mono');
+      return `${exactly[0].textContent} of ${exactly[1].textContent}`;
     });
     expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
     expect(holds).not.toContain('viewer of project:atlas');
     const secrets = $$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you');
     expect(secrets?.textContent).toContain('Secret values are never displayed here.');
+  });
+});
+
+const AGENTS_G = 'grant-' + '42'.padStart(32, '0');
+const NONE_G = 'grant-' + '43'.padStart(32, '0');
+
+/**
+ * The service as the first administrator reads it after install: Ada also holds
+ * the editor root grant on the directory's agents the install issues, and one
+ * grant whose recorded actions are empty, so it lets her take no action.
+ */
+function withInstallGrants(): typeof SERVICE {
+  const base = GRANTS.find((g) => g.id === LEDGER_G) as Grant;
+  const agentsG: Grant = {
+    ...base, id: AGENTS_G, resource: { kind: 'directory', id: 'agents' }, relation: 'editor', actions: ['edit', 'view'],
+    pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['service_account'] },
+  };
+  const noneG: Grant = { ...base, id: NONE_G, resource: { kind: 'project', id: 'atlas' }, relation: 'auditor', actions: [] };
+  return { ...SERVICE, '/grants': ok({ grants: [...GRANTS, agentsG, noneG], revision: 7 }) };
+}
+
+describe('What you hold', () => {
+  const rows = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) =>
+    [tr.querySelector('td')?.firstChild?.textContent, ...[...tr.querySelectorAll('td .mono')].map((span) => span.textContent), tr.querySelectorAll('td')[1].textContent]);
+
+  it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
+    await mount('#/me', withInstallGrants());
+    expect(rows()).toEqual([
+      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root'],
+      ['You can view project ledger.', 'viewer', 'project:ledger', 'root'],
+      ["You can view and edit the directory's agents.", 'editor', 'directory:agents', 'root'],
+      ['You can take no action on project atlas.', 'auditor', 'project:atlas', 'root'],
+    ]);
   });
 });

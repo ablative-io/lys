@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
 import { Delegate } from '../grants/Delegate';
-import { nameOf, onText, passesToAgents, readGrantWorld } from '../grants/model';
+import { mayText, nameOf, onText, passesToAgents, readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
@@ -69,14 +69,13 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
         <div>
           <div className="section-h" style={{ marginTop: 0 }}><span>What you hold</span></div>
           <table>
-            <thead><tr><th>Relation</th><th>On</th><th>From</th><th>You may pass it on</th><th></th></tr></thead>
+            <thead><tr><th>What it lets you do</th><th>Given by</th><th>You can give it to your agents</th><th></th></tr></thead>
             <tbody>
               {mine.length ? mine.map((g) => (
                 <tr key={g.id}>
-                  <td className="mono" style={{ color: 'var(--accent)' }}>{g.relation}</td>
-                  <td className="mono">{onText(g)}</td>
+                  <td>{mayText(w, g)}<details><summary>Exactly</summary><span className="mono">{g.relation}</span> on <span className="mono">{onText(g)}</span></details></td>
                   <td className="sec">{g.source ? nameOf(w, w.byId.get(g.source)?.holder ?? g.issuer) : 'root'}</td>
-                  <td>{passesToAgents(g.pass_on) ? <span className="pass">yes, to agents</span> : <span className="dim">no</span>}</td>
+                  <td>{passesToAgents(g.pass_on) ? <span className="pass">yes</span> : <span className="dim">no</span>}</td>
                   <td>
                     {passesToAgents(g.pass_on) && agents.length ? (
                       <button className="btn" data-act="delegate" data-g={g.id} onClick={() => shell.openDrawer(<Delegate w={w} source={g} done={reload} />)}>
@@ -85,7 +84,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
                     ) : null}
                   </td>
                 </tr>
-              )) : <tr><td colSpan={5} className="dim">Nothing yet.</td></tr>}
+              )) : <tr><td colSpan={4} className="dim">Nothing yet.</td></tr>}
             </tbody>
           </table>
           <div className="section-h">

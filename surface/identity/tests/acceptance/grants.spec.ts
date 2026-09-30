@@ -80,7 +80,7 @@ const fresh = () => {
 
 const holdRows = () =>
   [...($$('.grid2 > div:first-child table')[0]?.querySelectorAll('tbody tr') ?? [])].map((tr) =>
-    [...tr.querySelectorAll('td')].map((td) => td.textContent));
+    { const [first, ...rest] = [...tr.querySelectorAll('td')]; return [first.firstChild?.textContent, ...[...first.querySelectorAll('.mono')].map((span) => span.textContent), ...rest.map((td) => td.textContent)]; });
 
 /** The administrator's wider view: both people, and the grants of both. */
 const ADMIN: Record<string, (typeof SERVICE)[string]> = {
@@ -137,8 +137,8 @@ const ROWS: ConformanceRow[] = [
       const { requests } = await mount('#/me');
       expect(requests).toContain('/grants');
       expect(holdRows()).toEqual([
-        ['owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
-        ['viewer', 'project:ledger', 'root', 'no', ''],
+        ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
+        ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
       ]);
     },
   },
