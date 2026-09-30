@@ -291,9 +291,16 @@ pub(crate) fn settled(decided: &Decided, by: PersonId, approved: bool) -> Result
 async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    query: crate::list_page::Input,
 ) -> Result<Json<RequestList>, ServerError> {
     with_grants(&state, |judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+        let page = crate::list_page::Page::read(query, "/requests")?;
+        let members = page
+            .as_ref()
+            .map(|page| page.members(&state))
+            .transpose()?
+            .flatten();
         let at = now();
         with_requests(&state, |store| {
             let mut requests = Vec::new();
@@ -304,7 +311,27 @@ async fn list(
                     requests.push(weighed.view(&judged, caller, asked, decided, held_by)?);
                 }
             }
-            Ok(Json(RequestList { requests }))
+            let totals = if let Some(page) = &page {
+                requests.retain(|request| {
+                    crate::list_page::member(
+                        members.as_ref(),
+                        &request.asked_by,
+                        Some(&request.responsible.id),
+                    ) && page.matches([
+                        request.asked_by_name.as_deref().unwrap_or_default(),
+                        request.relation.as_str(),
+                        request.resource.id.as_str(),
+                        request.why.as_str(),
+                    ])
+                });
+                Some(page.finish(&mut requests, |request| &request.id)?)
+            } else {
+                None
+            };
+            Ok(Json(RequestList {
+                requests,
+                page: totals,
+            }))
         })
     })
 }

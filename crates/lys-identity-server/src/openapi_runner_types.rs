@@ -120,7 +120,12 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<WakeBody>()),
             None,
         ),
-        (GET, "/runtime/live", None, None),
+        (
+            GET,
+            "/runtime/live",
+            Some(api.schema::<crate::list_page::ListQuery>()),
+            None,
+        ),
         (GET, "/network/machines/{id}/runner", None, None),
         (
             POST,

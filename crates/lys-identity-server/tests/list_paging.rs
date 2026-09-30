@@ -16,6 +16,9 @@ mod scale;
 #[path = "support/list_paging_rows.rs"]
 mod agent_rows;
 
+#[path = "support/list_paging_contract.rs"]
+mod contract;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const OTHER: &str = "other-subject";

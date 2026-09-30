@@ -38,7 +38,7 @@ use serde_json::{Value, json};
 use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::provisioning_store::SessionSettings;
-use crate::routes::{AppState, signed_in};
+use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_acts::{Digested, RunnerAct};
 use crate::runner_client::RunnerRecord;
 use crate::runner_sessions::{Driven, driven, ended_in, keep_act, kind, operator, record_end};
@@ -431,8 +431,10 @@ async fn wake(
 async fn live(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    query: crate::list_page::Input,
 ) -> Result<Json<Value>, ServerError> {
     let seen = crate::runtime_api::visible_sessions(&state, &headers)?;
+    let page = crate::list_page::Page::read(query, "/runtime/live")?;
     let mut unanswered = Vec::new();
     for tracked in seen.iter().filter(|tracked| !tracked.stopped()) {
         let driven = match driven(&state, &tracked.session) {
@@ -463,14 +465,58 @@ async fn live(
             }
         }
     }
-    let sessions: Vec<_> = crate::runtime_api::visible_sessions(&state, &headers)?
+    let mut sessions: Vec<_> = crate::runtime_api::visible_sessions(&state, &headers)?
         .iter()
         .filter(|tracked| !tracked.stopped())
         .filter_map(|tracked| crate::runtime_api::view(&state, tracked))
         .collect();
-    Ok(Json(
-        json!({ "sessions": sessions, "unanswered": unanswered }),
-    ))
+    let totals = if let Some(page) = &page {
+        Some(live_page(&state, page, &mut sessions)?)
+    } else {
+        None
+    };
+    if totals.is_some() {
+        unanswered.retain(|unanswered| {
+            sessions
+                .iter()
+                .any(|session| unanswered["session"].as_str() == Some(session.session.as_str()))
+        });
+    }
+    let mut answer = json!({ "sessions": sessions, "unanswered": unanswered });
+    if let Some(totals) = totals {
+        answer["total"] = json!(totals.total);
+        answer["next"] = json!(totals.next);
+    }
+    Ok(Json(answer))
+}
+
+fn live_page(
+    state: &AppState,
+    page: &crate::list_page::Page,
+    sessions: &mut Vec<crate::runtime_api::SessionView>,
+) -> Result<crate::list_page::Totals, ServerError> {
+    let members = page.members(state)?;
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        for session in std::mem::take(sessions) {
+            let agent = session
+                .agent
+                .as_deref()
+                .ok_or(ServerError::RuntimeSessionUnknown)?;
+            let id = agent.parse::<lys_identity::AgentId>()?;
+            let record = projection
+                .record(lys_identity::IdentityId::Agent(id))
+                .ok_or(ServerError::AgentNotVisible)?;
+            let person = record.responsible().map(|person| person.to_string());
+            if crate::list_page::member(members.as_ref(), agent, person.as_deref())
+                && page.matches([record.profile().display_name()])
+            {
+                sessions.push(session);
+            }
+        }
+        Ok(())
+    })?;
+    page.finish(sessions, |session| &session.session)
 }
 
 async fn runner(

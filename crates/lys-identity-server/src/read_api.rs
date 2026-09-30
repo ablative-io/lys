@@ -170,6 +170,7 @@ async fn me(
 async fn own_people(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    query: crate::list_page::Input,
 ) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     with_directory(&state, |directory| {
@@ -177,16 +178,20 @@ async fn own_people(
         let person = own_person(projection, &actor)?;
         let record = person_record(projection, person)?;
         let agents = agents_of(projection, person);
-        Ok(Json(PeopleView {
-            scope: "personal".to_owned(),
-            people: vec![person_view(person, record, agents)],
-        }))
+        people_page(
+            &state,
+            "personal",
+            vec![person_view(person, record, agents)],
+            query,
+            "/people",
+        )
     })
 }
 
 async fn every_person(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    query: crate::list_page::Input,
 ) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
@@ -203,11 +208,50 @@ async fn every_person(
                 IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => None,
             })
             .collect();
-        Ok(Json(PeopleView {
-            scope: "directory".to_owned(),
-            people,
-        }))
+        people_page(&state, "directory", people, query, "/directory/people")
     })
+}
+
+fn people_page(
+    state: &AppState,
+    scope: &str,
+    mut people: Vec<PersonView>,
+    query: crate::list_page::Input,
+    route: &'static str,
+) -> Result<Json<PeopleView>, ServerError> {
+    let page = crate::list_page::Page::read(query, route)?;
+    let (totals, agents_total) = if let Some(page) = page {
+        let members = page.members(state)?;
+        people.retain(|person| {
+            let in_team = crate::list_page::member(members.as_ref(), &person.id, None)
+                || person
+                    .agents
+                    .iter()
+                    .any(|agent| crate::list_page::member(members.as_ref(), &agent.id, None));
+            in_team
+                && page.matches(
+                    std::iter::once(person.display_name.as_str()).chain(
+                        person
+                            .agents
+                            .iter()
+                            .map(|agent| agent.display_name.as_str()),
+                    ),
+                )
+        });
+        let agents_total = people.iter().map(|person| person.agents.len()).sum();
+        (
+            Some(page.finish(&mut people, |person| &person.id)?),
+            Some(agents_total),
+        )
+    } else {
+        (None, None)
+    };
+    Ok(Json(PeopleView {
+        scope: scope.to_owned(),
+        people,
+        page: totals,
+        agents_total,
+    }))
 }
 
 async fn own_agent(
