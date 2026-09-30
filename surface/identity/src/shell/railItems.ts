@@ -8,7 +8,6 @@ export type RailItem =
 export const RAIL: RailItem[] = [
   {"t": "a", "title": "You (g u)", "label": "You", "svg": "<circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20c1-4 3.8-6 7-6s6 2 7 6\"/>", "href": "#/me", "nav": "me", "kbd": "g u"},
   {"t": "a", "title": "People and agents (g p)", "label": "People and agents", "svg": "<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5\"/><circle cx=\"17\" cy=\"9\" r=\"2.4\"/><path d=\"M15.5 14.2c2.3.2 4 1.8 4.6 4.8\"/>", "href": "#/people", "nav": "people", "kbd": "g p"},
-  {"t": "a", "title": "Team (g e)", "label": "Team", "svg": "<circle cx=\"12\" cy=\"5\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"18\" r=\"2\"/><path d=\"M12 7v4M6 16v-3h12v3\"/>", "href": "#/team", "nav": "team", "kbd": "g e"},
   {"t": "a", "title": "Roles (g o)", "label": "Roles", "svg": "<rect x=\"4\" y=\"7\" width=\"16\" height=\"12\" rx=\"2\"/><path d=\"M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7\"/><path d=\"M4 12h16\"/>", "href": "#/roles", "nav": "roles", "kbd": "g o"},
   {"t": "sep"},
   {"t": "a", "title": "Resources (g r)", "label": "Resources", "svg": "<path d=\"M12 3 20 7.5 12 12 4 7.5z\"/><path d=\"M4 12l8 4.5 8-4.5M4 16.5 12 21l8-4.5\"/>", "href": "#/resources", "nav": "resources", "kbd": "g r"},

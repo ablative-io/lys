@@ -1,0 +1,17 @@
+/* The front page: running agents across the top, what waits for you, and your agents as a tree under their teams. */
+.you-quiet { margin: 0; }
+.you-waiting { margin: 0; font-size: 13px; }
+.you-waiting a { color: var(--text-primary); }
+.you-tree td { border-bottom: 0; padding: 0; }
+.you-tree tr[data-href] td { padding: 7px 10px; }
+.you-tree tr[data-href] td:first-child { padding-left: calc(var(--depth, 0) * 18px + 10px); }
+.you-tree tr[data-href]:hover td, .you-tree tr[data-href]:focus-visible td { background: var(--surface-hover); }
+.you-tree tr[data-href] td:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.you-tree tr[data-href] td:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.you-agent .dot { margin-right: 8px; }
+.you-team td { padding: 10px 0 2px calc(var(--depth, 0) * 18px); }
+.you-fold { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.you-fold:hover { color: var(--text-primary); background: var(--surface-hover); }
+.you-chevron { width: 6px; height: 6px; margin: 0 2px 2px 0; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform .12s; }
+.you-fold[aria-expanded="true"] .you-chevron { transform: rotate(45deg); }
+.you-count { font-weight: 400; color: var(--text-muted); }

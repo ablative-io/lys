@@ -22,7 +22,6 @@ td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-spa
 tbody tr[data-href] { cursor: pointer; }
 tbody tr:hover td { background: rgba(255,255,255,.02); }
 tbody tr.cursor td { background: rgba(212,151,90,.07); }
-tbody tr.cursor td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .dim { color: var(--text-muted); }
 .sec { color: var(--text-secondary); }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
