@@ -404,7 +404,7 @@ fn accounts_move_under_one_handle_and_refuse_when_all_rest() -> TestResult {
         )?,
         b"value-two"
     );
-    assert_eq!(refusal(broker.next_account("token")), "NoAccountAvailable");
+    assert_eq!(refusal(broker.next_account("token")), "AccountsRested");
     assert_eq!(
         value(
             &mut broker,

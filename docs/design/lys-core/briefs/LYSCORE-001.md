@@ -2,17 +2,12 @@
 type: brief
 id: LYSCORE-001
 cluster: lys-core
-title: Give lys an ast-grep gate leg with the rule set it can carry, and bring the tree to zero hits
+title: Carry the hand-written lys-core design into its three JSON documents
 ---
 
-# LYSCORE-001: Give lys an ast-grep gate leg with the rule set it can carry, and bring the tree to zero hits
+# LYSCORE-001: Carry the hand-written lys-core design into its three JSON documents
 
 > **Cluster:** lys-core
-> **Blocked by:** HOME-013 (roadmap RM-028, brief branch brief/home/a3186728), the split of crates/lys-home/src/record/mod.rs, must land on origin/main first: the leg lands only when R9's count command prints 0 for that file on origin/main., ast-grep installed at the gate place, at 0.44.1 as this brief was measured with, so a leg requiring tool:ast-grep can be placed.
-> **Design anchor:**
-> - ADR-009 — People sign in through a maintained Rauthy fork of our own — Rauthy authenticates people, and its one-provider-per-user limit is changed in a fork we maintain, ablative-io/rauthy, not contributed upstream as a prerequisite. The maintained branch is ablative, created from upstream v0.36.2 commit dd61ac3c84d6b238108dc8438b53043b5177a662; the fork's main stays an untouched upstream mirror; lys pins an exact commit of ablative as the submodule vendor/rauthy. Upgrades rebase ablative onto upstream release tags only, each in its own gated row; no cherry-picks and no reset of main.
-> - ADR-054 — lys recognises test code by structure the file carries, for ast-grep and clippy alike — Test code is a file whose first line is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a path under a crate's tests/ directory; every file only ever compiled as a test carries the first-line marker, and clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests replace the per-module #![allow]. Rejected: an exemption list of file names in the rule, and rewriting the test helpers' calls.
-> - ADR-055 — Cambium's ast-grep rules are carried into lys only where they can fire — lys carries mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes, and records no-std-mutex-in-async, no-timer-in-door-handlers and no-timer-import-in-door-handlers as not carried with the finding that they cannot fire; the _name rule is its own card. Rejected: copying all six rules, which would look like cover the scan cannot give.
 > **Checklist:**
 > - C1 — DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md under docs/design/lys-core are byte-identical to DESIGN.md, CHECKLIST.md and USER-STORIES.md at 7b53625.
 > - C2 — DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md under docs/design/lys-core are what render-cluster.py renders, and sh scripts/design/gate.sh exits 0.
@@ -37,6 +32,48 @@ title: Give lys an ast-grep gate leg with the rule set it can carry, and bring t
 > - C21 — `ast-grep scan --config sgconfig.yml` reports zero hits and exits 0 at the landed commit.
 > - C22 — A never-landed scratch file with an unwrap and no #![cfg(test)] makes .land/gates.sh show the ast-grep leg red and every other leg green.
 > - C23 — The leg lands only after origin/main's crates/lys-home/src/record/mod.rs has zero non-module lines, checked by command.
+> - C24 — `LYS_OID_ARC` constant equals [1, 3, 6, 1, 4, 1, 66364] with a doc comment stating that 66364 is the IANA Private Enterprise Number assigned to lys and that the arc is permanent
+> - C25 — encode_extension / decode_extension round-trip an arbitrary DER payload under LYS_OID_ARC; decode of a cert without the extension returns Ok(None)
+> - C26 — Round-trip test: rcgen-generated Ed25519 keypair is loadable as ed25519-dalek SigningKey/VerifyingKey
+> - C27 — AppendOnlyTree<L> generic over leaf type L: Serialize; append(leaf) returns the new tree size
+> - C28 — No delete or modify operation exists on the tree — append-only enforced by API
+> - C29 — root() returns the current RootHash; the empty tree produces a deterministic empty root hash
+> - C30 — prove_inclusion(leaf_index) pre-checks bounds and returns TrustError::MerkleTree on out-of-range index — no panic path into the backing library
+> - C31 — prove_consistency(old_size, new_size) pre-checks the size pair (old ≤ new, new ≤ len, old ≥ 1) and returns TrustError::MerkleTree on violation
+> - C32 — verify_inclusion(root_hash, leaf, index, proof) and verify_consistency(old_root, new_root, proof) return Result; tampered proofs and mismatched roots fail
+> - C33 — RootHash::from_parts(root_hash, num_leaves) and to_parts() round-trip; from_parts requires no tree access
+> - C34 — InclusionProof and ConsistencyProof round-trip through as_bytes() / try_from_bytes()
+> - C35 — External-verifier round-trip test exists: a verifier holding only published root parts and proof bytes (never the tree) verifies inclusion and consistency
+> - C36 — reconstruct_from_leaves(leaves) rebuilds a tree with a root hash identical to the original (test exists)
+> - C37 — merkle module docs state the frozen-wire-contract rule: leaf encodings are canonical bytes, evolved only by introducing a new versioned leaf type
+> - C38 — sign_attestation(payload, signing_key) signs the COSE `Sig_structure` `["Signature1", protected, h'', claims]` (RFC 9052 §4.4) with protected `{1: -8, 3: "application/vnd.lys.attestation.v2+cbor", 4: signer key}` — no meridian string, no v1 preimage constant remains anywhere
+> - C39 — Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 } carries no serde; the only durable form is `to_cose_bytes()` / `from_cose_bytes()` (canonical-encoding-strict)
+> - C40 — verify_attestation(attestation, payload) rebuilds the `Sig_structure` from the attestation's own fields and verifies with `verify_strict`
+> - C41 — No legacy fallback exists: a signature over the bare payload hash and a signature over the deleted v1 preimage both fail verify_attestation (tests exist)
+> - C42 — Tampered payload fails verify_attestation
+> - C43 — Tampered timestamp fails verify_attestation — the timestamp is a signed claim inside the `Sig_structure` (test exists)
+> - C44 — seal(payload, recipient_public_key) returns SealedEnvelope { ephemeral_public_key, ciphertext, nonce } using a fresh ephemeral X25519 keypair per call (two seals of the same payload to the same recipient differ)
+> - C45 — HKDF-SHA256 info input is `b"lys-sealed-envelope/v1" || ephemeral_public_key || recipient_public_key` — the hyphen-form HKDF domain tag, deliberately distinct from the slash-form attestation context tag `lys/sealed-envelope/v1`
+> - C46 — Both seal and open reject non-contributory Diffie-Hellman: a low-order public key fails via `was_contributory` before any key derivation (test exists)
+> - C47 — Seal/open roundtrip succeeds: sealed with the recipient's X25519 public key, opened with the recipient's static secret
+> - C48 — Wrong private key, tampered ciphertext, and tampered nonce all return exactly TrustError::UnsealFailed — a single undifferentiated failure through the AES-GCM arbiter, with no early return distinguishing causes
+> - C49 — SealedEnvelope::attestation_bytes() covers every wire byte of the envelope (ephemeral key, nonce, ciphertext)
+> - C50 — sign_and_seal(payload, sender_identity, recipient_x25519_public_key) returns (SealedEnvelope, Attestation) where the attestation signs attestation_bytes()
+> - C51 — open_and_verify verifies the attestation before any decryption: an invalid sender signature is rejected without the cipher being touched, and a valid signature over a tampered envelope also fails (tests exist)
+> - C52 — `lys` binary crate exists; main.rs is a thin entry (parse, dispatch, exit codes) with clap definitions isolated in cli.rs; no `anyhow` anywhere — the CLI carries its own thiserror type
+> - C53 — `lys key` generates an identity at a path and inspects one (public key, fingerprint); no subcommand, flag, or output format prints private key material (test asserts output contains no seed bytes in any encoding)
+> - C54 — `lys ca issue` issues a certificate signed by an issuer identity file, embedding a caller-supplied capability-claim payload as a LYS_OID_ARC extension, and writes the PEM out
+> - C55 — `lys ca verify` verifies a certificate against an issuer public key, and accepts an explicit verification instant flag routing to verify_certificate_chain_at
+> - C56 — `lys attest` signs a payload file and emits the COSE_Sign1 artifact; `lys verify` checks an artifact against a payload and reports success/failure via exit code. (File paths only as built — the stdin path this item originally anticipated was not implemented, and ROADMAP Phase 2 records the file-only surface.)
+> - C57 — `lys seal` seals a payload file for a recipient public key and writes the sender attestation alongside it; `lys open` opens it with the recipient identity, verifying the attestation first; the pair round-trips
+> - C58 — `lys log init` pins the log's origin exactly once and refuses to re-initialize; `lys log append` appends a leaf file's raw bytes and prints the new root; `lys log checkpoint` signs a C2SP tlog-checkpoint in the signed-note envelope over the current root; `lys log prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded verbatim
+> - C59 — `lys log verify` verifies an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the leaf sequence, the store, or the tree; declared sizes are checked against the signature-verified checkpoint and roots are recomputed, never trusted; every tamper class collapses to one identical message
+> - C60 — Cross-process CLI test exists: a log produced by one process is verified end-to-end by the CLI in another process with no access to the original tree
+> - C61 — cargo fmt --check passes clean *(gate — verified by CI, not from source)*
+> - C62 — cargo clippy --all-targets -- -D warnings passes clean *(gate — verified by CI, not from source)*
+> - C63 — cargo test --workspace passes green *(gate — verified by CI, not from source)*
+> - C64 — No file exceeds 500 lines of code; every mod.rs carries only pub mod / pub use / module docs; tests live in sibling *_tests.rs files *(not met: `merkle/leaf.rs`, both `seal/` files, `error.rs`, and six CLI modules carry inline `mod tests` — REVIEW-23-07.md F12)*
+> - C65 — lys-core builds standalone with zero meridian-* dependencies in its Cargo.toml and Cargo.lock
 > **Stories:**
 > - S1 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want the gate to refuse unwrap, expect and panic in library code so that a panic path cannot land where clippy is silenced.
 > - S2 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want a lint bypass attribute refused at landing so that a lint is fixed at its cause instead of hidden.
@@ -48,420 +85,264 @@ title: Give lys an ast-grep gate leg with the rule set it can carry, and bring t
 > - S8 (Lys contributor, Writing tests and library code) — As a lys contributor reading a module tree, I want mod.rs files to hold only declarations and re-exports so that logic is found in a named file.
 > - S9 (Lys contributor, Writing tests and library code) — As a lys contributor, I want no `let _ =` discard in the tree so that no error is swallowed without a decision.
 > - S10 (Design reader, Reading the lys-core cluster) — As a reader of the lys-core design, I want the hand-written pre-method documents kept beside the rendered cluster so that the earlier design is not lost when the method's documents replace it.
+> - S11 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit.
+> - S12 (Lys CLI, Operator and Auditor) — As an operator, I want `lys attest` to sign a file or stdin so that I can hand a third party a detached, self-contained attestation over any artifact.
+> - S13 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys verify` to check an attestation with only the payload and the signer's public key so that verification requires nothing from the party who produced the record.
+> - S14 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys log verify` to prove inclusion from only a published root and proof bytes so that I can confirm a challenged entry was logged without the operator's cooperation and without seeing any other entry.
+> - S15 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys log verify` to check consistency between two published roots so that I can detect any rewrite of history between two points in time.
+> - S16 (Lys CLI, Operator and Auditor) — As an operator, I want `lys seal` and `lys open` so that I can move a credential file to a specific recipient with per-envelope forward secrecy instead of pasting secrets into a chat.
+> - S17 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to reconstruct submitted roots via `RootHash::from_parts` so that I can verify consistency proofs between an instance's successive submissions while seeing only roots, never contents.
+> - S18 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to verify the submitter's v1 domain-separated attestation over each submitted root so that only the holder of the registered instance key can extend that instance's anchored history.
+> - S19 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to append anchored roots to my own `AppendOnlyTree` and serve inclusion proofs so that my receipt for an anchoring event is itself independently verifiable.
+> - S20 (Lys-Anchor Service, (future notary)) — As the anchor service, I want the wire tags and preimage layouts frozen at `v1` so that a receipt issued today still verifies against signatures produced years from now.
+> - S21 (Haematite, Commit Attestation) — As haematite, I want to attest a BLAKE3 commit root — 32 opaque bytes signed with the instance identity — so that a whole database state becomes attestable without lys knowing anything about haematite's hash world.
+> - S22 (Haematite, Commit Attestation) — As haematite, I want to append commit attestations to an append-only log so that my flat timestamped commit list gains the hash-chained lineage it structurally lacks.
+> - S23 (Haematite, Commit Attestation) — As haematite, I want inclusion proofs over the commit log so that any party can verify a historical commit belongs to the canonical lineage without replaying the database.
 
 ## Purpose
 
-lys holds itself to rules its gate does not enforce: no unwrap, expect or panic outside tests, no lint bypass, no logic in mod.rs, no `let _ =` discard. This brief gives the gate an ast-grep leg, carries the Cambium rules that can fire on lys, adds the one rule Cambium relies on clippy for, and brings the tree to zero hits by fixing causes, so the leg can land green and refuse the next hit on every path to main (see the design's solution, ADR-054 and ADR-055).
+The lys-core design on main is three hand-written documents, DESIGN.md, CHECKLIST.md and USER-STORIES.md, with no JSON sources. The design gate renders every cluster that has a design.json and compares the render with the committed markdown, so the first lys-core brief to add a design.json would replace the hand-written documents with whatever that JSON holds and the older design would leave the record. This brief carries the whole hand-written design into design.json, checklist.json and stories.json first, so that the render reproduces it: every C id and text, every S id and text, and every section of DESIGN.md in the field the design schema gives it. Nothing new is designed and no code changes.
 
 ## Task
 
-Start from a clean clone of the lys repository at the commit this brief lands at, never a shared folder; two earlier runs collided on shared state. The brief's own commit already carries the rename of the three hand-written lys-core documents to *-PRE-METHOD.md and the rendered DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md, so the design leg is green when the brief lands. In order: check that the kept and rendered cluster documents still hold (R1); add sgconfig.yml and the four rules (R2); add clippy.toml and the #![cfg(test)] first line to the 90 src test files (R3) and the 30 files under tests/ (R4), removing all 106 #![allow] test opt-outs; replace the env mutation in lys-core's identity tests with a seam and correct the lib.rs comment (R5); move the mod.rs logic into named files (R6); fix the `let _ =` discards (R7); correct CLAUDE.md and Cargo.toml (R8); and wire the leg into project.json, .land/gates.sh and CI (R9). Heavy builds and full gates run at the gate place; only a single crate's clippy or tests runs where the work is written.
+Carry main's docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md at 7b536253 into docs/design/lys-core/design.json, checklist.json and stories.json (R1 to R3), render the cluster with python3 scripts/design/render-cluster.py docs/design/lys-core, commit the rendered DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md from that render (R4), and pass sh scripts/design/gate.sh. Every path is relative to the repository root.
 
-Corrections to the words' sentences. The words list no unwrap, expect or panic outside tests, no #[allow], no _name renames and no #[ignore] as rules the estate holds and ask for the same rule set Cambium carries. Measured at Cambium 1be80d8ec, Cambium carries six rules and none for unwrap, expect or panic (it relies on clippy) and none for _name bindings. So the rule set carried is three of Cambium's six (mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes, the last covering #[allow] and #[ignore]) plus a structural unwrap/expect/panic rule of lys's own; the _name rule is not carried and is its own card; no-std-mutex-in-async and the two door-timer rules are not carried because they cannot fire on lys. The 22 fixture calls and the helper calls in the sibling test files are not hits because their files carry #![cfg(test)], and none of them is rewritten.
+The three JSON documents are written on the brief branch with this brief, as the method writes a cluster's design beside its first brief. The build starts from them: it runs the measurements in R1 to R3 against main's bytes at 7b536253, corrects any carried text the measurements show differs from main so that it matches main exactly, and renders. Write each JSON document with json.dumps(doc, indent=2, ensure_ascii=False) and one trailing newline, so an en dash stays an en dash and a backtick stays a backtick.
 
-Counts measured at 7b53625, which this brief follows where a ruling's count differs: 88 sibling *_tests.rs under src/ plus the 4 *_tests.rs roots of crates/lys make the 92 *_tests.rs files; 28 integration roots and 2 harness modules under tests/ (26 of them carrying #![allow], where the ruling counted 22); 106 #![allow] test opt-outs and 7 #[allow(unsafe_code)]; 224 unwrap/expect/panic calls outside the structural test markers before the markers, 0 in library code, 0 after them.
+What is carried, and where. Nothing is reworded, merged, dropped, renumbered or reordered, and stale text is carried as it stands (S12's stdin, S14's root parts, and the structure tree's missing delegation/, receipt/, bundle/, ca/request.rs and keys/ssh.rs are corrected by a later unit, not here). The constraints take ids CN1 to CN9 in main's order because the schema requires an id; the goals render as bullets in main's order because the renderer writes goals that way; the fenced structure tree becomes one structure row per entry, 75 rows (73 entries under the two roots crates/lys-core/ and crates/lys/, and the two roots), with each path spelled as the tree spells it (directory entries keep their trailing slash, *_tests.rs globs stay globs), continuation lines joined into the note with one space, and every brief field empty because every one of those paths exists on main; the D1 to D8 subsections stay inside the solution text, not in decisions, because they are not ledger ADRs.
 
-The kept CHECKLIST-PRE-METHOD.md's C4 says the env-backed tests call set_var under an explicit #[allow]; after R5 the code no longer bears that sentence out, and the kept file is not corrected. The rendered CHECKLIST.md is the current truth. The pre-method C-numbers and this cluster's C-numbers are different lists; this brief's C-numbers are the rendered checklist's.
+Sentences with no field of their own, named: (a) the paragraph under main's structure tree that begins 'Tests live in sibling' has no field after a structure table, so it goes into the solution text, as its own paragraph after the last D8 paragraph; (b) CHECKLIST.md's three-paragraph intro blockquote and its two italic annotations, the one above C38 that covers C38 to C43 and the one above C58 that covers C58 to C59, have no field in checklist.json, so they go into design.json as one section at the end of the solution text headed '### Checklist notes', carried verbatim, each annotation opening with the ids it covers as main's does; they do not go into any checklist section name, and the eight checklist headings stay exactly as main has them; (c) three persona headings have no ' — ' between a name and a role, and the renderer always writes one, so each is split into name and role at the point given in R2. The dev record says each of these, where it went, and why.
 
-Out of scope, each its own unit: the _name rule, no-std-mutex-in-async, tightening the unsafe attribute so tests forbid unsafe code too, and the record/mod.rs split.
+Differences the render makes against main, which the R3 dev record lists by name with its reason. Layout: the frontmatter title loses its quotes; the renderer adds the '> **Cluster:** lys-core' line under the heading; the 'Tests live in sibling' paragraph moves from under the structure tree to the end of the D8 text; goals change from '1.' to '6.' numbering to bullets; the structure tree becomes a Path, Note, Brief table; each constraint gains its '**CNn** —' prefix. Content, the two the card's lead allows: the '### Checklist notes' section in the solution (carrying (b) above, so the rendered DESIGN.md holds it and the rendered CHECKLIST.md does not), and the eight structure rows for the cluster's own documents and this brief's own files, listed as the directory cluster lists its own, so that check-coverage.py passes and R1 to R4 name real files. Every other difference between the rendered DESIGN.md and main's is layout only. The dev record also lists the rendered CHECKLIST.md's eleven missing lines and the rendered USER-STORIES.md's three changed headings.
+
+Coverage. This brief claims C1 to C65 and S1 to S23 because check-coverage.py fails every checklist item and story that no brief in the cluster claims. It carries them; it did not build them. The done flags record main's ticks unchanged: C1 to C60 and C65 true, C61 to C64 false. The later lys-core card that waits on this one adds its own brief, items and stories after the carried ones; none of them is added here.
+
+Out of scope: any new checklist item, user story, principle, ADR, goal, non-goal or constraint; any change to code, to crates/, to scripts/design/ (renderer, validator, schemas) or to any other cluster; a note field for checklists and personas in the method's renderer and schemas.
 
 ## Requirements
 
-### R1: Check that the kept *-PRE-METHOD.md documents and the rendered cluster hold on the card's tree
+### R1: Carry CHECKLIST.md into checklist.json and render it
 
-Structural. The brief's own commit renamed docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and carries DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md as scripts/design/render-cluster.py renders them from the cluster's JSON. This requirement checks that this state holds on the card's tree; it performs no rename and no render of its own. The kept files are the historical record and are not edited: CHECKLIST-PRE-METHOD.md's C4 says the env-backed tests call std::env::set_var under an explicit #[allow], which the code no longer bears out after R5, and the rendered CHECKLIST.md is the current truth. THE SYSTEM SHALL NOT edit a *-PRE-METHOD.md file, SHALL NOT hand-edit a rendered markdown file, and SHALL NOT write under any docs/design directory other than lys-core and docs/design/project.json.
+docs/design/lys-core/checklist.json holds cluster 'lys-core' and main's eight CHECKLIST.md sections at 7b536253, each named exactly as main names it and in main's order: Crate Setup, Key Management, Certificate Authority, Merkle Transparency Log, Signed Attestations, Sealed Envelope, CLI Surface, Integration Verification. Each of main's item lines '- [x] **Cn** — text' and '- [ ] **Cn** — text' becomes one item {id, text, done} in its section and in main's order, where text is every character after the first ' — ' byte for byte (C61 to C64 keep their italic tails inside the text) and done is true for '[x]' and false for '[ ]'. The document SHALL NOT reword, merge, drop, renumber, reorder or add any item, SHALL NOT change any section name, and SHALL NOT hold the intro blockquote and the two italic annotations in any section name or item text. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/CHECKLIST.md whose eight headings and 65 item lines equal main's byte for byte, and SHALL NOT write any line main's CHECKLIST.md does not hold.
 
 **Acceptance:**
-- `git show 7b53625:docs/design/lys-core/DESIGN.md | cmp - docs/design/lys-core/DESIGN-PRE-METHOD.md` exits 0.
-- `git show 7b53625:docs/design/lys-core/CHECKLIST.md | cmp - docs/design/lys-core/CHECKLIST-PRE-METHOD.md` exits 0.
-- `git show 7b53625:docs/design/lys-core/USER-STORIES.md | cmp - docs/design/lys-core/USER-STORIES-PRE-METHOD.md` exits 0.
-- `test -f docs/design/lys-core/briefs/LYSCORE-001.md` exits 0.
-- `sh scripts/design/gate.sh` exits 0 and prints no line containing `rendered markdown differs`.
-- `git diff --name-only origin/main...HEAD -- docs/design | grep -v '^docs/design/lys-core/' | grep -vx 'docs/design/project.json'` prints nothing.
+- From the repository root: python3 -c "import json; d=json.load(open('docs/design/lys-core/checklist.json')); ids=[i['id'] for s in d['sections'] for i in s['items']]; print(len(ids), len(set(ids)), ids==['C%d' % n for n in range(1, 66)])" prints 65 65 True.
+- From the repository root: python3 -c "import json; d=json.load(open('docs/design/lys-core/checklist.json')); print([i['id'] for s in d['sections'] for i in s['items'] if not i['done']])" prints ['C61', 'C62', 'C63', 'C64'].
+- From the repository root: python3 -c "import json; print([s['name'] for s in json.load(open('docs/design/lys-core/checklist.json'))['sections']])" prints ['Crate Setup', 'Key Management', 'Certificate Authority', 'Merkle Transparency Log', 'Signed Attestations', 'Sealed Envelope', 'CLI Surface', 'Integration Verification'].
+- From the repository root: the C and S text comparison in this brief's verification prints 'compared 88 differences 0' as its last line.
+- From the repository root: git show 7b536253:docs/design/lys-core/CHECKLIST.md | diff - docs/design/lys-core/CHECKLIST.md | grep -c '^<' prints 11 (the five intro blockquote lines, their following blank line, and the two annotations with their three blank lines), and the same pipeline with grep -c '^>' prints 0.
+
+**Files:**
+- modify: docs/design/lys-core/checklist.json
+- modify: docs/design/lys-core/CHECKLIST.md
 
 **Checklist:**
 - C1 — DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md under docs/design/lys-core are byte-identical to DESIGN.md, CHECKLIST.md and USER-STORIES.md at 7b53625.
 - C2 — DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md under docs/design/lys-core are what render-cluster.py renders, and sh scripts/design/gate.sh exits 0.
-
-**Stories:**
-- S10 (Design reader, Reading the lys-core cluster) — As a reader of the lys-core design, I want the hand-written pre-method documents kept beside the rendered cluster so that the earlier design is not lost when the method's documents replace it.
-
-### R2: Add sgconfig.yml and rules/ast-grep with the three carried Cambium rules and the structural unwrap/expect/panic rule
-
-Structural. sgconfig.yml at the repository root reads `ruleDirs:` with the one entry `rules/ast-grep`, as Cambium's does. In this requirement's acceptance, `$cambium` is the path of a local clone of the Cambium repository in which commit 1be80d8ec is present, set by whoever takes the measurement; `git -C $cambium cat-file -e 1be80d8ec` exits 0 in it. rules/ast-grep holds exactly four rules. mod-rs-declarations-only.yml, no-let-underscore-on-results.yml and no-lint-bypass-attributes.yml are Cambium's files at 1be80d8ec with one addition each: an `ignores` list holding `vendor/**`. no-unwrap-expect-panic-outside-tests.yml (severity error, language rust) matches `$RECV.unwrap()`, `$RECV.expect($$$ARGS)` and `panic!($$$ARGS)`, and does not report a match that sits in test code, which is: inside a source file whose first child is `#![cfg(test)]`; inside a mod item preceded by `#[cfg(test)]`; inside a function item preceded by `#[test]`, other attributes and comments between them allowed; and any file under `crates/*/tests/`, written as an `ignores` entry beside `vendor/**`. WHEN code outside those four structures calls unwrap, expect or panic, THE SYSTEM SHALL report it as an error-severity hit. THE SYSTEM SHALL NOT name a file or a list of file names in any rule, SHALL NOT recognise test code by a file's name, SHALL NOT scan vendor/, SHALL NOT edit vendor/rauthy, and SHALL NOT edit Cambium's rules or config. Recorded as not carried, each with its finding: no-std-mutex-in-async, because lys has no async fn, no tokio entry and no std Mutex at 7b53625, so it could not fire and would only look like cover; the card that lands lys's first async code carries it and its brief names this ruling. no-timer-in-door-handlers and no-timer-import-in-door-handlers, for the same reason: lys has no door handlers. The _name rule, because Cambium carries none, so the same rule set does not include it: the ruling counts 272 underscore-prefixed bindings at 7b53625 (not reproduced here: an ast-grep count of identifiers beginning with an underscore finds 303, and a grep for `let _x` and `_x:` finds 37), and a card of its own writes the rule and handles each binding by its act. #[ignore] is caught by the carried no-lint-bypass-attributes.
-
-**Acceptance:**
-- `cat sgconfig.yml` prints exactly the two lines `ruleDirs:` and `  - rules/ast-grep`.
-- `ls rules/ast-grep` prints exactly mod-rs-declarations-only.yml, no-let-underscore-on-results.yml, no-lint-bypass-attributes.yml and no-unwrap-expect-panic-outside-tests.yml.
-- `git -C $cambium cat-file -e 1be80d8ec` exits 0, before either acceptance line that reads from $cambium is taken.
-- For each of the three carried rules, deleting its `ignores:` line and its `  - "vendor/**"` line leaves a file byte-identical to `git -C $cambium show 1be80d8ec:rules/ast-grep/<name>.yml`.
-- `grep -c 'vendor/\*\*' rules/ast-grep/*.yml` prints 1 for each of the four files.
-- A scratch file crates/lys-core/src/scratch_markers.rs holding the 14 lines `pub fn a(x: Option<u8>) -> u8 { x.unwrap() }`, `pub fn b(x: Option<u8>) -> u8 { x.expect("b") }`, `pub fn c() { panic!("c") }`, `#[cfg(test)]`, `mod t { fn h(x: Option<u8>) -> u8 { x.unwrap() } }`, `#[test]`, `fn tt() { None::<u8>.unwrap(); }`, `#[cfg(unix)]`, `#[test]`, `// comment`, `fn tt2() { None::<u8>.unwrap(); }`, `#[cfg(not(test))]`, `mod n { fn h(x: Option<u8>) -> u8 { x.unwrap() } }`, `fn not_test_fn() { None::<u8>.expect("x"); }` gives exactly 5 no-unwrap-expect-panic-outside-tests hits from `ast-grep scan --config sgconfig.yml --json=stream crates/lys-core/src/scratch_markers.rs`, at lines 1, 2, 3, 13 and 14; the file is deleted after.
-- A scratch file crates/lys-core/src/scratch_first.rs whose two lines are `#![cfg(test)]` and `pub fn a(x: Option<u8>) -> u8 { x.unwrap() }` gives 0 hits from the same scan; the file is deleted after.
-- A scratch file crates/lys-core/src/scratch_second.rs whose three lines are `//! doc`, `#![cfg(test)]` and `pub fn a(x: Option<u8>) -> u8 { x.unwrap() }` gives exactly 1 hit, at line 3; the file is deleted after.
-- A scratch file crates/lys-core/tests/scratch_path.rs whose one line is `fn h(x: Option<u8>) -> u8 { x.unwrap() }` gives 0 hits from `ast-grep scan --config sgconfig.yml --json=stream`; the file is deleted after.
-- A scratch file vendor/scratch_vendor.rs whose one line is `pub fn a(x: Option<u8>) -> u8 { x.unwrap() }` gives 0 hits from `ast-grep scan --config sgconfig.yml --json=stream`; the file is deleted after.
-- `git -C $cambium status --porcelain rules sgconfig.yml clippy.toml` prints nothing.
-
-**Files:**
-- create: sgconfig.yml
-- create: rules/ast-grep/mod-rs-declarations-only.yml
-- create: rules/ast-grep/no-let-underscore-on-results.yml
-- create: rules/ast-grep/no-lint-bypass-attributes.yml
-- create: rules/ast-grep/no-unwrap-expect-panic-outside-tests.yml
-
-**Checklist:**
 - C3 — sgconfig.yml at the repository root names rules/ast-grep as its only rule directory.
 - C4 — rules/ast-grep carries mod-rs-declarations-only, no-let-underscore-on-results and no-lint-bypass-attributes with the rule bodies Cambium carries at 1be80d8ec.
 - C5 — rules/ast-grep carries the error-severity rule no-unwrap-expect-panic-outside-tests, which reports unwrap, expect and panic outside test code recognised by structure.
 - C6 — Every rule in rules/ast-grep ignores vendor/**.
 - C7 — The brief records no-std-mutex-in-async, no-timer-in-door-handlers, no-timer-import-in-door-handlers and the _name rule as not carried, each with its finding.
-
-**Stories:**
-- S1 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want the gate to refuse unwrap, expect and panic in library code so that a panic path cannot land where clippy is silenced.
-- S2 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want a lint bypass attribute refused at landing so that a lint is fixed at its cause instead of hidden.
-- S4 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want every rule shown to fire on a scratch case so that a silent scan means clean code rather than a rule that never matches.
-
-### R3: Add clippy.toml's test allowances and mark the fixtures and sibling test files with #![cfg(test)]
-
-Structural. clippy.toml at the repository root sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true and nothing else. Each of the 2 fixture.rs files and the 88 sibling *_tests.rs files under crates/*/src gains `#![cfg(test)]` as its first line, and the 80 of them that carry `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` lose that line. The outer #[cfg(test)] on each parent's `mod x;` declaration stays: measured with clippy 0.1.97, the pair trips no lint. THE SYSTEM SHALL NOT rewrite any unwrap, expect or panic call in these files, SHALL NOT put any #[allow], #![allow] or #[expect] in place of a removed line, and SHALL NOT change what any of these files declares.
-
-**Acceptance:**
-- `cat clippy.toml` prints exactly the three lines `allow-unwrap-in-tests = true`, `allow-expect-in-tests = true` and `allow-panic-in-tests = true`.
-- `for f in $(find crates -name '*_tests.rs' -path '*/src/*') crates/lys-anchor/src/upward/fixture.rs crates/lys-anchor/src/witness/fixture.rs; do head -1 "$f"; done | sort | uniq -c` prints exactly `  90 #![cfg(test)]`.
-- `grep -l '#!\[allow' $(find crates -name '*_tests.rs' -path '*/src/*') crates/lys-anchor/src/upward/fixture.rs crates/lys-anchor/src/witness/fixture.rs` prints nothing.
-- For each of these 90 files, `grep -oE '\.unwrap\(\)|\.expect\(|panic!\(' <file> | wc -l` at HEAD is not below the same count at origin/main.
-- `ast-grep scan --config sgconfig.yml --filter no-unwrap-expect-panic-outside-tests --json=stream | wc -l` prints 0.
-- `cargo clippy -p lys-anchor --all-targets --all-features -- -D warnings` exits 0.
-
-**Files:**
-- create: clippy.toml
-- modify: crates/lys-anchor-cli/src/cli_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/anchor/open_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/anchor/policy_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/error_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/hex_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/output_tests.rs
-- modify: crates/lys-anchor/src/admission/certificate_tests.rs
-- modify: crates/lys-anchor/src/admission/context_tests.rs
-- modify: crates/lys-anchor/src/admission/trivial_tests.rs
-- modify: crates/lys-anchor/src/anchor/append_tests.rs
-- modify: crates/lys-anchor/src/anchor/artifact_tests.rs
-- modify: crates/lys-anchor/src/anchor/checkpoint_tests.rs
-- modify: crates/lys-anchor/src/anchor/genesis_tests.rs
-- modify: crates/lys-anchor/src/anchor/open_tests.rs
-- modify: crates/lys-anchor/src/anchor/proof_nodes_tests.rs
-- modify: crates/lys-anchor/src/anchor/read_only_tests.rs
-- modify: crates/lys-anchor/src/anchor/status_tests.rs
-- modify: crates/lys-anchor/src/anchor/submit_tests.rs
-- modify: crates/lys-anchor/src/keys/file_signer_tests.rs
-- modify: crates/lys-anchor/src/upward/bundle_tests.rs
-- modify: crates/lys-anchor/src/upward/pin_tests.rs
-- modify: crates/lys-anchor/src/witness/observe_tests.rs
-- modify: crates/lys-anchor/src/witness/projection_tests.rs
-- modify: crates/lys-core/src/attestation/artifact_tests.rs
-- modify: crates/lys-core/src/attestation/encoding_tests.rs
-- modify: crates/lys-core/src/attestation/sign_tests.rs
-- modify: crates/lys-core/src/bundle/verify_tests.rs
-- modify: crates/lys-core/src/ca/authority_tests.rs
-- modify: crates/lys-core/src/ca/certificate_tests.rs
-- modify: crates/lys-core/src/ca/extensions_tests.rs
-- modify: crates/lys-core/src/ca/request_tests.rs
-- modify: crates/lys-core/src/cbor_tests.rs
-- modify: crates/lys-core/src/checkpoint/body_tests.rs
-- modify: crates/lys-core/src/checkpoint/note_tests.rs
-- modify: crates/lys-core/src/checkpoint/verifier_key_tests.rs
-- modify: crates/lys-core/src/delegation/artifact_tests.rs
-- modify: crates/lys-core/src/delegation/encoding_tests.rs
-- modify: crates/lys-core/src/delegation/sign_tests.rs
-- modify: crates/lys-core/src/error_tests.rs
-- modify: crates/lys-core/src/keys/compare_tests.rs
-- modify: crates/lys-core/src/keys/identity_tests.rs
-- modify: crates/lys-core/src/keys/ssh_tests.rs
-- modify: crates/lys-core/src/merkle/consistency_tests.rs
-- modify: crates/lys-core/src/merkle/leaf_tests.rs
-- modify: crates/lys-core/src/merkle/proof_tests.rs
-- modify: crates/lys-core/src/merkle/reconstruct_tests.rs
-- modify: crates/lys-core/src/merkle/tree_tests.rs
-- modify: crates/lys-core/src/receipt/artifact_tests.rs
-- modify: crates/lys-core/src/receipt/consistency_tests.rs
-- modify: crates/lys-core/src/receipt/encoding_tests.rs
-- modify: crates/lys-core/src/receipt/sign_tests.rs
-- modify: crates/lys-core/src/seal/authenticated_tests.rs
-- modify: crates/lys-core/src/seal/sealed_envelope_tests.rs
-- modify: crates/lys-core/src/tlog/artifact_tests.rs
-- modify: crates/lys-core/src/tlog/build_tests.rs
-- modify: crates/lys-core/src/tlog/verify_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/events_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/given_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/import_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/paths_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/render_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/seed_tests.rs
-- modify: crates/lys-home/src/harness/claude_code/template_tests.rs
-- modify: crates/lys-home/src/record/beside_tests.rs
-- modify: crates/lys-home/src/record/blocks_tests.rs
-- modify: crates/lys-home/src/record/call_tests.rs
-- modify: crates/lys-home/src/record/canon_tests.rs
-- modify: crates/lys-home/src/record/epilogue_tests.rs
-- modify: crates/lys-home/src/record/fork_cut_tests.rs
-- modify: crates/lys-home/src/record/fork_tests.rs
-- modify: crates/lys-home/src/record/given_tests.rs
-- modify: crates/lys-home/src/record/lantern_tests.rs
-- modify: crates/lys-home/src/record/reader_tests.rs
-- modify: crates/lys-home/src/record/recall_tests.rs
-- modify: crates/lys-home/src/record/record_tests.rs
-- modify: crates/lys-home/src/record/templates_tests.rs
-- modify: crates/lys-log-store/src/file_tests.rs
-- modify: crates/lys-log-store/src/log_tests.rs
-- modify: crates/lys/src/cli_tests.rs
-- modify: crates/lys/src/commands/ca_tests.rs
-- modify: crates/lys/src/commands/duration_tests.rs
-- modify: crates/lys/src/commands/error_tests.rs
-- modify: crates/lys/src/commands/files_tests.rs
-- modify: crates/lys/src/commands/hex_tests.rs
-- modify: crates/lys/src/commands/log/status_tests.rs
-- modify: crates/lys/src/commands/log/store_tests.rs
-- modify: crates/lys/src/commands/output_tests.rs
-- modify: crates/lys/src/commands/pem_tests.rs
-- modify: crates/lys-anchor/src/upward/fixture.rs
-- modify: crates/lys-anchor/src/witness/fixture.rs
-
-**Checklist:**
 - C8 — clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true.
 - C9 — Both fixture.rs files and the 88 sibling *_tests.rs files under src/ begin with #![cfg(test)] and carry no #![allow].
-
-**Stories:**
-- S5 (Lys contributor, Writing tests and library code) — As a lys contributor writing tests, I want a test file recognised by the marker it carries so that its helpers need no per-file lint opt-out and no one keeps an exemption list.
-
-### R4: Mark the integration test roots and the two harness modules with #![cfg(test)]
-
-Structural. Measured at 7b53625: crates/*/tests holds 28 integration test roots, 24 of which carry `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, and 2 tests/harness/mod.rs files, both carrying it: 30 files and 26 lines, where the ruling counted 22; this brief follows the measured count. Each of the 30 files gains `#![cfg(test)]` as its first line, the harness modules as an inner attribute of their module, and the 26 #![allow] lines are removed. An integration root is only ever compiled as a test, so the marker changes nothing that is built; measured with clippy 0.1.97, a root or harness helper calling unwrap or expect is reported without the marker and passes with it. THE SYSTEM SHALL NOT rewrite any unwrap, expect or panic call in these files and SHALL NOT put any #[allow], #![allow] or #[expect] in place of a removed line.
-
-**Acceptance:**
-- `ls crates/*/tests/*.rs | wc -l` prints 28.
-- `for f in crates/*/tests/*.rs crates/*/tests/harness/mod.rs; do head -1 "$f"; done | sort | uniq -c` prints exactly `  30 #![cfg(test)]`.
-- `grep -l '#!\[allow' crates/*/tests/*.rs crates/*/tests/harness/*.rs` prints nothing.
-- For each of these 30 files, `grep -oE '\.unwrap\(\)|\.expect\(|panic!\(' <file> | wc -l` at HEAD is not below the same count at origin/main.
-- `cargo clippy --all-targets --all-features -- -D warnings` exits 0.
-- `cargo clippy --all-targets -- -D warnings` exits 0.
-
-**Files:**
-- modify: crates/lys-anchor-cli/tests/anchor_cli.rs
-- modify: crates/lys-anchor/tests/anchor_receipt_conformance.rs
-- modify: crates/lys-anchor/tests/cascade.rs
-- modify: crates/lys-anchor/tests/checkpoint_note_conformance.rs
-- modify: crates/lys-anchor/tests/standalone_is_complete.rs
-- modify: crates/lys-anchor/tests/stranger_verification.rs
-- modify: crates/lys-core/tests/bundle_conformance.rs
-- modify: crates/lys-core/tests/consistency_conformance.rs
-- modify: crates/lys-core/tests/consistency_receipt_conformance.rs
-- modify: crates/lys-core/tests/cose_conformance.rs
-- modify: crates/lys-core/tests/delegation_conformance.rs
-- modify: crates/lys-core/tests/delegation_vector.rs
-- modify: crates/lys-core/tests/go_conformance.rs
-- modify: crates/lys-core/tests/openssl_csr_interop.rs
-- modify: crates/lys-core/tests/receipt_conformance.rs
-- modify: crates/lys-core/tests/seal_derivation.rs
-- modify: crates/lys-core/tests/signed_note_crosscheck.rs
-- modify: crates/lys-home/tests/cached_index.rs
-- modify: crates/lys-home/tests/claude_code_round_trip.rs
-- modify: crates/lys-home/tests/fork.rs
-- modify: crates/lys-home/tests/given_record.rs
-- modify: crates/lys-home/tests/lantern_cli.rs
-- modify: crates/lys-home/tests/lantern_home.rs
-- modify: crates/lys-home/tests/launch_template.rs
-- modify: crates/lys/tests/certified_attestation_tests.rs
-- modify: crates/lys/tests/cli_tests.rs
-- modify: crates/lys/tests/json_output_tests.rs
-- modify: crates/lys/tests/log_tests.rs
-- modify: crates/lys-anchor/tests/harness/mod.rs
-- modify: crates/lys-core/tests/harness/mod.rs
-
-**Checklist:**
 - C10 — The 28 integration test roots and both tests/harness/mod.rs files begin with #![cfg(test)] and carry no #![allow].
-
-**Stories:**
-- S5 (Lys contributor, Writing tests and library code) — As a lys contributor writing tests, I want a test file recognised by the marker it carries so that its helpers need no per-file lint opt-out and no one keeps an exemption list.
-
-### R5: Test from_env through a seam instead of the process environment, and correct the lib.rs comment
-
-Ed25519Identity::from_env keeps its signature `pub fn from_env() -> TrustResult<Self>` and becomes one call: it reads LYS_IDENTITY_KEY with std::env::var and hands the read's Result to a private associated function, from_env_value, that holds today's trimming, decoding, length check and error texts unchanged. The five env-backed tests in identity_tests.rs call from_env_value with the value they used to put in the environment, and with Err(std::env::VarError::NotPresent) for the missing-variable case; they lose #[serial_test::serial], and the EnvCleanup guard with its two #[allow(unsafe_code)] is removed. identity_tests.rs is the only user of serial_test in the tree, so the dev-dependency goes with it: the line `serial_test.workspace = true` under [dev-dependencies] in crates/lys-core/Cargo.toml and the line `serial_test = "3"` under [workspace.dependencies] in Cargo.toml are removed, and Cargo.lock is regenerated by cargo so it no longer lists serial_test or serial_test_derive. WHEN from_env_value is given Ok of the standard base64 of 32 bytes, THE SYSTEM SHALL return the identity whose seed is those bytes; WHEN it is given an Err, THE SYSTEM SHALL return TrustError::KeyManagement saying LYS_IDENTITY_KEY is not set. The comment above `#![cfg_attr(not(test), forbid(unsafe_code))]` in crates/lys-core/src/lib.rs (lines 27-30) is rewritten to say what is true after this change: library code has no unsafe, non-test builds forbid it, test builds fall back to the workspace-level deny, and no test in the crate uses unsafe code. It names no person and no date. THE SYSTEM SHALL NOT change the attribute line, SHALL NOT change any code line of lib.rs other than lines 54 and 59, which R7 changes, SHALL NOT make from_env_value public, SHALL NOT change the three KeyManagement reason texts, and SHALL NOT mutate the process environment in any test, and SHALL NOT change any other dependency line in either Cargo.toml. This touches the key-loading path of a published crate, so the change is reviewed adversarially before landing, as the repository requires for cryptographic changes.
-
-**Acceptance:**
-- `grep -cE 'set_var|remove_var|unsafe|serial' crates/lys-core/src/keys/identity_tests.rs` prints 0.
-- `grep -c 'pub fn from_env() -> TrustResult<Self>' crates/lys-core/src/keys/identity.rs` prints 1, and the body of from_env is the single expression `Self::from_env_value(std::env::var(KEY_ENV_VAR))`.
-- from_env_value(Ok(STANDARD.encode([9u8; 32]))) returns an identity whose public_key_bytes() equals ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]).verifying_key().to_bytes().
-- from_env_value(Ok(URL_SAFE_NO_PAD.encode([3u8; 32]))) returns an identity whose public_key_bytes() equals ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]).verifying_key().to_bytes().
-- from_env_value(Err(std::env::VarError::NotPresent)) returns TrustError::KeyManagement whose message contains `LYS_IDENTITY_KEY` and `not set`.
-- from_env_value(Ok("not-base64!!!@@".to_string())) returns TrustError::KeyManagement whose message contains `invalid base64`.
-- from_env_value(Ok(STANDARD.encode([1u8; 16]))) returns TrustError::KeyManagement whose message contains `decoded to 16 bytes, expected 32`.
-- `grep -cx '#!\[cfg_attr(not(test), forbid(unsafe_code))\]' crates/lys-core/src/lib.rs` prints 1, and `grep -cE 'set_var|#\[allow' crates/lys-core/src/lib.rs` prints 0.
-- Every line `git diff -U0 origin/main...HEAD -- crates/lys-core/src/lib.rs` adds or removes begins with `//` after its leading whitespace, except the removal of original line 54 `use std::fmt::Write;`, the removal of original line 59 `let _ = s.write_fmt(format_args!("{b:02x}"));`, and the one line added in place of line 59.
-- `grep -rc serial_test crates Cargo.toml | grep -vc ':0$'` prints 0.
-- `grep -c 'name = "serial_test' Cargo.lock` prints 0.
-- `cargo test -p lys-core --all-features` exits 0.
-
-**Files:**
-- modify: crates/lys-core/src/keys/identity.rs
-- modify: crates/lys-core/src/keys/identity_tests.rs
-- modify: crates/lys-core/src/lib.rs
-- modify: crates/lys-core/Cargo.toml
-- modify: Cargo.toml
-- modify: Cargo.lock
-
-**Checklist:**
 - C11 — The env-backed tests of Ed25519Identity::from_env call no set_var, remove_var or unsafe code, and from_env keeps its signature and its error texts.
 - C12 — The comment above #![cfg_attr(not(test), forbid(unsafe_code))] in lys-core's lib.rs says what is true after the env tests change, and the attribute is byte-identical.
-
-**Stories:**
-- S6 (Lys contributor, Writing tests and library code) — As a lys contributor reading the tree's rules, I want CLAUDE.md, Cargo.toml and the lib.rs comment to state the policy the gate enforces so that the written rule and the enforced rule agree.
-- S7 (Lys contributor, Writing tests and library code) — As a lys contributor changing key loading, I want the env-backed identity tests to run without unsafe code so that the test build needs no lint bypass.
-
-### R6: Move the logic out of the two tests/harness/mod.rs files and lys-home's claude_code/mod.rs into named files
-
-Structural. crates/lys-core/tests/harness/mod.rs keeps its marker, a short module doc and `mod go;` with the re-exports its roots use; find_go, go_or_skip, build_go_tool and run_built_tool move to tests/harness/go.rs, whose module doc opens with the phrase `Shared Go-toolchain harness` that lys-anchor's contract test reads. crates/lys-anchor/tests/harness/mod.rs keeps its marker, its module doc and the declarations of go, scaffold and scaffold_tests with the re-exports its roots use; find_go, go_or_skip, build_go_tool and run_built_tool move to go.rs; GO_ENV, GoScaffold, its impl, ALL_SCAFFOLDS and lys_core_harness move to scaffold.rs, and lys_core_harness names ../lys-core/tests/harness/go.rs; the two #[test] functions move to scaffold_tests.rs unchanged. crates/lys-home/src/harness/claude_code/mod.rs keeps its module doc and declarations; HARNESS, PROVIDER, API and AUTHORED move with their docs to names.rs and are re-exported from mod.rs, so crate::harness::claude_code::HARNESS and the other three resolve as before. THE SYSTEM SHALL NOT change what any moved item does, SHALL NOT loosen the contract test's clause checks, and SHALL NOT touch crates/lys-home/src/record/mod.rs.
-
-**Acceptance:**
-- `ast-grep scan --config sgconfig.yml --filter mod-rs-declarations-only --json=stream crates/lys-core/tests/harness/mod.rs crates/lys-anchor/tests/harness/mod.rs crates/lys-home/src/harness/claude_code/mod.rs | wc -l` prints 0.
-- `git diff --name-only origin/main...HEAD -- crates/lys-home/src/cli.rs crates/lys-home/src/record/given.rs crates/lys-home/src/harness/claude_code/events.rs crates/lys-home/src/harness/claude_code/template.rs crates/lys-home/src/record/mod.rs` prints nothing.
-- `cargo test -p lys-anchor --all-features the_go_environment_contract_matches_the_one_lys_core_wrote_down` passes in every test binary that declares `mod harness`.
-- Changing `"GOPROXY", "off"` in crates/lys-core/tests/harness/go.rs to `"GOPROXY", "direct"` makes `cargo test -p lys-anchor --all-features` fail the_go_environment_contract_matches_the_one_lys_core_wrote_down in every binary that declares `mod harness`, with no other test failing; the change is reverted after.
-- `cargo test --workspace --all-features` exits 0.
-
-**Files:**
-- create: crates/lys-core/tests/harness/go.rs
-- create: crates/lys-anchor/tests/harness/go.rs
-- create: crates/lys-anchor/tests/harness/scaffold.rs
-- create: crates/lys-anchor/tests/harness/scaffold_tests.rs
-- create: crates/lys-home/src/harness/claude_code/names.rs
-- modify: crates/lys-core/tests/harness/mod.rs
-- modify: crates/lys-anchor/tests/harness/mod.rs
-- modify: crates/lys-home/src/harness/claude_code/mod.rs
-
-**Checklist:**
+- C13 — grep finds zero #[allow], #![allow], #[expect] and #[ignore] under crates/.
 - C14 — The tests/harness/mod.rs files of lys-core and lys-anchor and lys-home's harness/claude_code/mod.rs hold only module declarations and re-exports.
-
-**Stories:**
-- S8 (Lys contributor, Writing tests and library code) — As a lys contributor reading a module tree, I want mod.rs files to hold only declarations and re-exports so that logic is found in a named file.
-
-### R7: Fix the `let _ =` discards at their cause
-
-The three hex writers (crates/lys/src/commands/hex.rs:15, crates/lys-anchor-cli/src/commands/hex.rs:15 and crates/lys-core/src/lib.rs:59) take a form that returns no Result: each byte pushes its two lowercase digits from a 16-character digit table, and the `use std::fmt::Write;` and the deliberate-discard comment go. `s.push_str(&format!(..))` is not the form, because clippy's format_push_string refuses it under the workspace's pedantic lints. The 14 test-code writes to a String handle their Result with `.expect("writing to a String cannot fail")`: anchor_receipt_conformance.rs:163, sealed_envelope_tests.rs:286, bundle_conformance.rs:673 and :692, consistency_conformance.rs:52, consistency_receipt_conformance.rs:80, delegation_conformance.rs:188, delegation_vector.rs:616, receipt_conformance.rs:48, signed_note_crosscheck.rs:55, given_tests.rs:29, given_record.rs:47, cli_tests.rs:52 and log_tests.rs:81. The two discards of values that are not Results are removed with what they held: identity_tests.rs:589 `let _ = id.public_key_bytes();` is deleted; json_output_tests.rs:375 `let _ = recipient_pub;` is deleted with the binding at line 92, and the key-generate call at line 87 stays as a statement, since json_ok asserts its success. In crates/lys-core/src/lib.rs the new form is the one line that replaces line 59, the deliberate-discard comment above it goes, and line 54's `use std::fmt::Write;`, which the new form leaves unused, is removed; no other code line of lib.rs changes. IF a hex writer is given the bytes 0x00, 0x0f, 0xab, 0xff, THEN THE SYSTEM SHALL return `000fabff`. Each writer's measurement is a new test named hex_lower_writes_000fabff asserting that hex_lower(&[0x00, 0x0f, 0xab, 0xff]) equals "000fabff": in crates/lys/src/commands/hex_tests.rs and crates/lys-anchor-cli/src/commands/hex_tests.rs, beside the existing 0xa5 vectors, which stay as they are; and, because lib.rs gains no test, in crates/lys-core/src/ca/authority_tests.rs, the sibling test file of ca/authority.rs, which calls hex_lower, reaching it through crate::hex_lower. THE SYSTEM SHALL NOT discard a Result, SHALL NOT use `_ =` in place of `let _ =`, and SHALL NOT add any #[allow].
-
-**Acceptance:**
-- `ast-grep scan --config sgconfig.yml --filter no-let-underscore-on-results --json=stream | wc -l` prints 0.
-- `cargo test -p lys --all-features --bin lys commands::hex::tests::hex_lower_writes_000fabff -- --exact` prints `test commands::hex::tests::hex_lower_writes_000fabff ... ok` and exits 0.
-- `cargo test -p lys-anchor-cli --all-features --lib commands::hex::tests::hex_lower_writes_000fabff -- --exact` prints `test commands::hex::tests::hex_lower_writes_000fabff ... ok` and exits 0.
-- `cargo test -p lys-core --all-features --lib ca::authority::tests::hex_lower_writes_000fabff -- --exact` prints `test ca::authority::tests::hex_lower_writes_000fabff ... ok` and exits 0.
-- `grep -c 'write_fmt\|std::fmt::Write' crates/lys/src/commands/hex.rs crates/lys-anchor-cli/src/commands/hex.rs crates/lys-core/src/lib.rs` prints 0 for each file.
-- `grep -c 'recipient_pub' crates/lys/tests/json_output_tests.rs` prints 0.
-
-**Files:**
-- modify: crates/lys/src/commands/hex.rs
-- modify: crates/lys-anchor-cli/src/commands/hex.rs
-- modify: crates/lys-core/src/lib.rs
-- modify: crates/lys/src/commands/hex_tests.rs
-- modify: crates/lys-anchor-cli/src/commands/hex_tests.rs
-- modify: crates/lys-core/src/ca/authority_tests.rs
-- modify: crates/lys-core/src/keys/identity_tests.rs
-- modify: crates/lys/tests/json_output_tests.rs
-- modify: crates/lys-anchor/tests/anchor_receipt_conformance.rs
-- modify: crates/lys-core/src/seal/sealed_envelope_tests.rs
-- modify: crates/lys-core/tests/bundle_conformance.rs
-- modify: crates/lys-core/tests/consistency_conformance.rs
-- modify: crates/lys-core/tests/consistency_receipt_conformance.rs
-- modify: crates/lys-core/tests/delegation_conformance.rs
-- modify: crates/lys-core/tests/delegation_vector.rs
-- modify: crates/lys-core/tests/receipt_conformance.rs
-- modify: crates/lys-core/tests/signed_note_crosscheck.rs
-- modify: crates/lys-home/src/harness/claude_code/given_tests.rs
-- modify: crates/lys-home/tests/given_record.rs
-- modify: crates/lys/tests/cli_tests.rs
-- modify: crates/lys/tests/log_tests.rs
-
-**Checklist:**
 - C15 — The `let _ =` hits in the three hex writers, the 14 test-code writes, identity_tests.rs and json_output_tests.rs are gone.
-
-**Stories:**
-- S9 (Lys contributor, Writing tests and library code) — As a lys contributor, I want no `let _ =` discard in the tree so that no error is swallowed without a decision.
-
-### R8: Correct CLAUDE.md and the Cargo.toml lint comment to name clippy.toml and the ast-grep leg
-
-Structural. The coding-standards sentence at CLAUDE.md:35 that tells tests to opt out per module with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` is replaced by one naming clippy.toml's allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests and the #![cfg(test)] first line that marks a file as test code. The comment at Cargo.toml:69-70 is corrected the same way. CLAUDE.md's `Gates before any commit` block gains the line `ast-grep scan --config sgconfig.yml` after `cargo doc --no-deps`, and its count sentence `All five clean.` becomes `All seven clean.`, matching the seven lines the block then lists. THE SYSTEM SHALL NOT change any other rule CLAUDE.md states and SHALL NOT change any line inside Cargo.toml's [workspace.lints] tables other than those comment lines; the serial_test removal from [workspace.dependencies] is R5's.
-
-**Acceptance:**
-- `grep -c 'Tests opt out per-module' CLAUDE.md` prints 0, and `grep -c 'clippy.toml' CLAUDE.md` prints at least 1.
-- `grep -c '#!\[allow' Cargo.toml` prints 0, and `grep -c 'clippy.toml' Cargo.toml` prints 1.
-- `sed -n '/^## Gates before any commit/,/^All /p' CLAUDE.md | grep -c '^ast-grep scan --config sgconfig.yml$'` prints 1, and the block's last line is `All seven clean. No exceptions.`
-- `diff <(git show origin/main:Cargo.toml | sed -n '/^\[workspace\.lints/,$p' | grep -v '^#') <(sed -n '/^\[workspace\.lints/,$p' Cargo.toml | grep -v '^#')` prints nothing, over the [workspace.lints.rust] and [workspace.lints.clippy] tables that end the file.
-
-**Files:**
-- modify: CLAUDE.md
-- modify: Cargo.toml
-
-**Checklist:**
 - C16 — CLAUDE.md's coding-standards sentence and the Cargo.toml lint comment name clippy.toml's allow-*-in-tests in place of the per-module #![allow].
 - C17 — CLAUDE.md's gates block lists `ast-grep scan --config sgconfig.yml` and its count sentence matches the lines it lists.
-
-**Stories:**
-- S6 (Lys contributor, Writing tests and library code) — As a lys contributor reading the tree's rules, I want CLAUDE.md, Cargo.toml and the lib.rs comment to state the policy the gate enforces so that the written rule and the enforced rule agree.
-
-### R9: Wire `ast-grep scan --config sgconfig.yml` into project.json, .land/gates.sh and CI, and land it only at zero hits
-
-docs/design/project.json gains, after the design leg, the leg named `ast-grep` with command `ast-grep scan --config sgconfig.yml`, requires ["tool:ast-grep"] and cadence round. .land/gates.sh gains the line `leg ast-grep scan --config sgconfig.yml` after its last cargo doc leg. .github/workflows/ci.yml's test job gains a step running `cargo install ast-grep --version 0.44.1 --locked` and a step running `ast-grep scan --config sgconfig.yml`. WHEN any rule in rules/ast-grep reports a hit, THE SYSTEM SHALL fail the ast-grep leg in each of the three places. WHILE origin/main's crates/lys-home/src/record/mod.rs has any non-module line, THE SYSTEM SHALL NOT land this leg; the count is taken by `git show origin/main:crates/lys-home/src/record/mod.rs | ast-grep scan --rule rules/ast-grep/mod-rs-declarations-only.yml --stdin --json=stream | python3 -c "import sys,json; print(len({n for h in map(json.loads,sys.stdin) for n in range(h['range']['start']['line'],h['range']['end']['line']+1)}))"`, which prints 521 at 7b53625 and must print 0. THE SYSTEM SHALL NOT change the seven existing legs or their commands, SHALL NOT pass a path to the scan, and SHALL NOT land any scratch file.
-
-**Acceptance:**
-- `python3 scripts/design/validate.py docs/design/project.json` exits 0, and the file's last leg is {"name": "ast-grep", "command": "ast-grep scan --config sgconfig.yml", "requires": ["tool:ast-grep"], "cadence": "round"}.
-- `git diff origin/main...HEAD -- docs/design/project.json .land/gates.sh | grep '^-[^-]'` prints nothing.
-- `git diff --name-only origin/main...HEAD -- docs/design | grep -v '^docs/design/lys-core/'` prints exactly `docs/design/project.json`.
-- `grep -cx 'leg ast-grep scan --config sgconfig.yml' .land/gates.sh` prints 1.
-- `grep -c 'cargo install ast-grep --version 0.44.1 --locked' .github/workflows/ci.yml` prints 1, and `grep -c 'run: ast-grep scan --config sgconfig.yml' .github/workflows/ci.yml` prints 1.
-- The record/mod.rs count command above prints 0 against origin/main before the leg lands.
-- `ast-grep scan --config sgconfig.yml` from the repository root prints no hit and exits 0.
-- With a scratch file crates/lys-core/src/scratch_red.rs whose one line is `pub fn scratch(x: Option<u8>) -> u8 { x.unwrap() }`, `sh .land/gates.sh` exits 1, prints `--- status 1: ast-grep scan --config sgconfig.yml ---`, and prints `--- status 0:` for each of its other seven legs; the file is deleted after and is in no commit.
-- `grep -rnE '#!?\[(allow|expect)\(|#\[ignore' crates --include='*.rs'` prints nothing.
-
-**Files:**
-- modify: docs/design/project.json
-- modify: .land/gates.sh
-- modify: .github/workflows/ci.yml
-
-**Checklist:**
-- C13 — grep finds zero #[allow], #![allow], #[expect] and #[ignore] under crates/.
 - C18 — docs/design/project.json has a leg running `ast-grep scan --config sgconfig.yml` requiring tool:ast-grep, and validate.py accepts the file.
 - C19 — .land/gates.sh runs `leg ast-grep scan --config sgconfig.yml`.
 - C20 — .github/workflows/ci.yml installs ast-grep 0.44.1 and runs `ast-grep scan --config sgconfig.yml`.
 - C21 — `ast-grep scan --config sgconfig.yml` reports zero hits and exits 0 at the landed commit.
 - C22 — A never-landed scratch file with an unwrap and no #![cfg(test)] makes .land/gates.sh show the ast-grep leg red and every other leg green.
 - C23 — The leg lands only after origin/main's crates/lys-home/src/record/mod.rs has zero non-module lines, checked by command.
+- C24 — `LYS_OID_ARC` constant equals [1, 3, 6, 1, 4, 1, 66364] with a doc comment stating that 66364 is the IANA Private Enterprise Number assigned to lys and that the arc is permanent
+- C25 — encode_extension / decode_extension round-trip an arbitrary DER payload under LYS_OID_ARC; decode of a cert without the extension returns Ok(None)
+- C26 — Round-trip test: rcgen-generated Ed25519 keypair is loadable as ed25519-dalek SigningKey/VerifyingKey
+- C27 — AppendOnlyTree<L> generic over leaf type L: Serialize; append(leaf) returns the new tree size
+- C28 — No delete or modify operation exists on the tree — append-only enforced by API
+- C29 — root() returns the current RootHash; the empty tree produces a deterministic empty root hash
+- C30 — prove_inclusion(leaf_index) pre-checks bounds and returns TrustError::MerkleTree on out-of-range index — no panic path into the backing library
+- C31 — prove_consistency(old_size, new_size) pre-checks the size pair (old ≤ new, new ≤ len, old ≥ 1) and returns TrustError::MerkleTree on violation
+- C32 — verify_inclusion(root_hash, leaf, index, proof) and verify_consistency(old_root, new_root, proof) return Result; tampered proofs and mismatched roots fail
+- C33 — RootHash::from_parts(root_hash, num_leaves) and to_parts() round-trip; from_parts requires no tree access
+- C34 — InclusionProof and ConsistencyProof round-trip through as_bytes() / try_from_bytes()
+- C35 — External-verifier round-trip test exists: a verifier holding only published root parts and proof bytes (never the tree) verifies inclusion and consistency
+- C36 — reconstruct_from_leaves(leaves) rebuilds a tree with a root hash identical to the original (test exists)
+- C37 — merkle module docs state the frozen-wire-contract rule: leaf encodings are canonical bytes, evolved only by introducing a new versioned leaf type
+- C38 — sign_attestation(payload, signing_key) signs the COSE `Sig_structure` `["Signature1", protected, h'', claims]` (RFC 9052 §4.4) with protected `{1: -8, 3: "application/vnd.lys.attestation.v2+cbor", 4: signer key}` — no meridian string, no v1 preimage constant remains anywhere
+- C39 — Attestation { payload_hash: [u8; 32], signature: [u8; 64], signer_public_key: [u8; 32], timestamp: i64 } carries no serde; the only durable form is `to_cose_bytes()` / `from_cose_bytes()` (canonical-encoding-strict)
+- C40 — verify_attestation(attestation, payload) rebuilds the `Sig_structure` from the attestation's own fields and verifies with `verify_strict`
+- C41 — No legacy fallback exists: a signature over the bare payload hash and a signature over the deleted v1 preimage both fail verify_attestation (tests exist)
+- C42 — Tampered payload fails verify_attestation
+- C43 — Tampered timestamp fails verify_attestation — the timestamp is a signed claim inside the `Sig_structure` (test exists)
+- C44 — seal(payload, recipient_public_key) returns SealedEnvelope { ephemeral_public_key, ciphertext, nonce } using a fresh ephemeral X25519 keypair per call (two seals of the same payload to the same recipient differ)
+- C45 — HKDF-SHA256 info input is `b"lys-sealed-envelope/v1" || ephemeral_public_key || recipient_public_key` — the hyphen-form HKDF domain tag, deliberately distinct from the slash-form attestation context tag `lys/sealed-envelope/v1`
+- C46 — Both seal and open reject non-contributory Diffie-Hellman: a low-order public key fails via `was_contributory` before any key derivation (test exists)
+- C47 — Seal/open roundtrip succeeds: sealed with the recipient's X25519 public key, opened with the recipient's static secret
+- C48 — Wrong private key, tampered ciphertext, and tampered nonce all return exactly TrustError::UnsealFailed — a single undifferentiated failure through the AES-GCM arbiter, with no early return distinguishing causes
+- C49 — SealedEnvelope::attestation_bytes() covers every wire byte of the envelope (ephemeral key, nonce, ciphertext)
+- C50 — sign_and_seal(payload, sender_identity, recipient_x25519_public_key) returns (SealedEnvelope, Attestation) where the attestation signs attestation_bytes()
+- C51 — open_and_verify verifies the attestation before any decryption: an invalid sender signature is rejected without the cipher being touched, and a valid signature over a tampered envelope also fails (tests exist)
+- C52 — `lys` binary crate exists; main.rs is a thin entry (parse, dispatch, exit codes) with clap definitions isolated in cli.rs; no `anyhow` anywhere — the CLI carries its own thiserror type
+- C53 — `lys key` generates an identity at a path and inspects one (public key, fingerprint); no subcommand, flag, or output format prints private key material (test asserts output contains no seed bytes in any encoding)
+- C54 — `lys ca issue` issues a certificate signed by an issuer identity file, embedding a caller-supplied capability-claim payload as a LYS_OID_ARC extension, and writes the PEM out
+- C55 — `lys ca verify` verifies a certificate against an issuer public key, and accepts an explicit verification instant flag routing to verify_certificate_chain_at
+- C56 — `lys attest` signs a payload file and emits the COSE_Sign1 artifact; `lys verify` checks an artifact against a payload and reports success/failure via exit code. (File paths only as built — the stdin path this item originally anticipated was not implemented, and ROADMAP Phase 2 records the file-only surface.)
+- C57 — `lys seal` seals a payload file for a recipient public key and writes the sender attestation alongside it; `lys open` opens it with the recipient identity, verifying the attestation first; the pair round-trips
+- C58 — `lys log init` pins the log's origin exactly once and refuses to re-initialize; `lys log append` appends a leaf file's raw bytes and prints the new root; `lys log checkpoint` signs a C2SP tlog-checkpoint in the signed-note envelope over the current root; `lys log prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded verbatim
+- C59 — `lys log verify` verifies an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the leaf sequence, the store, or the tree; declared sizes are checked against the signature-verified checkpoint and roots are recomputed, never trusted; every tamper class collapses to one identical message
+- C60 — Cross-process CLI test exists: a log produced by one process is verified end-to-end by the CLI in another process with no access to the original tree
+- C61 — cargo fmt --check passes clean *(gate — verified by CI, not from source)*
+- C62 — cargo clippy --all-targets -- -D warnings passes clean *(gate — verified by CI, not from source)*
+- C63 — cargo test --workspace passes green *(gate — verified by CI, not from source)*
+- C64 — No file exceeds 500 lines of code; every mod.rs carries only pub mod / pub use / module docs; tests live in sibling *_tests.rs files *(not met: `merkle/leaf.rs`, both `seal/` files, `error.rs`, and six CLI modules carry inline `mod tests` — REVIEW-23-07.md F12)*
+- C65 — lys-core builds standalone with zero meridian-* dependencies in its Cargo.toml and Cargo.lock
+
+### R2: Carry USER-STORIES.md into stories.json and render it
+
+docs/design/lys-core/stories.json holds cluster 'lys-core' and main's four USER-STORIES.md persona headings at 7b536253 as four personas in main's order, each split into name and role: 'Norn Agent Runtime — Signing Session History (primary consumer)' at its ' — ' into name 'Norn Agent Runtime' and role 'Signing Session History (primary consumer)'; 'Lys CLI Operator and Auditor' into name 'Lys CLI' and role 'Operator and Auditor'; 'Lys-Anchor Service (future notary)' into name 'Lys-Anchor Service' and role '(future notary)'; 'Haematite Commit Attestation' into name 'Haematite' and role 'Commit Attestation'. Each of main's story lines '**Sn.** text' becomes one story {id, text} under its persona and in main's order, where text is every character after '**Sn.** ' byte for byte. The document SHALL NOT reword, merge, drop, renumber, reorder or add any story, and SHALL NOT drop or add any word of a persona heading. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/USER-STORIES.md whose 23 story lines equal main's byte for byte and whose only changed lines are the three headings that gain ' — '.
+
+**Acceptance:**
+- From the repository root: python3 -c "import json; d=json.load(open('docs/design/lys-core/stories.json')); ids=[s['id'] for p in d['personas'] for s in p['stories']]; print(len(ids), len(set(ids)), ids==['S%d' % n for n in range(1, 24)])" prints 23 23 True.
+- From the repository root: python3 -c "import json; print([(p['name'], p['role']) for p in json.load(open('docs/design/lys-core/stories.json'))['personas']])" prints [('Norn Agent Runtime', 'Signing Session History (primary consumer)'), ('Lys CLI', 'Operator and Auditor'), ('Lys-Anchor Service', '(future notary)'), ('Haematite', 'Commit Attestation')].
+- From the repository root: the C and S text comparison in this brief's verification prints 'compared 88 differences 0' as its last line.
+- From the repository root: git show 7b536253:docs/design/lys-core/USER-STORIES.md | diff - docs/design/lys-core/USER-STORIES.md | grep '^>' prints exactly the three lines '> ## Lys CLI — Operator and Auditor', '> ## Lys-Anchor Service — (future notary)' and '> ## Haematite — Commit Attestation', and the same pipeline with grep -c '^<' prints 3.
+
+**Files:**
+- modify: docs/design/lys-core/stories.json
+- modify: docs/design/lys-core/USER-STORIES.md
 
 **Stories:**
 - S1 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want the gate to refuse unwrap, expect and panic in library code so that a panic path cannot land where clippy is silenced.
 - S2 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want a lint bypass attribute refused at landing so that a lint is fixed at its cause instead of hidden.
 - S3 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want the same scan run by the design gate, the landing gate and CI so that no path to main skips it.
 - S4 (Lys maintainer, Landing a card through the gate) — As a lys maintainer landing a card, I want every rule shown to fire on a scratch case so that a silent scan means clean code rather than a rule that never matches.
+- S5 (Lys contributor, Writing tests and library code) — As a lys contributor writing tests, I want a test file recognised by the marker it carries so that its helpers need no per-file lint opt-out and no one keeps an exemption list.
+- S6 (Lys contributor, Writing tests and library code) — As a lys contributor reading the tree's rules, I want CLAUDE.md, Cargo.toml and the lib.rs comment to state the policy the gate enforces so that the written rule and the enforced rule agree.
+- S7 (Lys contributor, Writing tests and library code) — As a lys contributor changing key loading, I want the env-backed identity tests to run without unsafe code so that the test build needs no lint bypass.
+- S8 (Lys contributor, Writing tests and library code) — As a lys contributor reading a module tree, I want mod.rs files to hold only declarations and re-exports so that logic is found in a named file.
+- S9 (Lys contributor, Writing tests and library code) — As a lys contributor, I want no `let _ =` discard in the tree so that no error is swallowed without a decision.
+- S10 (Design reader, Reading the lys-core cluster) — As a reader of the lys-core design, I want the hand-written pre-method documents kept beside the rendered cluster so that the earlier design is not lost when the method's documents replace it.
+- S11 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit.
+- S12 (Lys CLI, Operator and Auditor) — As an operator, I want `lys attest` to sign a file or stdin so that I can hand a third party a detached, self-contained attestation over any artifact.
+- S13 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys verify` to check an attestation with only the payload and the signer's public key so that verification requires nothing from the party who produced the record.
+- S14 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys log verify` to prove inclusion from only a published root and proof bytes so that I can confirm a challenged entry was logged without the operator's cooperation and without seeing any other entry.
+- S15 (Lys CLI, Operator and Auditor) — As an auditor, I want `lys log verify` to check consistency between two published roots so that I can detect any rewrite of history between two points in time.
+- S16 (Lys CLI, Operator and Auditor) — As an operator, I want `lys seal` and `lys open` so that I can move a credential file to a specific recipient with per-envelope forward secrecy instead of pasting secrets into a chat.
+- S17 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to reconstruct submitted roots via `RootHash::from_parts` so that I can verify consistency proofs between an instance's successive submissions while seeing only roots, never contents.
+- S18 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to verify the submitter's v1 domain-separated attestation over each submitted root so that only the holder of the registered instance key can extend that instance's anchored history.
+- S19 (Lys-Anchor Service, (future notary)) — As the anchor service, I want to append anchored roots to my own `AppendOnlyTree` and serve inclusion proofs so that my receipt for an anchoring event is itself independently verifiable.
+- S20 (Lys-Anchor Service, (future notary)) — As the anchor service, I want the wire tags and preimage layouts frozen at `v1` so that a receipt issued today still verifies against signatures produced years from now.
+- S21 (Haematite, Commit Attestation) — As haematite, I want to attest a BLAKE3 commit root — 32 opaque bytes signed with the instance identity — so that a whole database state becomes attestable without lys knowing anything about haematite's hash world.
+- S22 (Haematite, Commit Attestation) — As haematite, I want to append commit attestations to an append-only log so that my flat timestamped commit list gains the hash-chained lineage it structurally lacks.
+- S23 (Haematite, Commit Attestation) — As haematite, I want inclusion proofs over the commit log so that any party can verify a historical commit belongs to the canonical lineage without replaying the database.
+
+### R3: Carry DESIGN.md into design.json and render it
+
+docs/design/lys-core/design.json holds cluster 'lys-core' and main's DESIGN.md at 7b536253 in the fields the design schema gives it: title 'Lys Core — Trust Primitives and CLI Surface' (the frontmatter title without its quotes); intention, the two Intention paragraphs; problem, the whole Problem section (opening paragraph, four bullets, closing paragraph); solution, the whole Solution section from '### D1: Domain-agnostic boundary' to the paragraph beginning 'The phase proof', then the paragraph under main's structure tree beginning 'Tests live in sibling', then a section headed '### Checklist notes' holding main's CHECKLIST.md intro blockquote (its five lines as main writes them) and its two italic annotations, the C38 to C43 one first, each carried verbatim and separated by one blank line; goals, the six goals in main's order without their '1. ' to '6. ' numbering; non_goals, the seven bullets in main's order, each whole bullet after '- ' as text and reason empty; structure, 75 rows for the fenced tree's two roots and 73 entries in the tree's order, each path the entry's full repository-relative path as the tree spells it, each note the entry's comment after '— ' with continuation lines joined by one space (empty when the entry has none), each brief empty, followed by eight rows, in this order and exactly as written here (path 'docs/design/lys-core/design.json' with note 'the lys-core design, carried from main's DESIGN.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/DESIGN.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/checklist.json' with note 'the lys-core checklist, carried from main's CHECKLIST.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/CHECKLIST.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/stories.json' with note 'the lys-core user stories, carried from main's USER-STORIES.md' and brief 'LYSCORE-001'; path 'docs/design/lys-core/USER-STORIES.md' with note 'rendered markdown' and brief empty; path 'docs/design/lys-core/briefs/LYSCORE-001.json' with note 'the brief that carries the hand-written lys-core design into the three JSON documents' and brief 'LYSCORE-001'; path 'docs/design/lys-core/briefs/LYSCORE-001.md' with note 'rendered markdown' and brief 'LYSCORE-001'); constraints, the nine bullets in main's order as CN1 to CN9, each whole bullet after '- ' as text; principles, decisions and inventory empty; and gate, the project's one tree entry for '.' with its shorthand and its seven legs fmt, clippy-all-features, clippy, tests, doc-all-features, doc and design. It SHALL NOT reword, merge, drop, reorder or add any sentence of main's DESIGN.md, SHALL NOT correct stale carried text, SHALL NOT change any relative link (../../ROADMAP.md, ../WIRE-FORMATS.md, ../../PEN-REGISTRATION.md, ../../REVIEW-23-07.md, DESIGN.md), and SHALL NOT add any principle, ADR, goal, non-goal, constraint, inventory row, structure row beyond the eight named, and SHALL NOT add any word beyond the '### Checklist notes' heading and the eight rows' paths, notes and brief values as stated here. WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs, THE SYSTEM SHALL write docs/design/lys-core/DESIGN.md, and the build's dev record SHALL list every difference between it and main's DESIGN.md with its reason: six of layout (unquoted title, the added '> **Cluster:** lys-core' line, the moved 'Tests live in sibling' paragraph, goals as bullets, the structure tree as a table, the CN prefixes) and two of content that the card's lead allows (the '### Checklist notes' section, the eight rows for the cluster's own documents and this brief's own files).
+
+**Acceptance:**
+- From the repository root: the field comparison in this brief's verification prints 'carried fields 7 differences []'.
+- From the repository root: the structure tree comparison in this brief's verification prints '75 75 True True'.
+- From the repository root: python3 -c "import json; d=json.load(open('docs/design/lys-core/design.json')); s=d['structure']; print(len(s), [r['brief'] for r in s[:75]] == [''] * 75)" prints 83 True.
+- From the repository root: python3 -c "import json; print([(r['path'], r['note'], r['brief']) for r in json.load(open('docs/design/lys-core/design.json'))['structure'][75:]] == [('docs/design/lys-core/design.json', \"the lys-core design, carried from main's DESIGN.md\", 'LYSCORE-001'), ('docs/design/lys-core/DESIGN.md', 'rendered markdown', ''), ('docs/design/lys-core/checklist.json', \"the lys-core checklist, carried from main's CHECKLIST.md\", 'LYSCORE-001'), ('docs/design/lys-core/CHECKLIST.md', 'rendered markdown', ''), ('docs/design/lys-core/stories.json', \"the lys-core user stories, carried from main's USER-STORIES.md\", 'LYSCORE-001'), ('docs/design/lys-core/USER-STORIES.md', 'rendered markdown', ''), ('docs/design/lys-core/briefs/LYSCORE-001.json', 'the brief that carries the hand-written lys-core design into the three JSON documents', 'LYSCORE-001'), ('docs/design/lys-core/briefs/LYSCORE-001.md', 'rendered markdown', 'LYSCORE-001')])" prints True, the eight rows' paths, notes and brief values being exactly those stated in the spec, in its order.
+- From the repository root: python3 -c "import json; d=json.load(open('docs/design/lys-core/design.json')); print(d['principles'], d['decisions'], d['inventory'], [l['name'] for g in d['gate'] for l in g['legs']])" prints [] [] [] ['fmt', 'clippy-all-features', 'clippy', 'tests', 'doc-all-features', 'doc', 'design'].
+- From the repository root: rg -c '^### Checklist notes$' docs/design/lys-core/DESIGN.md prints 1, and rg -c '^\*\(C38–C43 amended|^\*\(C58–C59 superseded' docs/design/lys-core/DESIGN.md prints 2.
+- From the repository root: git show 7b536253:docs/design/lys-core/DESIGN.md | diff - docs/design/lys-core/DESIGN.md | grep -c '^<' prints 104, and the same pipeline with grep -c '^>' prints 117.
+- The R3 dev record names each of the eight differences listed in the spec, one entry each, with its reason, and names no other difference.
+
+**Files:**
+- modify: docs/design/lys-core/design.json
+- modify: docs/design/lys-core/DESIGN.md
+
+### R4: Render the brief's own markdown and pass the design gate
+
+WHEN python3 scripts/design/render-cluster.py docs/design/lys-core runs after R1 to R3, THE SYSTEM SHALL write docs/design/lys-core/briefs/LYSCORE-001.md from docs/design/lys-core/briefs/LYSCORE-001.json, and the committed DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-001.md SHALL each be byte-identical to that render. WHEN sh scripts/design/gate.sh runs on the card's final tree, THE SYSTEM SHALL exit 0 with lys-core among the measured clusters. The build SHALL NOT change any file outside docs/design/lys-core, SHALL NOT hand-edit any rendered markdown, and SHALL NOT change the authored fields of briefs/LYSCORE-001.json.
+
+**Acceptance:**
+- From the repository root: sh scripts/design/gate.sh exits 0 and prints no line containing 'differs'.
+- From the repository root: python3 scripts/design/render-cluster.py docs/design/lys-core prints 'Done. 4 file(s) rendered.', and git status --porcelain docs/design/lys-core prints nothing after it.
+- From the repository root: python3 scripts/design/check-coverage.py docs/design/lys-core exits 0 and reports 65 checklist items, 23 user stories and 1 brief.
+- From the repository root, on the build branch: git diff --no-ext-diff --name-only <base>..HEAD -- . ':!docs/design/lys-core' prints nothing, where <base> is the commit the build started from.
+
+**Files:**
+- create: docs/design/lys-core/briefs/LYSCORE-001.md
 
 ## Boundaries
 
-- No unwrap, expect or panic call in a fixture, a *_tests.rs file or a file under tests/ is rewritten.
-- No rule, config or script names a file or a list of file names to exempt; test code is recognised by structure only.
-- No #[allow], #![allow], #[expect] or #[ignore] of any kind is added, in tests or in library code; an #[allow] that cannot be fixed at its cause goes back to the lead as a question with its line.
-- #![cfg_attr(not(test), forbid(unsafe_code))] in crates/lys-core/src/lib.rs stays byte-identical, and no code line of lib.rs changes other than lines 54 and 59.
-- crates/lys-home/src/record/mod.rs is not changed.
-- Nothing is written under any docs/design directory other than lys-core, except the one ast-grep leg in docs/design/project.json.
-- No wire format, domain-separation tag, public API signature or public behaviour of any crate changes.
-- vendor/rauthy is neither scanned nor edited, and no file under vendor/ is committed.
-- Cambium's rules and config are not edited.
-- The seven existing gate legs and their commands are unchanged.
-- No scratch file is committed.
+- No change to code: no file under crates/ and no file under scripts/ changes, including scripts/design/render-cluster.py, scripts/design/validate.py, scripts/design/check-coverage.py and scripts/design/schemas/.
+- No new checklist item, user story, principle, ADR, goal, non-goal or constraint: the checklist holds C1 to C65 and the stories S1 to S23 and nothing else; the CN ids name the nine constraints main already has.
+- No carried text is reworded, merged, dropped, renumbered, reordered or corrected, even where it is stale; reconciling the design with the tree as built is a later unit.
+- No done flag changes: C1 to C60 and C65 stay true and C61 to C64 stay false, exactly as main ticks them.
+- The eight checklist section names stay exactly as main has them; no checklist note is placed in a section name.
+- The directory, home, secrets, identity, lys-anchor and lys-log-store clusters, docs/design/decisions.json, docs/design/project.json and docs/design/WIRE-FORMATS.md are not touched.
+- No note slot is added to the renderer and the schemas; that is a change to the shared design tooling and a later unit.
+- The later lys-core card's brief, items and stories are not added here; they come after the carried ones once this brief lands.
+- Claiming C1 to C65 and S1 to S23 records that this brief carries them into JSON; it does not claim to have built them.
 
 ## Verification
 
-- From the repository root: cargo fmt --check; cargo clippy --all-targets --all-features -- -D warnings; cargo clippy --all-targets -- -D warnings; cargo test --workspace --all-features; cargo doc --no-deps --all-features; cargo doc --no-deps; each exits 0.
-- From the repository root: `ast-grep scan --config sgconfig.yml` prints no hit and exits 0.
-- From the repository root: `sh scripts/design/gate.sh` exits 0.
-- From the repository root: `sh .land/gates.sh` exits 0 with eight `--- status 0:` lines, then again with the R9 scratch file, exiting 1 with the ast-grep leg the only `--- status 1:` line; the scratch file is deleted after.
-- `grep -rnE '#!?\[(allow|expect)\(|#\[ignore' crates --include='*.rs'` prints nothing.
-- An adversarial review of the crates/lys-core/src/keys/identity.rs diff shows the seed still decoded into Zeroizing buffers, the three KeyManagement reason texts unchanged, and no key material in any error or Debug output.
-- `git status --porcelain` after the scratch cases prints nothing that is not part of the card's diff.
+- From the repository root: sh scripts/design/gate.sh exits 0.
+- From the repository root: python3 scripts/design/validate.py docs/design/lys-core and python3 scripts/design/check-coverage.py docs/design/lys-core both exit 0.
+- C and S text comparison, keyed on main's bytes at 7b536253 and counting every id either side holds; from the repository root run the following, which prints 'compared 88 differences 0' as its last line:
+python3 - <<'EOF'
+import re, subprocess
+base = '7b536253'
+pats = {'CHECKLIST.md': r'^- \[[ x]\] \*\*(C\d+)\*\* — (.*)$', 'USER-STORIES.md': r'^\*\*(S\d+)\.\*\* (.*)$'}
+compared = differences = 0
+for name, pat in pats.items():
+    old = re.findall(pat, subprocess.run(['git', 'show', base + ':docs/design/lys-core/' + name], capture_output=True, text=True, check=True).stdout, re.M)
+    new = re.findall(pat, open('docs/design/lys-core/' + name).read(), re.M)
+    old_d, new_d = dict(old), dict(new)
+    if len(old_d) != len(old) or len(new_d) != len(new):
+        differences += 1
+        print('duplicate id in', name)
+    for i in sorted(set(old_d) | set(new_d), key=lambda s: int(s[1:])):
+        compared += 1
+        if old_d.get(i) != new_d.get(i):
+            differences += 1
+            print('differs:', i)
+print('compared', compared, 'differences', differences)
+EOF
+- Field comparison of design.json against main's DESIGN.md and CHECKLIST.md at 7b536253; from the repository root run the following, which prints 'carried fields 7 differences []':
+python3 - <<'EOF'
+import json, subprocess
+def main_lines(name):
+    return subprocess.run(['git', 'show', '7b536253:docs/design/lys-core/' + name], capture_output=True, text=True, check=True).stdout.split('\n')
+D, C = main_lines('DESIGN.md'), main_lines('CHECKLIST.md')
+d = json.load(open('docs/design/lys-core/design.json'))
+notes = '\n'.join(C[2:7]) + '\n\n' + C[59] + '\n\n' + C[88]
+checks = {
+    'title': d['title'] == D[3][len('title: "'):-1],
+    'intention': d['intention'] == '\n'.join(D[10:13]),
+    'problem': d['problem'] == '\n'.join(D[16:24]),
+    'solution': d['solution'] == '\n'.join(D[27:133]) + '\n\n' + D[242] + '\n\n### Checklist notes\n\n' + notes,
+    'goals': d['goals'] == [l.split('. ', 1)[1] for l in D[136:142]],
+    'non_goals': d['non_goals'] == [{'text': l[2:], 'reason': ''} for l in D[145:152]],
+    'constraints': d['constraints'] == [{'id': 'CN%d' % i, 'text': l[2:]} for i, l in enumerate(D[246:255], 1)],
+}
+print('carried fields', len(checks), 'differences', [k for k, v in checks.items() if not v])
+EOF
+- Structure tree comparison, the entry names and every word of the tree's notes against the first 75 structure rows; from the repository root run the following, which prints '75 75 True True':
+python3 - <<'EOF'
+import json, re, subprocess
+t = subprocess.run(['git', 'show', '7b536253:docs/design/lys-core/DESIGN.md'], capture_output=True, text=True, check=True).stdout
+fence = t.split('## Structure\n\n```\n')[1].split('\n```\n')[0]
+names, words = [], []
+for line in fence.split('\n'):
+    m = re.match(r'^(crates/\S+)|^[│ ]*[├└]── (\S+)', line)
+    if m:
+        names.append(m.group(1) or m.group(2))
+        words += line.split('— ', 1)[1].split() if '— ' in line else []
+    else:
+        words += line.replace('│', ' ').split()
+rows = json.load(open('docs/design/lys-core/design.json'))['structure'][:75]
+print(len(names), len(rows), all(r['path'].endswith(n) for r, n in zip(rows, names)), ' '.join(words) == ' '.join(w for r in rows for w in r['note'].split()))
+EOF
+- From the repository root: git diff --no-ext-diff --name-only <base>..HEAD -- crates scripts prints nothing, where <base> is the commit the build started from.
+- From the repository root: python3 scripts/design/render-cluster.py docs/design/lys-core run a second time changes no file (git status --porcelain docs/design/lys-core prints nothing after it).

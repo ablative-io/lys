@@ -1,44 +1,38 @@
 # Lys-Core — User Stories
 
+## Norn Agent Runtime — Signing Session History (primary consumer)
+
+## Lys CLI Operator and Auditor — Checking certificates and certified statements
+
 ## Card author — Landing work in lys
+
+**S24.** As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced.
 
 **S30.** As a card author landing work in lys, I want the gate to refuse an unwrap, a lint bypass, a dropped Result or logic in a mod.rs so that a rule break is caught before review rather than by a reviewer's memory.
 
 ## Test writer — Writing tests in sibling files
 
+**S25.** As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
+
 **S31.** As a test writer, I want a test file recognised as test code by a marker it carries so that I can unwrap in test helpers without an #[allow].
+
+## Third-party verifier — Verifying lys artifacts
+
+**S26.** As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed.
+
+## Consumer of lys-log-store — Implementing LeafStore
+
+**S27.** As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release.
 
 ## Lead — Trusting the gate
 
+**S28.** As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured.
+
+**S29.** As the lead for lys, I want the full suite to run the same tests before and after the card so that I know the cleanup changed no behaviour.
+
 **S32.** As the lead for lys, I want proof that the unwrap rule fires so that a green leg means the rule held and not that nothing was measured.
 
-## Reader of the design — Tracing the earlier lys-core design
-
-**S33.** As a reader of the lys-core design, I want the hand-written pre-method documents kept under their own names so that the earlier design and the citations of it survive the method's render.
-
-## Norn Agent Runtime — Signing Session History (primary consumer)
-
-**S1.** As the Norn runtime, I want a signing `PersistenceSink` decorator to attest each session event with the agent's Ed25519 identity so that every persisted event carries a verifiable, timestamp-authenticated signature without any core-loop change.
-
-**S2.** As the Norn runtime, I want to append each event's hash to a per-session `AppendOnlyTree` so that the session history becomes tamper-evident from the first event.
-
-**S3.** As the Norn runtime, I want to export the session root via `RootHash::to_parts()` at every `checkpoint()` so that the 32-byte root can later be anchored externally without revealing session contents.
-
-**S4.** As the Norn runtime, I want to issue an X.509 certificate at agent spawn with capability claims embedded as a `LYS_OID_ARC` extension so that the agent's identity and permissions are one presentable object.
-
-**S5.** As the Norn runtime, I want to verify a counterparty's certificate chain at the MCP boundary — at the dispatch instant, via `verify_certificate_chain_at` — so that cross-agent tool calls are gated on legitimate, unexpired, capability-scoped identity.
-
-**S6.** As the Norn runtime, I want spawned agents to load their identity from `LYS_IDENTITY_KEY` so that key material reaches an agent process through its environment without touching shared disk.
-
-**S7.** As the Norn runtime, I want `reconstruct_from_leaves` to rebuild a session tree from the persisted event sequence after a crash so that the recovered tree's root matches the last checkpointed root exactly.
-
-**S8.** As the Norn runtime, I want concurrent agent processes calling `load_or_generate` on the same key path to converge on one persisted key so that a spawn race never leaves an agent holding an identity that differs from the key on disk.
-
 ## Lys CLI — Operator and Auditor
-
-**S9.** As an operator, I want `lys key` to generate and inspect identities without ever printing private material so that key handling over a shoulder-surfable terminal is safe by construction.
-
-**S10.** As an operator, I want `lys ca issue` to mint certificates with capability-claim extensions from my instance CA key so that I can provision agent identities from the command line.
 
 **S11.** As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit.
 
@@ -70,36 +64,6 @@
 
 **S23.** As haematite, I want inclusion proofs over the commit log so that any party can verify a historical commit belongs to the canonical lineage without replaying the database.
 
-## Norn Agent Runtime — Signing Session History (primary consumer)
-
-**S5.** As the Norn runtime, I want to verify a counterparty's certificate chain at the MCP boundary — at the dispatch instant, via `verify_certificate_chain_at` — so that cross-agent tool calls are gated on legitimate, unexpired, capability-scoped identity.
-
-## Lys CLI Operator and Auditor — Checking certificates and certified statements
-
-**S11.** As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit.
-
-## Card author — Landing work in lys
-
-**S24.** As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced.
-
-## Test writer — Reading a test's fixtures
-
-**S25.** As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
-
-## Third-party verifier — Verifying lys artifacts
-
-**S26.** As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed.
-
-## Consumer of lys-log-store — Implementing LeafStore
-
-**S27.** As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release.
-
-## Lead — Trusting the gate
-
-**S28.** As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured.
-
-**S29.** As the lead for lys, I want the full suite to run the same tests before and after the card so that I know the cleanup changed no behaviour.
-
 ## Lys maintainer — Landing a card through the gate
 
 **S1.** As a lys maintainer landing a card, I want the gate to refuse unwrap, expect and panic in library code so that a panic path cannot land where clippy is silenced.
@@ -125,3 +89,7 @@
 ## Design reader — Reading the lys-core cluster
 
 **S10.** As a reader of the lys-core design, I want the hand-written pre-method documents kept beside the rendered cluster so that the earlier design is not lost when the method's documents replace it.
+
+## Reader of the design — Tracing the earlier lys-core design
+
+**S33.** As a reader of the lys-core design, I want the hand-written pre-method documents kept under their own names so that the earlier design and the citations of it survive the method's render.

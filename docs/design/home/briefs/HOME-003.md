@@ -14,13 +14,13 @@ title: Record what a session was given: a lys.given entry at render, listed and 
 > - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
-> - ADR-013 — Claude Code's compaction is read and rendered in the shape the measured version writes — The importer reads a compact_boundary record and its isCompactSummary record as one Pi compaction entry: the summary is the isCompactSummary message's text, the first kept entry is the entry of preservedSegment.headUuid (the compaction itself when there is no preservedSegment, so it keeps nothing), tokensBefore is compactMetadata.preTokens, and Pi's details field names both source records by uuid; a named first kept entry not on record is refused by uuid. The summary record path stays for the file that carries one. The render writes a compact_boundary record, then the isCompactSummary record, then the kept records, with the parent chain advancing through all three, measured on the installed Claude Code version. Rejected: attaching the loss entry only to the summary record path, which almost no file uses, and keeping R4's summary line, which a resumed session would not read.
+> - ADR-013 — The context record is a lys.given custom entry of document hashes, never copies — The context record is one lys.given custom entry, appended after the render event, whose data is the harness name, the Claude Code version the load order was measured on, the kinds as two lists, resolved (claude_md_chain, user_claude_md, memory_index, appended_instructions, mcp_config, environment_names) and unlisted (claude_md_imports and claude_rules, which this entry does not list and a later entry at the first request records), the config directory as its path and its source (template or home), the documents in the measured order each as kind, path, byte length and SHA-256, and the names of the environment variables the template set. It is not a copy of each document into the block store, and not a content-bearing record, because the entry must hold no content under home P7 and CN3. It is unsigned and unencrypted now, and because it names hashes only, signing and encryption at rest can be added later without changing what is recorded.
 > **Checklist:**
-> - C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+> - C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 > - C22 — Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.
 > - C23 — The Claude Code version on this Mac, the instruction load order and project slug rule measured from its own behaviour, and one real session render, are written in PROOF-GIVEN.md as paths, counts and hashes only.
 > **Stories:**
-> - S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+> - S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 > - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
 ## Purpose
@@ -80,10 +80,10 @@ WHEN a render resolves the given documents for a working directory, a config dir
 - modify: crates/lys-home/src/harness/claude_code/mod.rs
 
 **Checklist:**
-- C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 - S13 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the instruction load order measured on a named Claude Code version and written in a proof document, so that a later version that changes the order is caught rather than assumed.
 
 ### R3: Define the lys.given entry and append and read it inside Pi's custom entry
@@ -105,10 +105,10 @@ Add the custom type constant lys.given beside the four lys custom types. Its dat
 - modify: crates/lys-home/src/record/mod.rs
 
 **Checklist:**
-- C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 ### R4: Append the given record after the render event on every template render
 
@@ -123,10 +123,10 @@ WHEN the template subcommand renders a Claude Code session and has appended its 
 - modify: crates/lys-home/src/harness/claude_code/launch.rs
 
 **Checklist:**
-- C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 ### R5: List a session's given records and check a listed document against a file by hash
 
@@ -151,7 +151,7 @@ Add the subcommands given and given-check, implemented in src/cli/given.rs and d
 - C22 — Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 ### R6: Prove the acceptance end to end on the fixture template
 
@@ -170,11 +170,11 @@ Add an integration test that renders the fixture template for a fixture working 
 - create: crates/lys-home/tests/given_record.rs
 
 **Checklist:**
-- C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 - C22 — Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 ### R7: Write lys.given into RECORD.md and the crate README
 
@@ -189,11 +189,11 @@ Add lys.given to the lys custom entries in RECORD.md: its data keys, the config_
 - modify: crates/lys-home/README.md
 
 **Checklist:**
-- C21 — `lys-home fork` prints one JSON report of the child id, parent, lantern, point, cut entry, entry and block counts (blocks the store holds, and hashes it does not), coordinate_carried and the carried entry id, and never transcript content.
+- C21 — The card lands through src_pr and src_land with Jev and the gate; the seven cards are set done only on a green landing with no finding, a card carrying a partly present row stays in review, and one card is filed per finding line.
 - C22 — Rendering the child prints a `claude --resume` launch line that resumes it, and PROOF-FORK.md records a conversation held with the lantern's self through the fork on a named Claude Code version, as hashes, counts and paths only.
 
 **Stories:**
-- S12 (Tom, Owns the platform and reads what a session was given) — As Tom, I want every render to record which instruction documents the session was given, in the order the harness reads them, by path, length and hash, with the environment names it was set, so that I can later check a file on disk against what a session was given without anyone reading its contents.
+- S12 (Board reader, Reads the step 5 board to know what the chain has judged) — As a reader of the step 5 board, I want each finding written as its own line naming the check, the file and the rows it touches, so that a card can be filed from that line alone.
 
 ### R8: Record the measurement and one real render in PROOF-GIVEN.md
 

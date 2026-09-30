@@ -2,13 +2,13 @@
 
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
-**S1.** As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time.
-
 ## Person — Grants an agent provisioned under them access to an account
 
 **S2.** As a person granting an agent access, I want to give it a handle under my own grant, limited by uses, time and spend, so that it can use the account without ever holding the credential and the grant traces back to me.
 
 **S3.** As a person, I want to drop an agent's handle and have every new call on it refused at once, so that taking access back does not wait on rotating the real key.
+
+**S18.** As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 **S19.** As the person an agent acts for under a lease, I want to revoke the lease and see issuing stopped at once and the confirmation from the system behind shown pending until it comes, so that I know what has stopped and what is still unconfirmed.
 
@@ -40,6 +40,8 @@
 
 **S11.** As a reviewer reading the audit, I want each call that was in flight when its handle was dropped to show the outcome the cancellation rule gave it, so that no call's end is unaccounted for.
 
+**S1.** As the reviewer, I want the secrets broker's implementation brief in the design-system form, with numbered requirements and criteria, so that its rows can be reviewed and dispatched one at a time.
+
 ## Account holder — Uses and deliberately delegates scoped access without exposing credentials
 
 **S12.** As a person allowed to use an account, I want the screen and server to distinguish that from permission to lend it, so I cannot accidentally grant my agent authority I do not hold.
@@ -59,7 +61,3 @@
 ## Implementer — Is dispatched one SECRETS-003 code row at a time
 
 **S17.** As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-
-## Person — Keeps credentials with the standalone identity platform
-
-**S18.** As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.

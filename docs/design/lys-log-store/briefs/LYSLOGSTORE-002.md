@@ -25,10 +25,10 @@ title: Refuse a damaged pinned prefix at open, report leftover temporary leaf fi
 > - C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
 > - C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
 > **Stories:**
-> - S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+> - S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 > - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 > - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
-> - S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+> - S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
 ## Purpose
 
@@ -60,7 +60,7 @@ IF a leaf at an index below the pinned tree size holds bytes other than those ap
 - C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed.
 
 **Stories:**
-- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
 #### R1 — Execution record
 
@@ -78,7 +78,7 @@ IF a leaf at an index below the pinned tree size holds bytes other than those ap
   - [x] C9 — A torn leaf just past the pin is adopted by the one-leaf repair and reported by recovered_to. — A one-byte change inside the pin is refused and no index is named.
   - [x] C10 — FileLeafStore::leftover_temporaries returns the store's temporary-leaf names in lexical order, none counted toward the extent and none changed. — A torn leaf past the pin is adopted and reported.
 - Story delivery:
-  - [x] S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will. — The operator gets a refusal, not silent adoption, for a damaged pinned prefix.
+  - [x] S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove. — The operator gets a refusal, not silent adoption, for a damaged pinned prefix.
 
 **Review (recorded):**
 
@@ -166,7 +166,7 @@ WHEN a lys log command opens a store whose leftover_temporaries() is not empty, 
 **Stories:**
 - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
 - S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
-- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
 #### R3 — Execution record
 
@@ -185,7 +185,7 @@ WHEN a lys log command opens a store whose leftover_temporaries() is not empty, 
 - Story delivery:
   - [x] S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
   - [x] S2 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a store left mid-append to be refused by name when I open it for reading so that I learn a repair is pending instead of performing one.
-  - [x] S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+  - [x] S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
 **Review (recorded):**
 
@@ -218,7 +218,7 @@ WHEN a lys-anchor command opens an anchor directory whose store reports a non-em
 
 **Stories:**
 - S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
-- S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+- S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
 #### R4 — Execution record
 
@@ -235,7 +235,7 @@ WHEN a lys-anchor command opens an anchor directory whose store reports a non-em
   - [x] C12 — file.rs's module doc states that FileLeafStore::leaf serves bytes it has not checked and that a leaf is proven whole only through Log::open against the pinned root.
 - Story delivery:
   - [x] S1 (Auditor, Reading a flight recorder's log without changing it) — As an auditor, I want a leaf store I open for reading to refuse every write so that reading the log never changes the evidence.
-  - [x] S4 (Operator, Recovering a log after a crash) — As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will.
+  - [x] S4 (Log operator, Opens a log store, including after a crash) — As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove.
 
 **Review (recorded):**
 
@@ -268,7 +268,7 @@ WitnessProjection SHALL record the number of the anchor's leaves it has folded, 
 - C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
 
 **Stories:**
-- S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+- S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
 #### R5 — Execution record
 
@@ -283,7 +283,7 @@ WitnessProjection SHALL record the number of the anchor's leaves it has folded, 
 - Checklist delivery:
   - [x] C5 — put_leaf on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
 - Story delivery:
-  - [x] S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+  - [x] S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
 **Review (recorded):**
 
@@ -321,7 +321,7 @@ observe SHALL take the caller's kept WitnessProjection as a mutable argument aft
 - C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
 
 **Stories:**
-- S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+- S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
 #### R6 — Execution record
 
@@ -337,7 +337,7 @@ observe SHALL take the caller's kept WitnessProjection as a mutable argument aft
   - [x] C6 — pin on a handle from FileLeafStore::open_read_only returns StoreError::ReadOnly and every file under the store directory holds the same bytes before and after.
   - [x] C7 — A store one leaf past its pin, the state a read-only open refuses with RepairPending, is repaired by FileLeafStore::open followed by Log::open, which reports recovered_to as Some of the extent.
 - Story delivery:
-  - [x] S3 (Operator, Recovering a log after a crash) — As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history.
+  - [x] S3 (Witness operator, Runs a witness anchor that observes other logs' checkpoints) — As a witness operator, I want each observation to cost only the leaves recorded since the previous one, so that the witness stays usable as its own log grows.
 
 **Review (recorded):**
 

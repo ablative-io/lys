@@ -2,92 +2,171 @@
 type: brief
 id: HOME-013
 cluster: home
-title: Prove a second put writes nothing by pinned modification times, not by sleeping
+title: Move the home record's logic out of record/mod.rs into home.rs, session.rs and helpers.rs
 ---
 
-# HOME-013: Prove a second put writes nothing by pinned modification times, not by sleeping
+# HOME-013: Move the home record's logic out of record/mod.rs into home.rs, session.rs and helpers.rs
 
 > **Cluster:** home
 > **Design anchor:**
-> - ADR-012 — A compaction's loss is a lys.loss custom entry beside it, and a session's block hashes are a lys file beside the session — Each compaction entry is followed in the file by a lys.loss custom entry, a side leaf under the compaction, whose data names the summarised span's first and last entry ids, its counts of entries, messages, tool calls, tool results and blocks, their bytes, a digest of the span's block hashes and the harness's tokensBefore, deterministic so two imports agree apart from ids and timestamps. Block hashes are kept in <id>.blocks.jsonl beside the session, one {entry, part, hash} row per stored part, as the index and head are kept. Rejected: a new field on a Pi message or a custom entry per message for block references, which adds to Pi's grammar or doubles every import's entries; re-hashing parts or following only harness-event record hashes, which cannot find the stored blocks; and placing the loss entry on the chain, which would re-parent the record after the compaction and break the importer's parent equality.
+> - ADR-012 — A harness launch template is kept in the home by hash, and each render is recorded on the session beside its context path — A launch template per harness is a JSON object with named slots (transcript, mcp, env, secrets, instructions) plus flags, stored in the home under templates/ by its SHA-256; lys-home renders a template and a session into files and runtime variables with command mappings in text, prints the launch line and never runs it, and records each render as a sixth lys.harness_event kind, template_render, hung as a side leaf beside the context path with the written paths in a manifest block named by hash. Rejected: a transcript converter or adapter protocol per harness, a template kept outside the home (a seat document of another tool), and a render event that advances the head, which would change the session head hash between two renders of the same session.
+> - ADR-014 — A lantern is a custom entry in its session, and its note grows only by epilogue entries — A lantern is a `lys.lantern` custom entry appended at its session's head, carrying in custom.data the entry id of its point (an existing entry of the same session that is not itself a lantern or an epilogue, the head or any entry the head has moved past), the note as written, who lit it and when. Its note grows only by `lys.lantern_epilogue` custom entries naming the lantern's entry id and carrying the further words, who added them and when; a lantern's story is its entry followed by its epilogues in order, and nothing is rewritten. Rejected: Pi's `label` entry on the target (it replaces or clears a label rather than growing one, and carries no author or time), a lantern store beside the session outside Pi's grammar (a lantern would stop travelling with its session), and editing the lantern's note in place (the record is append-only, P1).
+> - ADR-017 — A fork is a child session cut from the parent's own lines at a lantern's point, with its ancestry on both sides — A fork resolves a lantern to the session it was lit in, read from the lys.lantern data's lit_in when the record carries it and otherwise by the older-record rule (one holder cuts, several refuse lantern_ambiguous until a session is named), and cuts that session's root-to-point chain at the last assistant message at or before the point, through the index. The child is a new session under the parent's cwd whose header's parentSession is the parent file's path relative to the home, holding each cut entry as the parent file's own line bytes, then one lys.forked_from custom entry as its head naming the parent session, the lantern, the point, the cut entry, whether the coordinate was carried and the carried entry; the parent gains one lys.fork custom entry at its head naming the child. Nothing else is copied and no block is written. Rejected: re-serialising the copied entries (the copy would stop hash-matching the parent's lines), a fork store beside the sessions outside Pi's grammar, cutting at a point no lantern names, and a header field beyond Pi's parentSession.
+> - ADR-018 — A user-message point is carried as a seed prompt beside the rendered file, never copied into the child — When the point is a user message the cut stops at the assistant message before it and the message is carried, not copied: lys.forked_from records its id with coordinate_carried true and counts, by kind, the parts of it that are not text. The Claude Code render of such a child writes the message's text parts, in order, as a seed prompt beside the rendered file under an in-band marker line naming the parent session, the point and the lantern, and names it in the render report; the template's launch line, printed by render-launch only, passes that file as the resumed session's first prompt. A part that is not text never refuses a fork or a render and never enters the seed. Rejected: copying the user message into the child's chain, refusing a fork for a non-text part, and putting the seed's text in the report or the loss account.
 > **Checklist:**
-> - C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
-> - C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+> - C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+> - C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+> - C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+> - C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+> - C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+> - C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+> - C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
 > **Stories:**
-> - S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+> - S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+> - S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
 
 ## Purpose
 
-The block store's and the template store's gates tell a second put that wrote nothing from one that rewrote the same bytes by a modification time taken 20 milliseconds apart. That wait is a clock: on a filesystem with coarse timestamps, or on a loaded host where the second put lands inside the same tick, it proves nothing, and the suite pays it on every run. This brief makes both gates prove the write-once property with no elapsed time, by pinning the modification times the second put would change to a fixed instant and asserting they did not move.
+The repository's structure rule says a mod.rs carries only pub mod, pub use and module docs, with logic in named files and tests in sibling *_tests.rs files. crates/lys-home/src/record/mod.rs carries the record's logic: Home, Session, their impls, the shared helpers and two constants, 630 lines at 7b53625. The judged-rows card of the home line, whose brief is on brief/home/e35a7157-b4f6-447c-9988-4006d58ba102 at 8620ba6, records this as a finding on HOME-001 R1 and names this card as the act that answers it; that finding is not on main. This brief moves the code into named files and changes no behaviour and no public path, so the record module meets the rule and no caller notices.
 
 ## Task
 
-Two tests change and nothing else in crates/lys-home: the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing in crates/lys-home/src/record/blocks_tests.rs and a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing in crates/lys-home/src/record/templates_tests.rs. In each, the std::thread::sleep of 20 milliseconds before the second put is removed. In its place, before the second put, the test sets the modification time of both the shard directory and the stored file to the fixed instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, reads both back and asserts each equals that instant; after the second put it asserts both are still exactly that instant and the shard's entry count equals the count taken before the second put. The shard directory is pinned as well as the file because the directory's modification time is what catches a temporary file created and deleted in the shard, which neither the file's modification time nor the entry count shows; the block test's existing check reads that directory, as HOME-001's acceptance measures it. Every assertion each test makes today is kept. The block and template stores (blocks.rs, templates.rs) already write once by hash and do not change. Out of scope: any store's write path, every other test in the workspace including the sleep in the lys-anchor crate's admission certificate tests, and canon.rs's millis_now, which records a timestamp and waits on nothing.
+Start from main as it stands when the build runs and move whatever crates/lys-home/src/record/mod.rs then holds; other home cards change files under record, so the item list below is mod.rs at 7b53625 and the build moves any item added since by the same rule. BASE names the main commit the build branch starts from (git merge-base HEAD origin/main). Order: helpers.rs first (R1), then session.rs (R2), which calls the helpers, then home.rs (R3), which calls Session, then fork.rs's import (R4), then mod.rs reduced to docs, mod lines and re-exports (R5), then the proof that nothing else changed (R6). Home goes to home.rs, Session and the helpers only Session calls (take_lock, load_checked, to_line) to session.rs, and the helpers and constants the record's files share (safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable, custom_type_of) to helpers.rs. The three new modules are private and their public items are re-exported from mod.rs, so lys_home::record::{Home, Session, safe_component, now, fresh_id, json_len, MAX_NAME_BYTES, PI_FORMAT_VERSION} and lys_home::{Home, Session} resolve as before and no public path is added. Private fields and methods of Session and Home become pub(super), which reaches the record module and its descendants, exactly the reach private had in mod.rs; the impl Session blocks in beside.rs and fork.rs depend on it. Code moves byte for byte: a body's text does not change, and each new file imports what its bodies name. The 500-line measure is the repository's own: lines of code, without blank and comment lines, counted over non-test source; *_tests.rs files and files under crates/lys-home/tests are outside it, so record/call_tests.rs (519 lines of code at 7b53625) is not measured and is not split here. A test file changes only where the move requires a use path, and none is expected to. Out of scope: renaming or removing any public item, changing what any function does, splitting any test file, any other module's mod.rs (harness/claude_code/mod.rs included), and any crate outside lys-home.
 
 ## Requirements
 
-### R1: Pin the block shard and block file modification times in the block store's gate instead of sleeping
+### R1: Move the shared helpers and constants into record/helpers.rs
 
-WHEN the test the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing has put a 1 MiB block once, THE SYSTEM SHALL, before the second put, set the modification time of the shard directory store.root()/<first two hex digits of the hash> and of the block file store.root()/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the block file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (first.new, !second.new, second.hash == first.hash, the unchanged count, count == 1), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in blocks_tests.rs, and SHALL NOT change crates/lys-home/src/record/blocks.rs.
-
-**Acceptance:**
-- `grep -n 'sleep' crates/lys-home/src/record/blocks_tests.rs` prints nothing.
-- `grep -c 'set_modified' crates/lys-home/src/record/blocks_tests.rs` prints a count of at least 1, and the test pins both the path store.root().join(&first.hash.as_str()[..2]) and the path store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
-- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the block file.
-- After the second put the test asserts the same equality for the shard directory and for the block file, asserts the shard's read_dir count equals the count taken before the second put, and asserts that count equals 1.
-- The test still asserts `first.new`, `!second.new` and `second.hash == first.hash`.
-- `cargo test -p lys-home the_same_bytes_put_twice_occupy_one_block_and_the_second_put_writes_nothing` reports `1 passed` and `0 failed`.
-- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/blocks.rs` exits 0.
-
-**Files:**
-- modify: crates/lys-home/src/record/blocks_tests.rs
-
-**Checklist:**
-- C95 — The block store's gate proves a second put of the same bytes writes nothing without elapsed time: before the second put it pins the shard directory's and the block file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
-
-**Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
-
-### R2: Pin the template shard and template file modification times in the template store's gate instead of sleeping
-
-WHEN the test a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing has put the launch template fixture once, THE SYSTEM SHALL, before the second put, take the entry count of the template shard directory <home>/templates/<first two hex digits of the hash>, set the modification time of that shard directory and of the template file <home>/templates/<hh>/<hash> to the instant std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000) with std::fs::File::set_modified, read each back with std::fs::metadata(..).modified() and assert each equals that instant; WHEN the second put of the same bytes returns, THE SYSTEM SHALL assert the shard directory's and the template file's modification times each still equal that instant and the shard's entry count equals the count taken before the second put. THE SYSTEM SHALL NOT sleep, SHALL NOT read the current time, SHALL NOT drop any assertion the test makes today (the root absent before the first put, first.new, first.hash == Hash::of(bytes), the stored bytes, path_of, !second.new, second.hash == first.hash, the shard holding exactly 1 entry, contains, get, and the missing-hash error naming the hash), SHALL NOT rename, split, ignore or add a timeout to the test, SHALL NOT change any other test in templates_tests.rs, and SHALL NOT change crates/lys-home/src/record/templates.rs.
+Create crates/lys-home/src/record/helpers.rs holding, moved from crates/lys-home/src/record/mod.rs as it stands at BASE, the constants MAX_NAME_BYTES and PI_FORMAT_VERSION, and the functions safe_component, now, fresh_id, json_len, write_durable and custom_type_of, each with its doc comment, attributes and body unchanged, and every other free function or constant mod.rs holds at BASE that is not Home's or Session's and is not used only by Session. MAX_NAME_BYTES, PI_FORMAT_VERSION, safe_component, now, fresh_id and json_len stay pub; write_durable and custom_type_of are declared pub(super), so they reach the record module and its descendants and nothing wider. The file opens with a //! module doc naming what it holds and imports what the moved bodies name (fresh_id's blocks::hex_of through a use of the record's blocks module), so no body's text changes. The file SHALL NOT hold Home, Session, take_lock, load_checked or to_line, SHALL NOT declare any item pub(crate) or pub(in ...), SHALL NOT rename any item, and SHALL NOT change what any function returns, writes or refuses.
 
 **Acceptance:**
-- `grep -n 'sleep' crates/lys-home/src/record/templates_tests.rs` prints nothing.
-- `grep -c 'set_modified' crates/lys-home/src/record/templates_tests.rs` prints a count of at least 1, and the test pins both path.parent() and path, where path is home.root().join("templates").join(&first.hash.as_str()[..2]).join(first.hash.as_str()).
-- Before the second put the test asserts `std::fs::metadata(p).unwrap().modified().unwrap() == UNIX_EPOCH + Duration::from_secs(1_000_000_000)` for the shard directory and for the template file, and takes the shard's read_dir count.
-- After the second put the test asserts the same equality for the shard directory and for the template file, asserts the shard's read_dir count equals the count taken before the second put, and still asserts that count equals 1.
-- The test still asserts the store root is absent before the first put, `first.new`, `first.hash == Hash::of(&bytes)`, the file's bytes equal the fixture, `store.path_of(&first.hash) == path`, `!second.new`, `second.hash == first.hash`, `store.contains(&first.hash)`, `store.get(&first.hash) == bytes`, and that the error for Hash::of(b"never stored") contains that hash.
-- `cargo test -p lys-home a_template_is_kept_once_under_its_hash_and_a_second_put_writes_nothing` reports `1 passed` and `0 failed`.
-- `git diff --exit-code 7b53625 -- crates/lys-home/src/record/templates.rs` exits 0.
+- `grep -nE '^(pub(\(super\))? )?(const|fn) (MAX_NAME_BYTES|PI_FORMAT_VERSION|safe_component|now|fresh_id|json_len|write_durable|custom_type_of)\b' crates/lys-home/src/record/helpers.rs` prints exactly 8 lines, one per name.
+- `grep -nE '^pub\(super\) fn (write_durable|custom_type_of)\(' crates/lys-home/src/record/helpers.rs` prints exactly 2 lines.
+- `grep -nE 'pub\(crate\)|pub\(in |struct (Home|Session)|fn (take_lock|load_checked|to_line)\b' crates/lys-home/src/record/helpers.rs` prints nothing.
+- The first line of crates/lys-home/src/record/helpers.rs begins with `//!`.
 
 **Files:**
-- modify: crates/lys-home/src/record/templates_tests.rs
+- create: crates/lys-home/src/record/helpers.rs
 
 **Checklist:**
-- C96 — The template store's gate proves a second put of the same template writes nothing without elapsed time: before the second put it pins the template shard directory's and the template file's modification time to one fixed past instant and reads both back, and after it asserts both are still exactly that instant and the shard's entry count is unchanged; the test sleeps on no clock.
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
 
 **Stories:**
-- S40 (Reviewer, Checks the proofs before anything relies on them) — As a reviewer, I want the proof that a second put writes nothing to hold on a filesystem with coarse timestamps and on a loaded host without the suite waiting on a clock, so that a passing store gate means the store wrote nothing and never that the tick was too coarse to see a write.
+- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+### R2: Move Session and its own helpers into record/session.rs
+
+Create crates/lys-home/src/record/session.rs holding, moved from mod.rs at BASE, the Session struct with its derive and field docs, its impl block whole, and the functions take_lock, load_checked and to_line, which only Session's impl calls; bodies, doc comments and attributes unchanged. Every field and every method of Session that is private at BASE is declared pub(super), so the impl Session blocks in record/beside.rs and record/fork.rs, and every other descendant of the record module, keep exactly the reach they have today; take_lock, load_checked and to_line stay private to the file. The file opens with a //! module doc naming what it holds and imports the helpers it calls from crate::record::helpers. It SHALL NOT make any field or method pub or pub(crate), SHALL NOT add, remove or rename a field or method, SHALL NOT change the lock, the durability order of line, index row and head, the reconcile path or any error variant, and SHALL NOT use an #[allow] to quiet a lint the move raises.
+
+**Acceptance:**
+- `grep -nE '^pub struct Session\b|^impl Session\b' crates/lys-home/src/record/session.rs` prints exactly 2 lines.
+- `grep -nE '^fn (take_lock|load_checked|to_line)\b' crates/lys-home/src/record/session.rs` prints exactly 3 lines.
+- `grep -cE '^[[:space:]]+pub\(super\) ' crates/lys-home/src/record/session.rs` prints the number of Session's fields and methods that carry no pub at BASE (11 at 7b53625: the 8 fields file, header, index, head, rebuilt, lock, stale and reconciliations, and the methods reconcile, fresh and append_line).
+- `grep -nE 'pub\(crate\)|pub\(in |#\[allow|#!\[allow' crates/lys-home/src/record/session.rs` prints nothing.
+- `git diff "$BASE" -- crates/lys-home/src/record/beside.rs` prints nothing.
+
+**Files:**
+- create: crates/lys-home/src/record/session.rs
+
+**Checklist:**
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+
+**Stories:**
+- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+### R3: Move Home into record/home.rs
+
+Create crates/lys-home/src/record/home.rs holding, moved from mod.rs at BASE, the Home struct with its derive and doc and its impl block whole, bodies, doc comments and attributes unchanged. Every field and method of Home that is private at BASE is declared pub(super). The file opens with a //! module doc naming what it holds and imports Session, the helpers and the stores it names. It SHALL NOT hold Session or any helper, SHALL NOT add, remove or rename a field or method, and SHALL NOT change where a session, block or template file is placed or how a session id is checked.
+
+**Acceptance:**
+- `grep -nE '^pub struct Home\b|^impl Home\b' crates/lys-home/src/record/home.rs` prints exactly 2 lines.
+- `grep -nE 'struct Session|impl Session|pub\(crate\)|pub\(in |#\[allow|#!\[allow' crates/lys-home/src/record/home.rs` prints nothing.
+
+**Files:**
+- create: crates/lys-home/src/record/home.rs
+
+**Checklist:**
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+
+**Stories:**
+- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+
+### R4: Point fork.rs's import of the private helpers at record::helpers
+
+In crates/lys-home/src/record/fork.rs, import write_durable and custom_type_of from crate::record::helpers, and keep Home, Session and fresh_id imported from crate::record. No other line of fork.rs changes, and its impl Session block is unchanged. The change SHALL NOT re-export write_durable or custom_type_of from mod.rs and SHALL NOT widen either beyond pub(super).
+
+**Acceptance:**
+- `git diff -U0 "$BASE" -- crates/lys-home/src/record/fork.rs | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) '` prints exactly the three lines `-use crate::record::{Home, Session, custom_type_of, fresh_id, write_durable};`, `+use crate::record::helpers::{custom_type_of, write_durable};` and `+use crate::record::{Home, Session, fresh_id};`, in any order.
+
+**Files:**
+- modify: crates/lys-home/src/record/fork.rs
+
+**Checklist:**
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+
+**Stories:**
+- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+
+### R5: Reduce record/mod.rs to module docs, mod lines and pub use lines
+
+crates/lys-home/src/record/mod.rs keeps its //! module docs, every pub mod and mod line it holds at BASE with its cfg(test) attribute, and declares the three new modules as private `mod helpers;`, `mod home;` and `mod session;`. It re-exports with pub use exactly the public items it defined at BASE: Home from home, Session from session, and MAX_NAME_BYTES, PI_FORMAT_VERSION, safe_component, now, fresh_id and json_len from helpers, plus any other public item it defines at BASE from the file it moved to. Its five private use lines at BASE go, and its module doc's link to HomeError::SessionHeld keeps its text and names its target as crate::error::HomeError::SessionHeld, so it resolves without an import. mod.rs SHALL NOT hold any fn, struct, enum, union, impl, const, static, type or trait item, any private use line or any restricted re-export, SHALL NOT re-export any item that is not public at BASE, and SHALL NOT make helpers, home or session a pub mod, so no new public path is added. crates/lys-home/src/lib.rs does not change.
+
+**Acceptance:**
+- `grep -nE '^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?((const|async|unsafe|extern)[[:space:]]+)*(fn|struct|enum|union|impl|const|static|type|trait)\b|macro_rules!' crates/lys-home/src/record/mod.rs` prints nothing.
+- `grep -nE '^[[:space:]]*use |pub\((crate|super|in )[^)]*\) use ' crates/lys-home/src/record/mod.rs` prints nothing.
+- `grep -nxE 'mod (helpers|home|session);' crates/lys-home/src/record/mod.rs` prints exactly 3 lines.
+- After `cargo doc --no-deps -p lys-home`, the 8 files target/doc/lys_home/record/struct.Home.html, struct.Session.html, fn.safe_component.html, fn.now.html, fn.fresh_id.html, fn.json_len.html, constant.MAX_NAME_BYTES.html and constant.PI_FORMAT_VERSION.html all exist, and none of the directories target/doc/lys_home/record/helpers, target/doc/lys_home/record/home and target/doc/lys_home/record/session exists.
+- `git diff "$BASE" -- crates/lys-home/src/lib.rs` prints nothing.
+- `cargo doc --no-deps` and `cargo doc --no-deps --all-features` each exit 0 with no warning line naming crates/lys-home/src/record.
+
+**Files:**
+- modify: crates/lys-home/src/record/mod.rs
+
+**Checklist:**
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+- C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+
+**Stories:**
+- S24 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want the home record's mod.rs to hold only module docs, mod lines and re-exports, with Home, Session and the shared helpers in files named for them, so that the record module meets the repository's structure rule when I judge it.
+- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
+
+### R6: Prove the move changed no code, no test and no other crate
+
+WHEN the moved items in helpers.rs, session.rs and home.rs are compared with mod.rs at BASE, ignoring blank lines, //! lines, use lines, mod lines, cfg(test) attributes and the text `pub(super) `, THE SYSTEM SHALL show the same lines. WHEN the workspace's tests run with all features, THE SYSTEM SHALL report the same passed, failed and ignored counts as at BASE, with none failed. THE SYSTEM SHALL NOT change any file outside crates/lys-home except the design documents that carry this brief and its roadmap row, SHALL NOT change any line of a test file other than a use line, SHALL NOT change any other module's mod.rs, and SHALL NOT leave any non-test source file in crates/lys-home over 500 lines of code, counted without blank lines and comment lines, with *_tests.rs files and files under crates/lys-home/tests left out of the count.
+
+**Acceptance:**
+- `bash -c 'strip() { sed -E "/^(pub )?use .*\{$/,/\};$/d" | grep -vE "^[[:space:]]*($|//!|(pub )?use |(pub(\(crate\))? )?mod |#\[cfg\(test\)\])" | sed -E "s/pub\(super\) //" | sort; }; diff <(git show "$BASE":crates/lys-home/src/record/mod.rs | strip) <(cat crates/lys-home/src/record/helpers.rs crates/lys-home/src/record/session.rs crates/lys-home/src/record/home.rs | strip)'` prints nothing.
+- `cargo test --workspace --all-features 2>&1 | grep -E '^test result:' | awk '{p+=$4; f+=$6; i+=$8} END {print p, f, i}'` prints the same three numbers on the branch as on BASE, and the second number is 0.
+- `git diff -U0 "$BASE" -- 'crates/lys-home/*_tests.rs' crates/lys-home/tests | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' | grep -vE '^[+-][[:space:]]*(pub )?use '` prints nothing.
+- `git diff --name-only "$BASE" -- . ':!crates/lys-home' ':!docs/design'` prints nothing.
+- `git diff --name-only "$BASE" -- 'crates/lys-home/*mod.rs'` prints exactly crates/lys-home/src/record/mod.rs.
+- `find crates/lys-home -name '*.rs' ! -name '*_tests.rs' ! -path 'crates/lys-home/tests/*' -exec sh -c 'n=$(grep -cvE "^[[:space:]]*(//|$)" "$1"); [ "$n" -gt 500 ] && echo "$1 $n"' _ {} \;` prints nothing.
+
+**Checklist:**
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+
+**Stories:**
+- S25 (Developer, Works on lys-home's code beside the record module) — As a developer working on lys-home, I want every public path of the record module to resolve and every test to pass unchanged after the move, so that my code and tests need no edit because files moved.
 
 ## Boundaries
 
-- No change to crates/lys-home/src/record/blocks.rs or crates/lys-home/src/record/templates.rs: BlockStore::put, BlockStore::put_file and TemplateStore::put stay byte-for-byte as they are.
-- No change to any test other than the two this brief names, in lys-home or in any other crate; the sleep in the lys-anchor crate's admission certificate tests stays.
-- No change to crates/lys-home/src/record/canon.rs; millis_now stays.
-- No new dependency: std::fs::File::set_modified only.
-- No test renamed, split, ignored or given a raised timeout, and no #[allow], #[ignore] or cfg added to silence anything.
-- The change is one commit on the card branch.
+- SHALL NOT rename, remove or move to a new path any public item of lys-home, and SHALL NOT add a public path.
+- SHALL NOT change the text of any moved function body, and SHALL NOT change any on-disk format, the session lock, the durability order of line, index row and head, or any error variant.
+- SHALL NOT change any file of a crate other than lys-home.
+- SHALL NOT change any test file except a use line the move requires, and SHALL NOT split or add a test file.
+- SHALL NOT change any mod.rs other than crates/lys-home/src/record/mod.rs.
+- SHALL NOT widen any private field, method or helper beyond pub(super).
+- SHALL NOT silence a lint with #[allow], #[ignore], a _-prefixed name or #[cfg(any())].
 
 ## Verification
 
-- From the repository root: `grep -rnE 'thread::sleep|tokio::time::sleep' crates/lys-home` prints nothing.
-- `git diff --name-only 7b53625 -- crates/` prints exactly crates/lys-home/src/record/blocks_tests.rs and crates/lys-home/src/record/templates_tests.rs.
-- `git log --oneline $(git merge-base HEAD origin/main)..HEAD` on the card branch lists exactly one commit; the card branch starts from origin/main, which contains 7b53625.
-- File drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, rewrite the stored file with its own bytes — in the block test `std::fs::write(store.root().join(&first.hash.as_str()[..2]).join(first.hash.as_str()), &block).unwrap();`, in the template test `std::fs::write(&path, &bytes).unwrap();`. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the stored file's modification time; the shard directory's modification time and the entry count assertions still hold, because rewriting an existing file adds and removes no entry.
-- Directory drift check, run and reverted, never committed: in each test, after the read-back assertions on the pinned instant and before the second put, create a file named drift in the shard directory and remove it — in the block test `let shard = store.root().join(&first.hash.as_str()[..2]); std::fs::write(shard.join("drift"), b"").unwrap(); std::fs::remove_file(shard.join("drift")).unwrap();`, in the template test the same with `path.parent().unwrap()` as the shard. Each injection makes exactly that test fail, and the failing assertion is the one after the second put on the shard directory's modification time; the stored file's modification time and the entry count assertions still hold, because the file is untouched and the created file is gone before the count is taken.
-- cargo fmt --all leaves the tree unchanged.
-- cargo clippy --all-targets --all-features -- -D warnings and cargo clippy --all-targets -- -D warnings exit 0.
-- cargo test --workspace --all-features exits 0 and lists both named tests as passed.
-- cargo doc --no-deps --all-features and cargo doc --no-deps exit 0.
-- sh scripts/design/gate.sh exits 0.
+- Set and export BASE as the main commit the build branch starts from: `export BASE=$(git merge-base HEAD origin/main)`.
+- Run `grep -nE '^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?((const|async|unsafe|extern)[[:space:]]+)*(fn|struct|enum|union|impl|const|static|type|trait)\b|macro_rules!' crates/lys-home/src/record/mod.rs` and confirm it prints nothing.
+- Run `bash -c 'strip() { sed -E "/^(pub )?use .*\{$/,/\};$/d" | grep -vE "^[[:space:]]*($|//!|(pub )?use |(pub(\(crate\))? )?mod |#\[cfg\(test\)\])" | sed -E "s/pub\(super\) //" | sort; }; diff <(git show "$BASE":crates/lys-home/src/record/mod.rs | strip) <(cat crates/lys-home/src/record/helpers.rs crates/lys-home/src/record/session.rs crates/lys-home/src/record/home.rs | strip)'` and confirm it prints nothing.
+- Run `cargo test --workspace --all-features 2>&1 | grep -E '^test result:' | awk '{p+=$4; f+=$6; i+=$8} END {print p, f, i}'` on BASE and on the branch and confirm the two outputs are equal with 0 failed.
+- Run `find crates/lys-home -name '*.rs' ! -name '*_tests.rs' ! -path 'crates/lys-home/tests/*' -exec sh -c 'n=$(grep -cvE "^[[:space:]]*(//|$)" "$1"); [ "$n" -gt 500 ] && echo "$1 $n"' _ {} \;` and confirm it prints nothing.
+- Run `cargo fmt --all` and confirm `git status --porcelain` shows no file it changed.
+- Run `cargo clippy --all-targets --all-features -- -D warnings` and `cargo clippy --all-targets -- -D warnings` and confirm each exits 0.
+- Run `cargo test --workspace --all-features` and confirm it exits 0.
+- Run `cargo doc --no-deps --all-features` and `cargo doc --no-deps` and confirm each exits 0.
+- Run `sh scripts/design/gate.sh` and confirm it exits 0.

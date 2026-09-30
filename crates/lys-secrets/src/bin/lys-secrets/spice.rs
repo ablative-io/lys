@@ -134,6 +134,7 @@ impl SpiceGrants {
         match self.engine.check(&resource, action, subject, now) {
             Ok(true) => Ok(Permitted {
                 person: "the directory's grant chain".to_owned(),
+                ends_at_ms: None,
             }),
             Ok(false) => Err(denied(format!(
                 "the directory gives no {} on {kind}/{secret}",

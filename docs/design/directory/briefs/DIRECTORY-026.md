@@ -37,7 +37,7 @@ title: Make each session its own directory record with its own credential, start
 > - C208 — A report-back from an agent whose certificate has been revoked is refused certificate_revoked, creating no session, and the agent's open sessions stay open.
 > **Stories:**
 > - S80 (Started agent, Reports back to the directory and presents its session credential) — As a started agent, I want to present my session credential to the directory, so that it confirms I am my enduring agent in this session.
-> - S81 (Responsible person, Signs in and provisions agents under their own authority) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+> - S81 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
 > - S82 (Operator, Installs and runs the standalone identity product) — As the operator, I want to stop a session on the directory, so that its credential is refused even when the agent crashed and never reported its end.
 > - S83 (Operator, Installs and runs the standalone identity product) — As the operator, I want to list an agent's sessions with their states, so that I can see which of its session credentials are still accepted.
 
@@ -93,7 +93,7 @@ The directory contract docs/design/identity/DIRECTORY-CONTRACT.md SHALL gain one
 - C193 — docs/design/identity/DIRECTORY-CONTRACT.md has a section '## Sessions and their credentials' giving the session record's seven members, the credential as 32 random bytes kept only as its SHA-256, the challenge issued for one agent id and one launch record id with its 60-second lifetime, the lys/session-start/v1 message over the agent's directory id, the directory's identifier, the launch record id and the challenge with a 109-byte worked example, the signature checked first, the state-revealing refusals in their order, the two acts that end a session, and the fourteen named refusals.
 
 **Stories:**
-- S81 (Responsible person, Signs in and provisions agents under their own authority) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+- S81 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
 
 ### R2: Extend lys/identity-event/v1 with the session events and the agent's actor methods, under a fresh joint review of the envelope
 
@@ -185,7 +185,7 @@ WHEN an agent asks for a challenge naming an agent directory id and a launch rec
 - C201 — A correctly signed report-back is refused by name, committing no event and creating no session, for a reused challenge (challenge_reused), an expired one (challenge_expired), one issued to another agent (challenge_foreign_agent), one never issued (challenge_unknown), a proof naming another directory (wrong_directory), a launch record id that differs from the challenge's (launch_record_mismatch), a retired agent (agent_retired) and an agent whose certificate is not issued (certificate_not_issued, naming the act of issuing it); a suspended agent is not refused.
 
 **Stories:**
-- S81 (Responsible person, Signs in and provisions agents under their own authority) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+- S81 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
 
 ### R6: Check a presented session credential and answer its enduring agent
 
@@ -229,7 +229,7 @@ WHEN the agent reports its end with its session credential, THE SYSTEM SHALL che
 - C204 — The directory's configured administrator stops a session as one signed event naming the administrator as actor, after which its credential is refused session_ended, naming the session; any other caller's stop is refused by DIRECTORY-003's admission.
 
 **Stories:**
-- S81 (Responsible person, Signs in and provisions agents under their own authority) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+- S81 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
 - S82 (Operator, Installs and runs the standalone identity product) — As the operator, I want to stop a session on the directory, so that its credential is refused even when the agent crashed and never reported its end.
 
 ### R8: Expose the challenge, report-back, presentation, end and stop as directory routes, admitting an agent only to its own session
@@ -308,7 +308,7 @@ WHEN a correctly signed report-back passes R5's check that the agent's certifica
 - C208 — A report-back from an agent whose certificate has been revoked is refused certificate_revoked, creating no session, and the agent's open sessions stay open.
 
 **Stories:**
-- S81 (Responsible person, Signs in and provisions agents under their own authority) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
+- S81 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want each session of my agent kept as its own record under that one agent, so that starting another session never makes another agent.
 
 ## Boundaries
 

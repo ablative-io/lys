@@ -16,12 +16,12 @@ title: Build the directory contract and signed authoritative identity changes
 > **Checklist:**
 > - C11 — People and agents are registered with enduring identifiers and issuer-subject bindings, each agent under the signed-in person responsible for it, and registration issues no login, credential or certificate (ID001_DIRECTORY).
 > - C12 — Every identity change is one signed event through lys-log-store under a jointly reviewed envelope, every answered projection equals replay across the crash boundaries, and a receipt verifies independently (ID001_AUDIT_FAULTS, ID001_RECEIPT).
-> - C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN). Under the lead's ruling of 27 September 2026 (DIRECTORY-026), one exception: an agent authenticated by its enrolled key may create and end its own session record, and nothing else; every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused by name.
+> - C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN).
 > - C14 — The link-audit receiver is built and proved against fixtures before row 03 needs it (ID001_RECEIVER).
 > - C15 — Each identity's lifecycle state is recorded as ADR-011 proposes, every transition one signed event, and the grant path's row is recorded open for Tom with its criteria drafted.
 > **Stories:**
-> - S1 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
-> - S4 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
+> - S1 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
+> - S4 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
 > - S7 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
 
 ## Purpose
@@ -58,8 +58,8 @@ THE SYSTEM SHALL add the domain crates crates/lys-identity (directory records, t
 - C11 — People and agents are registered with enduring identifiers and issuer-subject bindings, each agent under the signed-in person responsible for it, and registration issues no login, credential or certificate (ID001_DIRECTORY).
 
 **Stories:**
-- S1 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
-- S4 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
+- S1 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
+- S4 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
 
 ### R2: Commit every identity change as one signed event through lys-log-store
 
@@ -79,7 +79,7 @@ THE SYSTEM SHALL commit every signed directory change through lys-log-store and 
 - C12 — Every identity change is one signed event through lys-log-store under a jointly reviewed envelope, every answered projection equals replay across the crash boundaries, and a receipt verifies independently (ID001_AUDIT_FAULTS, ID001_RECEIPT).
 
 **Stories:**
-- S4 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
+- S4 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
 - S7 (Verifier, Checks a recorded identity change without the operator's cooperation) — As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.
 
 ### R3: Admit only the configured administrator to change the directory
@@ -94,10 +94,10 @@ THE SYSTEM SHALL authenticate the initial directory administrator by an explicit
 - create: tests/identity_contract/
 
 **Checklist:**
-- C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN). Under the lead's ruling of 27 September 2026 (DIRECTORY-026), one exception: an agent authenticated by its enrolled key may create and end its own session record, and nothing else; every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused by name.
+- C13 — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN).
 
 **Stories:**
-- S4 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
+- S4 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to register an agent under my name before it ever runs, with every change to it signed, so that who created it and who answers for it is never reconstructed after the fact.
 
 ### R4: Build the link-audit receiver before row 03 needs it
 
@@ -137,7 +137,7 @@ OPEN for Tom, not decided here: which row owns the grant path. The path: a perso
 - C15 — Each identity's lifecycle state is recorded as ADR-011 proposes, every transition one signed event, and the grant path's row is recorded open for Tom with its criteria drafted.
 
 **Stories:**
-- S1 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
+- S1 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every grant my agent holds to trace back to me, so that withdrawing my authority stops everything derived from it.
 
 ## Boundaries
 

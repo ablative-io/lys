@@ -39,7 +39,8 @@ impl<P: PermissionCheck> Broker<P> {
     ///
     /// # Errors
     ///
-    /// `SecretUnknown` and `NoAccountAvailable`.
+    /// `SecretUnknown`, and `AccountsRested` when there is no account in
+    /// service to move to.
     pub fn next_account(&mut self, secret: &str) -> Result<String, SecretsError> {
         match self.store.next_account(secret) {
             Ok(account) => {
@@ -104,6 +105,27 @@ impl<P: PermissionCheck> Broker<P> {
                 Err(refusal)
             }
         }
+    }
+
+    /// Rests `account` of `secret`, for example when it is revoked or at
+    /// its usage limit. The turn passes to the next account in service; a
+    /// secret whose every account rests refuses each use, spawn and ask as
+    /// `AccountsRested` until one is brought back.
+    ///
+    /// # Errors
+    ///
+    /// `SecretUnknown`, `AccountUnknown`, and the audit log's refusals.
+    pub fn rest_account(&mut self, secret: &str, account: &str) -> Result<(), SecretsError> {
+        self.store.rest_account(secret, account)?;
+        let named = format!("{secret}@{account}");
+        self.record(
+            AuditKind::NextAccount,
+            (None, None, Some(&named)),
+            None,
+            None,
+            "rested",
+        )?;
+        Ok(())
     }
 
     /// Returns a resting account of `secret` to service.

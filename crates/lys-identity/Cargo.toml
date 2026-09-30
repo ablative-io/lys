@@ -10,6 +10,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+chrono.workspace = true
 ciborium.workspace = true
 lys-core.workspace = true
 lys-log-store.workspace = true
@@ -17,6 +18,7 @@ rand.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+x509-parser.workspace = true
 
 [features]
 # The failing permission engine the grant tests drive an outage with.

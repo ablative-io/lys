@@ -28,7 +28,7 @@ title: Build the identity surface's shell to the mock-up and close its two keybo
 > - C312 — CONFORMANCE.md line 3 names index.v6.html as the reference, with v5 as the prior, and pins index.v6.html by its path and sha256, the first pin of the mock-up.
 > **Stories:**
 > - S132 (Keyboard user, Working the identity screens without a mouse) — As a person working by keyboard, I want to reach and press every control on every screen without a mouse, so that nothing the screens offer is closed to me.
-> - S133 (Responsible person, Sharing and returning to a place in the screens) — As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
+> - S133 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
 > - S134 (Newcomer to the screens, Learning what a screen shows) — As a newcomer, I want the help overlay to number what is on screen and put me back where I was when I leave it, so that asking for help never costs me my place.
 > - S135 (Identity line lead, Keeping the mock-up and the build in step) — As the identity line lead, I want the mock-up and the built shell to change together and the proof to run in the gate, so that the mock-up stays the definition the build is held to.
 
@@ -100,7 +100,7 @@ THE SYSTEM SHALL create surface/identity/src/shell/routeTable.ts holding one exp
 - C304 — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
 
 **Stories:**
-- S133 (Responsible person, Sharing and returning to a place in the screens) — As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
+- S133 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want every screen and tab to have its own address, so that a link I send opens exactly the view I was looking at.
 
 ### R3: Prove the rail and the dock side as the mock-up has them
 

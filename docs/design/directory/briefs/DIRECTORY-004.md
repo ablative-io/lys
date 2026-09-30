@@ -16,7 +16,7 @@ title: Link two upstream providers to one Rauthy person
 > - C16 — The pinned fork commit links Google and GitHub to one unchanged Rauthy person, refuses every collision and replay, migrates both storages and audits each link atomically (ID001_LINK_PAIR, ID001_LINK_REFUSAL, ID001_LINK_MIGRATION, ID001_LINK_AUDIT).
 > - C17 — The provider-link contract and the links report are written, and the report names the gated fork commit the pin moves to.
 > **Stories:**
-> - S5 (Responsible person, Signs in and provisions agents under their own authority) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
+> - S5 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
 ## Purpose
 
@@ -54,7 +54,7 @@ WHEN no commit on the ablative branch of ablative-io/rauthy has passed the fork'
 - C16 — The pinned fork commit links Google and GitHub to one unchanged Rauthy person, refuses every collision and replay, migrates both storages and audits each link atomically (ID001_LINK_PAIR, ID001_LINK_REFUSAL, ID001_LINK_MIGRATION, ID001_LINK_AUDIT).
 
 **Stories:**
-- S5 (Responsible person, Signs in and provisions agents under their own authority) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
+- S5 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
 ### R2: Write the provider-link contract and the links report
 
@@ -74,7 +74,7 @@ WHEN DIRECTORY-003 has not landed, THE SYSTEM SHALL NOT start R2. R2 SHALL NOT a
 - C17 — The provider-link contract and the links report are written, and the report names the gated fork commit the pin moves to.
 
 **Stories:**
-- S5 (Responsible person, Signs in and provisions agents under their own authority) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
+- S5 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a person signing in, I want Google and GitHub to resolve to the one me, so that adding a provider never splits me into two people or merges me with someone who shares my email.
 
 ## Boundaries
 

@@ -2,9 +2,23 @@
   "cluster": "lys-core",
   "personas": [
     {
+      "name": "Norn Agent Runtime",
+      "role": "Signing Session History (primary consumer)",
+      "stories": []
+    },
+    {
+      "name": "Lys CLI Operator and Auditor",
+      "role": "Checking certificates and certified statements",
+      "stories": []
+    },
+    {
       "name": "Card author",
       "role": "Landing work in lys",
       "stories": [
+        {
+          "id": "S24",
+          "text": "As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced."
+        },
         {
           "id": "S30",
           "text": "As a card author landing work in lys, I want the gate to refuse an unwrap, a lint bypass, a dropped Result or logic in a mod.rs so that a rule break is caught before review rather than by a reviewer's memory."
@@ -16,8 +30,32 @@
       "role": "Writing tests in sibling files",
       "stories": [
         {
+          "id": "S25",
+          "text": "As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends."
+        },
+        {
           "id": "S31",
           "text": "As a test writer, I want a test file recognised as test code by a marker it carries so that I can unwrap in test helpers without an #[allow]."
+        }
+      ]
+    },
+    {
+      "name": "Third-party verifier",
+      "role": "Verifying lys artifacts",
+      "stories": [
+        {
+          "id": "S26",
+          "text": "As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed."
+        }
+      ]
+    },
+    {
+      "name": "Consumer of lys-log-store",
+      "role": "Implementing LeafStore",
+      "stories": [
+        {
+          "id": "S27",
+          "text": "As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release."
         }
       ]
     },
@@ -26,56 +64,16 @@
       "role": "Trusting the gate",
       "stories": [
         {
+          "id": "S28",
+          "text": "As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured."
+        },
+        {
+          "id": "S29",
+          "text": "As the lead for lys, I want the full suite to run the same tests before and after the card so that I know the cleanup changed no behaviour."
+        },
+        {
           "id": "S32",
           "text": "As the lead for lys, I want proof that the unwrap rule fires so that a green leg means the rule held and not that nothing was measured."
-        }
-      ]
-    },
-    {
-      "name": "Reader of the design",
-      "role": "Tracing the earlier lys-core design",
-      "stories": [
-        {
-          "id": "S33",
-          "text": "As a reader of the lys-core design, I want the hand-written pre-method documents kept under their own names so that the earlier design and the citations of it survive the method's render."
-        }
-      ]
-    },
-    {
-      "name": "Norn Agent Runtime",
-      "role": "Signing Session History (primary consumer)",
-      "stories": [
-        {
-          "id": "S1",
-          "text": "As the Norn runtime, I want a signing `PersistenceSink` decorator to attest each session event with the agent's Ed25519 identity so that every persisted event carries a verifiable, timestamp-authenticated signature without any core-loop change."
-        },
-        {
-          "id": "S2",
-          "text": "As the Norn runtime, I want to append each event's hash to a per-session `AppendOnlyTree` so that the session history becomes tamper-evident from the first event."
-        },
-        {
-          "id": "S3",
-          "text": "As the Norn runtime, I want to export the session root via `RootHash::to_parts()` at every `checkpoint()` so that the 32-byte root can later be anchored externally without revealing session contents."
-        },
-        {
-          "id": "S4",
-          "text": "As the Norn runtime, I want to issue an X.509 certificate at agent spawn with capability claims embedded as a `LYS_OID_ARC` extension so that the agent's identity and permissions are one presentable object."
-        },
-        {
-          "id": "S5",
-          "text": "As the Norn runtime, I want to verify a counterparty's certificate chain at the MCP boundary — at the dispatch instant, via `verify_certificate_chain_at` — so that cross-agent tool calls are gated on legitimate, unexpired, capability-scoped identity."
-        },
-        {
-          "id": "S6",
-          "text": "As the Norn runtime, I want spawned agents to load their identity from `LYS_IDENTITY_KEY` so that key material reaches an agent process through its environment without touching shared disk."
-        },
-        {
-          "id": "S7",
-          "text": "As the Norn runtime, I want `reconstruct_from_leaves` to rebuild a session tree from the persisted event sequence after a crash so that the recovered tree's root matches the last checkpointed root exactly."
-        },
-        {
-          "id": "S8",
-          "text": "As the Norn runtime, I want concurrent agent processes calling `load_or_generate` on the same key path to converge on one persisted key so that a spawn race never leaves an agent holding an identity that differs from the key on disk."
         }
       ]
     },
@@ -83,14 +81,6 @@
       "name": "Lys CLI",
       "role": "Operator and Auditor",
       "stories": [
-        {
-          "id": "S9",
-          "text": "As an operator, I want `lys key` to generate and inspect identities without ever printing private material so that key handling over a shoulder-surfable terminal is safe by construction."
-        },
-        {
-          "id": "S10",
-          "text": "As an operator, I want `lys ca issue` to mint certificates with capability-claim extensions from my instance CA key so that I can provision agent identities from the command line."
-        },
         {
           "id": "S11",
           "text": "As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit."
@@ -158,80 +148,6 @@
       ]
     },
     {
-      "name": "Norn Agent Runtime",
-      "role": "Signing Session History (primary consumer)",
-      "stories": [
-        {
-          "id": "S5",
-          "text": "As the Norn runtime, I want to verify a counterparty's certificate chain at the MCP boundary — at the dispatch instant, via `verify_certificate_chain_at` — so that cross-agent tool calls are gated on legitimate, unexpired, capability-scoped identity."
-        }
-      ]
-    },
-    {
-      "name": "Lys CLI Operator and Auditor",
-      "role": "Checking certificates and certified statements",
-      "stories": [
-        {
-          "id": "S11",
-          "text": "As an auditor, I want `lys ca verify` with an explicit instant so that I can check whether a certificate was valid at the time a disputed action occurred, not just at the time of my audit."
-        }
-      ]
-    },
-    {
-      "name": "Card author",
-      "role": "Landing work in lys",
-      "stories": [
-        {
-          "id": "S24",
-          "text": "As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced."
-        }
-      ]
-    },
-    {
-      "name": "Test writer",
-      "role": "Reading a test's fixtures",
-      "stories": [
-        {
-          "id": "S25",
-          "text": "As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends."
-        }
-      ]
-    },
-    {
-      "name": "Third-party verifier",
-      "role": "Verifying lys artifacts",
-      "stories": [
-        {
-          "id": "S26",
-          "text": "As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed."
-        }
-      ]
-    },
-    {
-      "name": "Consumer of lys-log-store",
-      "role": "Implementing LeafStore",
-      "stories": [
-        {
-          "id": "S27",
-          "text": "As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release."
-        }
-      ]
-    },
-    {
-      "name": "Lead",
-      "role": "Trusting the gate",
-      "stories": [
-        {
-          "id": "S28",
-          "text": "As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured."
-        },
-        {
-          "id": "S29",
-          "text": "As the lead for lys, I want the full suite to run the same tests before and after the card so that I know the cleanup changed no behaviour."
-        }
-      ]
-    },
-    {
       "name": "Lys maintainer",
       "role": "Landing a card through the gate",
       "stories": [
@@ -286,6 +202,16 @@
         {
           "id": "S10",
           "text": "As a reader of the lys-core design, I want the hand-written pre-method documents kept beside the rendered cluster so that the earlier design is not lost when the method's documents replace it."
+        }
+      ]
+    },
+    {
+      "name": "Reader of the design",
+      "role": "Tracing the earlier lys-core design",
+      "stories": [
+        {
+          "id": "S33",
+          "text": "As a reader of the lys-core design, I want the hand-written pre-method documents kept under their own names so that the earlier design and the citations of it survive the method's render."
         }
       ]
     }

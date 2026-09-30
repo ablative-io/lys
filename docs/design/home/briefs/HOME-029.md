@@ -1,0 +1,195 @@
+---
+type: brief
+id: HOME-029
+cluster: home
+title: Prove a subscription login through the pass-through example on the shared forward.rs
+---
+
+# HOME-029: Prove a subscription login through the pass-through example on the shared forward.rs
+
+> **Cluster:** home
+> **Blocked by:** HOME-001 R10 (the little proxy) must land on main first: it creates crates/lys-home/src/proxy/forward.rs, error.rs and forward_tests.rs, brings the HTTP, async and TLS dependencies into crates/lys-home/Cargo.toml, and creates docs/design/home/PROOF-PROXY.md holding its session-key section. None of these exists on main at 7b53625. This brief is built on the main R10 lands on., The live run in R7 needs a seat whose Claude Code login is a subscription, not an API key, on the installed Claude Code 2.1.283, in a session that is not the one running the proof, and a person watching it. It is a named step after the build, outside the gate.
+> **Design anchor:**
+> - ADR-001 — Secrets are held behind a handle the door swaps for the credential — A seat holds a short-lived handle bound to its identity. The real credential sits in the door's encrypted store and never leaves the server. The door's proxy checks SpiceDB, swaps the handle for the credential, forwards the call and writes one audit line. Built in Rust inside the door; no OpenBao unless credentials minted on demand are later needed.
+> - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
+> - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
+> - ADR-019 — The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001) — The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.
+> **Checklist:**
+> - C7 — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
+> - C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+> - C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+> - C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+> - C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+> - C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+> - C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+> - C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+> **Stories:**
+> - S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+## Purpose
+
+HOME-001's third proof is that a subscription login survives a pass-through proxy, so the tee that records the stream has a place to live. HOME-001 R7 is that proof and is unbuilt. This brief builds it on R10's shared transport: the pass-through example, which forwards to the provider base URL on its command line and writes one four-field line per call, gated by loopback tests that need no provider; then one live run with a subscription login through it, recorded truthfully in PROOF-PROXY.md whether it completed or failed.
+
+## Task
+
+Build HOME-001 R7 as its own card, on the main HOME-001 R10 lands on. R7's example shares R10's crates/lys-home/src/proxy/forward.rs and builds no second transport. In order: (1) forward.rs, which R10 creates, returns a named error to its caller when the upstream fails before any response (refused, reset, or broken before the status line) and synthesises nothing, so lys-proxy keeps R10's own behaviour (ADR-019); (2) crates/lys-home/examples/passthrough.rs takes exactly two positional arguments, the loopback address to listen on in the form 127.0.0.1:PORT and then the provider base URL, serves HTTP on that address and forwards every request through forward.rs, rewriting Host and dropping the fixed hop-by-hop list and passing everything else byte for byte; (3) once listening, it writes one four-field line per call (method, path, status, duration_ms) to stderr and nothing else, anywhere, its only other line being a refusal by name of a bad argument before it listens; (4) it answers 502 with an empty body when forward.rs fails before any upstream response, and closes the client connection when the upstream breaks after its status and headers were sent; (5) the loopback tests for (2) to (4) run in `cargo test --workspace --all-features` with no provider; (6) the cluster's markdown, DESIGN.md, CHECKLIST.md and briefs/HOME-008.md, is rendered from its JSON with render-cluster.py, never by hand; (7) after the build, the named live run is made and its section is appended to PROOF-PROXY.md. The card is done when PROOF-PROXY.md records the live run truthfully, completed or failed, and what failed if it did. Split note: C7 and S5 are also claimed by HOME-001, whose R7 is the source this brief builds; C45 to C51 are this brief's alone. The person who runs the example chooses the port and sets ANTHROPIC_BASE_URL to the same address, so the example announces nothing; every gate test drives the example's server through its function that takes a TcpListener the test itself binds. Out of scope: any change to HOME-001.json or to the design's 2.1.281 lines (reported as a finding, not edited), any change to lys-proxy's behaviour, any stripping experiment, and installing any other Claude Code version.
+
+## Requirements
+
+### R1: forward.rs names a failure before any upstream response and invents nothing
+
+IF forwarding fails before any upstream response reaches forward.rs (the connection is refused, the connection is reset, or the stream breaks before the status line), THEN forward.rs SHALL return an error to its caller naming which of those three kinds occurred, as three distinct variants of the proxy's error type in error.rs. forward.rs SHALL NOT synthesise a status, a header or a body byte on that path, SHALL NOT answer 502 itself, SHALL NOT retry (retry_canceled_requests(false) stays as R10 sets it), and SHALL NOT put an error's source text, a header value or a body byte into the error it returns. lys-proxy's observable behaviour is unchanged by this requirement.
+
+**Acceptance:**
+- A test in forward_tests.rs binds a TcpListener on 127.0.0.1:0, reads its port and drops the listener, then forwards GET / to http://127.0.0.1:<that port>: the call returns the refused variant of the proxy's error type, and no response value (no status, no header, no body byte) is returned to the caller.
+- `grep -nE '502|BAD_GATEWAY' crates/lys-home/src/proxy/forward.rs` prints nothing.
+- `grep -n 'retry' crates/lys-home/src/proxy/forward.rs` prints exactly the one line holding `retry_canceled_requests(false)`.
+
+**Files:**
+- modify: crates/lys-home/src/proxy/error.rs
+- modify: crates/lys-home/src/proxy/forward.rs
+- modify: crates/lys-home/src/proxy/forward_tests.rs
+
+**Checklist:**
+- C45 — A Session asked by find_call for a call id builds, once per open, a map from call id to the first lys.call entry holding it in file order, keeps it current on every append and rebuilds it after a reconcile; once it is built, an ingest through ingest_call, ingest_call_files and ingest_outcome reads no lys.call entry, and a second ingest of a recorded call id records nothing and returns that entry's id.
+
+### R2: The pass-through example forwards through forward.rs
+
+Write crates/lys-home/examples/passthrough.rs, declared in crates/lys-home/Cargo.toml as an example target with `test = true` and with the package's automatic example discovery off, so its sibling test file crates/lys-home/examples/passthrough_tests.rs is compiled only as its test module. It takes exactly two positional arguments, in this order: the address to listen on, in the form 127.0.0.1:PORT, and the provider base URL. It serves HTTP on that address through a function that takes a bound TcpListener and the base URL, which main calls with the listener it binds and the tests call with a listener they bind. WHEN a request arrives THE SYSTEM SHALL forward it through forward.rs to the base URL joined with the request's path and query, and SHALL return the upstream response's status, headers and streamed body to the client as they arrive. The R7 sentence 'forwards every request unchanged' holds under this definition, which is also appended to CN5: Unchanged is defined as exactly this: the Host header is rewritten to the upstream's authority and TLS SNI names the same host; the hop-by-hop headers HTTP forbids forwarding are dropped, namely Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; every other request header, and the body, pass byte for byte. The dropped names are one fixed list in the source, never read from a request. THE SYSTEM SHALL NOT build a second transport, SHALL NOT buffer a streamed body before forwarding it, SHALL NOT retry, SHALL NOT store anything, SHALL NOT see, copy, swap or store a credential (it passes in its header like any other), SHALL NOT add a dependency beyond those R10 brings, and SHALL NOT run as a service. IF either argument is missing, the listen address is not an IP address and port, the listen address's IP is not a loopback address, the base URL is not an http or https URL, or the listen address cannot be bound, THEN THE SYSTEM SHALL refuse by name: exit with a nonzero status having written one line to stderr that names the argument at fault (`listen address` or `base URL`) and the fault (`missing`, `malformed`, `not loopback` or `cannot bind`). main is a thin wrapper over one run function that takes the argument list and a stderr writer, parses, binds and serves, and returns the exit code; main passes the process's arguments and stderr and exits with the returned code, and run takes no stdout writer. THE SYSTEM SHALL NOT write the argument's value or an error's source text in that line, SHALL NOT listen on a non-loopback address, SHALL NOT choose a port itself, and SHALL NOT announce the address it listens on.
+
+**Acceptance:**
+- A loopback fake upstream on 127.0.0.1 answers GET / with status 418 and a chunked body written as three chunks `chunk-1\n`, `chunk-2\n`, `chunk-3\n` with a flush after each; the example's server, started in-process on a listener the test binds with the base URL `http://127.0.0.1:<upstream port>` parsed from the argument list [`passthrough`, `127.0.0.1:<example port>`, `http://127.0.0.1:<upstream port>`], answers a client's GET / with status 418 and the body `chunk-1\nchunk-2\nchunk-3\n`, in that order.
+- The client sends POST /v1/messages?beta=true with Host `127.0.0.1:<example port>`, `Connection: x-lys-hop`, `x-lys-hop: 1`, `Keep-Alive: timeout=5`, `TE: trailers`, `Proxy-Authorization: Basic eDp5`, `x-lys-pass: 7` and the body `{"a":1}`; the loopback upstream records exactly one request, with path and query `/v1/messages?beta=true`, Host `127.0.0.1:<upstream port>`, no `connection`, `x-lys-hop`, `keep-alive`, `te` or `proxy-authorization` header, `x-lys-pass: 7`, and the body bytes `{"a":1}`.
+- passthrough.rs holds the dropped names as one constant list, and `grep -ciE 'upgrade|trailer|transfer-encoding|proxy-authenticate' crates/lys-home/examples/passthrough.rs` counts only lines of that list.
+- `git diff` of crates/lys-home/Cargo.toml over the card's commits adds `autoexamples = false` and one `[[example]]` block naming `passthrough` with `test = true`, and adds no dependency line.
+- The tests call the run function directly with each argument list below and an in-memory buffer as its stderr writer; for each, run returns a nonzero exit code and the buffer holds exactly the one line named beside it and nothing else: [`passthrough`] gives `listen address: missing`; [`passthrough`, `127.0.0.1:47001`] gives `base URL: missing`; [`passthrough`, `not an address`, `http://127.0.0.1:47002`] gives `listen address: malformed`; [`passthrough`, `0.0.0.0:47001`, `http://127.0.0.1:47002`] gives `listen address: not loopback`; [`passthrough`, `127.0.0.1:47001`, `not a url`] gives `base URL: malformed`.
+- With a 127.0.0.1 listener the test binds and holds open, calling the run function with [`passthrough`, `127.0.0.1:<that listener's port>`, `http://127.0.0.1:<another port>`] and an in-memory stderr buffer returns a nonzero exit code, and the buffer holds exactly the one line `listen address: cannot bind` and nothing else.
+- main's body is one call to the run function with the process's arguments and stderr followed by `std::process::exit` with its result, and `grep -nE 'stdout|print!|println!' crates/lys-home/examples/passthrough.rs` prints nothing, so no path writes to stdout.
+- Parsing [`passthrough`, `127.0.0.1:47001`, `https://127.0.0.1:47002`] yields the listen address 127.0.0.1:47001 and the base URL https://127.0.0.1:47002, with no error, so an https base URL is accepted.
+
+**Files:**
+- create: crates/lys-home/examples/passthrough.rs
+- create: crates/lys-home/examples/passthrough_tests.rs
+- modify: crates/lys-home/Cargo.toml
+
+**Checklist:**
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- C49 — resume_check counts each transcript's tool_use ids in one pass and reports the same values as before.
+
+### R3: One four-field line per call, and nothing else written
+
+WHEN a call ends, THE SYSTEM SHALL write exactly one line to stderr: a JSON object with exactly the four keys `method`, `path`, `status` and `duration_ms`, where `path` is the request path without its query string, `status` is the status sent to the client, and `duration_ms` is the whole milliseconds from the request's arrival to the call's end. The line is written through one function whose writer main gives as stderr and a test gives as a buffer. THE SYSTEM SHALL NOT write a header value, a header name, a query string, a body byte or error text to stderr, stdout or any file, and once it is listening SHALL NOT write any line other than the call line; the only other line it ever writes is R2's refusal by name, before it listens.
+
+**Acceptance:**
+- In the 418 test of R2 the line buffer holds exactly one line, which parses as a JSON object with exactly four keys: `method` is `GET`, `path` is `/`, `status` is 418 and `duration_ms` is an unsigned integer.
+- In the header test of R2 the line's `path` is `/v1/messages` and the buffer contains none of the strings `beta`, `x-lys-pass`, `eDp5` and `{"a":1}`.
+- A call whose request carries the header `x-lys-sentinel: SENTINEL-HEADER` and the body `SENTINEL-BODY`, answered by the upstream with the body `SENTINEL-REPLY`, leaves a line buffer containing none of the strings `SENTINEL-HEADER`, `SENTINEL-BODY`, `SENTINEL-REPLY` and `x-lys-sentinel`.
+- `grep -nE 'println!|print!|eprint!|dbg!|std::fs|File::|tracing|log::' crates/lys-home/examples/passthrough.rs` prints nothing, and `grep -c 'writeln!' crates/lys-home/examples/passthrough.rs` prints 2: one inside the call-line function and one inside the refusal function of R2.
+
+**Files:**
+- modify: crates/lys-home/examples/passthrough.rs
+- modify: crates/lys-home/examples/passthrough_tests.rs
+
+**Checklist:**
+- C50 — The canon keeps the id set load builds, and adding an example refuses a repeated id by that set, never by walking the loaded entries.
+
+### R4: 502 before any upstream response, a closed connection after one
+
+IF forward.rs returns its pre-response error (refused, reset, or broken before the status line), THEN THE SYSTEM SHALL answer the client 502 Bad Gateway with an empty body and SHALL write the call line with `status` 502. IF the upstream breaks after its status and headers have gone to the client, THEN THE SYSTEM SHALL close the client connection without completing the body, and SHALL write the call line with that upstream status and `duration_ms` up to the break. In both cases THE SYSTEM SHALL NOT write error text, a header value or a body byte anywhere, SHALL NOT send a body on the 502, SHALL NOT change a status already sent, and SHALL NOT retry. This mapping lives in the example only (ADR-019).
+
+**Acceptance:**
+- The example's server started in-process with the base URL of a 127.0.0.1 port whose listener the test bound and dropped answers a client's GET / with status 502 and a body of 0 bytes, and the line buffer holds exactly one line whose `status` is 502 and which has exactly the four keys.
+- A loopback upstream answers GET / with status 200 and a chunked body, writes the chunks `part-1` and `part-2`, waits 200 ms and then resets the connection (SO_LINGER 0, no terminating chunk); the client receives status 200, reads the bytes `part-1part-2`, and then its body read ends in an error instead of a complete body; the line buffer holds exactly one line whose `status` is 200 and whose `duration_ms` is at least 200.
+- In both tests above the line buffer holds no text beyond the one JSON line.
+
+**Files:**
+- modify: crates/lys-home/examples/passthrough.rs
+- modify: crates/lys-home/examples/passthrough_tests.rs
+
+**Checklist:**
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+
+### R5: The loopback tests run in the gate with no provider
+
+The tests of R2, R3 and R4 live in crates/lys-home/examples/passthrough_tests.rs as the example's test module and the test of R1 in crates/lys-home/src/proxy/forward_tests.rs. WHEN `cargo test --workspace --all-features` runs, THE SYSTEM SHALL run all of them against loopback fakes on 127.0.0.1. THE SYSTEM SHALL NOT reach any provider or any address other than 127.0.0.1, SHALL NOT be skipped by `#[ignore]` or a feature gate, and SHALL NOT name a test after a header value or a body string.
+
+**Acceptance:**
+- `cargo test -p lys-home --all-features --example passthrough` reports at least 5 passed tests and 0 ignored: the 418 test, the header test, the sentinel test, the 502 test and the mid-stream reset test.
+- `grep -rnE 'https?://' crates/lys-home/examples/passthrough_tests.rs` prints only lines whose URL host is 127.0.0.1.
+- `grep -c '#\[ignore' crates/lys-home/examples/passthrough_tests.rs crates/lys-home/src/proxy/forward_tests.rs` prints 0 for each file.
+
+**Files:**
+- modify: crates/lys-home/examples/passthrough_tests.rs
+
+**Checklist:**
+- C46 — A Session reports how many entries it has read from its file and how many syncs its own writes made (its line file, its index, its head and the sessions directory), and the block store reports its own syncs beside them, as counts a test reads.
+- C47 — The import command builds a new session under `<id>.jsonl.importing` with no per-entry sync and publishes it with one sync each of the line file, the index and the head and a sessions-directory sync before and after the rename to `<id>.jsonl`, five syncs whatever the record count; a crash before the rename leaves no `<id>.jsonl`, and the next import or open of that id removes what was left.
+- C48 — RECORD.md states the staged import's durability rule beside the per-append rule, as ADR-108 records it.
+
+### R6: Render the cluster's markdown from its JSON
+
+Structure: docs/design/home/briefs/HOME-008.md is created, and docs/design/home/DESIGN.md and docs/design/home/CHECKLIST.md are re-rendered, by the method's scripts/design/render-cluster.py from the cluster's JSON as it stands, so DESIGN.md carries ADR-019 and CN5's definition of unchanged, and CHECKLIST.md carries C45 to C51. THE SYSTEM SHALL NOT edit a rendered markdown file by hand, SHALL NOT change the cluster's JSON documents in this requirement, and SHALL NOT change a rendered file other than these three.
+
+**Acceptance:**
+- `python3 scripts/design/render-cluster.py docs/design/home` run from the repository root at the branch head leaves `git status --porcelain docs/design/home` printing nothing.
+- `grep -c 'ADR-019' docs/design/home/DESIGN.md` prints a number greater than 0, and `grep -c 'Unchanged is defined as exactly this' docs/design/home/DESIGN.md` prints 1.
+- For each of the ids C45, C46, C47, C48, C49, C50 and C51, `grep -c '<id>' docs/design/home/CHECKLIST.md` prints at least 1.
+- `sh scripts/design/gate.sh` exits 0 from the repository root.
+
+**Files:**
+- create: docs/design/home/briefs/HOME-008.md
+- modify: docs/design/home/DESIGN.md
+- modify: docs/design/home/CHECKLIST.md
+
+**Checklist:**
+- C51 — Opening a session from its cached index checks every row in memory, reads the final byte of at most three rows (the first, the middle and the last by position) through one buffered reader, and returns a read error other than an unexpected end of file as that error, never as a stale index that is rebuilt.
+
+### R7: The live subscription run, appended to PROOF-PROXY.md
+
+After the build lands, as a named step outside the gate: the seat of the lead who owns the home line (or another seat that lead names) runs Claude Code 2.1.283, the version installed now, logged in with a subscription and not an API key, with ANTHROPIC_BASE_URL pointing at the example, which forwards to https://api.anthropic.com; that lead watches. The card appends one live-run section to docs/design/home/PROOF-PROXY.md, below R10's session-key section, which it leaves byte for byte. The section SHALL record: the Claude Code version 2.1.283; the login kind as subscription; the seat that ran it; the listen address the example was given; the exact commands (the example's command line, with that listen address and https://api.anthropic.com as its two arguments, and the Claude Code launch line with ANTHROPIC_BASE_URL set to http:// and that same address); the outcome as `completed` or `failed`; every call line the run produced as method, path and status in the order written; the headers record, which is that every end-to-end request header the client sent passed unchanged and none was removed, that Host was rewritten to the upstream's authority, and the fixed list of hop-by-hop names dropped, copied from the source's list; and, on a failed run, the failing call's status code and the provider's error kind as Claude Code reported it. The section SHALL carry a finding that HOME-001's verification names Claude Code 2.1.281 while the run was measured on 2.1.283, for the design to update. WHEN the outcome is completed, the card SHALL set C7 to done in docs/design/home/checklist.json, re-render docs/design/home/CHECKLIST.md with the method's render-cluster.py, and name C7 beside the run, all in the card's own commit. IF the outcome is failed, THEN the card SHALL leave C7 open, SHALL NOT claim C7, and SHALL report the failure to that lead as a finding. The card SHALL NOT write a header value, a token, a body byte or error text into PROOF-PROXY.md or the dev record, SHALL NOT claim in its own added lines that the request was forwarded untouched, SHALL NOT run a variant that strips headers, SHALL NOT install another Claude Code version, SHALL NOT rewrite R10's section, and SHALL NOT edit HOME-001.json.
+
+**Acceptance:**
+- `git diff` of docs/design/home/PROOF-PROXY.md over the card's commits shows added lines only.
+- The live-run section contains the lines `Claude Code: 2.1.283` and `Login: subscription`, one line naming the seat, one line `Listen address: 127.0.0.1:<port>`, and the two commands in code blocks: the example's command line with that address and `https://api.anthropic.com` as its two arguments, and the Claude Code launch line setting ANTHROPIC_BASE_URL to `http://127.0.0.1:<port>` with the same port.
+- The live-run section contains exactly one line beginning `Outcome: `, and its value is one word from the set {`completed`, `failed`}.
+- The live-run section lists the call lines as method, path and status, one row per line the example wrote during the run, in the order written.
+- The live-run section states that every end-to-end request header passed unchanged and none was removed, that Host was rewritten, and names the dropped headers as Connection and every header Connection names, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailer, Transfer-Encoding and Upgrade; and `git diff <card base>..HEAD -- docs/design/home/PROOF-PROXY.md | grep '^+' | grep -v '^+++' | grep -ci 'untouched'` prints 0, where <card base> is the main commit the card branches from, so only the card's added lines are counted.
+- `git diff <card base>..HEAD -- docs/design/home/PROOF-PROXY.md | grep '^+' | grep -v '^+++' | grep -cE 'Bearer |sk-ant-|x-api-key:'` prints 0, counting only the lines the card adds, with <card base> as above.
+- The live-run section contains a finding paragraph naming HOME-001's verification line on 2.1.281 against the measured 2.1.283, and `git diff` over the card's commits shows docs/design/home/briefs/HOME-001.json unchanged.
+- With `Outcome: completed`: C7 in docs/design/home/checklist.json has `done` true, `python3 scripts/design/render-cluster.py docs/design/home` leaves `git status` clean, and the live-run section names C7.
+- With `Outcome: failed`: C7 in docs/design/home/checklist.json has `done` false, the section names the failing status code and the provider's error kind, and the section does not name C7 as met.
+
+**Files:**
+- modify: docs/design/home/PROOF-PROXY.md
+- modify: docs/design/home/checklist.json
+- modify: docs/design/home/CHECKLIST.md
+
+**Checklist:**
+- C7 — One seat with a subscription login completes a call through a pass-through proxy; the measurement is written down.
+
+**Stories:**
+- S5 (Reviewer, Checks the proofs before anything relies on them) — As the reviewer, I want each resume path measured on a named harness version with the command and hashes recorded, so that a later version changing the path is caught.
+
+## Boundaries
+
+- No second transport: the example forwards through R10's forward.rs and re-implements no forwarding.
+- forward.rs synthesises no status, header or body byte; the 502 and the connection close live in the example only, and lys-proxy's behaviour does not change (ADR-019).
+- No request or response body byte is altered, buffered to disk or retried; retry_canceled_requests(false) stays as R10 sets it.
+- No header value, header name list, query string, body byte, token or error text appears in the example's output, PROOF-PROXY.md, a test name, the dev record or any post.
+- R10's session-key section of PROOF-PROXY.md is not rewritten; this brief only appends.
+- No door code, SECRETS-002 file or credential store is touched; the example never sees, copies or swaps a credential and is never a service.
+- No older Claude Code is installed for the proof, and no run strips headers.
+- HOME-001.json and the design's 2.1.281 lines are not edited; the mismatch is reported as a finding.
+- The card launches no agent: the live run is a person's step after the build (ADR-007).
+- No file is created outside design.json's structure array; lys-core, lys-log-store and the published crates are untouched.
+
+## Verification
+
+- From the repository root: `python3 scripts/design/validate.py docs/design/home` and `python3 scripts/design/check-coverage.py docs/design/home` exit 0.
+- From the repository root: `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace --all-features`, `cargo doc --no-deps --all-features` and `cargo doc --no-deps` exit 0.
+- From the repository root: `sh scripts/design/gate.sh` exits 0 with PROOF-PROXY.md changed.
+- `cargo test -p lys-home --all-features --example passthrough` prints the five loopback tests of R5 and the refusal tests of R2 as passed and 0 ignored.
+- crates/lys-home/examples/passthrough.rs and passthrough_tests.rs each hold at most 500 lines of code, counted without comments and blank lines.
+- Read crates/lys-home/examples/passthrough.rs against R3: the only writes are the call-line function's `writeln!` and the refusal function's `writeln!`, and no code path passes a header value, a body byte, an argument's value or an error's text to either.
+- Read PROOF-PROXY.md's live-run section against R7: every figure is a version, a command, a status code, a method, a path, a header name or a count.

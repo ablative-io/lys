@@ -25,7 +25,7 @@ title: Refuse underscore-prefixed bindings in lys and clear each one by what it 
 > - C84 — Each of the eight test fixture structs that holds a TempDir guard names the field temp_dir and has a close method returning TempDir::close's error, and every test that builds one calls its close after the value's last use.
 > **Stories:**
 > - S24 (Card author, Landing work in lys) — As a card author landing work in lys, I want the gate to refuse an underscore-prefixed binding with a message saying why so that an unused warning is fixed at its cause rather than silenced.
-> - S25 (Test writer, Reading a test's fixtures) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
+> - S25 (Test writer, Writing tests in sibling files) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
 > - S26 (Third-party verifier, Verifying lys artifacts) — As a third party verifying a lys artifact, I want every verification failure to keep returning the one uniform error so that the cleanup reveals nothing about which check failed.
 > - S27 (Consumer of lys-log-store, Implementing LeafStore) — As a consumer implementing lys-log-store's LeafStore, I want the trait left unchanged so that my implementation still compiles against the next release.
 > - S28 (Lead, Trusting the gate) — As the lead for lys, I want the rule shown to fire once for each binding position so that zero hits on the tree means the rule held and not that nothing was measured.
@@ -70,7 +70,7 @@ WHEN a test binds a value that keeps something alive which the test still uses a
 - C78 — Every guard whose directory or state the test still uses after the binding (a TempDir holder or an EnvCleanup guard) has a name without a leading underscore and is ended by drop(name) after its last use, with a tail result bound, the guard dropped and the binding returned.
 
 **Stories:**
-- S25 (Test writer, Reading a test's fixtures) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
+- S25 (Test writer, Writing tests in sibling files) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
 
 ### R2: Name each fixture's directory guard field and close it where the test ends
 
@@ -98,7 +98,7 @@ WHEN a test fixture struct holds a tempfile::TempDir only to keep its directory 
 - C84 — Each of the eight test fixture structs that holds a TempDir guard names the field temp_dir and has a close method returning TempDir::close's error, and every test that builds one calls its close after the value's last use.
 
 **Stories:**
-- S25 (Test writer, Reading a test's fixtures) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
+- S25 (Test writer, Writing tests in sibling files) — As a test writer, I want a temporary directory's guard named and dropped by name so that I can see where the directory's life ends.
 
 ### R3: Take an ignored trait parameter as a bare `_`, leaving every trait unchanged
 

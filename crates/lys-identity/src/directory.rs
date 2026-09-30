@@ -448,4 +448,16 @@ impl<S: LeafStore> Directory<S> {
             .entry(index)?
             .map(|(signed, coordinate)| Receipt::of(&signed, coordinate)))
     }
+
+    /// The committed event at `index` with its log position, or `None` past
+    /// what the directory has folded.
+    pub(crate) fn committed_at(
+        &self,
+        index: u64,
+    ) -> Result<Option<(SignedEvent, Coordinate)>, IdentityError> {
+        if index >= self.folded {
+            return Ok(None);
+        }
+        self.log.entry(index)
+    }
 }

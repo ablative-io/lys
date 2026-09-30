@@ -60,20 +60,6 @@ Documents only. THE SYSTEM SHALL add docs/design/identity/CERTIFICATE-REVOCATION
 **Stories:**
 - S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
 
-#### R1 — Execution record
-
-**Dev (recorded):**
-
-- Status: implemented
-- How: Leg 1: the greps for 'lys-identity/certificate-log/v1' and 'lys-identity/certificate-revocation/v1' print 2 each. The grep for lines beginning '| 0x01 ', '| 0x02 ' or '| 0x03 ' prints 3; these are the three rows of the section 3 table, headed '| Kind |'. Leg 2: the grep over the 12 refusal row names prints 12; these are the rows of the section 12 table, headed '| Refusal |', so no other line matches. Leg 3: every phrase prints at least 1 when grepped by hand (case-sensitive). Where a phrase first appeared capitalised at the start of a sentence, the sentence was reworded so the lowercase form appears ('Permanence means no leaf reinstates a revoked certificate', 'The rule is that a revocation always names...', 'The rule is that only the key of the authority that issued the certificate...'). The truncation sentence was re-wrapped so 'detects truncation only against the caller' sits on one line. Leg 4: 'DIRECTORY-006 R4' prints 1, 'DP26' prints 3 and 'C25 stays open' prints 1. Leg 5: git status shows the new file as the only change, so an R1 commit would list exactly docs/design/identity/CERTIFICATE-REVOCATION.md. I made no commit, as instructed. The file is under docs/design/identity, which has no design.json, so the cluster render check of scripts/design/gate.sh does not measure it. I ran gate.sh by hand once against this tree and it exited 0; the workflow's own run is the one that counts. Content: the leaf layouts follow R1 (3) exactly (a 32-byte tag plus zero byte, a kind byte, a 129-byte revocation leaf, DER and COSE bodies with no length prefix). The signed bytes follow R1 (4). The last-wins hazard cites crates/lys-core/src/delegation/artifact.rs:370-373. The false positive cites crates/lys-core/src/ca/authority.rs:335-341, and I confirmed that range is the rustdoc paragraph describing it. The truncation statement cites docs/design/lys-anchor/KEY-HISTORY-FOLD-QUESTIONS.md:100-140. No lys-core, lys-log-store, C25, DECISIONS.md, WIRE-FORMATS.md or IDENTITY-001 file was touched.
-- Deviation: I ran sh scripts/design/gate.sh by hand once to confirm the new document breaks no design check. The instructions say to run none of the measured checks. It exited 0; the workflow's own run is the one that counts.
-- Files changed:
-  - created: `docs/design/identity/CERTIFICATE-REVOCATION.md` — The certificate revocation contract, in 13 numbered sections in the brief's order: (1) the premise; (2) the unit; (3) the leaf table; (4) the signed bytes; (5) the signer; (6) permanence; (7) revocation_before_issuance; (8) the fold; (9) N and the tolerance, with what the fold does not claim; (10) history; (11) the no-log forms and the rustdoc gap; (12) the 12-row refusal table; (13) where this stands.
-- Checklist delivery:
-  - [x] C65 — docs/design/identity/CERTIFICATE-REVOCATION.md states the certificate-log leaves, the one-claim certificate as the revocable unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table. — The document states the leaves, the one-claim unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table.
-- Story delivery:
-  - [ ] S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back. — R1 writes down the rule that only the issuing authority can revoke and that a revocation is permanent. S33 is satisfied only once R2 to R4 build it, and those rows are blocked.
-
 ### R2: Encode and decode the three certificate-log leaves, and verify a revocation only under the issuing authority's key
 
 THE SYSTEM SHALL encode and decode the issuance leaf, the revocation leaf and the attestation entry exactly as R1's contract lays them out, in crates/lys-identity/src/revocation/leaf.rs, with the refusals in crates/lys-identity/src/revocation/error.rs and crates/lys-identity/src/revocation/mod.rs carrying only module declarations, re-exports and module docs. A certificate is named by the SHA-256 of its DER, computed from the bytes the caller supplies and never from a serial or name the issuer chose. WHEN bytes are decoded, THE SYSTEM SHALL refuse certificate_leaf_malformed naming the reason for a wrong domain tag, a missing zero byte, an unknown kind byte, a revocation leaf that is not exactly 129 bytes long, an issuance leaf with no DER byte, and an attestation entry with no COSE byte after its hash, and SHALL NOT return a partial leaf. WHEN a revocation is signed, THE SYSTEM SHALL sign R1's signed bytes, which bind the SHA-256 of the log's origin and the certificate hash, with no length prefix anywhere, with the issuing authority's Ed25519 identity from lys-core. WHEN a revocation is checked against an issuer public key, THE SYSTEM SHALL verify the signature over R1's signed bytes rebuilt from the leaf and the log's origin, and SHALL refuse revocation_not_signed_by_issuer when it does not verify; a signature by any other key, a signature made for another log's origin and a signature over another certificate's hash SHALL all be refused. The leaf layer SHALL NOT carry a claim selector, a reinstatement kind or any field R1 does not lay out, and SHALL NOT change lys-core. No private key material appears in Debug, logs or refusals. Estimate: 3 hours.
@@ -99,18 +85,6 @@ THE SYSTEM SHALL encode and decode the issuance leaf, the revocation leaf and th
 
 **Stories:**
 - S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
-
-#### R2 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked. crates/lys-identity does not exist: ls crates shows lys, lys-anchor, lys-anchor-cli, lys-core, lys-home and lys-log-store, and git log --all has no history under crates/lys-identity. This row modifies crates/lys-identity/src/lib.rs and crates/lys-identity/Cargo.toml, which DIRECTORY-003 creates, and the brief starts R2 to R6 only when DIRECTORY-003 has landed and the constructed-attack review of R1's contract has its verdict on the card. Neither holds, and creating the crate here would build DIRECTORY-003's files outside this brief's wall (CN9).
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C66 — The issuance leaf, the revocation leaf and the attestation entry encode and decode under lys-identity/certificate-log/v1, and a revocation verifies only under the issuing authority's key for the log's origin. — Blocked on DIRECTORY-003 landing and on the constructed-attack review verdict for R1.
-- Story delivery:
-  - [ ] S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back. — Blocked.
 
 ### R3: Fold the live set from the certificate log, refusing unauthorised revocations, revocations before issuance and reinstatements by name
 
@@ -141,19 +115,6 @@ THE SYSTEM SHALL fold a certificate log in crates/lys-identity/src/revocation/fo
 - S31 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
 - S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
 
-#### R3 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked for the same reason as R2: the lys-identity crate from DIRECTORY-003 does not exist and the constructed-attack review verdict is not on the card. The fold also needs R2's leaf layer.
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C67 — The live set is folded from the certificate log with its folded size; revocations not signed by the issuing authority, revocations of a certificate with no earlier issuance and reinstatements are refused by name at their index, and a leaf the fold cannot read blocks every permit. — Blocked on DIRECTORY-003, the review verdict and R2.
-- Story delivery:
-  - [ ] S31 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word. — Blocked.
-  - [ ] S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back. — Blocked.
-
 ### R4: Append issuance, revocation and attestation-entry leaves only as new leaves at the log's extent
 
 THE SYSTEM SHALL append a certificate's issuance leaf, its revocation leaf signed with the issuing authority's identity for the log's origin, and an attestation entry, in crates/lys-identity/src/revocation/append.rs, each through lys-log-store's Log::append, which writes with LeafStore::put_leaf at the store's extent, and SHALL return the index each leaf was written at. WHEN a revocation is appended, THE SYSTEM SHALL add exactly one leaf and SHALL NOT remove, rewrite, truncate or replace any stored leaf or any byte of one. IF lys-log-store refuses or fails a write, THEN THE SYSTEM SHALL return that refusal with the operation and the index it was attempted at, and SHALL NOT retry the write and SHALL NOT report the leaf as written. The append layer SHALL NOT decide who asked for the revocation: it signs with the issuing authority's identity it is given, and the request path through which a responsible person or an administrator asks the directory is a later unit, so until it lands the only way to revoke is a caller that holds the issuing authority identity. lys-log-store is not changed by this brief: the LeafStore trait keeps its six methods, origin, extent, leaf, put_leaf, pinned and pin, and gains no delete, rewrite, truncate, fork or merge. Estimate: 2 hours.
@@ -176,18 +137,6 @@ THE SYSTEM SHALL append a certificate's issuance leaf, its revocation leaf signe
 
 **Stories:**
 - S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back.
-
-#### R4 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 and R3.
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C68 — A revocation is one leaf appended at the log's extent through lys-log-store, and the LeafStore trait gains no delete, rewrite, truncate, fork or merge. — Blocked on DIRECTORY-003, the review verdict, R2 and R3.
-- Story delivery:
-  - [ ] S33 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, I want my agent's certificate revocable only by its issuing authority's key, so that nobody else can end it and nothing can quietly bring it back. — Blocked.
 
 ### R5: Verify a certificate against the log with N and the tolerance as inputs, and refuse a revoked certificate naming its revocation leaf
 
@@ -214,18 +163,6 @@ THE SYSTEM SHALL offer, in crates/lys-identity/src/revocation/verify.rs, a verif
 **Stories:**
 - S31 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
 
-#### R5 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 to R4.
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C69 — Revocation-aware verification takes N and a tolerance with no default, carries the folded size in every answer, and refuses a revoked certificate naming its revocation leaf. — Blocked on DIRECTORY-003, the review verdict and R2 to R4.
-- Story delivery:
-  - [ ] S31 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word. — Blocked.
-
 ### R6: Keep a revoked certificate's history verifying: its proofs, its issuance record, and the attestations logged before its revocation
 
 THE SYSTEM SHALL offer, in crates/lys-identity/src/revocation/history.rs, an attestation call taking a store through LeafStore, the issuing authority's public key, the certificate's DER, the attestation's COSE bytes, the payload, the size N the caller has evidence of and a tolerance counted in entries, all required. WHEN called, THE SYSTEM SHALL verify the attestation under the certificate's subject public key with lys-core's verify_attestation_bytes_by_signer, unchanged, and refuse attestation_signature_invalid when it fails; SHALL fold the store (R3); and, WHEN the fold holds the certificate revoked at index r, SHALL first refuse fold_unreadable_leaf naming the index when the fold holds any leaf it could not read, before any verified answer, and otherwise SHALL answer verified, naming the entry's index, r and the folded size, if and only if an attestation entry naming the certificate's hash with exactly these COSE bytes sits at an index below r, and otherwise SHALL refuse attestation_after_revocation naming r; an entry at an index above r SHALL NOT verify. WHEN the fold does not hold the certificate revoked, THE SYSTEM SHALL answer not revoked carrying the folded size, subject to R5's fold_unreadable_leaf and fold_stale refusals with the same N and tolerance, and SHALL NOT require an attestation entry for it. The log's inclusion and consistency proofs and the issuance record SHALL keep verifying after a revocation with lys-core's verify_inclusion_raw and verify_consistency, unchanged: nothing in this brief removes, rewrites or hides the issuance leaf or any leaf before the revocation. The call SHALL NOT read a wall clock and SHALL NOT change lys-core. Estimate: 3 hours.
@@ -251,18 +188,6 @@ THE SYSTEM SHALL offer, in crates/lys-identity/src/revocation/history.rs, an att
 **Stories:**
 - S32 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation.
 
-#### R6 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 to R5.
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C70 — A revoked certificate's inclusion and consistency proofs and issuance record still verify, an attestation by its key verifies only when its own entry precedes the revocation leaf, and an attestation by a certificate not revoked needs no entry. — Blocked on DIRECTORY-003, the review verdict and R2 to R5.
-- Story delivery:
-  - [ ] S32 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier, I want a revoked certificate's past record to still verify, so that revoking a certificate does not erase what it legitimately did before its revocation. — Blocked.
-
 ### R7: Say in lys ca verify's help that verification without a log does not check revocation, and change nothing else it does
 
 THE SYSTEM SHALL add to the help of the lys ca verify command, in the Verify variant's doc comment in crates/lys/src/cli.rs, the sentence: Verification without a log does not check revocation. The command SHALL keep its arguments, its exit codes and its output, and SHALL keep exiting 0 for a certificate whose chain and validity window verify, revoked or not, because lys-core's published verify_certificate_chain and verify_certificate_chain_at keep their meaning. The lys binary SHALL NOT gain a dependency on lys-identity, and this row SHALL NOT add a command, an argument or any change to lys-core, the rustdoc of verify_certificate_chain included. Estimate: 1 hour.
@@ -280,18 +205,6 @@ THE SYSTEM SHALL add to the help of the lys ca verify command, in the Verify var
 
 **Stories:**
 - S34 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live.
-
-#### R7 — Execution record
-
-**Dev (recorded):**
-
-- Status: blocked
-- How: Blocked by the brief's own ordering: 'R7 starts only when DIRECTORY-003 has landed', and it has not, since crates/lys-identity is absent. The change itself touches only crates/lys/src/cli.rs and crates/lys/src/cli_tests.rs, so it is ready to build as soon as DIRECTORY-003 lands.
-- Deviation: (none)
-- Checklist delivery:
-  - [ ] C71 — lys ca verify keeps its meaning and its help says verification without a log does not check revocation, with lys-core unchanged. — Blocked on DIRECTORY-003 landing, per the brief.
-- Story delivery:
-  - [ ] S34 (Certificate verifier, Checks an agent's certificate and its record against the certificate log without the issuer's cooperation) — As a certificate verifier using the command that takes no log, I want its help to say it does not check revocation, so that I never take its pass as proof a certificate is live. — Blocked.
 
 ## Boundaries
 

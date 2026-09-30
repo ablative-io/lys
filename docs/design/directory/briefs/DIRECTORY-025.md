@@ -27,7 +27,7 @@ title: Road step 2: every permission check the identity server makes asks SpiceD
 > - C191 — The server answers why an identity can and why it cannot do a thing from the one evaluator's traced verdict, with the path to a responsible person, the named reason and the policy revision, and answers who can act on a resource through SpiceDB at the same revision, so the forward and reverse answers agree.
 > - C192 — The screen shows the server's why answer for a permitted and a refused question and never decides a permission in the browser.
 > **Stories:**
-> - S77 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
+> - S77 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
 > - S78 (Grant holder and reviewer, Exercises or delegates current authority and verifies its exact origin) — As a grant holder or reviewer looking at an identity, I want the screen to answer why it can or cannot do a thing, with the path to a responsible person or the named reason, so that I can trust or correct its access from the server's own decision.
 > - S79 (Operator, Installs and runs the standalone identity product) — As the operator, I want a permission check the permission projection has not yet caught up with to be refused by name, naming the grant, while unrelated checks keep being answered, so that a lagging projection never admits a call and never stops unrelated work.
 
@@ -173,7 +173,7 @@ WHEN an agent has made the first call of a two-step task to the identity server 
 - C190 — An agent whose permission is withdrawn between the two steps of a task is refused on its next call to the identity server.
 
 **Stories:**
-- S77 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
+- S77 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an agent whose permission I withdraw in the middle of a task to be refused on its next call, so that the withdrawal takes effect at once and not when the task ends.
 
 ### R6: Answer why an identity can, and why it cannot, do a thing, and who can, from the one evaluator at one revision, behind DIRECTORY-006 R5's explain seam
 

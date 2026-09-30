@@ -20,8 +20,8 @@ title: Keep the enduring agent apart from each session's credential, and show a 
 > - C49 — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
 > - C50 — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.
 > **Stories:**
-> - S22 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
-> - S23 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
+> - S22 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
+> - S23 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
 
 ## Purpose
 
@@ -51,7 +51,7 @@ The directory contract docs/design/identity/DIRECTORY-CONTRACT.md SHALL gain one
 - C49 — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
 
 **Stories:**
-- S22 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
+- S22 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern.
 
 #### R1 — Execution record
 
@@ -65,7 +65,7 @@ The directory contract docs/design/identity/DIRECTORY-CONTRACT.md SHALL gain one
 - Checklist delivery:
   - [ ] C49 — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential. — Blocked: the contract file DIRECTORY-003 must land does not exist.
 - Story delivery:
-  - [ ] S22 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern. — Blocked on DIRECTORY-003.
+  - [ ] S22 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want every session my agent runs to present the one enduring agent with a credential of its own, so that starting another session never leaves me a second agent to govern. — Blocked on DIRECTORY-003.
 
 **Review (recorded):**
 
@@ -98,7 +98,7 @@ WHILE an agent is registered under its responsible person and no session of it e
 - C50 — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.
 
 **Stories:**
-- S23 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
+- S23 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has.
 
 #### R2 — Execution record
 
@@ -110,7 +110,7 @@ WHILE an agent is registered under its responsible person and no session of it e
 - Checklist delivery:
   - [ ] C50 — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential. — Blocked: the crate lys-identity with its registration, list and read API does not exist.
 - Story delivery:
-  - [ ] S23 (Responsible person, Signs in and provisions agents under their own authority) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has. — Blocked on DIRECTORY-003.
+  - [ ] S23 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an agent I registered before it ever ran to show no session credential, so that I can tell an agent that has never run from one that has. — Blocked on DIRECTORY-003.
 
 **Review (recorded):**
 

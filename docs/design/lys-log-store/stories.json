@@ -4,72 +4,37 @@
     {
       "name": "Consumer library",
       "role": "Settling an uncertain append by reading the leaf back",
-      "stories": [
-        {
-          "id": "S1",
-          "text": "As the identity directory committing through the file store, I want a leaf that reads back under its final name to be whole and flushed so that settling an uncertain append by reading the leaf back gives the committed answer."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Operator",
-      "role": "Reopening a log after a crash or a failed write",
-      "stories": [
-        {
-          "id": "S2",
-          "text": "As an operator reopening a log after a crash, I want only whole, flushed leaves to be counted so that a torn leaf is never pinned into the tree."
-        }
-      ]
+      "role": "Recovering a log after a crash",
+      "stories": []
     },
     {
       "name": "Writer",
       "role": "Racing another writer for the same index",
-      "stories": [
-        {
-          "id": "S3",
-          "text": "As a writer whose index another writer has already taken, I want my write refused by name so that neither writer's leaf is replaced."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Writer",
       "role": "Seeing a failure after its leaf was named",
-      "stories": [
-        {
-          "id": "S4",
-          "text": "As a writer whose append failed after its leaf was named, I want an error that says the leaf is written but its durability is uncertain so that I never mistake my own leaf for another writer's."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Read-only caller",
       "role": "Opening a store without writing to it",
-      "stories": [
-        {
-          "id": "S5",
-          "text": "As a read-only caller opening a store, I want open to leave every file in the directory as it found it so that a read-only open stays read-only."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Read-only caller",
       "role": "Reading a log on read-only media",
-      "stories": [
-        {
-          "id": "S6",
-          "text": "As a reader of a log on media that refuses a directory flush, I want a read-only open to count the named leaves without flushing so that a status opens as it did before this change."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Read-only caller",
       "role": "Reading a log that a crash left one leaf ahead of its pin",
-      "stories": [
-        {
-          "id": "S7",
-          "text": "As a reader of a log one leaf ahead of its pin, I want a read-only open to leave the store as it found it and tell me that a writable open repairs it so that reading never writes and the pending repair is never silent."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Log operator",
@@ -78,22 +43,13 @@
         {
           "id": "S4",
           "text": "As a log operator, I want a store whose pinned leaves no longer rebuild to the pin to refuse to open and tell me the pin and the root the leaves give, so that a damaged leaf is never committed to the tree and I am never told more than the store can prove."
-        },
-        {
-          "id": "S1",
-          "text": "As a log operator, I want to be told which leftover temporary files opening my store ignored, so that what an interrupted append left behind is visible rather than skipped in silence."
         }
       ]
     },
     {
       "name": "Third-party verifier",
       "role": "Checks a leaf without lys",
-      "stories": [
-        {
-          "id": "S2",
-          "text": "As a third-party verifier, I want a leaf from a store written after this change to verify with the standalone Python verifier, so that checking a leaf still needs no lys code."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Witness operator",
@@ -120,38 +76,14 @@
       ]
     },
     {
-      "name": "Operator",
-      "role": "Recovering a log after a crash",
-      "stories": [
-        {
-          "id": "S3",
-          "text": "As an operator, I want a writable open to repair an interrupted append as it does today so that a crash costs no history."
-        },
-        {
-          "id": "S4",
-          "text": "As an operator, I want to be told which leftover temporary leaf files an open skipped so that I can clear them myself, knowing the store never will."
-        }
-      ]
-    },
-    {
       "name": "Verifier",
       "role": "Trusting a leaf the log serves",
-      "stories": [
-        {
-          "id": "S5",
-          "text": "As a verifier, I want a leaf damaged inside the pinned prefix to be refused by name at open so that a corrupted leaf is never served as whole."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Developer",
       "role": "Building a reader on the leaf store",
-      "stories": [
-        {
-          "id": "S6",
-          "text": "As a developer, I want the leaf store's module doc to say what open does and never does so that I know which call proves a leaf whole."
-        }
-      ]
+      "stories": []
     },
     {
       "name": "Log inspector",

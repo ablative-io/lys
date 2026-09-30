@@ -14,8 +14,8 @@ title: Build the secrets broker in crates/lys-secrets: baseline, contract and co
 > - ADR-002 — The token revolver is the first consumer of the handle — The worker asks the broker for its next account instead of walking its own list; the store keeps the set of real accounts behind one handle and the proxy takes the next in turn and logs which one served each call. This replaces the account pool file.
 > - ADR-003 — Everything is pegged to a human authority — A person signs in first; an agent is provisioned under that person with its own identity; the person's permissions are the ceiling and the agent holds an explicit subset; every grant says who may exercise it and who may pass it on; withdrawing the authority stops every grant derived from it. The exact delegation schema is not settled by this decision.
 > - ADR-004 — Manifold is optional and every project stands alone — The engine that starts or ends a seat is whichever one runs the agent: manifold, aion, or a customer's own. Each project in the stack works without the others; an engine without the broker reads its own pool file as it does today.
-> - ADR-019 — The fork's ablative branch moves only from a green candidate, with its previous head kept under a tag — Before any force-push of ablative, its previous head is pushed under a tag naming it (pre-rebase-<old base tag>-<short sha>). The rebased head is proved first on a candidate branch rauthy-rebase/<new upstream commit>; ablative is force-pushed with --force-with-lease naming the tagged previous head only after the fork build and full suite pass there. A failure on the candidate moves nothing and keeps the candidate branch; a later failure in the same card resets ablative to the tagged head with --force-with-lease naming the rebased head, verified by ls-remote, and stops by name. Before the rebased build, the postgres and hiqlite migration numbers of both sides are listed, and a number held by both stops the card naming both files and the upstream commit; it is never renumbered to fit. Rejected: force-pushing the rebased head straight to ablative and proving it there, force-pushing without keeping the previous head reachable, and renumbering a colliding fork migration.
-> - ADR-020 — The home's non-goal on signing narrows to anchoring — Signing into a lys log is in scope for lys.call entries, lys.harness_event entries and sealed-record opens, and for nothing else; anchoring stays out of scope. Rejected: keeping the whole non-goal, and widening signing to every entry kind.
+> - ADR-019 — The secrets broker lives in lys, as crates/lys-secrets; Cambium consumes it and is never its home (amends ADR-001) — The broker lives in the lys repository as the crate crates/lys-secrets, part of the standalone identity platform, built in Rust. A person installs Lys to hold secrets; Cambium reaches the broker through the door as a consumer and is never its home. Rejected: the broker inside the cambium door that ADR-001 and SECRETS-002 name, which would make Cambium a runtime a person must install to keep a credential.
+> - ADR-020 — A lease is a broker record under the audit log, not a signed format — The lease is a broker record under the audit log: it counts uses, time and spend against a grant and is read only by the broker, so nothing a stranger verifies changes. The limit on a lease's time is the window of the lys-identity grant it counts against (DIRECTORY-006 R1): the lease's own not_after never extends past it. Rejected: a signed lease format, a new version beside lys/delegation/v1 with its own adversarial review; and reading the window as one the signed delegation keeps, which v1 cannot carry.
 > **Checklist:**
 > - C19 — docs/design/secrets/BASELINE.md records, by repository, pinned commit, file and line, the revolver's next-account call site and every consumer of the account pool file.
 > - C20 — docs/design/secrets/BASELINE.md records every credential path into a seat today, by file and line, each classed as exactly one of: the login exception, a proxied credential, or neither.
@@ -32,7 +32,7 @@ title: Build the secrets broker in crates/lys-secrets: baseline, contract and co
 > - S15 (Lead, Reviews SECRETS-003's rows before any is dispatched) — As the lead, I want the revolver's call site, the pool file's consumers, every credential path into a seat and what the lys formats can carry recorded from source by file and line, so that the contract rests on what the code does today rather than on memory.
 > - S16 (Lead, Reviews SECRETS-003's rows before any is dispatched) — As the lead, I want the broker's contract and an adversarial review by someone other than its author before any code, so that every named attack has a clause defeating it before it can be built in.
 > - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-> - S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+> - S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ## Purpose
 
@@ -141,7 +141,7 @@ THE SYSTEM SHALL keep real credentials encrypted at rest in crates/lys-secrets, 
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ### R4: Build the proxy: check, swap, forward, record, rotate, and apply the cancellation rule
 
@@ -177,7 +177,7 @@ WHEN a seat makes an outbound call carrying its handle, THE SYSTEM SHALL have th
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ### R5: Refresh OAuth at the proxy; the seat never sees a token
 
@@ -209,7 +209,7 @@ WHEN a call arrives on a handle whose credential is an OAuth grant, THE SYSTEM S
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ### R6: Answer the seat's own login at spawn, and record which login went to which seat
 
@@ -239,7 +239,7 @@ WHEN the engine that runs a seat starts it, THE SYSTEM SHALL have crates/lys-sec
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ### R7: Keep sealed records under SpiceDB relations, and use keys without reading them
 
@@ -270,7 +270,7 @@ THE SYSTEM SHALL keep keys that cannot rotate, and memories an identity wants ke
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ### R8: Answer the revolver's ask for its next account from the broker
 
@@ -298,7 +298,7 @@ WHEN a worker that runs sessions asks for its next account, THE SYSTEM SHALL hav
 
 **Stories:**
 - S17 (Implementer, Is dispatched one SECRETS-003 code row at a time) — As the implementer of a code row, I want the row to name the SECRETS-002 requirements it delivers, its counted legs, its hours and what blocks it, so that I build from one row and nothing is described twice.
-- S18 (Person, Keeps credentials with the standalone identity platform) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
+- S18 (Person, Grants an agent provisioned under them access to an account) — As a person keeping credentials, I want the broker to come with Lys alone, so that I never have to install Cambium to keep a credential.
 
 ## Boundaries
 

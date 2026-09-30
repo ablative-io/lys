@@ -109,10 +109,38 @@ impl<P: PermissionCheck> Broker<P> {
         presentation: &Presentation,
         reserve: u64,
     ) -> Result<Admitted, UseError> {
+        self.admit_asked(token, presentation, None, reserve)
+    }
+
+    /// Admits one call of `token` presented for the secret `asked`, as
+    /// [`Broker::admit_use`] does, and refuses as `OutsideScope` a handle
+    /// whose lease names another secret. The proxy admits this way: the
+    /// request names the secret it is for, and the handle must be on it.
+    ///
+    /// # Errors
+    ///
+    /// As [`Broker::admit_use`], and `OutsideScope`.
+    pub fn admit_use_for(
+        &mut self,
+        token: &HandleToken,
+        presentation: &Presentation,
+        asked: &str,
+        reserve: u64,
+    ) -> Result<Admitted, UseError> {
+        self.admit_asked(token, presentation, Some(asked), reserve)
+    }
+
+    fn admit_asked(
+        &mut self,
+        token: &HandleToken,
+        presentation: &Presentation,
+        asked: Option<&str>,
+        reserve: u64,
+    ) -> Result<Admitted, UseError> {
         let operation = hex(&presentation.operation_id);
         let mark = self.request_mark(&presentation.request)?;
         let call = Some((operation.as_str(), mark.as_str()));
-        let admission = match self.admit(token, presentation, (&operation, &mark), reserve) {
+        let admission = match self.admit(token, presentation, (&operation, &mark), reserve, asked) {
             Ok(admission) => admission,
             Err(refusal) => {
                 let found = self.find(token).map(|record| {

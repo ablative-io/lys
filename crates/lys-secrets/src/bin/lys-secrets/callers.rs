@@ -31,9 +31,12 @@ pub fn refused(error: &SecretsError) -> (StatusCode, String) {
         | SecretsError::InvalidName { .. }
         | SecretsError::Encoding { .. }
         | SecretsError::OwnerChange(_)
+        | SecretsError::PresentationUnsigned { .. }
         | SecretsError::PresentationInvalid { .. }
         | SecretsError::OperationIdTooShort { .. } => StatusCode::BAD_REQUEST,
         SecretsError::Lending(_)
+        | SecretsError::Lease(_)
+        | SecretsError::OAuth(_)
         | SecretsError::Revocation(_)
         | SecretsError::Service(_)
         | SecretsError::PermissionDenied { .. }

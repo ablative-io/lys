@@ -58,33 +58,7 @@
       ],
       "stories": [
         "S33"
-      ],
-      "dev": {
-        "status": "implemented",
-        "files_changed": [
-          {
-            "path": "docs/design/identity/CERTIFICATE-REVOCATION.md",
-            "change": "created",
-            "note": "The certificate revocation contract, in 13 numbered sections in the brief's order: (1) the premise; (2) the unit; (3) the leaf table; (4) the signed bytes; (5) the signer; (6) permanence; (7) revocation_before_issuance; (8) the fold; (9) N and the tolerance, with what the fold does not claim; (10) history; (11) the no-log forms and the rustdoc gap; (12) the 12-row refusal table; (13) where this stands."
-          }
-        ],
-        "how": "Leg 1: the greps for 'lys-identity/certificate-log/v1' and 'lys-identity/certificate-revocation/v1' print 2 each. The grep for lines beginning '| 0x01 ', '| 0x02 ' or '| 0x03 ' prints 3; these are the three rows of the section 3 table, headed '| Kind |'. Leg 2: the grep over the 12 refusal row names prints 12; these are the rows of the section 12 table, headed '| Refusal |', so no other line matches. Leg 3: every phrase prints at least 1 when grepped by hand (case-sensitive). Where a phrase first appeared capitalised at the start of a sentence, the sentence was reworded so the lowercase form appears ('Permanence means no leaf reinstates a revoked certificate', 'The rule is that a revocation always names...', 'The rule is that only the key of the authority that issued the certificate...'). The truncation sentence was re-wrapped so 'detects truncation only against the caller' sits on one line. Leg 4: 'DIRECTORY-006 R4' prints 1, 'DP26' prints 3 and 'C25 stays open' prints 1. Leg 5: git status shows the new file as the only change, so an R1 commit would list exactly docs/design/identity/CERTIFICATE-REVOCATION.md. I made no commit, as instructed. The file is under docs/design/identity, which has no design.json, so the cluster render check of scripts/design/gate.sh does not measure it. I ran gate.sh by hand once against this tree and it exited 0; the workflow's own run is the one that counts. Content: the leaf layouts follow R1 (3) exactly (a 32-byte tag plus zero byte, a kind byte, a 129-byte revocation leaf, DER and COSE bodies with no length prefix). The signed bytes follow R1 (4). The last-wins hazard cites crates/lys-core/src/delegation/artifact.rs:370-373. The false positive cites crates/lys-core/src/ca/authority.rs:335-341, and I confirmed that range is the rustdoc paragraph describing it. The truncation statement cites docs/design/lys-anchor/KEY-HISTORY-FOLD-QUESTIONS.md:100-140. No lys-core, lys-log-store, C25, DECISIONS.md, WIRE-FORMATS.md or IDENTITY-001 file was touched.",
-        "deviation": "I ran sh scripts/design/gate.sh by hand once to confirm the new document breaks no design check. The instructions say to run none of the measured checks. It exited 0; the workflow's own run is the one that counts.",
-        "checklist": [
-          {
-            "id": "C65",
-            "done": true,
-            "note": "The document states the leaves, the one-claim unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S33",
-            "satisfied": false,
-            "note": "R1 writes down the rule that only the issuing authority can revoke and that a revocation is permanent. S33 is satisfied only once R2 to R4 build it, and those rows are blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R2",
@@ -116,27 +90,7 @@
       ],
       "stories": [
         "S33"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked. crates/lys-identity does not exist: ls crates shows lys, lys-anchor, lys-anchor-cli, lys-core, lys-home and lys-log-store, and git log --all has no history under crates/lys-identity. This row modifies crates/lys-identity/src/lib.rs and crates/lys-identity/Cargo.toml, which DIRECTORY-003 creates, and the brief starts R2 to R6 only when DIRECTORY-003 has landed and the constructed-attack review of R1's contract has its verdict on the card. Neither holds, and creating the crate here would build DIRECTORY-003's files outside this brief's wall (CN9).",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C66",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003 landing and on the constructed-attack review verdict for R1."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S33",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R3",
@@ -171,32 +125,7 @@
       "stories": [
         "S31",
         "S33"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked for the same reason as R2: the lys-identity crate from DIRECTORY-003 does not exist and the constructed-attack review verdict is not on the card. The fold also needs R2's leaf layer.",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C67",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003, the review verdict and R2."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S31",
-            "satisfied": false,
-            "note": "Blocked."
-          },
-          {
-            "id": "S33",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R4",
@@ -225,27 +154,7 @@
       ],
       "stories": [
         "S33"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 and R3.",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C68",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003, the review verdict, R2 and R3."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S33",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R5",
@@ -276,27 +185,7 @@
       ],
       "stories": [
         "S31"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 to R4.",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C69",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003, the review verdict and R2 to R4."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S31",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R6",
@@ -327,27 +216,7 @@
       ],
       "stories": [
         "S32"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked: the lys-identity crate from DIRECTORY-003 does not exist, the review verdict is not on the card, and the row needs R2 to R5.",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C70",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003, the review verdict and R2 to R5."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S32",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "R7",
@@ -370,27 +239,7 @@
       ],
       "stories": [
         "S34"
-      ],
-      "dev": {
-        "status": "blocked",
-        "files_changed": [],
-        "how": "Blocked by the brief's own ordering: 'R7 starts only when DIRECTORY-003 has landed', and it has not, since crates/lys-identity is absent. The change itself touches only crates/lys/src/cli.rs and crates/lys/src/cli_tests.rs, so it is ready to build as soon as DIRECTORY-003 lands.",
-        "deviation": "",
-        "checklist": [
-          {
-            "id": "C71",
-            "done": false,
-            "note": "Blocked on DIRECTORY-003 landing, per the brief."
-          }
-        ],
-        "stories": [
-          {
-            "id": "S34",
-            "satisfied": false,
-            "note": "Blocked."
-          }
-        ]
-      }
+      ]
     }
   ],
   "boundaries": [

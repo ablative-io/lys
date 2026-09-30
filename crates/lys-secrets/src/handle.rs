@@ -118,8 +118,9 @@ pub struct Presentation {
     /// The digest of the request it is for. It never travels: the broker
     /// computes it from the request it is given.
     pub request: [u8; 32],
-    /// The presenter's signature over the payload.
-    pub attestation: Attestation,
+    /// The presenter's signature over the payload; none when the handle
+    /// was presented unsigned, which the broker refuses by name.
+    pub attestation: Option<Attestation>,
 }
 
 impl Presentation {
@@ -130,13 +131,18 @@ impl Presentation {
             self.handle_id.as_str().to_owned(),
             hex(&self.operation_id),
             self.signed_at_ms.to_string(),
-            hex(&self.attestation.to_cose_bytes()),
+            self.attestation
+                .as_ref()
+                .map(|attestation| hex(&attestation.to_cose_bytes()))
+                .unwrap_or_default(),
         ]
     }
 
     /// Reads a presentation from its four text values and the digest of
     /// the request that carried them. A value that does not read is the one
-    /// `PresentationInvalid`.
+    /// `PresentationInvalid`. No signature, or an empty one, reads as a
+    /// presentation sent unsigned, which the broker refuses as
+    /// `PresentationUnsigned` once it has found the handle.
     ///
     /// # Errors
     ///
@@ -145,7 +151,7 @@ impl Presentation {
         handle_id: &str,
         operation: &str,
         signed_at: &str,
-        signature: &str,
+        signature: Option<&str>,
         request: [u8; 32],
     ) -> Result<Self, SecretsError> {
         let invalid = || SecretsError::PresentationInvalid {
@@ -153,8 +159,13 @@ impl Presentation {
         };
         let operation_id = unhex(operation).ok_or_else(invalid)?;
         let signed_at_ms = signed_at.parse::<i64>().map_err(|_number| invalid())?;
-        let cose = unhex(signature).ok_or_else(invalid)?;
-        let attestation = Attestation::from_cose_bytes(&cose).map_err(|_cose| invalid())?;
+        let attestation = match signature.filter(|text| !text.is_empty()) {
+            None => None,
+            Some(text) => {
+                let cose = unhex(text).ok_or_else(invalid)?;
+                Some(Attestation::from_cose_bytes(&cose).map_err(|_cose| invalid())?)
+            }
+        };
         Ok(Self {
             handle_id: HandleId(handle_id.to_owned()),
             operation_id,
@@ -184,20 +195,44 @@ impl Presentation {
             operation_id: operation_id.to_vec(),
             signed_at_ms,
             request,
-            attestation: sign_attestation(&payload, key),
+            attestation: Some(sign_attestation(&payload, key)),
         })
     }
 
+    /// A presentation of `handle_id` for `operation_id` at `signed_at_ms`
+    /// that carries no signature, as a presenter who skipped signing sends
+    /// it. The broker refuses it as `PresentationUnsigned`.
+    pub fn unsigned(
+        handle_id: &HandleId,
+        operation_id: &[u8],
+        signed_at_ms: i64,
+        request: [u8; 32],
+    ) -> Self {
+        Self {
+            handle_id: handle_id.clone(),
+            operation_id: operation_id.to_vec(),
+            signed_at_ms,
+            request,
+            attestation: None,
+        }
+    }
+
     /// Verifies the signature against `registered`, the key of the identity
-    /// the handle is bound to. Every failure is the one `PresentationInvalid`.
+    /// the handle is bound to. No signature is `PresentationUnsigned`; every
+    /// failure of a signature is the one `PresentationInvalid`.
     pub(crate) fn verify(&self, registered: &[u8; 32]) -> Result<(), SecretsError> {
+        let Some(attestation) = &self.attestation else {
+            return Err(SecretsError::PresentationUnsigned {
+                handle: self.handle_id.to_string(),
+            });
+        };
         let payload = payload(
             &self.handle_id,
             &self.operation_id,
             self.signed_at_ms,
             &self.request,
         )?;
-        verify_attestation_by_signer(&self.attestation, &payload, registered).map_err(|_invalid| {
+        verify_attestation_by_signer(attestation, &payload, registered).map_err(|_invalid| {
             SecretsError::PresentationInvalid {
                 handle: self.handle_id.to_string(),
             }

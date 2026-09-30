@@ -17,36 +17,36 @@ title: Check an agent before giving its start command, keep a launch record for 
 > - ADR-007 — The product starts an agent by giving its start command, never by running it — The product is not an execution engine. For the first release an agent's file gives the command that starts it on a chosen machine: the command carries the agent's identity and its handles, never a credential's value, and it is rendered from the agent's kept launch record. A started agent reports back, so the sessions screen shows what is running. A terminal inside the product, sandboxes, virtual machines and containers are later runtimes that plug in, and none is built into this product.
 > - ADR-010 — Every product shares one design and keeps its own accent; the identity product's is orange — The identity screens follow Aion's structure, typography, spacing and interaction, and Rauthy's client themes take the same colours, with no build dependency on Cambium or Aion. Each product keeps its own accent within the estate colour family: Cambium green, Aion blue and black, Argus light blue, Haematite mustard. The identity product's accent is orange (accent #D4975A, deep #A86B2E, wash #3D2A17 in the estate colour tokens), set apart from Manifold's copper. No product is silently made Aion-blue, and purple is not used.
 > - ADR-011 — An identity is registered, active, suspended or retired — An identity is in one of four states: registered (exists in the directory, no grants, no credential handle, may not act), active (may act within its grants), suspended (kept whole, grants kept but not effective) and retired (permanent, history kept, never reactivated; a new identity is made instead). Register, activate, suspend, reinstate and retire are the only transitions, each one signed audit record naming the authenticated actor and their provenance, the identity, from, to, when and reason. Having a grant or a credential is a fact beside the state, not a state. A person is registered by first sign-in; an agent is registered by a signed-in person, who carries it as its responsible person for life and may cause every transition of their own agents. Source: docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:17-44 and docs/design/identity/LIFECYCLE-STATES-2026-09-22.md:71-95.
-> - ADR-086
-> - ADR-087
-> - ADR-088
-> - ADR-091
+> - ADR-086 — Every command given keeps its own signed launch record, and running is tied to it through lys/session-start/v1 — Every command given keeps one launch record, a signed directory event naming the machine, the executable, the working directory, the profile version and the credential ids. Its id is carried in lys/session-start/v1, whose signed message then holds five things: the tag, the agent's directory id, the directory's identifier, the launch record id and the directory-issued challenge. The agent reads the id from LYS_LAUNCH_RECORD and its report names it, and running is tied to the command given through that id. A start given again copies a kept record into a new record with its own id that names the record it was copied from. Rejected: tying running to the agent id alone, re-issuing one record for every command given, and keeping the launch facts only in the command line.
+> - ADR-087 — The executable, its arguments and the working directory are fields of the reviewed profile version, never of a start request — The executable, the arguments and the working directory are read from the reviewed profile version's record, as the mock-up draws them, and a start request names only the agent, the profile version and the machine. Rejected: letting a start request set either, and taking either from the machine or a default.
+> - ADR-088 — Withdrawing a start request records only that the request no longer stands — A start request can be withdrawn by the person who gave it or anyone holding the same right. The withdrawal records that the request no longer stands, with who and when, and never that the agent did not start. If a signed report later arrives for the withdrawn launch record, the session shows as running with the withdrawal beside it. Rejected: recording a withdrawal as not started, and refusing a report that arrives after a withdrawal.
+> - ADR-091 — One standing start per agent, and the command given as ids-only environment assignments before the recorded executable — While a start for an agent stands unconfirmed, a second start for that agent, on any machine, is refused as start_unconfirmed, naming the standing request and the act that answers it: wait for its report, or withdraw it first. The given command reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> <executable> <recorded arguments>, with the working directory set to the recorded one. The three values are ids only, each shell-quoted and refused by name if it holds anything outside its id grammar. Rejected: appending the ids to the recorded arguments, and giving a second command while one stands unconfirmed.
 > **Checklist:**
-> - C229
-> - C230
-> - C231
-> - C232
-> - C233
-> - C234
-> - C235
-> - C236
-> - C237
-> - C238
-> - C239
-> - C240
-> - C241
+> - C229 — No start path in the library, the route or the CLI spawns a process, and a test that reads the start files and gives a start with a marker-writing executable proves it (CONFORMANCE 5.1).
+> - C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+> - C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
+> - C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).
+> - C233 — A launch record naming the machine, the executable, the working directory, the profile version and the credential ids is kept for every command given, reads back after a restart, and a start given again from it is a new record naming the one it was copied from (CONFORMANCE 5.4).
+> - C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.
+> - C235 — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5).
+> - C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).
+> - C237 — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it.
+> - C238 — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack.
+> - C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1.
+> - C240 — The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand this card adds to DIRECTORY-002's identity group, prints exactly what the route answers for the same three inputs and starts nothing.
+> - C241 — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store.
 > **Stories:**
-> - S109
-> - S99
-> - S100
-> - S101
-> - S102
-> - S103
-> - S104
-> - S105
-> - S106
-> - S107
-> - S108
+> - S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+> - S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
+> - S100 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start.
+> - S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice.
+> - S102 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start.
+> - S103 (Operator, Installs and runs the standalone identity product) — As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process.
+> - S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret.
+> - S105 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent.
+> - S106 (Person without the right to start, Opens an agent file that is not theirs to start) — As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me.
+> - S107 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs.
+> - S108 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered.
 
 ## Purpose
 
@@ -78,12 +78,12 @@ Structure: a start request names exactly three members, the agent, the profile v
 - modify: crates/lys-identity/src/lib.rs
 
 **Checklist:**
-- C234
-- C241
+- C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.
+- C241 — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store.
 
 **Stories:**
-- S107
-- S108
+- S107 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs.
+- S108 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered.
 
 #### R1 — Execution record
 
@@ -121,10 +121,10 @@ WHEN a start, a start given again or a withdrawal is asked for an agent, THE SYS
 - create: crates/lys-identity/tests/start_authority.rs
 
 **Checklist:**
-- C238
+- C238 — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack.
 
 **Stories:**
-- S106
+- S106 (Person without the right to start, Opens an agent file that is not theirs to start) — As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me.
 
 #### R2 — Execution record
 
@@ -162,12 +162,12 @@ WHEN an admitted start is asked, THE SYSTEM SHALL run five named checks, each re
 - create: crates/lys-identity/tests/start_checks.rs
 
 **Checklist:**
-- C230
-- C231
+- C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
 
 **Stories:**
-- S109
-- S99
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
 #### R3 — Execution record
 
@@ -203,12 +203,12 @@ THE SYSTEM SHALL check that the requested profile version has a review on record
 - create: crates/lys-identity/tests/start_profile_review.rs
 
 **Checklist:**
-- C230
-- C231
+- C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
 
 **Stories:**
-- S109
-- S99
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
 #### R4 — Execution record
 
@@ -242,12 +242,12 @@ THE SYSTEM SHALL check that the requested machine is one of the machines the age
 - create: crates/lys-identity/tests/start_machine_role.rs
 
 **Checklist:**
-- C230
-- C231
+- C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
 
 **Stories:**
-- S109
-- S99
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
 #### R5 — Execution record
 
@@ -290,12 +290,12 @@ THE SYSTEM SHALL check that the agent holds valid virtual credentials, reading t
 - create: crates/lys-identity-server/examples/door_handles.rs
 
 **Checklist:**
-- C230
-- C231
+- C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
 
 **Stories:**
-- S109
-- S99
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
 #### R6 — Execution record
 
@@ -335,12 +335,12 @@ THE SYSTEM SHALL check that every destination the requested profile version need
 - create: crates/lys-identity/tests/start_egress.rs
 
 **Checklist:**
-- C230
-- C231
+- C230 — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- C231 — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
 
 **Stories:**
-- S109
-- S99
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
 
 #### R7 — Execution record
 
@@ -374,7 +374,7 @@ Structure: append one sentence to the spec of DIRECTORY-005 R1 and the same sent
 - modify: docs/design/directory/briefs/DIRECTORY-005.md
 
 **Checklist:**
-- C239
+- C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1.
 
 #### R8 — Execution record
 
@@ -388,7 +388,7 @@ Structure: append one sentence to the spec of DIRECTORY-005 R1 and the same sent
   - modified: `docs/design/directory/briefs/DIRECTORY-005.md` — Re-rendered from the JSON (unchanged this round).
   - modified: `docs/design/directory/briefs/DIRECTORY-029.md` — Re-rendered from DIRECTORY-029.json after the workflow wrote its round-2 dev and review blocks, so the design gate's byte-identical render check passes. sh scripts/design/gate.sh exits 0.
 - Checklist delivery:
-  - [ ] C239 — The DIRECTORY-005 wording half is done. The drawer half belongs to R13, which is blocked on surface/ (DIRECTORY-005).
+  - [ ] C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1. — The DIRECTORY-005 wording half is done. The drawer half belongs to R13, which is blocked on surface/ (DIRECTORY-005).
 
 **Review (recorded):**
 
@@ -418,11 +418,11 @@ The executable and the working directory a command runs are fields of the review
 - create: crates/lys-identity/tests/start_profile_command.rs
 
 **Checklist:**
-- C234
+- C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.
 
 **Stories:**
-- S103
-- S107
+- S103 (Operator, Installs and runs the standalone identity product) — As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process.
+- S107 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want the command I am given to run the executable in the working directory that were reviewed, so that no start request can change what runs.
 
 #### R9 — Execution record
 
@@ -469,14 +469,14 @@ Structure: a launch record is one signed directory event (P4) of a kind added to
 - modify: docs/design/identity/IDENTITY-EVENTS.md
 
 **Checklist:**
-- C235
-- C236
-- C237
+- C235 — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5).
+- C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).
+- C237 — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it.
 
 **Stories:**
-- S100
-- S101
-- S102
+- S100 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start.
+- S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice.
+- S102 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start.
 
 #### R10 — Execution record
 
@@ -531,18 +531,18 @@ WHEN every check passes, THE SYSTEM SHALL keep a launch record (R10) naming the 
 - create: crates/lys-identity/tests/start_launch_record.rs
 
 **Checklist:**
-- C232
-- C233
-- C234
-- C236
-- C241
+- C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).
+- C233 — A launch record naming the machine, the executable, the working directory, the profile version and the credential ids is kept for every command given, reads back after a restart, and a start given again from it is a new record naming the one it was copied from (CONFORMANCE 5.4).
+- C234 — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.
+- C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).
+- C241 — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store.
 
 **Stories:**
-- S109
-- S101
-- S103
-- S104
-- S108
+- S109 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent's start command given only after its checks pass, so that I never start an agent that is not active, reviewed, allowed on the machine, credentialed and able to reach what it needs.
+- S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice.
+- S103 (Operator, Installs and runs the standalone identity product) — As the operator, I want a kept launch record for every command given, so that I can give the same start again without looking inside a running process.
+- S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret.
+- S108 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want starting my agent again while it runs to become a second session of the same agent, so that starting never makes another agent and never changes the one I registered.
 
 #### R11 — Execution record
 
@@ -605,13 +605,13 @@ The start route in crates/lys-identity-server/src/start.rs, mounted from crates/
 - modify: Cargo.lock
 
 **Checklist:**
-- C229
-- C232
-- C240
+- C229 — No start path in the library, the route or the CLI spawns a process, and a test that reads the start files and gives a start with a marker-writing executable proves it (CONFORMANCE 5.1).
+- C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).
+- C240 — The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand this card adds to DIRECTORY-002's identity group, prints exactly what the route answers for the same three inputs and starts nothing.
 
 **Stories:**
-- S104
-- S105
+- S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret.
+- S105 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that fails if any start path spawns a process, so that lys stays a product that checks, gives and records and never runs an agent.
 
 #### R12 — Execution record
 
@@ -664,20 +664,20 @@ WHEN the admitted administrator, or the agent's responsible person once step 1's
 - modify: surface/identity/src/generated/index.ts
 
 **Checklist:**
-- C232
-- C235
-- C236
-- C237
-- C238
-- C239
+- C232 — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).
+- C235 — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5).
+- C236 — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).
+- C237 — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it.
+- C238 — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack.
+- C239 — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1.
 
 **Stories:**
-- S99
-- S100
-- S101
-- S102
-- S104
-- S106
+- S99 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want each failed check named in words, so that I know what to fix before a command can be given.
+- S100 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want my agent shown as running only when its own signed report names the command I was given, so that copying a command is never mistaken for a start.
+- S101 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want an unanswered start shown as unconfirmed with its request standing, so that I do not ask elsewhere and start the agent twice.
+- S102 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As the responsible person, I want to withdraw a start request I no longer want, so that the record says the request no longer stands without claiming the agent did not start.
+- S104 (Reviewer, Reviews a brief before any of its rows is dispatched) — As a reviewer, I want a test that reads the command line and the clipboard and finds no credential value, so that giving a command never discloses a secret.
+- S106 (Person without the right to start, Opens an agent file that is not theirs to start) — As a person who is neither the agent's responsible person nor a directory administrator, I want a refusal naming the agent and the right I lack, so that I know why there is no working Start for me.
 
 #### R13 — Execution record
 

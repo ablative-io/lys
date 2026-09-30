@@ -3,7 +3,10 @@
 //! The source reports each link or unlink it observed under its own operation
 //! id. The receiver records it once: a delivery of a source operation id it
 //! already accepted is answered with the first receipt and records nothing, so a
-//! lost acknowledgement or a redelivery never makes a second event. What is
+//! lost acknowledgement or a redelivery never makes a second event. The first
+//! receipt answers only the delivery it was made for: the same source operation
+//! id with another person or another observation is refused as `LinkSourceSeen`,
+//! so one operation's acknowledgement is never handed to another. What is
 //! recorded is the issuer's observation, kept apart from any claim a person
 //! made, and the actor is the authenticated source as the service attests it,
 //! so the actor's provenance survives replay with the event.
@@ -32,11 +35,20 @@ impl<S: LeafStore> Directory<S> {
             .projection()?
             .link_source(observation.source_operation_id())
         {
-            return self
-                .receipt_at(index)?
-                .ok_or(IdentityError::ReceiptInvalid {
-                    reason: "an accepted source operation has no receipt",
+            let (first, coordinate) =
+                self.committed_at(index)?
+                    .ok_or(IdentityError::ReceiptInvalid {
+                        reason: "an accepted source operation has no receipt",
+                    })?;
+            let accepted = first.event();
+            if accepted.identity() != IdentityId::Person(person)
+                || accepted.change() != &Change::LinkAudit(observation.clone())
+            {
+                return Err(IdentityError::LinkSourceSeen {
+                    source_operation_id: observation.source_operation_id().to_owned(),
                 });
+            }
+            return Ok(Receipt::of(&first, coordinate));
         }
         self.commit_change(
             source,

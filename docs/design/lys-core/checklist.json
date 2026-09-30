@@ -2,202 +2,32 @@
   "cluster": "lys-core",
   "sections": [
     {
-      "name": "Pre-method documents",
-      "items": [
-        {
-          "id": "C85",
-          "text": "docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and the two live citations name the new paths.",
-          "done": false
-        },
-        {
-          "id": "C86",
-          "text": "The lys-core cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-003.md are rendered from its JSON, and sh scripts/design/gate.sh exits 0.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "Test code recognition",
-      "items": [
-        {
-          "id": "C87",
-          "text": "clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true, and CLAUDE.md and Cargo.toml name it in place of the per-module #![allow].",
-          "done": false
-        },
-        {
-          "id": "C88",
-          "text": "Every *_tests.rs file, both fixture.rs files, every integration test root and the two tests/harness/mod.rs files begin with #![cfg(test)], and no #![allow] line remains in any of them.",
-          "done": false
-        },
-        {
-          "id": "C89",
-          "text": "crates/lys-core/src/keys/identity_tests.rs holds no #[allow(unsafe_code)] and no unsafe block, and the comment above lib.rs's unsafe_code attribute says what is true after that.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "Existing hits cleared",
-      "items": [
-        {
-          "id": "C90",
-          "text": "No `let _ =` statement remains under crates/.",
-          "done": false
-        },
-        {
-          "id": "C91",
-          "text": "crates/lys-core/tests/harness/mod.rs, crates/lys-anchor/tests/harness/mod.rs and crates/lys-home/src/harness/claude_code/mod.rs hold no fn, struct, enum, trait, impl, const or static item.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "Rules and leg",
-      "items": [
-        {
-          "id": "C92",
-          "text": "sgconfig.yml names rules/ast-grep, which holds mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes and no-unwrap-expect-panic-outside-tests, each at severity error.",
-          "done": false
-        },
-        {
-          "id": "C93",
-          "text": "The leg `ast-grep scan --config sgconfig.yml` is in docs/design/project.json requiring tool:ast-grep, in .land/gates.sh and in CI.",
-          "done": false
-        },
-        {
-          "id": "C94",
-          "text": "The scan reports zero hits over the landed tree, and exactly one hit on an uncommitted scratch file holding an unwrap outside test code.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "Crate Setup",
-      "items": [
-        {
-          "id": "C1",
-          "text": "Root Cargo.toml declares workspace members `crates/lys-core` and `crates/lys`",
-          "done": true
-        },
-        {
-          "id": "C2",
-          "text": "lys-core Cargo.toml declares ed25519-dalek, x25519-dalek, aes-gcm, rcgen, ct-merkle, x509-parser, sha2, hkdf, rand, serde, thiserror, zeroize, base64, chrono, tracing dependencies — plus ciborium (COSE), postcard (typed leaf encoding), and time",
-          "done": true
-        },
-        {
-          "id": "C3",
-          "text": "lys-core lib.rs declares public modules: keys, ca, merkle, checkpoint, tlog, attestation, seal, error — and the crate-internal `hex_lower` helper",
-          "done": true
-        },
-        {
-          "id": "C4",
-          "text": "lib.rs carries `#![cfg_attr(not(test), forbid(unsafe_code))]`, over the workspace-wide `unsafe_code = \"deny\"`; `forbid` relaxes to `deny` in test builds only so the env-backed tests can call `std::env::set_var` (unsafe in edition 2024) under an explicit `#[allow]`",
-          "done": true
-        },
-        {
-          "id": "C5",
-          "text": "TrustError enum defined with thiserror: CertificateGeneration, CertificateParsing, CertificateVerification, CertificateRevocation, MerkleTree, Seal, UnsealFailed, AttestationFailed, KeyManagement, Signing, InvalidSignature — plus CheckpointEncoding, CheckpointParsing, VerifierKey, NoteVerification, LogArtifactEncoding, LogArtifactVerification — with `TrustResult<T>` alias",
-          "done": true
-        },
-        {
-          "id": "C6",
-          "text": "No Meridian reference anywhere in lys-core or lys sources: `grep -ri meridian crates/` returns nothing",
-          "done": true
-        }
-      ]
-    },
-    {
-      "name": "Key Management",
-      "items": [
-        {
-          "id": "C7",
-          "text": "Ed25519Identity struct holds SigningKey + VerifyingKey; Debug output contains '[REDACTED]' for the signing key (test exists)",
-          "done": true
-        },
-        {
-          "id": "C8",
-          "text": "Ed25519Identity::load_or_generate(path) loads a 32-byte seed file or generates and persists one; malformed-length files return KeyManagement errors",
-          "done": true
-        },
-        {
-          "id": "C9",
-          "text": "Key generation is race-free: seed written to a unique temp file (pid + per-process counter in the name), published via no-clobber `hard_link`; on `AlreadyExists` the loser discards its candidate seed and loads the persisted key (first-writer-wins; concurrent-generation test exists)",
-          "done": true
-        },
-        {
-          "id": "C10",
-          "text": "On Unix the key file is created mode 0o600; loading a key file with loose permissions emits a warning but still loads",
-          "done": true
-        },
-        {
-          "id": "C11",
-          "text": "Ed25519Identity::from_env() reads a base64-encoded 32-byte seed from the `LYS_IDENTITY_KEY` environment variable; missing variable, invalid base64, and wrong decoded length each return KeyManagement errors",
-          "done": true
-        },
-        {
-          "id": "C12",
-          "text": "All seed material in loading, generation, and decode paths is held in `Zeroizing` buffers",
-          "done": true
-        },
-        {
-          "id": "C13",
-          "text": "Ed25519Identity::sign(message) returns [u8; 64]",
-          "done": true
-        },
-        {
-          "id": "C14",
-          "text": "Ed25519Identity::verify(public_key, message, signature) uses ed25519-dalek `verify_strict`; no non-strict verification exists in library code anywhere in either crate — the only `verify` calls are inside tests that construct a small-order forgery, prove dalek's non-strict path accepts it, and prove lys rejects it",
-          "done": true
-        },
-        {
-          "id": "C15",
-          "text": "Ed25519Identity::x25519_public_key() returns the Montgomery-form [u8; 32] and x25519_static_secret() returns the clamped-scalar StaticSecret; Diffie-Hellman between two identities' derived keys agrees from both sides (test exists)",
-          "done": true
-        }
-      ]
-    },
-    {
       "name": "Certificate Authority",
       "items": [
         {
-          "id": "C16",
-          "text": "CertificateAuthority::new(identity) wraps Ed25519Identity and exposes public_key_bytes()",
-          "done": true
+          "id": "C66",
+          "text": "verify_certificate_chain_at compares no subject or issuer distinguished-name bytes: crates/lys-core/src/ca/authority.rs calls neither .subject() nor .issuer() on a parsed certificate.",
+          "done": false
         },
         {
-          "id": "C17",
-          "text": "issue_certificate(subject, ttl, extensions) returns IssuedCertificate holding DER bytes, subject keypair, SHA-256 fingerprint ([u8; 32] of DER), expiry, and issuer public key",
-          "done": true
+          "id": "C67",
+          "text": "A certificate issued by CertificateAuthority::issue_certificate to the subject named by the authority's lowercase-hex public key verifies under the authority's key and is refused under any other key.",
+          "done": false
         },
         {
-          "id": "C18",
-          "text": "rcgen signing goes through a RemoteKeyPair adapter with PKCS_ED25519 so the CA private seed is never serialised into rcgen's keypair representation",
-          "done": true
+          "id": "C68",
+          "text": "A certificate issued by issue_certificate_for_request over a request made with the authority's own key is refused by verify_certificate_chain as self-signed.",
+          "done": false
         },
         {
-          "id": "C19",
-          "text": "IssuedCertificate Debug output redacts private key material (test exists)",
-          "done": true
+          "id": "C69",
+          "text": "The rustdoc of verify_certificate_chain states what it checks and what it leaves to the caller.",
+          "done": false
         },
         {
-          "id": "C20",
-          "text": "verify_certificate_chain(cert_der, issuer_public_key) extracts TBS bytes with x509-parser and verifies the signature with ed25519-dalek `verify_strict`",
-          "done": true
-        },
-        {
-          "id": "C21",
-          "text": "Chain verification enforces the validity window: expired certificates and not-yet-valid certificates are both rejected (tests exist for each)",
-          "done": true
-        },
-        {
-          "id": "C22",
-          "text": "verify_certificate_chain_at(cert_der, issuer_public_key, instant) verifies at an explicit instant; a cert expired now but valid at the given instant passes",
-          "done": true
-        },
-        {
-          "id": "C23",
-          "text": "Self-signed certificates are rejected by verify_certificate_chain",
-          "done": true
+          "id": "C70",
+          "text": "The rustdoc of verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain states the key-based self-signed rule and mentions no distinguished-name heuristic.",
+          "done": false
         },
         {
           "id": "C24",
@@ -213,6 +43,81 @@
           "id": "C26",
           "text": "Round-trip test: rcgen-generated Ed25519 keypair is loadable as ed25519-dalek SigningKey/VerifyingKey",
           "done": true
+        }
+      ]
+    },
+    {
+      "name": "CLI Surface",
+      "items": [
+        {
+          "id": "C71",
+          "text": "lys ca verify and lys verify --cert exit 0 for a certificate issued to the subject named by the issuer's lowercase-hex public key, and exit 1 for a certificate self-signed by keys.",
+          "done": false
+        },
+        {
+          "id": "C52",
+          "text": "`lys` binary crate exists; main.rs is a thin entry (parse, dispatch, exit codes) with clap definitions isolated in cli.rs; no `anyhow` anywhere — the CLI carries its own thiserror type",
+          "done": true
+        },
+        {
+          "id": "C53",
+          "text": "`lys key` generates an identity at a path and inspects one (public key, fingerprint); no subcommand, flag, or output format prints private key material (test asserts output contains no seed bytes in any encoding)",
+          "done": true
+        },
+        {
+          "id": "C54",
+          "text": "`lys ca issue` issues a certificate signed by an issuer identity file, embedding a caller-supplied capability-claim payload as a LYS_OID_ARC extension, and writes the PEM out",
+          "done": true
+        },
+        {
+          "id": "C55",
+          "text": "`lys ca verify` verifies a certificate against an issuer public key, and accepts an explicit verification instant flag routing to verify_certificate_chain_at",
+          "done": true
+        },
+        {
+          "id": "C56",
+          "text": "`lys attest` signs a payload file and emits the COSE_Sign1 artifact; `lys verify` checks an artifact against a payload and reports success/failure via exit code. (File paths only as built — the stdin path this item originally anticipated was not implemented, and ROADMAP Phase 2 records the file-only surface.)",
+          "done": true
+        },
+        {
+          "id": "C57",
+          "text": "`lys seal` seals a payload file for a recipient public key and writes the sender attestation alongside it; `lys open` opens it with the recipient identity, verifying the attestation first; the pair round-trips",
+          "done": true
+        },
+        {
+          "id": "C58",
+          "text": "`lys log init` pins the log's origin exactly once and refuses to re-initialize; `lys log append` appends a leaf file's raw bytes and prints the new root; `lys log checkpoint` signs a C2SP tlog-checkpoint in the signed-note envelope over the current root; `lys log prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded verbatim",
+          "done": true
+        },
+        {
+          "id": "C59",
+          "text": "`lys log verify` verifies an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the leaf sequence, the store, or the tree; declared sizes are checked against the signature-verified checkpoint and roots are recomputed, never trusted; every tamper class collapses to one identical message",
+          "done": true
+        },
+        {
+          "id": "C60",
+          "text": "Cross-process CLI test exists: a log produced by one process is verified end-to-end by the CLI in another process with no access to the original tree",
+          "done": true
+        }
+      ]
+    },
+    {
+      "name": "Consumers and Records",
+      "items": [
+        {
+          "id": "C72",
+          "text": "lys-anchor's admission module doc says verify_certificate_chain rejects certificates whose subject key is the issuer key.",
+          "done": false
+        },
+        {
+          "id": "C73",
+          "text": "CHANGELOG.md's Unreleased section records that a hex-common-name certificate now verifies, that a certificate self-signed by keys is now refused, and the new rustdoc caveat on verify_certificate_chain.",
+          "done": false
+        },
+        {
+          "id": "C74",
+          "text": "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys.",
+          "done": false
         }
       ]
     },
@@ -357,56 +262,6 @@
       ]
     },
     {
-      "name": "CLI Surface",
-      "items": [
-        {
-          "id": "C52",
-          "text": "`lys` binary crate exists; main.rs is a thin entry (parse, dispatch, exit codes) with clap definitions isolated in cli.rs; no `anyhow` anywhere — the CLI carries its own thiserror type",
-          "done": true
-        },
-        {
-          "id": "C53",
-          "text": "`lys key` generates an identity at a path and inspects one (public key, fingerprint); no subcommand, flag, or output format prints private key material (test asserts output contains no seed bytes in any encoding)",
-          "done": true
-        },
-        {
-          "id": "C54",
-          "text": "`lys ca issue` issues a certificate signed by an issuer identity file, embedding a caller-supplied capability-claim payload as a LYS_OID_ARC extension, and writes the PEM out",
-          "done": true
-        },
-        {
-          "id": "C55",
-          "text": "`lys ca verify` verifies a certificate against an issuer public key, and accepts an explicit verification instant flag routing to verify_certificate_chain_at",
-          "done": true
-        },
-        {
-          "id": "C56",
-          "text": "`lys attest` signs a payload file and emits the COSE_Sign1 artifact; `lys verify` checks an artifact against a payload and reports success/failure via exit code. (File paths only as built — the stdin path this item originally anticipated was not implemented, and ROADMAP Phase 2 records the file-only surface.)",
-          "done": true
-        },
-        {
-          "id": "C57",
-          "text": "`lys seal` seals a payload file for a recipient public key and writes the sender attestation alongside it; `lys open` opens it with the recipient identity, verifying the attestation first; the pair round-trips",
-          "done": true
-        },
-        {
-          "id": "C58",
-          "text": "`lys log init` pins the log's origin exactly once and refuses to re-initialize; `lys log append` appends a leaf file's raw bytes and prints the new root; `lys log checkpoint` signs a C2SP tlog-checkpoint in the signed-note envelope over the current root; `lys log prove` emits a self-contained JSON proof artifact with the relevant signed checkpoint(s) embedded verbatim",
-          "done": true
-        },
-        {
-          "id": "C59",
-          "text": "`lys log verify` verifies an inclusion or consistency claim from **only** the artifact, the leaf, and the verifier key — no access to the leaf sequence, the store, or the tree; declared sizes are checked against the signature-verified checkpoint and roots are recomputed, never trusted; every tamper class collapses to one identical message",
-          "done": true
-        },
-        {
-          "id": "C60",
-          "text": "Cross-process CLI test exists: a log produced by one process is verified end-to-end by the CLI in another process with no access to the original tree",
-          "done": true
-        }
-      ]
-    },
-    {
       "name": "Integration Verification",
       "items": [
         {
@@ -433,71 +288,6 @@
           "id": "C65",
           "text": "lys-core builds standalone with zero meridian-* dependencies in its Cargo.toml and Cargo.lock",
           "done": true
-        }
-      ]
-    },
-    {
-      "name": "Certificate Authority",
-      "items": [
-        {
-          "id": "C23",
-          "text": "Self-signed certificates are rejected by verify_certificate_chain, where a certificate is self-signed when its subject public key is the supplied issuer key, compared as decoded Ed25519 points, and its signature verifies under that key.",
-          "done": false
-        },
-        {
-          "id": "C66",
-          "text": "verify_certificate_chain_at compares no subject or issuer distinguished-name bytes: crates/lys-core/src/ca/authority.rs calls neither .subject() nor .issuer() on a parsed certificate.",
-          "done": false
-        },
-        {
-          "id": "C67",
-          "text": "A certificate issued by CertificateAuthority::issue_certificate to the subject named by the authority's lowercase-hex public key verifies under the authority's key and is refused under any other key.",
-          "done": false
-        },
-        {
-          "id": "C68",
-          "text": "A certificate issued by issue_certificate_for_request over a request made with the authority's own key is refused by verify_certificate_chain as self-signed.",
-          "done": false
-        },
-        {
-          "id": "C69",
-          "text": "The rustdoc of verify_certificate_chain states what it checks and what it leaves to the caller.",
-          "done": false
-        },
-        {
-          "id": "C70",
-          "text": "The rustdoc of verify_certificate_chain_at and CertificateAuthority::verify_certificate_chain states the key-based self-signed rule and mentions no distinguished-name heuristic.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "CLI Surface",
-      "items": [
-        {
-          "id": "C71",
-          "text": "lys ca verify and lys verify --cert exit 0 for a certificate issued to the subject named by the issuer's lowercase-hex public key, and exit 1 for a certificate self-signed by keys.",
-          "done": false
-        }
-      ]
-    },
-    {
-      "name": "Consumers and Records",
-      "items": [
-        {
-          "id": "C72",
-          "text": "lys-anchor's admission module doc says verify_certificate_chain rejects certificates whose subject key is the issuer key.",
-          "done": false
-        },
-        {
-          "id": "C73",
-          "text": "CHANGELOG.md's Unreleased section records that a hex-common-name certificate now verifies, that a certificate self-signed by keys is now refused, and the new rustdoc caveat on verify_certificate_chain.",
-          "done": false
-        },
-        {
-          "id": "C74",
-          "text": "DIRECTORY-013's fold issues a legitimately issued hex-common-name leaf and records certificate_chain_invalid for a leaf self-signed by keys.",
-          "done": false
         }
       ]
     },
@@ -707,6 +497,76 @@
         {
           "id": "C23",
           "text": "The leg lands only after origin/main's crates/lys-home/src/record/mod.rs has zero non-module lines, checked by command.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Pre-method documents",
+      "items": [
+        {
+          "id": "C85",
+          "text": "docs/design/lys-core/DESIGN.md, CHECKLIST.md and USER-STORIES.md are renamed to DESIGN-PRE-METHOD.md, CHECKLIST-PRE-METHOD.md and USER-STORIES-PRE-METHOD.md with their bytes unchanged, and the two live citations name the new paths.",
+          "done": false
+        },
+        {
+          "id": "C86",
+          "text": "The lys-core cluster's DESIGN.md, CHECKLIST.md, USER-STORIES.md and briefs/LYSCORE-003.md are rendered from its JSON, and sh scripts/design/gate.sh exits 0.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Test code recognition",
+      "items": [
+        {
+          "id": "C87",
+          "text": "clippy.toml sets allow-unwrap-in-tests, allow-expect-in-tests and allow-panic-in-tests to true, and CLAUDE.md and Cargo.toml name it in place of the per-module #![allow].",
+          "done": false
+        },
+        {
+          "id": "C88",
+          "text": "Every *_tests.rs file, both fixture.rs files, every integration test root and the two tests/harness/mod.rs files begin with #![cfg(test)], and no #![allow] line remains in any of them.",
+          "done": false
+        },
+        {
+          "id": "C89",
+          "text": "crates/lys-core/src/keys/identity_tests.rs holds no #[allow(unsafe_code)] and no unsafe block, and the comment above lib.rs's unsafe_code attribute says what is true after that.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Existing hits cleared",
+      "items": [
+        {
+          "id": "C90",
+          "text": "No `let _ =` statement remains under crates/.",
+          "done": false
+        },
+        {
+          "id": "C91",
+          "text": "crates/lys-core/tests/harness/mod.rs, crates/lys-anchor/tests/harness/mod.rs and crates/lys-home/src/harness/claude_code/mod.rs hold no fn, struct, enum, trait, impl, const or static item.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "Rules and leg",
+      "items": [
+        {
+          "id": "C92",
+          "text": "sgconfig.yml names rules/ast-grep, which holds mod-rs-declarations-only, no-let-underscore-on-results, no-lint-bypass-attributes and no-unwrap-expect-panic-outside-tests, each at severity error.",
+          "done": false
+        },
+        {
+          "id": "C93",
+          "text": "The leg `ast-grep scan --config sgconfig.yml` is in docs/design/project.json requiring tool:ast-grep, in .land/gates.sh and in CI.",
+          "done": false
+        },
+        {
+          "id": "C94",
+          "text": "The scan reports zero hits over the landed tree, and exactly one hit on an uncommitted scratch file holding an unwrap outside test code.",
           "done": false
         }
       ]

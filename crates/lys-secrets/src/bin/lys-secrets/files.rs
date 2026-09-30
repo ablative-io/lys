@@ -141,6 +141,10 @@ struct GrantRow {
     granted_by: Option<String>,
     #[serde(default = "use_relation")]
     relation: String,
+    /// When the grant's window ends, in milliseconds since the epoch, when
+    /// it has an end.
+    #[serde(default)]
+    ends_at_ms: Option<i64>,
 }
 
 fn use_relation() -> String {
@@ -190,6 +194,7 @@ impl FileGrants {
             secret: secret.to_owned(),
             granted_by: by.map(str::to_owned),
             relation: relation.label().to_owned(),
+            ends_at_ms: None,
         });
         self.write(&rows)
     }
@@ -225,8 +230,9 @@ impl FileGrants {
         {
             Some(GrantRow {
                 granted_by: Some(person),
+                ends_at_ms,
                 ..
-            }) => Ok(Permitted { person }),
+            }) => Ok(Permitted { person, ends_at_ms }),
             Some(GrantRow {
                 granted_by: None, ..
             }) => Err(Denied {

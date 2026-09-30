@@ -318,6 +318,8 @@ pub enum CaCommand {
     /// Exits 0 if the certificate verifies (printing issuer key, checked-at
     /// instant, and any embedded capability claims), 1 otherwise with a
     /// single generic failure message.
+    ///
+    /// Verification without a log does not check revocation.
     Verify {
         /// Path to the PEM certificate produced by `lys ca issue`.
         #[arg(long)]

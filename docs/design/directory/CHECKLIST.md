@@ -48,6 +48,13 @@
 - [ ] **C29** — The You and delegation screens show real server authority, separate service accounts from sign-in identities, and preserve personal versus administrator visibility.
 - [ ] **C30** — The accepted mock-up conformance is tested through actual requests, refusals, pending outcomes, keyboard paths and durable read-back rather than simulated success.
 
+## Lifecycle states and transitions (DIRECTORY-009)
+
+- [ ] **C38** — The state is answered only by folding the identity's transition records in log order over a type of exactly four values; nothing sets a state; a record the table refuses makes the read refuse lifecycle_fold_invalid at its coordinate; reads never write the log (d009_r3_ac1 to d009_r3_ac5).
+- [ ] **C39** — An access check is the conjunction, active and grant exists and grant fresh, state first: a registered, suspended, retired or unknown identity is refused by state with the grant answerer called zero times, the grant legs pass through DIRECTORY-006 R4's decision with its names, and an answered check appends nothing (d009_r4_ac1 to d009_r4_ac5).
+- [ ] **C40** — At sign-in and at every refresh the directory service refuses a suspended or retired identity by name before any grant question, calls Rauthy to revoke nothing, rolls back no admitted action, and admits an active identity at refresh whatever grants it holds (d009_r5_ac1 to d009_r5_ac5).
+- [ ] **C41** — One typed read answers an identity's state, the record that put it there, the actions available in that state, its full history and provisioned as a view, and one typed list is filterable by state and kind; a retired identity reads exactly as a live one and no operation deletes, hides, redacts or truncates a record (d009_r6_ac1 to d009_r6_ac5).
+
 ## Certificate revocation folded from the log
 
 - [ ] **C65** — docs/design/identity/CERTIFICATE-REVOCATION.md states the certificate-log leaves, the one-claim certificate as the revocable unit, the issuing-authority signer, permanence, revocation_before_issuance, the fold, N and the tolerance, history, the no-log forms and the refusal table.
@@ -63,22 +70,14 @@
 - [ ] **C49** — docs/design/identity/DIRECTORY-CONTRACT.md states road adjustment 3 as the directory's contract, citing docs/design/identity/STATEMENT-2026-09-22.md:162-167: the agent record holds no session credential, a session is a separate record that points at its agent, starting a session never creates an agent, and a second session of the same agent presents the same enduring identity with a new session credential.
 - [ ] **C50** — An agent registered with no session appears in the directory under its responsible person, and its read carries no session credential.
 
-## Audit receipts (DIRECTORY-007)
+## Sign-in identities belong to people (conformance row 1.2)
 
-- [ ] **C31** — docs/design/identity/AUDIT-RECEIPT.md carries IDENTITY-001's receipt contract word for word with the test tag as its one ruled addition, names exactly one emitter for every operation, states the step-1 sign-in boundary, the changes-only rule and the test-receipt rule, and lists what IDENTITY-EVENTS.md must carry before the code rows start.
-- [ ] **C32** — crates/lys-receipt reads a receipt of the shared shape and verifies it from a LeafStore and a key in the order tag, signature, coordinate, commitment, with every cryptographic or structural failure one refusal class and the test-tag and shape refusals named on their own (rcpt_accept, rcpt_tamper, rcpt_leaf, rcpt_testtag, rcpt_shape, rcpt_redact).
-- [ ] **C33** — lys log verify receipt verifies offline from the receipt, the log directory and the key strings alone, keeps the published CLI's refusal discipline, writes nothing to the log and leaves inclusion and consistency verification unchanged (rcli_accept, rcli_tamper, rcli_precrypto, rcli_test, rcli_readonly).
-- [ ] **C34** — The directory service leaves a sign-in receipt for every sign-in it records and a refusal receipt for the one refusal step 1 makes, registers nobody on a first sign-in, refuses nothing on state, and leaves no receipt for a read or an answered check (signin_ok, signin_refused, signin_first, signin_state).
-- [ ] **C35** — A development install emits test receipts under a test key and a test tag and the whole path is proved end to end: verified with the test key, refused without it by name, refused under another key, with no private key in any document.
-
-## Lifecycle states and transitions (DIRECTORY-009)
-
-- [ ] **C36** — docs/design/identity/LIFECYCLE-CONTRACT.md carries the four states with provisioned as a view, the five transitions each with who may cause it and no policy actor, the record rule, the fold rule, the check conjunction, the next-check rule with a refresh as a check, the retired rule, what the screen shows, the six named refusals with their acts, and what IDENTITY-EVENTS.md must carry before the code rows start.
-- [ ] **C37** — A transition is admitted only from the administrator or, for an agent, its responsible person as its registration record names them; every other actor, and an unattested one, is refused lifecycle_actor_not_permitted with nothing appended (d009_r2_ac1 to d009_r2_ac4).
-- [ ] **C38** — The state is answered only by folding the identity's transition records in log order over a type of exactly four values; nothing sets a state; a record the table refuses makes the read refuse lifecycle_fold_invalid at its coordinate; reads never write the log (d009_r3_ac1 to d009_r3_ac5).
-- [ ] **C39** — An access check is the conjunction, active and grant exists and grant fresh, state first: a registered, suspended, retired or unknown identity is refused by state with the grant answerer called zero times, the grant legs pass through DIRECTORY-006 R4's decision with its names, and an answered check appends nothing (d009_r4_ac1 to d009_r4_ac5).
-- [ ] **C40** — At sign-in and at every refresh the directory service refuses a suspended or retired identity by name before any grant question, calls Rauthy to revoke nothing, rolls back no admitted action, and admits an active identity at refresh whatever grants it holds (d009_r5_ac1 to d009_r5_ac5).
-- [ ] **C41** — One typed read answers an identity's state, the record that put it there, the actions available in that state, its full history and provisioned as a view, and one typed list is filterable by state and kind; a retired identity reads exactly as a live one and no operation deletes, hides, redacts or truncates a record (d009_r6_ac1 to d009_r6_ac5).
+- [ ] **C313** — Binding to an agent a provider account linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
+- [ ] **C314** — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account; the agent's binding stands, and the agent is named in the directory's history to its responsible person and a directory administrator, never to the person trying to link.
+- [ ] **C315** — Delegating from a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
+- [ ] **C316** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
+- [ ] **C317** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
+- [ ] **C318** — Each refusal of an act that would give an agent a sign-in identity leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
 
 ## Lifecycle conformance rows 3.1 and 3.2 (DIRECTORY-019)
 
@@ -88,14 +87,10 @@
 - [ ] **C126** — A walk of all 20 origin-by-target changes of state admits exactly the 6 in the table and refuses the other 14 by name with nothing appended.
 - [ ] **C127** — A change of state starts and stops no process, and no key of the typed lifecycle read says anything about running.
 
-## Sign-in identities belong to people (conformance row 1.2)
+## The Rauthy readiness gate leg (DIRECTORY-009)
 
-- [ ] **C31** — Binding to an agent a provider account that is, or once was, linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-- [ ] **C32** — A person's link of a provider account already bound to an agent as its service account is refused by name at the lys-identity check the link path asks, naming the withdrawal that answers it, naming the agent only to its responsible person and a directory administrator, and no binding is withdrawn.
-- [ ] **C33** — Delegating a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
-- [ ] **C34** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
-- [ ] **C35** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-- [ ] **C36** — Every sign-in identity refusal leaves the log and projection unchanged, and one counted test over the store finds no agent record carrying a sign-in identity.
+- [ ] **C36** — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
+- [ ] **C37** — .land/gates.sh is unchanged and no round-cadence leg is added.
 
 ## What a person cannot give (DIRECTORY-024)
 
@@ -104,15 +99,6 @@
 - [ ] **C183** — The cannot-give answer comes from the one authenticated grant seam, is byte-identical for API, tool and browser callers, refuses an unknown reason on the typed contract, and discloses nothing the person cannot discover.
 - [ ] **C184** — The delegation screen shows exactly the items and reasons the answer lists, asks again when the recipient changes and discards a superseded answer, and refuses an answer carrying an unknown reason by name, showing no item and no blank.
 - [ ] **C185** — Conformance row 2.4 is carried by acceptance lines that name it, and its Brief column names DIRECTORY-024.
-
-## The revised directory briefs
-
-- [ ] **C1** — The directory design records the outcome, the shared contract as principles, the constraints and the non-goals of IDENTITY-001, revised for the grant ruling.
-- [ ] **C2** — The project decision ledger holds the identity decisions with their authority and quote: the maintained Rauthy fork, one PostgreSQL service and database (ADR-005, already recorded), the product accents, and the lifecycle states as working team decisions marked proposed.
-- [ ] **C3** — Each open row (02, 04, 03, 05) is a design-system brief, DIRECTORY-002 to DIRECTORY-005, in dependency order, with its wall as files, its ID001 acceptance identifiers kept, and its estimate in its task.
-- [ ] **C4** — The grant path (create an agent under a person, grant it a project, the action is allowed, revoke or suspend, the same action is refused) is a requirement with acceptance criteria in the row that owns it, and row 02 states what SpiceDB enforces in step 1 and what it does not.
-- [ ] **C5** — Every decision still open for Tom is recorded as open: the grant representation, suspension semantics, the service name, the anchor, and nightly versus waiting for the upstream release. Decided under ADR-078: the grant representation was ruled by the owning lead, Archie, with Apollo as second reader, on Waffles' ruling of 12:13 on Tom's word of 12:12 that technical formats are the owning lead's with a second reader.
-- [ ] **C6** — The rendered markdown of this cluster matches its JSON and coverage is clean.
 
 ## Road step 2: SpiceDB answers every permission check (DIRECTORY-025)
 
@@ -124,6 +110,31 @@
 - [ ] **C191** — The server answers why an identity can and why it cannot do a thing from the one evaluator's traced verdict, with the path to a responsible person, the named reason and the policy revision, and answers who can act on a resource through SpiceDB at the same revision, so the forward and reverse answers agree.
 - [ ] **C192** — The screen shows the server's why answer for a permitted and a refused question and never decides a permission in the browser.
 
+## Starting an agent (CONFORMANCE section 5)
+
+- [ ] **C229** — No start path in the library, the route or the CLI spawns a process, and a test that reads the start files and gives a start with a marker-writing executable proves it (CONFORMANCE 5.1).
+- [ ] **C230** — Before a command is given the five named checks run (the agent is active, its profile version is reviewed, the machine is allowed for the role, its virtual credentials are valid, the machine may reach what the profile needs), a failed check names itself in words, and no command is given (CONFORMANCE 5.2).
+- [ ] **C231** — While a check's owning record does not exist, a start is refused by name, naming the check and the card that makes the record (Ink1H1Os, SECRETS-002, network row 8.5), and nothing is faked to let it through.
+- [ ] **C232** — No credential value is on the command line or the clipboard, and a test reads both (CONFORMANCE 5.3).
+- [ ] **C233** — A launch record naming the machine, the executable, the working directory, the profile version and the credential ids is kept for every command given, reads back after a restart, and a start given again from it is a new record naming the one it was copied from (CONFORMANCE 5.4).
+- [ ] **C234** — A start request names only the agent, the profile version and the machine; the command given reads env LYS_AGENT_ID=<agent id> LYS_LAUNCH_RECORD=<launch record id> LYS_CREDENTIAL_IDS=<comma-separated credential ids> before the reviewed profile version's own executable and its recorded arguments, unchanged and in order, with the recorded working directory, each value shell-quoted and refused by name outside its id grammar; it is not a lys subcommand, and a request that sets the executable or the working directory is refused by name.
+- [ ] **C235** — An agent shows as running only when its verified signed report names its launch record, and copying the command changes no state (CONFORMANCE 5.5).
+- [ ] **C236** — With no report a start reads unconfirmed, never not started; the screen says the request stands and warns against asking elsewhere, and a second start for the agent is refused as start_unconfirmed (CONFORMANCE 5.6).
+- [ ] **C237** — A withdrawal by the giver or anyone holding the same right records who and when and that the request no longer stands, never that the agent did not start, and a report arriving afterwards shows running with the withdrawal beside it.
+- [ ] **C238** — Only the agent's responsible person and a directory administrator (in step 1, the admitted administrator) have a working Start; anyone else is refused by name, naming the agent and the right they lack.
+- [ ] **C239** — The Start drawer and the unconfirmed notice are built on DIRECTORY-005's surface, and DIRECTORY-005's R1 and boundary name Start as the one control that works in step 1.
+- [ ] **C240** — The start route gives, gives again, withdraws and reads a start through the library and holds no start logic of its own, and the CLI answer lys identity start-command, the one subcommand this card adds to DIRECTORY-002's identity group, prints exactly what the route answers for the same three inputs and starts nothing.
+- [ ] **C241** — A start resolves its agent to the enduring agent record the provision brief DIRECTORY-011 keeps and is refused by name, writing nothing, when there is none; a start never creates or changes an agent record and writes no session record, and a start of an agent already running is given as a new launch record naming the same agent, whose session record the report makes in the sessions brief's store.
+
+## Row 07: gate, install and demonstrate the release (DIRECTORY-030)
+
+- [ ] **C242** — The identity-release leg is registered once, as a demand-cadence leg in docs/design/project.json running scripts/identity-gates/release.sh, named in one line of CLAUDE.md and mirrored in the directory design's gate, and .land/gates.sh is unchanged.
+- [ ] **C243** — Every required venue leg is recorded green on the exact pushed Lys, Rauthy and Cambium refs in IDENTITY-001-commands.jsonl and the release report, and a missing leg is named as a blocker.
+- [ ] **C244** — The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.
+- [ ] **C245** — The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.
+- [ ] **C246** — Standalone acceptance on the staged install is recorded before any cutover, with the staging statement at the demonstration's opening, who the two providers resolve to and the agent's recorded creation.
+- [ ] **C247** — Every requirement not met is named in the release report, preserved Cambium identities among them until the cutover, the three reserved acts are named, and no health check is counted as completion.
+
 ## Road step 2: the agent capability claim
 
 - [ ] **C249** — docs/design/identity/CAPABILITY-CLAIM.md proposes lys/agent-capability/v1 under the proposed OID 1.3.6.1.4.1.66364.2.1, alongside the unchanged .1 extension transport, stating its transport, assertion, encoding, issuer key identifier (the 20-byte RFC 7093 method 1 keyid, a new issuer-key fingerprint), scope, verifier check, rendering consumer, revocation, issuer and anchor, and status; docs/design/WIRE-FORMATS.md carries it as PROPOSED and both of its ratification sentences name the owning lead with a second reader, with D1 to D6 unchanged; and the .2 row of docs/PEN-REGISTRATION.md keeps .2 a family arc and records .2.1 for the typed capability claim.
@@ -134,14 +145,6 @@
 - [ ] **C254** — When the operator calls the directory's issuance route with an active agent's certificate-signing request, the directory issues that enduring agent a certificate, subject its directory id, carrying exactly one lys/agent-capability/v1 claim listing every grant it holds at issuance, an empty list when it holds none, under an issuer key held in the service's custody and named in the certificate's Authority Key Identifier by its 20-byte issuer-key fingerprint so that `openssl verify -CAfile` finds the issuer, for the window asked for or the configured default of 30 days and never past the configured maximum of 90 days, appended to the certificate log as the revocation card's issuance leaf, as one directory event naming the certificate it follows; it refuses an agent that is not active, an agent holding a current certificate, one not expired, not under a replaced key and not held revoked by the revocation fold (naming it and its expiry), an agent with no enrolled key (agent_key_not_enrolled), a request whose key does not match the enrolled key (key_mismatch) and an issuance whose leaf is not appended; nothing issues when a grant is given.
 - [ ] **C255** — Replacing an agent's enrolled key is one audited directory event naming the old and new key, never an overwrite; an old key that is not the enrolled one is refused with key_replacement_mismatch, and a certificate under the replaced key is no longer current.
 - [ ] **C256** — verify_agent_capability finds the signing key in a set of trusted issuer keys before it reads the claim and refuses an Authority Key Identifier that is absent or names another key (issuer_key_mismatch), a malformed claim, an unknown version, a holder other than the subject, a grant the claim does not list, and an instant outside the certificate's own window, each by a named refusal, with the refusal legs counted; a listed grant's window is never checked as live.
-
-## Row 04: the directory and its signed changes (DIRECTORY-003)
-
-- [ ] **C11** — People and agents are registered with enduring identifiers and issuer-subject bindings, each agent under the signed-in person responsible for it, and registration issues no login, credential or certificate (ID001_DIRECTORY).
-- [ ] **C12** — Every identity change is one signed event through lys-log-store under a jointly reviewed envelope, every answered projection equals replay across the crash boundaries, and a receipt verifies independently (ID001_AUDIT_FAULTS, ID001_RECEIPT).
-- [ ] **C13** — Only the configured administrator mutates the directory in step 1; unauthenticated, same-email and wrong issuer-subject callers are refused without effect (ID001_ADMIN). Under the lead's ruling of 27 September 2026 (DIRECTORY-026), one exception: an agent authenticated by its enrolled key may create and end its own session record, and nothing else; every other mutation by a caller who is not an administrator, including an agent acting on another agent's session, is still refused by name.
-- [ ] **C14** — The link-audit receiver is built and proved against fixtures before row 03 needs it (ID001_RECEIVER).
-- [ ] **C15** — Each identity's lifecycle state is recorded as ADR-011 proposes, every transition one signed event, and the grant path's row is recorded open for Tom with its criteria drafted.
 
 ## Sessions: the session record and its credential (DIRECTORY-026)
 
@@ -162,16 +165,6 @@
 - [ ] **C207** — An agent's sessions are listed by its directory id, in the order they started, with each session's state and how it ended, on a route only the directory's configured administrator is answered on, by a command written out in full, and every other caller is refused by DIRECTORY-003's admission.
 - [ ] **C208** — A report-back from an agent whose certificate has been revoked is refused certificate_revoked, creating no session, and the agent's open sessions stay open.
 
-## Row 6.4: issuance entered in the log (DIRECTORY-031)
-
-- [ ] **C209** — `lys ca issue` refuses to run without `--log` and `--leaf-out`, and on both issuance paths enters the certificate in the lys-log-store log as one leaf whose bytes are the certificate's DER and nothing else before any file is written.
-- [ ] **C210** — With `--log` and `--leaf-out` and no log key, `lys ca issue` writes the certificate and the leaf and reports the log, the leaf index, the tree size and the root in base64, signing nothing and writing no artifact; the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`.
-- [ ] **C211** — When the log refuses the entry, `lys ca issue` exits 1 with the log's refusal by name, writes no certificate and no leaf, and the log's leaves are unchanged.
-- [ ] **C212** — `lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material, and it and `lys ca issue --issuer-out` write the same bytes on every call, from one issuer certificate stored beside the CA key when it is first built.
-- [ ] **C213** — Holding only the issuer certificate, the issued certificate, the leaf and the operator's artifact, with no lys binary on PATH, `openssl verify -CAfile` accepts the certificate, `scripts/verify_inclusion.py` exits 0 under the reported root, and a leaf changed by one byte makes it exit 2.
-- [ ] **C214** — docs/design/directory/PROOF-ISSUANCE.md records the stranger's check run with test keys and a test log: each command, its exit code and its output, and otherwise hashes, counts and paths only.
-- [ ] **C215** — The directory design's non-goal for road step 2 no longer excludes capability certificates, cites CONFORMANCE rows 6.1 to 6.4 as the reason, and still excludes anchoring in production.
-
 ## Roles and their versions
 
 - [ ] **C169** — Roles, versions and holdings are typed records whose every act is one signed directory event naming the authenticated actor and its capacity, and a committed version never changes.
@@ -187,14 +180,15 @@
 - [ ] **C179** — A provisional holding's end date is on its grants and is the same after a role edit and after a move (the roles half of conformance 4.5).
 - [ ] **C180** — The role screen shows versions, holders on each version, move dates, policies and the move preview from the server's answers, shows Assign only to the person the holder answers to and the owners of the role's project, and offers an act only where the server says it is permitted.
 
-## Row 07: gate, install and demonstrate the release (DIRECTORY-030)
+## Row 6.4: issuance entered in the log (DIRECTORY-031)
 
-- [ ] **C242** — The identity-release leg is registered once, as a demand-cadence leg in docs/design/project.json running scripts/identity-gates/release.sh, named in one line of CLAUDE.md and mirrored in the directory design's gate, and .land/gates.sh is unchanged.
-- [ ] **C243** — Every required venue leg is recorded green on the exact pushed Lys, Rauthy and Cambium refs in IDENTITY-001-commands.jsonl and the release report, and a missing leg is named as a blocker.
-- [ ] **C244** — The row 03 and row 05 live install receipts are verified against the release refs and each is marked test-keyed.
-- [ ] **C245** — The staged install runs the tested refs on the node the operator names under a test service key, with its backups and a rollback that never launches an older Rauthy binary against a forward-only migrated database recorded.
-- [ ] **C246** — Standalone acceptance on the staged install is recorded before any cutover, with the staging statement at the demonstration's opening, who the two providers resolve to and the agent's recorded creation.
-- [ ] **C247** — Every requirement not met is named in the release report, preserved Cambium identities among them until the cutover, the three reserved acts are named, and no health check is counted as completion.
+- [ ] **C209** — `lys ca issue` refuses to run without `--log` and `--leaf-out`, and on both issuance paths enters the certificate in the lys-log-store log as one leaf whose bytes are the certificate's DER and nothing else before any file is written.
+- [ ] **C210** — With `--log` and `--leaf-out` and no log key, `lys ca issue` writes the certificate and the leaf and reports the log, the leaf index, the tree size and the root in base64, signing nothing and writing no artifact; the log's operator makes the lys/log-inclusion-proof/v1 artifact with `lys log prove inclusion`.
+- [ ] **C211** — When the log refuses the entry, `lys ca issue` exits 1 with the log's refusal by name, writes no certificate and no leaf, and the log's leaves are unchanged.
+- [ ] **C212** — `lys ca issuer-cert --key <path> --out <path>` writes the issuer's self-signed CA certificate as one PEM block carrying no key material, and it and `lys ca issue --issuer-out` write the same bytes on every call, from one issuer certificate stored beside the CA key when it is first built.
+- [ ] **C213** — Holding only the issuer certificate, the issued certificate, the leaf and the operator's artifact, with no lys binary on PATH, `openssl verify -CAfile` accepts the certificate, `scripts/verify_inclusion.py` exits 0 under the reported root, and a leaf changed by one byte makes it exit 2.
+- [ ] **C214** — docs/design/directory/PROOF-ISSUANCE.md records the stranger's check run with test keys and a test log: each command, its exit code and its output, and otherwise hashes, counts and paths only.
+- [ ] **C215** — The directory design's non-goal for road step 2 no longer excludes capability certificates, cites CONFORMANCE rows 6.1 to 6.4 as the reason, and still excludes anchoring in production.
 
 ## Row 8.3: the access graph (DIRECTORY-034)
 
@@ -205,61 +199,6 @@
 - [ ] **C276** — Choosing a person or agent draws the forward answer for each resource and action its visible grants carry, choosing a resource draws the reverse answer, an administrator holding the reverse question's visibility permission sees the whole directory, a reverse question the person may not ask is refused by name, no hidden grant is drawn or hinted at, and an incomplete reverse answer is marked incomplete.
 - [ ] **C277** — Every grant and does not stand edge shows the model version of the Access answer it came from and every containment edge that of the resource route's answer, a draw of mixed versions names each above the graph, the draw time shows beside the version, and the graph asks Access again only on navigation, reload or its refresh control.
 - [ ] **C278** — The graph is reached by the deep links #/graph and #/graph/<id> and by a Show in graph link on each screen present at build time that shows one identity (the directory's preview drawer, the identity record screen and the You page) and on the grant explanation, whose link opens the graph on the holder's node with that grant's edge selected, none on sign-in or the delegation form, with no rail entry or g h shortcut of its own.
-
-## The Rauthy readiness gate leg (DIRECTORY-009)
-
-- [ ] **C31** — docs/design/project.json declares the rauthy-ready leg with cadence demand and a requires list naming tool:python3, tool:docker and tool:git, its seven existing legs unchanged, and the file validates against the project schema.
-- [ ] **C32** — The directory cluster's design.json gate carries the same rauthy-ready leg with cadence demand, and the directory documents validate with it present.
-- [ ] **C33** — The rauthy-ready leg starts the Rauthy image recorded by its local image ID in deploy/identity/versions.json, whose revision label equals the vendor/rauthy pin, against a scratch PostgreSQL container from the digest reference there, and exits 0 only when Rauthy answers ready.
-- [ ] **C34** — A missing container runtime, a missing Rauthy image, a missing PostgreSQL image, and a Rauthy revision label that is absent or other than the pin each make the leg refuse by name with a non-zero exit; the leg never pulls, builds or relabels an image and never passes by skipping.
-- [ ] **C35** — After every run, passing or not, no container, network or volume the leg created remains, and no object it did not create was touched.
-- [ ] **C36** — A test run by a round leg searches the leg's complete output for every secret value the runtime received, asserts how many it searched for, and finds none.
-- [ ] **C37** — .land/gates.sh is unchanged and no round-cadence leg is added.
-
-## Grant conformance rows named by their tests
-
-- [ ] **C279** — Each of conformance rows 1.4, 1.5 (its agents and grants clauses), 2.1, 2.2, 2.3, 2.5, 2.6 and 8.4 names the test that passes it with a stated command that runs that test alone, and every crates/lys-identity test of the relation bound, affirmative pass-on, inherited expiry, cascading revocation and last used carries its row in its name.
-- [ ] **C280** — The grant view the service answers carries each grant's effective standing and effective end, judged over its chain on the server, and the screens render those two fields and walk no chain of their own.
-- [ ] **C281** — The screens meet the rows' words from the service's answer and from nothing else: What you hold shows each grant's source and whether it may be passed on and drops the grants derived from a revoked one, as does each agent's holdings on You; an agent's Access tab keeps them marked void; the delegation form shows the source grant, its actions, may-pass-on and the effective end it ends no later than; a grant card shows last used, its source and its window, and not seen is never shown as never used.
-- [ ] **C282** — An administrator's People screen shows other people while You shows only the signed-in person's own agents and grants; row 1.5's personal-secrets clause stays unmet and You keeps its not-built panel naming SECRETS-002.
-- [ ] **C283** — Each of the seven drift injections (a grant shown without its source, may-pass-on read from a missing prohibition, a derived grant surviving its source's revocation, a derived grant surviving its source's end past admission's own check, the same past the hop check at commit and on replay, the same past the hop check at exercise, not seen rendered as never used) makes exactly one test fail, and it is the named test of that row.
-- [ ] **C284** — A surface leg registered in docs/design/project.json installs surface/identity's dependencies from its lockfile and runs its vitests, so every land runs the screen tests.
-- [ ] **C285** — CONFORMANCE.md's Brief cell on each of the eight rows names this brief's tests in the '<brief id> <leg> <test name>' entry form after the kept planning text, and DIRECTORY-006 R6 names the screen files that exist in place of the four it names that do not, with no structure path of the directory design named twice.
-
-## Sign-in identities belong to people (conformance row 1.2)
-
-- [ ] **C313** — Binding to an agent a provider account linked to a person is refused by name and writes nothing, while an agent's own machine account, linked to no person, is accepted as its issuer-subject binding.
-- [ ] **C314** — A person's link of a provider account the directory already binds to an agent is refused by name, stating that the account is an agent's own account; the agent's binding stands, and the agent is named in the directory's history to its responsible person and a directory administrator, never to the person trying to link.
-- [ ] **C315** — Delegating from a sign-in identity is refused by name for an agent recipient and for a person recipient, while a service-access grant consented through the same provider account is admitted by the grant rules alone.
-- [ ] **C316** — The explanation seam lists each of a person's sign-in identities on the cannot-give list with the reason 'sign-in identity', whoever the recipient is.
-- [ ] **C317** — A sign-in identity refusal shows the provider and subject to the identity's owner and a directory administrator only; anyone else sees the act, the recipient and that a sign-in identity is involved.
-- [ ] **C318** — Each refusal of an act that would give an agent a sign-in identity leaves the log and projection unchanged, and one counted test over the store after the two directory refusals finds no agent record carrying a sign-in identity.
-
-## The identity surface shell (conformance 9.1 to 9.3)
-
-- [ ] **C303** — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the project setup's trees, with the design's gate array copying them, measure surface/identity by npm ci and npm test.
-- [ ] **C304** — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
-- [ ] **C305** — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \, kept under iam.dock, with the layout flipped.
-- [ ] **C306** — The palette Go to entries and the fourteen g go-to letters reach every rail screen.
-- [ ] **C307** — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.
-- [ ] **C308** — j and k move focus with the cursor without replacing the screen, and Enter opens the focused row.
-- [ ] **C309** — The help overlay places one numbered mark per explained element and states the count, swallows its dismissing click, and returns focus on Escape to the element that had it.
-- [ ] **C310** — A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
-- [ ] **C311** — index.v6.html sits beside index.v5.html and differs from it by the focus fix and the keyboard fix only, each proved against v6 and shown failing on v5.
-- [ ] **C312** — CONFORMANCE.md line 3 names index.v6.html as the reference, and DIRECTORY-006's GRANT_CONFORMANCE line pins index.v6.html by its sha256.
-
-## The identity surface shell (conformance 9.1 to 9.3)
-
-- [ ] **C303** — .land/gates.sh runs the surface's test command as a leg that fails by name when npm is missing, and the project setup's trees measure surface/identity by npm ci and npm test, with the design's gate array copying the project setup's trees verbatim.
-- [ ] **C304** — One route table names the 14 rail screens and the 30 hash-routed tabs with a built column, and the tests fail by name on a built row the shell does not serve.
-- [ ] **C305** — The rail toggles by its button and by [, kept under iam.labels across a reload, and the dock side switches by the Configuration Layout segment, by the palette act and by \, kept under iam.dock, with the layout flipped.
-- [ ] **C306** — The palette Go to entries and the fourteen g go-to letters reach every rail screen.
-- [ ] **C307** — Every element with a click action is a button or a link, or has tabindex 0 and dispatches one click on Enter and Space, palette rows included, with no caller under surface/identity/src/features changed.
-- [ ] **C308** — j and k move focus with the cursor without replacing the screen, and Enter opens the focused row.
-- [ ] **C309** — The help overlay places one numbered mark per explained element and states the count, swallows its dismissing click, and returns focus on Escape to the element that had it.
-- [ ] **C310** — A Tab walk over every built route, driven by @testing-library/user-event, reaches every element with a click action other than those in a closed layer (the closed palette's rows, walked instead with the palette open) and the two dismiss backdrops, and activates each with Enter and, for non-links, Space, with a non-zero count asserted.
-- [ ] **C311** — index.v6.html sits beside index.v5.html and differs from it by the focus fix and the keyboard fix only, each proved against v6 and shown failing on v5.
-- [ ] **C312** — CONFORMANCE.md line 3 names index.v6.html as the reference, with v5 as the prior, and pins index.v6.html by its path and sha256, the first pin of the mock-up.
 
 ## Grant conformance rows named by their tests
 

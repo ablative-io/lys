@@ -280,7 +280,7 @@
         },
         {
           "name": "tests",
-          "command": "cargo test --workspace --all-features --no-fail-fast",
+          "command": "cargo test --workspace --all-features",
           "requires": [
             "rust-build"
           ],
@@ -349,7 +349,7 @@
         },
         {
           "name": "tests",
-          "command": "cargo test --workspace --all-features",
+          "command": "cargo test --workspace --all-features --no-fail-fast",
           "requires": [
             "rust-build"
           ],
