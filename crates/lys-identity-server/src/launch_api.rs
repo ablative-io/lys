@@ -29,14 +29,12 @@
 //! is answered as it always was, and nothing runs. The service itself
 //! never runs anything: it asks the runner over its socket.
 
-use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, Method};
+use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
 use lys_identity::{AgentId, IdentityId, OperationId};
@@ -47,7 +45,7 @@ use crate::agent_policy_api::with_policies;
 use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_harness::skill_files;
-use crate::launch_template::{HandleName, Start, handle_variable, render};
+use crate::launch_template::{HandleName, Start, render};
 use crate::network_api::with_network;
 use crate::provisioning_api::with_provisioning;
 use crate::provisioning_store::Version;
@@ -56,7 +54,7 @@ use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
 use crate::session::now;
 pub(crate) use crate::start_checks::placed;
-use crate::start_checks::{active, reaches, reviewed};
+use crate::start_checks::{active, handles, reaches, reviewed};
 
 /// The answer of the start-command route.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -99,52 +97,6 @@ pub(crate) struct Launch {
 /// The start-command route.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/agents/{id}/start-command", post(start_command))
-}
-
-/// The handles `agent` holds that are not dropped, as the broker lists them
-/// to the signed-in person, each with the variable the launch sets.
-async fn handles(
-    state: &AppState,
-    headers: &HeaderMap,
-    agent: &str,
-) -> Result<Vec<HandleName>, ServerError> {
-    let path = format!("/_lys/handles?holder={agent}");
-    let answer = crate::secrets_api::ask(state, headers, Method::GET, &path, Bytes::new()).await?;
-    let unread = |reason: &str| ServerError::SecretsUnavailable {
-        reason: format!("the broker's handle list does not read: {reason}"),
-    };
-    let listed = answer
-        .get("handles")
-        .and_then(Value::as_array)
-        .ok_or_else(|| unread("it holds no handles list"))?;
-    let mut held: Vec<(String, String)> = Vec::new();
-    for handle in listed {
-        let dropped = handle
-            .get("dropped")
-            .and_then(Value::as_bool)
-            .ok_or_else(|| unread("a handle does not say whether it was dropped"))?;
-        if dropped {
-            continue;
-        }
-        let text = |name: &str| {
-            handle
-                .get(name)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| unread(&format!("a handle has no {name}")))
-        };
-        held.push((text("id")?, text("secret")?));
-    }
-    held.sort();
-    let mut taken = BTreeSet::new();
-    Ok(held
-        .into_iter()
-        .map(|(id, secret)| HandleName {
-            env: handle_variable(&secret, &mut taken),
-            id,
-            secret,
-        })
-        .collect())
 }
 
 async fn start_command(
