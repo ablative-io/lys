@@ -29,10 +29,10 @@ Keep one description per supported program as data in the repository: its plain 
 
 ### R1: Lys answers the programs it can start, with their models and modes as named choices
 
-Behavioural. WHEN a signed-in person reads the programs, THE SYSTEM SHALL answer each program Lys describes with its plain name and line, its models as id and label with the default first, its permission modes as id and plain meaning, and its declared-harness description, together with every build already declared in a reviewed profile under that program's name; a description file Lys cannot read SHALL fail the service's start naming the file.
+Behavioural. WHEN a signed-in person reads the programs, THE SYSTEM SHALL answer each program Lys describes whose rendering contract is registered in the home with its plain name and line, its models as id and label with the default first, its permission modes as id and plain meaning, and its declared-harness description, together with every build already declared in a reviewed profile under that program's name; a description file Lys cannot read SHALL fail the service's start naming the file.
 
 **Acceptance:**
-- A fresh install answers Claude Code and Codex with their models and modes before any profile exists.
+- A fresh install answers the named models and modes of every described program with a registered rendering contract before any profile exists; kept descriptions with unregistered contracts are absent.
 - A build declared in a reviewed profile is answered under its program with its path and package.
 - An unreadable description names its file at start.
 
@@ -48,6 +48,7 @@ Behavioural. WHEN a signed-in person reads the programs, THE SYSTEM SHALL answer
 - modify: crates/lys-identity-server/src/error.rs
 - modify: crates/lys-identity-server/src/error_status.rs
 - modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-home/src/harness/rendering.rs
 
 **Checklist:**
 - C474 — Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).

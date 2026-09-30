@@ -1131,6 +1131,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/error.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `crates/lys-identity-server/src/error_status.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `crates/lys-identity-server/src/openapi_types.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-home/src/harness/rendering.rs` | The programme catalogue reads registration through the rendering resolver (DIRECTORY-076 R1) | DIRECTORY-076 |
 
 ## Inventory
 

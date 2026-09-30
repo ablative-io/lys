@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn expected() -> Result<Value, Box<dyn Error>> {
+fn described() -> Result<Vec<Value>, Box<dyn Error>> {
     let mut programs = Vec::new();
     for source in [
         include_str!("../../../docs/harness/catalogue/claude-code.json"),
@@ -30,6 +30,11 @@ fn expected() -> Result<Value, Box<dyn Error>> {
         program["builds"] = json!([]);
         programs.push(program);
     }
+    Ok(programs)
+}
+
+fn expected() -> Result<Value, Box<dyn Error>> {
+    let programs: Vec<Value> = described()?.into_iter().take(1).collect();
     Ok(json!({ "programs": programs }))
 }
 
@@ -57,8 +62,33 @@ async fn a_fresh_install_answers_named_models_modes_and_descriptions() -> TestRe
     assert_eq!(answer, expected()?);
     assert_eq!(answer["programs"][0]["name"], "Claude Code");
     assert_eq!(answer["programs"][0]["models"][0]["id"], "default");
-    assert_eq!(answer["programs"][1]["name"], "Codex");
-    assert_eq!(answer["programs"][1]["models"][0]["id"], "gpt-6.1-sol");
+    assert_eq!(
+        answer["programs"]
+            .as_array()
+            .ok_or("programs is not an array")?
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unregistered_contract_is_kept_as_data_but_not_offered() -> TestResult {
+    let data = described()?;
+    assert_eq!(data[1]["name"], "Codex");
+    assert_eq!(data[1]["models"][0]["id"], "gpt-6.1-sol");
+    let (service, seeded, cookie) = table().await?;
+    drop(seeded);
+    let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer, expected()?);
+    assert!(
+        !answer["programs"]
+            .as_array()
+            .ok_or("programs is not an array")?
+            .iter()
+            .any(|program| program["name"] == "Codex")
+    );
     Ok(())
 }
 
@@ -76,18 +106,27 @@ async fn the_programmes_read_requires_a_signed_in_caller() -> TestResult {
 async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absent() -> TestResult {
     let (service, seeded, cookie) = table().await?;
     let route = format!("/agents/{}/provisioning", seeded.people[0].agents[0].id);
+    let data = described()?;
     let mut wanted = expected()?;
     for (from, program, name, path, package, reviewed) in [
         (
             0,
             0,
-            "Reviewed Claude build",
+            "First reviewed build",
             "/opt/seat/claude",
-            "claude-build",
+            "first-build",
             true,
         ),
         (
             1,
+            0,
+            "Second reviewed build",
+            "/opt/seat/other",
+            "second-build",
+            true,
+        ),
+        (
+            2,
             1,
             "Reviewed Codex build",
             "/opt/seat/codex",
@@ -95,7 +134,7 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
             true,
         ),
         (
-            2,
+            3,
             0,
             "Unreviewed build",
             "/opt/seat/pending",
@@ -103,8 +142,8 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
             false,
         ),
     ] {
-        let description = wanted["programs"][program]["description"].clone();
-        let model = wanted["programs"][program]["models"][0]["id"].clone();
+        let description = data[program]["description"].clone();
+        let model = data[program]["models"][0]["id"].clone();
         let body = json!({
             "operation": OperationId::generate()?.to_string(), "from_version": from,
             "model_access": [model], "tools": [], "skills": [], "mcp_servers": [],
@@ -123,9 +162,11 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
                 )
                 .await?;
             assert_eq!(status, 200, "{answer}");
-            wanted["programs"][program]["builds"] = json!([
-                {"name": name, "program": path, "package": package, "from": "profile"}
-            ]);
+            if program == 0 {
+                wanted["programs"][0]["builds"].as_array_mut().ok_or("builds is not an array")?.push(
+                    json!({"name": name, "program": path, "package": package, "from": "profile"})
+                );
+            }
         }
     }
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
