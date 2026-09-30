@@ -47,7 +47,6 @@ pub mod goals_api;
 pub mod goals_state;
 pub mod goals_store;
 pub mod grant_contract;
-mod grant_delegation;
 mod grant_sight;
 pub mod grants;
 pub mod grants_batch;
