@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 //! The start-command route: an agent's start command is rendered from its
 //! kept profile for a chosen machine, names the agent and its handle ids and
 //! never a credential's value, is never run, and each refusal is by name.
@@ -117,37 +115,26 @@ impl Table {
     }
 
     async fn profile(&self) -> TestResult {
-        self.profile_on(None, 0).await
-    }
-
-    async fn profile_on(&self, machine: Option<&str>, from: u32) -> TestResult {
         let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
         let (status, kept) = self
             .service
             .post("/skills", Some(&self.ada), &skill)
             .await?;
         assert_eq!(status, 200, "{kept}");
-        let mut body = json!({
-            "operation": operation()?, "from_version": from,
+        let body = json!({
+            "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
             "harness": harness_description::declared(),
             "instructions": "Build what the brief says.", "note": "First setup.",
         });
-        if let Some(machine) = machine {
-            body["runs_on"] = json!(machine);
-        }
         let path = format!("/agents/{}/provisioning", self.agent());
         let (status, set) = self.service.post(&path, Some(&self.ada), &body).await?;
         assert_eq!(status, 200, "{set}");
         let reviewed = json!({ "operation": operation()? });
         let (status, set) = self
             .service
-            .post(
-                &format!("{path}/{}/review", from + 1),
-                Some(&self.ada),
-                &reviewed,
-            )
+            .post(&format!("{path}/1/review"), Some(&self.ada), &reviewed)
             .await?;
         assert_eq!(status, 200, "{set}");
         assert!(set["profile"]["reviewed_by"].is_string(), "{set}");
@@ -232,8 +219,8 @@ async fn each_refusal_is_by_name() -> TestResult {
             &json!({ "operation": operation()? }),
         )
         .await?;
-    assert_eq!(status, 404, "{none}");
-    assert_eq!(none["refusal"], "MachineUnknown");
+    assert_eq!(status, 400, "{none}");
+    assert_eq!(none["refusal"], "RequestMalformed");
     Ok(())
 }
 
@@ -352,68 +339,5 @@ async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
         409,
         "MachineCannotReach",
     );
-    Ok(())
-}
-
-#[tokio::test]
-async fn an_omitted_machine_uses_the_profile_and_replay_keeps_it() -> TestResult {
-    let table = Table::set().await?;
-    let agent = table.agent();
-    let first_machine = table
-        .machine(Some("manifold"), std::slice::from_ref(&agent))
-        .await?;
-    let other_machine = table
-        .machine(Some("manifold"), std::slice::from_ref(&agent))
-        .await?;
-    table.profile_on(Some(&first_machine), 0).await?;
-    let path = format!("/agents/{agent}/start-command");
-    let request = json!({ "operation": operation()? });
-    let (status, first) = table
-        .service
-        .post(&path, Some(&table.ada), &request)
-        .await?;
-    assert_eq!(status, 200, "{first}");
-    assert_eq!(first["machine"], first_machine);
-    let parsed = parse_template(first["template"].as_str().ok_or("no template")?.as_bytes())?;
-    assert_eq!(parsed.env.get("LYS_MACHINE"), Some(&first_machine));
-    let (status, explicit) = table.ask(&agent, &other_machine, &table.ada).await?;
-    assert_eq!(status, 200, "{explicit}");
-    assert_eq!(explicit["machine"], other_machine);
-    table.profile_on(Some(&other_machine), 1).await?;
-    let (status, replay) = table
-        .service
-        .post(&path, Some(&table.ada), &request)
-        .await?;
-    assert_eq!(status, 200, "{replay}");
-    assert_eq!(replay, first);
-    let (status, next) = table
-        .service
-        .post(
-            &path,
-            Some(&table.ada),
-            &json!({ "operation": operation()? }),
-        )
-        .await?;
-    assert_eq!(status, 200, "{next}");
-    assert_eq!(next["machine"], other_machine);
-    assert_eq!(next["provisioning_version"], 2);
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_profile_machine_still_requires_placement_admission() -> TestResult {
-    let table = Table::set().await?;
-    let agent = table.agent();
-    let forbidden = table.machine(Some("manifold"), &[]).await?;
-    table.profile_on(Some(&forbidden), 0).await?;
-    let answer = table
-        .service
-        .post(
-            &format!("/agents/{agent}/start-command"),
-            Some(&table.ada),
-            &json!({ "operation": operation()? }),
-        )
-        .await?;
-    refused(&answer, 403, "MachineNotForAgent");
     Ok(())
 }
