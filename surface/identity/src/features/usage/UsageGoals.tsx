@@ -13,7 +13,7 @@ export function UsageGoals({ agent, goals, changed }: Props) {
   return <section className="card usage-goals" aria-label="Goals"><h3>Goals</h3>
     {goals.length ? <table className="usage-list"><thead><tr><th>Kind</th><th>What</th><th>Deadline</th><th>Where it stands</th></tr></thead>
       <tbody>{goals.map((item) => <tr key={item.goal.id}><td>{item.goal.kind}</td><td>{item.goal.words}</td>
-        <td>{new Date(item.goal.deadline * 1000).toLocaleString()}</td><td>{STANDING[item.standing]}</td></tr>)}</tbody></table> : <p>No goal is set for this agent.</p>}
+        <td>{item.goal.deadline === null ? 'No deadline' : new Date(item.goal.deadline * 1000).toLocaleString()}</td><td>{STANDING[item.standing]}</td></tr>)}</tbody></table> : <p>No goal is set for this agent.</p>}
     <SetGoal agent={agent} changed={changed} />
   </section>;
 }

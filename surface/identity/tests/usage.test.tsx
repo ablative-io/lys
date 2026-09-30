@@ -29,7 +29,7 @@ function keeping(receipts: Receipt[] = [], reported: number | null = 17900000000
     [goals]: () => ok({ goals: set }),
     ['POST ' + goals]: (body) => {
       const given = body as { operation: string; kind: GoalItem['goal']['kind']; words: string; deadline: number };
-      const item: GoalItem = { goal: { id: given.operation, kind: given.kind, words: given.words, deadline: given.deadline, evidence: null }, standing: 'open' };
+      const item: GoalItem = { goal: { id: given.operation, kind: given.kind, words: given.words, deadline: given.deadline, active: true, evidence: null }, standing: 'open' };
       set.push(item);
       return ok(item);
     },
@@ -78,6 +78,14 @@ describe('Usage', () => {
     const what = $('form[aria-label="Set a goal"] textarea[name="words"]') as HTMLTextAreaElement | null;
     expect(what?.rows).toBeGreaterThanOrEqual(4);
     expect(what?.maxLength).toBe(500);
+  });
+
+  it('shows a deadline-free goal without inventing a date', async () => {
+    const item: GoalItem = { goal: { id: 'op-standing-aim', kind: 'goal', words: 'Keep the directory available', deadline: null, active: true, evidence: null }, standing: 'open' };
+    await mount(file, { ...keeping(), [goals]: ok({ goals: [item] }) });
+    const row = $('section[aria-label="Goals"] tbody tr');
+    expect(row?.children[1]?.textContent).toBe(item.goal.words);
+    expect(row?.children[2]?.textContent).toBe('No deadline');
   });
 
   it('changes a budget on the agent\'s own file and keeps it across a reload', async () => {
