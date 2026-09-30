@@ -489,6 +489,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             Some(retire),
             Some(account),
         ),
+        (
+            GET,
+            "/tree",
+            None,
+            Some(api.schema::<crate::tree_views::TreeView>()),
+        ),
         (GET, "/teams", None, Some(api.schema::<TeamsView>())),
         (POST, "/teams", Some(team), Some(changed.clone())),
         (GET, "/teams/{id}", None, Some(api.schema::<TeamView>())),

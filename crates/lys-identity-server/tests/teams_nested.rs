@@ -271,19 +271,42 @@ async fn a_nested_teams_owner_cannot_change_its_parent() -> TestResult {
         .await?;
     let parent = OperationId::generate()?.to_string();
     let child = OperationId::generate()?.to_string();
-    for (id, cookie, parent) in [
-        (&parent, &owner, None),
-        (&child, &other, Some(parent.as_str())),
-    ] {
+    for (id, cookie) in [(&parent, &owner), (&child, &other)] {
         let (status, answer) = service
             .post(
                 "/teams",
                 Some(cookie),
-                &json!({"operation":id,"name":"team","parent":parent}),
+                &json!({"operation":id,"name":"team"}),
             )
             .await?;
         assert_eq!(status, 200, "{answer}");
     }
+    for (route, body) in [
+        (
+            "/teams".to_owned(),
+            json!({"operation": OperationId::generate()?.to_string(), "name":"child", "parent":parent}),
+        ),
+        (
+            format!("/teams/{child}/nesting"),
+            nesting(Some(&parent), None)?,
+        ),
+        (
+            format!("/teams/{child}/nesting"),
+            nesting(Some(&OperationId::generate()?.to_string()), None)?,
+        ),
+    ] {
+        let (status, answer) = service.post(&route, Some(&other), &body).await?;
+        assert_eq!(status, 403, "{answer}");
+        assert_eq!(answer["refusal"], "NotAdmitted");
+    }
+    let (status, answer) = service
+        .post(
+            &format!("/teams/{child}/nesting"),
+            Some(&owner),
+            &nesting(Some(&parent), None)?,
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
     let (status, answer) = service
         .post(
             &format!("/teams/{parent}/nesting"),
@@ -293,5 +316,69 @@ async fn a_nested_teams_owner_cannot_change_its_parent() -> TestResult {
         .await?;
     assert_eq!(status, 403, "{answer}");
     assert_eq!(answer["refusal"], "NotAdmitted");
+    Ok(())
+}
+
+#[tokio::test]
+async fn plain_creation_keeps_the_old_event_while_nesting_refuses_a_reversible_upgrade()
+-> TestResult {
+    use identity_contract::harness::GRANT_MODEL;
+    use lys_core::Ed25519Identity;
+    use lys_identity_server::teams_state::Line as CurrentLine;
+    use lys_identity_server::teams_store::TeamStore as CurrentStore;
+    use std::sync::Arc;
+
+    let temporary = tempfile::tempdir()?;
+    let intent = temporary.path().join("upgrade.intent");
+    let (service, (teams, key)) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.operator_upgrade_file = Some(intent.clone()),
+        |config| {
+            let seeded = seed_configured(config, [ADMINISTRATOR])?;
+            assert_eq!(seeded.people.len(), 1);
+            Ok((
+                config.teams_dir.clone().ok_or("no teams directory")?,
+                config.event_key_file.clone(),
+            ))
+        },
+    )
+    .await?;
+    let cookie = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    std::fs::write(&intent, b"pending")?;
+    let id = OperationId::generate()?.to_string();
+    let (status, answer) = service
+        .post(
+            "/teams",
+            Some(&cookie),
+            &json!({"operation":id,"name":"plain team"}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let stored = CurrentStore::open(&teams, Arc::new(Ed25519Identity::load(&key)?))?;
+    assert!(matches!(
+        stored.recorded(&id),
+        Some(CurrentLine::Created(_))
+    ));
+    drop(stored);
+    let (status, refused) = service.post("/teams",Some(&cookie),&json!({"operation":OperationId::generate()?.to_string(),"name":"nested team","parent":id})).await?;
+    assert_eq!(status, 503, "{refused}");
+    assert_eq!(refused["refusal"], "TeamsUnavailable");
+    let (status, refused) = service
+        .post(
+            &format!("/teams/{id}/nesting"),
+            Some(&cookie),
+            &nesting(None, None)?,
+        )
+        .await?;
+    assert_eq!(status, 503, "{refused}");
+    assert_eq!(refused["refusal"], "TeamsUnavailable");
     Ok(())
 }

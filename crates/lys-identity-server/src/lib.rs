@@ -135,6 +135,8 @@ pub mod teams_migration;
 pub mod teams_nesting;
 pub mod teams_state;
 pub mod teams_store;
+pub mod tree_api;
+pub mod tree_views;
 
 pub use config::Config;
 mod signed_json;

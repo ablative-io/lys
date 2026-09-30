@@ -8,7 +8,7 @@ use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use lys_identity::{AgentId, OperationId};
+use lys_identity::{Actor, AgentId, OperationId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -145,22 +145,30 @@ pub(crate) async fn create(
     }
     let description = words("description", &body.description, DESCRIPTION_MAX)?;
     let (parent, lead) = position(body.parent, body.lead)?;
-    crate::teams_migration::require_committed(&state)?;
+    if parent.is_some() || lead.is_some() {
+        crate::teams_migration::require_committed(&state)?;
+    }
+    parent_owned(&state, &actor, parent.as_deref())?;
     crate::teams_migration::advance(&state)?;
     with_directory(&state, |directory| {
         let owner = own_person(directory.projection()?, &actor)?;
-        let line = Line::CreatedV1(CreatedV1 {
-            created: Created {
-                id,
-                owner: owner.to_string(),
-                name,
-                description,
-                by: login(actor.binding()),
-                at: now(),
-            },
-            parent,
-            lead,
-        });
+        let created = Created {
+            id,
+            owner: owner.to_string(),
+            name,
+            description,
+            by: login(actor.binding()),
+            at: now(),
+        };
+        let line = if parent.is_some() || lead.is_some() {
+            Line::CreatedV1(CreatedV1 {
+                created,
+                parent,
+                lead,
+            })
+        } else {
+            Line::Created(created)
+        };
         with_teams(&state, |store| kept(store, line))
     })
     .map(Json)
@@ -178,6 +186,7 @@ pub(crate) async fn nest(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let (parent, lead) = position(body.parent, body.lead)?;
     crate::teams_migration::require_committed(&state)?;
+    parent_owned(&state, &actor, parent.as_deref())?;
     change(&state, &actor, &id, |team, by| {
         Ok(Line::NestedV1(NestedV1 {
             operation,
@@ -189,4 +198,27 @@ pub(crate) async fn nest(
         }))
     })
     .map(Json)
+}
+
+fn parent_owned(state: &AppState, actor: &Actor, parent: Option<&str>) -> Result<(), ServerError> {
+    let Some(parent) = parent else {
+        return Ok(());
+    };
+    if state.admission.administrator(actor).is_ok() {
+        return Ok(());
+    }
+    with_directory(state, |directory| {
+        let own = own_person(directory.projection()?, actor)?.to_string();
+        with_teams(state, |store| {
+            if !store
+                .team(parent)
+                .is_some_and(|team| team.created.owner == own)
+            {
+                return Err(ServerError::NotAdmitted {
+                    reason: "only a parent team's owner or the administrator nests a team under it",
+                });
+            }
+            Ok(())
+        })
+    })
 }
