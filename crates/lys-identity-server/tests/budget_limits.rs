@@ -1,0 +1,261 @@
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::path::{Path, PathBuf};
+
+use identity_contract::apps::{Auth, send};
+use identity_contract::fake_issuer::Login;
+use identity_contract::harness::{ADMINISTRATOR, Service};
+use lys_core::Ed25519Identity;
+use lys_identity::OperationId;
+use lys_identity_server::dev_seed::seed_configured;
+use lys_log_store::{FileLeafStore, FrontierLog};
+use serde_json::{Value, json};
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+type Files = BTreeMap<PathBuf, Vec<u8>>;
+
+fn login(subject: &str) -> Login {
+    Login {
+        subject: subject.to_owned(),
+        email: "operator@example.test".to_owned(),
+    }
+}
+
+struct Table {
+    service: Service,
+    cookie: String,
+    agent: String,
+    person: String,
+}
+
+impl Table {
+    async fn fresh() -> TestResult<Self> {
+        let (service, seeded) = Service::start_with(|config| {
+            Ok(seed_configured(config, [ADMINISTRATOR, "other-subject"])?)
+        })
+        .await?;
+        let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+        Ok(Self {
+            service,
+            cookie,
+            agent: seeded.people[0].agents[0].id.to_string(),
+            person: seeded.people[1].id.to_string(),
+        })
+    }
+
+    async fn put(&self, path: &str, body: &Value) -> TestResult<(u16, Value)> {
+        send(
+            &self.service,
+            reqwest::Method::PUT,
+            path,
+            Auth::Cookie(&self.cookie),
+            Some(body),
+        )
+        .await
+    }
+
+    async fn get(&self, path: &str) -> TestResult<Value> {
+        let (status, body) = self.service.get(path, Some(&self.cookie)).await?;
+        assert_eq!(status, 200, "{body}");
+        Ok(body)
+    }
+}
+
+fn token_limits() -> Value {
+    json!([
+        {"unit": "tokens", "amount": 400, "period": "week", "act": "tell"},
+        {"unit": "tokens", "amount": 500, "period": "week", "act": "stop"}
+    ])
+}
+
+#[tokio::test]
+async fn limits_keep_distinct_actions_for_the_same_unit_and_period() -> TestResult {
+    let mut table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let body = json!({"limits": token_limits(), "warn_at": 80, "version": 0});
+    let (status, set) = table.put(&path, &body).await?;
+    assert_eq!(status, 200, "{set}");
+    assert_eq!(set["limits"], token_limits(), "{set}");
+    assert_eq!(set["version"], 1);
+    let read = table.get(&path).await?;
+    assert_eq!(read["holder"], json!({"kind": "agent", "id": table.agent}));
+    assert_eq!(read["limits"], token_limits(), "{read}");
+    assert_eq!(read["warn_at"], 80);
+    assert!(read["zone"].as_str().is_some(), "{read}");
+    assert!(read.get("act").is_none(), "{read}");
+    table.service.restart().await?;
+    assert_eq!(table.get(&path).await?, read);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_stale_holder_version_cannot_replace_any_limit() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let body = json!({"limits": token_limits(), "warn_at": null, "version": 0});
+    let (status, set) = table.put(&path, &body).await?;
+    assert_eq!(status, 200, "{set}");
+    let kept = table.get(&path).await?;
+    let changed = json!({"limits": [], "warn_at": 50, "version": 0});
+    let (status, refused) = table.put(&path, &changed).await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "BudgetVersionConflict");
+    assert_eq!(table.get(&path).await?, kept);
+    Ok(())
+}
+
+#[tokio::test]
+async fn only_the_administrator_changes_a_persons_limit_list() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/person/{}", table.person);
+    let body = json!({"limits": token_limits(), "warn_at": null, "version": 0});
+    let (status, set) = table.put(&path, &body).await?;
+    assert_eq!(status, 200, "{set}");
+    let kept = table.get(&path).await?;
+    let other = table.service.sign_in(login("other-subject")).await?;
+    let (status, read) = table.service.get(&path, Some(&other)).await?;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(read, kept);
+    let (status, refused) = send(
+        &table.service,
+        reqwest::Method::PUT,
+        &path,
+        Auth::Cookie(&other),
+        Some(&json!({"limits": [], "warn_at": null, "version": 1})),
+    )
+    .await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "not_permitted");
+    assert_eq!(table.get(&path).await?, kept);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_team_context_limit_names_the_refusal_and_the_agent_fix() -> TestResult {
+    let table = Table::fresh().await?;
+    let team = OperationId::generate()?.to_string();
+    let (status, created) = table
+        .service
+        .post(
+            "/teams",
+            Some(&table.cookie),
+            &json!({"operation": team, "name": "Team"}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{created}");
+    let path = format!("/budgets/team/{team}");
+    let body = json!({
+        "limits": [{"unit": "context_percent", "amount": 80, "period": null, "act": "compact"}],
+        "warn_at": null, "version": 0
+    });
+    let (status, refused) = table.put(&path, &body).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "TeamUnitRefused", "{refused}");
+    assert!(
+        refused.to_string().contains("set it on each agent"),
+        "{refused}"
+    );
+    assert_eq!(table.get(&path).await?["limits"], json!([]));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_unit_without_a_reported_source_is_unavailable_and_not_kept() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    for (unit, period) in [("dollars", "week"), ("plan_percent", "five_hour")] {
+        let before = table.get(&path).await?;
+        let unavailable = before["unavailable"]
+            .as_array()
+            .ok_or("no unavailable units")?;
+        assert!(
+            unavailable.iter().any(|entry| {
+                entry["unit"] == unit
+                    && entry["reason"]
+                        .as_str()
+                        .is_some_and(|reason| !reason.is_empty())
+            }),
+            "{before}"
+        );
+        let body = json!({
+            "limits": [{"unit": unit, "amount": 50, "period": period, "act": "stop"}],
+            "warn_at": null, "version": 0
+        });
+        let (status, refused) = table.put(&path, &body).await?;
+        assert_eq!(status, 400, "{refused}");
+        assert_eq!(refused["refusal"], "BudgetUnitUnavailable", "{refused}");
+        assert_eq!(table.get(&path).await?, before);
+    }
+    Ok(())
+}
+
+fn files(dir: &Path) -> TestResult<Files> {
+    let mut found = BTreeMap::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            found.extend(files(&path)?);
+        } else {
+            found.insert(path.clone(), std::fs::read(path)?);
+        }
+    }
+    Ok(found)
+}
+
+#[tokio::test]
+async fn an_old_install_keeps_each_limits_action_and_zone_without_rewriting_reads() -> TestResult {
+    let (mut service, (agent, dir, leaves)) = Service::start_with(|config| {
+        let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
+        let agent = seeded.people[0].agents[0].id.to_string();
+        let dir = config.budgets_dir.clone().ok_or("no budgets directory")?;
+        FileLeafStore::create(&dir, "lys/identity/budgets")?;
+        let (mut log, _) = FrontierLog::open(FileLeafStore::open(&dir)?)?;
+        let mut budgets = Vec::new();
+        for (measure, limit, length, zone, act) in [
+            ("tokens", 500, "week", "UTC", "stop"),
+            ("running_ms", 400, "day", "Australia/Sydney", "tell"),
+        ] {
+            let budget = json!({
+                "holder": {"kind": "agent", "id": agent}, "measure": measure, "limit": limit,
+                "period": {"length": length, "zone": zone}, "act": act,
+                "version": 1, "by": seeded.people[0].id.to_string(), "at": 1
+            });
+            let mut leaf = budget.clone();
+            leaf["kind"] = json!("set");
+            log.append(&serde_json::to_vec(&leaf)?)?;
+            budgets.push(budget);
+        }
+        log.write_snapshot(
+            "lys/identity/budgets-state/v2",
+            &serde_json::to_vec(&json!({
+                "format": "lys-budgets-state/v2",
+                "held": {"budgets": budgets, "unconfirmed": [], "charged": [], "uses": []}
+            }))?,
+            &Ed25519Identity::load(&config.event_key_file)?,
+        )?;
+        let leaves = files(&dir.join("leaves"))?;
+        Ok((agent, dir, leaves))
+    })
+    .await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let path = format!("/budgets/agent/{agent}");
+    let before = files(&dir)?;
+    let (status, read) = service.get(&path, Some(&cookie)).await?;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(
+        read["limits"],
+        json!([
+            {"unit": "tokens", "amount": 500, "period": "week", "act": "stop", "zone": "UTC"},
+            {"unit": "running_ms", "amount": 400, "period": "day", "act": "tell", "zone": "Australia/Sydney"}
+        ]),
+        "{read}"
+    );
+    assert_eq!(files(&dir)?, before, "a read must not rewrite the old log");
+    assert_eq!(files(&dir.join("leaves"))?, leaves);
+    service.restart().await?;
+    let (status, restored) = service.get(&path, Some(&cookie)).await?;
+    assert_eq!(status, 200, "{restored}");
+    assert_eq!(restored["limits"], read["limits"]);
+    assert_eq!(files(&dir.join("leaves"))?, leaves);
+    Ok(())
+}
