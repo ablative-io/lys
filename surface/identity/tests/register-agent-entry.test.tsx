@@ -50,38 +50,47 @@ async function follow(anchor: HTMLAnchorElement) {
   }
 }
 
+async function directory() {
+  await home();
+  expect(document.querySelector('nav[aria-label="Main"] a[href="#/agents/new"]')).toBeNull();
+  expect(document.querySelector('.you-page a[href^="#/agents/new"]')).toBeNull();
+  const entry = document.querySelector<HTMLAnchorElement>('nav[aria-label="Main"] a[href="#/people"]');
+  if (!entry) throw new Error('Missing People and agents link');
+  await follow(entry);
+  expect(document.querySelector('h1')?.textContent).toBe('People and agents');
+}
+
 describe('Registration entry points', () => {
   it.each([
-    { label: '+ Add agent', target: '#/agents/new', form: 'Register an agent' },
-    { label: 'Add a person', target: '#/directory/manage?action=person', form: 'Register a person' },
-  ])('reaches $label from the main menu by its text link', async ({ label, target, form }) => {
-    await home();
-    const main = document.querySelector('nav[aria-label="Main"]');
-    if (!main) throw new Error('Missing main menu');
-    const entry = link(main, label);
+    { label: 'Add agent', target: '#/agents/new', form: 'Register an agent' },
+    { label: 'Add person', target: '#/people/new', form: 'Add a person' },
+  ])('reaches $label through People and agents by visible links only', async ({ label, target, form }) => {
+    await directory();
+    const heading = document.querySelector('.page .head');
+    if (!heading) throw new Error('Missing People and agents heading');
+    const entry = link(heading, label);
     expect(entry.getAttribute('href')).toBe(target);
     await follow(entry);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe(form);
     expect(location.hash).toBe(target);
   });
 
-  it('carries the responsible person from the top of the team tree to registration', async () => {
-    await home();
-    const heading = document.querySelector('.you-panel .section-h');
-    if (!heading) throw new Error('Missing agent tree heading');
-    const entry = link(heading, '+ Add agent');
-    await follow(entry);
+  it('carries the person from their row to registration', async () => {
+    await directory();
+    const row = document.querySelector('tr[data-href="#/file/' + ADA + '"]');
+    if (!row) throw new Error('Missing person row');
+    await follow(link(row, 'Add agent under them'));
     const query = new URLSearchParams(location.hash.split('?')[1]);
     expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('answers_to')).toBe(ADA);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Register an agent');
   });
 
-  it('carries the team and its owner from the team link to registration', async () => {
-    await home();
-    const team = [...document.querySelectorAll('.you-team')].find((entry) => entry.textContent?.includes('Crew'));
-    if (!team) throw new Error('Missing Crew team');
-    await follow(link(team, '+ Add agent'));
+  it('carries an agent’s responsible person and team from its row to registration', async () => {
+    await directory();
+    const row = document.querySelector('tr[data-href="#/file/' + COURIER + '"]');
+    if (!row) throw new Error('Missing agent row');
+    await follow(link(row, 'Add agent under them'));
     const query = new URLSearchParams(location.hash.split('?')[1]);
     expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('team')).toBe('team-crew');

@@ -60,7 +60,7 @@ describe('Add-agent retry safety', () => {
   it('sends one registration and one activation for two simultaneous submits', async () => {
     const { entry, posted } = await form({
       'POST /agents': (body) => ok({ agent: COURIER, responsible: ADA, receipt: receipt(body) }),
-      ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: receipt(body) }),
+      ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: { ...receipt(body), change_kind: 5 } }),
     });
     await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
     await act(async () => {
