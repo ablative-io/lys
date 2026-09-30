@@ -135,19 +135,23 @@ fn exercise(
     assert!(filled > 0);
     let (blocked, pipe_full) = mpsc::sync_channel(1);
     let (release, resume) = mpsc::sync_channel(1);
-    {
+    let terminal_input = {
         let mut table = sessions.lock();
         let live = table
             .sessions
             .get_mut("blocked")
             .ok_or("blocked session missing")?
             .live("blocked")?;
-        live.writer = crate::input::Input::new(Box::new(GatedPipe {
-            pipe,
-            blocked,
-            resume,
-            entered: false,
-        }));
+        // Dropping the terminal input sends EOF; keep it alive through delivery.
+        let terminal_input = std::mem::replace(
+            &mut live.writer,
+            crate::input::Input::new(Box::new(GatedPipe {
+                pipe,
+                blocked,
+                resume,
+                entered: false,
+            })),
+        );
         if operation.is_some() {
             let tracking = crate::tracking::Tracking {
                 harness: crate::tracking::Harness::ClaudeCode,
@@ -164,7 +168,8 @@ fn exercise(
             session.guard.tracking = Some(tracking);
             session.guard.idle = false;
         }
-    }
+        terminal_input
+    };
     let compact = matches!(operation, Some(OperationRequest::Compact { .. }));
     let writer = if let Some(request) = operation {
         let mut table = sessions.lock();
@@ -247,6 +252,7 @@ fn exercise(
         available,
         "the full input pipe held the shared table and stopped the second session answering"
     );
+    drop(terminal_input);
     Ok(())
 }
 
