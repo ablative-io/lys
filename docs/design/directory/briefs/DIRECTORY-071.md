@@ -41,10 +41,15 @@ Behavioural. WHEN a team is created or changed, THE SYSTEM SHALL accept an optio
 
 **Files:**
 - create: crates/lys-identity-server/tests/teams_nested.rs
+- create: crates/lys-identity-server/tests/support/teams_before_nesting_state.rs
+- create: crates/lys-identity-server/tests/support/teams_before_nesting_store.rs
 - modify: crates/lys-identity-server/src/teams_state.rs
 - modify: crates/lys-identity-server/src/teams_store.rs
 - modify: crates/lys-identity-server/src/teams_api.rs
 - modify: crates/lys-identity-server/src/teams_migration.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
 
 **Checklist:**
 - C462 — The team store reads a team written before nesting as top-level with no lead. (DIRECTORY-071 R1).
@@ -71,6 +76,7 @@ Behavioural. WHEN a person or agent reads GET /api/tree, THE SYSTEM SHALL answer
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
 
 **Checklist:**
 - C463 — The tree read answers only what is under the caller, with each agent's session and settings. (DIRECTORY-071 R2).

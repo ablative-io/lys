@@ -1120,6 +1120,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
 | `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_store.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error_status.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/lib.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
 
 ## Inventory
 

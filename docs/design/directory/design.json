@@ -5108,6 +5108,41 @@
       "path": "crates/lys-identity-server/tests/mcp_registry.rs",
       "note": "Approved MCP servers are a registry (DIRECTORY-075 R3)",
       "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/support/teams_before_nesting_state.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/support/teams_before_nesting_store.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_state.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_status.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
     }
   ],
   "inventory": [

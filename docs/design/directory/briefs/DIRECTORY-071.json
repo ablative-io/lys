@@ -32,13 +32,18 @@
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/tests/teams_nested.rs"
+          "crates/lys-identity-server/tests/teams_nested.rs",
+          "crates/lys-identity-server/tests/support/teams_before_nesting_state.rs",
+          "crates/lys-identity-server/tests/support/teams_before_nesting_store.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/teams_state.rs",
           "crates/lys-identity-server/src/teams_store.rs",
           "crates/lys-identity-server/src/teams_api.rs",
-          "crates/lys-identity-server/src/teams_migration.rs"
+          "crates/lys-identity-server/src/teams_migration.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "crates/lys-identity-server/src/error_status.rs",
+          "crates/lys-identity-server/src/openapi_table.rs"
         ],
         "delete": []
       },
@@ -70,7 +75,8 @@
         "modify": [
           "crates/lys-identity-server/src/routes_table.rs",
           "crates/lys-identity-server/src/lib.rs",
-          "crates/lys-identity-server/src/openapi_types.rs"
+          "crates/lys-identity-server/src/openapi_types.rs",
+          "crates/lys-identity-server/src/openapi_table.rs"
         ],
         "delete": []
       },

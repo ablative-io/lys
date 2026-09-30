@@ -8,6 +8,13 @@ use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use serde_json::{Value, json};
 
+pub use lys_identity_server::{config, error, read_views, routes};
+
+#[path = "support/teams_before_nesting_state.rs"]
+pub mod teams_state;
+#[path = "support/teams_before_nesting_store.rs"]
+pub mod teams_store;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 struct Table {
@@ -153,5 +160,78 @@ async fn a_lead_outside_the_membership_is_refused_without_changing_the_team() ->
         .await?;
     assert_eq!(status, 200, "{unchanged}");
     assert_eq!(unchanged["lead"], Value::Null);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_archived_writer_store_and_snapshot_read_as_top_level_without_a_lead() -> TestResult {
+    use std::sync::Arc;
+
+    use lys_core::Ed25519Identity;
+    use lys_log_store::{FileLeafStore, FrontierLog};
+    use teams_state::{Created, DOMAIN, Held, Line};
+
+    assert_eq!(teams_state::SOURCE_COMMIT, teams_store::SOURCE_COMMIT);
+    let team = OperationId::generate()?.to_string();
+    let old_team = team.clone();
+    let (service, before) = Service::start_with(move |config| {
+        let seeded = seed_configured(config, [ADMINISTRATOR])?;
+        let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+        let path = config.teams_dir.as_deref().ok_or("no teams directory")?;
+        let mut store = teams_store::TeamStore::open(path, Arc::clone(&key))?;
+        store.keep(Line::Created(Created {
+            id: old_team,
+            owner: seeded.people[0].id.to_string(),
+            name: "old team".to_owned(),
+            description: "kept by the archived writer".to_owned(),
+            by: read_views::Login {
+                provider: config.link_audit_source.provider.clone(),
+                subject: ADMINISTRATOR.to_owned(),
+            },
+            at: 1,
+        }))?;
+        let held = Held {
+            teams: store.teams().to_vec(),
+            checked: None,
+        };
+        let bytes = held.encode()?;
+        let sealed: Value = serde_json::from_slice(&bytes)?;
+        let old = sealed["held"]["teams"][0]
+            .as_object()
+            .ok_or("no old team")?;
+        assert!(!old.contains_key("parent"));
+        assert!(!old.contains_key("lead"));
+        drop(store);
+        let (mut log, tail) = FrontierLog::open(FileLeafStore::open(path)?)?;
+        assert_eq!(tail.leaves.len(), 1);
+        log.write_snapshot(DOMAIN, &bytes, &key)?;
+        Ok(sealed)
+    })
+    .await?;
+    let cookie = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let (status, answer) = service
+        .get(&format!("/teams/{team}"), Some(&cookie))
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(
+        answer["name"],
+        before["held"]["teams"][0]["created"]["name"]
+    );
+    let object = answer.as_object().ok_or("team answer is not an object")?;
+    assert!(
+        object.contains_key("parent"),
+        "old team has no explicit parent answer"
+    );
+    assert!(
+        object.contains_key("lead"),
+        "old team has no explicit lead answer"
+    );
+    assert_eq!(answer["parent"], Value::Null);
+    assert_eq!(answer["lead"], Value::Null);
     Ok(())
 }
