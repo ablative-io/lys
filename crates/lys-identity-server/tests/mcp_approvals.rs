@@ -18,7 +18,7 @@ async fn a_lead_approves_from_its_own_latest_reviewed_profile() -> TestResult {
     let approved = fixture
         .approve(
             asked["id"].as_str().ok_or("no request id")?,
-            &fixture.lead_cookie,
+            &fixture.lead_auth,
             &body,
             200,
         )
@@ -66,6 +66,39 @@ async fn a_lead_approves_from_its_own_latest_reviewed_profile() -> TestResult {
 }
 
 #[tokio::test]
+async fn approval_copies_the_reviewed_target_over_a_newer_unreviewed_version() -> TestResult {
+    let fixture = Fixture::new().await?;
+    fixture
+        .version(
+            &fixture.target,
+            1,
+            json!([server("https://unreviewed-target.example.test/mcp")]),
+            false,
+        )
+        .await?;
+    let before = fixture.versions()?;
+    let asked = fixture.ask("dot").await?;
+    assert_eq!(asked["profile_version"], 1);
+    let approved = fixture
+        .approve(
+            asked["id"].as_str().ok_or("no request id")?,
+            &fixture.lead_auth,
+            &approval(&operation()?),
+            200,
+        )
+        .await?;
+    assert_eq!(approved["decision"]["profile_version"], 3);
+    let after = fixture.versions()?;
+    assert_eq!(after.len(), 3);
+    assert_eq!(&after[..2], before.as_slice());
+    let mut expected = before[0].settings.clone();
+    expected.mcp_servers =
+        serde_json::from_value(json!([server("https://lead.example.test/mcp")]))?;
+    assert_eq!(after[2].settings, expected);
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_server_outside_agent_remit_names_approver_target_and_server() -> TestResult {
     let fixture = Fixture::new().await?;
     let before = fixture.versions()?;
@@ -73,7 +106,7 @@ async fn a_server_outside_agent_remit_names_approver_target_and_server() -> Test
     let refused = fixture
         .approve(
             asked["id"].as_str().ok_or("no request id")?,
-            &fixture.narrow_cookie,
+            &fixture.narrow_auth,
             &approval(&operation()?),
             403,
         )
@@ -94,16 +127,12 @@ async fn approval_preserves_the_previous_profile_version_across_reopen() -> Test
     let asked = fixture.ask("dot").await?;
     let id = asked["id"].as_str().ok_or("no request id")?;
     let body = approval(&operation()?);
-    let approved = fixture
-        .approve(id, &fixture.lead_cookie, &body, 200)
-        .await?;
+    let approved = fixture.approve(id, &fixture.lead_auth, &body, 200).await?;
     fixture.service.restart().await?;
     let after = fixture.versions()?;
     assert_eq!(after.len(), 2);
     assert_eq!(after[0], before[0]);
-    let replay = fixture
-        .approve(id, &fixture.lead_cookie, &body, 200)
-        .await?;
+    let replay = fixture.approve(id, &fixture.lead_auth, &body, 200).await?;
     assert_eq!(replay, approved);
     assert_eq!(fixture.versions()?, after);
     Ok(())
@@ -116,7 +145,7 @@ async fn the_approved_profile_renders_the_server_in_native_mcp_config() -> TestR
     fixture
         .approve(
             asked["id"].as_str().ok_or("no request id")?,
-            &fixture.lead_cookie,
+            &fixture.lead_auth,
             &approval(&operation()?),
             200,
         )
@@ -164,7 +193,7 @@ async fn an_outside_approver_is_refused_before_server_remit_is_examined() -> Tes
         let refused = fixture
             .approve(
                 asked["id"].as_str().ok_or("no request id")?,
-                &fixture.outside_cookie,
+                &fixture.outside_auth,
                 &approval(&operation()?),
                 404,
             )
@@ -181,7 +210,7 @@ async fn approval_operations_replay_exactly_and_refuse_unknown_or_decided_reques
     let unknown = fixture
         .approve(
             &operation()?,
-            &fixture.lead_cookie,
+            &fixture.lead_auth,
             &approval(&operation()?),
             404,
         )
@@ -190,23 +219,19 @@ async fn approval_operations_replay_exactly_and_refuse_unknown_or_decided_reques
     let asked = fixture.ask("dot").await?;
     let id = asked["id"].as_str().ok_or("no request id")?;
     let body = approval(&operation()?);
-    let approved = fixture
-        .approve(id, &fixture.lead_cookie, &body, 200)
-        .await?;
+    let approved = fixture.approve(id, &fixture.lead_auth, &body, 200).await?;
     assert_eq!(
-        fixture
-            .approve(id, &fixture.lead_cookie, &body, 200)
-            .await?,
+        fixture.approve(id, &fixture.lead_auth, &body, 200).await?,
         approved
     );
     let mut changed = body.clone();
     changed["note"] = json!("changed words");
     let reused = fixture
-        .approve(id, &fixture.lead_cookie, &changed, 409)
+        .approve(id, &fixture.lead_auth, &changed, 409)
         .await?;
     assert_eq!(reused["refusal"], "RequestReused", "{reused}");
     let decided = fixture
-        .approve(id, &fixture.lead_cookie, &approval(&operation()?), 409)
+        .approve(id, &fixture.lead_auth, &approval(&operation()?), 409)
         .await?;
     assert_eq!(decided["refusal"], "RequestDecided", "{decided}");
     assert_eq!(fixture.versions()?.len(), 2);
@@ -218,11 +243,9 @@ async fn a_directory_scope_person_approves_from_a_reviewed_estate_profile() -> T
     let fixture = Fixture::new().await?;
     let asked = fixture.ask("waffles").await?;
     let approved = fixture
-        .approve(
+        .approve_person(
             asked["id"].as_str().ok_or("no request id")?,
-            &fixture.administrator,
             &approval(&operation()?),
-            200,
         )
         .await?;
     assert_eq!(approved["state"], "approved");
@@ -237,5 +260,46 @@ async fn a_directory_scope_person_approves_from_a_reviewed_estate_profile() -> T
         versions[1].reviewed.as_ref().ok_or("no review")?.by,
         approved["decision"]["by"]
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn approval_without_a_signature_or_cookie_is_refused() -> TestResult {
+    let fixture = Fixture::new().await?;
+    let asked = fixture.ask("dot").await?;
+    let path = fixture.approval_path(asked["id"].as_str().ok_or("no request id")?);
+    let (status, refused) = fixture
+        .service
+        .post(&path, None, &approval(&operation()?))
+        .await?;
+    assert_eq!(status, 401, "{refused}");
+    assert_eq!(refused["refusal"], "NotSignedIn", "{refused}");
+    assert_eq!(fixture.versions()?.len(), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn approval_refuses_a_signature_over_a_different_path_or_body() -> TestResult {
+    let fixture = Fixture::new().await?;
+    let asked = fixture.ask("dot").await?;
+    let path = fixture.approval_path(asked["id"].as_str().ok_or("no request id")?);
+    let bytes = serde_json::to_vec(&approval(&operation()?))?;
+    for (signed_path, signed_body) in [
+        ("/different-path", bytes.as_slice()),
+        (path.as_str(), b"different body".as_slice()),
+    ] {
+        let signature = fixture.lead_auth.signature(signed_path, signed_body)?;
+        let (status, refused) = fixture
+            .service
+            .post_signed(
+                &path,
+                (lys_identity_server::agent_signature::HEADER, &signature),
+                bytes.clone(),
+            )
+            .await?;
+        assert_eq!(status, 401, "{refused}");
+        assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
+    }
+    assert_eq!(fixture.versions()?.len(), 1);
     Ok(())
 }
