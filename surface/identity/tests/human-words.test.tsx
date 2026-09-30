@@ -10,6 +10,9 @@ import { SignInProviders } from '../src/features/connections/SignInProviders';
 import { Secrets } from '../src/features/secrets/Secrets';
 import { ADA, DIRECTORY, ME, SERVICE } from './fixtures';
 import { Requests } from '../src/features/requests/Requests';
+import { Apps } from '../src/features/apps/Apps';
+import { SessionList } from '../src/features/sessions/Sessions';
+import { Reviews } from '../src/features/reviews/Reviews';
 
 const roots: Root[] = [];
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
@@ -115,4 +118,73 @@ it('keeps the recorded request on screen without replacing it with an older list
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({ relation: 'viewer', ends_at: null, why: 'A newly recorded request' });
   expect(view.querySelector('section[aria-label="Visible requests"]')?.textContent).toContain('A newly recorded request');
+});
+
+async function clickNamed(view: HTMLElement, name: string) {
+  const button = [...view.querySelectorAll('button')].find((entry) => entry.textContent === name);
+  if (!button) throw new Error('Missing button: ' + name);
+  await act(async () => button.click());
+}
+
+it('shows app approval from its response without relying on another list read', async () => {
+  const pending = { id: 'fixture_notes', name: 'Notes', state: 'pending', redirects: [],
+    schema: { kinds: {} }, version: 0, versions: [], pending: null, client_id: null,
+    service_account: null, registered_by: { kind: 'start' }, registered_at: 1 };
+  let reads = 0;
+  const sent: unknown[] = [];
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const path = String(url).replace(/^\/api/, '');
+    if (path === '/apps/fixture_notes/approve' && init?.method === 'POST') {
+      sent.push(JSON.parse(String(init.body)));
+      return Response.json({ app: { ...pending, state: 'approved', version: 1, versions: [1] }, client: null, credentials: null });
+    }
+    if (path === '/apps') { reads += 1; return Response.json({ apps: [pending] }); }
+    if (path === '/directory/people') return Response.json(DIRECTORY);
+    throw new Error('Unexpected fixture read: ' + path);
+  });
+  const view = await show(<Apps />);
+  await clickNamed(view, 'Approve Notes');
+  expect(sent).toHaveLength(1);
+  expect(reads).toBe(1);
+  expect(view.querySelector('article')?.textContent).toContain('approved');
+  expect([...view.querySelectorAll('button')].some((entry) => entry.textContent === 'Approve Notes')).toBe(false);
+});
+
+it('removes only the sign-in session confirmed ended without another list read', async () => {
+  const session = { id: 'session-other', current: false, login: { issuer: 'https://example.test', subject: 'account' }, started_at: 1, ends_at: 2 };
+  let reads = 0;
+  const sent: unknown[] = [];
+  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') { sent.push(JSON.parse(String(init.body))); return Response.json({ ended: session.id }); }
+    reads += 1;
+    return Response.json({ person: ADA, sessions: [session] });
+  });
+  const view = await show(<SessionList person="" />);
+  await clickNamed(view, 'End session');
+  await clickNamed(view, 'Confirm end session');
+  expect(sent).toEqual([{}]);
+  expect(reads).toBe(1);
+  expect(view.textContent).not.toContain('Another signed-in session');
+});
+
+it('shows the kept review and its person from the confirmed answer without rereading', async () => {
+  const review = { scope: 'personal', revision: 4, judged_at: 1, decisions_recorded: true, unanswered: [],
+    due: [{ agent: { id: 'agent-example', display_name: 'Builder', state: 'active' }, reviewer: ME.person,
+      last_kept: null, grant: { id: 'grant-review', relation: 'viewer', resource: { kind: 'project', id: 'Lys' }, actions: ['view'] } }] };
+  let reads = 0;
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const path = String(url).replace(/^\/api/, '');
+    if (path === '/reviews/grant-review/keep' && init?.method === 'POST') {
+      return Response.json({ ...JSON.parse(String(init.body)), grant: 'grant-review', kept_by: ADA, at: 2, revision: 4 });
+    }
+    if (path === '/reviews') { reads += 1; return Response.json(review); }
+    if (path === '/me') return Response.json(ME);
+    if (path === '/directory/people') return Response.json(DIRECTORY);
+    throw new Error('Unexpected fixture read: ' + path);
+  });
+  const view = await show(<MemoryRouter><Reviews /></MemoryRouter>);
+  await clickNamed(view, 'Keep access');
+  await clickNamed(view, 'Confirm keep');
+  expect(reads).toBe(1);
+  expect(view.textContent).toContain('Last kept by ' + ME.person.display_name);
 });
