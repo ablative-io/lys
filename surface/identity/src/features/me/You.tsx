@@ -74,6 +74,11 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
   );
 }
 
+/** How many grants an agent holds, in a word; the list itself is on the agent's own page. */
+const holdsWord = (held: string): string => {
+  const count = held ? held.split('; ').length : 0;
+  return count === 0 ? 'no access' : count === 1 ? '1 grant' : count + ' grants';
+};
 const liveOf = (sessions: RuntimeSession[], id: string) => sessions.find((entry) => entry.agent === id && entry.shown !== 'stopped');
 const FOLDED = 'you-folded';
 const readFolded = () => new Set(pref(FOLDED, '').split(',').filter(Boolean));
@@ -104,7 +109,7 @@ function AgentRows({ branches, level, sessions, held, folded, fold, open, watchi
           <tr data-href={'#/file/' + member.entry.id} {...keyable(() => open(member.entry.id))}>
             <td style={depth(level + (branch.team ? 1 : 0))} className="you-agent"><span className={'dot ' + (session ? 's-active' : 's-retired')} aria-label={session ? 'running' : 'not running'} />{member.entry.display_name}</td>
             <td className="sec you-where">{session ? 'on ' + (session.machine_name ?? session.machine) : member.entry.state === 'active' ? 'not running' : member.entry.state}</td>
-            <td className="sec you-holds">{held(member.entry.id) || 'no access'}</td>
+            <td className="sec you-holds" title={held(member.entry.id) || 'no access'}>{holdsWord(held(member.entry.id))}</td>
             <td className="you-act">{session ? <button type="button" className="you-watch" aria-pressed={watching(session.session)} onClick={(event) => { event.stopPropagation(); toggleWatch(session, member.entry.display_name); }}>{watching(session.session) ? 'Watching' : 'Watch'}</button> : null}</td>
           </tr>
           <AgentRows branches={member.branches} level={level + 1} sessions={sessions} held={held} folded={folded} fold={fold} open={open} watching={watching} toggleWatch={toggleWatch} />

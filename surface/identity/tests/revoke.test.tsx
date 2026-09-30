@@ -133,8 +133,8 @@ const held = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll(
   return `${cells[0].textContent} of ${cells[1].textContent}`;
 });
 
-/** What Scribe holds, as its row under Your agents on You lists it. */
-const scribeHolds = () => ($(`tr[data-href="#/file/${SCRIBE}"]`)?.querySelectorAll('td')[2].textContent ?? '').split('; ');
+/** What Scribe holds, as its row under Your agents on You carries it: the list in the cell's title, the count in its text. */
+const scribeHolds = () => ($(`tr[data-href="#/file/${SCRIBE}"]`)?.querySelectorAll('td')[2].getAttribute('title') ?? '').split('; ');
 
 describe('What you hold after a revoke', () => {
   it('row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one', async () => {

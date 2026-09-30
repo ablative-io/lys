@@ -383,7 +383,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     location.hash = '#/me';
     await settle();
     expect(text()).toContain('Reviewer');
-    expect(text()).toContain('viewer of project:ledger');
+    expect($$('tr[data-href]').map((tr) => tr.querySelectorAll('td')[2].getAttribute('title'))).toContain('viewer of project:ledger');
     location.hash = '#/me?tab=account';
     await settle();
     await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));

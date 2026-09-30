@@ -28,7 +28,8 @@ describe('You', () => {
     await mount('#/me');
     const agents = $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
     expect(agents).toEqual(["Scribe", "Courier", "Archivist"]);
-    expect($$('tr[data-href]')[0].textContent).toContain('viewer of project:identity');
+    expect($$('tr[data-href]')[0].querySelectorAll('td')[2].getAttribute('title')).toBe('viewer of project:identity');
+    expect($$('tr[data-href]')[0].textContent).toContain('1 grant');
     expect($$('tr[data-href]')[1].textContent).toContain('no access');
     expect(text()).not.toContain('finance-readonly');
   });
