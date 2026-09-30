@@ -86,7 +86,9 @@ fn cat(client: &Client, session: &str) -> TestResult {
         rotation: None,
         policy: None,
     };
-    match client.ask(&Act::Start { launch })? {
+    match client.ask(&Act::Start {
+        launch: Box::new(launch),
+    })? {
         Answer::Started { .. } => {}
         other => return Err(format!("start answered {other:?}").into()),
     }

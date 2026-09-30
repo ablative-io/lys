@@ -292,7 +292,7 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
                 .clone()
                 .map(|admitted| Admitted::verified(*admitted))
                 .transpose()?;
-            let (pid, started_at) = sessions.begin(launch, policy, None)?;
+            let (pid, started_at) = sessions.begin(*launch, policy, None)?;
             Ok(Answer::Started {
                 session,
                 pid,

@@ -41,7 +41,7 @@ pub(super) struct Reader {
 impl Reader {
     pub(super) fn for_api(api: Api, encodings: GetAll<'_, HeaderValue>) -> Self {
         let reader = StreamReader::for_api(api);
-        let mut values = encodings.iter();
+        let mut values = encodings.into_iter();
         let encoding = values.next().map(HeaderValue::as_bytes);
         // Multiple codings are not admitted: none of their bytes are guessed at.
         if values.next().is_none()

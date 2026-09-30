@@ -64,7 +64,9 @@ fn started(client: &Client, id: &str, script: &str) -> TestResult {
         policy: None,
     };
     assert!(matches!(
-        client.ask(&Act::Start { launch })?,
+        client.ask(&Act::Start {
+            launch: Box::new(launch)
+        })?,
         Answer::Started { .. }
     ));
     let waited = client.ask(&Act::Wait {

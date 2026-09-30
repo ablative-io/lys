@@ -311,8 +311,15 @@ pub async fn run_on_runner(
         machine: machine.to_owned(),
         runner: runner.clone(),
     };
-    let asked =
-        crate::runner_client::ask(state, machine, runner.clone(), Act::Start { launch }).await;
+    let asked = crate::runner_client::ask(
+        state,
+        machine,
+        runner.clone(),
+        Act::Start {
+            launch: Box::new(launch),
+        },
+    )
+    .await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
             let act = Act::Status {

@@ -242,7 +242,9 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
         rotation: None,
         policy: None,
     };
-    client.ask(&Act::Start { launch })?;
+    client.ask(&Act::Start {
+        launch: Box::new(launch),
+    })?;
     upgrade(&scratch.layout, &new, None, &mut parts, &mut |_| {})?;
     assert_eq!(std::fs::read_to_string(&pid)?, first_pid);
     let Answer::Status { status } = client.ask(&Act::Status { session: None })? else {

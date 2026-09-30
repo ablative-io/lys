@@ -281,7 +281,7 @@ impl Sessions {
             .canonicalize()
             .map_err(|error| RunnerError::refused("launch_config_refused", error.to_string()))?;
         let sessions = Arc::new_cyclic(|owner| {
-            table.owner = owner.clone();
+            table.owner = Weak::clone(owner);
             Self {
                 table: Mutex::new(table),
                 changed: Condvar::new(),

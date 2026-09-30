@@ -133,7 +133,7 @@ fn exercise(
         }
     }
     assert!(filled > 0);
-    let (blocked, waiting) = mpsc::sync_channel(1);
+    let (blocked, pipe_full) = mpsc::sync_channel(1);
     let (release, resume) = mpsc::sync_channel(1);
     {
         let mut table = sessions.lock();
@@ -187,10 +187,12 @@ fn exercise(
         )?;
         None
     } else {
-        let writing = Arc::clone(sessions);
-        Some(std::thread::spawn(move || writing.write("blocked", b"x")))
+        let input_owner = Arc::clone(sessions);
+        Some(std::thread::spawn(move || {
+            input_owner.write("blocked", b"x")
+        }))
     };
-    waiting.recv()?;
+    pipe_full.recv()?;
     if compact {
         let mut table = sessions.lock();
         crate::operations::compacting(&mut table, "blocked");

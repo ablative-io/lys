@@ -57,9 +57,8 @@ pub(crate) fn finish_restart(
     match result {
         Ok(ended) => {
             held.state = OperationState::Confirmed;
-            held.words =
-                "the session exited and its held launch restarted with unchanged credentials"
-                    .to_owned();
+            "the session exited and its held launch restarted with unchanged credentials"
+                .clone_into(&mut held.words);
             held.ended = Some(ended);
         }
         Err(error) => {

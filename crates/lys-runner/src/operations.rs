@@ -20,7 +20,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::{Weak, atomic::AtomicBool};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -407,7 +407,7 @@ fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<(), RunnerErr
     session.guard.idle = false;
     let mut bytes = text.into_bytes();
     bytes.extend_from_slice(Key::Enter.bytes());
-    let owner = table.owner.clone();
+    let owner = Weak::clone(&table.owner);
     let operation = operation.to_owned();
     writer.submit(bytes, move |result| {
         let Some(sessions) = owner.upgrade() else {

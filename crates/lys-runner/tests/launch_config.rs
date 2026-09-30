@@ -58,7 +58,10 @@ fn signed_config_is_written_under_the_session_and_read_by_its_process() -> TestR
     })?
     .spawn();
     let client = Client::new(socket, key);
-    let Answer::Started { .. } = client.ask(&Act::Start { launch: launch() })? else {
+    let Answer::Started { .. } = client.ask(&Act::Start {
+        launch: Box::new(launch()),
+    })?
+    else {
         return Err("the runner did not start the declared process".into());
     };
     let Answer::Matched { .. } = client.ask(&Act::Wait {
@@ -194,7 +197,9 @@ fn the_signature_covers_config_files_and_bindings() -> TestResult {
     let dir = tempfile::tempdir()?;
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
     let greeting = Greeting::fresh("11");
-    let act = Act::Start { launch: launch() };
+    let act = Act::Start {
+        launch: Box::new(launch()),
+    };
     let signed = sign_request(&key, &greeting, &act)?;
     assert_eq!(
         verify_request(&signed, &key.public_key_bytes(), &greeting)?,
@@ -243,5 +248,22 @@ fn the_previous_launch_reader_refuses_config_by_name() -> TestResult {
     };
     assert_eq!(named.name(), "runner_request_malformed");
     assert!(named.to_string().contains("unknown field `config`"));
+    Ok(())
+}
+
+#[test]
+fn a_start_request_keeps_the_existing_wire_bytes() -> TestResult {
+    let launch = launch();
+    let legacy = format!(
+        "{{\"act\":\"start\",\"launch\":{}}}",
+        serde_json::to_string(&launch)?
+    );
+    let act = Act::Start {
+        launch: Box::new(launch),
+    };
+    assert_eq!(serde_json::to_string(&act)?, legacy);
+    let decoded: Act = serde_json::from_str(&legacy)?;
+    assert_eq!(decoded, act);
+    assert_eq!(serde_json::to_string(&decoded)?, legacy);
     Ok(())
 }

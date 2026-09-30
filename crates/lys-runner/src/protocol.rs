@@ -172,7 +172,7 @@ pub enum Act {
     /// Start a session in its own pseudo-terminal.
     Start {
         /// What it is started with.
-        launch: Launch,
+        launch: Box<Launch>,
     },
     /// Type text, then Enter when asked.
     Input {

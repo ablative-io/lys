@@ -108,7 +108,9 @@ fn shell(id: &str) -> Launch {
 }
 
 fn start(client: &Client, id: &str) -> TestResult {
-    match client.ask(&Act::Start { launch: shell(id) })? {
+    match client.ask(&Act::Start {
+        launch: Box::new(shell(id)),
+    })? {
         Answer::Started { session, pid, .. } if session == id && pid > 0 => Ok(()),
         other => Err(format!("start answered {other:?}").into()),
     }
@@ -375,7 +377,9 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             session: id.clone(),
             data: vec![0xff],
         },
-        Act::Start { launch: shell(&id) },
+        Act::Start {
+            launch: Box::new(shell(&id)),
+        },
         Act::Input {
             session: id.clone(),
             text: String::new(),

@@ -225,11 +225,10 @@ pub(crate) fn prepare(state: &Path, launch: &mut Launch) -> Result<(), RunnerErr
     checked(config, launch.arguments.len())?;
     let dir = publish(state, &launch.session, config)?;
     for (index, path) in &config.argument_files {
-        launch.arguments[*index] = dir
-            .join(path)
+        dir.join(path)
             .to_str()
             .ok_or_else(|| refused("the config directory is not UTF-8"))?
-            .to_owned();
+            .clone_into(&mut launch.arguments[*index]);
     }
     for (name, path) in &config.environment_paths {
         launch.environment.insert(
@@ -241,10 +240,9 @@ pub(crate) fn prepare(state: &Path, launch: &mut Launch) -> Result<(), RunnerErr
         );
     }
     if config.working_directory {
-        launch.directory = dir
-            .to_str()
+        dir.to_str()
             .ok_or_else(|| refused("the config directory is not UTF-8"))?
-            .to_owned();
+            .clone_into(&mut launch.directory);
     }
     Ok(())
 }

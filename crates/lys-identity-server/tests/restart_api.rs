@@ -231,7 +231,7 @@ async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> Test
     let held = Held::open().await?;
     let session = operation()?;
     held.client().ask(&Act::Start {
-        launch: Launch {
+        launch: Box::new(Launch {
             session: session.clone(),
             program: "/bin/cat".to_owned(),
             arguments: Vec::new(),
@@ -242,7 +242,7 @@ async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> Test
             rows: 24,
             rotation: None,
             policy: None,
-        },
+        }),
     })?;
     held.ok(&format!("/agents/{}/runtime/sessions/{session}/reports", held.agent()), &json!({ "operation": operation()?, "machine": held.machine, "state": "running", "what": "process started" })).await?;
     let (status, refused) = held
