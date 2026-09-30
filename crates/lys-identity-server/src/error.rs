@@ -8,6 +8,14 @@ use lys_identity::grants::GrantError;
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
+    /// A catalogue description could not be read before serving.
+    #[error("harness_catalogue_unreadable: {file}: {reason}")]
+    HarnessCatalogueUnreadable {
+        /// The description that could not be read.
+        file: String,
+        /// What made it unreadable.
+        reason: String,
+    },
     /// A directory refusal.
     #[error(transparent)]
     Identity(#[from] IdentityError),

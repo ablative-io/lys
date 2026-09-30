@@ -52,6 +52,7 @@ pub mod grants;
 pub mod grants_batch;
 pub mod grants_reach;
 pub mod grants_refusals;
+pub mod harness_catalogue;
 mod import_api;
 mod import_bootstrap;
 pub mod launch_api;

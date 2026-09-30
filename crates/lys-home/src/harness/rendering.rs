@@ -52,6 +52,22 @@ fn refused(
     }
 }
 
+enum Contract {
+    Native,
+}
+
+fn resolve(contract: &str) -> Option<Contract> {
+    match contract {
+        "claude-code/template-v1" => Some(Contract::Native),
+        _ => None,
+    }
+}
+
+/// Whether the rendering registry can resolve this explicit contract.
+pub fn registered(contract: &str) -> bool {
+    resolve(contract).is_some()
+}
+
 /// Resolve the explicit rendering contract; display names are never examined.
 pub fn render(
     fields: &LaunchFields,
@@ -59,9 +75,9 @@ pub fn render(
     permissions: &Value,
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
-    match fields.harness.description.rendering_contract.as_str() {
-        "claude-code/template-v1" => native_template(fields, skills, permissions, secrets),
-        _ => Err(refused(
+    match resolve(&fields.harness.description.rendering_contract) {
+        Some(Contract::Native) => native_template(fields, skills, permissions, secrets),
+        None => Err(refused(
             fields,
             "description.rendering_contract",
             "unknown identifier",
@@ -174,4 +190,17 @@ fn native_template(
         text,
         sha256: parsed.hash.as_str().to_owned(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::registered;
+
+    #[test]
+    fn only_registered_contracts_are_answered_as_registered() {
+        assert!(registered("claude-code/template-v1"));
+        assert!(!registered("codex/template-v1"));
+        assert!(!registered("Claude Code"));
+        assert!(!registered(""));
+    }
 }

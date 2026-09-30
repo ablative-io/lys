@@ -5143,6 +5143,31 @@
       "path": "crates/lys-runner/tests/installed.rs",
       "note": "Each computer's runner reports where each described program is installed (DIRECTORY-076 R2)",
       "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_status.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_types.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-home/src/harness/rendering.rs",
+      "note": "The programme catalogue reads registration through the rendering resolver (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
     }
   ],
   "inventory": [
