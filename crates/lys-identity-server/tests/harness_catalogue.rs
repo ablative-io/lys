@@ -3,13 +3,83 @@
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_home::harness::description::Description;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
+use lys_identity_server::error::ServerError;
+use lys_identity_server::harness_catalogue::Catalogue;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn named_refusal(answer: Result<Catalogue, ServerError>, file: &str) -> TestResult {
+    let Err(error) = answer else {
+        return Err("an unreadable catalogue was accepted".into());
+    };
+    let ServerError::HarnessCatalogueUnreadable {
+        file: named,
+        reason,
+    } = &error
+    else {
+        return Err(format!("wrong refusal: {error}").into());
+    };
+    assert_eq!(named, file);
+    assert!(!reason.is_empty());
+    assert_eq!(error.name(), "harness_catalogue_unreadable");
+    assert!(error.to_string().contains(file));
+    Ok(())
+}
+
+#[test]
+fn a_malformed_description_names_its_file_before_serving() -> TestResult {
+    named_refusal(Catalogue::read(&[("broken.json", "{")]), "broken.json")
+}
+
+#[test]
+fn invalid_description_members_are_refused_instead_of_served() -> TestResult {
+    let source: Value =
+        serde_json::from_str(include_str!("../../../docs/harness/catalogue/codex.json"))?;
+    for (pointer, value) in [
+        ("/name", json!("")),
+        ("/line", json!("two\nlines")),
+        ("/models", json!([])),
+        ("/models/0/label", json!("")),
+        ("/models/1/id", source["models"][0]["id"].clone()),
+        ("/modes/0/id", json!("mismatch")),
+        ("/modes/0/meaning", json!("")),
+        ("/description/models/minimum", json!(0)),
+        ("/description/models/maximum", json!(0)),
+        ("/description/rendering_contract", json!("")),
+        ("/description/mcp/transports", json!(["stdio", "stdio"])),
+        ("/description/mcp/channel_policies", json!(["off", "off"])),
+        ("/sources", json!([])),
+        ("/sources/0", json!("file:///local")),
+    ] {
+        let mut invalid = source.clone();
+        *invalid
+            .pointer_mut(pointer)
+            .ok_or("test pointer is absent")? = value;
+        let text = serde_json::to_string(&invalid)?;
+        named_refusal(Catalogue::read(&[("invalid.json", &text)]), "invalid.json")?;
+    }
+    let mut unknown = source;
+    unknown["unexpected"] = json!(true);
+    let text = serde_json::to_string(&unknown)?;
+    named_refusal(Catalogue::read(&[("unknown.json", &text)]), "unknown.json")
+}
+
+#[test]
+fn a_repeated_contract_names_the_later_description() -> TestResult {
+    let source = include_str!("../../../docs/harness/catalogue/claude-code.json");
+    let mut duplicate: Value = serde_json::from_str(source)?;
+    duplicate["name"] = json!("Another programme label");
+    let text = serde_json::to_string(&duplicate)?;
+    named_refusal(
+        Catalogue::read(&[("first.json", source), ("duplicate.json", &text)]),
+        "duplicate.json",
+    )
+}
 
 fn described() -> Result<Vec<Value>, Box<dyn Error>> {
     let mut programs = Vec::new();
@@ -69,6 +139,52 @@ async fn a_fresh_install_answers_named_models_modes_and_descriptions() -> TestRe
             .len(),
         1
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn descriptions_exist_without_a_configured_profile_store() -> TestResult {
+    let (service, seeded) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.provisioning_file = None,
+        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+    )
+    .await?;
+    drop(seeded);
+    let cookie = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer, expected()?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_programmes_read_has_a_typed_openapi_answer() -> TestResult {
+    let (service, seeded, cookie) = table().await?;
+    drop(seeded);
+    let (status, document) = service.get("/openapi.json", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{document}");
+    assert_eq!(
+        document["paths"]["/harnesses"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+            ["$ref"],
+        "#/components/schemas/CatalogueView"
+    );
+    let schemas = &document["components"]["schemas"];
+    for member in ["name", "line", "models", "modes", "description", "builds"] {
+        assert!(
+            !schemas["ProgramView"]["properties"][member].is_null(),
+            "{member}"
+        );
+    }
+    assert!(!schemas["BuildView"]["properties"]["from"].is_null());
     Ok(())
 }
 
@@ -141,6 +257,14 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
             "pending-build",
             false,
         ),
+        (
+            4,
+            0,
+            "First reviewed build",
+            "/opt/seat/claude",
+            "first-build",
+            true,
+        ),
     ] {
         let description = data[program]["description"].clone();
         let model = data[program]["models"][0]["id"].clone();
@@ -162,7 +286,7 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
                 )
                 .await?;
             assert_eq!(status, 200, "{answer}");
-            if program == 0 {
+            if program == 0 && from < 2 {
                 wanted["programs"][0]["builds"].as_array_mut().ok_or("builds is not an array")?.push(
                     json!({"name": name, "program": path, "package": package, "from": "profile"})
                 );

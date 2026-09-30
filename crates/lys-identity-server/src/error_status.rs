@@ -180,6 +180,7 @@ impl ServerError {
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
+            | Self::HarnessCatalogueUnreadable { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }

@@ -297,6 +297,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     vec![
         (
             GET,
+            "/harnesses",
+            None,
+            Some(api.schema::<crate::harness_catalogue::CatalogueView>()),
+        ),
+        (
+            GET,
             "/runtime/message-edges",
             Some(api.schema::<crate::message_edges::EdgeQuery>()),
             Some(api.schema::<crate::message_edges::EdgePage>()),

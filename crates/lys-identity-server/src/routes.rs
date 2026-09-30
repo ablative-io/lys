@@ -133,6 +133,7 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    let catalogue = Arc::new(crate::harness_catalogue::Catalogue::embedded()?);
     let operator_token = crate::operator::token(config, &*say)?;
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
@@ -280,6 +281,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         crate::routes_table::router(Arc::clone(&state))
             .merge(configured)
             .merge(starts)
+            .layer(axum::Extension(catalogue))
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );
     let served = match &config.surface_dir {
