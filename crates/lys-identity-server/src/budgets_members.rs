@@ -35,6 +35,8 @@ pub fn from_parts(directory: &Projection, teams: &[Team]) -> Result<Vec<Standing
 fn ancestors(agent: &str, teams: &[Team]) -> Result<BTreeSet<String>, ServerError> {
     let mut covered = BTreeSet::new();
     for team in teams.iter().filter(|team| {
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::Team);
         team.retired.is_none()
             && team.members.iter().any(|member| member == agent)
             && !team.held.iter().any(|hold| hold.member == agent)
@@ -57,7 +59,11 @@ fn ancestors(agent: &str, teams: &[Team]) -> Result<BTreeSet<String>, ServerErro
                 .map(|parent| {
                     teams
                         .iter()
-                        .find(|candidate| candidate.created.id == *parent)
+                        .find(|candidate| {
+                            #[cfg(test)]
+                            crate::budgets_work::visit(crate::budgets_work::Work::Parent);
+                            candidate.created.id == *parent
+                        })
                         .ok_or_else(|| {
                             ServerError::Budget(BudgetError::BudgetsUnavailable {
                                 reason: format!("team budget parent {parent} is missing"),

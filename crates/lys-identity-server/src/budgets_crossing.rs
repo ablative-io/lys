@@ -242,31 +242,30 @@ impl Crossings {
 
     /// Keep `crossing` unless its operation is kept already.
     pub fn hold(&mut self, crossing: Crossing) {
-        if !self.holds(&crossing.operation) {
-            self.index.insert(
-                self.crossed.len(),
-                &crossing,
-                self.acted.get(&crossing.operation),
-            );
+        if !self.crossed.iter().any(|held| {
+            #[cfg(test)]
+            crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
+            held.operation == crossing.operation
+        }) {
             self.crossed.push(crossing);
         }
     }
 
-    /// Update the selected operation and its pending indexes together.
-    pub fn acted(&mut self, acted: Acted) {
-        if let Some(position) = self.index.operations.get(&acted.operation).copied() {
-            self.index
-                .update(position, &self.crossed[position], Some(&acted));
-        }
-        self.acted.insert(acted.operation.clone(), acted);
-    }
-
-    fn selected(&self, positions: impl Iterator<Item = usize>) -> Vec<Crossing> {
-        positions
-            .map(|position| {
+    /// The crossings whose act is not settled: never answered, accepted and
+    /// waiting, or a stop sent whose exit is not yet seen.
+    pub fn unsettled(&self) -> Vec<Crossing> {
+        self.crossed
+            .iter()
+            .filter(|crossing| {
                 #[cfg(test)]
-                crate::budgets_work::visit(crate::budgets_work::Work::Crossing);
-                self.crossed[position].clone()
+                crate::budgets_work::visit(crate::budgets_work::Work::Pending);
+                match self.acted.get(&crossing.operation) {
+                    None => true,
+                    Some(acted) => {
+                        acted.stands == Stands::Accepted
+                            || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+                    }
+                }
             })
             .collect()
     }

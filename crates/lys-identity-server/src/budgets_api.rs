@@ -302,8 +302,11 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let sessions = crate::runtime_api::session_agents(state)?;
-    let held = with_budgets(state, |store| Ok(store.held().clone()))?;
+    let held = with_budgets(state, |store| {
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
+        Ok(store.held().clone())
+    })?;
     let at_ms = jiff::Timestamp::now().as_millisecond();
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));

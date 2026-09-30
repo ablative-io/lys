@@ -559,9 +559,11 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealing {
-            format: FORMAT,
-            held: self,
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
+        serde_json::to_vec(&Sealed {
+            format: FORMAT.to_owned(),
+            held: self.clone(),
         })
         .map_err(|error| format!("budgets state: {error}"))
     }
