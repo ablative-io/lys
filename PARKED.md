@@ -43,10 +43,19 @@ refuse `ProvisioningChanged`, naming the latest version. No fix is implemented.
 
 Its `src_gate` workflow is `4612aebc-0f31-4401-9b9d-7dcf7e486829`, run
 `826b47fd-dc14-47e9-a7d1-930066493552`, namespace `default`. The measured
-commit remains `29c6b333`, even though the branch has since advanced. At the
-last observation the gate was queued for Dean's worker; no test outcome,
-counts or terminal exit were available. A terminal mention from the lead is
-the requested wake signal. This regression is deliberately awaiting red proof;
+commit remains `29c6b333`, even though the branch has since advanced.
+The lead requested cancellation with the reason
+`#120 parked 30 Sep 18:38 for the team-tree work`. The command
+`aion cancel 4612aebc-0f31-4401-9b9d-7dcf7e486829 --reason '#120 parked 30 Sep 18:38 for the team-tree work'`
+exited 0 and answered accepted. A subsequent `describe_run` confirmed
+terminal `Cancelled`, ending at `2026-09-30T08:40:48.095571+00:00`.
+No gate exit or test outcome is claimed from the cancellation.
+
+The requested #120 cancellation and queued #119 cancellation identify this
+same single workflow: it measured the #119 regression under the #120 job.
+The full list of eight `src_gate` runs since `2026-09-30T08:00:00Z` held no
+second distinct #119 run. Only this workflow was cancelled; no other seat's
+gate was changed. This regression remains without red proof;
 it must be resolved or explicitly parked outside active test discovery before
 any later change on this branch can be considered ready to land.
 
