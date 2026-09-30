@@ -3,3 +3,6 @@ target/
 .DS_Store
 __pycache__/
 /canon/*.lock
+
+# Each seat's registered git worktree, on its own branch, removed the day that branch lands.
+/worktrees/
