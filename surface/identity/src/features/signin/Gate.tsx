@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import { API, api, useLoad } from '../../api';
 import type { Load, Refused } from '../../api';
 
-export function Loading() {
+export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
     <div className="page">
-      <div className="dim">Reading the directory…</div>
+      <div className="dim">Reading {title}…</div>
     </div>
   );
 }
@@ -52,7 +52,7 @@ export function RefusedPage({ refused, title }: { refused: Refused; title: strin
 
 /** Render `ok` once the read has answered, the refusal if it was refused. */
 export function Gate<T>({ load, title, ok, renderError }: { load: Load<T>; title: string; ok: (data: T) => ReactNode; renderError?: (refused: Refused) => ReactNode }) {
-  if (load.status === 'loading') return <Loading />;
+  if (load.status === 'loading') return <Loading title={title} />;
   if (load.status === 'refused') return <>{load.refused.status !== 401 && renderError ? renderError(load.refused) : <RefusedPage refused={load.refused} title={title} />}</>;
   return <>{ok(load.data)}</>;
 }
