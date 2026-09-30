@@ -30,7 +30,7 @@ struct Held {
     surface: PathBuf,
     binaries: PathBuf,
     tools: PathBuf,
-    finished: Vec<(String, File)>,
+    finished: Vec<(String, File, File)>,
 }
 
 impl Held {
@@ -79,14 +79,16 @@ impl Held {
         }
         let mut finished = Vec::new();
         for name in ["issuer", "service", "app"] {
-            let fifo = dir.path().join(format!("{name}.finished"));
+            let started = dir.path().join(format!("{name}.started"));
+            let ended = dir.path().join(format!("{name}.finished"));
             succeeded(
-                Command::new("mkfifo").arg(&fifo).output()?,
-                "make an exit signal",
+                Command::new("mkfifo").arg(&started).arg(&ended).output()?,
+                "make child lifecycle signals",
             )?;
             finished.push((
                 name.to_owned(),
-                OpenOptions::new().read(true).write(true).open(fifo)?,
+                OpenOptions::new().read(true).write(true).open(started)?,
+                OpenOptions::new().read(true).write(true).open(ended)?,
             ));
         }
         let observer = tools.join("nohup");
@@ -104,6 +106,7 @@ finished="$LYS_DEV_TEST_SIGNALS/$name.finished"
 "$@" &
 child=$!
 trap 'if kill -TERM "$child"; then wait "$child"; fi; printf x >"$finished"; exit 0' TERM INT
+printf x >"$LYS_DEV_TEST_SIGNALS/$name.started"
 wait "$child"
 code=$?
 printf x >"$finished"
@@ -129,11 +132,14 @@ exit "$code"
     }
 
     fn stop(&mut self) -> TestResult {
-        for (name, signal) in self.finished.iter_mut().rev() {
+        for (name, started, signal) in self.finished.iter_mut().rev() {
             let pid_file = self.dir.path().join(format!("state/{name}.pid"));
             if !pid_file.exists() {
                 continue;
             }
+            let mut ready = [0];
+            started.read_exact(&mut ready)?;
+            assert_eq!(ready, [b'x']);
             let pid = std::fs::read_to_string(&pid_file)?.trim().parse::<u32>()?;
             let killed = Command::new("kill")
                 .args(["-TERM", &pid.to_string()])
