@@ -22,7 +22,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_home::harness::launch_fields::DeclaredHarness;
+use lys_home::harness::launch_fields::{DeclaredHarness, InstructionsMode};
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +63,11 @@ pub struct VersionView {
     pub mcp_servers: Vec<McpServer>,
     /// Its instructions.
     pub instructions: String,
+    /// How instructions affect the program's prompt: keep, append or replace.
+    #[schema(schema_with = instructions_mode_schema)]
+    pub instructions_mode: InstructionsMode,
+    /// How the profile drives its sessions, null when none was recorded.
+    pub session: Option<SessionSettings>,
     /// Why this version was set.
     pub note: String,
     /// Each named skill's text as this version was recorded with it.
@@ -146,6 +151,9 @@ pub(crate) struct SetBody {
     skills: Vec<String>,
     mcp_servers: Vec<crate::mcp_record::McpServerBody>,
     instructions: String,
+    #[serde(default)]
+    #[schema(schema_with = instructions_mode_schema)]
+    instructions_mode: InstructionsMode,
     note: String,
     #[serde(default)]
     session: Option<SessionSettings>,
@@ -158,6 +166,14 @@ pub(crate) struct SetBody {
     runs_on: Option<String>,
     #[serde(default)]
     writable: Option<String>,
+}
+
+fn instructions_mode_schema() -> utoipa::openapi::schema::Object {
+    utoipa::openapi::schema::ObjectBuilder::new()
+        .schema_type(utoipa::openapi::schema::Type::String)
+        .enum_values(Some(["keep", "append", "replace"]))
+        .default(Some(serde_json::json!("append")))
+        .build()
 }
 
 /// The provisioning routes.
@@ -225,6 +241,7 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         skills: names("skills", &body.skills)?,
         mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
         instructions: text("instructions", &body.instructions, INSTRUCTIONS_MAX)?,
+        instructions_mode: body.instructions_mode,
         note: text("note", &body.note, NOTE_MAX)?,
         session: body.session.clone().map(session).transpose()?,
         harness: declared,
@@ -358,6 +375,8 @@ fn view(
             skills: version.settings.skills.clone(),
             mcp_servers: version.settings.mcp_servers.clone(),
             instructions: version.settings.instructions.clone(),
+            instructions_mode: version.settings.instructions_mode,
+            session: version.settings.session.clone(),
             note: version.settings.note.clone(),
             skill_pins: version.settings.skill_pins.clone(),
             harness: version.settings.harness.clone(),

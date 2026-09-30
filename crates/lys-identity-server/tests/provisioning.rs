@@ -377,6 +377,7 @@ fn version(operation: &str, note: &str) -> Version {
                 channel: Channel::Off,
             }],
             instructions: String::new(),
+            instructions_mode: Default::default(),
             note: note.to_owned(),
             session: None,
             harness: None,

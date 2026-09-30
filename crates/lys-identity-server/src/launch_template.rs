@@ -151,6 +151,7 @@ pub fn from_template(
         &harness.description.rendering_contract,
         &harness.program,
         template,
+        version.settings.instructions_mode,
     )
     .map_err(|reason| ServerError::LaunchUnrenderable { reason })
 }
