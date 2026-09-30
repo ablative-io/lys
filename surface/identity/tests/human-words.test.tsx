@@ -4,10 +4,12 @@ import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router';
 import { Refused } from '../src/api';
 import { SignInProviders } from '../src/features/connections/SignInProviders';
 import { Secrets } from '../src/features/secrets/Secrets';
-import { ADA, DIRECTORY } from './fixtures';
+import { ADA, DIRECTORY, ME, SERVICE } from './fixtures';
+import { Requests } from '../src/features/requests/Requests';
 
 const roots: Root[] = [];
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
@@ -74,4 +76,43 @@ it('puts a secret owner identifier behind a details toggle', async () => {
   expect(account?.open).toBe(false);
   for (const detail of details) detail.remove();
   expect(view.textContent).not.toContain(owner);
+});
+
+it('keeps the recorded request on screen without replacing it with an older list', async () => {
+  const sent: Record<string, unknown>[] = [];
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const path = String(url).replace(/^\/api/, '');
+    if (path === '/requests' && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      sent.push(body);
+      return Response.json({ id: body.operation, asked_by: ADA, asked_by_name: ME.person.display_name,
+        responsible: ME.person, resource: body.resource, relation: body.relation, actions: ['view'],
+        ends_at: body.ends_at, why: body.why, asked_at: 1, state: 'waiting', approvers: [], sources: [], decision: null });
+    }
+    if (path === '/requests') return Response.json({ requests: [] });
+    const route = SERVICE[path];
+    if (!route || typeof route === 'function') throw new Error('Unexpected fixture read: ' + path);
+    return Response.json(route.body, { status: route.status });
+  });
+  const view = await show(<MemoryRouter><Requests /></MemoryRouter>);
+  const form = view.querySelector<HTMLFormElement>('form[aria-label="Ask for access"]');
+  if (!form) throw new Error('The request form is missing');
+  await act(async () => {
+    const selects = form.querySelectorAll('select');
+    if (selects.length !== 2) throw new Error('The request must offer a resource and access');
+    selects[0].value = '0';
+    selects[0].dispatchEvent(new Event('change', { bubbles: true }));
+    selects[1].value = 'viewer';
+    selects[1].dispatchEvent(new Event('change', { bubbles: true }));
+    form.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+  });
+  await act(async () => {
+    const why = form.querySelector('textarea');
+    if (!why) throw new Error('The reason input is missing');
+    why.value = 'A newly recorded request';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  });
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({ relation: 'viewer', ends_at: null, why: 'A newly recorded request' });
+  expect(view.querySelector('section[aria-label="Visible requests"]')?.textContent).toContain('A newly recorded request');
 });
