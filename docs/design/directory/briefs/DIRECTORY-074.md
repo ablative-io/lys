@@ -24,7 +24,7 @@ The runner already builds OS containment from a Lys policy and reports native de
 
 ## Task
 
-Let a profile version name the folders a seat may write. Carry them in the signed runner Launch and have the runner apply containment from them, so a write outside is refused and reported by name. A Launch with no folders behaves as today, so no running seat changes until its profile is moved. Out: moving existing seats onto confinement, which is done one team at a time on Tom's word.
+Let a profile version name the folders a seat may write. Carry them in the signed runner Launch and have the runner apply containment from them, so a write outside is refused and reported by name. A Launch with no folders behaves as today, so no running seat changes until its profile is moved. Out: moving existing seats onto confinement, which is done one team at a time on Tom's word. Confinement is set per seat in its profile, never for everyone: leads keep the reach their profile gives them, and changing a seat's folders is a new reviewed profile version and a restart.
 
 ## Requirements
 
