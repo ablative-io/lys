@@ -347,6 +347,7 @@ async fn an_unconfigured_runtime_refuses_restart_by_name() -> TestResult {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestResult {
+    use lys_runner::protocol::{Greeting, reply_line, verify_request};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixListener;
     let held = Held::open().await?;
@@ -356,16 +357,33 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
     let socket = held.dir.path().join("other.sock");
     let listener = UnixListener::bind(&socket)?;
     let reply_session = session.clone();
+    let server = held.key.public_key_bytes();
     let answering = std::thread::spawn(move || -> std::io::Result<()> {
         let (stream, _) = listener.accept()?;
         let mut writer = &stream;
-        writer.write_all(b"{\"version\":1,\"runner\":\"00000000000000000000000000000000\",\"challenge\":\"00000000000000000000000000000000\"}\n")?;
+        let greeting = Greeting::fresh("00000000000000000000000000000000");
+        writer.write_all(greeting.line().as_bytes())?;
+        writer.write_all(b"\n")?;
         let mut line = String::new();
-        BufReader::new(&stream).read_line(&mut line)?;
-        let answer = serde_json::to_vec(&Answer::Delivered {
-            session: reply_session,
+        if BufReader::new(&stream).read_line(&mut line)? == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "runner stand-in received no end request",
+            ));
+        }
+        let act = verify_request(&line, &server, &greeting).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
         })?;
-        writer.write_all(&answer)?;
+        if !matches!(act, Act::End { session } if session == reply_session) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runner stand-in received an act other than the selected session's end",
+            ));
+        }
+        let answer = reply_line(Answer::Delivered {
+            session: reply_session,
+        });
+        writer.write_all(answer.as_bytes())?;
         writer.write_all(b"\n")?;
         Ok(())
     });
@@ -385,6 +403,13 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
     answering.join().expect("runner stand-in panicked")?;
     assert_eq!(status, 502, "{refused}");
     assert_eq!(refused["refusal"], "runner_reply_malformed", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("the restart's end answered without the session's exit"),
+        "{refused}"
+    );
     assert!(held.status(&session)?.ended.is_none());
     held.close()
 }
