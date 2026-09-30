@@ -141,6 +141,7 @@ describe('Usage', () => {
     const receipts = [...reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 }),
       { ...reached(null)[0], crossing: { ...reached(null)[0].crossing, limit_index: 1, warning: true } }];
     await mount(file, { ...keeping(receipts), [budgets]: ok(budgetsView(holder, limits, {
+      version: 1,
       used: limits.map(() => ({ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null })),
     })) });
     const rows = document.querySelectorAll('section[aria-label="Budgets"] tbody tr');
