@@ -1,7 +1,8 @@
-/** The terminal is the screen: the open agents' terminals fill it edge to edge, split like a multiplexer, with one status bar at the foot. The tree of names is down the left; settings open as the drawer over the terminal. */
+/** The terminal is the screen: the open agents' terminals fill it edge to edge, split like a multiplexer, each with its own foot line. The tree of names is down the left and folds away; settings open as the drawer over the terminal. */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Refused, request } from '../../api';
+import { pref, setPref } from '../../shell/prefs';
 import { useShell } from '../../shell/ShellContext';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
@@ -15,6 +16,8 @@ import { addressOf, liveOf, openAgents, useWorld } from './world';
 import '../runtime/terminal.css';
 import '../usage/usage.css';
 import './team.css';
+
+const TREE = 'team-tree';
 
 function Runtime({ session, changed }: { session: RuntimeSession | undefined; changed: () => void }) {
   const [said, setSaid] = useState('');
@@ -62,13 +65,19 @@ export function Team() {
   const { pathname, search } = useLocation();
   const open = openAgents(pathname, search);
   const [revision, setRevision] = useState(0);
+  const [treeShown, setTree] = useState(() => pref(TREE, 'shown'));
+  const toggleTree = () => {
+    const next = treeShown === 'shown' ? 'hidden' : 'shown';
+    setPref(TREE, next);
+    setTree(next);
+  };
   const load = useWorld(revision);
   const navigate = useNavigate();
   const first = load.status === 'ok' ? agentsOf(load.data.tree).find((entry) => liveOf(load.data.sessions, entry.id)) ?? agentsOf(load.data.tree)[0] : undefined;
   useEffect(() => {
     if (!open.length && first) navigate('/team/' + encodeURIComponent(first.id), { replace: true });
   }, [open.length, first?.id]);
-  if (load.status === 'loading') return <div className="team-screen"><TeamTree world={null} /></div>;
+  if (load.status === 'loading') return <div className="team-screen" data-tree={treeShown}><TeamTree world={null} /></div>;
   if (load.status === 'refused') {
     const { status, refusal } = load.refused;
     return <p className="team-screen why-not team-refused">Could not read your teams and agents: {status === 401 ? 'you are not signed in. Sign in to Lys, then reload this page.' : status ? `the service answered ${status}: ${refusal.reason}` : refusal.reason}</p>;
@@ -78,22 +87,22 @@ export function Team() {
   const panes = open.flatMap((id) => agents.filter((entry) => entry.id === id));
   const changed = () => setRevision((value) => value + 1);
   const settings = (entry: Entry) => shell.openDrawer(<Settings entry={entry} session={liveOf(sessions, entry.id)} changed={changed} />);
-  return <div className="team-screen"><TeamTree world={load.data} /><div className="team-stage">
+  const shown = treeShown === 'shown';
+  return <div className="team-screen" data-tree={treeShown}><TeamTree world={load.data} /><div className="team-stage">
     {panes.length
-      ? <div className="team-panes" data-n={panes.length}>{panes.map((entry) => <div className="team-pane" key={entry.id}>
-        <Pane entry={entry} session={liveOf(sessions, entry.id)} alone={panes.length === 1} started={changed} />
-      </div>)}</div>
-      : <p className="team-empty dim">{agents.length ? 'Choose an agent from the tree.' : 'No agent answers to you yet.'}</p>}
-    {panes.length ? <div className="team-bar">
-      {panes.map((entry) => {
+      ? <div className="team-panes" data-n={panes.length}>{panes.map((entry, index) => {
         const session = liveOf(sessions, entry.id);
-        return <span className="team-bar-pane" key={entry.id}>
-          <span className={'dot ' + (session ? 's-active' : 's-retired')} />{entry.display_name}
-          {session ? <span className="dim"> · {session.machine_name ?? session.machine}</span> : null}
-          <button type="button" className="team-bar-act" onClick={() => settings(entry)}>settings</button>
-          {panes.length > 1 ? <a className="team-bar-act" href={addressOf(open.filter((id) => id !== entry.id))} title="Close this pane; it keeps running">close</a> : null}
-        </span>;
-      })}
-    </div> : null}
+        return <div className="team-pane" key={entry.id}>
+          <Pane entry={entry} session={session} alone={panes.length === 1} started={changed} />
+          <div className="team-foot">
+            {index === 0 ? <button type="button" className="icon-btn team-foot-tree" aria-pressed={shown} title={shown ? 'Hide the tree' : 'Show the tree'} onClick={toggleTree}>{shown ? '‹' : '›'}</button> : null}
+            <span className="team-foot-name">{entry.display_name}</span>
+            {session ? <span className="team-foot-machine">{session.machine_name ?? session.machine}</span> : null}
+            <button type="button" className="team-foot-act" onClick={() => settings(entry)}>settings</button>
+            {panes.length > 1 ? <a className="team-foot-act" href={addressOf(open.filter((id) => id !== entry.id))} title="Close this pane; it keeps running">close</a> : null}
+          </div>
+        </div>;
+      })}</div>
+      : <p className="team-empty dim">{agents.length ? 'Choose an agent from the tree.' : 'No agent answers to you yet.'}</p>}
   </div></div>;
 }

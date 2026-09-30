@@ -1,7 +1,9 @@
-/* The terminal is the screen: edge to edge, split like a multiplexer, one status bar at the foot. The tree of names is down the left. */
+/* The terminal is the screen: edge to edge, split like a multiplexer, each pane with its own foot line. The tree of names is down the left and folds away. */
 .team-screen { height: 100%; display: grid; grid-template-columns: 200px minmax(0, 1fr); background: var(--surface-code); }
+.team-screen[data-tree="hidden"] { grid-template-columns: minmax(0, 1fr); }
+.team-screen[data-tree="hidden"] .team-tree { display: none; }
 .team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.team-tree { overflow: auto; padding: 14px 10px 14px 16px; background: var(--surface-base); }
+.team-tree { overflow: auto; padding: 12px 8px; background: var(--surface-base); }
 .team-refused, .team-empty { margin: 0; padding: 26px 32px; }
 .team-panes { flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--border-default); }
 .team-panes[data-n="1"] { grid-template-columns: 1fr; }
@@ -23,19 +25,28 @@
 .team-machine input { grid-row: span 2; }
 .team-start-acts { display: flex; align-items: center; gap: 12px; }
 .team-start-acts .why-not { border: 0; padding: 0; }
-.team-bar { flex: none; display: flex; align-items: center; gap: 18px; height: 26px; padding: 0 12px; font: 11px "JetBrains Mono"; color: var(--text-secondary); background: var(--surface-base); overflow: hidden; white-space: nowrap; }
-.team-bar-pane { display: inline-flex; align-items: center; gap: 6px; }
-.team-bar .dot { margin: 0; }
-.team-bar-act { font: inherit; color: var(--text-muted); text-decoration: none; padding: 0 2px; }
-.team-bar-act:hover { color: var(--text-primary); }
-.tree-team { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 12px 0 4px calc(var(--depth, 0) * 14px); white-space: nowrap; }
-.tree-root { padding-top: 0; color: var(--text-secondary); }
-.tree-line { display: flex; align-items: center; gap: 4px; padding-left: calc(var(--depth, 0) * 14px); }
-.tree-name { position: relative; display: flex; align-items: center; min-width: 0; flex: 1; padding: 5px 6px 5px 0; color: var(--text-secondary); text-decoration: none; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tree-name:hover, .tree-name[aria-current] { color: var(--text-primary); }
-.tree-name[aria-current="page"]::before { content: ""; position: absolute; left: -8px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--accent); }
-.tree-add { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-size: 13px; opacity: 0; }
+.team-foot { flex: none; display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px 0 8px; font-size: 12px; color: var(--text-secondary); background: var(--surface-base); white-space: nowrap; overflow: hidden; }
+.team-foot-tree { flex: none; margin-right: 2px; font-size: 16px; line-height: 1; color: var(--text-muted); }
+.team-foot-tree:hover { color: var(--text-primary); }
+.team-foot-name { color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.team-foot-machine { color: var(--text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.team-foot-act { margin-left: auto; font: inherit; color: var(--text-muted); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; }
+.team-foot-act + .team-foot-act { margin-left: 0; }
+.team-foot-act:hover { color: var(--text-primary); }
+.tree-team { display: flex; align-items: center; gap: 6px; width: 100%; margin: 16px 0 4px; font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); background: none; border: 0; padding: 4px 10px 4px calc(var(--depth, 0) * 14px + 6px); white-space: nowrap; cursor: pointer; text-align: left; }
+.tree-team:first-child { margin-top: 0; }
+.tree-team:hover { color: var(--text-primary); }
+.tree-fold { flex: none; width: 4px; height: 4px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform .12s; }
+.tree-team[aria-expanded="true"] .tree-fold { transform: rotate(45deg); }
+.tree-count { margin-left: auto; letter-spacing: 0; text-transform: none; font-size: 11px; }
+.tree-line { display: flex; align-items: center; gap: 2px; padding-left: calc(var(--depth, 0) * 14px); }
+.tree-name { display: flex; align-items: center; min-width: 0; flex: 1; padding: 7px 10px; border-radius: var(--radius-md); color: var(--text-secondary); text-decoration: none; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-name:hover { background: var(--surface-hover); }
+.tree-name[aria-current] { color: var(--text-primary); }
+.tree-name[aria-current="page"] { background: var(--surface-hover); box-shadow: inset 2px 0 0 var(--accent); }
+.tree-add { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-size: 13px; opacity: .45; }
 .tree-line:hover .tree-add, .tree-add:focus-visible { opacity: 1; }
+.tree-add:hover { background: var(--surface-hover); }
 .tree-add:hover { color: var(--text-primary); }
 .team-settings h2 { margin: 0 0 12px; }
 .team-settings .card { margin-bottom: 12px; }

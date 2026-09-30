@@ -30,11 +30,30 @@ describe('Team', () => {
     expect(location.hash).toBe('#/team/' + SCRIBE);
     const names = $$('.tree-name').map((el) => el.textContent);
     expect(names).toEqual(['Reviewer', 'Scribe', 'Courier', 'Archivist']);
-    expect($$('.tree-team').map((el) => el.textContent)).toEqual(['Ada (test person)', 'Ada team', 'Crew']);
+    expect($$('.tree-team').map((el) => el.textContent)).toEqual(['Ada team', 'Crew']);
+    expect(text()).not.toContain('Ada (test person)');
     expect($('.tree-name[aria-current="page"]')?.textContent).toBe('Scribe');
-    expect($('.team-bar')?.textContent).toContain('Lab');
+    expect($('.team-foot')?.textContent).toContain('Lab');
     expect($('form[aria-label="Type to the session"]')).toBeNull();
     expect(unreachable()).toEqual([]);
+  });
+
+  it('folds a team away and back, and hides the tree from the foot line', async () => {
+    localStorage.clear();
+    await mount('#/team/' + SCRIBE, routes);
+    await click($$('.tree-team').find((el) => el.textContent === 'Crew') ?? null);
+    expect($$('.tree-name').map((el) => el.textContent)).toEqual(['Reviewer', 'Scribe']);
+    expect($$('.tree-team').map((el) => el.textContent)).toEqual(['Ada team', 'Crew2']);
+    expect(localStorage.getItem('iam.team-folded')).toBe('team-2');
+    await click($$('.tree-team').find((el) => el.textContent === 'Crew2') ?? null);
+    expect($$('.tree-name').map((el) => el.textContent)).toEqual(['Reviewer', 'Scribe', 'Courier', 'Archivist']);
+    expect($('.team-screen')?.getAttribute('data-tree')).toBe('shown');
+    await click($('.team-foot-tree'));
+    expect($('.team-screen')?.getAttribute('data-tree')).toBe('hidden');
+    expect(localStorage.getItem('iam.team-tree')).toBe('hidden');
+    await click($('.team-foot-tree'));
+    expect($('.team-screen')?.getAttribute('data-tree')).toBe('shown');
+    localStorage.clear();
   });
 
   it('starts a stopped agent in place, the machine it ran on first, and hands over the command when that machine has no runner', async () => {
