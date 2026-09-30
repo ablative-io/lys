@@ -16,6 +16,10 @@ use crate::routes::{AppState, Shared, signed_in};
 #[path = "harness_installed.rs"]
 mod installed;
 
+#[cfg(test)]
+#[path = "harness_catalogue_tests.rs"]
+mod tests;
+
 type InstalledCopies = BTreeMap<(String, installed::CopyKey), Result<BuildView, String>>;
 
 /// A model choice, with the programme's default first.
@@ -229,30 +233,38 @@ impl Catalogue {
         let mut programs = self.installed_in(&path)?.programs;
         if state.provisioning.is_some() {
             crate::provisioning_api::with_provisioning(state, |store| {
-                for program in &mut programs {
-                    let builds: BTreeSet<BuildView> = store
-                        .profiles()
-                        .iter()
-                        .flat_map(|profile| &profile.versions)
-                        .filter(|version| version.reviewed.is_some())
-                        .filter_map(|version| version.settings.harness.as_ref())
-                        .filter(|harness| {
-                            harness.description.rendering_contract
-                                == program.description.rendering_contract
-                        })
-                        .map(|harness| BuildView {
-                            name: harness.name.clone(),
-                            program: harness.program.clone(),
-                            package: harness.package.clone(),
-                            source: BuildSource::Profile,
-                        })
-                        .collect();
-                    program.builds.extend(builds);
-                }
+                profile_builds(&mut programs, store, || {});
                 Ok(())
             })?;
         }
         Ok(CatalogueView { programs })
+    }
+}
+
+fn profile_builds(
+    programs: &mut [ProgramView],
+    store: &crate::provisioning_store::ProvisioningStore,
+    mut visited: impl FnMut(),
+) {
+    for program in programs {
+        let builds: BTreeSet<BuildView> = store
+            .profiles()
+            .iter()
+            .flat_map(|profile| &profile.versions)
+            .inspect(|_| visited())
+            .filter(|version| version.reviewed.is_some())
+            .filter_map(|version| version.settings.harness.as_ref())
+            .filter(|harness| {
+                harness.description.rendering_contract == program.description.rendering_contract
+            })
+            .map(|harness| BuildView {
+                name: harness.name.clone(),
+                program: harness.program.clone(),
+                package: harness.package.clone(),
+                source: BuildSource::Profile,
+            })
+            .collect();
+        program.builds.extend(builds);
     }
 }
 
