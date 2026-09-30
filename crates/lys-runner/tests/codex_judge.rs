@@ -26,6 +26,7 @@ fn asked(value: &Value) -> Result<JudgeAsk, Box<dyn Error>> {
     match request(&value.to_string())?.peer {
         PeerAct::Judge(asked) => Ok(asked),
         PeerAct::Collect(_) => Err("hook became a collector request".into()),
+        PeerAct::Restart { .. } => Err("hook became a restart request".into()),
     }
 }
 

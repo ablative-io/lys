@@ -17,7 +17,9 @@ use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
-use lys_log_store::{FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, start};
+use lys_log_store::{
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, open_with_snapshot,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -254,7 +256,8 @@ fn opened<S: LeafStore>(
     key: &Ed25519Identity,
 ) -> Result<(FrontierLog<S>, Start), ServerError> {
     let store = reopen().map_err(unavailable)?;
-    let started = start(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    let started =
+        open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
     let readable = started.state.as_deref().map(|state| {
         serde_json::from_slice::<Sealed>(state)
             .map_err(|error| error.to_string())

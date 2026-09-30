@@ -27,8 +27,8 @@
 //! A snapshot is local state, like the pin, and it is believed only as far as
 //! it is checked: the signature must verify under the owner's key, the format,
 //! domain and origin must be this owner's and this log's, and the frontier must
-//! fold to the signed root. [`crate::start`] then requires the log to agree
-//! with that root at that size before a single tail leaf is applied. A snapshot
+//! fold to the signed root. [`crate::open_with_snapshot`] then requires the log
+//! to agree with that root at that size before a single tail leaf is applied. A snapshot
 //! failing any check is refused by its [`SnapshotRefusal`] name and the owner
 //! rebuilds from the whole log; nothing in a refused snapshot is used.
 

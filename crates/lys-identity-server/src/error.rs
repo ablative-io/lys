@@ -8,6 +8,9 @@ use lys_identity::grants::GrantError;
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
+    /// A team refusal, preserving its status and response words.
+    #[error(transparent)]
+    Team(#[from] crate::error_team::TeamError),
     /// A catalogue description could not be read before serving.
     #[error("harness_catalogue_unreadable: {file}: {reason}")]
     HarnessCatalogueUnreadable {
@@ -500,15 +503,6 @@ pub enum ServerError {
         /// The person named.
         owner: String,
     },
-    /// The teams are not configured, or their log could not be read or written.
-    #[error("TeamsUnavailable: {reason}")]
-    TeamsUnavailable {
-        /// Why.
-        reason: String,
-    },
-    /// No team by that id was ever created.
-    #[error("TeamUnknown: no team by that id was ever created")]
-    TeamUnknown,
     /// The budgets cannot be kept or read.
     #[error("BudgetsUnavailable: {reason}")]
     BudgetsUnavailable {
@@ -573,39 +567,6 @@ pub enum ServerError {
         /// The operation id.
         operation: String,
     },
-    /// The operation id already names a team act sent in other words.
-    #[error(
-        "TeamReused: operation `{operation}` already names a team act in other words: send this act under a new operation id"
-    )]
-    TeamReused {
-        /// The operation id.
-        operation: String,
-    },
-    /// The team is retired and takes no more changes.
-    #[error("TeamRetired: team `{team}` is retired and takes no more changes")]
-    TeamRetired {
-        /// The team.
-        team: String,
-    },
-    /// The member is already in the team.
-    #[error("TeamMemberHeld: that member is already in the team")]
-    TeamMemberHeld,
-    /// The member is not in the team.
-    #[error("TeamMemberAbsent: that member is not in the team")]
-    TeamMemberAbsent,
-    /// The parent would close a team cycle.
-    #[error(
-        "team_parent_cycle: team `{team}` cannot have parent `{parent}` because that closes a cycle"
-    )]
-    TeamParentCycle { team: String, parent: String },
-    /// A lead must remain an admitted member.
-    #[error("team_lead_not_member: agent `{lead}` is not an admitted member of team `{team}`")]
-    TeamLeadNotMember { team: String, lead: String },
-    /// The member named is not a person or agent the directory holds, or is retired.
-    #[error(
-        "TeamMemberUnknown: a member is a person or agent the directory holds and has not retired"
-    )]
-    TeamMemberUnknown,
     /// The review decisions are not configured, or their log could not be read or written.
     #[error("ReviewsUnavailable: {reason}")]
     ReviewsUnavailable {

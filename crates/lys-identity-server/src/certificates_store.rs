@@ -19,7 +19,8 @@ use lys_core::Ed25519Identity;
 use lys_core::merkle::{InclusionProof, RootHash};
 use lys_identity::SNAPSHOT_EVERY;
 use lys_log_store::{
-    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, Tail, start,
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, Tail,
+    open_with_snapshot,
 };
 use serde::{Deserialize, Serialize};
 
@@ -393,7 +394,8 @@ fn opened<S: LeafStore>(
     key: &Ed25519Identity,
 ) -> Result<Opened<S>, ServerError> {
     let store = reopen().map_err(unavailable)?;
-    let started = start(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    let started =
+        open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
     let mut held = match started.state.as_deref().map(Held::decode) {
         None => Held::default(),
         Some(Ok(held)) => held,

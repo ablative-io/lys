@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use lys_core::Ed25519Identity;
-use lys_log_store::{FileLeafStore, FrontierLog, SnapshotRefusal, Start, Tail, start};
+use lys_log_store::{FileLeafStore, FrontierLog, SnapshotRefusal, Start, Tail, open_with_snapshot};
 use serde::{Deserialize, Serialize};
 
 use crate::encoding::{Canonical, hex, sha256};
@@ -230,7 +230,7 @@ impl AuditLog {
         key: &StoreKey,
     ) -> Result<(Self, Opened), SecretsError> {
         ensure_outside(anchor, guarded)?;
-        let started = start(
+        let started = open_with_snapshot(
             FileLeafStore::open(dir)?,
             STATE_DOMAIN,
             &key.verifying_key(),

@@ -24,7 +24,7 @@ it, and reads only the leaves written after it.
   snapshot slot. It is local state, like the pin. The file store keeps it in
   `snapshot.bin`, written to `snapshot.bin.tmp`, flushed, renamed over the
   slot, and then the directory is flushed.
-- `start(store, domain, public_key)` opens the log from its snapshot, or from
+- `open_with_snapshot(store, domain, public_key)` opens the log from its snapshot, or from
   the whole log when the snapshot is refused. It returns the log, the
   snapshot's state if the snapshot was used, the leaves the owner still has to
   apply, and a `Start` that says which path it took.

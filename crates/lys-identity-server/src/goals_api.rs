@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::goals_state::{
     EvidenceKind, Goal, GoalError, Holder, HolderKind, Item, Kind, Marked, Remind, Standing,
 };
@@ -158,17 +159,19 @@ fn holder(
 }
 
 fn team(state: &AppState, id: &str) -> Result<crate::teams_state::Team, ServerError> {
-    let store = state
-        .teams
-        .as_ref()
-        .ok_or_else(|| ServerError::TeamsUnavailable {
+    let store = state.teams.as_ref().ok_or_else(|| {
+        ServerError::Team(TeamError::Unavailable {
             reason: "the configuration names no teams_dir".to_owned(),
-        })?;
+        })
+    })?;
     let mut store = store
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     store.settle()?;
-    store.team(id).cloned().ok_or(ServerError::TeamUnknown)
+    store
+        .team(id)
+        .cloned()
+        .ok_or(ServerError::Team(TeamError::Unknown))
 }
 
 /// The agents `holder` judges: the agent, or every agent in the team.

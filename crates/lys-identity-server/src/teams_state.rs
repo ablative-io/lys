@@ -234,9 +234,19 @@ pub enum Refused {
     /// The memberships were already checked.
     Checked,
     /// The requested parent closes a cycle.
-    ParentCycle { team: String, parent: String },
+    ParentCycle {
+        /// The team whose parent would change.
+        team: String,
+        /// The requested parent that would close a cycle.
+        parent: String,
+    },
     /// The requested lead is not an admitted member.
-    LeadNotMember { team: String, lead: String },
+    LeadNotMember {
+        /// The team requiring an admitted lead.
+        team: String,
+        /// The requested lead that is not an admitted member.
+        lead: String,
+    },
 }
 
 impl Held {
@@ -389,8 +399,8 @@ impl Held {
             }
             Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
             Line::NestedV1(nested) => {
-                team.parent = nested.parent.clone();
-                team.lead = nested.lead.clone();
+                team.parent.clone_from(&nested.parent);
+                team.lead.clone_from(&nested.lead);
             }
             Line::Created(_) | Line::CreatedV1(_) | Line::Checked(_) => {}
         }
