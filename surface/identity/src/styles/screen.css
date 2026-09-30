@@ -101,3 +101,5 @@ tr.group .group-name { font-weight: 600; color: var(--text-primary); margin-righ
 .btn.under { min-height: 0; padding: 0 8px; margin-left: 10px; font-size: 11.5px; }
 tr.more td { border-bottom: 0; }
 @media (max-width: 900px) { .fill > .body { grid-template-columns: minmax(0, 1fr); } .fill .detail { display: none; } }
+.fill > .file { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fill > .file > .pane { flex: 1; min-height: 0; }

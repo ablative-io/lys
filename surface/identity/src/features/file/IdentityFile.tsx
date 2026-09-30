@@ -58,7 +58,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
     access: data.grants.list.grants.filter((g) => g.holder === x.id).length,
   };
   return (
-    <div className="page">
+    <div className="page fill">
       <div className="eyebrow">
         <a href="#/people">People and agents</a> / {x.display_name}
       </div>
@@ -103,7 +103,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
             </a>
           ))}
         </nav>
-        <TabBody tab={tab} data={data} reload={reload} />
+        <div className="pane"><TabBody tab={tab} data={data} reload={reload} /></div>
       </div>
     </div>
   );
