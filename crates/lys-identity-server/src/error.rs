@@ -223,6 +223,14 @@ pub enum ServerError {
         /// The version asked for.
         version: u32,
     },
+    /// A recorded version was replaced and cannot be approved for a new start.
+    #[error("version {version} has been replaced by version {latest}; approve the latest")]
+    ProfileVersionReplaced {
+        /// The recorded version whose review was requested.
+        version: u32,
+        /// The latest recorded version, which must be reviewed instead.
+        latest: u32,
+    },
     /// The agent's latest profile version is not reviewed, so it is not started.
     #[error(
         "ProfileNotReviewed: version {version} of the agent's profile is not reviewed; review it before the agent is started"
