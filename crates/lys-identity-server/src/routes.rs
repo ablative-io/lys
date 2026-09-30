@@ -183,6 +183,7 @@ pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerE
         say,
     });
     let configured = crate::configuration_api::routes(config)
+        .merge(crate::message_edges::routes(config)?)
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));

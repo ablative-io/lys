@@ -78,14 +78,16 @@ pub fn api() -> Api {
 
 /// The document, generated from the table.
 pub fn document() -> Result<Value, ServerError> {
-    api()
+    let mut document = api()
         .document()
         .map_err(|faults| ServerError::ConfigInvalid {
             reason: format!(
                 "the OpenAPI document could not be generated: {}",
                 faults.join("; ")
             ),
-        })
+        })?;
+    crate::message_edges::document_query(&mut document)?;
+    Ok(document)
 }
 
 /// The document's route: public, since the document describes the API and

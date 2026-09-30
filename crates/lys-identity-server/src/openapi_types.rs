@@ -282,6 +282,7 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     let (report, session) = (api.schema::<ReportBody>(), api.schema::<RuntimeSession>());
     let running = api.schema::<RuntimeList>();
     vec![
+        (GET, "/runtime/message-edges", Some(api.schema::<crate::message_edges::EdgeQuery>()), Some(api.schema::<crate::message_edges::EdgePage>())),
         (POST, "/link-audit", Some(delivery), Some(receipt)),
         (
             POST,

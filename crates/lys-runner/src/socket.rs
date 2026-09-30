@@ -260,6 +260,14 @@ pub fn dispatch(
 
 fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answer, RunnerError> {
     match act {
+        Act::ReadBytes {
+            session,
+            cursor,
+            follow,
+        } => crate::terminal_bytes::read(sessions, &session, cursor, follow, left),
+        Act::InputBytes { session, data } => sessions
+            .write(&session, &data)
+            .map(|()| Answer::Delivered { session }),
         Act::Start { launch } => {
             let session = launch.session.clone();
             let (pid, started_at) = sessions.start(launch)?;

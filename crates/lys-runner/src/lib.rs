@@ -32,7 +32,20 @@
 //! against any runner given its socket.
 
 pub mod client;
+pub mod codex_judge;
+pub mod codex_judge_client;
+pub mod codex_policy;
+pub mod codex_policy_contract;
+pub mod codex_policy_readback;
+pub mod codex_refusals;
 pub mod collector;
+pub mod containment_descriptors;
+pub mod containment_entry;
+pub mod containment_inputs;
+pub mod containment_macos;
+pub mod containment_paths;
+pub mod containment_policy;
+pub mod containment_stdio;
 pub mod dial;
 pub mod error;
 pub mod judge;
@@ -40,6 +53,9 @@ pub mod operations;
 pub mod peer;
 pub mod protocol;
 pub mod pty;
+mod pty_command;
+#[cfg(test)]
+mod pty_command_tests;
 pub mod published;
 pub mod refusal_log;
 pub mod refusals;
@@ -48,6 +64,7 @@ pub mod scrollback;
 pub mod session;
 pub mod socket;
 pub mod state;
+pub mod terminal_bytes;
 pub mod tracking;
 pub mod tracking_store;
 

@@ -12,12 +12,22 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 8] = [
-    "start", "input", "keys", "read", "wait", "resize", "end", "status",
+pub const ACTS: [&str; 10] = [
+    "read_bytes",
+    "input_bytes",
+    "start",
+    "input",
+    "keys",
+    "read",
+    "wait",
+    "resize",
+    "end",
+    "status",
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 7] = [
+pub const ANSWERS: [&str; 8] = [
+    "bytes",
     "started",
     "delivered",
     "output",
@@ -67,6 +77,8 @@ pub fn section() -> Value {
                 "answered": "only on the connection whose greeting it names, by the runner it names: once",
             },
             "acts": {
+                "read_bytes": {"session": "string", "cursor": "optional u64", "follow": "bool"},
+                "input_bytes": {"session": "string", "data": "array of u8, exact bytes without newline"},
                 "start": {"launch": {"session": "string", "program": "string", "arguments": ["string"], "directory": "string, empty for the runner's own", "environment": {"NAME": "value; a handle's id, never a credential"}, "columns": "u16", "rows": "u16", "rotation": "optional: accounts (handles), variable, limit {signal: exit_status, status} or {signal: words, words}, resume_arguments"}},
                 "input": {"session": "string", "text": "string", "enter": "bool"},
                 "keys": {"session": "string", "keys": ["enter", "tab", "escape", "backspace", "delete", "up", "down", "left", "right", "home", "end", "page_up", "page_down", "space", "ctrl_c", "ctrl_d", "ctrl_l", "ctrl_r", "ctrl_z"]},
@@ -79,6 +91,7 @@ pub fn section() -> Value {
             "act_tag": "act",
             "reply": {"version": PROTOCOL_VERSION, "answer": "tagged by kind"},
             "answers": ANSWERS,
+            "bytes": {"output": {"session": "string", "from": "u64", "cursor": "u64", "oldest": "u64", "data": "array of u8, exact PTY bytes", "ended": "observed end or null"}},
             "request_refusals": REQUEST_REFUSALS,
             "act_refusals": ["session_unknown", "session_exists", "session_ended", "session_invalid", "cursor_expired", "cursor_ahead", "pattern_invalid", "size_invalid", "spawn_failed", "write_failed", "resize_failed", "end_failed", "rotation_invalid", "runner_stopping", "caller_left"],
             "ended": {"how": ["exited", "ended_by_runner_restart", "accounts_exhausted"], "at": "milliseconds since the Unix epoch", "status": "the exit status seen, or null: never invented", "signal": "string or null"},
