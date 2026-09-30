@@ -276,6 +276,8 @@
 
 **S189.** As the person running a team of agents, I want every setting an agent can have listed and checked, and a list of approved MCP servers, so that I can see an agent's whole configuration and a mistyped setting is refused before it starts.
 
+**S190.** As the person running a team of agents, I want to pick an agent's program, model and mode from named choices, so that I can set an agent up without typing paths, ids or JSON.
+
 ## Installer and operator — Provision and upgrade the internal audit connection
 
 **S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.

@@ -475,3 +475,8 @@
 - [ ] **C471** — Each harness's flags, arguments, environment variables and settings are Rust generated from its kept docs. (DIRECTORY-075 R1).
 - [ ] **C472** — A profile version is checked against its harness's schema and its settings read lists every setting. (DIRECTORY-075 R2).
 - [ ] **C473** — Approved MCP servers are kept in a registry that requests choose from. (DIRECTORY-075 R3).
+
+## Lys offers the programs it can start and each program's models and modes as named choices, from its own descriptions and what each computer's runner finds installed (DIRECTORY-076)
+
+- [ ] **C474** — Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).
+- [ ] **C475** — Each computer's runner reports where each described program is installed. (DIRECTORY-076 R2).

@@ -1120,6 +1120,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
 | `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-identity-server/src/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/tests/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/claude-code.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/codex.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-runner/src/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
+| `crates/lys-runner/tests/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
 
 ## Inventory
 
