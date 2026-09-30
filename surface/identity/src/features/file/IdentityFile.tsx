@@ -87,7 +87,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
               </button>
             ))}
             {kind === 'agent' && x.state === 'active' ? (
-              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Choose settings to start this agent</a>
+              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Start this agent">Start this agent</a>
             ) : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />

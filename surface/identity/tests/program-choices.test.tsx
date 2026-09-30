@@ -1,7 +1,6 @@
 /** A program Lys lists offers its own models and modes, its default among them, never a second default beside it. */
-import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, mount, settle } from './harness';
+import { mount } from './harness';
 import { ADA, SCRIBE, SERVICE, ok } from './fixtures';
 import type { ProvisioningAnswer, ProvisioningProfile } from '../src/features/provisioning/Provisioning';
 
@@ -21,19 +20,14 @@ const options = (select: Element | null | undefined) => [...(select?.querySelect
 describe('A listed program', () => {
   it('offers its own default model and mode, and no second default beside them', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    const model = [...document.querySelectorAll('label.field')].find((label) => label.textContent?.startsWith('Model'))?.querySelector('select');
+    const model = document.querySelector<HTMLSelectElement>('select[name="model"]');
     expect(options(model)).toEqual(['Default for this account', 'Opus']);
     expect(model?.value).toBe('default');
-    expect(options($('select[name="mode"]'))).toEqual(['default — Reads freely and asks before most changes and commands.', 'acceptEdits — Reads and edits files without asking.']);
+    expect(options(document.querySelector('select[name="mode"]'))).toEqual(['Reads freely and asks before most changes and commands.', 'Reads and edits files without asking.']);
   });
-  it('records the model the screen shows', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', routes);
-    const form = $('form[aria-label="This agent\'s settings"]');
-    const note = form?.querySelector<HTMLInputElement>('[name="note"]');
-    if (!form || !note) throw new Error('Profile form missing');
-    note.value = 'Choose the model';
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
-    await settle();
-    expect(posted[0]).toMatchObject({ path, body: { model_access: ['default'], permissions: { default_mode: 'default' } } });
+  it('keeps the prompt textbox optional and behind a choice', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', routes);
+    expect(document.querySelector('textarea[name="instructions"]')).toBeNull();
+    expect(document.querySelector('input[required], textarea[required]')).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ export interface Program {
   name: string; line: string;
   models: { id: string; label: string }[];
   modes: { id: string; meaning: string }[];
+  instructions_modes?: ('keep' | 'append' | 'replace')[];
   description: HarnessDescription;
   builds: { name: string; program: string; package: string; from: 'profile' | 'runner'; machine?: string }[];
 }

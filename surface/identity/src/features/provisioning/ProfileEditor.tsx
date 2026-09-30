@@ -1,94 +1,56 @@
-/** The agent's settings, as the form it is changed in: each label says what the start does with the value; choices come from the service, never typed as JSON. */
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { operationId } from '../../api';
-import { useRoleChange } from '../roles/useRoleChange';
-import { ChangeStatus } from '../roles/ChangeStatus';
 import type { Choices } from './choices';
-import type { ProvisioningAnswer, ProvisioningProfile } from './Provisioning';
-import { ServiceRows, draftOf, serverOf } from './ServiceRows';
-import type { ServiceDraft } from './ServiceRows';
+import type { ProvisioningProfile } from './Provisioning';
+import { StartAgent } from '../runtime/StartAgent';
 
-const lines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
-const unique = (values: string[]) => values.filter((value, index) => values.indexOf(value) === index);
-
-export function ProfileEditor({ id, path, person, profile, choices, changed, readOnly }: { id: string; path: string; person: string; profile: ProvisioningProfile | null; choices: Choices; changed: () => void; readOnly: boolean }) {
-  const held = profile?.permissions;
-  const declared = profile?.harness ?? null;
-  const [programName, setProgramName] = useState(declared?.name ?? '');
-  const [build, setBuild] = useState(declared ? declared.program + '\n' + declared.package : '');
-  const [models, setModels] = useState<string[]>(profile?.model_access ?? []);
-  const [skills, setSkills] = useState<string[]>(profile?.skills ?? []);
-  const [services, setServices] = useState<ServiceDraft[]>((profile?.mcp_servers ?? []).map(draftOf));
-  const [error, setError] = useState('');
-  const program = choices.programs?.find((entry) => entry.name === programName) ?? null;
-  const change = useRoleChange<ProvisioningAnswer>('lys.pending.provisioning.' + person + '.' + id, path,
-    (answer, body) => answer.agent === id && (answer.recorded ? answer.recorded.operation === body.operation && answer.recorded.version === Number(body.from_version) + 1 : answer.profile !== null && answer.profile.operation === body.operation && answer.profile.version === Number(body.from_version) + 1), changed);
-  const harness = () => {
-    if (!programName) return null;
-    if (!program) {
-      if (declared && declared.name === programName) return declared;
-      throw new Error('Lys does not list the program ' + programName + ', so it cannot be chosen.');
-    }
-    const [binary, pkg] = build.split('\n');
-    if (!binary) throw new Error('Choose which installed copy of ' + program.name + ' this agent uses.');
-    return { name: program.name, description: program.description, program: binary, package: pkg ?? '' };
+export function ProfileEditor({ id, profile, choices, readOnly = false }: {
+  id: string; profile: ProvisioningProfile | null; choices: Choices; readOnly?: boolean;
+}) {
+  const available = choices.programs?.filter((entry) => entry.builds.length > 0) ?? [];
+  const [programName, setProgram] = useState(profile?.harness?.name ?? (available.length === 1 ? available[0].name : choices.programs?.length === 1 ? choices.programs[0].name : ''));
+  const program = choices.programs?.find((entry) => entry.name === programName);
+  const [model, setModel] = useState(profile?.model_access[0] ?? program?.models[0]?.id ?? '');
+  const [mode, setMode] = useState(profile?.permissions?.default_mode ?? program?.modes[0]?.id ?? '');
+  const [prompt, setPrompt] = useState(profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
+  const [promptChanged, setPromptChanged] = useState(false);
+  const [instructions, setInstructions] = useState(profile?.instructions ?? '');
+  const builds = program?.builds ?? [];
+  const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
+  const [build, setBuild] = useState(heldBuild ? heldBuild.program + '\n' + heldBuild.package : builds.length === 1 ? builds[0].program + '\n' + builds[0].package : '');
+  const supported = program?.instructions_modes ?? ['keep', 'append'];
+  const selected = builds.find((entry) => entry.program + '\n' + entry.package === build) ?? heldBuild;
+  let refusal = '';
+  if (choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
+  else if (!program) refusal = choices.programs.length ? 'Choose the program this agent will use.' : 'ProgramUnavailable: Lys lists no startable programs.';
+  else if (!selected) refusal = 'ProgramBuildUnavailable: Lys has no selected installed copy of this program.';
+  else if (!program.models.some((entry) => entry.id === model)) refusal = 'ModelUnavailable: choose a model this program lists.';
+  else if (!program.modes.some((entry) => entry.id === mode)) refusal = 'ModeUnavailable: choose a mode this program lists.';
+  else if (!supported.includes(prompt as 'keep' | 'append' | 'replace')) refusal = 'PromptReplacementUnavailable: this program does not list that prompt choice.';
+  const permissions = { ...profile?.permissions, default_mode: mode };
+  const settings: Record<string, unknown> = {
+    model_access: profile?.model_access[0] === model ? profile.model_access : [model],
+    tools: profile?.tools ?? [], skills: profile?.skills ?? [], mcp_servers: profile?.mcp_servers ?? [],
+    instructions: prompt === 'keep' ? '' : instructions.trim(), note: 'Start this agent',
+    harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
+    permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
+    ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
+    ...(profile?.session ? { session: profile.session } : {}),
   };
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); if (change.blocked) return;
-    try {
-      const data = new FormData(event.currentTarget);
-      const text = (name: string) => String(data.get(name) ?? '').trim();
-      const mcp_servers = services.map(serverOf);
-      if (new Set(mcp_servers.map((entry) => entry.name)).size !== mcp_servers.length) throw new Error('Give each connected service a different name.');
-      const mode = text('mode');
-      const permissions = { allow: unique(lines(text('allow'))), deny: lines(text('deny')), ask: lines(text('ask')), additional_directories: lines(text('folders')), ...(mode ? { default_mode: mode } : {}) };
-      const empty = !mode && [permissions.allow, permissions.deny, permissions.ask, permissions.additional_directories].every((list) => !list.length);
-      const runsOn = text('runs_on'); const writable = text('writable');
-      setError('');
-      change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: models.length || !program?.models.length ? models : [program.models[0].id], tools: [], skills, mcp_servers,
-        instructions: text('instructions'), note: text('note'), harness: harness(), permissions: empty ? null : permissions,
-        ...(runsOn ? { runs_on: runsOn } : {}), ...(writable ? { writable } : {}) });
-    } catch (failure) { setError(String(failure)); }
-  };
-  const toggle = (list: string[], value: string, on: boolean) => on ? unique([...list, value]) : list.filter((entry) => entry !== value);
-  const modelChoices = program?.models ?? models.map((model) => ({ id: model, label: model }));
-  return <form className="card recorded-form" aria-label="This agent's settings" onSubmit={submit}>
-    <fieldset disabled={readOnly || change.blocked} style={{ border: 0, padding: 0 }}>
-      <label className="field">Computer<span className="hint">Which computer this agent works on. It starts there unless you pick another when you start it.</span>
-        <select name="runs_on" defaultValue={profile?.runs_on ?? ''}><option value="">Chosen at each start</option>{choices.machines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label>
-      <label className="field">Folder it may change<span className="hint">The one folder this agent can change. Leave empty and it can change anything your account can. Not enforced yet.</span>
-        <input name="writable" defaultValue={profile?.writable ?? ''} placeholder="/Users/you/agents/this-agent" /></label>
-      <label className="field">Program<span className="hint">The program that does this agent's work. A start is refused until one is chosen.</span>
-        <select value={programName} onChange={(event) => { setProgramName(event.target.value); setBuild(''); setModels([]); }}><option value="">Not chosen</option>
-          {(choices.programs ?? (declared ? [{ name: declared.name, line: '' }] : [])).map((entry) => <option key={entry.name} value={entry.name}>{entry.name}{entry.line ? ' — ' + entry.line : ''}</option>)}</select>
-        {choices.programs === null ? <span className="hint">Lys cannot list its programs yet ({choices.programsMissing}); the program already saved is kept.</span> : null}</label>
-      {program ? <label className="field">Installed copy<span className="hint">Where {program.name} is on the computer, as Lys found it. The start runs exactly this file.</span>
-        <select value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose</option>{program.builds.map((entry) => <option key={entry.program + entry.package} value={entry.program + '\n' + entry.package}>{entry.program} · {entry.package}</option>)}</select>
-        {!program.builds.length ? <span className="hint">No computer has reported where {program.name} is installed yet.</span> : null}</label> : null}
-      <label className="field">Model<span className="hint">Which AI model it uses, passed to the program as --model.</span>
-        <select value={models[0] ?? (program?.models[0]?.id ?? '')} onChange={(event) => setModels(unique([event.target.value, ...models.slice(1)].filter(Boolean)))}>{program ? null : <option value="">The program's default</option>}{modelChoices.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}</select></label>
-      {models[0] ? <div className="field">Backup models<span className="hint">Used in order if the first is unavailable, passed as --fallback-model.</span>
-        {modelChoices.filter((model) => model.id !== models[0]).map((model) => <label key={model.id}><input type="checkbox" checked={models.slice(1).includes(model.id)} onChange={(event) => setModels([models[0], ...toggle(models.slice(1), model.id, event.target.checked)])} /> {model.label}</label>)}</div> : null}
-      <label className="field">Standing instructions<span className="hint">Written to instructions.md and added to the end of the program's own system prompt each time the agent starts. They do not replace it.</span>
-        <textarea name="instructions" rows={6} defaultValue={profile?.instructions ?? ''} /></label>
-      <div className="field">Skills<span className="hint">At each start Lys writes each chosen skill into the agent's own settings folder as skills/name/SKILL.md, as the text saved with these settings. The program sees each skill's name and summary when it starts and reads the whole text when a job matches it.</span>
-        {choices.skills === null ? skills.map((skill) => <span key={skill}>{skill}</span>) : choices.skills.map((skill) => <label key={skill}><input type="checkbox" checked={skills.includes(skill)} onChange={(event) => setSkills(toggle(skills, skill, event.target.checked))} /> {skill}</label>)}</div>
-      <div className="field">Connected services<span className="hint">Other programs this agent can use, written into the start's MCP settings file.</span>
-        <ServiceRows drafts={services} setDrafts={setServices} secrets={choices.secrets} /></div>
-      <label className="field">Can do without asking<span className="hint">Written into the agent's settings file as its allow rules: one per line, a tool's name, or a tool's name with one detail in brackets.</span>
-        <textarea name="allow" rows={3} defaultValue={unique([...(held?.allow ?? []), ...(profile?.tools ?? [])]).join('\n')} /></label>
-      <label className="field">Must ask first<span className="hint">Written as its ask rules: it stops and asks before doing these.</span>
-        <textarea name="ask" rows={2} defaultValue={held?.ask?.join('\n') ?? ''} /></label>
-      <label className="field">Never allowed<span className="hint">Written as its deny rules: refused even when asked.</span>
-        <textarea name="deny" rows={2} defaultValue={held?.deny?.join('\n') ?? ''} /></label>
-      <label className="field">How much it decides alone<span className="hint">The program's permission mode.</span>
-        <select name="mode" key={program?.name ?? ''} defaultValue={held?.default_mode ?? program?.modes[0]?.id ?? ''}>{program ? null : <option value="">The program's default</option>}
-          {(program?.modes ?? (held?.default_mode ? [{ id: held.default_mode, meaning: '' }] : [])).map((mode) => <option key={mode.id} value={mode.id}>{mode.meaning ? mode.id + ' — ' + mode.meaning : mode.id}</option>)}</select></label>
-      <label className="field">Other folders it may work in<span className="hint">Folders outside its own it can open and use, one per line. Written into its settings file as additional directories.</span>
-        <textarea name="folders" rows={2} defaultValue={held?.additional_directories?.join('\n') ?? ''} /></label>
-      {readOnly ? <p className="note">Only a directory administrator can change these settings.</p> : <><label className="field">What you changed and why<span className="hint">Kept with this version of the settings.</span><input name="note" required /></label>
-      <button type="submit" className="btn primary">Save these settings</button></>}
-    </fieldset>{error ? <p role="alert">{error}</p> : null}<ChangeStatus change={change} />
-  </form>;
+  return <section className="card" aria-label="Start this agent">
+    <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
+      const next = choices.programs?.find((entry) => entry.name === event.target.value);
+      setProgram(event.target.value); setModel(next?.models[0]?.id ?? ''); setMode(next?.modes[0]?.id ?? ''); setPrompt('keep'); setPromptChanged(true);
+      setBuild(next?.builds.length === 1 ? next.builds[0].program + '\n' + next.builds[0].package : '');
+    }}>
+      {!available.some((entry) => entry.name === programName) ? <option value={programName}>{programName || 'Choose a program'}</option> : null}
+      {available.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
+    </select></label>
+    {builds.length > 1 ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose an installed copy</option>{builds.map((entry) => <option key={entry.program + '\n' + entry.package} value={entry.program + '\n' + entry.package}>{entry.name} — {entry.package}</option>)}</select></label> : null}
+    <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
+    <label className="field">What this agent may do<select name="mode" value={mode} onChange={(event) => setMode(event.target.value)}>{!program?.modes.some((entry) => entry.id === mode) ? <option value={mode}>{mode || 'Choose a mode'}</option> : null}{program?.modes.map((entry) => <option key={entry.id} value={entry.id}>{entry.meaning}</option>)}</select></label>
+    <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { setPrompt(event.target.value); setPromptChanged(true); }}>{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
+    {prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
+    <p>Lys makes this agent’s own folder when it starts.</p>
+    <StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} />
+  </section>;
 }
