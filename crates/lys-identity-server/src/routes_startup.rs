@@ -23,7 +23,8 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     let key = Arc::new(load_service_key(&config.event_key_file)?);
     let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &*say)?;
     let mcp_requests =
-        crate::mcp_requests_store::McpRequestStore::configured(config, Arc::clone(&key), &say)?;
+        crate::mcp_requests_store::McpRequestStore::configured(config, Arc::clone(&key), &say)?
+            .map(|store| Box::new(Mutex::new(store)));
     let certificates = config
         .certificates_dir
         .as_deref()
@@ -105,7 +106,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
         requests: requests.map(Mutex::new),
-        mcp_requests: mcp_requests.map(Mutex::new),
+        mcp_requests,
         network: network.map(Mutex::new),
         roles: roles.map(Mutex::new),
         provisioning: provisioning.map(Mutex::new),

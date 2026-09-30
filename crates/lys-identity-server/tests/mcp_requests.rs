@@ -314,3 +314,59 @@ async fn a_server_held_by_the_latest_reviewed_version_is_refused_by_name()
     assert_eq!(listed, json!({"requests": []}));
     Ok(())
 }
+
+#[tokio::test]
+async fn an_agent_with_only_an_unreviewed_profile_cannot_record_a_request()
+-> Result<(), Box<dyn Error>> {
+    let (service, seeded) = Service::start_with(|config| {
+        Ok(seed_configured(config, [ADMINISTRATOR, "holder-subject"])?)
+    })
+    .await?;
+    let administrator = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let holder = service
+        .sign_in(Login {
+            subject: "holder-subject".to_owned(),
+            email: "holder@example.test".to_owned(),
+        })
+        .await?;
+    let donor = seeded.people[0].agents[0].id.to_string();
+    let agent = seeded.people[1].agents[0].id.to_string();
+    version(
+        &service,
+        &administrator,
+        &donor,
+        0,
+        declared_server("dot"),
+        true,
+    )
+    .await?;
+    version(&service, &administrator, &agent, 0, json!([]), false).await?;
+    let path = format!("/agents/{agent}/mcp-requests");
+    let (status, refused) = post(
+        &service,
+        &path,
+        &holder,
+        &json!({
+            "operation": OperationId::generate()?.to_string(), "server": "dot",
+        }),
+    )
+    .await?;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"], "ProfileNotReviewed", "{refused}");
+    let reason = refused["reason"]
+        .as_str()
+        .ok_or("the refusal has no reason")?;
+    assert!(
+        reason.contains("version 1") && reason.contains("not reviewed"),
+        "{refused}"
+    );
+    let (status, listed) = service.get(&path, Some(&holder)).await?;
+    assert_eq!(status, 200, "{listed}");
+    assert_eq!(listed, json!({"requests": []}));
+    Ok(())
+}
