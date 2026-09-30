@@ -419,7 +419,7 @@ async fn each_refusal_is_the_librarys_own_bytes() -> TestResult {
 }
 
 const ROUTE: &str = include_str!("../src/start.rs");
-const ROUTES: &str = include_str!("../src/routes.rs");
+const ROUTES: &str = include_str!("../src/routes_startup.rs");
 
 #[test]
 fn the_route_holds_no_start_logic_and_reads_the_door_through_the_seam() {
