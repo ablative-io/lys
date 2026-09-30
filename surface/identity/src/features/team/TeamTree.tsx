@@ -4,7 +4,8 @@ import { useLocation } from 'react-router';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { Branch } from './tree';
-import { addressOf, liveOf, openAgents, useWorld } from './world';
+import { addressOf, liveOf, openAgents } from './world';
+import type { World } from './world';
 import './team.css';
 
 const depth = (level: number) => ({ '--depth': level } as CSSProperties);
@@ -30,16 +31,13 @@ function Branches({ branches, level, open, sessions }: { branches: Branch[]; lev
   </div>)}</>;
 }
 
-export function TeamTree() {
+export function TeamTree({ world }: { world: World | null }) {
   const { pathname, search } = useLocation();
   const open = openAgents(pathname, search);
-  const load = useWorld(0);
   return <nav className="team-tree" aria-label="Teams and agents">
-    {load.status === 'loading' ? null : load.status === 'refused'
-      ? <p className="why-not">{load.refused.status === 401 ? 'Sign in to Lys to see your agents.' : load.refused.refusal.reason}</p>
-      : <>
-        <div className="tree-team tree-root">{load.data.tree.entry.display_name}</div>
-        <Branches branches={load.data.tree.branches} level={1} open={open} sessions={load.data.sessions} />
-      </>}
+    {world ? <>
+      <div className="tree-team tree-root">{world.tree.entry.display_name}</div>
+      <Branches branches={world.tree.branches} level={1} open={open} sessions={world.sessions} />
+    </> : null}
   </nav>;
 }

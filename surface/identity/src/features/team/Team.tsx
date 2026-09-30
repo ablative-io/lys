@@ -10,7 +10,7 @@ import { Provisioning } from '../provisioning/Provisioning';
 import { AgentUsage } from '../usage/Usage';
 import { Start } from './Start';
 import { agentsOf } from './tree';
-import { TeamTree } from './TeamPanel';
+import { TeamTree } from './TeamTree';
 import { addressOf, liveOf, openAgents, useWorld } from './world';
 import '../runtime/terminal.css';
 import '../usage/usage.css';
@@ -68,7 +68,7 @@ export function Team() {
   useEffect(() => {
     if (!open.length && first) navigate('/team/' + encodeURIComponent(first.id), { replace: true });
   }, [open.length, first?.id]);
-  if (load.status === 'loading') return <div className="team-screen"><TeamTree /></div>;
+  if (load.status === 'loading') return <div className="team-screen"><TeamTree world={null} /></div>;
   if (load.status === 'refused') {
     const { status, refusal } = load.refused;
     return <p className="team-screen why-not team-refused">Could not read your teams and agents: {status === 401 ? 'you are not signed in. Sign in to Lys, then reload this page.' : status ? `the service answered ${status}: ${refusal.reason}` : refusal.reason}</p>;
@@ -78,7 +78,7 @@ export function Team() {
   const panes = open.flatMap((id) => agents.filter((entry) => entry.id === id));
   const changed = () => setRevision((value) => value + 1);
   const settings = (entry: Entry) => shell.openDrawer(<Settings entry={entry} session={liveOf(sessions, entry.id)} changed={changed} />);
-  return <div className="team-screen"><TeamTree /><div className="team-stage">
+  return <div className="team-screen"><TeamTree world={load.data} /><div className="team-stage">
     {panes.length
       ? <div className="team-panes" data-n={panes.length}>{panes.map((entry) => <div className="team-pane" key={entry.id}>
         <Pane entry={entry} session={liveOf(sessions, entry.id)} alone={panes.length === 1} started={changed} />
