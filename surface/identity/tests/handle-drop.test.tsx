@@ -20,7 +20,7 @@ describe('Handle withdrawal', () => {
     await click(button('End handle')); await click(button('Confirm end handle'));
     unmountAll(); document.body.innerHTML = '';
     const next = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: SCRIBE, handles: [{ id: handle, secret: 'calendar', used: 0, max_uses: 4, not_after_ms: 1990000000000, dropped: true, spend_cap: null, settled: 0, parent: null }] }), 'POST /secrets/drop': receipt });
-    await click(button('Check original change')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('Use stopped at this broker');
+    await click(button('Check whether Lys saved it')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('Use stopped at this broker');
   });
   it('does not accept a receipt for another handle', async () => {
     await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': (body) => ok({ ...(body as Record<string, unknown>), handle: 'wrong', outcome: 'ended', ended: [], stopped_here: true, upstream: 'not_asked' }) });
