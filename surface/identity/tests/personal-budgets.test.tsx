@@ -1,4 +1,4 @@
-/** Personal confirmation preserves the enforced policy and trusts the subsequent read. */
+/** Confirmation preserves the enforced policy until a matching answer advances its version. */
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { $, click, mount, text } from './harness';
@@ -12,13 +12,12 @@ const pending = { holder: requested.holder, budgets: [requested], unconfirmed: [
 const confirm = () => $('section[aria-label="Personal budgets"] button.primary');
 const routes = (more: Record<string, Route> = {}): Record<string, Route> => ({ ...SERVICE, [path]: ok(pending), ...more });
 describe('personal budgets', () => {
-  it('shows both full policies, confirms the exact version, and reads the stored result', async () => {
-    let confirmed = false;
+  it('shows both full policies and applies the policy returned for the exact requested version', async () => {
+    const confirmed = { ...requested, limit: 150, version: 3 };
     const world = await mount('#/file/' + ADA + '/budgets', routes({
-      [path]: () => ok(confirmed ? { holder: requested.holder, budgets: [{ ...requested, version: 3 }], unconfirmed: [] } : pending),
-      ['POST ' + path + '/confirm']: () => { confirmed = true; return ok({ ...requested, version: 3 }); },
+      ['POST ' + path + '/confirm']: ok(confirmed),
     }));
-    expect(text()).toContain('Budgets for Ada (test person)');
+    expect(text()).toContain('Limits across Ada (test person)’s agents');
     const before = $('section[aria-label="Currently enforced"]');
     expect(before?.textContent).toContain('100');
     expect(before?.textContent).toContain('Each day, Australia/Melbourne');
@@ -29,9 +28,14 @@ describe('personal budgets', () => {
     expect(after?.textContent).toContain('Tell the responsible person');
     await click(confirm());
     expect(world.posted).toEqual([{ path: path + '/confirm', body: { measure: 'tokens', version: 2 } }]);
-    expect(world.requests.filter((entry) => entry === path)).toHaveLength(2);
+    expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
     expect(document.querySelector('article[aria-label="Pending tokens"]')).toBeNull();
     expect(text()).toContain('Enforced budget');
+    const enforced = $('section[aria-label="Personal budgets"] article');
+    expect(enforced?.textContent).toContain('150');
+    expect(enforced?.textContent).toContain('Each week, Australia/Melbourne');
+    expect(enforced?.textContent).toContain('Version3');
+    expect(confirm()).toBeNull();
   });
   it('keeps the owner read-only', async () => {
     const world = await mount('#/file/' + ADA + '/budgets', routes({ '/directory/people': refused(403, 'NotAdmitted', 'administrator only'), '/people': ok(OWN) }));
@@ -40,24 +44,34 @@ describe('personal budgets', () => {
     expect(world.posted).toEqual([]);
   });
   for (const [status, kind, reason] of [[503, 'BudgetsUnavailable', 'upgrade_pending'], [409, 'BudgetVersionConflict', 'budget changed'], [500, 'BudgetsUnavailable', 'outcome unreadable']] as const) {
-    it('reads the budgets again after ' + kind + ' ' + status, async () => {
+    it('keeps the pending policy and names ' + kind + ' ' + status + ' without another read', async () => {
       const world = await mount('#/file/' + ADA + '/budgets', routes({ ['POST ' + path + '/confirm']: refused(status, kind, reason) }));
       await click(confirm());
       expect(text()).toContain(kind + ': ' + reason);
       expect(text()).toContain('Currently enforced');
       expect(text()).toContain('Requested change');
-      expect(world.requests.filter((entry) => entry === path)).toHaveLength(2);
+      expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
       expect(world.posted).toHaveLength(1);
     });
   }
-  it('does not infer completion from a successful POST if the fresh read says pending', async () => {
-    const world = await mount('#/file/' + ADA + '/budgets', routes({ ['POST ' + path + '/confirm']: ok({ ...requested, version: 3 }) }));
-    await click(confirm());
-    expect(world.requests.filter((entry) => entry === path)).toHaveLength(2);
-    expect(text()).toContain('Currently enforced');
-    expect(text()).toContain('Requested change');
-  });
-  it('sends once while confirmation is pending and never shows success before the read', async () => {
+  for (const [what, answer] of [
+    ['an unchanged version', requested],
+    ['another person', { ...requested, holder: { ...requested.holder, id: ADA + '-other' }, version: 3 }],
+    ['another holder kind', { ...requested, holder: { ...requested.holder, kind: 'agent' }, version: 3 }],
+    ['another measure', { ...requested, measure: 'running_ms', version: 3 }],
+  ] as const) {
+    it('does not treat ' + what + ' as confirmation', async () => {
+      const world = await mount('#/file/' + ADA + '/budgets', routes({ ['POST ' + path + '/confirm']: ok(answer) }));
+      await click(confirm());
+      expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
+      expect(text()).toContain('The answer did not confirm the requested budget.');
+      expect(text()).toContain('Currently enforced');
+      expect(text()).toContain('Requested change');
+      expect(text()).not.toContain('Enforced budget');
+      expect(confirm()).not.toBeNull();
+    });
+  }
+  it('sends once while confirmation is pending and never shows success before the answer', async () => {
     await mount('#/file/' + ADA + '/budgets', routes());
     let answer: ((value: Response) => void) | undefined;
     const response = new Promise<Response>((resolve) => { answer = resolve; });
@@ -81,41 +95,46 @@ describe('personal budgets', () => {
     await act(async () => release(new Response(JSON.stringify(requested), { status: 200 })));
     expect(text()).toContain('Currently enforced');
   });
-  it('names a failed read after confirmation without pretending the requested change is enforced', async () => {
+  it('uses a confirmed answer without depending on a subsequent read', async () => {
     let confirmed = false;
-    await mount('#/file/' + ADA + '/budgets', routes({
+    const world = await mount('#/file/' + ADA + '/budgets', routes({
       [path]: () => confirmed ? refused(503, 'BudgetsUnavailable', 'cannot read recorded budget') : ok(pending),
       ['POST ' + path + '/confirm']: () => { confirmed = true; return ok({ ...requested, version: 3 }); },
     }));
     await click(confirm());
-    expect(text()).toContain('cannot read recorded budget');
+    expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
+    expect(text()).not.toContain('cannot read recorded budget');
     expect(document.querySelector('article[aria-label="Pending tokens"]')).toBeNull();
-    expect(text()).not.toContain('Enforced budget');
+    expect(text()).toContain('Enforced budget');
   });
 
-  it('removes stale confirmation controls while the authoritative follow-up read is pending', async () => {
-    await mount('#/file/' + ADA + '/budgets', routes());
+  it('keeps confirmation unavailable until the pending answer confirms the requested version', async () => {
+    const world = await mount('#/file/' + ADA + '/budgets', routes());
     let answer: ((value: Response) => void) | undefined;
-    const pendingRead = new Promise<Response>((resolve) => { answer = resolve; });
+    const pendingAnswer = new Promise<Response>((resolve) => { answer = resolve; });
     const original = fetch;
     let posts = 0;
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'POST') {
         posts += 1;
-        return Promise.resolve(new Response(JSON.stringify(requested), { status: 200 }));
+        return pendingAnswer;
       }
-      if (String(input).endsWith(path)) return pendingRead;
       return original(input, init);
     });
-    await click(confirm());
+    const button = confirm();
+    if (!button) throw new Error('confirmation button absent');
+    await act(async () => button.click());
     expect(posts).toBe(1);
-    expect(confirm()).toBeNull();
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(text()).not.toContain('Enforced budget');
-    if (!answer) throw new Error('fresh read resolver absent');
+    expect(text()).toContain('Currently enforced');
+    if (!answer) throw new Error('confirmation resolver absent');
     const release = answer;
-    await act(async () => release(new Response(JSON.stringify(pending), { status: 200 })));
-    expect(text()).toContain('Requested change');
-    expect(confirm()).not.toBeNull();
+    await act(async () => release(new Response(JSON.stringify({ ...requested, version: 3 }), { status: 200 })));
+    expect(confirm()).toBeNull();
+    expect(text()).not.toContain('Requested change');
+    expect(text()).toContain('Enforced budget');
+    expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
   });
 
 });
