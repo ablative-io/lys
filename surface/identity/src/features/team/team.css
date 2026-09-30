@@ -1,8 +1,8 @@
 /* A tree of names down the left and the chosen agent filling the rest. */
 .team-screen { display: grid; grid-template-columns: 200px minmax(0, 1fr); height: 100%; min-height: 0; }
-.team-screen .tree { border-right: 1px solid var(--border-default); padding: 12px 8px; overflow: auto; }
+.team-screen .tree { padding: 12px 8px; overflow: auto; }
 .tree ul { list-style: none; margin: 0; padding: 0; }
-.tree-under { margin-left: 10px !important; padding-left: 10px !important; border-left: 1px solid var(--border-default); }
+.tree-under { padding-left: 14px !important; }
 .tree-label { display: block; padding: 5px 6px 2px; color: var(--text-secondary); }
 .tree-person { color: var(--text-primary); font-weight: 600; }
 .tree-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text-primary); }
@@ -10,7 +10,7 @@
 .tree-row[aria-current="page"] { background: var(--accent-wash); }
 .tree-row .dot { flex: none; }
 .tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stage-strip { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--border-default); flex: none; }
+.stage-strip { display: flex; align-items: center; gap: 8px; padding: 4px 8px; flex: none; }
 .strip-acts { display: flex; gap: 4px; margin-left: auto; }
 .strip-acts .btn { padding: 3px 8px; font-size: 11.5px; }
 .team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
@@ -20,4 +20,4 @@
 .team-stage .terminal-screen, .team-stage .terminal-display .terminal-screen { flex: 1; height: auto; max-height: none; min-height: 0; }
 .team-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; }
 .team-failed { padding: 24px; }
-@media (max-width: 760px) { .team-screen { grid-template-columns: 1fr; } .team-screen .tree { border-right: 0; border-bottom: 1px solid var(--border-default); } }
+@media (max-width: 760px) { .team-screen { grid-template-columns: 1fr; } }
