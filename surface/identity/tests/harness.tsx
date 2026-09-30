@@ -74,6 +74,16 @@ export async function press(key: string, init: KeyboardEventInit = {}, target?: 
 }
 
 /** Choose `value` in a select, as a person would. */
+/** Choose by name in a picker: type part of the name, then press the match. */
+export async function pick(scope: ParentNode, label: string, typed: string, name: string): Promise<void> {
+  const find = scope.querySelector('input[aria-label="' + label + '"]');
+  if (!(find instanceof HTMLInputElement)) throw new Error('no picker ' + label);
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(find, typed); find.dispatchEvent(new Event('input', { bubbles: true })); });
+  const match = [...scope.querySelectorAll('.picker li button')].find((each) => each.textContent === name);
+  if (!(match instanceof HTMLElement)) throw new Error('no match ' + name);
+  await act(async () => { match.click(); });
+}
+
 export async function choose(select: Element | null, value: string): Promise<void> {
   if (!(select instanceof HTMLSelectElement)) throw new Error('no select');
   await act(async () => {

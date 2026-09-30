@@ -3,9 +3,9 @@ import { useState } from 'react';
 
 export interface Pickable { id: string; name: string; detail?: string }
 
-export function Picker({ name, label, options, multiple = false, onChange }: { name: string; label: string; options: Pickable[]; multiple?: boolean; onChange?: (ids: string[]) => void }) {
+export function Picker({ name, label, options, multiple = false, initial = [], onChange }: { name: string; label: string; options: Pickable[]; multiple?: boolean; initial?: string[]; onChange?: (ids: string[]) => void }) {
   const [query, setQuery] = useState('');
-  const [chosen, setChosen] = useState<Pickable[]>([]);
+  const [chosen, setChosen] = useState<Pickable[]>(() => options.filter((option) => initial.includes(option.id)));
   const needle = query.trim().toLowerCase();
   const matches = needle ? options.filter((option) => option.name.toLowerCase().includes(needle) && !chosen.some((each) => each.id === option.id)).slice(0, 8) : [];
   const set = (next: Pickable[]) => { setChosen(next); onChange?.(next.map((each) => each.id)); };

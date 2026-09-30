@@ -136,9 +136,9 @@ export function PersonAccount({ id }: { id: string }) {
 /** The administrator's account screen for one person. */
 export function AccountPage() {
   const { id = '' } = useParams();
-  return <div className="page">
+  return <div className="page fill">
     <div className="head"><div><div className="eyebrow">Directory</div><h1>Lys account</h1>
-      <p className="sub">Change this person's email and password, or whether they can sign in.</p></div></div>
-    <PersonAccount id={id} />
+      <p className="sub">Change this person's email and password, or whether they can sign in.</p></div><a className="btn" href={'#/file/' + encodeURIComponent(id)}>Back to their file</a></div>
+    <div className="pane"><PersonAccount id={id} /></div>
   </div>;
 }
