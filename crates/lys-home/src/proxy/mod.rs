@@ -19,6 +19,8 @@
 //!   the spool and the home's block store ([`error`] names paths and ids).
 
 pub mod capture;
+#[cfg(test)]
+mod capture_decode_tests;
 pub mod error;
 pub mod forward;
 #[cfg(test)]
