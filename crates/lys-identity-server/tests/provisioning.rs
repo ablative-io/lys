@@ -7,7 +7,7 @@ use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
-use lys_home::harness::launch_fields::Channel;
+use lys_home::harness::launch_fields::{Channel, InstructionsMode};
 use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::error::ServerError;
@@ -377,7 +377,7 @@ fn version(operation: &str, note: &str) -> Version {
                 channel: Channel::Off,
             }],
             instructions: String::new(),
-            instructions_mode: Default::default(),
+            instructions_mode: InstructionsMode::default(),
             note: note.to_owned(),
             session: None,
             harness: None,
