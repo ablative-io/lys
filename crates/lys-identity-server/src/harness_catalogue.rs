@@ -90,7 +90,7 @@ pub struct ProgramView {
     /// Native instruction choices supported by the registered renderer.
     pub instructions_modes: Vec<String>,
     /// The declared-harness capability and rendering contract.
-    #[schema(value_type = serde_json::Value)]
+    #[schema(value_type = Object)]
     pub description: Description,
     /// All distinct builds declared in reviewed profile versions.
     pub builds: Vec<BuildView>,
