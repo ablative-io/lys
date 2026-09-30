@@ -101,6 +101,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
+    GET "/agents/{id}/mcp-requests" "An agent's pending MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable"]];
+    POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];

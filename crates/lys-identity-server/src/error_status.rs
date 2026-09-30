@@ -109,6 +109,7 @@ impl ServerError {
             | Self::NotPermitted { .. }
             | Self::ReviewerOnly => StatusCode::FORBIDDEN,
             Self::AgentNotVisible
+            | Self::McpServerUnknown { .. }
             | Self::GrantNotVisible
             | Self::SessionUnknown
             | Self::RequestUnknown
@@ -125,6 +126,7 @@ impl ServerError {
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
+            | Self::McpServerHeld { .. }
             | Self::MachineReused { .. }
             | Self::MachineTeamReused { .. }
             | Self::RoleReused { .. }
@@ -182,6 +184,7 @@ impl ServerError {
             | Self::HarnessCatalogueUnreadable { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
+            | Self::McpRequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }
             | Self::RolesUnavailable { .. }
             | Self::SessionsUnavailable { .. }

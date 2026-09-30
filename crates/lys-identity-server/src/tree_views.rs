@@ -9,10 +9,19 @@ use serde::Serialize;
 use crate::budgets_state::{Budget, Held, Holder, Measure, Standing, covered};
 use crate::error::ServerError;
 use crate::error_team::TeamError;
-use crate::provisioning_store::Profile;
+use crate::provisioning_store::{Profile, Version};
 use crate::roles_records::Role;
 use crate::runtime_state::Tracked;
 use crate::teams_state::Team;
+
+/// Read the most recent reviewed version, even when a newer version awaits review.
+pub(crate) fn latest_reviewed(profile: &Profile) -> Option<&Version> {
+    profile
+        .versions
+        .iter()
+        .rev()
+        .find(|version| version.reviewed.is_some())
+}
 
 /// The caller and only the teams within their reach.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -200,30 +209,29 @@ impl TreeState {
             .profiles
             .iter()
             .find(|profile| profile.agent == id)
-            .and_then(|profile| {
-                profile.versions.iter().rev().find_map(|version| {
-                    version.reviewed.as_ref().map(|review| TreeProfile {
-                        version: version.operation.clone(),
-                        reviewed_by: review.by.clone(),
-                        harness: version
-                            .settings
-                            .harness
-                            .as_ref()
-                            .map(|harness| harness.name.clone()),
-                        program: version
-                            .settings
-                            .harness
-                            .as_ref()
-                            .map(|harness| harness.program.clone()),
-                        model: version.settings.model_access.first().cloned(),
-                        mcp_servers: version
-                            .settings
-                            .mcp_servers
-                            .iter()
-                            .map(|server| server.name.clone())
-                            .collect(),
-                        writable: None,
-                    })
+            .and_then(latest_reviewed)
+            .and_then(|version| {
+                version.reviewed.as_ref().map(|review| TreeProfile {
+                    version: version.operation.clone(),
+                    reviewed_by: review.by.clone(),
+                    harness: version
+                        .settings
+                        .harness
+                        .as_ref()
+                        .map(|harness| harness.name.clone()),
+                    program: version
+                        .settings
+                        .harness
+                        .as_ref()
+                        .map(|harness| harness.program.clone()),
+                    model: version.settings.model_access.first().cloned(),
+                    mcp_servers: version
+                        .settings
+                        .mcp_servers
+                        .iter()
+                        .map(|server| server.name.clone())
+                        .collect(),
+                    writable: None,
                 })
             });
         let budgets = self

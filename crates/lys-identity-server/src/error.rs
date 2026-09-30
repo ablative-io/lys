@@ -147,6 +147,24 @@ pub enum ServerError {
         /// What failed.
         reason: String,
     },
+    /// Requests for declared MCP servers cannot be read or recorded.
+    #[error("McpRequestsUnavailable: {reason}")]
+    McpRequestsUnavailable {
+        /// What failed.
+        reason: String,
+    },
+    /// No reviewed provisioning version declares the named server.
+    #[error("mcp_server_unknown: no reviewed profile declares MCP server `{server}`")]
+    McpServerUnknown {
+        /// The server requested.
+        server: String,
+    },
+    /// The requesting agent's most recent reviewed version already carries it.
+    #[error("mcp_server_held: the latest reviewed profile already carries MCP server `{server}`")]
+    McpServerHeld {
+        /// The server requested.
+        server: String,
+    },
     /// The request is not one the caller may see: none is kept by that id, or it is another's.
     #[error("RequestUnknown: no access request by that id is visible to the signed-in caller")]
     RequestUnknown,

@@ -126,6 +126,39 @@ fn declared_server(name: &str) -> Value {
     json!([{"name": name, "url": "https://tools.example.test/mcp"}])
 }
 
+async fn without_request_storage(
+    service: &mut Service,
+    path: &str,
+    cookie: &str,
+) -> Result<(), Box<dyn Error>> {
+    service
+        .restart_adjusted(|config| config.requests_dir = None)
+        .await?;
+    let answer = service.get(path, Some(cookie)).await?;
+    assert_eq!(answer.0, 503, "{}", answer.1);
+    assert_eq!(
+        answer.1["refusal"], "McpRequestsUnavailable",
+        "{}",
+        answer.1
+    );
+    let answer = post(
+        service,
+        path,
+        cookie,
+        &json!({
+            "operation": OperationId::generate()?.to_string(), "server": "dot",
+        }),
+    )
+    .await?;
+    assert_eq!(answer.0, 503, "{}", answer.1);
+    assert_eq!(
+        answer.1["refusal"], "McpRequestsUnavailable",
+        "{}",
+        answer.1
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_declared_server_request_keeps_the_reviewed_version_and_reads_back_pending()
 -> Result<(), Box<dyn Error>> {
@@ -224,6 +257,7 @@ async fn a_declared_server_request_keeps_the_reviewed_version_and_reads_back_pen
     let (status, after) = service.get(&profile, Some(&holder)).await?;
     assert_eq!(status, 200, "{after}");
     assert_eq!(after, before);
+    without_request_storage(&mut service, &path, &holder).await?;
     Ok(())
 }
 

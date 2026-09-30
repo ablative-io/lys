@@ -65,6 +65,8 @@ pub struct AppState {
     pub secrets: Option<crate::secrets_api::SecretsBroker>,
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
+    /// Requests for declared MCP servers, recorded without changing provisioning.
+    pub mcp_requests: Option<Mutex<crate::mcp_requests_store::McpRequestStore>>,
     /// The machines, when the configuration names their file.
     pub network: Option<Mutex<crate::network_store::NetworkStore>>,
     /// The roles, when the configuration names their file.
