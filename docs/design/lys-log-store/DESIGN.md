@@ -202,6 +202,19 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 
 ## Inventory
 
+- `crates/lys-log-store/src/file.rs` — 462 lines, 315 code lines. put_leaf opens the final leaf path with create_new, then write_all, sync_all and fsync_dir; a failure after create_new leaves a named leaf the next open counts. contiguous_extent already skips names starting with '.'. write_state uses a fixed, non-hidden state.json.tmp and rename. fsync_dir is a no-op on non-unix. No fault-injection seam.
+- `crates/lys-log-store/src/file_tests.rs` — 22 tests. create_new_alone_refuses_a_leaf_this_store_never_saw isolates the filesystem absent-check; an_unexpected_leaves_entry_is_detected_but_dotfiles_are_ignored covers .DS_Store only. The module docs carry the drift-injection tables.
+- `crates/lys-log-store/src/error.rs` — StoreError, #[non_exhaustive], 13 variants; LeafAlreadyWritten documented as two writers claiming one position; Poisoned belongs to Log's pin-failure case. No read-only variant.
+- `crates/lys-log-store/src/store.rs` — The LeafStore contract: durable on return, write-once, contiguous at open; LeafAlreadyWritten is a conflict meaning another writer, not a resume signal.
+- `crates/lys-log-store/src/log.rs` — Log::open rebuilds from leaves and repairs exactly one leaf ahead of the pin through the store's pin; Log::append poisons only after put_leaf returns Ok. No open that leaves a store one leaf ahead as it found it.
+- `docs/design/lys-log-store/BACKENDS.md` — The cluster's only document before this design: the criteria a backend satisfies.
+- `docs/design/directory/briefs/DIRECTORY-003.json` — The dependent card: R2 commits every identity change through lys-log-store's file storage and reconciles an uncertain write (ID001_AUDIT_FAULTS). depends_on is DIRECTORY-002 only; it lands after LYSLOGSTORE-001.
+- `crates/lys/src/commands/log/store.rs` — A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code.
+- `crates/lys-anchor-cli/src/commands/anchor/open.rs` — A writer's caller of FileLeafStore::open; picks up the open-time flush and its Io on failure, unchanged in code.
+- `crates/lys-anchor/src/anchor/read_only.rs` — Anchor::open_read_only takes a store its caller opened and opens its log with Log::open, so it repairs a store one leaf ahead through the store's pin; it has no production caller. Its two doc examples (one of them compile_fail) open the store with FileLeafStore::open.
+- `crates/lys-anchor/src/anchor/read_only_tests.rs` — Its read_only helper and a_reader_refuses_a_log_with_no_genesis_leaf_exactly_as_open_does pass FileLeafStore::open(dir) to Anchor::open_read_only.
+- `crates/lys-anchor/tests/standalone_is_complete.rs` — One Anchor::open_read_only call, taking FileLeafStore::open(dir).
+- `crates/lys-anchor/src/anchor/status.rs` — AnchorStatus, #[non_exhaustive]: origin, root, posture and recovered_to; nothing reports a repair that is pending rather than done.
 - `crates/lys-log-store/src/file.rs` — On main: put_leaf_with writes leaves/.<pid>-<index>-<seq>.tmp, syncs it, hard-links it to the 20-digit name, removes the temporary file and syncs leaves/. open syncs leaves/ before counting. contiguous_extent skips every dot-prefixed name without reporting it. 430 code lines.
 - `crates/lys-log-store/src/file_tests.rs` — On main: includes a_leftover_temporary_file_is_ignored_at_open and open_leaves_a_leftover_temporary_file_byte_identical.
 - `crates/lys-log-store/src/error.rs` — StoreError::PinMismatch's message: 'stored leaves rebuild to tree size {rebuilt_size} with root {rebuilt_root}, but the pinned state is tree size {pinned_size} with root {pinned_root}'. Unchanged by this cluster.

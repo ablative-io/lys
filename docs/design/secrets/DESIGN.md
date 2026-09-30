@@ -58,8 +58,10 @@ A broker in Rust inside the door: an encrypted store of real credentials, handle
 - OpenBao or another external secrets engine — Tom's model is built in Rust inside the door; an external engine is only reconsidered if credentials minted on demand are needed.
 - The seat login through a proxy handle and base URL — Not tested with a subscription login; the statement keeps it open to prove later and nothing depends on it.
 - The delegation schema — The statement says it is not settled.
+- OpenBao or another external secrets engine — Tom's model is a broker built in Rust (ADR-001); ADR-019, proposed and waiting on his word, amends where it is built, from inside the door to lys as crates/lys-secrets. An external engine is only reconsidered if credentials minted on demand are needed.
 - A signed lease format, a new version beside lys/delegation/v1 — ADR-020: the lease is a broker record read only by the broker; a lease a stranger verifies offline is a new brief with its own adversarial review.
 - A release and demonstration row for the broker — SECRETS-003's words list its rows, and a release row is not among them; it would come from a later roadmap decision.
+- OpenBao or another external secrets engine — Tom's model is a broker built in Rust (ADR-001); ADR-019, decided, amends where it is built, from inside the door to lys as crates/lys-secrets. An external engine is only reconsidered if credentials minted on demand are needed.
 
 ## Structure
 

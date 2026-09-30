@@ -347,7 +347,7 @@
     },
     {
       "path": "crates/lys-home/src/record/mod.rs",
-      "note": "the home record's module docs, its pub mod and mod lines, and the pub use lines that keep Home, Session and the shared helpers at lys_home::record",
+      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path",
       "brief": "HOME-001"
     },
     {
@@ -367,7 +367,7 @@
     },
     {
       "path": "docs/design/home/RECORD.md",
-      "note": "the home record written down: Pi's grammar as adopted, the lys custom entries (the handover's rule-less lys.inherited among them), the block store, the loss account",
+      "note": "the home record written down: Pi's grammar as adopted, the two lys custom entries, the block store, the loss account",
       "brief": "HOME-001"
     },
     {
@@ -437,12 +437,12 @@
     },
     {
       "path": "crates/lys-home/src/record/handover.rs",
-      "note": "the handover (HOME-015): the letter, a run of assistant entries on the outgoing path, copied whole into a new successor home after a rule-less lys.inherited entry, then a session_info named inherited from the outgoing session; every refusal before anything is written",
+      "note": "the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited",
       "brief": "HOME-001"
     },
     {
       "path": "docs/design/home/PROOF-HANDOVER.md",
-      "note": "measured (HOME-015): an elicited letter handed over by ids and hashes with its signatures compared, whether the inherited signed block appears in a resumed continuation's own file, and the seeded and plain card counts recorded as not run",
+      "note": "measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card",
       "brief": "HOME-001"
     },
     {
@@ -512,7 +512,7 @@
     },
     {
       "path": "docs/design/home/briefs/HOME-002.json",
-      "note": "the second brief: the Claude Code launch template and render-launch",
+      "note": "the second brief: a compaction's loss entry, the block rows beside a session, the compaction listing, the compaction render, and the proof",
       "brief": "HOME-002"
     },
     {
@@ -807,7 +807,7 @@
     },
     {
       "path": "docs/design/home/briefs/HOME-004.json",
-      "note": "the lantern brief: light, epilogue and recall by note and by point",
+      "note": "the fourth brief: ship and fetch a home as one git ref, the arrival event, the same-machine resume proof",
       "brief": "HOME-004"
     },
     {
@@ -1063,6 +1063,111 @@
     {
       "path": "docs/design/home/briefs/HOME-008.json",
       "note": "the given-statement brief: the given hash, the signed given statement at render, checked offline with lys verify",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/decisions.json",
+      "note": "the decision ledger; HOME-008 moves ADR-016 to decided",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/Cargo.toml",
+      "note": "the crate manifest; gains the passthrough example, and jiff for the Codex rollout path's local time",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-004.json",
+      "note": "the fourth brief: the first translation, Claude Code to Codex 0.156.0, with its loss account",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/PROOF-TRANSLATE.md",
+      "note": "the measured resume of a translated rollout by Codex 0.156.0 in an isolated Codex home: version, hashes, counts and paths only",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/mod.rs",
+      "note": "the Codex profile: the measured 0.156.0 rollout shape and its constants (version, model provider, originator, source, history mode, id prefixes, image detail, content item kinds); declarations only",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/rollout.rs",
+      "note": "the context path mapped to Codex 0.156.0 lines: session_meta, then text, function call and output whole, readable thinking as text, a compaction as a marked user message, the marker last",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/rollout_tests.rs",
+      "note": "gates on the item mapping: whole, ordered, deterministic, opaque dropped, base64 images carried and other images lost",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss.rs",
+      "note": "the loss account: kept, changed and lost by entry id, part index and the importer's block hash, and every entry off the context path",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/loss_tests.rs",
+      "note": "gates on the account: every hash found in the block store, every entry and part once",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/translate.rs",
+      "note": "render-codex's work: version check, existing path refused, both files written, the codex_translation side leaf",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/harness/codex/translate_tests.rs",
+      "note": "gates on the refusals writing nothing, and the side leaf leaving the head",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/src/cli/codex.rs",
+      "note": "the render-codex subcommand, split out of cli.rs",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.toml",
+      "note": "the workspace manifest; gains jiff, the pure-Rust time-zone database the Codex rollout path is dated with",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "Cargo.lock",
+      "note": "the workspace lockfile; gains jiff",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/codex_translation.rs",
+      "note": "end to end: fixture Claude Code file imported and translated, matched to the recorded rollout, the account, the Claude Code render unchanged",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/claude-code.jsonl",
+      "note": "the fixture Claude Code file, synthetic, in the measured part shapes, carrying the recorded rollout's conversation",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/claude-code-losses.jsonl",
+      "note": "the second fixture Claude Code file, synthetic: thinking, redacted thinking, long tool input and result, images, a sidechain, harness events, meta and authored records",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/codex/rollout-0.156.0.jsonl",
+      "note": "the fixture rollout recorded from Codex 0.156.0 itself, synthetic",
+      "brief": "HOME-004"
+    },
+    {
+      "path": "docs/design/home/design.json",
+      "note": "the cluster design, rendered to DESIGN.md, CHECKLIST.md and USER-STORIES.md by the design gate",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the rendered-uuid contract: the rule and its vector in RECORD.md pinned by a test, the launch card amended, ADR-016 decided",
       "brief": "HOME-008"
     },
     {
@@ -1376,6 +1481,336 @@
       "brief": "HOME-015"
     },
     {
+      "path": "docs/design/home/briefs/HOME-010.json",
+      "note": "the lit-in brief: LanternData's lit_in, recorded by the light act, reported by recall and read by the fork",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-010.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/given_path.rs",
+      "note": "canonicalising one given path: a directory whole, a document by its parent with its own name kept, relative left as written, absent kept and marked unresolved",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/given_path_tests.rs",
+      "note": "the canonicalisation cases built under a temporary directory: symlink, `..`, trailing slash, symlinked document, dangling symlink, absent directory, absent document, file as a parent, unreadable",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-010.json",
+      "note": "the canonical-path brief",
+      "brief": "HOME-010"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-011.json",
+      "note": "the brief of the request's order: the context record's documents in the request's order, re-measured, with the old order named as superseded",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-011.md",
+      "note": "its rendered markdown",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/proof-given/measure.py",
+      "note": "PROOF-GIVEN's measure fixture, committed byte for byte (SHA-256 db17cccb008507eed1ca67ab197a353c6901d09a63d1c284bf8a1f7d49ac245d): Claude Code pointed at a local listener, printing the read order and the request's order as orders, counts and hashes only",
+      "brief": "HOME-011"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the config-directory brief: measure whether --settings moves the session's config directory, and record the directory the session uses",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2.rs",
+      "note": "the lys.given.v2 record, on a no answer: lys.given's data with config_dir {path, source, given_not_applied}",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/given_v2_tests.rs",
+      "note": "lys.given.v2's key-set, null and round-trip tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/given_versions.rs",
+      "note": "given and given-check over a session holding one lys.given and one lys.given.v2 entry",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the compaction brief",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "the compaction brief, rendered",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/PROOF-COMPACTION.md",
+      "note": "one real compact_boundary session imported read-only with its listing, and the rendered pair's resume, by hashes and counts only",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/loss.rs",
+      "note": "the lys.loss data and its append as a side leaf under a compaction",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/loss_tests.rs",
+      "note": "tests for the lys.loss data",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/compaction.rs",
+      "note": "both Claude Code compaction shapes into one Pi compaction entry",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/compaction_tests.rs",
+      "note": "tests for the compaction mapping",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/span.rs",
+      "note": "a compaction's summarised span: its bounds, counts, byte counts and SHA-256s from the source lines",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/span_tests.rs",
+      "note": "tests for the span account",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/compactions.rs",
+      "note": "a session's compactions with their loss entries and the span check through the index and the block store",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/compactions_tests.rs",
+      "note": "tests for the compaction listing",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/cli/compactions.rs",
+      "note": "lys-home compactions",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/compaction_import.rs",
+      "note": "the compaction fixture imported, its loss entries, context path and two-home equality",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/compactions_cli.rs",
+      "note": "the listing through the binary's run",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/compaction.jsonl",
+      "note": "a synthetic Claude Code file with one compact_boundary pair and one legacy summary record",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the pass-through brief: HOME-001 R7 on R10's forward.rs, the loopback gate tests and the live subscription run",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/examples/passthrough_tests.rs",
+      "note": "the pass-through example's test module against loopback fakes: 418 in three chunks, headers, the call line, 502, a mid-stream reset",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/checklist.json",
+      "note": "the checklist, the source CHECKLIST.md is rendered from",
+      "brief": ""
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path; append_entry calls the entry log after the head, and Session::open writes a pending leaf first and it declares leaf, entry_log, log_checkpoint, pending, open and verify with their tests (HOME-008)",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/lib.rs",
+      "note": "module wiring: record and harness; declares cli_entry_log and cli_open (HOME-008)",
+      "brief": "HOME-001"
+    },
+    {
+      "path": "crates/lys-home/src/record/beside.rs",
+      "note": "append beside the context path without moving the head; the session head hash; calls the entry log at the end of append_beside and append_under (HOME-008)",
+      "brief": "HOME-002"
+    },
+    {
+      "path": "crates/lys-home/src/record/fork.rs",
+      "note": "writing the child from the parent's own lines, lys.forked_from in the child and lys.fork at the parent's head; append_copied appends a copy leaf on a logging home, naming the checkpoint leaf for a parent entry from before it (HOME-008)",
+      "brief": "HOME-006"
+    },
+    {
+      "path": "crates/lys-identity/src/lib.rs",
+      "note": "the identity crate's root, brought by DIRECTORY-003 R2; declares the home payloads when its envelope lands without them (HOME-008 R1), changed only after it lands",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "crates/lys-identity/src/home_payloads.rs",
+      "note": "the lys/home-entry/v1, lys/home-entry-copy/v1 and lys/home-checkpoint/v1 payloads of the identity event envelope, created only when the envelope lands without them",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/identity/IDENTITY-EVENTS.md",
+      "note": "the identity event envelope (DIRECTORY-003 R2); records the three home payloads and their adversarial review (HOME-008 R1, R12), changed only after DIRECTORY-003 R2 brings it",
+      "brief": "DIRECTORY-003"
+    },
+    {
+      "path": "crates/lys-home/src/record/call_tests.rs",
+      "note": "call ingest tests",
+      "brief": ""
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the signed entry log",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.md",
+      "note": "rendered HOME-008",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/leaf.rs",
+      "note": "the encoding and decoding of a home leaf: the lys/home-entry/v1, lys/home-entry-copy/v1 and lys/home-checkpoint/v1 payloads in the identity envelope with their attestation",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/leaf_tests.rs",
+      "note": "leaf encoding and signature tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/entry_log.rs",
+      "note": "the home's log at log/ and its agent named in log/agent: sign and append a leaf with that agent's key, find a leaf and its index by session and entry",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/entry_log_tests.rs",
+      "note": "entry log tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/log_checkpoint.rs",
+      "note": "the checkpoint leaf written when logging is first enabled on a home",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/log_checkpoint_tests.rs",
+      "note": "checkpoint tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/pending.rs",
+      "note": "the pending marker log/pending/<session id>.json (session and entry ids) and the retry of its leaf at the session's next open, its next append, or verify --repair",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/pending_tests.rs",
+      "note": "pending marker tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify.rs",
+      "note": "verify one session against the log and the checkpoint, a fork's copy leaves against their parent leaves, or against the checkpoint and the parent's line when they name the checkpoint leaf",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/verify_tests.rs",
+      "note": "verify tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/cli_entry_log.rs",
+      "note": "the log-enable subcommand (--agent, written to log/agent) and the verify subcommand with its --repair",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/open.rs",
+      "note": "open a sealed envelope through the home and append its lys.open entry",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/open_tests.rs",
+      "note": "open-through-the-home tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/cli_open.rs",
+      "note": "the open subcommand",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/entry_log.rs",
+      "note": "the words' four tests, log-enable, the checkpoint, the absent key, the failed append, the open and the wrong key, through the command line",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/entry_log/one_event.jsonl",
+      "note": "a Claude Code transcript of one permission-mode record and no message",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.jsonl",
+      "note": "the prelog home's session pre, written before logging: one lys.call and one lys.harness_event",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.index.jsonl",
+      "note": "the prelog home's index of session pre",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/tests/fixtures/entry_log/prelog/sessions/pre.head",
+      "note": "the prelog home's head of session pre",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "docs/design/home/briefs/HOME-008.json",
+      "note": "the render refuses by name what it cannot shape and writes nothing",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields.rs",
+      "note": "the render's checked readers: a field present and of the target's type, or a refusal by entry id, field and expected type; the stopReason arms",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields_tests.rs",
+      "note": "the checked readers' unit tests",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write.rs",
+      "note": "the render's one write stage: every serialisation decided before any directory or file is created",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write_tests.rs",
+      "note": "the write stage's tests, the failing-serialiser account among them",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_refusal_tests.rs",
+      "note": "one fixture per refusal of the render, the absent-redacted reading and the unknown role",
+      "brief": "HOME-008"
+    },
+    {
+      "path": "crates/lys-home/src/record/mod.rs",
+      "note": "the home record's module docs, its pub mod and mod lines, and the pub use lines that keep Home, Session and the shared helpers at lys_home::record",
+      "brief": "HOME-001"
+    },
+    {
       "path": "crates/lys-home/src/record/helpers.rs",
       "note": "the helpers and constants the record files share: safe_component, MAX_NAME_BYTES, PI_FORMAT_VERSION, now, fresh_id, json_len, write_durable, custom_type_of",
       "brief": "HOME-013"
@@ -1431,19 +1866,49 @@
       "brief": "HOME-015"
     },
     {
+      "path": "docs/design/home/briefs/HOME-015.json",
+      "note": "the render refuses by name what it cannot shape and writes nothing",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields.rs",
+      "note": "the render's checked readers: a field present and of the target's type, or a refusal by entry id, field and expected type; the stopReason arms",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_fields_tests.rs",
+      "note": "the checked readers' unit tests",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write.rs",
+      "note": "the render's one write stage: every serialisation decided before any directory or file is created",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_write_tests.rs",
+      "note": "the write stage's tests, the failing-serialiser account among them",
+      "brief": "HOME-015"
+    },
+    {
+      "path": "crates/lys-home/src/harness/claude_code/render_refusal_tests.rs",
+      "note": "one fixture per refusal of the render, the absent-redacted reading and the unknown role",
+      "brief": "HOME-015"
+    },
+    {
       "path": "crates/lys-home/src/record/given_statement.rs",
       "note": "the lys.given_statement entry: signing a lys.given record's canonical bytes, the statement kept as a block, appended under the given entry and read back",
-      "brief": "HOME-018"
+      "brief": "HOME-008"
     },
     {
       "path": "crates/lys-home/src/record/given_statement_tests.rs",
       "note": "the statement's entry shape, parent, block and payload hash; the head and the given entry's line unchanged",
-      "brief": "HOME-018"
+      "brief": "HOME-008"
     },
     {
       "path": "crates/lys-home/tests/given_statement.rs",
       "note": "end to end with two test keys: accepted, every one-byte alteration refused, signer attributed, signed hash equals given_sha256, no secret in the statement files",
-      "brief": "HOME-018"
+      "brief": "HOME-008"
     },
     {
       "path": "docs/design/home/briefs/HOME-019.json",
@@ -1838,6 +2303,14 @@
     {
       "path": "docs/design/identity/CONFORMANCE.md",
       "note": "row 6.5 asks for the start, the given record and role moves as signed statements checked with lys verify --attestation; row 6.6 keeps production keys as the owner's acts; row 6.1 carries --cert"
+    },
+    {
+      "path": "crates/lys/src/commands/verify.rs",
+      "note": "lys verify --attestation --payload: without --cert proves only that some key signed; one failure message naming no file; --json prints signer_public_key and payload_hash; --cert with --issuer-public-key requires the signer to be the key the certificate certifies"
+    },
+    {
+      "path": "docs/design/identity/CONFORMANCE.md",
+      "note": "row 6.5 asks for the start, the given record and role moves as signed statements checked with lys verify --attestation; row 6.6 keeps production keys as the owner's acts; row 6.1 supplies the capability certificate over a proven key"
     }
   ],
   "constraints": [
@@ -1907,6 +2380,75 @@
     }
   ],
   "gate": [
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    },
     {
       "tree": ".",
       "shorthand": {

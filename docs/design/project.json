@@ -3,55 +3,145 @@
     {
       "tree": ".",
       "shorthand": {
-        "rust-build": ["toolchain:rust", "lockfile:Cargo.lock"]
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
       },
       "legs": [
         {
           "name": "fmt",
           "command": "cargo fmt --all",
-          "requires": ["tool:cargo", "tool:rustfmt"],
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
           "cadence": "round"
         },
         {
           "name": "clippy-all-features",
           "command": "cargo clippy --all-targets --all-features -- -D warnings",
-          "requires": ["rust-build"],
+          "requires": [
+            "rust-build"
+          ],
           "cadence": "round"
         },
         {
           "name": "clippy",
           "command": "cargo clippy --all-targets -- -D warnings",
-          "requires": ["rust-build"],
+          "requires": [
+            "rust-build"
+          ],
           "cadence": "round"
         },
         {
           "name": "tests",
-          "command": "cargo test --workspace --all-features --no-fail-fast",
-          "requires": ["rust-build"],
+          "command": "cargo test --workspace --all-features",
+          "requires": [
+            "rust-build"
+          ],
           "cadence": "round"
         },
         {
           "name": "doc-all-features",
           "command": "cargo doc --no-deps --all-features",
-          "requires": ["rust-build"],
+          "requires": [
+            "rust-build"
+          ],
           "cadence": "round"
         },
         {
           "name": "doc",
           "command": "cargo doc --no-deps",
-          "requires": ["rust-build"],
+          "requires": [
+            "rust-build"
+          ],
           "cadence": "round"
         },
         {
           "name": "design",
           "command": "sh scripts/design/gate.sh",
-          "requires": ["tool:sh", "tool:python3"],
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
+          "cadence": "round"
+        }
+      ]
+    },
+    {
+      "tree": ".",
+      "shorthand": {
+        "rust-build": [
+          "toolchain:rust",
+          "lockfile:Cargo.lock"
+        ]
+      },
+      "legs": [
+        {
+          "name": "fmt",
+          "command": "cargo fmt --all",
+          "requires": [
+            "tool:cargo",
+            "tool:rustfmt"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy-all-features",
+          "command": "cargo clippy --all-targets --all-features -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "clippy",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "tests",
+          "command": "cargo test --workspace --all-features --no-fail-fast",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc-all-features",
+          "command": "cargo doc --no-deps --all-features",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "doc",
+          "command": "cargo doc --no-deps",
+          "requires": [
+            "rust-build"
+          ],
+          "cadence": "round"
+        },
+        {
+          "name": "design",
+          "command": "sh scripts/design/gate.sh",
+          "requires": [
+            "tool:sh",
+            "tool:python3"
+          ],
           "cadence": "round"
         },
         {
           "name": "ast-grep",
           "command": "ast-grep scan --config sgconfig.yml",
-          "requires": ["tool:ast-grep"],
+          "requires": [
+            "tool:ast-grep"
+          ],
           "cadence": "round"
         },
         {

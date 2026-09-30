@@ -160,11 +160,11 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/cli.rs` | import, render, resume-check subcommands | HOME-001 |
 | `crates/lys-home/examples/passthrough.rs` | a pass-through HTTP proxy that forwards to the provider unchanged, for the proof only | HOME-001 |
 | `crates/lys-home/tests/claude_code_round_trip.rs` | import then render equals the model-visible content; opaque blocks kept whole | HOME-001 |
-| `crates/lys-home/src/record/mod.rs` | the home record's module docs, its pub mod and mod lines, and the pub use lines that keep Home, Session and the shared helpers at lys_home::record | HOME-001 |
+| `crates/lys-home/src/record/mod.rs` | the home record: Pi's session tree read and written, leaf pointer, root-to-leaf path | HOME-001 |
 | `crates/lys-home/src/record/entries.rs` | Pi's entry types as Rust types, plus the lys custom entries lys.harness_event and lys.call | HOME-001 |
 | `crates/lys-home/src/record/call.rs` | a proxy call record: request and response block hashes, provider, api, model, timing | HOME-001 |
 | `crates/lys-home/src/harness/claude_code/events.rs` | Claude Code's harness-local records (hooks, permission mode, tool completion) as lys.harness_event entries | HOME-001 |
-| `docs/design/home/RECORD.md` | the home record written down: Pi's grammar as adopted, the lys custom entries (the handover's rule-less lys.inherited among them), the block store, the loss account | HOME-001 |
+| `docs/design/home/RECORD.md` | the home record written down: Pi's grammar as adopted, the two lys custom entries, the block store, the loss account | HOME-001 |
 | `crates/lys-home/src/lib.rs` | module wiring: record and harness | HOME-001 |
 | `crates/lys-home/src/harness/mod.rs` | harness profiles; Claude Code first | HOME-001 |
 | `crates/lys-home/Cargo.toml` | the crate manifest; gains the passthrough example | HOME-001 |
@@ -178,8 +178,8 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/record/canon_tests.rs` | gates on the canon: copied whole, never twice, no authored thinking, rendered first | HOME-001 |
 | `docs/design/home/PROOF-CANON.md` | measured: a session started from the canon against a plain start, on one card | HOME-001 |
 | `canon/canon.jsonl` | the canon itself, versioned by the repository, changed only through src_commit and review | HOME-001 |
-| `crates/lys-home/src/record/handover.rs` | the handover (HOME-015): the letter, a run of assistant entries on the outgoing path, copied whole into a new successor home after a rule-less lys.inherited entry, then a session_info named inherited from the outgoing session; every refusal before anything is written | HOME-001 |
-| `docs/design/home/PROOF-HANDOVER.md` | measured (HOME-015): an elicited letter handed over by ids and hashes with its signatures compared, whether the inherited signed block appears in a resumed continuation's own file, and the seeded and plain card counts recorded as not run | HOME-001 |
+| `crates/lys-home/src/record/handover.rs` | the handover: take the outgoing session's letter turn (thinking intact) and seed the successor with it as lys.inherited | HOME-001 |
+| `docs/design/home/PROOF-HANDOVER.md` | measured: a successor seeded with an inherited letter, whether 2.1.281 replays the signed thinking, and seeded against plain on one card | HOME-001 |
 | `crates/lys-home/src/proxy/forward.rs` | forward a request to the provider and stream the response back unchanged | HOME-001 |
 | `crates/lys-home/src/proxy/capture.rs` | bounded spooling of request and response bodies to files while forwarding, handed to the R6 sink | HOME-001 |
 | `crates/lys-home/src/proxy/journal.rs` | the open-call journal: a call id written before forwarding, retired after ingest, so a restart records lost calls once | HOME-001 |
@@ -193,7 +193,7 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 | `crates/lys-home/src/proxy/stream_tests.rs` | the three grammars, partial streams | HOME-001 |
 | `crates/lys-home/src/proxy/link_tests.rs` | linking by the measured key; unlinked; never inferred | HOME-001 |
 | `crates/lys-home/src/proxy/journal_tests.rs` | recovery after a kill: one lost record per open call | HOME-001 |
-| `docs/design/home/briefs/HOME-002.json` | the second brief: the Claude Code launch template and render-launch | HOME-002 |
+| `docs/design/home/briefs/HOME-002.json` | the second brief: a compaction's loss entry, the block rows beside a session, the compaction listing, the compaction render, and the proof | HOME-002 |
 | `docs/design/home/briefs/HOME-002.md` | its rendered markdown | HOME-002 |
 | `docs/design/home/PROOF-COMPACTION.md` | one real compact_boundary session imported read-only with its listing, and the rendered pair's resume, by hashes and counts only | HOME-008 |
 | `crates/lys-home/src/record/block_rows.rs` | the block rows beside a session, <id>.blocks.jsonl: one {entry, part, hash} row per content part stored at import | HOME-002 |
@@ -467,6 +467,8 @@ The given statement (HOME-018, ADR-072). CONFORMANCE row 6.5 asks for three sign
 - `docs/design/directory/briefs/DIRECTORY-003.json` — R2 defines the versioned identity event envelope outside lys-core with typed payloads, written in docs/design/identity/IDENTITY-EVENTS.md and reviewed before it signs durable bytes; neither that file nor crates/lys-identity exists yet.
 - `crates/lys/src/commands/verify.rs` — lys verify --attestation --payload: without --cert proves only that some key signed; one failure message naming no file; --json prints signer_public_key and payload_hash
 - `docs/design/identity/CONFORMANCE.md` — row 6.5 asks for the start, the given record and role moves as signed statements checked with lys verify --attestation; row 6.6 keeps production keys as the owner's acts; row 6.1 carries --cert
+- `crates/lys/src/commands/verify.rs` — lys verify --attestation --payload: without --cert proves only that some key signed; one failure message naming no file; --json prints signer_public_key and payload_hash; --cert with --issuer-public-key requires the signer to be the key the certificate certifies
+- `docs/design/identity/CONFORMANCE.md` — row 6.5 asks for the start, the given record and role moves as signed statements checked with lys verify --attestation; row 6.6 keeps production keys as the owner's acts; row 6.1 supplies the capability certificate over a proven key
 
 ## Constraints
 
