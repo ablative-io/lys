@@ -117,10 +117,10 @@ pub(crate) fn allows(
 }
 
 fn position(
-    parent: Option<String>,
+    parent: Option<&str>,
     lead: Option<String>,
 ) -> Result<(Option<String>, Option<String>), ServerError> {
-    let parent = parent.as_deref().map(team_id).transpose()?;
+    let parent = parent.map(team_id).transpose()?;
     let lead = lead
         .map(|lead| {
             AgentId::from_str(&lead)
@@ -144,7 +144,7 @@ pub(crate) async fn create(
         return Err(malformed("a team has a name"));
     }
     let description = words("description", &body.description, DESCRIPTION_MAX)?;
-    let (parent, lead) = position(body.parent, body.lead)?;
+    let (parent, lead) = position(body.parent.as_deref(), body.lead)?;
     if parent.is_some() || lead.is_some() {
         crate::teams_migration::require_committed(&state)?;
     }
@@ -184,7 +184,7 @@ pub(crate) async fn nest(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    let (parent, lead) = position(body.parent, body.lead)?;
+    let (parent, lead) = position(body.parent.as_deref(), body.lead)?;
     crate::teams_migration::require_committed(&state)?;
     parent_owned(&state, &actor, parent.as_deref())?;
     change(&state, &actor, &id, |team, by| {
@@ -210,9 +210,9 @@ fn parent_owned(state: &AppState, actor: &Actor, parent: Option<&str>) -> Result
     with_directory(state, |directory| {
         let own = own_person(directory.projection()?, actor)?.to_string();
         with_teams(state, |store| {
-            if !store
+            if store
                 .team(parent)
-                .is_some_and(|team| team.created.owner == own)
+                .is_none_or(|team| team.created.owner != own)
             {
                 return Err(ServerError::NotAdmitted {
                     reason: "only a parent team's owner or the administrator nests a team under it",

@@ -399,8 +399,8 @@ impl Held {
             }
             Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
             Line::NestedV1(nested) => {
-                team.parent = nested.parent.clone();
-                team.lead = nested.lead.clone();
+                team.parent.clone_from(&nested.parent);
+                team.lead.clone_from(&nested.lead);
             }
             Line::Created(_) | Line::CreatedV1(_) | Line::Checked(_) => {}
         }
