@@ -157,7 +157,7 @@ fn checked(template: &Template) -> Result<(), String> {
 
 pub(super) fn parse(text: &str) -> Result<Template, String> {
     let template: Template = serde_json::from_str(text)
-        .map_err(|_| "template: invalid native template shape".to_owned())?;
+        .map_err(|error| format!("template: invalid native template shape: {error}"))?;
     checked(&template)?;
     Ok(template)
 }
@@ -168,8 +168,13 @@ pub(crate) fn render(
     granted: &Value,
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
-    let permissions: Permissions = serde_json::from_value(granted.clone())
-        .map_err(|_| refused(fields, "permissions", "invalid native permissions shape"))?;
+    let permissions: Permissions = serde_json::from_value(granted.clone()).map_err(|error| {
+        refused(
+            fields,
+            "permissions",
+            &format!("invalid native permissions shape: {error}"),
+        )
+    })?;
     let mut environment = BTreeMap::from([
         ("LYS_AGENT".to_owned(), fields.identity.agent.clone()),
         ("LYS_SESSION".to_owned(), fields.identity.session.clone()),
@@ -205,8 +210,13 @@ pub(crate) fn render(
             .map_or("template", |(member, _)| member);
         refused(fields, member, &reason)
     })?;
-    let text = serde_json::to_string_pretty(&template)
-        .map_err(|_| refused(fields, "template", "cannot encode native template"))?;
+    let text = serde_json::to_string_pretty(&template).map_err(|error| {
+        refused(
+            fields,
+            "template",
+            &format!("cannot encode native template: {error}"),
+        )
+    })?;
     Ok(RenderedTemplate {
         harness: "codex".to_owned(),
         sha256: Hash::of(text.as_bytes()).as_str().to_owned(),

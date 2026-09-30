@@ -22,7 +22,7 @@ fn native_value(value: &Value) -> Result<String, String> {
     match value {
         Value::String(_) | Value::Bool(_) | Value::Number(_) => serde_json::to_string(value)
             .map(|encoded| encoded.replace('\u{7f}', "\\u007f"))
-            .map_err(|_| "config: cannot encode native value".to_owned()),
+            .map_err(|error| format!("config: cannot encode native value: {error}")),
         Value::Array(items) => Ok(format!(
             "[{}]",
             items
@@ -100,7 +100,6 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         arguments.extend(["--add-dir".to_owned(), path]);
     }
     match mode {
-        InstructionsMode::Keep => {}
         InstructionsMode::Append if !template.fields.instructions.trim().is_empty() => {
             arguments.extend([
                 "-c".to_owned(),
@@ -110,7 +109,6 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
                 ),
             ]);
         }
-        InstructionsMode::Append => {}
         InstructionsMode::Replace => {
             if template.fields.instructions.trim().is_empty() {
                 return Err("instructions: Replace requires nonblank text".to_owned());
@@ -121,6 +119,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
                 "model_instructions_file=\"instructions.txt\"".to_owned(),
             ]);
         }
+        InstructionsMode::Keep | InstructionsMode::Append => {}
     }
     Ok(Launch {
         program: program.to_owned(),

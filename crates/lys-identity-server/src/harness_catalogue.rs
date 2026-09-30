@@ -36,6 +36,7 @@ pub struct ModeChoice {
 #[serde(deny_unknown_fields)]
 struct ProgramFile {
     name: String,
+    command: String,
     line: String,
     models: Vec<ModelChoice>,
     modes: Vec<ModeChoice>,
@@ -70,6 +71,8 @@ pub struct BuildView {
 pub struct ProgramView {
     /// Its plain name.
     pub name: String,
+    /// The standard command, resolved by the machine that runs it.
+    pub command: String,
     /// One line saying what it is.
     pub line: String,
     /// Named models, with the default first.
@@ -131,6 +134,7 @@ impl Catalogue {
             }
             programs.push(ProgramView {
                 name: parsed.name,
+                command: parsed.command,
                 line: parsed.line,
                 models: parsed.models,
                 modes: parsed.modes,
@@ -207,6 +211,16 @@ fn distinct_lines<'a>(values: impl IntoIterator<Item = &'a str>) -> bool {
 fn validate(program: &ProgramFile) -> Result<(), &'static str> {
     if !line(&program.name) || !line(&program.line) {
         return Err("name and line must each be nonempty plain text on one line");
+    }
+    let expected_command = match program.description.rendering_contract.as_str() {
+        "claude-code/template-v1" => Some("claude"),
+        "codex/template-v1" => Some("codex"),
+        _ => None,
+    };
+    if !matches!(program.command.as_str(), "claude" | "codex")
+        || expected_command.is_some_and(|command| command != program.command)
+    {
+        return Err("command must be the standard command matching the rendering contract");
     }
     if program.models.is_empty()
         || !distinct_lines(program.models.iter().map(|model| model.id.as_str()))
