@@ -173,4 +173,19 @@ describe('The route-backed start form', () => {
     expect(posted).toEqual([]);
   });
 
+  it('does not advance a save receipt that changes the chosen model', async () => {
+    const { posted } = await open({ ...routes(), ['POST ' + path]: (body) => {
+      const draft = body as Record<string, unknown>;
+      return ok({ ...answer({ ...draft, version: 1, model_access: ['different-model'] }), recorded: { operation: draft.operation, version: 1 } });
+    } });
+    await click(button());
+    expect(posted).toHaveLength(1);
+    expect(text()).toContain('ProfileReceiptMismatch');
+  });
+  it('does not rewrite an unchanged profile after capabilities begin listing prompt modes', async () => {
+    const { posted } = await open({ ...routes({ ...profile, instructions_mode: 'append' }), '/harnesses': ok({ programs: [{ ...program, instructions_modes: ['keep', 'append', 'replace'] }] }) });
+    await click(button());
+    expect(posted.map((entry) => entry.path)).toEqual([start]);
+  });
+
 });

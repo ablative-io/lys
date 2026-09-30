@@ -22,6 +22,11 @@ function same(left: unknown, right: unknown): boolean {
   const keys = Object.keys(left);
   return keys.length === Object.keys(right).length && keys.every((name) => Object.hasOwn(right, name) && same((left as Record<string, unknown>)[name], (right as Record<string, unknown>)[name]));
 }
+function setting(name: string, value: unknown): unknown {
+  return name === 'permissions' && value && typeof value === 'object'
+    ? { allow: [], deny: [], ask: [], additional_directories: [], ...value }
+    : value;
+}
 const fail = (name: string, words: string): never => { throw new Error(name + ': ' + words); };
 
 function permitted(machine: Machine, agent: string, held: string[]): boolean {
@@ -42,6 +47,7 @@ function retained(key: string, prefix: string): Pending | null {
   }
   if (value.stage === 'start' && value.body.machine !== value.machine) return fail('PendingStartUnreadable', 'The retained start names two different computers.');
   if (value.stage === 'profile' && value.body.from_version !== value.version) return fail('PendingStartUnreadable', 'The retained save names two different versions.');
+  if (value.legacyKey !== undefined && (typeof value.legacyKey !== 'string' || !['provisioning', 'profile-review', 'start'].some((kind) => value.legacyKey === key.replace('agent-start', kind)))) return fail('PendingStartUnreadable', 'The retained request names an unrelated record.');
   return value as Pending;
 }
 
@@ -110,7 +116,7 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
       if (!current) {
         if (block) fail('StartUnavailable', block);
         if (!machines.some((entry) => entry.id === machine)) fail('MachineUnavailable', 'Choose a computer this agent may use.');
-        const changed = settings && (!profile?.harness || Object.entries(settings).some(([name, value]) => name !== 'note' && !same(value, profile[name as keyof ProvisioningProfile])));
+        const changed = settings && (!profile?.harness || Object.entries(settings).some(([name, value]) => name !== 'note' && !same(setting(name, value), setting(name, profile[name as keyof ProvisioningProfile]))));
         if (changed) {
           if (!canSave) fail('NotAdmitted', 'An administrator must save this agent’s settings.');
           if (profile && !('session' in profile)) fail('ProfileReadIncomplete', 'Update Lys before changing this profile; its saved session settings are not returned.');
@@ -137,6 +143,7 @@ function StartForm({ agent, person, machines, profile, settings, refusal, canSav
         if (current.stage === 'profile') {
           const version = current.version + 1;
           if (receipt.recorded.operation !== current.body.operation || receipt.recorded.version !== version || receipt.profile.version !== version || receipt.profile.operation !== current.body.operation) fail('ProfileReceiptMismatch', 'The saved version does not match this request, or a newer version replaced it.');
+          if (Object.entries(current.body).some(([name, value]) => !['operation', 'from_version', 'note'].includes(name) && !same(setting(name, value), setting(name, receipt.profile![name as keyof ProvisioningProfile])))) fail('ProfileReceiptMismatch', 'The saved settings differ from this retained request.');
           current = receipt.profile.reviewed_by ? nextStart(version, current.machine) : nextReview(version, current.machine);
         } else {
           if (receipt.recorded.version !== current.version || receipt.profile.version !== current.version || !receipt.profile.reviewed_by || !/^op-[0-9a-f]{32}$/.test(receipt.recorded.operation)) fail('ProfileReceiptMismatch', 'The review did not confirm the current profile version.');
