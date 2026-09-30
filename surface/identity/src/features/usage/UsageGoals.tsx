@@ -32,7 +32,7 @@ function SetGoal({ agent, changed }: { agent: string; changed: (words: string) =
   };
   return <form aria-label="Set a goal" onSubmit={(event) => { event.preventDefault(); submit(); }}><h4>Set a goal</h4>
     <label className="field">Kind<select value={kind} disabled={change.blocked} onChange={(event) => setKind(event.target.value as GoalKind)}><option value="goal">Goal</option><option value="expectation">Expectation</option><option value="deliverable">Deliverable</option></select></label>
-    <label className="field">What<input name="words" value={words} required maxLength={500} disabled={change.blocked} onChange={(event) => setWords(event.target.value)} /></label>
+    <label className="field usage-what">What<textarea name="words" rows={4} value={words} required maxLength={500} disabled={change.blocked} onChange={(event) => setWords(event.target.value)} /></label>
     <label className="field">Deadline<input name="deadline" type="datetime-local" required value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></label>
     {kind === 'deliverable' ? <label className="field">Proved by<select value={evidence} disabled={change.blocked} onChange={(event) => setEvidence(event.target.value as 'commit' | 'document' | 'check')}><option value="commit">A landed commit</option><option value="document">A document</option><option value="check">A passing check</option></select></label> : null}
     <button className="btn primary" type="submit" disabled={change.blocked || !words.trim() || !deadline}>Set goal</button><ChangeStatus change={change} />

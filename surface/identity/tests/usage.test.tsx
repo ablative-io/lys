@@ -10,6 +10,7 @@ const budgets = '/budgets/agent/' + SCRIBE;
 const usage = '/agents/' + SCRIBE + '/usage';
 const goals = '/agents/' + SCRIBE + '/goals';
 const holder = { kind: 'agent' as const, id: SCRIBE };
+const file = '#/file/' + SCRIBE + '/budgets';
 
 /** A service that keeps the budgets and goals it is given, as the identity service does. */
 function keeping(receipts: Receipt[] = [], reported: number | null = 1790000000000): Record<string, Route> {
@@ -36,10 +37,11 @@ function keeping(receipts: Receipt[] = [], reported: number | null = 17900000000
 }
 
 async function type(selector: string, value: string): Promise<void> {
-  const input = document.querySelector<HTMLInputElement>(selector);
+  const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector);
   if (!input) throw new Error('no ' + selector);
+  const kind = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    Object.getOwnPropertyDescriptor(kind.prototype, 'value')?.set?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
@@ -51,7 +53,7 @@ async function submit(form: string): Promise<void> {
 async function reload(routes: Record<string, Route>): Promise<void> {
   unmountAll();
   document.body.innerHTML = '';
-  await mount('#/usage/' + SCRIBE, routes);
+  await mount(file, routes);
 }
 
 const reached = (stands: Receipt['acted']): Receipt[] => [{
@@ -62,10 +64,25 @@ const reached = (stands: Receipt['acted']): Receipt[] => [{
 const tokens: Budget = { holder, measure: 'tokens', limit: 1000, period: { length: 'day', zone: 'UTC' }, act: 'stop', version: 1, by: SCRIBE, at: 1790000000 };
 
 describe('Usage', () => {
-  it('changes a budget from the navigable screen and keeps it across a reload', async () => {
+  it('lives on the agent\'s own file: the old address opens its Budgets and goals tab, and the rail has no Usage page', async () => {
+    await mount('#/usage/' + SCRIBE, keeping());
+    expect(location.hash).toBe(file);
+    expect($('.tabs a.on')?.textContent).toBe('Budgets and goals');
+    expect($('section[aria-label="Budgets"]')).not.toBeNull();
+    expect($('section[aria-label="Goals"]')).not.toBeNull();
+    expect($('a[href="#/usage"]')).toBeNull();
+  });
+
+  it('gives a goal a box several lines tall', async () => {
+    await mount(file, keeping());
+    const what = $('form[aria-label="Set a goal"] textarea[name="words"]') as HTMLTextAreaElement | null;
+    expect(what?.rows).toBeGreaterThanOrEqual(4);
+    expect(what?.maxLength).toBe(500);
+  });
+
+  it('changes a budget on the agent\'s own file and keeps it across a reload', async () => {
     const routes = keeping();
-    const { requests } = await mount('#/usage', routes);
-    await click($('a[href="#/usage/' + SCRIBE + '"]'));
+    const { requests } = await mount(file, routes);
     await choose($('form[aria-label="Set a budget"] select'), 'tokens');
     await type('input[name="limit"]', '5000');
     await submit('Set a budget');
@@ -77,8 +94,8 @@ describe('Usage', () => {
 
   it('keeps a goal entered in the screen across a reload', async () => {
     const routes = keeping();
-    await mount('#/usage/' + SCRIBE, routes);
-    await type('input[name="words"]', 'Land the Usage screen');
+    await mount(file, routes);
+    await type('textarea[name="words"]', 'Land the Usage screen');
     await type('input[name="deadline"]', '2026-10-01T12:00');
     await submit('Set a goal');
     await reload(routes);
@@ -87,25 +104,25 @@ describe('Usage', () => {
   });
 
   it('says in plain words that a budget was reached and its act confirmed', async () => {
-    await mount('#/usage/' + SCRIBE, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
     expect(text()).toContain('Reached at 1200. Its act was confirmed: end the session.');
   });
 
   it('never shows an uncertain act as confirmed', async () => {
-    await mount('#/usage/' + SCRIBE, { ...keeping(reached({ stands: 'uncertain', words: 'runner restarted', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached({ stands: 'uncertain', words: 'runner restarted', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
     expect(text()).toContain('cannot be known');
     expect(text()).not.toContain('confirmed:');
   });
 
   it('shows no values to a caller who may not read them', async () => {
-    await mount('#/usage/' + SCRIBE, { ...keeping(), [budgets]: refused(403, 'not_permitted', 'you are not responsible for this agent') });
+    await mount(file, { ...keeping(), [budgets]: refused(403, 'not_permitted', 'you are not responsible for this agent') });
     expect(text()).toContain('not_permitted');
     expect($('section[aria-label="Budgets"]')).toBeNull();
   });
 
   it('keeps nothing a caller may not change, and names the refusal', async () => {
     const routes = { ...keeping(), ['PUT ' + budgets]: refused(403, 'not_permitted', 'you are not responsible for this agent') };
-    await mount('#/usage/' + SCRIBE, routes);
+    await mount(file, routes);
     await type('input[name="limit"]', '5000');
     await submit('Set a budget');
     expect($('[role="alert"]')?.textContent).toContain('not_permitted');
@@ -114,12 +131,12 @@ describe('Usage', () => {
   });
 
   it('shows missing runner tracking as incomplete', async () => {
-    await mount('#/usage/' + SCRIBE, keeping([], null));
+    await mount(file, keeping([], null));
     expect(text()).toContain('Tracking is incomplete');
   });
 
   it('draws no analytics dashboard', async () => {
-    await mount('#/usage/' + SCRIBE, { ...keeping(reached(null)), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached(null)), [budgets]: ok({ holder, budgets: [tokens] }) });
     expect(document.querySelectorAll('section.usage svg, section.usage canvas')).toHaveLength(0);
   });
 });

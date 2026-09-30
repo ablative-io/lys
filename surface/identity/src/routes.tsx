@@ -21,7 +21,6 @@ import { Resources } from './features/access/Resources';
 import { AccountPage } from './features/people/Account';
 import { Apps } from './features/apps/Apps';
 import { RunningSessions } from './features/runtime/Sessions';
-import { Usage } from './features/usage/Usage';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
 
 /** Every screen and tab has its own address (conformance 9.1). */
@@ -43,7 +42,7 @@ export function AppRoutes() {
       <Route path="/vault" element={<SecretsPage />} />
       <Route path="/sessions" element={<Sessions />} />
       <Route path="/runtime/:session?" element={<RunningSessions />} />
-      <Route path="/usage/:agent?" element={<Usage />} />
+      <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/runtime/canvas" element={<SessionCanvas />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
@@ -57,6 +56,12 @@ export function AppRoutes() {
       <Route path="*" element={<People />} />
     </Routes>
   );
+}
+
+/** An agent's budgets and goals are its own settings, on its file. */
+function UsageMoved() {
+  const { agent } = useParams();
+  return <Navigate replace to={agent ? '/file/' + encodeURIComponent(agent) + '/budgets' : '/people'} />;
 }
 
 /** An agent has one start, first on its settings page (#117). */

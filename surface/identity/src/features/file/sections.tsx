@@ -1,4 +1,5 @@
 import { PersonalBudgets } from './PersonalBudgets';
+import { AgentUsage } from '../usage/Usage';
 import { AgentCertificates } from './AgentCertificates';
 import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
@@ -189,7 +190,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
   const person = data.x.kind === 'person';
   switch (tab) {
     case 'budgets':
-      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <a className="btn" href={'#/usage/' + encodeURIComponent(data.x.id)}>Open agent usage and budgets</a>;
+      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <section className="usage"><AgentUsage key={data.x.id} agent={data.x.id} /></section>;
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
