@@ -97,6 +97,7 @@ pub fn document() -> Result<Value, ServerError> {
             ),
         })?;
     crate::message_edges::document_query(&mut document)?;
+    crate::list_page::document_query(&mut document)?;
     Ok(document)
 }
 

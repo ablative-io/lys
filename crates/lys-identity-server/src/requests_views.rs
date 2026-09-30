@@ -77,4 +77,7 @@ pub struct RequestView {
 pub struct RequestList {
     /// Every request the caller may see, in the order asked.
     pub requests: Vec<RequestView>,
+    /// Counters and continuation, absent when no query was supplied.
+    #[serde(flatten)]
+    pub page: Option<crate::list_page::Totals>,
 }

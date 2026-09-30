@@ -75,6 +75,9 @@ pub struct NetworkView {
     /// Whether this service keeps runtime reports. While it does not, no
     /// machine has a last report.
     pub reports_served: bool,
+    /// Counters and continuation, absent when no query was supplied.
+    #[serde(flatten)]
+    pub page: Option<crate::list_page::Totals>,
 }
 
 /// A machine to name. Every member is required; `runtime` may be null.
@@ -185,19 +188,29 @@ fn view(directory: &Projection, machine: &Machine, last_report_at: Option<u64>) 
 async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    query: crate::list_page::Input,
 ) -> Result<Json<NetworkView>, ServerError> {
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         caller(&state, &headers, directory)?;
+        let page = crate::list_page::Page::read(query, "/network")?;
         let last = last_reports(&state)?;
         with_network(&state, |store| {
+            let mut machines: Vec<_> = store
+                .machines()
+                .iter()
+                .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
+                .collect();
+            let totals = if let Some(page) = &page {
+                machines.retain(|machine| page.matches([machine.name.as_str()]));
+                Some(page.finish(&mut machines, |machine| &machine.id)?)
+            } else {
+                None
+            };
             Ok(Json(NetworkView {
-                machines: store
-                    .machines()
-                    .iter()
-                    .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
-                    .collect(),
+                machines,
                 reports_served: state.runtime.is_some(),
+                page: totals,
             }))
         })
     })

@@ -108,6 +108,12 @@ pub struct PeopleView {
     pub scope: String,
     /// The people the scope shows, each with their agents.
     pub people: Vec<PersonView>,
+    /// Counters and continuation, absent when no query was supplied.
+    #[serde(flatten)]
+    pub page: Option<crate::list_page::Totals>,
+    /// Every agent of the matching people before paging, absent without a query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agents_total: Option<usize>,
 }
 
 /// Where an agent's record came from.

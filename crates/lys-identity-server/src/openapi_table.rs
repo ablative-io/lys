@@ -59,9 +59,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
-    GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson"]];
+    GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]];
-    GET "/directory/people" "Every person, for the administrator" S [ADMIN];
+    GET "/directory/people" "Every person, for the administrator" S [ADMIN, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
     POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly"]];
@@ -85,7 +85,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/roles/{id}/holders" "Assign a role" S [ADMIN_BODY, &["HolderUnknown"], &["RoleHeld", "RoleUnknown"]];
     POST "/roles/{id}/holders/{holder}/move" "Move a holding" S [ADMIN_BODY, &["HoldingOver", "RoleVersionUnknown"], &["HolderUnknown", "HoldingChanged"]];
     POST "/roles/{id}/holders/{holder}/end" "End a holding" S [ADMIN_BODY];
-    GET "/requests" "The access requests" S [SIGNED, &["NoPerson", "NotAdmitted"]];
+    GET "/requests" "The access requests" S [SIGNED, &["NoPerson", "NotAdmitted", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     POST "/requests" "Ask for access" S [SIGNED_BODY, &["RelationUnknown"], &["NoPerson", "NotAdmitted", "RequestReused"]];
     POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown"]];
     POST "/requests/{id}/decline" "Decline an access request" S [SIGNED_BODY, &["RequestDecided", "RequestUnknown"], &["NotAdmitted"]];
@@ -95,7 +95,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY, &["ProviderRefused"]];
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
-    GET "/network" "The machines" S [SIGNED];
+    GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]];
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
@@ -128,7 +128,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runtime/sessions/{id}/compact" "Compact a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/end" "End a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted"]];
     POST "/agents/{id}/wake" "Wake an agent's live session" S [SIGNED_BODY, &["AgentNotVisible", "not_permitted", "no_live_session"]];
-    GET "/runtime/live" "The sessions still running" S [SIGNED];
+    GET "/runtime/live" "The sessions still running" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "AgentNotVisible", "IdentifierMalformed", "RuntimeSessionUnknown"]];
     GET "/network/machines/{id}/runner" "A machine's runner" S [SIGNED, &["MachineUnknown"]];
     POST "/network/machines/{id}/runner" "Name a machine's runner" S [ADMIN_BODY, &["MachineUnknown"]];
     GET "/runner/protocol" "The runner protocol" P [];

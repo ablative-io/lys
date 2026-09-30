@@ -141,9 +141,19 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         ),
         (POST, "/people/{id}/logins", Some(bound), Some(receipt)),
         (GET, "/me", None, Some(api.schema::<MeView>())),
-        (GET, "/people", None, Some(people.clone())),
+        (
+            GET,
+            "/people",
+            Some(api.schema::<crate::list_page::ListQuery>()),
+            Some(people.clone()),
+        ),
         (GET, "/agents/{id}", None, Some(agent.clone())),
-        (GET, "/directory/people", None, Some(people)),
+        (
+            GET,
+            "/directory/people",
+            Some(api.schema::<crate::list_page::ListQuery>()),
+            Some(people),
+        ),
         (GET, "/directory/agents/{id}", None, Some(agent)),
     ]
 }
@@ -247,7 +257,12 @@ fn roles_and_requests(api: &mut Api) -> Vec<Entry> {
             Some(end),
             Some(role),
         ),
-        (GET, "/requests", None, Some(api.schema::<RequestList>())),
+        (
+            GET,
+            "/requests",
+            Some(api.schema::<crate::list_page::ListQuery>()),
+            Some(api.schema::<RequestList>()),
+        ),
         (POST, "/requests", Some(ask), Some(request.clone())),
         (
             POST,
@@ -309,7 +324,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(asked),
             Some(api.schema::<LinkAuditPerson>()),
         ),
-        (GET, "/network", None, Some(api.schema::<NetworkView>())),
+        (
+            GET,
+            "/network",
+            Some(api.schema::<crate::list_page::ListQuery>()),
+            Some(api.schema::<NetworkView>()),
+        ),
         (
             POST,
             "/network/machines",
