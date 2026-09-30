@@ -24,7 +24,7 @@ describe('Certificate mutations', () => {
     const first = await mount('#/file/' + SCRIBE + '/certificate', { ...routes, ['POST ' + path]: refused(503, 'CertificatesUnavailable', 'Unknown outcome') });
     await input('form[aria-label="Issue capability certificate"] textarea', 'AQID'); await click(button('Issue certificate')); unmountAll(); document.body.innerHTML = '';
     const next = await mount('#/file/' + SCRIBE + '/certificate', { ...routes, ['POST ' + path]: (body) => { const asked = body as Record<string, unknown>; return ok({ ...view, recorded: asked.operation, certificates: [{ ...certificate, serial: asked.operation }] }); } });
-    await click(button('Check original change')); expect(next.posted).toEqual(first.posted);
+    await click(button('Check whether Lys saved it')); expect(next.posted).toEqual(first.posted);
   });
   it('requires a reason and confirms withdrawal separately from grants', async () => {
     const withdrawalPath = path + '/' + certificate.serial + '/withdrawal';
