@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
 use serde_json::{Value, json};
@@ -92,6 +92,41 @@ async fn the_tree_requires_authentication() -> TestResult {
     let (status, answer) = service.get("/tree", None).await?;
     assert_eq!(status, 401, "{answer}");
     assert_eq!(answer["refusal"], "NotSignedIn");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_owned_team_tree_names_the_missing_roles_configuration() -> TestResult {
+    let (service, ()) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.roles_file = None,
+        |config| {
+            seed_configured(config, [ADMINISTRATOR, "another-subject"])?;
+            Ok(())
+        },
+    )
+    .await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    post(
+        &service,
+        &cookie,
+        "/teams",
+        json!({"operation": operation()?, "name": "owned team"}),
+    )
+    .await?;
+    let (status, answer) = service.get("/tree", Some(&cookie)).await?;
+    assert_eq!(status, 503, "{answer}");
+    assert_eq!(answer["refusal"], "RolesUnavailable");
+    assert!(
+        answer["reason"]
+            .as_str()
+            .ok_or("no refusal reason")?
+            .contains("the configuration names no roles_file"),
+        "{answer}"
+    );
     Ok(())
 }
 
