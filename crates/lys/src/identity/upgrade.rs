@@ -16,6 +16,10 @@
 //! new ones placed; the screens kept in `surface.previous/` and the new ones
 //! placed; the compose services brought to a changed definition; and the
 //! broker and then the service started, each waited on for ready.
+//! The runner participates in the same placement and rollback. Its Status
+//! is read before recovery and again before stopping it: live sessions or
+//! an unreadable Status refuse the upgrade. Its replacement must say it
+//! listens and answer Status while still holding its own exit lock.
 //!
 //! Invariants: nothing is stopped until every input has been read, checked
 //! and rendered. When a step, a start or a readiness fails, what was started
@@ -44,6 +48,7 @@ use crate::commands::output::Emitter;
 pub mod adopt;
 pub mod intent;
 pub mod render;
+mod runner;
 pub mod swap;
 
 use intent::Intent;
@@ -151,7 +156,7 @@ impl Engine for Compose {
 
 /// What an upgrade works with besides its inputs.
 pub struct Parts<'a> {
-    /// Runner executable to ensure after swapping; absent for service-only fixtures.
+    /// Runner executable in the incoming build; absent for service-only fixtures.
     pub runner: Option<&'a Path>,
     /// The broker and the service, in start order.
     pub units: &'a [Unit],
@@ -352,18 +357,38 @@ pub fn upgrade(
     parts: &mut Parts<'_>,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
-    swap::recover(layout, parts.units, parts.engine, say)?;
-    let names: Vec<&'static str> = parts.units.iter().map(|unit| unit.binary).collect();
+    let mut restart = parts
+        .runner
+        .map(|_| runner::Restart::prepare(layout))
+        .transpose()?;
+    if let Some(restart) = &mut restart {
+        swap::recover_with_runner(layout, parts.units, parts.engine, restart, say)?;
+    } else {
+        swap::recover(layout, parts.units, parts.engine, say)?;
+    }
+    let mut all_units = parts.units.to_vec();
+    if let Some(restart) = &restart {
+        all_units.push(restart.unit.clone());
+    }
+    let names: Vec<&'static str> = all_units.iter().map(|unit| unit.binary).collect();
     require_install(layout)?;
     let to = incoming(from, &names)?;
-    if let Some(runner) = parts.runner {
-        version(runner, "lys")?;
+    if let Some(program) = parts.runner
+        && program != from.join("lys")
+    {
+        return Err(refuse(
+            ErrorKind::VersionUnreadable,
+            "find new binary",
+            "lys",
+            "the runner must come from the incoming build",
+        )
+        .at(program));
     }
     if let Some(package) = package {
         let (manifest, _) = surface::verify(package)?;
         say(&format!("screens: new {}", manifest.commit));
     }
-    let installed = adopt::installed(layout, parts.units, say)?;
+    let installed = adopt::installed(layout, &all_units, say)?;
     for (name, new) in &to {
         let old = installed.get(name).map_or(adopt::UNSTAMPED, String::as_str);
         say(&format!("{name}: installed {old}, new {new}"));
@@ -396,17 +421,15 @@ pub fn upgrade(
         package,
         files: &files,
     };
-    let result = swap::forward(layout, &plan, &mut intent, parts.units, parts.engine, say)
-        .and_then(|()| {
-            if let Some(program) = parts.runner {
-                let key = std::sync::Arc::new(
-                    install::service_key(layout).map_err(|error| error.to_string())?,
-                );
-                install::start_runner(layout, &key, program, say)
-                    .map_err(|error| error.to_string())?;
-            }
-            Ok(())
-        });
+    let result = swap::forward(
+        layout,
+        &plan,
+        &mut intent,
+        parts.units,
+        parts.engine,
+        restart.as_mut(),
+        say,
+    );
     let Err(failure) = result else {
         let record = record_build(layout, &names, say)?;
         Intent::clear(layout)?;
@@ -414,7 +437,14 @@ pub fn upgrade(
     };
     say(&format!("upgrade failed: {failure}"));
     say("putting the previous build back");
-    if let Err(again) = swap::back(layout, &intent, parts.units, parts.engine, say) {
+    if let Err(again) = swap::back(
+        layout,
+        &intent,
+        parts.units,
+        parts.engine,
+        restart.as_mut(),
+        say,
+    ) {
         return Err(refuse(
             ErrorKind::UpgradeFailed,
             "upgrade",

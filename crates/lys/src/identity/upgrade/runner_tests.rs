@@ -24,6 +24,13 @@ struct Running {
     scratch: Scratch,
     key: Arc<Ed25519Identity>,
 }
+#[derive(serde::Deserialize)]
+struct FixtureUnit {
+    binary: String,
+    args: Vec<String>,
+    log: PathBuf,
+    pid: PathBuf,
+}
 
 impl Running {
     fn new() -> TestResult<Self> {
@@ -344,13 +351,6 @@ fn upgrade_command_child() -> TestResult {
     let Some(root) = std::env::var_os("LYS_UPGRADE_TEST_ROOT") else {
         return Ok(());
     };
-    #[derive(serde::Deserialize)]
-    struct FixtureUnit {
-        binary: String,
-        args: Vec<String>,
-        log: PathBuf,
-        pid: PathBuf,
-    }
     let from = PathBuf::from(std::env::var_os("LYS_UPGRADE_TEST_FROM").ok_or("missing build")?);
     let file = std::env::var_os("LYS_UPGRADE_TEST_UNITS").ok_or("missing units")?;
     let fixture: Vec<FixtureUnit> = serde_json::from_slice(&std::fs::read(file)?)?;
