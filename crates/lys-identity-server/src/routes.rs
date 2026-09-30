@@ -13,7 +13,8 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
 use axum::{Json, Router};
 use lys_identity::{
-    Actor, AgentId, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile, Transition,
+    Actor, AgentId, Directory, IdentityError, IdentityId, LifecycleState, LoginBinding,
+    OperationId, PersonId, Profile, Transition,
 };
 use lys_log_store::FileLeafStore;
 use serde::Deserialize;
@@ -226,6 +227,45 @@ pub(crate) struct Named {
     display_name: String,
 }
 
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = AgentRegistrationBody)]
+pub(crate) struct AgentRegistration {
+    operation: String,
+    display_name: String,
+    #[serde(default)]
+    answers_to: Option<String>,
+}
+
+fn registration_person(
+    projection: &lys_identity::projection::Projection,
+    own: PersonId,
+    requested: Option<&str>,
+    may_choose: bool,
+) -> Result<PersonId, ServerError> {
+    let responsible = requested
+        .map(PersonId::from_str)
+        .transpose()?
+        .unwrap_or(own);
+    if responsible != own && !may_choose {
+        return Err(ServerError::NotAdmitted {
+            reason: "only an administrator may register an agent under another person",
+        });
+    }
+    let record = projection
+        .record(IdentityId::Person(responsible))
+        .ok_or_else(|| IdentityError::IdentityUnknown {
+            identity: responsible.to_string(),
+        })?;
+    if record.state() != LifecycleState::Active {
+        return Err(ServerError::Inactive {
+            identity: responsible.to_string(),
+            state: record.state(),
+        });
+    }
+    Ok(responsible)
+}
+
 fn operation(text: &str) -> Result<OperationId, ServerError> {
     OperationId::from_str(text).map_err(ServerError::from)
 }
@@ -253,18 +293,27 @@ pub(crate) async fn register_person(
 pub(crate) async fn register_agent(
     State(state): State<Shared>,
     headers: HeaderMap,
-    Json(body): Json<Named>,
+    Json(body): Json<AgentRegistration>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
     if !headers.contains_key(axum::http::header::AUTHORIZATION) {
         let actor = signed_in(&state, &headers)?;
-        state.admission.administrator(&actor)?;
+        let administrator = state.admission.administrator(&actor).is_ok();
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
         );
         return with_directory(&state, |directory| {
-            let responsible = directory.projection()?.person_for(actor.binding())
-                .ok_or(ServerError::NotAdmitted { reason: "the administrator's login is bound to no person, so no agent can be registered under them" })?;
+            let projection = directory.projection()?;
+            let own = match crate::caller_admission::active_caller(projection, &actor)? {
+                IdentityId::Person(person) => person,
+                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => {
+                    return Err(ServerError::NotAdmitted {
+                        reason: "an agent registration requires a person or an admitted service account",
+                    });
+                }
+            };
+            let responsible =
+                registration_person(projection, own, body.answers_to.as_deref(), administrator)?;
             let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
             Ok(Json(AgentRegistered {
                 agent: id.to_string(),
@@ -281,6 +330,12 @@ pub(crate) async fn register_agent(
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         crate::service_account_grants::admit(&mut judged, caller, "agents")?;
         let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
+        let responsible = registration_person(
+            directory.projection()?,
+            responsible,
+            body.answers_to.as_deref(),
+            false,
+        )?;
         let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
         Ok(Json(AgentRegistered {
             agent: id.to_string(),
