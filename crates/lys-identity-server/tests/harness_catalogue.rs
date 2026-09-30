@@ -1,4 +1,4 @@
-//! Programme choices exist before profiles, and builds come only from reviewed versions.
+//! Programme choices include installed copies before any reviewed profile exists.
 
 use std::error::Error;
 
@@ -110,6 +110,50 @@ fn expected() -> Result<Value, Box<dyn Error>> {
     Ok(json!({ "programs": programs }))
 }
 
+fn reviewed_view(mut answer: Value) -> Result<Value, Box<dyn Error>> {
+    for program in answer["programs"]
+        .as_array_mut()
+        .ok_or("programs is not an array")?
+    {
+        if let Some(reason) = program.get("not_found") {
+            assert!(!reason.as_str().ok_or("not_found is not text")?.is_empty());
+        }
+        program
+            .as_object_mut()
+            .ok_or("program is not an object")?
+            .remove("not_found");
+        let builds = program["builds"]
+            .as_array_mut()
+            .ok_or("builds is not an array")?;
+        let mut installed = 0;
+        for (index, build) in builds.iter().enumerate() {
+            if build["from"] == "installed" {
+                installed += 1;
+                assert_eq!(index, 0);
+                assert!(
+                    std::path::Path::new(
+                        build["program"]
+                            .as_str()
+                            .ok_or("program path is not text")?
+                    )
+                    .is_absolute()
+                );
+                assert!(
+                    !build["package"]
+                        .as_str()
+                        .ok_or("package is not text")?
+                        .is_empty()
+                );
+            } else {
+                assert_eq!(build["from"], "profile");
+            }
+        }
+        assert!(installed <= 1);
+        builds.retain(|build| build["from"] == "profile");
+    }
+    Ok(answer)
+}
+
 async fn table() -> Result<(Service, Seeded, String), Box<dyn Error>> {
     let (service, seeded) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
@@ -131,7 +175,7 @@ async fn a_fresh_install_answers_named_models_modes_and_descriptions() -> TestRe
     assert!(profile["profile"].is_null());
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
     assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer, expected()?);
+    assert_eq!(reviewed_view(answer.clone())?, expected()?);
     assert_eq!(answer["programs"][0]["name"], "Claude Code");
     assert_eq!(answer["programs"][0]["models"][0]["id"], "default");
     assert_eq!(
@@ -164,7 +208,7 @@ async fn descriptions_exist_without_a_configured_profile_store() -> TestResult {
         .await?;
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
     assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer, expected()?);
+    assert_eq!(reviewed_view(answer.clone())?, expected()?);
     Ok(())
 }
 
@@ -208,7 +252,7 @@ async fn codex_is_offered_with_all_native_instruction_modes() -> TestResult {
     drop(seeded);
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
     assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer, expected()?);
+    assert_eq!(reviewed_view(answer.clone())?, expected()?);
     assert!(
         answer["programs"]
             .as_array()
@@ -349,7 +393,7 @@ async fn reviewed_builds_are_grouped_by_contract_and_unreviewed_builds_are_absen
     }
     let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
     assert_eq!(status, 200, "{answer}");
-    assert_eq!(answer, wanted);
+    assert_eq!(reviewed_view(answer)?, wanted);
     Ok(())
 }
 
@@ -391,9 +435,7 @@ fn a_command_on_an_injected_path_is_offered_without_any_profile() -> TestResult 
     assert_eq!(value["programs"][0]["builds"][0]["from"], "installed");
     assert_eq!(
         value["programs"][0]["builds"][0]["program"],
-        directory
-            .path()
-            .join("claude")
+        std::fs::canonicalize(directory.path().join("claude"))?
             .to_str()
             .ok_or("path is not UTF-8")?
     );
@@ -486,5 +528,17 @@ fn a_relative_path_entry_is_refused_without_running_a_copy() -> TestResult {
             .ok_or("missing reason")?
             .contains("UnsafeSearchPath")
     );
+    Ok(())
+}
+
+#[test]
+fn a_copy_installed_after_a_missing_read_is_discovered() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let catalogue = discovery_catalogue()?;
+    let missing = serde_json::to_value(catalogue.installed_in(directory.path().as_os_str())?)?;
+    assert_eq!(missing["programs"][0]["builds"], json!([]));
+    fake_command(directory.path(), "printf 'new-version\\n'")?;
+    let found = serde_json::to_value(catalogue.installed_in(directory.path().as_os_str())?)?;
+    assert_eq!(found["programs"][0]["builds"][0]["package"], "new-version");
     Ok(())
 }
