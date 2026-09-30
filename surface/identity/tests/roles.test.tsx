@@ -41,22 +41,22 @@ describe('Roles', () => {
     await click(button('Create a role')); fillRole(); await submit('Create role');
     expect(posted).toHaveLength(1);
     expect(posted[0]).toMatchObject({ path: '/roles', body: { name: 'Release reviewer', responsibilities: words.responsibilities, goals: words.goals, practice: words.practice, profile: '', grant_templates: [], note: 'Create reviewer' } });
-    expect(text()).toContain('Change recorded.');
+    expect(text()).toContain('Lys saved the role change.');
   });
   it('keeps an unknown creation under the exact operation across remount', async () => {
     const first = await mount('#/roles', { ...routes, 'POST /roles': refused(503, 'RolesUnavailable', 'write outcome unknown') });
     await click(button('Create a role')); fillRole(); await submit('Create role');
     unmountAll(); document.body.innerHTML = '';
     const second = await mount('#/roles', { ...routes, 'POST /roles': (body) => ok(created(body)) });
-    await click(button('Create a role')); await click(button('Check original change'));
-    expect(second.posted).toEqual(first.posted); expect(text()).toContain('Change recorded.');
+    await click(button('Create a role')); await click(button('Check whether Lys saved it'));
+    expect(second.posted).toEqual(first.posted); expect(text()).toContain('Lys saved the role change.');
   });
   it('publishes a new version without changing existing holders', async () => {
     const path = '/roles/' + role.id + '/versions';
     const { posted } = await mount('#/roles/' + role.id, { ...routes, ['POST ' + path]: (body) => ok({ ...role, latest: 3, versions: [...role.versions, { ...(body as RoleWords), number: 3, made_by: ADA, made_at: 1790000002 }] }) });
     await click(button('New version')); input('responsibilities', 'Review signed releases'); input('note', 'Add signatures'); await submit('Publish role version');
     expect(posted).toHaveLength(1); expect(posted[0].path).toBe(path);
-    expect(text()).toContain('Change recorded.');
+    expect(text()).toContain('Lys saved the role change.');
   });
   it('assigns an identity with explicit expiry and checks the returned assignment operation', async () => {
     const path = '/roles/' + role.id + '/holders';
@@ -65,7 +65,7 @@ describe('Roles', () => {
       return ok({ ...role, holders: [{ ...holder, assignment: value.operation, holder: value.holder, ends_at: value.ends_at }] });
     } });
     await choose($('select[name="holder"]'), SCRIBE); await click($('form[aria-label="Assign role"] input[type="checkbox"]')); await submit('Assign role');
-    expect(posted[0]).toMatchObject({ path, body: { holder: SCRIBE, ends_at: null } }); expect(text()).toContain('Change recorded.');
+    expect(posted[0]).toMatchObject({ path, body: { holder: SCRIBE, ends_at: null } }); expect(text()).toContain('Lys saved the role change.');
   });
   it('reviews the change and fences a move to the exact assignment and previous version', async () => {
     const path = '/roles/' + role.id + '/holders/' + SCRIBE + '/move';
@@ -74,7 +74,7 @@ describe('Roles', () => {
     expect(text()).toContain('Review changes'); expect(text()).toContain('Review code and docs'); expect(text()).toContain('Existing grants are not changed');
     await click(button('Apply version 2'));
     expect(posted).toEqual([{ path, body: { assignment: holder.assignment, from_version: 1, to_version: 2 } }]);
-    expect(text()).toContain('Change recorded.');
+    expect(text()).toContain('Lys saved the role change.');
   });
   it('confirms ending the exact assignment without retiring the person or revoking grants', async () => {
     const path = '/roles/' + role.id + '/holders/' + SCRIBE + '/end';
