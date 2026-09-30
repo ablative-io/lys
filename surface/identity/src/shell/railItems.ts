@@ -3,7 +3,7 @@
 export type RailItem =
   | { t: 'sep' }
   | { t: 'grow' }
-  | { t: 'a' | 'button'; title: string; label: string; svg: string; href?: string; nav?: string; dock?: 'help' | 'assistant' | 'team'; id?: string; kbd?: string; cnt?: string };
+  | { t: 'a' | 'button'; title: string; label: string; svg: string; href?: string; nav?: string; dock?: 'help' | 'assistant'; id?: string; kbd?: string; cnt?: string };
 
 export const RAIL: RailItem[] = [
   {"t": "a", "title": "You (g u)", "label": "You", "svg": "<circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20c1-4 3.8-6 7-6s6 2 7 6\"/>", "href": "#/me", "nav": "me", "kbd": "g u"},

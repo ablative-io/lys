@@ -1,5 +1,7 @@
-/* The terminal is the screen: edge to edge, split like a multiplexer, one status bar at the foot. The tree of names lives in the dock. */
-.team-screen { height: 100%; display: flex; flex-direction: column; background: var(--surface-code); }
+/* The terminal is the screen: edge to edge, split like a multiplexer, one status bar at the foot. The tree of names is down the left. */
+.team-screen { height: 100%; display: grid; grid-template-columns: 200px minmax(0, 1fr); background: var(--surface-code); }
+.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.team-tree { overflow: auto; padding: 14px 10px 14px 16px; background: var(--surface-base); }
 .team-refused, .team-empty { margin: 0; padding: 26px 32px; }
 .team-panes { flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--border-default); }
 .team-panes[data-n="1"] { grid-template-columns: 1fr; }
@@ -26,10 +28,6 @@
 .team-bar .dot { margin: 0; }
 .team-bar-act { font: inherit; color: var(--text-muted); text-decoration: none; padding: 0 2px; }
 .team-bar-act:hover { color: var(--text-primary); }
-.team-dock { width: 240px; }
-.shell:has(.team-dock) .dock.open { width: 240px; }
-.team-dock .dock-body { padding: 14px 10px 14px 14px; }
-.team-dock-foot { display: flex; justify-content: flex-end; border-top: 0; padding: 6px 8px; }
 .tree-team { font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 12px 0 4px calc(var(--depth, 0) * 14px); white-space: nowrap; }
 .tree-root { padding-top: 0; color: var(--text-secondary); }
 .tree-line { display: flex; align-items: center; gap: 4px; padding-left: calc(var(--depth, 0) * 14px); }

@@ -3,7 +3,6 @@ import { CONCEPTS } from './concepts';
 import type { Concept } from './concepts';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
-import { TeamPanel } from '../features/team/TeamPanel';
 
 function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
   const shell = useShell();
@@ -97,7 +96,7 @@ export function Dock() {
   const shell = useShell();
   return (
     <aside className={'dock' + (shell.dockMode ? ' open' : '')} id="dock" aria-label="Help and assistant">
-      {shell.dockMode === 'help' ? <HelpPanel /> : shell.dockMode === 'assistant' ? <AssistantPanel /> : shell.dockMode === 'team' ? <TeamPanel /> : null}
+      {shell.dockMode === 'help' ? <HelpPanel /> : shell.dockMode === 'assistant' ? <AssistantPanel /> : null}
     </aside>
   );
 }

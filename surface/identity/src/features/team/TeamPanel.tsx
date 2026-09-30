@@ -1,7 +1,6 @@
-/** The dock's tree of names: you at the root, each team under its lead, each agent under its team. A name opens its terminal; the plus beside a running one opens it beside the terminals already open. */
+/** The tree of names down the left: you at the root, each team under its lead, each agent under its team. A name opens its terminal; the plus beside a running one opens it beside the terminals already open. */
 import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router';
-import { useShell } from '../../shell/ShellContext';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { Branch } from './tree';
@@ -31,20 +30,16 @@ function Branches({ branches, level, open, sessions }: { branches: Branch[]; lev
   </div>)}</>;
 }
 
-export function TeamPanel() {
-  const shell = useShell();
+export function TeamTree() {
   const { pathname, search } = useLocation();
-  const open = pathname.startsWith('/team') ? openAgents(pathname, search) : [];
+  const open = openAgents(pathname, search);
   const load = useWorld(0);
-  return <div className="dock-in team-dock">
-    <div className="dock-body">
-      {load.status === 'loading' ? null : load.status === 'refused'
-        ? <p className="why-not">{load.refused.status === 401 ? 'Sign in to Lys to see your agents.' : load.refused.refusal.reason}</p>
-        : <nav aria-label="Teams and agents">
-          <div className="tree-team tree-root">{load.data.tree.entry.display_name}</div>
-          <Branches branches={load.data.tree.branches} level={1} open={open} sessions={load.data.sessions} />
-        </nav>}
-    </div>
-    <div className="dock-foot team-dock-foot"><button className="icon-btn" title="Close" onClick={shell.closeDock}>×</button></div>
-  </div>;
+  return <nav className="team-tree" aria-label="Teams and agents">
+    {load.status === 'loading' ? null : load.status === 'refused'
+      ? <p className="why-not">{load.refused.status === 401 ? 'Sign in to Lys to see your agents.' : load.refused.refusal.reason}</p>
+      : <>
+        <div className="tree-team tree-root">{load.data.tree.entry.display_name}</div>
+        <Branches branches={load.data.tree.branches} level={1} open={open} sessions={load.data.sessions} />
+      </>}
+  </nav>;
 }
