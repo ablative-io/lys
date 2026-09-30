@@ -25,8 +25,10 @@ struct Table {
 
 impl Table {
     async fn start() -> Result<Self, Box<dyn Error>> {
-        let (service, seeded) =
-            Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+        let (service, seeded) = Service::start_with(|config| {
+            Ok(seed_configured(config, [ADMINISTRATOR, "another-subject"])?)
+        })
+        .await?;
         let cookie = service
             .sign_in(Login {
                 subject: ADMINISTRATOR.to_owned(),
@@ -175,7 +177,7 @@ async fn the_archived_writer_store_and_snapshot_read_as_top_level_without_a_lead
     let team = OperationId::generate()?.to_string();
     let old_team = team.clone();
     let (service, before) = Service::start_with(move |config| {
-        let seeded = seed_configured(config, [ADMINISTRATOR])?;
+        let seeded = seed_configured(config, [ADMINISTRATOR, "another-subject"])?;
         let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
         let path = config.teams_dir.as_deref().ok_or("no teams directory")?;
         let mut store = teams_store::TeamStore::open(path, Arc::clone(&key))?;

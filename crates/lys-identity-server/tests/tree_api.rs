@@ -84,8 +84,10 @@ async fn the_tree_shows_only_owned_teams_and_never_turns_people_into_members() -
 
 #[tokio::test]
 async fn the_tree_requires_authentication() -> TestResult {
-    let (service, seeded) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+    let (service, seeded) = Service::start_with(|config| {
+        Ok(seed_configured(config, [ADMINISTRATOR, "another-subject"])?)
+    })
+    .await?;
     assert_eq!(seeded.people.len(), 1);
     let (status, answer) = service.get("/tree", None).await?;
     assert_eq!(status, 401, "{answer}");
