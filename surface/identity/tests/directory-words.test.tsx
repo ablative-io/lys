@@ -76,7 +76,7 @@ describe('Directory words and write answers', () => {
     const world = await show(<ServiceAccounts />, { '/service-accounts': ok({ scope: 'personal', service_accounts: [account] }), ['POST /service-accounts/' + account.id + '/retire']: ok({ ...account, state: 'retired', retired_at: 1790000001 }) });
     expect(visibleWords()).toContain('Ada (test person)');
     expect(visibleWords()).not.toContain(ADA);
-    await click('Retire record'); await click('Confirm retirement');
+    await click('Retire this service account'); await click('Yes, retire Calendar');
     expect(world.posted).toHaveLength(1);
     expect(world.requests.filter((path) => path === '/service-accounts')).toHaveLength(1);
     expect(visibleWords()).toContain('retired');
@@ -88,7 +88,7 @@ describe('Directory words and write answers', () => {
     const requested = { ...effective, limit: 200, version: 2 };
     const context = { ...effective, measure: 'context_percent', limit: 80 };
     const world = await show(<PersonalBudgets id={ADA} name="Ada" />, { [path]: ok({ holder: effective.holder, budgets: [requested, context], unconfirmed: [{ requested, effective, reason: 'Waiting for confirmation' }, { requested: { ...context, version: 2 }, effective: context, reason: 'Waiting for confirmation' }] }), ['POST ' + path + '/confirm']: ok({ ...requested, version: 3 }) });
-    await click('Confirm requested tokens in a period');
+    await click('Apply the new limit of 200 tokens');
     expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
     expect(document.querySelector('[aria-label="Pending tokens"]')).toBeNull();
     expect(document.querySelector('[aria-label="Pending context_percent"]')).not.toBeNull();
@@ -127,7 +127,7 @@ describe('Directory words and write answers', () => {
     await show(<RecordedForm name="register-person" title="Register a person" done={() => undefined} change={(data) => ({ path: '/people', body: { display_name: String(data.get('display_name')) } })}><TextField name="display_name" label="Full name" /></RecordedForm>, { 'POST /people': refused(503, 'StorageUncertain', 'write outcome unknown') });
     await fill('input[name="display_name"]', 'New person');
     await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    expect(visibleWords()).toContain('Check original change');
+    expect(visibleWords()).toContain('Check whether Lys saved it');
     expect(visibleWords()).not.toContain('StorageUncertain');
     expect(visibleWords()).not.toMatch(/op-[0-9a-f]{32}/);
     expect(sessionStorage.getItem('lys.pending.register-person')).toContain('New person');
