@@ -10,25 +10,24 @@ type PersonalView = BudgetsView & { unconfirmed: Unconfirmed[] };
 
 export function PersonalBudgets({ id, name }: { id: string; name: string }) {
   const [revision, setRevision] = useState(0);
+  const [failure, setFailure] = useState('');
   const path = '/budgets/person/' + encodeURIComponent(id);
   return <section className="card" aria-label="Personal budgets">
     <h2>Budgets for {name}</h2>
     <p>These limits apply across this person’s agents. A requested change does not replace the enforced budget until an administrator confirms it.</p>
-    <PersonalBudgetRead key={id + ':' + revision} path={path} refresh={() => setRevision((value) => value + 1)} />
+    {failure ? <div role="alert"><p>{failure}</p><p>The budgets below were read again after this, so they show what is recorded now.</p></div> : null}
+    <PersonalBudgetRead key={id + ':' + revision} path={path} changed={(problem) => { setFailure(problem); setRevision((value) => value + 1); }} />
   </section>;
 }
 
-function PersonalBudgetRead({ path, refresh }: { path: string; refresh: () => void }) {
+function PersonalBudgetRead({ path, changed }: { path: string; changed: (problem: string) => void }) {
   const load = useLoad(async () => {
     const [view, people] = await Promise.all([request<PersonalView>(path), api.people()]);
     return { view, administrator: people.scope === 'directory' };
   }, path);
-  return <>
-    <Gate load={load} title="Personal budgets" ok={({ view, administrator }) =>
-      <BudgetReview path={path} view={view} administrator={administrator} refresh={refresh} />
-    } />
-    {load.status === 'refused' ? <button className="btn" onClick={refresh}>Read budgets again</button> : null}
-  </>;
+  return <Gate load={load} title="Personal budgets" ok={({ view, administrator }) =>
+    <BudgetReview path={path} view={view} administrator={administrator} changed={changed} />
+  } />;
 }
 
 function Details({ budget }: { budget: Budget }) {
@@ -40,19 +39,18 @@ function Details({ budget }: { budget: Budget }) {
   </dl>;
 }
 
-function BudgetReview({ path, view, administrator, refresh }: { path: string; view: PersonalView; administrator: boolean; refresh: () => void }) {
+function BudgetReview({ path, view, administrator, changed }: { path: string; view: PersonalView; administrator: boolean; changed: (problem: string) => void }) {
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
   const confirm = async (budget: Budget) => {
-    if (sending.current || failure) return;
+    if (sending.current) return;
     sending.current = true;
     setBusy(true);
     try {
       await request<Budget>(path + '/confirm', { measure: budget.measure, version: budget.version });
-      refresh();
+      changed('');
     } catch (error) {
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      changed(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     } finally {
       sending.current = false;
       setBusy(false);
@@ -71,10 +69,9 @@ function BudgetReview({ path, view, administrator, refresh }: { path: string; vi
         <section aria-label="Currently enforced"><h4>Currently enforced</h4><Details budget={effective} /></section>
         <section aria-label="Requested change"><h4>Requested change</h4><Details budget={requested} /></section>
       </div>
-      {administrator ? <button className="btn primary" disabled={busy || Boolean(failure)} onClick={() => void confirm(requested)}>Confirm requested {MEASURES[requested.measure].toLowerCase()}</button>
+      {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Confirm requested {MEASURES[requested.measure].toLowerCase()}</button>
         : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}
     </article>)}
     {busy ? <p role="status">Sending the confirmation; the stored result is not yet known.</p> : null}
-    {failure ? <div role="alert"><p>{failure}</p><p>Read the budgets again to check what was recorded before making another change.</p><button className="btn" onClick={refresh}>Read budgets again</button></div> : null}
   </>;
 }

@@ -1,5 +1,4 @@
 /** Saved emergency-stop outcomes are history, never a claim that a runtime has stopped. */
-import { useState } from 'react';
 import { Refused, request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 
@@ -49,10 +48,9 @@ function Identifiers({ values, empty }: { values: string[]; empty: string }) {
 }
 
 export function StopHistory({ id }: { id: string }) {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(async () => readStops(await request<unknown>('/agents/' + encodeURIComponent(id) + '/stops'), id), 'stop-history:' + id + ':' + revision);
+  const load = useLoad(async () => readStops(await request<unknown>('/agents/' + encodeURIComponent(id) + '/stops'), id), 'stop-history:' + id);
   return <section aria-label="Emergency-stop history">
-    <div className="head"><div><h2>Emergency-stop history</h2><p>Saved outcomes of earlier stops. These do not describe the agent’s current state.</p></div><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh stop history</button></div>
+    <div className="head"><div><h2>Emergency-stop history</h2><p>Saved outcomes of earlier stops. These do not describe the agent’s current state.</p></div></div>
     <Gate load={load} title="Emergency-stop history" ok={(stops) => stops.length ? stops.map((stop) => <article className="card" key={stop.operation}>
       <h3>{stop.done ? 'Stop recorded' : 'Stop requested — outcome not confirmed'}</h3><p>{stop.reason}</p>
       <dl className="facts">

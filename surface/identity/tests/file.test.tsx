@@ -35,7 +35,7 @@ describe("An agent's file", () => {
     expect(text()).toContain('the agent is suspended');
     expect(text()).toContain('Credential handles were not ended: SecretsUnavailable');
     expect(text()).toContain('stays unconfirmed until its runtime reports it stopped');
-    expect(text()).toContain('Refresh file');
+    expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
   });
 
   it('recovers an unanswered stop after the next read shows the agent suspended', async () => {
@@ -54,7 +54,7 @@ describe("An agent's file", () => {
     await click([...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Check original change') ?? null);
     expect(later.posted).toEqual(first.posted);
     expect(text()).toContain('Credential handles were not ended: Broker unavailable');
-    expect(text()).toContain('Refresh file');
+    expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.stop.' + SCRIBE)).toBeNull();
   });
 
