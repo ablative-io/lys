@@ -11,6 +11,9 @@ pub enum ServerError {
     /// A team refusal, preserving its status and response words.
     #[error(transparent)]
     Team(#[from] crate::error_team::TeamError),
+    /// A budget or organisation setting refusal, preserving its response.
+    #[error(transparent)]
+    Budget(#[from] crate::error_budget::BudgetError),
     /// A catalogue description could not be read before serving.
     #[error("harness_catalogue_unreadable: {file}: {reason}")]
     HarnessCatalogueUnreadable {
@@ -528,53 +531,6 @@ pub enum ServerError {
     ServiceAccountOwnerRetired {
         /// The person named.
         owner: String,
-    },
-    /// The budgets cannot be kept or read.
-    #[error("BudgetsUnavailable: {reason}")]
-    BudgetsUnavailable {
-        /// Why.
-        reason: String,
-    },
-    /// The organisation setting cannot be kept or read.
-    #[error("ConfigurationUnavailable: {reason}")]
-    ConfigurationUnavailable {
-        /// Why.
-        reason: String,
-    },
-    /// A zone changed after the administrator read it.
-    #[error(
-        "ConfigurationVersionConflict: the setting is at version {held}, not {expected}; read it again"
-    )]
-    ConfigurationVersionConflict {
-        /// The version held.
-        held: u64,
-        /// The version the caller read.
-        expected: u64,
-    },
-    /// A current stop limit prevents a fresh start before runner admission.
-    #[error("BudgetExhausted: {words}")]
-    BudgetExhausted {
-        /// The exhausted limit and its reported figure and reset.
-        words: String,
-    },
-    /// Another change to the budget came between the caller's read and its
-    /// change.
-    #[error(
-        "BudgetVersionConflict: the budget is at version {held}, not {expected}: read it again and send the change on the version read"
-    )]
-    BudgetVersionConflict {
-        /// The version held.
-        held: u64,
-        /// The version the caller read.
-        expected: u64,
-    },
-    /// A budget of the wrong shape, refused by name.
-    #[error("{refusal}: {words}")]
-    BudgetRefused {
-        /// The refusal's name.
-        refusal: &'static str,
-        /// Why, in words.
-        words: String,
     },
     /// The agent policies cannot be kept or read.
     #[error("PolicyUnavailable: {reason}")]

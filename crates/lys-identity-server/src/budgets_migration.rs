@@ -3,28 +3,31 @@
 
 use crate::budgets_api::with_budgets;
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 /// Whether budget migration must remain memory-only, with an unreadable intent refused.
 pub fn pending(state: &AppState) -> Result<bool, ServerError> {
-    crate::operator::upgrade_pending(state).map_err(|error| ServerError::BudgetsUnavailable {
-        reason: format!(
-            "budget migration cannot read upgrade intent {}: {error}",
-            state.operator_upgrade_file.as_deref().map_or_else(
-                || "(unmanaged)".to_owned(),
-                |path| path.display().to_string()
-            )
-        ),
+    crate::operator::upgrade_pending(state).map_err(|error| {
+        ServerError::Budget(BudgetError::BudgetsUnavailable {
+            reason: format!(
+                "budget migration cannot read upgrade intent {}: {error}",
+                state.operator_upgrade_file.as_deref().map_or_else(
+                    || "(unmanaged)".to_owned(),
+                    |path| path.display().to_string()
+                )
+            ),
+        })
     })
 }
 
 /// New-format confirmations are refused while the previous build may be restored.
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
-        return Err(ServerError::BudgetsUnavailable {
+        return Err(ServerError::Budget(BudgetError::BudgetsUnavailable {
             reason: "upgrade_pending: budget changes are refused while the upgrade is reversible"
                 .to_owned(),
-        });
+        }));
     }
     Ok(())
 }

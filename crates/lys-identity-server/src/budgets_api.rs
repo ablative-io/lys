@@ -23,6 +23,7 @@ use crate::budgets_state::{Act, Budget, Holder, HolderKind, Length, Measure};
 use crate::budgets_store::BudgetStore;
 use crate::budgets_usage::Used;
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -105,10 +106,10 @@ fn kind_of(kind: &str) -> Result<HolderKind, ServerError> {
         "agent" => Ok(HolderKind::Agent),
         "team" => Ok(HolderKind::Team),
         "person" => Ok(HolderKind::Person),
-        other => Err(ServerError::BudgetRefused {
+        other => Err(ServerError::Budget(BudgetError::BudgetRefused {
             refusal: "holder_unknown",
             words: format!("{other} is not a holder: agent, team or person"),
-        }),
+        })),
     }
 }
 
@@ -171,17 +172,16 @@ pub(crate) fn with_budgets<T>(
     state: &AppState,
     act: impl FnOnce(&mut BudgetStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let store = state
-        .budgets
-        .as_ref()
-        .ok_or_else(|| ServerError::BudgetsUnavailable {
+    let store = state.budgets.as_ref().ok_or_else(|| {
+        ServerError::Budget(BudgetError::BudgetsUnavailable {
             reason: "the configuration names no budgets_dir".to_owned(),
-        })?;
-    let mut store = store
-        .lock()
-        .map_err(|error| ServerError::BudgetsUnavailable {
+        })
+    })?;
+    let mut store = store.lock().map_err(|error| {
+        ServerError::Budget(BudgetError::BudgetsUnavailable {
             reason: format!("budget store lock poisoned: {error}"),
-        })?;
+        })
+    })?;
     store.settle()?;
     act(&mut store)
 }
@@ -207,9 +207,11 @@ async fn set(
     body: Result<Json<BudgetBody>, JsonRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let Json(body) = body.map_err(|rejected| ServerError::BudgetRefused {
-        refusal: "budget_malformed",
-        words: rejected.body_text(),
+    let Json(body) = body.map_err(|rejected| {
+        ServerError::Budget(BudgetError::BudgetRefused {
+            refusal: "budget_malformed",
+            words: rejected.body_text(),
+        })
     })?;
     let holder = Holder {
         kind: kind_of(&kind)?,
@@ -233,9 +235,11 @@ async fn set(
         at: now(),
     }
     .checked()
-    .map_err(|refused| ServerError::BudgetRefused {
-        refusal: refused.refusal,
-        words: refused.words,
+    .map_err(|refused| {
+        ServerError::Budget(BudgetError::BudgetRefused {
+            refusal: refused.refusal,
+            words: refused.words,
+        })
     })?;
     let zone = crate::configuration_api::organisation(&state)?.zone;
     let standings = crate::budgets_members::standings(&state)?;
@@ -245,10 +249,10 @@ async fn set(
         let old = store.held().limit_set(&holder);
         let held = old.map_or(0, |limits| limits.version);
         if held != body.version {
-            return Err(ServerError::BudgetVersionConflict {
+            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
                 held,
                 expected: body.version,
-            });
+            }));
         }
         for limit in &limits.limits {
             if limit.zone.is_some()
@@ -260,17 +264,19 @@ async fn set(
                     })
                 })
             {
-                return Err(ServerError::BudgetRefused { refusal: "BudgetZoneRefused", words: "new limits use the organisation zone; only an existing explicit migrated zone may be retained".to_owned() });
+                return Err(ServerError::Budget(BudgetError::BudgetRefused{ refusal: "BudgetZoneRefused", words: "new limits use the organisation zone; only an existing explicit migrated zone may be retained".to_owned() }));
             }
             if matches!(limit.unit, Measure::Dollars | Measure::PlanPercent) {
                 let used =
                     crate::budgets_usage::figure(store.held(), limit, &agents, &zone, at_ms, None)
-                        .map_err(|reason| ServerError::BudgetsUnavailable { reason })?;
+                        .map_err(|reason| {
+                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                        })?;
                 if let Some(reason) = used.unavailable {
-                    return Err(ServerError::BudgetRefused {
+                    return Err(ServerError::Budget(BudgetError::BudgetRefused {
                         refusal: "BudgetUnitUnavailable",
                         words: format!("{} in {:?}: {reason}", limit.unit.name(), limit.period),
-                    });
+                    }));
                 }
             }
         }
@@ -320,7 +326,7 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
         .iter()
         .map(|limit| {
             crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                .map_err(|reason| ServerError::BudgetsUnavailable { reason })
+                .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
@@ -357,7 +363,9 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                     .iter()
                     .map(|limit| {
                         crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                            .map_err(|reason| ServerError::BudgetsUnavailable { reason })
+                            .map_err(|reason| {
+                                ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                            })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {
@@ -416,21 +424,23 @@ async fn confirm(
         if !store.held().unconfirmed.iter().any(|pending| {
             pending.requested.holder == holder && pending.requested.measure == body.measure
         }) {
-            return Err(ServerError::BudgetRefused {
+            return Err(ServerError::Budget(BudgetError::BudgetRefused {
                 refusal: "budget_invalid",
                 words: "only an unconfirmed legacy personal budget can be confirmed".to_owned(),
-            });
+            }));
         }
         let budget = store
             .held()
             .budget(&holder, body.measure)
             .cloned()
-            .ok_or_else(|| ServerError::BudgetRefused {
-                refusal: "budget_invalid",
-                words: format!(
-                    "person `{}` has no {:?} budget to confirm",
-                    holder.id, body.measure
-                ),
+            .ok_or_else(|| {
+                ServerError::Budget(BudgetError::BudgetRefused {
+                    refusal: "budget_invalid",
+                    words: format!(
+                        "person `{}` has no {:?} budget to confirm",
+                        holder.id, body.measure
+                    ),
+                })
             })?;
         store.set_confirmed(
             Budget {
@@ -465,8 +475,9 @@ fn source_gaps(
                     act: Act::Stop,
                     zone: None,
                 };
-                crate::budgets_usage::figure(held, &limit, agents, zone, at_ms, None)
-                    .map_err(|reason| ServerError::BudgetsUnavailable { reason })
+                crate::budgets_usage::figure(held, &limit, agents, zone, at_ms, None).map_err(
+                    |reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }),
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
         if probes.iter().all(|probe| probe.figure.is_none()) {

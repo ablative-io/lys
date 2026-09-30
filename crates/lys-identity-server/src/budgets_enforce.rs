@@ -10,12 +10,13 @@ use crate::budgets_crossing::Crossing;
 use crate::budgets_limits::{Limit, Limits};
 use crate::budgets_state::{Act, Held, Measure, Standing, Usage};
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 fn unavailable(reason: impl std::fmt::Display) -> ServerError {
-    ServerError::BudgetsUnavailable {
+    ServerError::Budget(BudgetError::BudgetsUnavailable {
         reason: reason.to_string(),
-    }
+    })
 }
 
 /// Validate reported fields before charging any event or asking any act.
@@ -57,10 +58,11 @@ pub fn checked(usage: &Usage) -> Result<(), ServerError> {
 pub fn reached(unit: Measure, figure: &Number, threshold: &Number) -> Result<bool, String> {
     if !matches!(unit, Measure::PlanPercent | Measure::ContextPercent) {
         let places = if unit == Measure::Dollars { 6 } else { 0 };
-        lys_runner::tracking_budget::scaled_exact(figure, places)
+        let figure = lys_runner::tracking_budget::scaled_exact(figure, places)
             .ok_or("reported spend is not representable")?;
-        lys_runner::tracking_budget::scaled_exact(threshold, places)
+        let threshold = lys_runner::tracking_budget::scaled_exact(threshold, places)
             .ok_or("spend limit is not representable")?;
+        return Ok(figure >= threshold);
     }
     Ok(lys_runner::tracking_budget::compare(figure, threshold)? != std::cmp::Ordering::Less)
 }
@@ -261,7 +263,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                     } else {
                         crate::budgets_usage::reset(&limit, &zone, at_ms).map_err(unavailable)?
                     };
-                    return Err(ServerError::BudgetExhausted {
+                    return Err(ServerError::Budget(BudgetError::BudgetExhausted {
                         words: format!(
                             "{} limit {} for {} on {:?} {}; reported {figure}; resets at {} milliseconds since the Unix epoch",
                             limit.unit.name(),
@@ -275,7 +277,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                                 "an exhausted period has no reset instant"
                             ))?
                         ),
-                    });
+                    }));
                 }
             }
         }

@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 use crate::config::Config;
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::{AppState, signed_in};
 
 #[derive(Clone)]
@@ -68,13 +69,11 @@ async fn configuration(
 pub(crate) fn organisation(
     state: &AppState,
 ) -> Result<crate::configuration_store::Zone, ServerError> {
-    let mut store =
-        state
-            .configuration
-            .lock()
-            .map_err(|error| ServerError::ConfigurationUnavailable {
-                reason: format!("organisation setting lock poisoned: {error}"),
-            })?;
+    let mut store = state.configuration.lock().map_err(|error| {
+        ServerError::Budget(BudgetError::ConfigurationUnavailable {
+            reason: format!("organisation setting lock poisoned: {error}"),
+        })
+    })?;
     store.settle()?;
     Ok(store.zone().clone())
 }
@@ -94,20 +93,20 @@ async fn set_zone(
 ) -> Result<Json<crate::configuration_store::Zone>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     state.admission.administrator(&actor)?;
-    let Json(body) = body.map_err(|error| ServerError::BudgetRefused {
-        refusal: "ConfigurationMalformed",
-        words: error.body_text(),
+    let Json(body) = body.map_err(|error| {
+        ServerError::Budget(BudgetError::BudgetRefused {
+            refusal: "ConfigurationMalformed",
+            words: error.body_text(),
+        })
     })?;
     let by = crate::routes::with_directory(&state, |directory| {
         crate::read_api::own_person(directory.projection()?, &actor)
             .map(|person| person.to_string())
     })?;
-    let mut store =
-        state
-            .configuration
-            .lock()
-            .map_err(|error| ServerError::ConfigurationUnavailable {
-                reason: format!("organisation setting lock poisoned: {error}"),
-            })?;
+    let mut store = state.configuration.lock().map_err(|error| {
+        ServerError::Budget(BudgetError::ConfigurationUnavailable {
+            reason: format!("organisation setting lock poisoned: {error}"),
+        })
+    })?;
     store.set(body.zone, body.version, by).map(Json)
 }

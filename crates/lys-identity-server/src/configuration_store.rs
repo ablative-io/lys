@@ -8,6 +8,7 @@ use lys_log_store::{FileLeafStore, FrontierLog};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 
 /// One administrator-owned organisation zone version.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -37,22 +38,24 @@ const ORIGIN: &str = "lys/identity/organisation";
 const DOMAIN: &str = "lys/identity/organisation-zone/v1";
 
 fn unavailable(error: impl std::fmt::Display) -> ServerError {
-    ServerError::ConfigurationUnavailable {
+    ServerError::Budget(BudgetError::ConfigurationUnavailable {
         reason: error.to_string(),
-    }
+    })
 }
 
 /// Refuse an unknown zone at the boundary, without falling back to another one.
 pub fn checked(zone: &str) -> Result<(), ServerError> {
-    let known = jiff::tz::TimeZone::get(zone).map_err(|error| ServerError::BudgetRefused {
-        refusal: "ConfigurationZoneRefused",
-        words: format!("{zone} is not an IANA zone: {error}"),
+    let known = jiff::tz::TimeZone::get(zone).map_err(|error| {
+        ServerError::Budget(BudgetError::BudgetRefused {
+            refusal: "ConfigurationZoneRefused",
+            words: format!("{zone} is not an IANA zone: {error}"),
+        })
     })?;
     if known.iana_name().is_none() {
-        return Err(ServerError::BudgetRefused {
+        return Err(ServerError::Budget(BudgetError::BudgetRefused {
             refusal: "ConfigurationZoneRefused",
             words: format!("{zone} has no named IANA zone"),
-        });
+        }));
     }
     Ok(())
 }
@@ -145,10 +148,12 @@ impl ConfigurationStore {
         self.settle()?;
         checked(&zone)?;
         if self.zone.version != expected {
-            return Err(ServerError::ConfigurationVersionConflict {
-                held: self.zone.version,
-                expected,
-            });
+            return Err(ServerError::Budget(
+                BudgetError::ConfigurationVersionConflict {
+                    held: self.zone.version,
+                    expected,
+                },
+            ));
         }
         let next = Zone {
             zone,

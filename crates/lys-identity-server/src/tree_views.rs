@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::budgets_limits::Limit;
 use crate::budgets_state::{Act, Held, Holder, Length, Measure, Standing};
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::error_team::TeamError;
 use crate::provisioning_store::{Profile, Version};
 use crate::roles_records::Role;
@@ -259,7 +260,7 @@ impl TreeState {
             self.at_ms,
             None,
         )
-        .map_err(|reason| ServerError::BudgetsUnavailable { reason })?;
+        .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))?;
         if used.figure.is_some()
             && !self.budgets.uses.iter().any(|usage| {
                 agents.contains(&usage.agent)

@@ -153,9 +153,6 @@ impl ServerError {
             | Self::ServiceAccountRetired { .. }
             | Self::ServiceAccountOwnerRetired { .. }
             | Self::StopReused { .. }
-            | Self::BudgetVersionConflict { .. }
-            | Self::ConfigurationVersionConflict { .. }
-            | Self::BudgetExhausted { .. }
             | Self::PolicyVersionConflict { .. }
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
@@ -177,7 +174,6 @@ impl ServerError {
             | Self::ModelUnrepresentable { .. }
             | Self::PolicyUnrepresentable { .. }
             | Self::SkillUnknown { .. }
-            | Self::BudgetRefused { .. }
             | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
             Self::SignInFailed { .. }
             | Self::SecretsUnavailable { .. }
@@ -196,8 +192,6 @@ impl ServerError {
             | Self::RuntimeUnavailable { .. }
             | Self::ServiceAccountsUnavailable { .. }
             | Self::StopsUnavailable { .. }
-            | Self::BudgetsUnavailable { .. }
-            | Self::ConfigurationUnavailable { .. }
             | Self::PolicyUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::SetupUnavailable { .. }
@@ -210,6 +204,7 @@ impl ServerError {
             Self::App(error) => error.status(),
             Self::Goal(error) => error.status(),
             Self::Team(error) => error.status(),
+            Self::Budget(error) => error.status(),
         }
     }
 }

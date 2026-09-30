@@ -7,6 +7,7 @@ use lys_identity::{IdentityId, LifecycleState};
 
 use crate::budgets_state::{Holder, HolderKind, Standing};
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::{AppState, with_directory};
 use crate::teams_state::Team;
 
@@ -45,9 +46,9 @@ fn ancestors(agent: &str, teams: &[Team]) -> Result<BTreeSet<String>, ServerErro
                 break;
             }
             if !visiting.insert(team.created.id.clone()) {
-                return Err(ServerError::BudgetsUnavailable {
+                return Err(ServerError::Budget(BudgetError::BudgetsUnavailable {
                     reason: "team budget coverage contains a parent cycle".to_owned(),
-                });
+                }));
             }
             covered.insert(team.created.id.clone());
             current = team
@@ -57,8 +58,10 @@ fn ancestors(agent: &str, teams: &[Team]) -> Result<BTreeSet<String>, ServerErro
                     teams
                         .iter()
                         .find(|candidate| candidate.created.id == *parent)
-                        .ok_or_else(|| ServerError::BudgetsUnavailable {
-                            reason: format!("team budget parent {parent} is missing"),
+                        .ok_or_else(|| {
+                            ServerError::Budget(BudgetError::BudgetsUnavailable {
+                                reason: format!("team budget parent {parent} is missing"),
+                            })
                         })
                 })
                 .transpose()?;

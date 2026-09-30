@@ -23,6 +23,7 @@ use lys_log_store::{
 use crate::budgets_state::{Budget, DOMAIN, Held, Leaf, Usage};
 use crate::config::Config;
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::Say;
 
 /// How the leaf store is opened again after an append whose outcome is not known.
@@ -48,9 +49,9 @@ pub struct BudgetStore<S: LeafStore = FileLeafStore> {
 type Opened<S> = (FrontierLog<S>, Held, Start);
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
-    ServerError::BudgetsUnavailable {
+    ServerError::Budget(BudgetError::BudgetsUnavailable {
         reason: what.to_string(),
-    }
+    })
 }
 
 impl BudgetStore<FileLeafStore> {
@@ -239,16 +240,21 @@ impl<S: LeafStore> BudgetStore<S> {
             .limit_set(&limits.holder)
             .map_or(0, |limits| limits.version);
         if held != expected {
-            return Err(ServerError::BudgetVersionConflict { held, expected });
+            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
+                held,
+                expected,
+            }));
         }
         let version = expected
             .checked_add(1)
             .ok_or_else(|| unavailable("budget version exhausted"))?;
         let limits = crate::budgets_limits::Limits { version, ..limits }
             .checked()
-            .map_err(|refused| ServerError::BudgetRefused {
-                refusal: refused.refusal,
-                words: refused.words,
+            .map_err(|refused| {
+                ServerError::Budget(BudgetError::BudgetRefused {
+                    refusal: refused.refusal,
+                    words: refused.words,
+                })
             })?;
         self.append(Leaf::LimitsSet(limits.clone()))?;
         Ok(limits)
@@ -266,7 +272,10 @@ impl<S: LeafStore> BudgetStore<S> {
             .budget(&budget.holder, budget.measure)
             .map_or(0, |held| held.version);
         if held != expected {
-            return Err(ServerError::BudgetVersionConflict { held, expected });
+            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
+                held,
+                expected,
+            }));
         }
         let budget = Budget {
             version: expected

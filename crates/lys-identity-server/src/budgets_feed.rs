@@ -8,12 +8,13 @@ use lys_runner::tracking_store::{Body, FEED_FORMAT, FeedPage};
 use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_state::Usage;
 use crate::error::ServerError;
+use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 fn refused(reason: impl Into<String>) -> ServerError {
-    ServerError::BudgetsUnavailable {
+    ServerError::Budget(BudgetError::BudgetsUnavailable {
         reason: reason.into(),
-    }
+    })
 }
 
 /// Keep each charge durably, then keep the refusals and cursor together.

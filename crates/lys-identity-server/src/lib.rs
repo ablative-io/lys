@@ -46,6 +46,7 @@ pub mod connections_api;
 pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
+pub mod error_budget;
 mod error_status;
 pub mod error_team;
 mod estate_api;
