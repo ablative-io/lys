@@ -454,7 +454,7 @@ mod tests {
             attestation,
         })?)?;
         let snapshot = serde_json::to_vec(
-            &serde_json::json!({"format": "lys/identity/mcp-requests-state/v1", "requests": [asked.clone()]}),
+            &serde_json::json!({"format": "lys/identity/mcp-requests-state/v1", "requests": [asked]}),
         )?;
         store.log.write_snapshot(DOMAIN, &snapshot, &key)?;
         drop(store);

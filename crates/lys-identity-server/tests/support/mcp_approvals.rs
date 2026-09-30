@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
@@ -314,7 +315,7 @@ impl Fixture {
 
 pub struct Certified {
     agent: String,
-    key: Ed25519Identity,
+    key: Arc<Ed25519Identity>,
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -333,8 +334,9 @@ fn hex(bytes: &[u8]) -> String {
 
 impl Certified {
     async fn enroll(service: &Service, holder: &str, agent: &str) -> Result<Self, Box<dyn Error>> {
-        let key =
-            Ed25519Identity::load_or_generate(&service.dir.path().join(format!("{agent}.key")))?;
+        let key = Arc::new(Ed25519Identity::load_or_generate(
+            &service.dir.path().join(format!("{agent}.key")),
+        )?);
         post(service, &format!("/agents/{agent}/certificates"), holder,
             &json!({"operation": operation()?, "request": STANDARD.encode(create_certificate_request(&key, agent)?)}), 200).await?;
         Ok(Self {
