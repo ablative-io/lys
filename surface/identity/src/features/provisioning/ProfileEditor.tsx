@@ -30,7 +30,7 @@ export function ProfileEditor({ id, profile, choices, readOnly = false }: {
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
     tools: profile?.tools ?? [], skills: profile?.skills ?? [], mcp_servers: profile?.mcp_servers ?? [],
-    instructions: prompt === 'keep' ? '' : instructions.trim(), note: 'Start this agent',
+    instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Start this agent',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
     ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
