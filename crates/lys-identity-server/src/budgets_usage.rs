@@ -122,55 +122,118 @@ pub fn figure(
     at_ms: i64,
     incoming: Option<&Usage>,
 ) -> Result<Used, String> {
-    let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
-    let uses: Vec<_> = held
-        .uses
-        .iter()
-        .chain(incoming)
-        .filter(|usage| agents.contains(&usage.agent) && usage.at_ms <= at_ms)
-        .collect();
-    if limit.unit == Measure::PlanPercent {
-        return plan(limit, agents, &uses, at_ms);
+    Reading {
+        held,
+        limit,
+        agents,
+        zone,
+        at_ms,
+        incoming,
     }
-    if limit.unit == Measure::ContextPercent {
-        return context(limit, &uses);
+    .figure(Purpose::Spend)
+}
+
+/// Probe native reporting separately from a fresh period's known zero spend.
+pub(crate) fn source_figure(
+    held: &Held,
+    limit: &Limit,
+    agents: &BTreeSet<String>,
+    zone: &str,
+    at_ms: i64,
+) -> Result<Used, String> {
+    Reading {
+        held,
+        limit,
+        agents,
+        zone,
+        at_ms,
+        incoming: None,
     }
-    let since = start(limit, zone, at_ms)?;
-    if let Some(reason) = spend_gap(limit, agents, &uses, since) {
-        return Ok(unavailable(limit, since, reason));
-    }
-    if limit.unit == Measure::Tokens
-        && let Some(gap) = uses
+    .figure(Purpose::Source)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Purpose {
+    Spend,
+    Source,
+}
+
+struct Reading<'a> {
+    held: &'a Held,
+    limit: &'a Limit,
+    agents: &'a BTreeSet<String>,
+    zone: &'a str,
+    at_ms: i64,
+    incoming: Option<&'a Usage>,
+}
+
+impl Reading<'_> {
+    fn figure(self, purpose: Purpose) -> Result<Used, String> {
+        let Self {
+            held,
+            limit,
+            agents,
+            zone,
+            at_ms,
+            incoming,
+        } = self;
+        let incoming = incoming.filter(|usage| !held.charged.contains(&usage.event));
+        let mut uses: Vec<_> = held
+            .uses
             .iter()
-            .filter(|usage| since.is_none_or(|start| usage.at_ms >= start))
-            .flat_map(|usage| &usage.unavailable)
-            .find(|gap| gap.figure == "tokens")
-    {
-        return Ok(unavailable(limit, since, &gap.reason));
-    }
-    let mut total = 0_u64;
-    for usage in uses {
-        if since.is_some_and(|start| usage.at_ms < start) {
-            continue;
+            .chain(incoming)
+            .filter(|usage| agents.contains(&usage.agent) && usage.at_ms <= at_ms)
+            .collect();
+        if limit.unit == Measure::PlanPercent {
+            return plan(limit, agents, &uses, at_ms);
         }
-        let amount = match limit.unit {
-            Measure::Tokens => usage.tokens,
-            Measure::RunningMs => usage.running_ms,
-            Measure::Dollars => {
-                let Some(amount) = usage.dollars_micros else {
-                    continue;
-                };
-                amount
+        if limit.unit == Measure::ContextPercent {
+            return context(limit, &uses);
+        }
+        let since = start(limit, zone, at_ms)?;
+        if purpose == Purpose::Spend {
+            uses.retain(|usage| since.is_none_or(|start| usage.at_ms >= start));
+            // No charged observation in this period means no spend, not a missing native source.
+            if uses.is_empty() {
+                return present(limit, since, 0);
             }
-            Measure::ContextPercent | Measure::PlanPercent => {
-                return Err("a level reached spend summation".to_owned());
+        }
+        if let Some(reason) = spend_gap(limit, agents, &uses, since, purpose) {
+            return Ok(unavailable(limit, since, reason));
+        }
+        if limit.unit == Measure::Tokens
+            && let Some(gap) = uses
+                .iter()
+                .filter(|usage| since.is_none_or(|start| usage.at_ms >= start))
+                .flat_map(|usage| &usage.unavailable)
+                .find(|gap| gap.figure == "tokens")
+        {
+            return Ok(unavailable(limit, since, &gap.reason));
+        }
+        let mut total = 0_u64;
+        for usage in uses {
+            if since.is_some_and(|start| usage.at_ms < start) {
+                continue;
             }
-        };
-        total = total
-            .checked_add(amount)
-            .ok_or("budget spend overflows its reported unit")?;
+            let amount = match limit.unit {
+                Measure::Tokens => usage.tokens,
+                Measure::RunningMs => usage.running_ms,
+                Measure::Dollars => {
+                    let Some(amount) = usage.dollars_micros else {
+                        continue;
+                    };
+                    amount
+                }
+                Measure::ContextPercent | Measure::PlanPercent => {
+                    return Err("a level reached spend summation".to_owned());
+                }
+            };
+            total = total
+                .checked_add(amount)
+                .ok_or("budget spend overflows its reported unit")?;
+        }
+        present(limit, since, total)
     }
-    present(limit, since, total)
 }
 
 fn plan(
@@ -299,6 +362,7 @@ fn spend_gap(
     agents: &BTreeSet<String>,
     uses: &[&Usage],
     since: Option<i64>,
+    purpose: Purpose,
 ) -> Option<String> {
     if matches!(limit.unit, Measure::Dollars | Measure::RunningMs) {
         let field = if limit.unit == Measure::Dollars {
@@ -309,13 +373,18 @@ fn spend_gap(
         if let Some(gap) = uses
             .iter()
             .filter(|usage| since.is_none_or(|start| usage.at_ms >= start))
+            .filter(|usage| limit.unit != Measure::Dollars || usage.dollars_micros.is_none())
             .flat_map(|usage| &usage.unavailable)
             .find(|gap| gap.figure == field && gap.reason.contains("reset"))
         {
             return Some(gap.reason.clone());
         }
         let mut reports = BTreeMap::new();
+        let mut observed = BTreeSet::new();
         for usage in uses {
+            if limit.unit == Measure::Dollars && purpose == Purpose::Spend {
+                observed.insert(usage.agent.as_str());
+            }
             let reported = if limit.unit == Measure::Dollars {
                 usage.dollars_micros.is_some()
             } else {
@@ -333,6 +402,9 @@ fn spend_gap(
         }
         if limit.unit == Measure::Dollars {
             for agent in agents {
+                if purpose == Purpose::Spend && !observed.contains(agent.as_str()) {
+                    continue;
+                }
                 if !reports.keys().any(|(reported, _)| *reported == agent) {
                     return Some(format!("dollars have not been reported for agent {agent}"));
                 }

@@ -183,7 +183,7 @@ pub fn live(windows: &mut Vec<PlanWindow>, now: u64, notes: &mut Vec<Unavailable
     });
 }
 
-/// Keep a reported cumulative baseline even when a later report omits cost.
+/// Keep the cumulative baseline; a restarted counter contributes its new total.
 pub fn cost_delta(
     source: &mut crate::tracking_store::SourceState,
     figures: &mut crate::tracking::Figures,
@@ -196,6 +196,7 @@ pub fn cost_delta(
     if let Some(previous) = previous {
         figures.dollars_micros = total.checked_sub(previous);
         if figures.dollars_micros.is_none() {
+            figures.dollars_micros = Some(total);
             notes.push(Unavailable {
                 figure: "dollars_micros".to_owned(),
                 reason: "reported_session_cost_reset".to_owned(),
