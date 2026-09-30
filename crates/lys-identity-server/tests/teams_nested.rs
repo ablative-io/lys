@@ -185,7 +185,7 @@ async fn the_archived_writer_store_and_snapshot_read_as_top_level_without_a_lead
             name: "old team".to_owned(),
             description: "kept by the archived writer".to_owned(),
             by: read_views::Login {
-                provider: config.link_audit_source.provider.clone(),
+                provider: config.link_audit_source.issuer.clone(),
                 subject: ADMINISTRATOR.to_owned(),
             },
             at: 1,
