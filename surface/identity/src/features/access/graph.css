@@ -2,8 +2,8 @@
 .graph-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
 .chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border-default); border-radius: 999px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-secondary); }
 .chk.on { border-color: rgba(212,151,90,.5); color: var(--accent); background: rgba(212,151,90,.07); }
-.graph-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
-.graph-wrap { position: relative; height: calc(100vh - 330px); min-height: 420px; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
+.graph-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; flex: 1; min-height: 0; }
+.graph-wrap { position: relative; height: 100%; min-height: 0; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; }
 .graph-wrap svg { display: block; width: 100%; height: 100%; }
 .gn { cursor: pointer; }
 .gn text { font-size: 11px; fill: var(--text-secondary); pointer-events: none; }
@@ -18,7 +18,7 @@
 .legend { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 14px; font-size: 11px; color: var(--text-muted); }
 .legend i { display: inline-block; width: 16px; margin-right: 5px; vertical-align: middle; border-top: 2px solid; }
 .legend i.grant { border-color: rgba(212,151,90,.7); } .legend i.void { border-color: rgba(248,113,113,.6); border-top-style: dashed; } .legend i.answers { border-color: rgba(255,255,255,.3); border-top-style: dotted; }
-.node-card { padding: 16px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 12px; color: var(--text-primary); align-self: start; }
+.node-card { padding: 16px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 12px; color: var(--text-primary); align-self: start; max-height: 100%; box-sizing: border-box; }
 .node-card .row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; color: inherit; text-decoration: none; }
 .node-card .actions { display: flex; gap: 8px; margin-top: 10px; }
 @media (max-width: 900px) { .graph-split { grid-template-columns: 1fr; } }

@@ -1,6 +1,6 @@
 /** Model and resource screens display served records and preserve their visibility boundary. */
 import { describe, expect, it } from 'vitest';
-import { $, $$, choose, mount, text } from './harness';
+import { $, $$, mount, text, type } from './harness';
 import { SERVICE, ok, refused } from './fixtures';
 
 describe('Access read views', () => {
@@ -14,14 +14,14 @@ describe('Access read views', () => {
       kinds: ['project', 'secret'], revision: 23, judged_at: 1790540000,
       resources: [{ kind: 'project', id: 'identity', standing: 7, ended: 2, holders: 3 }, { kind: 'secret', id: 'build', standing: 1, ended: 0, holders: 1 }],
     }) });
-    expect($$('tbody tr')).toHaveLength(2);
+    expect($$('tbody tr[data-href]')).toHaveLength(2);
     expect($('a[href="#/access/who/project%3Aidentity"]')).not.toBeNull();
-    expect($$('tbody tr')[0].textContent).toContain('identity723');
+    expect($$('tbody tr[data-href]')[0].textContent).toContain('identity723');
     expect(text()).toContain('revision 23');
     expect(requests).toContain('/resources');
-    await choose($('select'), 'secret');
-    expect($$('tbody tr')).toHaveLength(1);
-    expect($('tbody')?.textContent).toContain('build');
+    await type($('input[aria-label="Search resources"]'), 'secret');
+    expect($$('tbody tr[data-href]')).toHaveLength(1);
+    expect($('tbody tr[data-href]')?.textContent).toContain('build');
   });
   it('names a model read failure instead of substituting defaults', async () => {
     await mount('#/model', { ...SERVICE, '/grants/model': refused(503, 'PermissionEngineUnavailable', 'model cannot be read') });

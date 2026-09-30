@@ -1,5 +1,6 @@
 /** Assignments and reviewed version moves name the exact holding so retries cannot affect a successor. */
 import { useState } from 'react';
+import { Picker } from '../../shell/Picker';
 import type { FormEvent } from 'react';
 import { operationId } from '../../api';
 import { field } from '../people/RecordedForm';
@@ -24,7 +25,7 @@ export function AssignRole({ role, person, identities, changed }: { role: Role; 
   return <form className="card recorded-form" aria-label="Assign role" onSubmit={submit}>
     <h2>Assign {role.name}</h2><p>This assigns the latest saved version to the selected person or agent. Access grants are separate.</p>
     <fieldset disabled={change.blocked} style={{ border: 0, padding: 0 }}>
-      <label className="field">Person or agent<select name="holder" required defaultValue=""><option value="">Choose a person or agent</option>{identities.map((identity) => <option key={identity.id} value={identity.id}>{identity.name}</option>)}</select></label>
+      <div className="field">Person or agent<Picker name="holder" label="Find a person or agent" options={identities} /></div>
       <label className="field">Role until (your local time)<input type="datetime-local" name="expires" required={!noExpiry} disabled={noExpiry} /></label>
       <label><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry</label>
       <p><button className="btn primary" type="submit">Assign role</button></p>

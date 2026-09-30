@@ -96,7 +96,7 @@ describe("An agent's file", () => {
     const { posted } = await mount('#/file/' + SCRIBE);
     await click($('[data-act="suspend"]'));
     expect(location.hash).toBe('#/directory/manage?action=status&identity=' + SCRIBE);
-    expect(document.querySelector<HTMLSelectElement>('select[name="identity"]')?.value).toBe(SCRIBE);
+    expect(document.querySelector<HTMLInputElement>('input[type="hidden"][name="identity"]')?.value).toBe(SCRIBE);
     expect($('form[aria-label="Record lifecycle change"]')).not.toBeNull();
     expect(posted).toHaveLength(0);
   });

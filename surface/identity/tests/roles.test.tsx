@@ -1,7 +1,7 @@
 /** Roles keep assignments on their version and ask for deliberate, fenced changes. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, click, choose, mount, settle, text, unmountAll } from './harness';
+import { $, click, mount, settle, text, unmountAll } from './harness';
 import { ADA, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Role, RoleHolder, RoleVersion, RoleWords } from '../src/features/roles/contract';
 
@@ -64,7 +64,9 @@ describe('Roles', () => {
       const value = body as { operation: string; holder: string; ends_at: number | null };
       return ok({ ...role, holders: [{ ...holder, assignment: value.operation, holder: value.holder, ends_at: value.ends_at }] });
     } });
-    await choose($('select[name="holder"]'), SCRIBE); await click($('form[aria-label="Assign role"] input[type="checkbox"]')); await submit('Assign role');
+    const find = $('input[aria-label="Find a person or agent"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(find, 'Scri'); find.dispatchEvent(new Event('input', { bubbles: true })); });
+    await click(button('Scribe')); await click($('form[aria-label="Assign role"] input[type="checkbox"]')); await submit('Assign role');
     expect(posted[0]).toMatchObject({ path, body: { holder: SCRIBE, ends_at: null } }); expect(text()).toContain('Lys saved the role change.');
   });
   it('reviews the change and fences a move to the exact assignment and previous version', async () => {

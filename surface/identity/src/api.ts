@@ -105,6 +105,26 @@ const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
 
 /** Read from the service when `key` changes; never a sample value in the meantime. */
+/** A read kept current: the first answer as useLoad gives it, then read again every `every` ms in place, never back to loading. */
+export function useLive<T>(read: () => Promise<T>, key: string, every = 10000): Load<T> {
+  const [state, setState] = useState<Load<T>>({ status: 'loading' });
+  useEffect(() => {
+    let live = true;
+    setState({ status: 'loading' });
+    const once = () => read().then(
+      (data) => live && setState({ status: 'ok', data }),
+      (error: unknown) => live && setState({ status: 'refused', refused: asRefused(error) }),
+    );
+    void once();
+    const timer = setInterval(() => void once(), every);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [key]);
+  return state;
+}
+
 export function useLoad<T>(read: () => Promise<T>, key: string): Load<T> {
   const [state, setState] = useState<Load<T>>({ status: 'loading' });
   useEffect(() => {

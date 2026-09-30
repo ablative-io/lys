@@ -2,6 +2,7 @@ import { RuntimeSessions } from '../runtime/RuntimeSessions';
 /** Live sign-ins use public session IDs; ending one requires an explicit confirmation. */
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { Picker } from '../../shell/Picker';
 import { api, request, useLoad } from '../../api';
 import { clock } from '../file/time';
 import { Gate, SignIn } from '../signin/Gate';
@@ -22,17 +23,19 @@ export function Sessions() {
   const [params, setParams] = useSearchParams();
   const person = params.get('person') ?? '';
   const people = useLoad(api.people, 'session-people');
-  return <div className="page">
-    <div className="head"><div><h1>Where you are signed in</h1>
+  const chosen = people.status === 'ok' ? people.data.people.find((entry) => entry.id === person) : undefined;
+  return <div className="page fill">
+    <div className="head"><div><div className="eyebrow">Sign-in</div><h1>Where you are signed in</h1>
       <p className="sub">See where you’re signed in and end a session you no longer need. Agents’ running sessions are on <a href="#/runtime">Running sessions</a>.</p></div></div>
-    {people.status === 'ok' && people.data.scope === 'directory' ? <details>
-      <summary>Advanced: another person’s sessions</summary>
-      <label className="field">Person<select value={person} onChange={(event) => setParams(event.target.value ? { person: event.target.value } : {})}>
-        <option value="">My sessions</option>{people.data.people.map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}
-      </select></label>
-    </details> : null}
-    <SessionList key={person} person={person} />
-    <RuntimeSessions />
+    {people.status === 'ok' && people.data.scope === 'directory' ? <div className="tools">
+      <span className="sec">{chosen ? 'Showing ' + chosen.display_name + '’s sessions' : 'Showing your sessions'}</span>
+      {person ? <button className="btn" onClick={() => setParams({})}>Show mine</button> : null}
+      <Picker name="person" label="Another person’s sessions" options={people.data.people.map((entry) => ({ id: entry.id, name: entry.display_name }))} onChange={(ids) => setParams(ids[0] ? { person: ids[0] } : {})} />
+    </div> : null}
+    <div className="pane">
+      <SessionList key={person} person={person} />
+      <RuntimeSessions />
+    </div>
   </div>;
 }
 

@@ -81,12 +81,15 @@ export function EstateApproval() {
     } catch (error) { setStatus((error instanceof Refused ? error.refusal.refusal+': '+error.refusal.reason : String(error)) + '. Stopped; no automatic retry. Some earlier grants may be recorded. An explicit repeat of the same plan and account uses the same operation IDs.'); }
     finally { working.current=false;setBusy(false); }
   };
-  return <section className="page"><h1>Approve estate grants</h1>
-    <p>Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active.</p>
-    {plan ? <><p>Using your installed Lys directory loader.</p>
-      <p>{plan.resources.length} resources. No expiry of their own. You can revoke the roots or loader grants later.</p>
-      <ul>{plan.resources.map((r)=><li key={r.kind+'/'+r.id}><strong>{r.id}</strong> ({r.kind}): {r.actions.join(', ')} → {r.seats.join(', ')}. <small>{r.evidence}</small></li>)}</ul>
-      <button className="btn primary" disabled={busy || !account} onClick={()=>void approve()}>Approve and apply estate grants</button></> : null}
+  return <div className="page fill">
+    <div className="head"><div><div className="eyebrow">Access</div><h1>Approve estate grants</h1></div>
+      {plan ? <button className="btn primary" disabled={busy || !account} onClick={()=>void approve()}>Approve and apply estate grants</button> : null}</div>
+    <p className="sub">Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active.</p>
     {status ? <p role="status">{status}</p> : null}
-  </section>;
+    {plan ? <div className="pane">
+      <p className="note">Using your installed Lys directory loader. {plan.resources.length} resources. No expiry of their own. You can revoke the roots or loader grants later.</p>
+      <table><thead><tr><th>Resource</th><th>Kind</th><th>Actions</th><th>Passed to</th><th>Why</th></tr></thead>
+        <tbody>{plan.resources.map((r)=><tr key={r.kind+'/'+r.id}><td><strong>{r.id}</strong></td><td className="sec">{r.kind}</td><td className="mono">{r.actions.join(', ')}</td><td className="sec">{r.seats.join(', ')}</td><td className="dim">{r.evidence}</td></tr>)}</tbody></table>
+    </div> : null}
+  </div>;
 }

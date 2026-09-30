@@ -58,7 +58,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
     access: data.grants.list.grants.filter((g) => g.holder === x.id).length,
   };
   return (
-    <div className="page">
+    <div className="page fill">
       <div className="eyebrow">
         <a href="#/people">People and agents</a> / {x.display_name}
       </div>
@@ -86,6 +86,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
                 {ACTION[a]}
               </button>
             ))}
+            {kind === 'agent' ? <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a> : null}
             {kind === 'agent' && x.state === 'active' ? (
               <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Start this agent">Start this agent</a>
             ) : null}
@@ -103,7 +104,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
             </a>
           ))}
         </nav>
-        <TabBody tab={tab} data={data} reload={reload} />
+        <div className="pane"><TabBody tab={tab} data={data} reload={reload} /></div>
       </div>
     </div>
   );

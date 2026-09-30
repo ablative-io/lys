@@ -83,4 +83,16 @@ describe('Agent canvas', () => {
     expect($('.terminal')).toBeNull();
     expect(posted.some((entry) => entry.path.endsWith('/end'))).toBe(false);
   });
+
+  it('is its own place in the rail, and an agent opens straight onto its terminal', async () => {
+    await mount('#/canvas/' + SCRIBE, routes);
+    expect($('#rail a.on')?.dataset.nav).toBe('canvas');
+    expect($('button[aria-expanded="true"]')?.textContent).toBe('Close terminal view');
+    expect([...document.querySelectorAll('button')].map((button) => button.textContent ?? '').filter((words) => /refresh|again/i.test(words))).toEqual([]);
+  });
+
+  it('is reached from an agent\'s file', async () => {
+    await mount('#/file/' + SCRIBE, routes);
+    expect($('a[data-act="canvas"]')?.getAttribute('href')).toBe('#/canvas/' + SCRIBE);
+  });
 });

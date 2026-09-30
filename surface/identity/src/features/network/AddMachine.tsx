@@ -5,6 +5,7 @@ import { operationId, Refused, request, useLoad } from '../../api';
 import type { AgentSummary } from '../../generated';
 import { readRoles } from '../roles/AssignedRoles';
 import { Gate } from '../signin/Gate';
+import { Picker } from '../../shell/Picker';
 import { matchesMachine, savedMachine } from './contract';
 import type { Machine, NameMachine } from './contract';
 
@@ -68,7 +69,7 @@ export function AddMachine({ agents, person, changed, cancel }: { agents: AgentS
       {starts === 'dialled' ? <label className="field">Its runner's key<span className="hint">Set up the Lys runner on that computer and paste the key it prints.</span><input name="runner-key" required autoComplete="off" /></label> : null}
       <div className="field">Who may start agents here
         <Gate load={roles} title="Roles" ok={(view) => view.roles.length ? <>{view.roles.map((role) => <label key={role.id} className="sec"><input type="checkbox" name="role" value={role.id} /> Anyone holding {role.name}</label>)}</> : null} />
-        <AgentPicker agents={agents} />
+        <Picker name="agent" label="Add an agent" multiple options={agents.map((agent) => ({ id: agent.id, name: agent.display_name }))} />
       </div>
       <details><summary className="sec">Websites its agents' services may connect to</summary>
         <label className="field"><span className="hint">One per line, for example mcp.example.com.</span><textarea name="hosts" rows={3} /></label>
@@ -78,18 +79,4 @@ export function AddMachine({ agents, person, changed, cancel }: { agents: AgentS
     {pending ? <div role="status"><p>Adding {pending.name} is not confirmed. What you entered is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending, null, true)}>Check whether it was added</button></div> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </form>;
-}
-
-/** Agents chosen by name, however many there are: type, pick from the few that match, remove with ×. */
-function AgentPicker({ agents }: { agents: AgentSummary[] }) {
-  const [query, setQuery] = useState('');
-  const [chosen, setChosen] = useState<AgentSummary[]>([]);
-  const needle = query.trim().toLowerCase();
-  const matches = needle ? agents.filter((agent) => agent.display_name.toLowerCase().includes(needle) && !chosen.some((each) => each.id === agent.id)).slice(0, 8) : [];
-  if (!agents.length) return <span className="hint">There are no agents yet.</span>;
-  return <div>
-    {chosen.map((agent) => <span key={agent.id} className="pill">{agent.display_name}<input type="hidden" name="agent" value={agent.id} />{' '}<button type="button" aria-label={'Remove ' + agent.display_name} onClick={() => setChosen((list) => list.filter((each) => each.id !== agent.id))}>×</button></span>)}
-    <input className="search" type="search" aria-label="Add an agent" placeholder={'Add an agent by name (' + agents.length.toLocaleString('en-AU') + ')'} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (matches[0]) { setChosen((list) => [...list, matches[0]]); setQuery(''); } } }} />
-    {matches.length ? <ul className="plain">{matches.map((agent) => <li key={agent.id}><button type="button" className="btn" onClick={() => { setChosen((list) => [...list, agent]); setQuery(''); }}>{agent.display_name}</button></li>)}</ul> : null}
-  </div>;
 }

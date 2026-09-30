@@ -1,7 +1,7 @@
 /** Browser mutations use the admitted routes and retain uncertain operations without resending. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, choose, click, mount, settle, text, unmountAll } from './harness';
+import { $, choose, click, mount, pick, settle, text, unmountAll } from './harness';
 import { ADA, RECEIPTS, SERVICE, ok, refused } from './fixtures';
 
 beforeEach(() => sessionStorage.clear());
@@ -119,7 +119,7 @@ describe('Directory mutations', () => {
   it('binds the exact provider identity to the selected person', async () => {
     const { posted } = await mount('#/directory/manage?action=login', { ...SERVICE, ['POST /people/' + ADA + '/logins']: (body) => recorded(body) });
     const page = form('Bind a sign-in identity');
-    await choose(page.querySelector('select[name="person"]'), ADA);
+    await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
     await fill(page, 'issuer', 'https://issuer.example/');
     await fill(page, 'subject', 'subject-123');
     await submit(page);
@@ -129,7 +129,7 @@ describe('Directory mutations', () => {
   it('records the selected transition with its reason', async () => {
     const { posted } = await mount('#/directory/manage?action=status', { ...SERVICE, ['POST /identities/' + ADA + '/transitions']: (body) => recorded(body) });
     const page = form('Record lifecycle change');
-    await choose(page.querySelector('select[name="identity"]'), ADA);
+    await pick(page, 'Find a person or agent', 'Ada', 'Ada (test person)');
     await choose(page.querySelector('select[name="transition"]'), 'suspend');
     await fill(page, 'reason', 'Owner requested suspension');
     await submit(page);
@@ -141,7 +141,7 @@ describe('Directory mutations', () => {
   it('issues a root grant only with the explicitly selected holder, relation and lifetime', async () => {
     const { posted } = await mount('#/access/issue', { ...SERVICE, 'POST /grants/roots': (body) => recorded(body, true) });
     const page = form('Issue root grant');
-    await choose(page.querySelector('select[name="holder"]'), ADA);
+    await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
     await choose(page.querySelector('select[name="relation"]'), 'viewer');
     await fill(page, 'kind', 'project');
     await fill(page, 'resource', 'integration-check');

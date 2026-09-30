@@ -8,6 +8,8 @@
  * through the same routes an upload uses.
  */
 import { useState } from 'react';
+import { Listing } from '../../shell/Listing';
+import type { Column } from '../../shell/Listing';
 import { Refused, operationId, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { SchemaBuilder, send } from './SchemaBuilder';
@@ -80,13 +82,29 @@ export function Apps() {
   const [stored, setStored] = useState<Record<string, StoredCredentials>>({});
   const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
   const changed = (message: string) => { setApproved({}); setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
-  return <section className="apps">
-    <div className="head"><div><h2>Apps</h2><p>Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
-      <button type="button" className="btn" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
+  const [picked, setPicked] = useState<string | null>(null);
+  return <div className="page fill apps">
+    <div className="head"><div><div className="eyebrow">Connections</div><h1>Apps</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
+      <button type="button" className="btn primary" onClick={() => setRegistering(!registering)}>{registering ? 'Close the new app' : 'Register an app'}</button></div>
     {notice ? <p role="status">{notice}</p> : null}
-    {registering ? <Register changed={changed} /> : null}
-    <Gate load={load} title="Apps" ok={(answer) => (answer.apps.length ? <>{answer.apps.map((app) => <AppCard key={app.id + ':' + revision} app={approved[app.id] ?? app} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[app.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[app.id]:answer})); setIssued((held)=>{const next={...held};delete next[app.id];return next;}); }} issued={issued[app.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [app.id]: client }))} changed={changed} />)}</> : <p>No app is registered.</p>)} />
-  </section>;
+    <Gate load={load} title="Apps" ok={(answer) => {
+      const apps = answer.apps.map((app) => approved[app.id] ?? app);
+      const open = apps.find((app) => app.id === picked) ?? apps.find((app) => app.state === 'pending') ?? apps[0] ?? null;
+      const group = [{ id: '', name: 'Apps', lead: null, depth: 0, items: apps, within: apps }];
+      const columns: Column<AppRecord>[] = [
+        { head: 'App', cell: (app) => app.name },
+        { head: 'State', cell: (app) => <span className={'app-state app-' + app.state}>{app.state === 'pending' ? 'waiting for approval' : app.state}</span> },
+        { head: 'Signs in to', cell: (app) => <span className="sec">{app.redirects.length} {app.redirects.length === 1 ? 'address' : 'addresses'}</span> },
+      ];
+      return <div className="body">
+        <Listing<AppRecord> groups={group} columns={columns} id={(app) => app.id} href={(app) => '#/apps?app=' + encodeURIComponent(app.id)} words={(app) => app.name + ' ' + app.id}
+          noun="apps" holds={(items) => items.length + ' apps'} selected={registering ? null : open?.id ?? null} select={() => undefined} open={(app) => { setPicked(app.id); setRegistering(false); }} />
+        <div className="detail">
+          {registering ? <Register changed={changed} /> : open ? <AppCard key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => { setStored((held)=>({...held,[open.id]:answer})); setIssued((held)=>{const next={...held};delete next[open.id];return next;}); }} issued={issued[open.id] ?? null} issue={(client) => setIssued((held) => ({ ...held, [open.id]: client }))} changed={changed} /> : <p>No app is registered.</p>}
+        </div>
+      </div>;
+    }} />
+  </div>;
 }
 
 function AppCard({ app, issued, issue, changed, stored, saved, approved }: { approved: (answer: AppRecord) => void; stored:StoredCredentials|null; saved:(answer:StoredCredentials)=>void; app: AppRecord; issued: ClientIssued | null; issue: (client: ClientIssued) => void; changed: (message: string) => void }) {

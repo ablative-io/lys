@@ -5,6 +5,7 @@ import type { GrantModel } from '../../generated/grants';
 import type { PeopleView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm, TextField } from '../people/RecordedForm';
+import { Picker } from '../../shell/Picker';
 
 function Form({ people, model }: { people: PeopleView; model: GrantModel }) {
   const [noExpiry, setNoExpiry] = useState(false);
@@ -24,7 +25,7 @@ function Form({ people, model }: { people: PeopleView; model: GrantModel }) {
       } };
     }}>
       <p>Only the directory's root authority may issue this grant. A root grant is given to a person; that person may delegate only if you permit it below.</p>
-      <label className="field">Holder<select name="holder" required defaultValue=""><option value="" disabled>Choose a person</option>{people.people.map((p) => <option key={p.id} value={p.id}>{p.display_name} · {p.state}</option>)}</select></label>
+      <div className="field">Holder<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
       <TextField name="kind" label="Resource kind" />
       <TextField name="resource" label="Resource ID" />
       <label className="field">Relation<select name="relation" required defaultValue=""><option value="" disabled>Choose a relation</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>
@@ -43,5 +44,8 @@ async function read() {
 
 export function IssueRoot() {
   const load = useLoad(read, 'root-grant');
-  return <div className="page"><a href="#/access">Access</a><h1>Issue access</h1><Gate load={load} title="Issue access" ok={(data) => <Form {...data} />} /></div>;
+  return <div className="page fill">
+    <div className="head"><div><div className="eyebrow">Access</div><h1>Issue access</h1><p className="sub">Give a person a root grant on something, straight from the directory's authority.</p></div><a className="btn" href="#/access">Back to access</a></div>
+    <div className="pane"><Gate load={load} title="Issue access" ok={(data) => <Form {...data} />} /></div>
+  </div>;
 }

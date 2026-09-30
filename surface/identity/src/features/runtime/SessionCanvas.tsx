@@ -1,6 +1,7 @@
 /** A keyboard-accessible canvas of permitted sessions and recorded connections, with one live terminal open at a time. */
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useLoad } from '../../api';
+import { useParams } from 'react-router';
+import { useLive, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import { Terminal } from './Terminal';
 import { readSessionGraph, withMessages } from './session-graph';
@@ -13,10 +14,13 @@ import './session-canvas.css';
 interface Line { id: string; path: string; kind: string; stands: boolean }
 
 function Canvas({ graph }: { graph: SessionGraph }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const { agent } = useParams();
+  const [selected, setSelected] = useState<string | null>(() => graph.nodes.find((node) => agent && node.session?.agent === agent)?.id ?? null);
   const [lines, setLines] = useState<Line[]>([]);
   const space = useRef<HTMLDivElement>(null);
   const nodes = useRef(new Map<string, HTMLElement>());
+  const [shown] = useState(selected);
+  useLayoutEffect(() => { if (shown) nodes.current.get(shown)?.scrollIntoView?.({ block: 'center', inline: 'center' }); }, [shown]);
   useLayoutEffect(() => {
     const element = space.current;
     if (!element) return;
@@ -71,19 +75,16 @@ function MessageCanvas({ graph, first }: { graph: SessionGraph; first: MessageRe
 }
 
 export function SessionCanvas() {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(readSessionGraph, 'session-canvas:' + revision);
-  const messages = useLoad(firstMessagePage, 'canvas-message-edges:' + revision);
-  return <div className="page session-canvas-page">
-    <h1>Agent canvas</h1>
-    <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running.</p>
-    <div className="actions"><a className="btn" href="#/runtime">Session list</a><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh connections</button></div>
+  const load = useLive(readSessionGraph, 'session-canvas');
+  const messages = useLoad(firstMessagePage, 'canvas-message-edges');
+  return <div className="page fill session-canvas-page">
+    <div className="head"><div><div className="eyebrow">Running</div><h1>Agent canvas</h1>
+      <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p></div></div>
     <Gate load={load} title="Agent canvas" ok={(graph) => <>
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <p className="why-not" role="alert" key={entry.session}>{entry.session}: {entry.refusal}: {entry.reason}</p>)}
       {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
-      {graph.nodes.some((node) => node.session) ? messages.status === 'ok' ? <MessageCanvas key={revision} graph={graph} first={messages.data} /> : <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
-      <p className="note">Team membership does not grant access. Dashed grant connections no longer stand. Terminal actions are checked by the service each time.</p>
+      {graph.nodes.some((node) => node.session) ? messages.status === 'ok' ? <MessageCanvas graph={graph} first={messages.data} /> : <Canvas graph={graph} /> : <p>No running sessions were returned.</p>}
     </>} />
   </div>;
 }

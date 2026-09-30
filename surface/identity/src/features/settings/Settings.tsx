@@ -25,17 +25,16 @@ export function Settings() {
   const shell = useShell();
   const { sec = 'layout' } = useParams();
   return (
-    <div className="page">
-      <div className="eyebrow">Configuration</div>
-      <h1>Configuration</h1>
-      <p className="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p>
+    <div className="page fill">
+      <div className="head"><div><div className="eyebrow">Configuration</div><h1>Configuration</h1>
+        <p className="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p></div></div>
       <div className="set-grid">
         <nav className="set-nav">
           {SET.map(([k, t]) => (
             <a key={k} href={'#/settings/' + k} className={sec === k ? 'on' : ''}>{t}</a>
           ))}
         </nav>
-        <div className="card">
+        <div className="card pane">
           {sec === 'layout' ? (
             <>
               <Row t="Dock side" d="Which edge the rail and its drawer occupy. The screen takes the other.">

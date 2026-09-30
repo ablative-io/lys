@@ -44,6 +44,7 @@ export function AppRoutes() {
       <Route path="/runtime/:session?" element={<RunningSessions />} />
       <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/runtime/canvas" element={<SessionCanvas />} />
+      <Route path="/canvas/:agent?" element={<SessionCanvas />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />

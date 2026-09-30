@@ -57,9 +57,17 @@ it('shows the provider write answer even when a later read would be stale', asyn
   expect(view.innerHTML).not.toContain('never-display-this-secret');
 });
 
+/** The directory, the signed-in person and no teams, as the secrets screen reads them. */
+const directoryOnly = async (url: string) => {
+  const path = String(url).replace(/^\/api/, '');
+  if (path === '/me') return Response.json(ME);
+  if (path === '/teams') return Response.json({ teams: [] });
+  return Response.json(DIRECTORY);
+};
+
 it('explains a secrets read failure and the next step without its refusal code', async () => {
-  vi.stubGlobal('fetch', async () => Response.json(DIRECTORY));
-  const view = await show(<Secrets read={async () => { throw new Refused(503, { refusal: 'SecretsUnavailable', reason: 'no secrets broker is configured for this service' }); }} />);
+  vi.stubGlobal('fetch', directoryOnly);
+  const view = await show(<MemoryRouter><Secrets read={async () => { throw new Refused(503, { refusal: 'SecretsUnavailable', reason: 'no secrets broker is configured for this service' }); }} /></MemoryRouter>);
   expect(view.textContent).toContain('Lys has no secrets store set up');
   expect(view.textContent).toContain('service configuration');
   expect(view.textContent).toContain('restart Lys');
@@ -70,8 +78,8 @@ it('explains a secrets read failure and the next step without its refusal code',
 
 it('puts a secret owner identifier behind a details toggle', async () => {
   const owner = ADA;
-  vi.stubGlobal('fetch', async () => Response.json(DIRECTORY));
-  const view = await show(<Secrets read={async () => ({ secrets: [{ name: 'Calendar', class: 'credential', owner, sequence: 2, upstream: null, header: null }] })} />);
+  vi.stubGlobal('fetch', directoryOnly);
+  const view = await show(<MemoryRouter><Secrets read={async () => ({ secrets: [{ name: 'Calendar', class: 'credential', owner, sequence: 2, upstream: null, header: null }] })} /></MemoryRouter>);
   const details = view.querySelectorAll('details');
   const account = [...details].find((detail) => detail.textContent?.includes(owner));
   expect(account).toBeDefined();
@@ -117,7 +125,7 @@ it('keeps the recorded request on screen without replacing it with an older list
   });
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({ relation: 'viewer', ends_at: null, why: 'A newly recorded request' });
-  expect(view.querySelector('section[aria-label="Visible requests"]')?.textContent).toContain('A newly recorded request');
+  expect(view.querySelector('.listing tr[data-href]')?.textContent).toContain('viewer on');
 });
 
 async function clickNamed(view: HTMLElement, name: string) {
