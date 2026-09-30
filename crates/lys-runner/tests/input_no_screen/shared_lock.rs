@@ -147,6 +147,22 @@ fn exercise(
             resume,
             entered: false,
         }));
+        if operation.is_some() {
+            let tracking = crate::tracking::Tracking {
+                harness: crate::tracking::Harness::ClaudeCode,
+                adapter: crate::tracking::CLAUDE_ADAPTER.to_owned(),
+                version: "2.1.281".to_owned(),
+                config_home: "/".to_owned(),
+                context_window: 200_000,
+                profile_version: 1,
+                account: None,
+                requires_pre_tool: false,
+            };
+            tracking.checked()?;
+            let session = table.sessions.get_mut("blocked").ok_or("session missing")?;
+            session.guard.tracking = Some(tracking);
+            session.guard.idle = false;
+        }
     }
     let compact = matches!(operation, Some(OperationRequest::Compact { .. }));
     let writer = if let Some(request) = operation {
@@ -159,8 +175,15 @@ fn exercise(
                 request,
             },
         )?;
-        assert_eq!(accepted.state, OperationState::Delivering);
+        assert_eq!(accepted.state, OperationState::Accepted);
         drop(table);
+        sessions.collect(
+            "blocked",
+            &crate::peer::Collected::Hook {
+                event: "Stop".to_owned(),
+                input: serde_json::json!({}),
+            },
+        )?;
         None
     } else {
         let writing = Arc::clone(sessions);
