@@ -27,7 +27,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
 use lys_identity::grants::{AppSchema, KindModel, LYS_APP, Model, Resource, owner_of};
 use lys_log_store::{
-    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, start,
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
 
 use crate::apps_error::AppError;
@@ -398,7 +398,8 @@ fn opened<S: LeafStore>(
     key: &Ed25519Identity,
 ) -> Result<Opened<S>, ServerError> {
     let store = reopen().map_err(unavailable)?;
-    let started = start(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    let started =
+        open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
     let mut held = match started.state.as_deref().map(Held::decode) {
         None => Held::default(),
         Some(Ok(held)) => held,

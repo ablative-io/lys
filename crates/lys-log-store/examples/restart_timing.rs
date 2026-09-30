@@ -1,6 +1,6 @@
 //! Times a restart of a file-backed log two ways: the full open through
-//! [`Log::open`], which reads and hashes every leaf, and a [`start`] that
-//! resumes a [`FrontierLog`](lys_log_store::FrontierLog) from a signed
+//! [`Log::open`], which reads and hashes every leaf, and [`open_with_snapshot`],
+//! which resumes a [`FrontierLog`](lys_log_store::FrontierLog) from a signed
 //! snapshot and reads only the leaves after it.
 //!
 //! ```text
@@ -22,7 +22,8 @@ use std::time::Instant;
 
 use lys_core::Ed25519Identity;
 use lys_log_store::{
-    FileLeafStore, Frontier, LeafStore, Log, PinnedRoot, Start, StoreResult, seal, start,
+    FileLeafStore, Frontier, LeafStore, Log, PinnedRoot, Start, StoreResult, open_with_snapshot,
+    seal,
 };
 
 /// The leaf count when no argument is given.
@@ -174,8 +175,8 @@ fn time_full_open(dir: &Path, leaves: u64) -> Result<Measured, Box<dyn Error>> {
     })
 }
 
-/// Opens the log at `dir` through [`start`] from its snapshot, and refuses a
-/// start that did not resume from it.
+/// Opens the log at `dir` through [`open_with_snapshot`] from its snapshot,
+/// and refuses a start that did not resume from it.
 fn time_snapshot_start(
     dir: &Path,
     leaves: u64,
@@ -183,7 +184,7 @@ fn time_snapshot_start(
     public_key: &[u8; 32],
 ) -> Result<Measured, Box<dyn Error>> {
     let began = Instant::now();
-    let started = start(Counting::new(FileLeafStore::open(dir)?), DOMAIN, public_key)?;
+    let started = open_with_snapshot(Counting::new(FileLeafStore::open(dir)?), DOMAIN, public_key)?;
     let millis = began.elapsed().as_secs_f64() * 1e3;
     match started.start {
         Start::Resumed { size, .. } if size == snapshot_at => {}

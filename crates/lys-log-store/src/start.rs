@@ -1,5 +1,5 @@
-//! [`start`] — opening a log from its owner's snapshot, or from the whole log
-//! when the snapshot cannot be believed, and saying which.
+//! [`open_with_snapshot`] opens a log from its owner's snapshot, or from the
+//! whole log when the snapshot cannot be believed, and says which.
 //!
 //! A start reads the store's snapshot, checks it (see [`crate::snapshot`]),
 //! refuses one claiming more leaves than the log has pinned, and resumes the
@@ -83,7 +83,7 @@ pub struct Started<S: LeafStore> {
 /// refusals when even the whole log does not reconcile with its pin. A
 /// snapshot that fails a check is never an error: it is refused by name in
 /// [`Started::start`].
-pub fn start<S: LeafStore>(
+pub fn open_with_snapshot<S: LeafStore>(
     store: S,
     domain: &str,
     public_key: &[u8; 32],

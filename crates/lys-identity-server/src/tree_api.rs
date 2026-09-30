@@ -13,6 +13,7 @@ use lys_identity::IdentityId;
 use crate::agent_signature::signed_agent;
 use crate::budgets_api::with_budgets;
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::goals_state::{GoalError, Holder, HolderKind, Standing as GoalStanding};
 use crate::grants::caller;
 use crate::provisioning_api::with_provisioning;
@@ -163,9 +164,9 @@ async fn read(
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
-    ServerError::TeamsUnavailable {
+    ServerError::Team(TeamError::Unavailable {
         reason: reason.into(),
-    }
+    })
 }
 
 fn instant() -> Result<(u64, i64), ServerError> {

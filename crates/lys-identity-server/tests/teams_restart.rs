@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity_server::error::ServerError;
+use lys_identity_server::error_team::TeamError;
 use lys_identity_server::read_views::Login;
 use lys_identity_server::teams_state::{Changed, Created, Line};
 use lys_identity_server::teams_store::TeamStore;
@@ -92,7 +93,7 @@ fn the_same_act_again_writes_nothing_and_other_words_are_refused() -> TestResult
     assert_eq!(store.teams().len(), 1);
     assert!(matches!(
         store.keep(created("op-1", "other", 9)),
-        Err(ServerError::TeamReused { .. })
+        Err(ServerError::Team(TeamError::Reused { .. }))
     ));
     Ok(())
 }
@@ -103,22 +104,22 @@ fn a_change_the_team_does_not_take_is_refused_by_name() -> TestResult {
     let mut store = TeamStore::open(&dir.path().join("teams"), key(dir.path())?)?;
     assert!(matches!(
         store.keep(Line::Added(changed("op-9", "op-1", MEMBER, 5))),
-        Err(ServerError::TeamUnknown)
+        Err(ServerError::Team(TeamError::Unknown))
     ));
     store.keep(created("op-1", "screens", 5))?;
     assert!(matches!(
         store.keep(Line::Removed(changed("op-2", "op-1", MEMBER, 6))),
-        Err(ServerError::TeamMemberAbsent)
+        Err(ServerError::Team(TeamError::MemberAbsent))
     ));
     store.keep(Line::Added(changed("op-3", "op-1", MEMBER, 7)))?;
     assert!(matches!(
         store.keep(Line::Added(changed("op-4", "op-1", MEMBER, 8))),
-        Err(ServerError::TeamMemberHeld)
+        Err(ServerError::Team(TeamError::MemberHeld))
     ));
     store.keep(Line::Retired(changed("op-5", "op-1", "", 9)))?;
     assert!(matches!(
         store.keep(Line::Removed(changed("op-6", "op-1", MEMBER, 10))),
-        Err(ServerError::TeamRetired { .. })
+        Err(ServerError::Team(TeamError::Retired { .. }))
     ));
     Ok(())
 }

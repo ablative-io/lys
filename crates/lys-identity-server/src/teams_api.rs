@@ -30,6 +30,7 @@ use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, OperationId, Pers
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::read_api::{login, own_person};
 use crate::read_views::Login;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -144,12 +145,11 @@ pub(crate) fn with_teams<T>(
     state: &AppState,
     act: impl FnOnce(&mut TeamStore) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let store = state
-        .teams
-        .as_ref()
-        .ok_or_else(|| ServerError::TeamsUnavailable {
+    let store = state.teams.as_ref().ok_or_else(|| {
+        ServerError::Team(TeamError::Unavailable {
             reason: "the configuration names no teams_dir".to_owned(),
-        })?;
+        })
+    })?;
     let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
     store.settle()?;
     act(&mut store)
@@ -187,12 +187,12 @@ fn recorded(line: &Line) -> Result<Recorded, ServerError> {
         Line::Retired(_) => ("retired", None),
         Line::Confirmed(changed) => ("confirmed", Some(changed.member.clone())),
         Line::Held(_) | Line::Checked(_) => {
-            return Err(ServerError::TeamsUnavailable {
+            return Err(ServerError::Team(TeamError::Unavailable {
                 reason: format!(
                     "operation `{}` records a system migration, not a caller act",
                     line.operation()
                 ),
-            });
+            }));
         }
     };
     let (by, at) = match line {
@@ -204,9 +204,9 @@ fn recorded(line: &Line) -> Result<Recorded, ServerError> {
         | Line::Retired(changed)
         | Line::Confirmed(changed) => (changed.by.clone(), changed.at),
         Line::Held(_) | Line::Checked(_) => {
-            return Err(ServerError::TeamsUnavailable {
+            return Err(ServerError::Team(TeamError::Unavailable {
                 reason: "a system migration has no authenticated caller".to_owned(),
-            });
+            }));
         }
     };
     Ok(Recorded {
@@ -223,11 +223,11 @@ fn recorded(line: &Line) -> Result<Recorded, ServerError> {
 pub(crate) fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
     let operation = line.operation().to_owned();
     let team = store.keep(line)?;
-    let first = store
-        .recorded(&operation)
-        .ok_or_else(|| ServerError::TeamsUnavailable {
+    let first = store.recorded(&operation).ok_or_else(|| {
+        ServerError::Team(TeamError::Unavailable {
             reason: format!("operation `{operation}` was kept and is not held"),
-        })?;
+        })
+    })?;
     Ok(TeamChanged {
         team: view(&team),
         recorded: recorded(&first)?,
@@ -250,7 +250,7 @@ pub(crate) fn words(name: &str, text: &str, most: usize) -> Result<String, Serve
 pub(crate) fn team_id(id: &str) -> Result<String, ServerError> {
     OperationId::from_str(id)
         .map(|id| id.to_string())
-        .map_err(|_unread| ServerError::TeamUnknown)
+        .map_err(|_unread| ServerError::Team(TeamError::Unknown))
 }
 
 /// Keep the change `made` makes on team `id`, admitted only for the team's
@@ -276,7 +276,9 @@ pub(crate) fn change(
             member_holds(projection, &changed.member)?;
         }
         with_teams(state, |store| {
-            let team = store.team(id).ok_or(ServerError::TeamUnknown)?;
+            let team = store
+                .team(id)
+                .ok_or(ServerError::Team(TeamError::Unknown))?;
             if own
                 .as_ref()
                 .is_some_and(|person| *person != team.created.owner)
@@ -326,12 +328,12 @@ fn member_holds(
     let identity = PersonId::from_str(member)
         .map(IdentityId::Person)
         .or_else(|_unread| AgentId::from_str(member).map(IdentityId::Agent))
-        .map_err(|_unread| ServerError::TeamMemberUnknown)?;
+        .map_err(|_unread| ServerError::Team(TeamError::MemberUnknown))?;
     let record = projection
         .record(identity)
-        .ok_or(ServerError::TeamMemberUnknown)?;
+        .ok_or(ServerError::Team(TeamError::MemberUnknown))?;
     if record.state() == LifecycleState::Retired {
-        return Err(ServerError::TeamMemberUnknown);
+        return Err(ServerError::Team(TeamError::MemberUnknown));
     }
     Ok(())
 }
@@ -419,7 +421,10 @@ async fn one(
     signed_in(&state, &headers)?;
     let id = team_id(&id)?;
     with_teams(&state, |store| {
-        store.team(&id).map(view).ok_or(ServerError::TeamUnknown)
+        store
+            .team(&id)
+            .map(view)
+            .ok_or(ServerError::Team(TeamError::Unknown))
     })
     .map(Json)
 }

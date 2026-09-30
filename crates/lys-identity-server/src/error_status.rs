@@ -121,8 +121,6 @@ impl ServerError {
             | Self::RoleVersionUnknown
             | Self::HolderUnknown
             | Self::ServiceAccountUnknown
-            | Self::TeamUnknown
-            | Self::TeamMemberUnknown
             | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             Self::RequestDecided { .. }
             | Self::RequestHeld { .. }
@@ -151,15 +149,9 @@ impl ServerError {
             | Self::ServiceAccountReused { .. }
             | Self::ServiceAccountRetired { .. }
             | Self::ServiceAccountOwnerRetired { .. }
-            | Self::TeamReused { .. }
             | Self::StopReused { .. }
             | Self::BudgetVersionConflict { .. }
             | Self::PolicyVersionConflict { .. }
-            | Self::TeamRetired { .. }
-            | Self::TeamMemberHeld
-            | Self::TeamParentCycle { .. }
-            | Self::TeamLeadNotMember { .. }
-            | Self::TeamMemberAbsent
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
             | Self::RunnerAbsent { .. }
@@ -197,7 +189,6 @@ impl ServerError {
             | Self::CertificatesUnavailable { .. }
             | Self::RuntimeUnavailable { .. }
             | Self::ServiceAccountsUnavailable { .. }
-            | Self::TeamsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::BudgetsUnavailable { .. }
             | Self::PolicyUnavailable { .. }
@@ -211,6 +202,7 @@ impl ServerError {
             Self::Grant(error) => grant_status(error),
             Self::App(error) => error.status(),
             Self::Goal(error) => error.status(),
+            Self::Team(error) => error.status(),
         }
     }
 }

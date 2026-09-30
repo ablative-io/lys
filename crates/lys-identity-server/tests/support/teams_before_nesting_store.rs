@@ -26,11 +26,12 @@ use std::sync::Arc;
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
 use lys_log_store::{
-    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, start,
+    FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
 
 use crate::config::Config;
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::routes::Say;
 use crate::teams_state::{DOMAIN, Held, Line, Refused, Team};
 
@@ -59,9 +60,9 @@ pub struct TeamStore<S: LeafStore = FileLeafStore> {
 type Opened<S> = (FrontierLog<S>, Held, Start);
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
-    ServerError::TeamsUnavailable {
+    ServerError::Team(TeamError::Unavailable {
         reason: what.to_string(),
-    }
+    })
 }
 
 impl TeamStore<FileLeafStore> {
@@ -240,19 +241,19 @@ impl<S: LeafStore> TeamStore<S> {
         }
         if let Some(kept) = self.held.operation(line.operation()) {
             if !kept.same_act(&line) {
-                return Err(ServerError::TeamReused {
+                return Err(ServerError::Team(TeamError::Reused {
                     operation: line.operation().to_owned(),
-                });
+                }));
             }
             return self.standing(line.team());
         }
         self.held.allows(&line).map_err(|refused| match refused {
-            Refused::Unknown => ServerError::TeamUnknown,
-            Refused::Retired => ServerError::TeamRetired {
+            Refused::Unknown => ServerError::Team(TeamError::Unknown),
+            Refused::Retired => ServerError::Team(TeamError::Retired {
                 team: line.team().to_owned(),
-            },
-            Refused::Held => ServerError::TeamMemberHeld,
-            Refused::Absent => ServerError::TeamMemberAbsent,
+            }),
+            Refused::Held => ServerError::Team(TeamError::MemberHeld),
+            Refused::Absent => ServerError::Team(TeamError::MemberAbsent),
             Refused::NotHeld => unavailable(format!("team `{}` member is not held", line.team())),
             Refused::Checked => unavailable("legacy memberships were already checked"),
         })?;
@@ -322,7 +323,9 @@ impl<S: LeafStore> TeamStore<S> {
     }
 
     fn standing(&self, id: &str) -> Result<Team, ServerError> {
-        self.team(id).cloned().ok_or(ServerError::TeamUnknown)
+        self.team(id)
+            .cloned()
+            .ok_or(ServerError::Team(TeamError::Unknown))
     }
 }
 
@@ -333,7 +336,8 @@ fn opened<S: LeafStore>(
     key: &Ed25519Identity,
 ) -> Result<Opened<S>, ServerError> {
     let store = reopen().map_err(unavailable)?;
-    let started = start(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    let started =
+        open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
     let mut held = match started.state.as_deref().map(Held::decode) {
         None => Held::default(),
         Some(Ok(held)) => held,

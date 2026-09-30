@@ -37,7 +37,7 @@ fn logged(count: u64, snapshot_at: u64, key: &Ed25519Identity) -> Disk {
 }
 
 fn started(disk: Disk, key: &Ed25519Identity) -> Started<CountingStore> {
-    start(CountingStore::over(disk), DOMAIN, &key.public_key_bytes()).unwrap()
+    open_with_snapshot(CountingStore::over(disk), DOMAIN, &key.public_key_bytes()).unwrap()
 }
 
 fn refused(disk: Disk, key: &Ed25519Identity, count: u64) -> SnapshotRefusal {
@@ -251,7 +251,7 @@ fn the_file_store_keeps_its_snapshot_across_a_reopen() {
     log.append(&leaf(5)).unwrap();
     drop(log);
     std::fs::write(log_dir.join("snapshot.bin.tmp"), b"a torn write").unwrap();
-    let started = start(
+    let started = open_with_snapshot(
         FileLeafStore::open(&log_dir).unwrap(),
         DOMAIN,
         &key.public_key_bytes(),

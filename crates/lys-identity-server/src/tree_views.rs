@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::budgets_state::{Budget, Held, Holder, Measure, Standing, covered};
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::provisioning_store::Profile;
 use crate::roles_records::Role;
 use crate::runtime_state::Tracked;
@@ -166,9 +167,9 @@ impl TreeState {
             .find(|(identity, _record)| identity.to_string() == id)
             .map(|(_identity, record)| record)
         else {
-            return Err(ServerError::TeamsUnavailable {
+            return Err(ServerError::Team(TeamError::Unavailable {
                 reason: format!("agent `{id}` has a standing but no directory record"),
-            });
+            }));
         };
         let roles = self
             .roles

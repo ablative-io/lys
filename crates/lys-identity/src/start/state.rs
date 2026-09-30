@@ -33,7 +33,8 @@ use std::path::Path;
 use ciborium::Value;
 use lys_core::Ed25519Identity;
 use lys_log_store::{
-    FileLeafStore, Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, start,
+    FileLeafStore, Frontier, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult,
+    open_with_snapshot,
 };
 
 use crate::encoding::{MAJOR_ARRAY, bytes, head};
@@ -346,7 +347,7 @@ fn opened<S: LeafStore>(
 ) -> Result<Opened<S>, StartError> {
     let public = key.public_key_bytes();
     let store = reopen().map_err(unavailable)?;
-    let started = start(store, DOMAIN, &public).map_err(unavailable)?;
+    let started = open_with_snapshot(store, DOMAIN, &public).map_err(unavailable)?;
     tracing::info!(domain = DOMAIN, "launch-record log {}", started.start);
     let mut held = match started.state.as_deref() {
         None => Held::default(),

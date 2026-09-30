@@ -10,6 +10,7 @@ use lys_identity::{AgentId, IdentityId, LoginBinding};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
+use crate::error_team::TeamError;
 use crate::grants::with_grants;
 use crate::routes::{AppState, hex, with_directory};
 use crate::session::now;
@@ -17,9 +18,9 @@ use crate::teams_api::with_teams;
 use crate::teams_state::{Changed, Checked, Hold, Line};
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
-    ServerError::TeamsUnavailable {
+    ServerError::Team(TeamError::Unavailable {
         reason: reason.into(),
-    }
+    })
 }
 
 fn pending(state: &AppState) -> Result<bool, ServerError> {

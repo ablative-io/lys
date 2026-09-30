@@ -65,6 +65,7 @@ fn native_deny_survives_a_real_peer_protocol_exchange() -> TestResult {
             assert_eq!(asked.tool_name, "Bash");
         }
         PeerAct::Collect(_) => return Err("judge sent a collector request".into()),
+        PeerAct::Restart { .. } => return Err("judge sent a restart request".into()),
     }
     Ok(())
 }
