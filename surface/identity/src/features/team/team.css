@@ -1,24 +1,18 @@
-/* A tree of names down the left and the chosen agent filling the rest. */
-.team-screen { display: grid; grid-template-columns: 200px minmax(0, 1fr); height: 100%; min-height: 0; }
-.team-screen .tree { padding: 26px 12px 26px 20px; overflow: auto; }
+/* The running-sessions workspace, with its list nested as a tree of names and the stage filling the height. */
+.team-page { height: 100%; display: flex; flex-direction: column; padding-bottom: 26px; }
+.team-page .session-workspace { flex: 1; min-height: 0; margin-top: 0; }
 .tree ul { list-style: none; margin: 0; padding: 0; }
 .tree-under { padding-left: 14px !important; }
-.tree-label { display: block; padding: 5px 6px 2px; color: var(--text-secondary); }
+.tree-label { display: block; padding: 8px 12px 4px; color: var(--text-secondary); }
 .tree-person { color: var(--text-primary); font-weight: 600; }
-.tree-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text-primary); }
-.tree-row:hover { background: var(--surface-hover); }
-.tree-row[aria-current="page"] { background: var(--accent-wash); }
+.tree-row { flex-direction: row; align-items: center; gap: 8px; padding: 7px 12px; }
 .tree-row .dot { flex: none; }
 .tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 10px 32px 24px 12px; }
+.team-stage { display: flex; flex-direction: column; min-height: 0; }
 .team-tabs { margin: 0 0 16px; align-items: center; }
 .team-acts { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-bottom: 6px; }
-.team-stage .terminal { flex: 1; margin: 0; min-height: 0; padding: 0; border: 0; border-radius: 0; }
-.team-stage .terminal-head h2, .team-stage .terminal-head .mono { display: none; }
+.team-stage .terminal { flex: 1; min-height: 0; }
 .team-stage .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.team-stage .terminal-screen, .team-stage .terminal-display .terminal-screen { flex: 1; height: auto; max-height: none; min-height: 0; }
-.team-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; }
-.team-failed { padding: 24px; }
-@media (max-width: 760px) { .team-screen { grid-template-columns: 1fr; } }
-.team-stage .terminal { background: transparent; gap: 0; }
-.team-stage .terminal-line input { border-color: transparent; }
+.team-stage .terminal-screen { flex: 1; max-height: none; }
+.team-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.team-stage .terminal-head h2, .team-stage .terminal-head .mono { display: none; }
