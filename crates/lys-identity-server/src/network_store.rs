@@ -62,6 +62,29 @@ pub struct Machine {
     pub named_at: u64,
     /// Its retirement, null while it is in use.
     pub retired: Option<Retirement>,
+    /// The owning team, absent while unowned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<String>,
+    /// The team given at creation, retained when ownership changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub creation_team: Option<String>,
+}
+
+/// The ownership act first recorded under an operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = ComputerTeamRecorded)]
+pub struct TeamRecorded {
+    /// The operation naming the act.
+    pub operation: String,
+    /// The computer whose ownership changed.
+    pub machine: String,
+    /// Its assigned team, null when cleared.
+    pub team: Option<String>,
+    /// The person who made the act.
+    pub by: String,
+    /// When the act was first recorded, in seconds since the Unix epoch.
+    pub at: u64,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -72,6 +95,8 @@ struct Kept {
     /// runner, and its start answers the command without running it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     runners: BTreeMap<String, RunnerRecord>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    team_changes: BTreeMap<String, TeamRecorded>,
 }
 
 /// The machines, read from their file and written to it.
@@ -159,8 +184,9 @@ impl NetworkStore {
 
     /// Keep `machine`. Named again in the same words it is kept once; the
     /// same operation in other words is refused.
-    pub fn name(&mut self, machine: Machine) -> Result<(), ServerError> {
+    pub fn name(&mut self, mut machine: Machine) -> Result<(), ServerError> {
         self.settle()?;
+        machine.creation_team.clone_from(&machine.team);
         match self.machine(&machine.id) {
             Some(kept) if same_words(kept, &machine) => Ok(()),
             Some(_) => Err(ServerError::MachineReused {
@@ -172,6 +198,41 @@ impl NetworkStore {
                 self.write(next)
             }
         }
+    }
+
+    /// The original ownership receipt, if this operation has been recorded.
+    pub fn team_recorded(&self, operation: &str) -> Option<&TeamRecorded> {
+        self.kept.team_changes.get(operation)
+    }
+
+    /// Keep ownership and its receipt together. A repeat writes nothing.
+    pub fn assign_team(&mut self, recorded: TeamRecorded) -> Result<TeamRecorded, ServerError> {
+        self.settle()?;
+        if let Some(first) = self.team_recorded(&recorded.operation) {
+            if first.machine == recorded.machine
+                && first.team == recorded.team
+                && first.by == recorded.by
+            {
+                return Ok(first.clone());
+            }
+            return Err(ServerError::MachineTeamReused {
+                operation: recorded.operation,
+            });
+        }
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == recorded.machine)
+            .ok_or(ServerError::MachineUnknown)?;
+        if machine.retired.is_some() {
+            return Err(ServerError::MachineRetired);
+        }
+        machine.team.clone_from(&recorded.team);
+        next.team_changes
+            .insert(recorded.operation.clone(), recorded.clone());
+        self.write(next)?;
+        Ok(recorded)
     }
 
     /// Retire the machine `id`. A machine already retired stays as it was retired.
@@ -218,10 +279,14 @@ impl NetworkStore {
 
 /// Whether two namings are the same machine, whenever each was named.
 fn same_words(kept: &Machine, named: &Machine) -> bool {
+    let original = Machine {
+        team: kept.creation_team.clone(),
+        ..kept.clone()
+    };
     let timeless = Machine {
         named_at: kept.named_at,
         retired: kept.retired.clone(),
         ..named.clone()
     };
-    *kept == timeless
+    original == timeless
 }

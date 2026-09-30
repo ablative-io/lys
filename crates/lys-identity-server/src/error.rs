@@ -194,6 +194,14 @@ pub enum ServerError {
         /// The operation id.
         machine: String,
     },
+    /// The operation already names an ownership act in different words.
+    #[error(
+        "MachineTeamReused: operation `{operation}` already assigned this computer to a different team; a new assignment needs a new operation"
+    )]
+    MachineTeamReused {
+        /// The reused operation.
+        operation: String,
+    },
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {

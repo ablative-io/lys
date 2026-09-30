@@ -126,6 +126,7 @@ impl ServerError {
             | Self::RequestHeld { .. }
             | Self::RequestReused { .. }
             | Self::MachineReused { .. }
+            | Self::MachineTeamReused { .. }
             | Self::RoleReused { .. }
             | Self::RoleHeld { .. }
             | Self::HoldingOver { .. }
