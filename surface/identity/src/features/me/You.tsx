@@ -250,7 +250,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
   const { search } = useLocation();
   const tab = new URLSearchParams(search).get('tab') === 'account' ? 'account' : 'agents';
   return (
-    <div className="page you-page">
+    <div className="page fill you-page">
       <div className="head">
         <div>
           <div className="eyebrow">Signed in as</div>
@@ -262,22 +262,24 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
         <a href="#/me" className={tab === 'agents' ? 'on' : undefined}>Agents</a>
         <a href="#/me?tab=account" className={tab === 'account' ? 'on' : undefined}>Account</a>
       </div>
-      {tab === 'account' ? <Account data={data} reload={reload} /> : <Agents data={data} />}
+      {tab === 'account' ? <div className="pane"><Account data={data} reload={reload} /></div> : <Agents data={data} />}
     </div>
   );
 }
 
 function Registered({ me }: { me: MeView }) {
-  return <div className="page">
+  return <div className="page fill">
     <div className="head"><div><div className="eyebrow">Signed in as</div>
       <h1>{me.person.display_name}</h1>
       <p>Your account is waiting for activation by an administrator.</p>
     </div></div>
+    <div className="pane">
     <OwnAccount readOnly />
     <section className="card" aria-label="Your signed-in sessions">
       <h2>Your signed-in sessions</h2>
       <SessionList person="" />
     </section>
+    </div>
   </div>;
 }
 
