@@ -1087,6 +1087,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/tests/support/codex_policy_fixture.rs` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 | `surface/identity/tests/acceptance/codex-policy.spec.ts` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
 | `docs/design/directory/PROOF-CODEX-POLICY.md` | Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6. | DIRECTORY-065 |
+| `crates/lys/src/identity/install/ports_tests.rs` | Tests that the service and broker ports come from the deployment configuration and a clash is refused | DIRECTORY-070 |
+| `scripts/identity-gates/upgrade_live.py` | touched by DIRECTORY-070 R2: the old install's ports come from its deployment configuration, not layout.rs | DIRECTORY-070 |
+| `scripts/identity-gates/test_upgrade_fixture.py` | touched by DIRECTORY-070 R2: fixture ports read from the old deployment configuration | DIRECTORY-070 |
+| `scripts/identity-gates/UPGRADE.md` | touched by DIRECTORY-070 R2: how the upgrade gate finds the old install's ports | DIRECTORY-070 |
+| `crates/lys/tests/identity_install.rs` | The first-install test on ports the operating system hands it, in folders it removes, built into the workspace target | DIRECTORY-070 |
+| `crates/lys/tests/cli_tests/identity_setup.rs` | touched by DIRECTORY-070 R3: the setup test takes its service port from the operating system | DIRECTORY-070 |
 
 ## Inventory
 

@@ -442,3 +442,9 @@
 - [ ] **C456** — The setting is Lys's own record, set on the Connections screen (DIRECTORY-069 R1).
 - [ ] **C457** — An install's configured setting becomes the first line, once (DIRECTORY-069 R2).
 - [ ] **C458** — The screen shows whether the service answers (DIRECTORY-069 R3).
+
+## Install ports are configuration and the install test is isolated (DIRECTORY-070)
+
+- [ ] **C459** — The service and broker ports are members of the deployment configuration (DIRECTORY-070 R1).
+- [ ] **C460** — An earlier install keeps its ports through upgrade (DIRECTORY-070 R2).
+- [ ] **C461** — The install test runs on free ports in its own folder, two at once, beside a live Lys (DIRECTORY-070 R3).

@@ -274,6 +274,8 @@
 
 **S172.** As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer.
 
+**S184.** As the person running a Lys install, I want its ports to be part of its own configuration and its install test to use ports and a folder of its own, so that testing an install never refuses, disturbs or depends on the Lys I am running.
+
 ## Person waiting on a permission check — Uses a Lys screen or route that checks a grant
 
 **S169.** As a person whose request is waiting on the permission service, I want my request to end when I leave it, and nobody else's request held behind mine.

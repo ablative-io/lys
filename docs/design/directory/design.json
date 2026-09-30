@@ -4943,6 +4943,36 @@
       "path": "docs/design/directory/PROOF-CODEX-POLICY.md",
       "note": "Prove config enforcement and denial delivery through the real harness. DIRECTORY-065 R6.",
       "brief": "DIRECTORY-065"
+    },
+    {
+      "path": "crates/lys/src/identity/install/ports_tests.rs",
+      "note": "Tests that the service and broker ports come from the deployment configuration and a clash is refused",
+      "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "scripts/identity-gates/upgrade_live.py",
+      "note": "touched by DIRECTORY-070 R2: the old install's ports come from its deployment configuration, not layout.rs",
+      "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "scripts/identity-gates/test_upgrade_fixture.py",
+      "note": "touched by DIRECTORY-070 R2: fixture ports read from the old deployment configuration",
+      "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "scripts/identity-gates/UPGRADE.md",
+      "note": "touched by DIRECTORY-070 R2: how the upgrade gate finds the old install's ports",
+      "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "crates/lys/tests/identity_install.rs",
+      "note": "The first-install test on ports the operating system hands it, in folders it removes, built into the workspace target",
+      "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "crates/lys/tests/cli_tests/identity_setup.rs",
+      "note": "touched by DIRECTORY-070 R3: the setup test takes its service port from the operating system",
+      "brief": "DIRECTORY-070"
     }
   ],
   "inventory": [

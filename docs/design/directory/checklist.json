@@ -1705,6 +1705,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Install ports are configuration and the install test is isolated (DIRECTORY-070)",
+      "items": [
+        {
+          "id": "C459",
+          "text": "The service and broker ports are members of the deployment configuration (DIRECTORY-070 R1).",
+          "done": false
+        },
+        {
+          "id": "C460",
+          "text": "An earlier install keeps its ports through upgrade (DIRECTORY-070 R2).",
+          "done": false
+        },
+        {
+          "id": "C461",
+          "text": "The install test runs on free ports in its own folder, two at once, beside a live Lys (DIRECTORY-070 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

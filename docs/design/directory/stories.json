@@ -614,6 +614,10 @@
         {
           "id": "S172",
           "text": "As the person running a Lys install, I want a missing API to say it is missing and one route that says the service is serving, so that a web page is never mistaken for an answer."
+        },
+        {
+          "id": "S184",
+          "text": "As the person running a Lys install, I want its ports to be part of its own configuration and its install test to use ports and a folder of its own, so that testing an install never refuses, disturbs or depends on the Lys I am running."
         }
       ]
     },
