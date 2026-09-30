@@ -70,6 +70,7 @@ use crate::requests_api::AskBody;
 use crate::requests_decide::{ApproveBody, DeclineBody};
 use crate::requests_views::{RequestList, RequestView};
 use crate::resources_api::ResourceList;
+use crate::restart_api::openapi as restart_types;
 use crate::reviews_api::{KeepBody, ReviewView};
 use crate::reviews_state::Kept;
 use crate::roles_api::{AssignBody, EndBody, MakeBody, MoveBody, VersionBody};
@@ -96,6 +97,7 @@ pub(crate) type Entry = (Method, &'static str, Schema, Schema);
 /// What each entry of the table takes and answers, by method and path.
 pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, Schema)> {
     let mut entries = sign_in_and_identities(api);
+    entries.push(restart_types(api));
     entries.extend(grants_and_reviews(api));
     entries.extend(roles_and_requests(api));
     entries.extend(machines_and_runtime(api));

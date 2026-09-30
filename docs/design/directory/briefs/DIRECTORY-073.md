@@ -44,6 +44,10 @@ Behavioural. WHEN a person or lead with the start right restarts an agent, THE S
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/runner_acts.rs
+- modify: crates/lys-identity-server/src/launch_api.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_refusals.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
 
 **Checklist:**
 - C466 — A restart ends the live session and starts it from the latest reviewed version. (DIRECTORY-073 R1).

@@ -38,6 +38,10 @@ struct Held {
 
 impl Held {
     async fn open() -> Result<Self, Box<dyn Error>> {
+        Self::open_with_runtime(true).await
+    }
+
+    async fn open_with_runtime(runtime: bool) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         let broker = Router::new().fallback(|| async { axum::Json(json!({"handles": []})) });
@@ -64,7 +68,12 @@ impl Held {
             None,
             Some(settings),
             None,
-            move |config| config.runner_socket = Some(adjusted),
+            move |config| {
+                config.runner_socket = Some(adjusted);
+                if !runtime {
+                    config.runtime_dir = None;
+                }
+            },
             move |config| {
                 let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
@@ -267,6 +276,139 @@ async fn another_person_cannot_restart_the_agents_session() -> TestResult {
         )
         .await?;
     assert_eq!(status, 403, "{refused}");
+    assert!(held.status(session)?.ended.is_none());
+    held.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restart_refuses_reused_ids_missing_sessions_and_inactive_agents() -> TestResult {
+    let held = Held::open().await?;
+    held.review(1).await?;
+    let started = held.start().await?;
+    let session = started["session"].as_str().ok_or("no session")?;
+    let path = format!("/agents/{}/restart", held.agent());
+    let (status, reused) = held
+        .service
+        .post(
+            &path,
+            Some(&held.ada),
+            &json!({ "session": session, "operation": session }),
+        )
+        .await?;
+    assert_ne!(status, 200);
+    assert_eq!(reused["refusal"], "RuntimeReportReused", "{reused}");
+    let absent = operation()?;
+    held.ok(
+        &format!("/agents/{}/runtime/sessions/{absent}/reports", held.agent()),
+        &json!({ "operation": operation()?, "machine": held.machine, "state": "running" }),
+    )
+    .await?;
+    let (status, missing) = held
+        .service
+        .post(
+            &path,
+            Some(&held.ada),
+            &json!({ "session": absent, "operation": operation()? }),
+        )
+        .await?;
+    assert_eq!(status, 404, "{missing}");
+    assert_eq!(missing["refusal"], "session_unknown", "{missing}");
+    held.ok(&format!("/identities/{}/transitions", held.agent()), &json!({ "operation": operation()?, "transition": "suspend", "reason": "suspend the agent" })).await?;
+    let (status, inactive) = held
+        .service
+        .post(
+            &path,
+            Some(&held.ada),
+            &json!({ "session": session, "operation": operation()? }),
+        )
+        .await?;
+    assert_ne!(status, 200);
+    assert_eq!(inactive["refusal"], "AgentNotActive", "{inactive}");
+    assert!(held.status(session)?.ended.is_none());
+    held.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unconfigured_runtime_refuses_restart_by_name() -> TestResult {
+    let held = Held::open_with_runtime(false).await?;
+    let (status, refused) = held
+        .service
+        .post(
+            &format!("/agents/{}/restart", held.agent()),
+            Some(&held.ada),
+            &json!({ "session": operation()?, "operation": operation()? }),
+        )
+        .await?;
+    assert_ne!(status, 200);
+    assert_eq!(refused["refusal"], "RuntimeUnavailable", "{refused}");
+    held.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestResult {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixListener;
+    let held = Held::open().await?;
+    held.review(1).await?;
+    let started = held.start().await?;
+    let session = started["session"].as_str().ok_or("no session")?.to_owned();
+    let socket = held.dir.path().join("other.sock");
+    let listener = UnixListener::bind(&socket)?;
+    let reply_session = session.clone();
+    let answering = std::thread::spawn(move || -> std::io::Result<()> {
+        let (stream, _) = listener.accept()?;
+        let mut writer = &stream;
+        writer.write_all(b"{\"version\":1,\"runner\":\"00000000000000000000000000000000\",\"challenge\":\"00000000000000000000000000000000\"}\n")?;
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line)?;
+        let answer = serde_json::to_vec(&Answer::Delivered {
+            session: reply_session,
+        })?;
+        writer.write_all(&answer)?;
+        writer.write_all(b"\n")?;
+        Ok(())
+    });
+    held.ok(
+        &format!("/network/machines/{}/runner", held.machine),
+        &json!({ "runner": { "kind": "socket", "path": socket.display().to_string() } }),
+    )
+    .await?;
+    let (status, refused) = held
+        .service
+        .post(
+            &format!("/agents/{}/restart", held.agent()),
+            Some(&held.ada),
+            &json!({ "session": session, "operation": operation()? }),
+        )
+        .await?;
+    answering.join().expect("runner stand-in panicked")?;
+    assert_eq!(status, 502, "{refused}");
+    assert_eq!(refused["refusal"], "runner_reply_malformed", "{refused}");
+    assert!(held.status(&session)?.ended.is_none());
+    held.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_machine_without_a_runner_refuses_restart_before_ending() -> TestResult {
+    let held = Held::open().await?;
+    held.review(1).await?;
+    let started = held.start().await?;
+    let session = started["session"].as_str().ok_or("no session")?;
+    held.ok(
+        &format!("/network/machines/{}/runner", held.machine),
+        &json!({ "runner": null }),
+    )
+    .await?;
+    let (status, refused) = held
+        .service
+        .post(
+            &format!("/agents/{}/restart", held.agent()),
+            Some(&held.ada),
+            &json!({ "session": session, "operation": operation()? }),
+        )
+        .await?;
+    assert_ne!(status, 200);
+    assert_eq!(refused["refusal"], "runner_absent", "{refused}");
     assert!(held.status(session)?.ended.is_none());
     held.close()
 }

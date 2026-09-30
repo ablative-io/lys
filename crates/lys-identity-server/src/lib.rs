@@ -88,6 +88,7 @@ mod requests_state;
 pub mod requests_store;
 pub mod requests_views;
 pub mod resources_api;
+pub mod restart_api;
 pub mod reviews_api;
 pub mod reviews_state;
 pub mod reviews_store;

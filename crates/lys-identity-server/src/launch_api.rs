@@ -123,34 +123,41 @@ pub(crate) async fn start_for(
     machine: &str,
     operation: &str,
 ) -> Result<Json<Value>, ServerError> {
+    start_profile(state, headers, actor, agent, machine, operation, None).await
+}
+
+/// Start an exact reviewed profile through the same admission and launch path.
+pub(crate) async fn start_profile(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    actor: &Actor,
+    agent: AgentId,
+    machine: &str,
+    operation: &str,
+    profile: Option<Version>,
+) -> Result<Json<Value>, ServerError> {
     let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
+    let admitted_by = start_caller(state, headers, actor, &agent)?;
     let admission = with_directory(state, |directory| {
         let directory = directory.projection()?;
-        let admitted_by = caller(state, headers, directory)?.to_string();
         let parsed = AgentId::from_str(&agent)?;
         let record = directory
             .record(IdentityId::Agent(parsed))
             .ok_or(ServerError::AgentNotVisible)?;
-        let answers = state.admission.administrator(actor).is_ok()
-            || directory
-                .person_for(actor.binding())
-                .is_some_and(|person| record.responsible() == Some(person));
-        if !answers {
-            return Err(ServerError::NotAdmitted {
-                reason: "only the administrator or the person responsible for the agent is given its start command",
-            });
-        }
         if let Some(kept) = admitted(state, &session, &agent)? {
             return Ok(Admission::Kept(kept, admitted_by));
         }
         active(record.state())?;
-        let version = with_provisioning(state, |store| {
-            store
-                .profile(&agent)
-                .and_then(|profile| profile.versions.last().cloned())
-                .ok_or(ServerError::LaunchRecordMissing)
-        })?;
+        let version = match profile {
+            Some(version) => version,
+            None => with_provisioning(state, |store| {
+                store
+                    .profile(&agent)
+                    .and_then(|profile| profile.versions.last().cloned())
+                    .ok_or(ServerError::LaunchRecordMissing)
+            })?,
+        };
         reviewed(&version)?;
         let held = crate::roles_api::held_roles(state, &agent, now())?;
         let runtime = with_network(state, |store| {
@@ -237,6 +244,33 @@ pub(crate) async fn start_for(
     run(state, kept, &admitted_by, rotation).await
 }
 
+/// Authenticate the caller and require the existing start authority.
+pub(crate) fn start_caller(
+    state: &AppState,
+    headers: &HeaderMap,
+    actor: &Actor,
+    agent: &str,
+) -> Result<String, ServerError> {
+    with_directory(state, |directory| {
+        let directory = directory.projection()?;
+        let admitted_by = caller(state, headers, directory)?.to_string();
+        let parsed = AgentId::from_str(agent)?;
+        let record = directory
+            .record(IdentityId::Agent(parsed))
+            .ok_or(ServerError::AgentNotVisible)?;
+        let answers = state.admission.administrator(actor).is_ok()
+            || directory
+                .person_for(actor.binding())
+                .is_some_and(|person| record.responsible() == Some(person));
+        if !answers {
+            return Err(ServerError::NotAdmitted {
+                reason: "only the administrator or the person responsible for the agent is given its start command",
+            });
+        }
+        Ok(admitted_by)
+    })
+}
+
 /// Run the start `view` answers on its machine's runner, when the machine
 /// names one, and answer the view with the runner's word on it beside it;
 /// a machine that names none is answered the view as it is, and nothing
@@ -294,7 +328,11 @@ enum Admission {
 /// The start kept under `session` for `agent`, answered exactly as it was
 /// first; none when nothing is kept under it, and refused when the id names
 /// any other report.
-fn admitted(state: &AppState, session: &str, agent: &str) -> Result<Option<Value>, ServerError> {
+pub(crate) fn admitted(
+    state: &AppState,
+    session: &str,
+    agent: &str,
+) -> Result<Option<Value>, ServerError> {
     with_runtime(state, |store| {
         let Some(tracked) = store.session(session) else {
             return Ok(None);
