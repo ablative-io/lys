@@ -157,6 +157,7 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
     let mut newer = version;
     newer.operation = "profile-two".to_owned();
     newer.settings.instructions = "Different instructions.".to_owned();
+    newer.settings.instructions_mode = lys_home::harness::launch_fields::InstructionsMode::Replace;
     newer.settings.harness.as_mut().ok_or("no harness")?.program = "/opt/new/program".to_owned();
     store.set("agent", 1, newer)?;
     assert_eq!(bytes, serde_json::to_vec(&kept_launch(&store, &view)?)?);
