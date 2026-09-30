@@ -39,8 +39,12 @@ Behavioural. WHEN a profile version names writable folders, THE SYSTEM SHALL car
 
 **Files:**
 - create: crates/lys-runner/tests/launch_folders.rs
+- create: crates/lys-identity-server/tests/profile_folders.rs
 - modify: crates/lys-runner/src/protocol.rs
 - modify: crates/lys-identity-server/src/launch_template.rs
+- modify: crates/lys-identity-server/src/provisioning_store.rs
+- modify: crates/lys-identity-server/src/provisioning_api.rs
+- modify: crates/lys-identity-server/tests/provisioning.rs
 
 **Checklist:**
 - C469 — The signed Launch carries a profile's writable folders. (DIRECTORY-074 R1).

@@ -382,6 +382,8 @@ fn version(operation: &str, note: &str) -> Version {
             harness: None,
             skill_pins: Vec::new(),
             permissions: None,
+            runs_on: None,
+            writable: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

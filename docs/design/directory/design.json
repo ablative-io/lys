@@ -5168,6 +5168,26 @@
       "path": "crates/lys-home/src/harness/rendering.rs",
       "note": "The programme catalogue reads registration through the rendering resolver (DIRECTORY-076 R1)",
       "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/profile_folders.rs",
+      "note": "The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_store.rs",
+      "note": "The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_api.rs",
+      "note": "The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/provisioning.rs",
+      "note": "The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
     }
   ],
   "inventory": [

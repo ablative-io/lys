@@ -1132,6 +1132,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/error_status.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `crates/lys-identity-server/src/openapi_types.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
 | `crates/lys-home/src/harness/rendering.rs` | The programme catalogue reads registration through the rendering resolver (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/tests/profile_folders.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/tests/provisioning.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
 
 ## Inventory
 
