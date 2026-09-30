@@ -270,6 +270,57 @@ async fn before_without_a_deadline_is_refused_by_name() -> TestResult {
     Ok(())
 }
 
+#[tokio::test]
+async fn the_tree_uses_current_goal_words_and_omits_inactive_aims() -> TestResult {
+    let table = Table::start().await?;
+    let team = table
+        .post(
+            "/teams",
+            &json!({
+                "operation": OperationId::generate()?.to_string(), "name": "Service team",
+            }),
+        )
+        .await?;
+    let team = team["id"].as_str().ok_or("team id absent")?;
+    table
+        .post(
+            &format!("/teams/{team}/members"),
+            &json!({
+                "operation": OperationId::generate()?.to_string(), "member": table.agent,
+            }),
+        )
+        .await?;
+    let item = table.set().await?;
+    let goal = goal_id(&item)?;
+    let (status, tree) = table.service.get("/tree", Some(&table.cookie)).await?;
+    assert_eq!(status, 200, "{tree}");
+    assert_eq!(
+        tree["teams"][0]["members"][0]["goals"],
+        json!(["keep the service available"])
+    );
+    table.post(&format!("/goals/{goal}/words"), &json!({
+        "operation": OperationId::generate()?.to_string(), "words": "keep the directory available",
+    })).await?;
+    let (status, tree) = table.service.get("/tree", Some(&table.cookie)).await?;
+    assert_eq!(status, 200, "{tree}");
+    assert_eq!(
+        tree["teams"][0]["members"][0]["goals"],
+        json!(["keep the directory available"])
+    );
+    table
+        .post(
+            &format!("/goals/{goal}/active"),
+            &json!({
+                "operation": OperationId::generate()?.to_string(), "active": false,
+            }),
+        )
+        .await?;
+    let (status, tree) = table.service.get("/tree", Some(&table.cookie)).await?;
+    assert_eq!(status, 200, "{tree}");
+    assert_eq!(tree["teams"][0]["members"][0]["goals"], json!([]));
+    Ok(())
+}
+
 fn held_goal(deadline: Option<u64>) -> Result<Held, Box<dyn Error>> {
     let mut goal = json!({
         "line": "set", "id": "goal-1", "holder": {"kind": "agent", "id": "agent-1"},
