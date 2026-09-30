@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resourceText } from '../../generated/grants';
 import type { ResourceRef } from '../../generated/grants';
 import { firstName } from '../people/directory';
+import { Picker } from '../../shell/Picker';
 import { AnswerView } from './Answer';
 import { ask } from './check';
 import type { Answer } from './check';
@@ -84,14 +85,12 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
   return (
     <>
       <div className="q">
-        <span className="sec">Can</span>
-        <select id="cWho" value={chosen} onChange={(e) => { setChosen(e.target.value); setAnswer(null); }} aria-label="Who">
-          {people.map(([id, x]) => <option key={id} value={id}>{x.name}</option>)}
-        </select>
+        <span className="sec">Can <strong>{nameOf(w, chosen)}</strong></span>
         {permSelect}
         {resSelect}
         {button}
       </div>
+      <Picker key={chosen} name="who" label="Ask about someone else" options={people.map(([id, x]) => ({ id, name: x.name }))} onChange={(ids) => { if (ids[0]) { setChosen(ids[0]); setAnswer(null); } }} />
       <div className="answer-box" id="answer">{shown}</div>
     </>
   );

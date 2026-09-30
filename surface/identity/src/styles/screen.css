@@ -24,6 +24,7 @@ tbody tr:hover td { background: rgba(255,255,255,.02); }
 tbody tr.cursor td { background: rgba(212,151,90,.07); }
 .dim { color: var(--text-muted); }
 .sec { color: var(--text-secondary); }
+.danger { color: var(--danger); }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
 .s-active { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-glow); }
 .s-commissioned, .s-registered { background: var(--muted-dot); }
