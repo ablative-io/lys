@@ -57,7 +57,7 @@ async function reload(routes: Record<string, Route>): Promise<void> {
 }
 
 const reached = (stands: Receipt['acted']): Receipt[] => [{
-  crossing: { operation: 'op-crossing', holder, measure: 'tokens', version: 1, limit: 1000, figure: 1200, act: 'stop', agent: SCRIBE, at_ms: 1790000000000 },
+  crossing: { operation: 'op-crossing', holder, measure: 'tokens', version: 1, limit: 1000, figure: 1200, limit_index: 0, warning: false, act: 'stop', agent: SCRIBE, at_ms: 1790000000000 },
   acted: stands,
 }];
 
