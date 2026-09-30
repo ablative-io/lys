@@ -1,6 +1,7 @@
 /** Failures explain the next act; identifiers remain available only in details. */
 import { Refused } from '../../api';
 import type { PeopleView } from '../../generated';
+import type { RoleChange } from '../roles/useRoleChange';
 
 const REFUSALS: Record<string, string> = {
   NoPerson: 'Your sign-in account has not been connected to a person in Lys.',
@@ -22,7 +23,7 @@ export function plainReason(reason: string, hidden: string[] = []): string {
   let words = reason;
   for (const value of hidden.filter(Boolean)) words = words.split(value).join('[secret withheld]');
   return words
-    .replace(/\b(?:person|agent|grant|op)-[0-9a-f]{32}\b/g, 'the recorded account or request')
+    .replace(/\b(person|agent|grant|op)-[0-9a-f]{32}\b/g, (_identifier, kind: string) => ({ person: 'that person', agent: 'that agent', grant: 'that permission', op: 'that request' })[kind] ?? 'that record')
     .replace(/\b[A-Z][A-Za-z]+:\s*/g, '')
     .replace(/\bprincipal\b/gi, 'person or agent')
     .replace(/\boperation(?:s)?(?: id(?:s)?)?\b/gi, 'request')
@@ -67,4 +68,11 @@ export function identityName(id: string, people?: PeopleView): string | null {
 export function IdentityName({ id, people }: { id: string; people?: PeopleView }) {
   const name = identityName(id, people);
   return <>{name ?? 'Name unavailable'}<details><summary>Account details</summary><p>Identifier: {id}</p></details></>;
+}
+
+/** Checking a pending change sends its original request, with no new request identity. */
+export function ChangeResult({ change }: { change: RoleChange }) {
+  return <>{change.pending ? <div role="status"><p>This change has no confirmed answer. Its original details are retained.</p>
+    <button className="btn" type="button" disabled={change.busy} onClick={change.retry}>Check original change</button></div> : null}
+    {change.failure ? <p role="alert" className="why-not">{failureWords(change.failure, 'Check the details. If the result is unconfirmed, choose Check original change; do not create another change.')}</p> : null}</>;
 }

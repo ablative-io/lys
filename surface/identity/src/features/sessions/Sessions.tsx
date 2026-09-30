@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { api, request, useLoad } from '../../api';
 import { clock } from '../file/time';
 import { Gate, SignIn } from '../signin/Gate';
+import { ReadFailure, failureWords } from '../signin/words';
 
 /** crates/lys-identity-server/src/sessions_api.rs: SessionView and SessionsView. */
 export interface SessionView {
@@ -22,7 +23,7 @@ export function Sessions() {
   const person = params.get('person') ?? '';
   const people = useLoad(api.people, 'session-people');
   return <div className="page">
-    <div className="head"><div><div className="eyebrow">Account security</div><h1>Signed-in sessions</h1>
+    <div className="head"><div><h1>Where you are signed in</h1>
       <p className="sub">See where you’re signed in and end a session you no longer need. Agents’ running sessions are on <a href="#/runtime">Running sessions</a>.</p></div></div>
     {people.status === 'ok' && people.data.scope === 'directory' ? <details>
       <summary>Advanced: another person’s sessions</summary>
@@ -41,6 +42,7 @@ export function SessionList({ person }: { person: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [ended, setEnded] = useState(false);
+  const [confirmedEnds, setConfirmedEnds] = useState<string[]>([]);
   const [blocked, setBlocked] = useState<{ id: string; revision: number } | null>(null);
   const sending = useRef(false);
   const path = sessionPath(person);
@@ -56,11 +58,11 @@ export function SessionList({ person }: { person: string }) {
       if (answer.ended !== session.id) throw new Error('Lys answered, but its answer named a different session.');
       setConfirm(null);
       if (session.current) setEnded(true);
-      else setRevision((value) => value + 1);
+      else setConfirmedEnds((held) => [...held, answer.ended]);
     } catch (error) {
       setConfirm(null);
       setBlocked({ id: session.id, revision });
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(failureWords(error, 'Keep this page open until the session list has answered.'));
       setRevision((value) => value + 1);
     } finally { sending.current = false; setBusy(false); }
   }
@@ -73,9 +75,9 @@ export function SessionList({ person }: { person: string }) {
       <button className="btn primary" disabled={busy || blockedId === confirm.id} onClick={() => { void finish(confirm); }}>{busy ? 'Ending session…' : 'Confirm end session'}</button>
       <button className="btn" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
     </section> : null}
-    <Gate load={load} title="Sessions" ok={(view) => view.sessions.length ? <table>
+    <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <table>
       <thead><tr><th>Session</th><th>Started</th><th>Expires</th><th>Action</th></tr></thead>
-      <tbody>{view.sessions.map((session) => <tr key={session.id}>
+      <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).map((session) => <tr key={session.id}>
         <td>{session.current ? 'This session' : 'Another signed-in session'}<details><summary>Sign-in details</summary>
           <p>Provider: {session.login.issuer}</p><p>Account identifier: {session.login.subject}</p><p>Session identifier: {session.id}</p>
         </details></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
