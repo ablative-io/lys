@@ -17,7 +17,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use lys_home::harness::launch_fields::{Channel, DeclaredHarness, Literal};
+use lys_home::harness::launch_fields::{Channel, DeclaredHarness, InstructionsMode, Literal};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -115,6 +115,9 @@ pub struct Settings {
     pub mcp_servers: Vec<McpServer>,
     /// Its instructions; may be empty.
     pub instructions: String,
+    /// Whether to keep, append to or replace the program's prompt.
+    #[serde(default, skip_serializing_if = "InstructionsMode::is_append")]
+    pub instructions_mode: InstructionsMode,
     /// Why this version was set; may be empty.
     pub note: String,
     /// How its sessions are driven through a runner, when the profile says.

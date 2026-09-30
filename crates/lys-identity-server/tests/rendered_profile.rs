@@ -157,6 +157,7 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
     let mut newer = version;
     newer.operation = "profile-two".to_owned();
     newer.settings.instructions = "Different instructions.".to_owned();
+    newer.settings.instructions_mode = lys_home::harness::launch_fields::InstructionsMode::Replace;
     newer.settings.harness.as_mut().ok_or("no harness")?.program = "/opt/new/program".to_owned();
     store.set("agent", 1, newer)?;
     assert_eq!(bytes, serde_json::to_vec(&kept_launch(&store, &view)?)?);
@@ -172,5 +173,72 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
         kept_launch(&store, &corrupt),
         Err(lys_identity_server::error::ServerError::LaunchUnrenderable { .. })
     ));
+    Ok(())
+}
+
+#[test]
+fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<(), Box<dyn Error>> {
+    use lys_identity_server::launch_template::from_template;
+    for (mode, expected) in [
+        ("keep", None),
+        ("append", Some("--append-system-prompt-file")),
+        ("replace", Some("--system-prompt-file")),
+    ] {
+        let version: Version = serde_json::from_value(json!({
+            "number": 1, "operation": "record-profile", "set_by": "operator", "set_at": 1,
+            "settings": {
+                "harness": harness_description::declared(),
+                "model_access": [], "tools": [], "skills": [], "mcp_servers": [],
+                "instructions": "Exact reviewed instructions.\n", "instructions_mode": mode, "note": ""
+            }
+        }))?;
+        let rendered = render(
+            &Start {
+                agent: "agent",
+                session: "session",
+                machine: "machine",
+                runtime: "unused",
+                version: &version,
+                skills: &[],
+                policy: None,
+            },
+            &[],
+        )?;
+        let launch = from_template(&version, &rendered.template, &rendered.template_sha256)?;
+        let prompt_flags: Vec<&str> = launch
+            .arguments
+            .iter()
+            .map(String::as_str)
+            .filter(|argument| argument.ends_with("system-prompt-file"))
+            .collect();
+        assert_eq!(
+            prompt_flags,
+            expected.into_iter().collect::<Vec<_>>(),
+            "{mode}"
+        );
+        let instruction_bindings: Vec<usize> = launch
+            .argument_files
+            .iter()
+            .filter_map(|(index, path)| (path == "instructions.txt").then_some(*index))
+            .collect();
+        match expected {
+            Some(flag) => {
+                assert_eq!(instruction_bindings.len(), 1, "{mode}");
+                let index = instruction_bindings[0];
+                assert_eq!(launch.arguments[index - 1], flag);
+                assert_eq!(launch.arguments[index], "instructions.txt");
+                assert_eq!(
+                    launch
+                        .files
+                        .iter()
+                        .find(|file| file.path == "instructions.txt")
+                        .ok_or("no instructions file")?
+                        .text,
+                    version.settings.instructions
+                );
+            }
+            None => assert!(instruction_bindings.is_empty()),
+        }
+    }
     Ok(())
 }

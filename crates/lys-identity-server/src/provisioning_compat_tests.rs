@@ -5,7 +5,6 @@ use super::{ProvisioningStore, read};
 #[test]
 fn an_old_profile_rewritten_without_edits_keeps_its_exact_bytes()
 -> Result<(), Box<dyn std::error::Error>> {
-    // Field order and pretty formatting are those of 1b568cd9's Kept/Version/Settings.
     let original = br#"{
   "profiles": [
     {
@@ -40,7 +39,20 @@ fn an_old_profile_rewritten_without_edits_keeps_its_exact_bytes()
     let file = directory.path().join("provisioning.json");
     std::fs::write(&file, original)?;
     let mut store = ProvisioningStore::open(&file)?;
+    let version = store
+        .profile("ordinary-agent")
+        .ok_or("no migrated profile")?
+        .versions
+        .first()
+        .ok_or("no migrated version")?;
+    assert_eq!(
+        version.settings.instructions_mode,
+        lys_home::harness::launch_fields::InstructionsMode::Append
+    );
+    assert_eq!(version.settings.instructions, "ordinary instructions");
     store.write(read(&file)?)?;
-    assert_eq!(std::fs::read(file)?, original);
+    assert_eq!(std::fs::read(&file)?, original);
+    let reopened = ProvisioningStore::open(&file)?;
+    assert_eq!(reopened.profiles(), store.profiles());
     Ok(())
 }
