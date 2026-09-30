@@ -51,9 +51,9 @@ export function RefusedPage({ refused, title }: { refused: Refused; title: strin
 }
 
 /** Render `ok` once the read has answered, the refusal if it was refused. */
-export function Gate<T>({ load, title, ok }: { load: Load<T>; title: string; ok: (data: T) => ReactNode }) {
+export function Gate<T>({ load, title, ok, renderError }: { load: Load<T>; title: string; ok: (data: T) => ReactNode; renderError?: (refused: Refused) => ReactNode }) {
   if (load.status === 'loading') return <Loading />;
-  if (load.status === 'refused') return <RefusedPage refused={load.refused} title={title} />;
+  if (load.status === 'refused') return <>{load.refused.status !== 401 && renderError ? renderError(load.refused) : <RefusedPage refused={load.refused} title={title} />}</>;
   return <>{ok(load.data)}</>;
 }
 
