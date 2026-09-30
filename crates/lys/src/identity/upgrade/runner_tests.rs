@@ -396,3 +396,108 @@ fn upgrade_command_child() -> TestResult {
         }
     }
 }
+
+#[test]
+fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -> TestResult {
+    use super::super::intent::{Intent, Step};
+    use super::super::{launch, swap};
+
+    for state in ["empty", "live", "unreadable"] {
+        let running = Running::new()?;
+        let new = running.new_build(false)?;
+        let layout = &running.scratch.layout;
+        let keys = running.keys()?;
+        services::stop(&running.pid())?;
+        swap::stop_all(&running.scratch.units, &mut |_| {})?;
+        let mut intent = Intent {
+            from: BINARIES
+                .into_iter()
+                .chain(["lys"])
+                .map(|name| (name.into(), A.into()))
+                .collect(),
+            to: BINARIES
+                .into_iter()
+                .chain(["lys"])
+                .map(|name| (name.into(), B.into()))
+                .collect(),
+            screens: false,
+            screens_existed: true,
+            files: Vec::new(),
+            compose_changed: false,
+            steps: vec![Step::Stopped],
+        };
+        intent.write(layout)?;
+        swap::keep_binaries(layout, &mut intent)?;
+        swap::place_binaries(
+            layout,
+            &new,
+            &[BINARIES[0], BINARIES[1], "lys"],
+            &mut intent,
+        )?;
+        for unit in &running.scratch.units {
+            launch(layout, unit, false)?;
+        }
+        if state != "unreadable" {
+            install::start_runner(layout, &running.key, &layout.binary("lys"), &mut |_| {})?;
+        }
+        if state == "live" {
+            let launch = Launch {
+                session: "recovery-held".into(),
+                program: "/bin/cat".into(),
+                arguments: vec![],
+                directory: running.scratch.work().display().to_string(),
+                environment: BTreeMap::new(),
+                config: None,
+                columns: 80,
+                rows: 24,
+                rotation: None,
+                policy: None,
+            };
+            assert!(matches!(
+                running.client().ask(&Act::Start {
+                    launch: Box::new(launch)
+                })?,
+                Answer::Started { .. }
+            ));
+        }
+        let before = running.unchanged()?;
+        let pid = std::fs::read(running.pid())?;
+        let recorded = std::fs::read(layout.upgrade_intent())?;
+        let result = swap::recover(
+            layout,
+            &running.scratch.units,
+            &mut Recorder::default(),
+            &mut |_| {},
+        );
+        if state == "empty" {
+            result?;
+            assert_eq!(version(&layout.binary("lys"), "lys")?, A);
+            assert_ne!(
+                std::fs::read(running.pid())?,
+                pid,
+                "recovery kept the replacement runner"
+            );
+            assert!(matches!(
+                running.client().ask(&Act::Status { session: None })?,
+                Answer::Status { .. }
+            ));
+            assert!(!layout.upgrade_intent().exists());
+        } else {
+            let error = result.err().ok_or("recovery acted on unsafe Status")?;
+            let named = error.to_string();
+            let expected = if state == "live" {
+                "runner_sessions_live"
+            } else {
+                "runner_status_unreadable"
+            };
+            assert!(named.contains(expected), "{named}");
+            if state == "live" {
+                assert!(named.contains("recovery-held"), "{named}");
+            }
+            assert_eq!(running.unchanged()?, before);
+            assert_eq!(std::fs::read(layout.upgrade_intent())?, recorded);
+        }
+        assert_eq!(running.keys()?, keys);
+    }
+    Ok(())
+}
