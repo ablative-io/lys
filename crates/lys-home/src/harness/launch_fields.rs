@@ -65,6 +65,26 @@ impl Channel {
     }
 }
 
+/// How reviewed instructions affect the program's own prompt.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InstructionsMode {
+    /// Keep the program's prompt without adding the profile's instructions.
+    Keep,
+    /// Add the profile's instructions to the program's prompt.
+    #[default]
+    Append,
+    /// Use the profile's instructions in place of the program's prompt.
+    Replace,
+}
+
+impl InstructionsMode {
+    /// An omitted mode in an older profile already means append.
+    pub fn is_append(&self) -> bool {
+        *self == Self::Append
+    }
+}
+
 /// One environment variable a command server is started with, as text.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvText {

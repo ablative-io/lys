@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use super::claude_code::launch_env::env_settings;
 use super::claude_code::template::parse_template;
+use super::launch_fields::InstructionsMode;
 use crate::record::blocks::Hash;
 
 /// One file, relative to the session's config directory.
@@ -46,12 +47,20 @@ fn file(path: &str, text: String) -> File {
 ///
 /// # Errors
 /// Refuses unknown contracts, invalid templates and invalid declared programs.
-pub fn render(contract: &str, program: &str, text: &str) -> Result<Launch, String> {
-    if contract != "claude-code/template-v1" {
+pub fn render(
+    contract: &str,
+    program: &str,
+    text: &str,
+    instructions_mode: InstructionsMode,
+) -> Result<Launch, String> {
+    if !matches!(contract, "claude-code/template-v1" | "codex/template-v1") {
         return Err(format!("unknown rendering contract `{contract}`"));
     }
     if !program.starts_with('/') || program.chars().any(char::is_control) {
         return Err("the declared program is not an absolute plain path".to_owned());
+    }
+    if contract == "codex/template-v1" {
+        return super::codex::launch::render(program, text, instructions_mode);
     }
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
@@ -80,20 +89,26 @@ pub fn render(contract: &str, program: &str, text: &str) -> Result<Launch, Strin
         "settings.json".to_owned(),
         "--setting-sources".to_owned(),
         String::new(),
-        "--append-system-prompt-file".to_owned(),
-        "instructions.txt".to_owned(),
     ];
+    let mut argument_files =
+        BTreeMap::from([(1, "mcp.json".to_owned()), (4, "settings.json".to_owned())]);
+    let prompt_flag = match instructions_mode {
+        InstructionsMode::Keep => None,
+        InstructionsMode::Append => Some("--append-system-prompt-file"),
+        InstructionsMode::Replace => Some("--system-prompt-file"),
+    };
+    if let Some(flag) = prompt_flag {
+        arguments.push(flag.to_owned());
+        argument_files.insert(arguments.len(), "instructions.txt".to_owned());
+        arguments.push("instructions.txt".to_owned());
+    }
     arguments.extend(template.flags);
     Ok(Launch {
         program: program.to_owned(),
         arguments,
         environment,
         files,
-        argument_files: BTreeMap::from([
-            (1, "mcp.json".to_owned()),
-            (4, "settings.json".to_owned()),
-            (8, "instructions.txt".to_owned()),
-        ]),
+        argument_files,
         environment_paths: BTreeMap::from([("CLAUDE_CONFIG_DIR".to_owned(), String::new())]),
     })
 }

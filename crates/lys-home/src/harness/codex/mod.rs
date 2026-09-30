@@ -4,6 +4,8 @@ mod account_tests;
 pub mod beside;
 #[cfg(test)]
 mod beside_tests;
+pub(crate) mod launch;
+pub(crate) mod launch_template;
 pub mod leaf;
 #[cfg(test)]
 mod leaf_tests;

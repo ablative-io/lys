@@ -1,5 +1,6 @@
 {
   "name": "Codex",
+  "command": "codex",
   "line": "An agent from OpenAI that helps read, change and test code.",
   "models": [
     {
