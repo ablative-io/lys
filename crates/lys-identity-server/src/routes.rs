@@ -85,6 +85,8 @@ pub struct AppState {
     pub teams: Option<Mutex<crate::teams_store::TeamStore>>,
     /// The budgets, when the configuration names their directory.
     pub budgets: Option<Mutex<crate::budgets_store::BudgetStore>>,
+    /// The persisted organisation settings.
+    pub configuration: Mutex<Box<crate::configuration_store::ConfigurationStore>>,
     /// The agents' tool-boundary policies, when the configuration names
     /// their directory.
     pub policies: Option<Mutex<crate::agent_policy_store::PolicyStore>>,

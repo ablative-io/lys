@@ -168,3 +168,37 @@ pub(crate) const RESTART: &[&str] = &[
     "runner_reply_malformed",
     "session_unknown",
 ];
+
+/// A current limit collection and its measured sources.
+pub(crate) const BUDGET_READ: &[&str] = &[
+    "not_permitted",
+    "holder_unknown",
+    "BudgetsUnavailable",
+    "ConfigurationUnavailable",
+    "TeamsUnavailable",
+    "NoPerson",
+];
+/// A whole-holder change is validated before a signed leaf is appended.
+pub(crate) const BUDGET_SET: &[&str] = &[
+    "budget_malformed",
+    "BudgetVersionConflict",
+    "TeamUnitRefused",
+    "BudgetUnitUnavailable",
+    "BudgetAmountRefused",
+    "BudgetPeriodRefused",
+    "BudgetWarningRefused",
+    "BudgetLimitsRefused",
+    "BudgetZoneRefused",
+];
+/// Fresh starts check authority before enforcing a known stop threshold.
+pub(crate) const START_BUDGET: &[&str] = &[
+    "BudgetExhausted",
+    "BudgetsUnavailable",
+    "ConfigurationUnavailable",
+    "TeamsUnavailable",
+    "NoPerson",
+    "NotAdmitted",
+    "AgentNotVisible",
+    "RequestMalformed",
+    "RuntimeUnavailable",
+];

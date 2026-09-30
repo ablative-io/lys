@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use identity_contract::apps::{Auth, send};
 use identity_contract::fake_issuer::Login;
@@ -195,22 +196,6 @@ async fn a_unit_without_a_reported_source_is_unavailable_and_not_kept() -> TestR
     Ok(())
 }
 
-#[tokio::test]
-async fn pause_is_refused_with_the_four_available_actions() -> TestResult {
-    let table = Table::fresh().await?;
-    let path = format!("/budgets/agent/{}", table.agent);
-    let before = table.get(&path).await?;
-    let body = json!({"limits": [{"unit": "tokens", "amount": 100, "period": "day", "act": "pause"}], "warn_at": null, "version": 0});
-    let (status, refused) = table.put(&path, &body).await?;
-    assert_eq!(status, 400, "{refused}");
-    let words = refused.to_string();
-    for name in ["pause", "tell", "notice", "compact", "stop"] {
-        assert!(words.contains(name), "{refused}");
-    }
-    assert_eq!(table.get(&path).await?, before);
-    Ok(())
-}
-
 fn files(dir: &Path) -> TestResult<Files> {
     let mut found = BTreeMap::new();
     for entry in std::fs::read_dir(dir)? {
@@ -296,4 +281,115 @@ async fn pause_is_refused_with_the_four_available_actions() -> TestResult {
     }
     assert_eq!(metadata(&table.get(&path).await?), metadata(&before));
     Ok(())
+}
+
+#[tokio::test]
+async fn invalid_collections_are_named_without_changing_the_holder() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let before = table.get(&path).await?;
+    let valid = json!({"unit": "tokens", "amount": 100, "period": "day", "act": "tell"});
+    for (limit, warn_at, refusal) in [
+        (
+            json!([{"unit": "tokens", "amount": -1, "period": "day", "act": "tell"}]),
+            json!(null),
+            "BudgetAmountRefused",
+        ),
+        (
+            json!([{"unit": "tokens", "amount": 0.5, "period": "day", "act": "tell"}]),
+            json!(null),
+            "BudgetAmountRefused",
+        ),
+        (
+            json!([{"unit": "context_percent", "amount": 101, "period": null, "act": "tell"}]),
+            json!(null),
+            "BudgetAmountRefused",
+        ),
+        (
+            json!([{"unit": "tokens", "amount": 1, "period": null, "act": "tell"}]),
+            json!(null),
+            "BudgetPeriodRefused",
+        ),
+        (
+            json!([{"unit": "context_percent", "amount": 50, "period": "day", "act": "tell"}]),
+            json!(null),
+            "BudgetPeriodRefused",
+        ),
+        (
+            json!([{"unit": "plan_percent", "amount": 50, "period": "month", "act": "stop"}]),
+            json!(null),
+            "BudgetPeriodRefused",
+        ),
+        (json!([valid.clone()]), json!(101), "BudgetWarningRefused"),
+        (
+            json!([valid.clone(), valid.clone()]),
+            json!(null),
+            "BudgetLimitsRefused",
+        ),
+        (
+            json!([{"unit": "tokens", "amount": 1, "period": "day", "act": "tell", "zone": "UTC"}]),
+            json!(null),
+            "BudgetZoneRefused",
+        ),
+        (
+            json!([{"unit": "tokens", "amount": 1, "period": "day", "act": "tell", "zone": "Etc/Unknown"}]),
+            json!(null),
+            "BudgetZoneRefused",
+        ),
+    ] {
+        let (status, answer) = table
+            .put(
+                &path,
+                &json!({"limits": limit, "warn_at": warn_at, "version": 0}),
+            )
+            .await?;
+        assert_eq!(status, 400, "{answer}");
+        assert_eq!(answer["refusal"], refusal, "{answer}");
+        assert_eq!(metadata(&table.get(&path).await?), metadata(&before));
+    }
+    let (status, answer) = table
+        .put(
+            &path,
+            &json!({"measure": "tokens", "limit": 100, "act": "tell", "version": 0}),
+        )
+        .await?;
+    assert_eq!(status, 400, "{answer}");
+    assert_eq!(answer["refusal"], "budget_malformed");
+    let (status, answer) = table
+        .put(
+            "/budgets/unknown/id",
+            &json!({"limits": [], "warn_at": null, "version": 0}),
+        )
+        .await?;
+    assert_eq!(status, 400, "{answer}");
+    assert_eq!(answer["refusal"], "holder_unknown");
+    let (status, answer) = table
+        .put(
+            "/configuration",
+            &json!({"zone": "UTC", "version": 1, "other": true}),
+        )
+        .await?;
+    assert_eq!(status, 400, "{answer}");
+    assert_eq!(answer["refusal"], "ConfigurationMalformed");
+    Ok(())
+}
+
+#[test]
+fn a_stored_organisation_setting_without_a_version_is_named_and_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let store = dir.path().join("organisation");
+    FileLeafStore::create(&store, "lys/identity/organisation")?;
+    let (mut log, _) = FrontierLog::open(FileLeafStore::open(&store)?)?;
+    let bytes =
+        serde_json::to_vec(&json!({"zone": "UTC", "version": 0, "by": "host_setup", "at": 1}))?;
+    log.append(&bytes)?;
+    log.write_snapshot("lys/identity/organisation-zone/v1", &bytes, &*key)?;
+    match lys_identity_server::configuration_store::ConfigurationStore::open(&store, key) {
+        Ok(_) => Err("an invalid stored version was accepted".into()),
+        Err(error) => {
+            assert_eq!(error.name(), "ConfigurationUnavailable");
+            Ok(())
+        }
+    }
 }

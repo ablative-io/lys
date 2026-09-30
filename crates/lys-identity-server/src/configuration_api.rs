@@ -1,4 +1,4 @@
-//! The administrator reads effective startup settings without credentials, private paths, or a pretend live editor.
+//! Startup metadata remains read-only; the administrator versions the organisation zone.
 
 use std::sync::Arc;
 
@@ -6,6 +6,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::config::Config;
@@ -21,7 +22,7 @@ struct StartupSettings {
 /// Configuration as loaded at startup, read only by the administrator.
 pub fn routes(config: &Config) -> Router<Arc<AppState>> {
     Router::new()
-        .route("/configuration", get(configuration))
+        .route("/configuration", get(configuration).put(set_zone))
         .layer(Extension(StartupSettings {
             session_seconds: config.session_seconds,
             secure_cookie: config.secure_cookie,
@@ -39,6 +40,7 @@ async fn configuration(
     Ok(Json(json!({
         "source": "startup_configuration",
         "mutable_in_browser": false,
+        "organisation": organisation(&state)?,
         "sign_in": {
             "provider_origin": issuer,
             "session_seconds": startup.session_seconds,
@@ -60,4 +62,52 @@ async fn configuration(
             "requests_configured": state.requests.is_some()
         }
     })))
+}
+
+/// Read the one settled organisation zone without using a per-request host default.
+pub(crate) fn organisation(
+    state: &AppState,
+) -> Result<crate::configuration_store::Zone, ServerError> {
+    let mut store =
+        state
+            .configuration
+            .lock()
+            .map_err(|error| ServerError::ConfigurationUnavailable {
+                reason: format!("organisation setting lock poisoned: {error}"),
+            })?;
+    store.settle()?;
+    Ok(store.zone().clone())
+}
+
+/// Only the administrator changes the organisation setting at the version read.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ZoneBody {
+    zone: String,
+    version: u64,
+}
+
+async fn set_zone(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<ZoneBody>, axum::extract::rejection::JsonRejection>,
+) -> Result<Json<crate::configuration_store::Zone>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
+    let Json(body) = body.map_err(|error| ServerError::BudgetRefused {
+        refusal: "ConfigurationMalformed",
+        words: error.body_text(),
+    })?;
+    let by = crate::routes::with_directory(&state, |directory| {
+        crate::read_api::own_person(directory.projection()?, &actor)
+            .map(|person| person.to_string())
+    })?;
+    let mut store =
+        state
+            .configuration
+            .lock()
+            .map_err(|error| ServerError::ConfigurationUnavailable {
+                reason: format!("organisation setting lock poisoned: {error}"),
+            })?;
+    store.set(body.zone, body.version, by).map(Json)
 }

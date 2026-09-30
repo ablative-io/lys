@@ -20,6 +20,15 @@ pub struct PlanWindow {
 
 /// A nonnegative decimal rounded to the nearest scaled integer, with overflow refused.
 pub fn scaled(number: &Number, places: i32) -> Option<u64> {
+    projection(number, places, true)
+}
+
+/// A boundary amount must be represented exactly, rather than rounded into a limit.
+pub fn scaled_exact(number: &Number, places: i32) -> Option<u64> {
+    projection(number, places, false)
+}
+
+fn projection(number: &Number, places: i32, rounded: bool) -> Option<u64> {
     let text = number.to_string();
     let (mantissa, exponent) = match text.split_once(['e', 'E']) {
         Some((mantissa, exponent)) => (mantissa, exponent.parse::<i32>().ok()?),
@@ -44,10 +53,20 @@ pub fn scaled(number: &Number, places: i32) -> Option<u64> {
     let amount = if shift >= 0 {
         digits.checked_mul(10_u128.checked_pow(u32::try_from(shift).ok()?)?)?
     } else if shift < -38 {
-        0
+        if rounded || digits == 0 {
+            0
+        } else {
+            return None;
+        }
     } else {
         let divisor = 10_u128.checked_pow(shift.unsigned_abs())?;
-        digits.checked_add(divisor / 2)?.checked_div(divisor)?
+        if rounded {
+            digits.checked_add(divisor / 2)?.checked_div(divisor)?
+        } else if digits % divisor == 0 {
+            digits / divisor
+        } else {
+            return None;
+        }
     };
     u64::try_from(amount).ok()
 }
@@ -55,8 +74,9 @@ pub fn scaled(number: &Number, places: i32) -> Option<u64> {
 /// Validate a reported percentage without inventing a missing figure.
 pub fn percent(value: &Value) -> Option<Number> {
     let number = value.as_number()?;
-    let value = number.as_f64()?;
-    (value.is_finite() && (0.0..=100.0).contains(&value)).then(|| number.clone())
+    (compare(number, &0.into()).ok()? != std::cmp::Ordering::Less
+        && compare(number, &100.into()).ok()? != std::cmp::Ordering::Greater)
+        .then(|| number.clone())
 }
 
 /// The status line's reported cost, projected to the nearest microdollar.
@@ -181,4 +201,59 @@ pub fn cost_delta(
             });
         }
     }
+}
+
+/// Compare nonnegative reported decimals without rounding their fractional digits.
+///
+/// # Errors
+/// Refuses a negative value or an exponent that cannot be represented.
+pub fn compare(left: &Number, right: &Number) -> Result<std::cmp::Ordering, String> {
+    fn parts(number: &Number) -> Result<(String, i64), String> {
+        let text = number.to_string();
+        let (mantissa, exponent) = text.split_once(['e', 'E']).unwrap_or((&text, "0"));
+        let fraction = mantissa
+            .split_once('.')
+            .map_or(0, |(_, fraction)| fraction.len());
+        let digits: String = mantissa
+            .chars()
+            .filter(|character| character.is_ascii_digit())
+            .collect();
+        let digits = digits.trim_start_matches('0');
+        if digits.is_empty() {
+            return Ok((String::new(), 0));
+        }
+        if mantissa.starts_with('-') {
+            return Err("reported decimal is negative".to_owned());
+        }
+        let exponent = exponent
+            .parse::<i64>()
+            .map_err(|error| format!("reported decimal exponent: {error}"))?;
+        let order = i64::try_from(digits.len())
+            .map_err(|error| error.to_string())?
+            .checked_sub(i64::try_from(fraction).map_err(|error| error.to_string())?)
+            .and_then(|order| order.checked_add(exponent))
+            .ok_or("reported decimal order overflows")?;
+        Ok((digits.to_owned(), order))
+    }
+    let (left, left_order) = parts(left)?;
+    let (right, right_order) = parts(right)?;
+    if left.is_empty() || right.is_empty() {
+        return Ok(left.is_empty().cmp(&right.is_empty()).reverse());
+    }
+    let order = left_order.cmp(&right_order);
+    if order != std::cmp::Ordering::Equal {
+        return Ok(order);
+    }
+    for (left, right) in left
+        .bytes()
+        .chain(std::iter::repeat(b'0'))
+        .zip(right.bytes().chain(std::iter::repeat(b'0')))
+        .take(left.len().max(right.len()))
+    {
+        let order = left.cmp(&right);
+        if order != std::cmp::Ordering::Equal {
+            return Ok(order);
+        }
+    }
+    Ok(std::cmp::Ordering::Equal)
 }

@@ -6,7 +6,8 @@ use lys_identity::IdentityId;
 use lys_identity::projection::Projection;
 use serde::Serialize;
 
-use crate::budgets_state::{Budget, Held, Holder, Measure, Standing, covered};
+use crate::budgets_limits::Limit;
+use crate::budgets_state::{Act, Held, Holder, Length, Measure, Standing};
 use crate::error::ServerError;
 use crate::error_team::TeamError;
 use crate::provisioning_store::{Profile, Version};
@@ -98,9 +99,19 @@ pub struct TreeBudget {
     /// The recorded unit.
     pub measure: Measure,
     /// The effective limit in that unit.
-    pub limit: u64,
+    #[schema(value_type = f64)]
+    pub limit: serde_json::Number,
+    /// The limit's independent period.
+    pub period: Option<Length>,
+    /// What reaching this threshold asks.
+    pub act: Act,
     /// Spend in the current period, or current context; null without reports.
-    pub spent: Option<u64>,
+    #[schema(value_type = Option<f64>)]
+    pub spent: Option<serde_json::Number>,
+    /// Why no current figure is available.
+    pub unavailable: Option<String>,
+    /// Start of the measured period or reported account window.
+    pub since_ms: Option<i64>,
 }
 
 /// A reviewed profile's public summary.
@@ -130,36 +141,15 @@ pub(crate) struct TreeState {
     pub profiles: Vec<Profile>,
     pub sessions: Vec<Tracked>,
     pub budgets: Held,
+    pub zone: String,
     pub goals: BTreeMap<String, Vec<String>>,
     pub at: u64,
     pub at_ms: i64,
 }
 
 impl TreeState {
-    pub(crate) fn standings(&self) -> Vec<Standing> {
-        self.directory
-            .records()
-            .filter_map(|(identity, record)| {
-                let IdentityId::Agent(agent) = identity else {
-                    return None;
-                };
-                let id = agent.to_string();
-                Some(Standing {
-                    agent: id.clone(),
-                    person: record.responsible().map(|person| person.to_string()),
-                    teams: self
-                        .teams
-                        .iter()
-                        .filter(|team| {
-                            team.retired.is_none()
-                                && team.members.contains(&id)
-                                && !team.held.iter().any(|hold| hold.member == id)
-                        })
-                        .map(|team| team.created.id.clone())
-                        .collect(),
-                })
-            })
-            .collect()
+    pub(crate) fn standings(&self) -> Result<Vec<Standing>, ServerError> {
+        crate::budgets_members::from_parts(&self.directory, &self.teams)
     }
 
     pub(crate) fn agent(
@@ -234,14 +224,15 @@ impl TreeState {
                     writable: None,
                 })
             });
-        let budgets = self
-            .budgets
-            .budgets
-            .iter()
-            .map(|budget| self.budgets.effective(budget))
-            .filter(|budget| covered(budget, [standing]).contains(id))
-            .map(|budget| self.budget(budget, standings))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut budgets = Vec::new();
+        for collection in &self.budgets.limit_sets {
+            if !crate::budgets_members::covered(&collection.holder, standings).contains(id) {
+                continue;
+            }
+            for limit in self.budgets.effective_limits(collection) {
+                budgets.push(self.budget(&collection.holder, &limit, standings)?);
+            }
+        }
         Ok(Some(TreeAgent {
             id: id.to_owned(),
             name: record.profile().display_name().to_owned(),
@@ -253,46 +244,31 @@ impl TreeState {
         }))
     }
 
-    fn budget(&self, budget: &Budget, standings: &[Standing]) -> Result<TreeBudget, ServerError> {
-        let agents = covered(budget, standings);
-        let spent = if budget.measure == Measure::ContextPercent {
-            // Context is a current session figure, never a cumulative charge.
-            let mut latest = BTreeMap::new();
-            for usage in &self.budgets.uses {
-                if agents.contains(&usage.agent) && usage.at_ms <= self.at_ms {
-                    if let Some(figure) = usage.context_percent {
-                        latest.insert((usage.agent.clone(), usage.session.clone()), figure);
-                    }
-                }
-            }
-            latest.values().copied().max()
-        } else {
-            let start = budget
-                .period
-                .as_ref()
-                .ok_or_else(|| ServerError::BudgetsUnavailable {
-                    reason: "a cumulative budget has no recorded period".to_owned(),
-                })?
-                .start_of(self.at_ms)
-                .map_err(|reason| ServerError::BudgetsUnavailable { reason })?;
-            let reported = self.budgets.uses.iter().any(|usage| {
-                agents.contains(&usage.agent) && usage.at_ms >= start && usage.at_ms <= self.at_ms
-            });
-            if reported {
-                Some(
-                    self.budgets
-                        .spent(budget, &agents, self.at_ms)
-                        .map_err(|reason| ServerError::BudgetsUnavailable { reason })?,
-                )
-            } else {
-                None
-            }
-        };
+    fn budget(
+        &self,
+        holder: &Holder,
+        limit: &Limit,
+        standings: &[Standing],
+    ) -> Result<TreeBudget, ServerError> {
+        let agents = crate::budgets_members::covered(holder, standings);
+        let used = crate::budgets_usage::figure(
+            &self.budgets,
+            limit,
+            &agents,
+            &self.zone,
+            self.at_ms,
+            None,
+        )
+        .map_err(|reason| ServerError::BudgetsUnavailable { reason })?;
         Ok(TreeBudget {
-            holder: budget.holder.clone(),
-            measure: budget.measure,
-            limit: budget.limit,
-            spent,
+            holder: holder.clone(),
+            measure: limit.unit,
+            limit: limit.amount.clone(),
+            period: limit.period,
+            act: limit.act,
+            spent: used.figure,
+            unavailable: used.unavailable,
+            since_ms: used.since_ms,
         })
     }
 }

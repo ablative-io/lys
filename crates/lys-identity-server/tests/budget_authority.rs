@@ -27,7 +27,7 @@ async fn a_person_cannot_raise_the_budget_the_administrator_set_on_them() -> Tes
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea = service.sign_in(login(BEA)).await?;
     let path = format!("/budgets/person/{}", seeded.people[1].id);
-    let set = json!({ "measure": "context_percent", "limit": 50, "act": "compact", "version": 0 });
+    let set = json!({ "limits": [{"unit": "context_percent", "amount": 50, "period": null, "act": "compact"}], "warn_at": null, "version": 0 });
     let (status, answer) = send(
         &service,
         reqwest::Method::PUT,
@@ -47,10 +47,9 @@ async fn a_person_cannot_raise_the_budget_the_administrator_set_on_them() -> Tes
     )
     .await?;
     assert_eq!(status, 200, "the person reads their own budget: {read}");
-    assert_eq!(read["budgets"][0]["limit"], 50, "{read}");
+    assert_eq!(read["limits"][0]["amount"], 50, "{read}");
 
-    let raised =
-        json!({ "measure": "context_percent", "limit": 100, "act": "compact", "version": 1 });
+    let raised = json!({ "limits": [{"unit": "context_percent", "amount": 100, "period": null, "act": "compact"}], "warn_at": null, "version": 1 });
     let (status, answer) = send(
         &service,
         reqwest::Method::PUT,
@@ -70,7 +69,7 @@ async fn a_person_cannot_raise_the_budget_the_administrator_set_on_them() -> Tes
         None,
     )
     .await?;
-    assert_eq!(kept["budgets"][0]["limit"], 50, "{kept}");
-    assert_eq!(kept["budgets"][0]["version"], 1, "{kept}");
+    assert_eq!(kept["limits"][0]["amount"], 50, "{kept}");
+    assert_eq!(kept["version"], 1, "{kept}");
     Ok(())
 }

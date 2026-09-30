@@ -331,8 +331,8 @@ async fn summaries_use_reviewed_versions_reported_sessions_and_every_applicable_
                 act:Act::Tell,version:1,by:person.clone(),at:1},0)?;
         }
         let at_ms = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
-        assert!(budgets.charge(Usage {event:operation()?,agent:agent.clone(),at_ms,tokens:42,running_ms:77,session:Some("running-session".to_owned()),context_percent:Some(55),crossed:Vec::new()})?);
-        assert!(budgets.charge(Usage {event:operation()?,agent,at_ms,tokens:0,running_ms:0,session:Some("running-session".to_owned()),context_percent:Some(35),crossed:Vec::new()})?);
+        assert!(budgets.charge(Usage {event:operation()?,agent:agent.clone(),at_ms,tokens:42,running_ms:77,session:Some("running-session".to_owned()),context_percent:Some(55),crossed:Vec::new(),..Usage::default()})?);
+        assert!(budgets.charge(Usage {event:operation()?,agent,at_ms,tokens:0,running_ms:0,session:Some("running-session".to_owned()),context_percent:Some(35),crossed:Vec::new(),..Usage::default()})?);
         Ok((seeded,reviewed))
     }).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -405,10 +405,7 @@ async fn summaries_use_reviewed_versions_reported_sessions_and_every_applicable_
             .ok_or("missing measure")?;
         assert_eq!(budget["spent"], spent);
     }
-    assert_eq!(
-        answer["teams"][0]["members"][1]["budgets"][0]["spent"],
-        Value::Null
-    );
+    assert_eq!(answer["teams"][0]["members"][1]["budgets"][0]["spent"], 42);
     assert!(
         !member
             .as_object()

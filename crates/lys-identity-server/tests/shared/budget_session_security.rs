@@ -30,8 +30,7 @@ async fn foreign_found_and_unknown_usage_sessions_leave_no_charge_or_runner_act(
             email: "shared@example.test".to_owned(),
         })
         .await?;
-    let cap = json!({ "measure": "tokens", "limit": 1, "act": "stop", "version": 0,
-        "period": { "length": "day", "zone": "UTC" } });
+    let cap = json!({"limits": [{"unit": "tokens", "amount": 1, "period": "day", "act": "stop"}], "warn_at": null, "version": 0});
     let (status, body) = table
         .call(
             reqwest::Method::PUT,

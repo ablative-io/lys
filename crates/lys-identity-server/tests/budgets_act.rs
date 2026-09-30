@@ -249,7 +249,7 @@ async fn a_context_crossing_types_one_compaction() -> TestResult {
     let session = table.start().await?;
     table
         .budget(
-            json!({ "measure": "context_percent", "limit": 80, "act": "compact", "version": 0 }),
+            json!({"limits": [{"unit": "context_percent", "amount": 80, "period": null, "act": "compact"}], "warn_at": null, "version": 0}),
         )
         .await?;
     let path = format!("/agents/{}/usage", table.agent());
@@ -282,7 +282,7 @@ async fn a_configured_context_notice_appears_in_the_live_session() -> TestResult
     let mut table = Table::set(&json!({})).await?;
     let session = table.start().await?;
     table
-        .budget(json!({ "measure": "context_percent", "limit": 50, "act": "notice", "version": 0 }))
+        .budget(json!({"limits": [{"unit": "context_percent", "amount": 50, "period": null, "act": "notice"}], "warn_at": null, "version": 0}))
         .await?;
     table.used(context("e1", &session, 64)).await?;
     table.waited(&session, "context is at 64%").await?;
@@ -294,8 +294,7 @@ async fn a_configured_context_notice_appears_in_the_live_session() -> TestResult
 async fn a_hard_token_cap_ends_the_session_confirmed_on_its_exit() -> TestResult {
     let mut table = Table::set(&json!({})).await?;
     let session = table.start().await?;
-    let cap = json!({ "measure": "tokens", "limit": 1000, "act": "stop", "version": 0,
-        "period": { "length": "day", "zone": "UTC" } });
+    let cap = json!({"limits": [{"unit": "tokens", "amount": 1000, "period": "day", "act": "stop"}], "warn_at": null, "version": 0});
     table.budget(cap).await?;
     let tokens =
         |event: &str, tokens: u64| json!({ "event": event, "at_ms": now_ms(), "tokens": tokens });
@@ -336,7 +335,7 @@ async fn an_act_whose_answer_cannot_be_had_stays_unconfirmed_and_is_asked_again_
     let mut table = Table::set(&json!({})).await?;
     let session = table.start().await?;
     table
-        .budget(json!({ "measure": "context_percent", "limit": 70, "act": "stop", "version": 0 }))
+        .budget(json!({"limits": [{"unit": "context_percent", "amount": 70, "period": null, "act": "stop"}], "warn_at": null, "version": 0}))
         .await?;
     table.stop_runner()?;
     let crossed = table.used(context("e1", &session, 75)).await?;

@@ -30,7 +30,7 @@ rustix.workspace = true
 rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 serde.workspace = true
 sha2.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
 thiserror.workspace = true
 # `lys runner serve` ends every session when the process is asked to stop.
 tokio = { workspace = true, features = ["rt", "signal", "macros"] }

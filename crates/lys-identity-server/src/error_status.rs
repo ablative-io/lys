@@ -154,6 +154,8 @@ impl ServerError {
             | Self::ServiceAccountOwnerRetired { .. }
             | Self::StopReused { .. }
             | Self::BudgetVersionConflict { .. }
+            | Self::ConfigurationVersionConflict { .. }
+            | Self::BudgetExhausted { .. }
             | Self::PolicyVersionConflict { .. }
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
@@ -195,6 +197,7 @@ impl ServerError {
             | Self::ServiceAccountsUnavailable { .. }
             | Self::StopsUnavailable { .. }
             | Self::BudgetsUnavailable { .. }
+            | Self::ConfigurationUnavailable { .. }
             | Self::PolicyUnavailable { .. }
             | Self::SignInProvidersUnavailable { .. }
             | Self::SetupUnavailable { .. }

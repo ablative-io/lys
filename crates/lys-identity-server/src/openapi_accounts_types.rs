@@ -5,7 +5,7 @@ use lys_openapi::Api;
 use crate::certificates_api::CertificatesView;
 use crate::certificates_issue::{IssueBody, WithdrawBody};
 use crate::memory_api::MemoryView;
-use crate::openapi_table::{GET, POST};
+use crate::openapi_table::{GET, POST, PUT};
 use crate::openapi_types::Entry;
 use crate::read_views::{ServiceAccountView, ServiceAccountsView};
 use crate::resources_api::ResourceList;
@@ -105,6 +105,12 @@ pub(crate) fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             Some(ended),
         ),
         (GET, "/configuration", None, None),
+        (
+            PUT,
+            "/configuration",
+            Some(api.schema::<crate::configuration_api::ZoneBody>()),
+            Some(api.schema::<crate::configuration_store::Zone>()),
+        ),
         (
             GET,
             "/agents/{id}/memory",

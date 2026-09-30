@@ -43,7 +43,19 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             PUT,
             "/budgets/{kind}/{id}",
             Some(api.schema::<BudgetBody>()),
-            Some(api.schema::<Budget>()),
+            Some(api.schema::<BudgetsView>()),
+        ),
+        (
+            GET,
+            "/teams/{id}/budget",
+            None,
+            Some(api.schema::<BudgetsView>()),
+        ),
+        (
+            PUT,
+            "/teams/{id}/budget",
+            Some(api.schema::<BudgetBody>()),
+            Some(api.schema::<BudgetsView>()),
         ),
         (GET, "/agents/{id}/policy", None, Some(policy.clone())),
         (

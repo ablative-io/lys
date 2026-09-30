@@ -6,8 +6,8 @@
 use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
-    ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, PROFILE_REVIEW,
-    RECORDED, RESTART, SIGNED, SIGNED_BODY, START_RUNNER, UNANSWERED,
+    ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON,
+    PROFILE_REVIEW, RECORDED, RESTART, SIGNED, SIGNED_BODY, START_BUDGET, START_RUNNER, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -107,7 +107,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW];
-    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], START_RUNNER];
+    POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], START_RUNNER, START_BUDGET];
     POST "/agents/{id}/restart" "Restart an agent on its latest reviewed profile" S [SIGNED_BODY, RESTART];
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed", "RuntimeSessionUnknown"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
@@ -118,8 +118,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]];
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
-    GET "/budgets/{kind}/{id}" "A holder's budgets" S [SIGNED, &["not_permitted"]];
-    PUT "/budgets/{kind}/{id}" "Set a holder's budget" S [SIGNED_BODY, &["not_permitted", "zone_missing", "zone_unknown", "period_missing", "budget_invalid", "BudgetsUnavailable"], &["BudgetVersionConflict"]];
+    GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ];
+    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
+    GET "/teams/{id}/budget" "A team's limits and measured usage" S [SIGNED, BUDGET_READ];
+    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
@@ -138,8 +140,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale"]];
     POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
-    GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
-    POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, &["AgentNotVisible", "not_permitted"]];
+    GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]];
+    POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown", "RuntimeUnavailable", "ProvisioningUnavailable"]];
     GET "/agents/{id}/policy" "An agent's tool-boundary policy" S [SIGNED, &["not_permitted"]];
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
@@ -170,7 +172,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/service-accounts" "The service accounts" S [SIGNED];
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]];
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];
-    GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "goals_unavailable"]];
+    GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "ConfigurationUnavailable", "goals_unavailable"]];
     GET "/teams" "Every team" S [SIGNED];
     POST "/teams" "Create a team" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     GET "/teams/{id}" "One team" S [SIGNED];
@@ -193,12 +195,13 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/sessions/{id}/end" "End one's own session" S [SIGNED, &["SessionUnknown"], &["NoPerson"]];
     GET "/directory/people/{id}/sessions" "A person's sessions" S [ADMIN, &["IdentityUnknown"]];
     POST "/directory/people/{id}/sessions/{session}/end" "End a session" S [ADMIN, &["SessionUnknown"], &["IdentityUnknown"]];
-    GET "/configuration" "The service's configuration" S [ADMIN];
+    GET "/configuration" "The service's configuration" S [ADMIN, &["ConfigurationUnavailable"]];
+    PUT "/configuration" "Set the organisation zone at its current version" S [ADMIN_BODY, &["ConfigurationMalformed", "ConfigurationVersionConflict", "ConfigurationZoneRefused", "ConfigurationUnavailable", "NoPerson"]];
     GET "/agents/{id}/memory" "An agent's memory" S [SIGNED, &["AgentNotVisible"]];
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]];
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn"], &["CertificateWithdrawn"]];
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY];
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET];
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY];
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];

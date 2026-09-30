@@ -73,11 +73,12 @@ async fn read(
         profiles: with_provisioning(&state, |store| Ok(store.profiles().to_vec()))?,
         sessions: with_runtime(&state, |store| Ok(store.sessions().to_vec()))?,
         budgets: with_budgets(&state, |store| Ok(store.held().clone()))?,
+        zone: crate::configuration_api::organisation(&state)?.zone,
         goals: BTreeMap::new(),
         at,
         at_ms,
     };
-    let standings = held.standings();
+    let standings = held.standings()?;
     held.goals = goals(&state, &standings)?;
     let mut built = BTreeMap::new();
     let mut pending: Vec<_> = held

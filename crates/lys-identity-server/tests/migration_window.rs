@@ -165,6 +165,10 @@ fn seed(config: &Config) -> ResultOf<Seed> {
         .as_object_mut()
         .ok_or("budgets not object")?
         .remove("unconfirmed");
+    old_budgets
+        .as_object_mut()
+        .ok_or("budgets not object")?
+        .remove("limit_sets");
     let budgets_dir = config.budgets_dir.clone().ok_or("budgets not configured")?;
     old_log(
         &budgets_dir,
@@ -396,5 +400,22 @@ async fn an_unreadable_intent_refuses_both_confirmation_writes_by_path() -> Resu
     }
     assert_eq!(files(&fixture.teams)?, fixture.old_teams);
     assert_eq!(files(&fixture.budgets)?, fixture.old_budgets);
+    Ok(())
+}
+
+#[tokio::test]
+async fn new_usage_fields_wait_until_the_rollback_window_is_committed() -> ResultOf {
+    let fixture = Fixture::open().await?;
+    let cookie = fixture.admin().await?;
+    let (status, answer) = fixture.service.post(&format!("/agents/{}/usage", fixture.member), Some(&cookie), &json!({"event": "new-usage", "at_ms": jiff::Timestamp::now().as_millisecond(), "tokens": 10, "dollars_micros": 500_000_000})).await?;
+    assert_eq!(status, 503, "{answer}");
+    assert_eq!(answer["refusal"], "BudgetsUnavailable");
+    assert!(
+        answer["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("upgrade_pending"))
+    );
+    assert_eq!(files(&fixture.budgets)?, fixture.old_budgets);
+    fixture.assert_held(&cookie).await?;
     Ok(())
 }

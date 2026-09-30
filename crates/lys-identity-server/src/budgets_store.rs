@@ -117,7 +117,7 @@ impl<S: LeafStore> BudgetStore<S> {
         Ok(store)
     }
 
-    /// Permit snapshot v2 only after the shared upgrade-intent guard is clear.
+    /// Permit current snapshots only after the shared upgrade-intent guard is clear.
     pub fn finish_migration(&mut self) -> Result<(), ServerError> {
         self.settle()?;
         if !self.snapshots_enabled {
@@ -227,6 +227,33 @@ impl<S: LeafStore> BudgetStore<S> {
         self.set_version(budget, expected, true)
     }
 
+    /// Replace every limit of one holder atomically at the version read.
+    pub fn set_limits(
+        &mut self,
+        limits: crate::budgets_limits::Limits,
+        expected: u64,
+    ) -> Result<crate::budgets_limits::Limits, ServerError> {
+        self.settle()?;
+        let held = self
+            .held
+            .limit_set(&limits.holder)
+            .map_or(0, |limits| limits.version);
+        if held != expected {
+            return Err(ServerError::BudgetVersionConflict { held, expected });
+        }
+        let version = expected
+            .checked_add(1)
+            .ok_or_else(|| unavailable("budget version exhausted"))?;
+        let limits = crate::budgets_limits::Limits { version, ..limits }
+            .checked()
+            .map_err(|refused| ServerError::BudgetRefused {
+                refusal: refused.refusal,
+                words: refused.words,
+            })?;
+        self.append(Leaf::LimitsSet(limits.clone()))?;
+        Ok(limits)
+    }
+
     fn set_version(
         &mut self,
         budget: Budget,
@@ -242,7 +269,9 @@ impl<S: LeafStore> BudgetStore<S> {
             return Err(ServerError::BudgetVersionConflict { held, expected });
         }
         let budget = Budget {
-            version: expected + 1,
+            version: expected
+                .checked_add(1)
+                .ok_or_else(|| unavailable("budget version exhausted"))?,
             ..budget
         };
         self.append(if confirmed {
@@ -301,6 +330,15 @@ fn opened<S: LeafStore>(
     let store = reopen().map_err(unavailable)?;
     let started =
         open_with_snapshot(store, DOMAIN, &key.public_key_bytes()).map_err(unavailable)?;
+    if let Some(bytes) = started.state.as_deref() {
+        match serde_json::from_slice::<serde_json::Value>(bytes) {
+            Ok(state) if state["format"] == "lys-budgets-state/v1" => {
+                return rebuilt(reopen, "legacy snapshots keep only latest values; signed history restores earlier personal restrictions".to_owned());
+            }
+            Ok(_) => {}
+            Err(error) => return rebuilt(reopen, format!("budget snapshot is not JSON: {error}")),
+        }
+    }
     let mut held = match started.state.as_deref().map(Held::decode) {
         None => Held::default(),
         Some(Ok(held)) => held,

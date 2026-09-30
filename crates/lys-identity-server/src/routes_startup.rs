@@ -21,6 +21,14 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
+    let configuration = Box::new(crate::configuration_store::ConfigurationStore::open(
+        &config.log_dir.with_file_name("organisation"),
+        Arc::clone(&key),
+    )?);
+    say(&format!(
+        "organisation configuration log {}",
+        configuration.start()
+    ));
     let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &*say)?;
     let mcp_requests =
         crate::mcp_requests_store::McpRequestStore::configured(config, Arc::clone(&key), &say)?
@@ -117,6 +125,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         teams: teams.map(Mutex::new),
         stops: stops.map(Mutex::new),
         budgets: budgets.map(Mutex::new),
+        configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
         apps: Mutex::new(apps),
@@ -153,7 +162,13 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         .merge(crate::memory_api::routes(config))
         .merge(crate::certificates_api::routes())
         .with_state(Arc::clone(&state));
-    let starts = start::routes(start_service(config, &state)?);
+    let start_service = start_service(config, &state)?;
+    let starts = crate::start_budget::guarded(
+        start::agent_route(Arc::clone(&start_service))
+            .merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
+        Arc::clone(&state),
+    );
+    let start_records = start::record_routes(start_service);
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)));
     // Authenticate the inner API/provider routes before body extraction. Static
@@ -168,6 +183,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         crate::routes_table::router(Arc::clone(&state))
             .merge(configured)
             .merge(starts)
+            .merge(start_records)
             .layer(axum::Extension(catalogue))
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );

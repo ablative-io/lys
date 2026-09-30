@@ -33,9 +33,20 @@ pub struct Crossing {
     /// The budget's version.
     pub version: u64,
     /// The budget's limit.
-    pub limit: u64,
+    #[schema(value_type = f64)]
+    pub limit: serde_json::Number,
     /// The figure that reached it.
-    pub figure: u64,
+    #[schema(value_type = f64)]
+    pub figure: serde_json::Number,
+    /// The stable position within this holder version.
+    #[serde(default)]
+    pub limit_index: u64,
+    /// A warning uses its own once-per-period identity and tells the responsible person.
+    #[serde(default)]
+    pub warning: bool,
+    /// The paying account whose reported plan window reached the threshold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
     /// What the budget does.
     pub act: Act,
     /// The agent whose use crossed it.

@@ -98,8 +98,11 @@ async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
             holder,
             measure: Measure::Tokens,
             version: 1,
-            limit: 1,
-            figure: 5,
+            limit: 1.into(),
+            figure: 5.into(),
+            limit_index: 0,
+            warning: false,
+            account: None,
             act: Act::Stop,
             agent: agent.clone(),
             session: Some(victim.clone()),
@@ -115,6 +118,7 @@ async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
             session: Some(victim.clone()),
             context_percent: None,
             crossed: vec![crossing],
+            ..Usage::default()
         })?;
         Ok((agent, victim, machine))
     })

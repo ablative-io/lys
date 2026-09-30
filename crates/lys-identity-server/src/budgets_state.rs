@@ -22,7 +22,7 @@ use crate::budgets_crossing::{Acted, Crossing, Crossings};
 /// The snapshot domain the budgets' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/budgets-state/v2";
 
-const FORMAT: &str = "lys-budgets-state/v2";
+const FORMAT: &str = "lys-budgets-state/v3";
 
 /// Who a budget is held on.
 #[derive(
@@ -62,6 +62,23 @@ pub enum Measure {
     Tokens,
     /// Running time in a period, in milliseconds.
     RunningMs,
+    /// Reported dollar spend, never inferred from token prices.
+    Dollars,
+    /// A reported account window's level.
+    PlanPercent,
+}
+
+impl Measure {
+    /// Its wire name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::ContextPercent => "context_percent",
+            Self::Tokens => "tokens",
+            Self::RunningMs => "running_ms",
+            Self::Dollars => "dollars",
+            Self::PlanPercent => "plan_percent",
+        }
+    }
 }
 
 /// What a reached budget does.
@@ -86,6 +103,22 @@ pub enum Length {
     Day,
     /// From Monday's midnight to the next.
     Week,
+    /// An epoch-aligned five-hour interval.
+    FiveHour,
+    /// From the first midnight of a month to the next.
+    Month,
+}
+
+impl Length {
+    /// Its wire name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::FiveHour => "five_hour",
+            Self::Month => "month",
+        }
+    }
 }
 
 /// The period a budget counts over, in a named zone.
@@ -134,6 +167,24 @@ pub struct Usage {
     pub tokens: u64,
     /// Running time, in milliseconds.
     pub running_ms: u64,
+    /// Reported dollar spend; absent is not zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dollars_micros: Option<u64>,
+    /// The account that the native record attributes the figures to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
+    /// Account windows observed by this snapshot; absent spend records do not replace them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_windows: Option<Vec<lys_runner::tracking_budget::PlanWindow>>,
+    /// The native cumulative running-time baseline, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reported_running_ms: Option<u64>,
+    /// A native snapshot updates availability and account levels, even without spend.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub native_snapshot: bool,
+    /// Each unavailable figure and its reported reason.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unavailable: Vec<lys_runner::tracking::Unavailable>,
     /// The session it was measured in, when one is named.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<String>,
@@ -151,6 +202,8 @@ pub struct Usage {
 pub enum Leaf {
     /// A budget set or changed.
     Set(Budget),
+    /// An entire holder's limits replaced under one optimistic version.
+    LimitsSet(crate::budgets_limits::Limits),
     /// A version admitted under the administrator-only personal-budget rule.
     Confirmed(Budget),
     /// A use charged.
@@ -195,9 +248,13 @@ pub struct Standing {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Held {
-    /// Each budget at its latest version, by holder and measure.
+    /// The old versions retained as migration and confirmation evidence.
     pub budgets: Vec<Budget>,
+    /// The current limits, migrated before any read or enforcement.
+    #[serde(default)]
+    pub limit_sets: Vec<crate::budgets_limits::Limits>,
     /// Legacy self-set personal budgets and what remains effective.
+    #[serde(default)]
     pub unconfirmed: Vec<crate::budgets_legacy::Unconfirmed>,
     /// The events already charged.
     pub charged: BTreeSet<String>,
@@ -227,6 +284,12 @@ impl Budget {
             return Err(refused("budget_invalid", "a budget names its holder"));
         }
         match (self.measure, &self.period) {
+            (Measure::Dollars | Measure::PlanPercent, _) => {
+                return Err(refused(
+                    "budget_invalid",
+                    "reported dollars and plan levels are set through limit collections",
+                ));
+            }
             (Measure::ContextPercent, Some(_)) => {
                 return Err(refused(
                     "budget_invalid",
@@ -274,6 +337,14 @@ impl Period {
         let local: Zoned = instant.to_zoned(zone);
         let day = local.date();
         let first = match self.length {
+            Length::FiveHour => {
+                return at_ms
+                    .div_euclid(18_000_000)
+                    .checked_mul(18_000_000)
+                    .ok_or_else(|| "five-hour start overflows milliseconds".to_owned());
+            }
+            Length::Month => jiff::civil::Date::new(day.year(), day.month(), 1)
+                .map_err(|error| error.to_string())?,
             Length::Day => day,
             Length::Week => {
                 let back = i64::from(day.weekday().since(Weekday::Monday));
@@ -301,10 +372,32 @@ impl Held {
     pub fn hold(&mut self, leaf: Leaf) -> Result<(), String> {
         let confirmed = matches!(&leaf, Leaf::Confirmed(_));
         match leaf {
+            Leaf::LimitsSet(limits) => {
+                let expected = self
+                    .limit_set(&limits.holder)
+                    .map_or(Some(1), |held| held.version.checked_add(1))
+                    .ok_or("budget version exhausted")?;
+                if limits.version != expected {
+                    return Err("limit collection version does not follow the one held".to_owned());
+                }
+                limits.clone().checked().map_err(|error| error.words)?;
+                self.unconfirmed
+                    .retain(|pending| pending.requested.holder != limits.holder);
+                if let Some(held) = self
+                    .limit_sets
+                    .iter_mut()
+                    .find(|held| held.holder == limits.holder)
+                {
+                    *held = limits;
+                } else {
+                    self.limit_sets.push(limits);
+                }
+            }
             Leaf::Set(budget) | Leaf::Confirmed(budget) => {
                 let expected = self
                     .budget(&budget.holder, budget.measure)
-                    .map_or(1, |held| held.version + 1);
+                    .map_or(Some(1), |held| held.version.checked_add(1))
+                    .ok_or("budget version exhausted")?;
                 if budget.version != expected {
                     return Err(format!(
                         "budget version {} does not follow the one held",
@@ -316,13 +409,14 @@ impl Held {
                 } else {
                     self.legacy_set(&budget);
                 }
+                self.migrate_budget(&budget)?;
                 let held = self
                     .budgets
                     .iter_mut()
                     .find(|held| held.holder == budget.holder && held.measure == budget.measure);
                 match held {
                     None if budget.version == 1 => self.budgets.push(budget),
-                    Some(held) if budget.version == held.version + 1 => *held = budget,
+                    Some(held) => *held = budget,
                     _ => {
                         return Err(format!(
                             "budget version {} does not follow the one held",
@@ -386,12 +480,19 @@ impl Held {
             if !agents.contains(&usage.agent) || usage.at_ms < start || usage.at_ms > at_ms {
                 continue;
             }
-            let figure = match budget.measure {
-                Measure::Tokens => usage.tokens,
-                Measure::RunningMs => usage.running_ms,
-                Measure::ContextPercent => 0,
-            };
-            total = total.saturating_add(figure);
+            let figure =
+                match budget.measure {
+                    Measure::Tokens => usage.tokens,
+                    Measure::RunningMs => usage.running_ms,
+                    Measure::ContextPercent => 0,
+                    Measure::Dollars | Measure::PlanPercent => return Err(
+                        "old single-measure accounting cannot read reported dollar or plan figures"
+                            .to_owned(),
+                    ),
+                };
+            total = total
+                .checked_add(figure)
+                .ok_or("budget spend overflows its unit")?;
         }
         Ok(total)
     }
@@ -421,13 +522,22 @@ impl Held {
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("budgets state: {error}"))?;
-        if sealed.format != FORMAT {
+        if !matches!(
+            sealed.format.as_str(),
+            "lys-budgets-state/v1" | "lys-budgets-state/v2" | "lys-budgets-state/v3"
+        ) {
             return Err(format!(
                 "budgets state is in format {}, not {FORMAT}",
                 sealed.format
             ));
         }
-        Ok(sealed.held)
+        let mut held = sealed.held;
+        if held.limit_sets.is_empty() {
+            for budget in held.budgets.clone() {
+                held.merge_budget(&budget, budget.version)?;
+            }
+        }
+        Ok(held)
     }
 }
 
@@ -456,4 +566,8 @@ pub fn by_holder(budgets: &[Budget]) -> BTreeMap<Holder, Vec<Budget>> {
             .push(budget.clone());
     }
     out
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
