@@ -228,6 +228,11 @@ async fn list(
         let directory = directory.projection()?;
         caller(&state, &headers, directory)?;
         let page = crate::list_page::Page::read(query, "/network")?;
+        let teams = page
+            .as_ref()
+            .map(|page| page.teams(&state))
+            .transpose()?
+            .flatten();
         let last = last_reports(&state)?;
         with_network(&state, |store| {
             let mut machines: Vec<_> = store
@@ -236,7 +241,15 @@ async fn list(
                 .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
                 .collect();
             let totals = if let Some(page) = &page {
-                machines.retain(|machine| page.matches([machine.name.as_str()]));
+                machines.retain(|machine| {
+                    page.matches([machine.name.as_str()])
+                        && teams.as_ref().is_none_or(|teams| {
+                            machine
+                                .team
+                                .as_ref()
+                                .is_some_and(|team| teams.contains(team))
+                        })
+                });
                 Some(page.finish(&mut machines, |machine| &machine.id)?)
             } else {
                 None

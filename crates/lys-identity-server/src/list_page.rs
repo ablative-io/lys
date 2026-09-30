@@ -14,6 +14,7 @@ use crate::error::ServerError;
 use crate::error_team::TeamError;
 use crate::routes::AppState;
 use crate::teams_api::with_teams;
+use crate::teams_state::Team;
 
 /// Optional search and paging inputs shared by the list routes.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
@@ -59,6 +60,28 @@ pub(crate) struct Page {
 fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
+    }
+}
+
+fn subtree(teams: &[Team], root: &str) -> Result<BTreeSet<String>, ServerError> {
+    if !teams.iter().any(|team| team.created.id == root) {
+        return Err(ServerError::Team(TeamError::Unknown));
+    }
+    let mut ids = BTreeSet::from([root.to_owned()]);
+    loop {
+        let before = ids.len();
+        for team in teams {
+            if team
+                .parent
+                .as_ref()
+                .is_some_and(|parent| ids.contains(parent))
+            {
+                ids.insert(team.created.id.clone());
+            }
+        }
+        if ids.len() == before {
+            return Ok(ids);
+        }
     }
 }
 
@@ -127,25 +150,7 @@ impl Page {
             return Ok(None);
         };
         with_teams(state, |store| {
-            if !store.teams().iter().any(|team| &team.created.id == root) {
-                return Err(ServerError::Team(TeamError::Unknown));
-            }
-            let mut subtree = BTreeSet::from([root.clone()]);
-            loop {
-                let before = subtree.len();
-                for team in store.teams() {
-                    if team
-                        .parent
-                        .as_ref()
-                        .is_some_and(|parent| subtree.contains(parent))
-                    {
-                        subtree.insert(team.created.id.clone());
-                    }
-                }
-                if subtree.len() == before {
-                    break;
-                }
-            }
+            let subtree = subtree(store.teams(), root)?;
             Ok(Some(
                 store
                     .teams()
@@ -155,6 +160,14 @@ impl Page {
                     .collect(),
             ))
         })
+    }
+
+    pub(crate) fn teams(&self, state: &AppState) -> Result<Option<BTreeSet<String>>, ServerError> {
+        self.query
+            .team
+            .as_deref()
+            .map(|root| with_teams(state, |store| subtree(store.teams(), root)))
+            .transpose()
     }
 
     pub(crate) fn finish<T>(
