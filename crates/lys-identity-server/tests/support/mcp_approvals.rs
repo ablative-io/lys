@@ -26,19 +26,14 @@ pub struct Fixture {
     pub service: Service,
     pub administrator: String,
     pub lead: String,
-    signer: Option<Certified>,
+    pub lead_auth: Certified,
+    pub narrow: String,
+    pub narrow_auth: Certified,
+    pub outside: String,
+    pub outside_auth: Certified,
     pub target: String,
     profiles: PathBuf,
-}
-
-#[derive(Clone, Copy)]
-pub enum Scenario {
-    Lead,
-    LatestReviewed,
-    Narrow,
-    Outside,
-    Person,
-    Unsigned,
+    client: reqwest::Client,
 }
 
 pub fn operation() -> Result<String, Box<dyn Error>> {
@@ -54,191 +49,181 @@ pub fn approval(operation: &str) -> Value {
 }
 
 pub async fn post(
+    client: &reqwest::Client,
     service: &Service,
     path: &str,
     cookie: &str,
     body: &Value,
     expected: u16,
 ) -> Result<Value, Box<dyn Error>> {
-    let (status, answer) = service.post(path, Some(cookie), body).await?;
-    assert_eq!(status, expected, "POST {path}: {answer}");
-    Ok(answer)
+    let response = client
+        .post(format!("{}{path}", service.base))
+        .header(reqwest::header::COOKIE, cookie)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body.to_string())
+        .send()
+        .await?;
+    let status = response.status().as_u16();
+    let text = response.text().await?;
+    assert_eq!(status, expected, "POST {path}: {text}");
+    assert!(!text.is_empty(), "POST {path} must answer a JSON record");
+    Ok(serde_json::from_str(&text)?)
 }
 
 impl Fixture {
-    pub async fn new(scenario: Scenario) -> Result<Self, Box<dyn Error>> {
-        let (service, (seeded, approver, profiles)) = Service::start_with(move |config| {
+    pub async fn new() -> Result<Self, Box<dyn Error>> {
+        let client = reqwest::Client::new();
+        let (service, (seeded, narrow, outside, profiles)) = Service::start_with(|config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, HOLDER])?;
-            let mut approver = seeded.people[1].agents[0].id;
-            if matches!(scenario, Scenario::Narrow) {
-                let mut directory = open_directory(config)?;
-                let actor = Actor::new(
-                    config.administrator_binding()?,
-                    Provenance::new(AuthMethod::Oidc, now()),
-                );
-                (approver, _) = directory.register_agent(
+            let mut directory = open_directory(config)?;
+            let actor = Actor::new(
+                config.administrator_binding()?,
+                Provenance::new(AuthMethod::Oidc, now()),
+            );
+            let mut agents = Vec::new();
+            for name in ["narrow approver", "outside approver"] {
+                let (agent, _) = directory.register_agent(
                     actor.clone(),
                     OperationId::generate()?,
                     seeded.people[1].id,
-                    Profile::new("approval approver")?,
+                    Profile::new(name)?,
                     now(),
                 )?;
                 directory.transition(
-                    actor,
+                    actor.clone(),
                     OperationId::generate()?,
-                    IdentityId::Agent(approver),
+                    IdentityId::Agent(agent),
                     Transition::Activate,
                     "",
                     now(),
                 )?;
+                agents.push(agent);
             }
             Ok((
                 seeded,
-                approver,
+                agents[0],
+                agents[1],
                 config.provisioning_file.clone().ok_or("no profiles path")?,
             ))
         })
         .await?;
-        let approver = approver.to_string();
         let administrator = service
             .sign_in(Login {
                 subject: ADMINISTRATOR.to_owned(),
                 email: "operator@example.test".to_owned(),
             })
             .await?;
-        let signer = if matches!(scenario, Scenario::Person | Scenario::Unsigned) {
-            None
-        } else {
-            let holder = service
-                .sign_in(Login {
-                    subject: HOLDER.to_owned(),
-                    email: "holder@example.test".to_owned(),
-                })
-                .await?;
-            Some(Certified::enroll(&service, &holder, &approver).await?)
-        };
+        let holder = service
+            .sign_in(Login {
+                subject: HOLDER.to_owned(),
+                email: "holder@example.test".to_owned(),
+            })
+            .await?;
+        let lead_auth = Certified::enroll(
+            &client,
+            &service,
+            &holder,
+            &seeded.people[1].agents[0].id.to_string(),
+        )
+        .await?;
+        let narrow_auth =
+            Certified::enroll(&client, &service, &holder, &narrow.to_string()).await?;
+        let outside_auth =
+            Certified::enroll(&client, &service, &holder, &outside.to_string()).await?;
         let fixture = Self {
             target: seeded.people[0].agents[0].id.to_string(),
             lead: seeded.people[1].agents[0].id.to_string(),
+            narrow: narrow.to_string(),
+            outside: outside.to_string(),
             service,
             administrator,
-            signer,
+            lead_auth,
+            narrow_auth,
+            outside_auth,
             profiles,
+            client,
         };
         fixture.version(&fixture.target, 0, json!([]), true).await?;
-        match scenario {
-            Scenario::Lead | Scenario::LatestReviewed | Scenario::Unsigned => {
-                fixture
-                    .version(
-                        &fixture.lead,
-                        0,
-                        json!([server("https://lead.example.test/mcp")]),
-                        true,
-                    )
-                    .await?;
-                if matches!(scenario, Scenario::LatestReviewed) {
-                    fixture
-                        .version(
-                            &fixture.lead,
-                            1,
-                            json!([server("https://unreviewed.example.test/mcp")]),
-                            false,
-                        )
-                        .await?;
-                }
-            }
-            Scenario::Narrow => {
-                fixture
-                    .version(
-                        &fixture.lead,
-                        0,
-                        json!([{"name": "waffles", "url": "https://waffles.example.test/mcp"}]),
-                        true,
-                    )
-                    .await?;
-                fixture.version(&approver, 0, json!([]), true).await?;
-            }
-            Scenario::Outside | Scenario::Person => {
-                fixture
-                    .version(
-                        &fixture.lead,
-                        0,
-                        json!([
-                            server("https://estate.example.test/mcp"),
-                            {"name": "waffles", "url": "https://waffles.example.test/mcp"}
-                        ]),
-                        true,
-                    )
-                    .await?;
-                fixture
-                    .version(
-                        &fixture.lead,
-                        1,
-                        json!([server("https://estate.example.test/mcp")]),
-                        true,
-                    )
-                    .await?;
-            }
-        }
-        if matches!(
-            scenario,
-            Scenario::Lead | Scenario::LatestReviewed | Scenario::Narrow
-        ) {
-            let parent = operation()?;
+        fixture
+            .version(
+                &fixture.lead,
+                0,
+                json!([server("https://lead.example.test/mcp")]),
+                true,
+            )
+            .await?;
+        fixture
+            .version(
+                &fixture.lead,
+                1,
+                json!([server("https://unreviewed.example.test/mcp")]),
+                false,
+            )
+            .await?;
+        fixture.version(&fixture.narrow, 0, json!([]), true).await?;
+        fixture
+            .version(
+                &fixture.outside,
+                0,
+                json!([
+                    server("https://estate.example.test/mcp"),
+                    {"name": "waffles", "url": "https://waffles.example.test/mcp"}
+                ]),
+                true,
+            )
+            .await?;
+        fixture
+            .version(
+                &fixture.outside,
+                1,
+                json!([server("https://estate.example.test/mcp")]),
+                true,
+            )
+            .await?;
+        let parent = operation()?;
+        let child = operation()?;
+        for (team, under, lead) in [
+            (&parent, None, &fixture.lead),
+            (&child, Some(parent.as_str()), &fixture.narrow),
+        ] {
             post(
+                &fixture.client,
                 &fixture.service,
                 "/teams",
                 &fixture.administrator,
-                &json!({"operation": parent, "name": "approval team"}),
+                &json!({"operation": team, "name": "approval team", "parent": under}),
                 200,
             )
             .await?;
             post(
-                &fixture.service,
-                &format!("/teams/{parent}/members"),
-                &fixture.administrator,
-                &json!({"operation": operation()?, "member": approver}),
-                200,
-            )
-            .await?;
-            post(
-                &fixture.service,
-                &format!("/teams/{parent}/nesting"),
-                &fixture.administrator,
-                &json!({"operation": operation()?, "parent": null, "lead": approver}),
-                200,
-            )
-            .await?;
-            let team = if matches!(scenario, Scenario::Narrow) {
-                parent
-            } else {
-                let child = operation()?;
-                post(
-                    &fixture.service,
-                    "/teams",
-                    &fixture.administrator,
-                    &json!({"operation": child, "name": "approval child", "parent": parent}),
-                    200,
-                )
-                .await?;
-                child
-            };
-            post(
+                &fixture.client,
                 &fixture.service,
                 &format!("/teams/{team}/members"),
                 &fixture.administrator,
-                &json!({"operation": operation()?, "member": fixture.target}),
+                &json!({"operation": operation()?, "member": lead}),
+                200,
+            )
+            .await?;
+            post(
+                &fixture.client,
+                &fixture.service,
+                &format!("/teams/{team}/nesting"),
+                &fixture.administrator,
+                &json!({"operation": operation()?, "parent": under, "lead": lead}),
                 200,
             )
             .await?;
         }
+        post(
+            &fixture.client,
+            &fixture.service,
+            &format!("/teams/{child}/members"),
+            &fixture.administrator,
+            &json!({"operation": operation()?, "member": fixture.target}),
+            200,
+        )
+        .await?;
         Ok(fixture)
-    }
-
-    pub fn signer(&self) -> Result<&Certified, Box<dyn Error>> {
-        self.signer
-            .as_ref()
-            .ok_or_else(|| "scenario has no certified approver".into())
     }
 
     pub async fn version(
@@ -250,6 +235,7 @@ impl Fixture {
     ) -> TestResult {
         let path = format!("/agents/{agent}/provisioning");
         post(
+            &self.client,
             &self.service,
             &path,
             &self.administrator,
@@ -264,6 +250,7 @@ impl Fixture {
         .await?;
         if review {
             post(
+                &self.client,
                 &self.service,
                 &format!("{path}/{}/review", from + 1),
                 &self.administrator,
@@ -286,6 +273,7 @@ impl Fixture {
 
     pub async fn ask(&self, server: &str) -> Result<Value, Box<dyn Error>> {
         post(
+            &self.client,
             &self.service,
             &format!("/agents/{}/mcp-requests", self.target),
             &self.administrator,
@@ -309,12 +297,19 @@ impl Fixture {
         let path = self.approval_path(request);
         let bytes = serde_json::to_vec(body)?;
         let signature = approver.signature(&path, &bytes)?;
-        let (status, answer) = self
-            .service
-            .post_signed(&path, (HEADER, &signature), bytes)
+        let response = self
+            .client
+            .post(format!("{}{path}", self.service.base))
+            .header(HEADER, signature)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(bytes)
+            .send()
             .await?;
-        assert_eq!(status, expected, "POST {path}: {answer}");
-        Ok(answer)
+        let status = response.status().as_u16();
+        let text = response.text().await?;
+        assert_eq!(status, expected, "POST {path}: {text}");
+        assert!(!text.is_empty(), "POST {path} must answer a JSON record");
+        Ok(serde_json::from_str(&text)?)
     }
 
     pub async fn approve_person(
@@ -323,6 +318,7 @@ impl Fixture {
         body: &Value,
     ) -> Result<Value, Box<dyn Error>> {
         post(
+            &self.client,
             &self.service,
             &self.approval_path(request),
             &self.administrator,
@@ -334,7 +330,7 @@ impl Fixture {
 }
 
 pub struct Certified {
-    pub agent: String,
+    agent: String,
     key: Arc<Ed25519Identity>,
 }
 
@@ -353,11 +349,16 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 impl Certified {
-    async fn enroll(service: &Service, holder: &str, agent: &str) -> Result<Self, Box<dyn Error>> {
+    async fn enroll(
+        client: &reqwest::Client,
+        service: &Service,
+        holder: &str,
+        agent: &str,
+    ) -> Result<Self, Box<dyn Error>> {
         let key = Arc::new(Ed25519Identity::load_or_generate(
             &service.dir.path().join(format!("{agent}.key")),
         )?);
-        post(service, &format!("/agents/{agent}/certificates"), holder,
+        post(client, service, &format!("/agents/{agent}/certificates"), holder,
             &json!({"operation": operation()?, "request": STANDARD.encode(create_certificate_request(&key, agent)?)}), 200).await?;
         Ok(Self {
             agent: agent.to_owned(),
