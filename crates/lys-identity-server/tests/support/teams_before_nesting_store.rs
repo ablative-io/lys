@@ -25,13 +25,13 @@ use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
+use lys_identity_server::error_team::TeamError;
 use lys_log_store::{
     FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
 
 use crate::config::Config;
 use crate::error::ServerError;
-use crate::error_team::TeamError;
 use crate::routes::Say;
 use crate::teams_state::{DOMAIN, Held, Line, Refused, Team};
 
