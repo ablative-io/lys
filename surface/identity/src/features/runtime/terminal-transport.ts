@@ -1,4 +1,4 @@
-/** The terminal preserves byte cursors and requires a receipt for every accepted input. */
+/** The terminal preserves byte cursors and requires a receipt for every request of input; input typed while one is in flight goes in the next, so pointer motion never holds typing back. */
 import { API, Refused } from '../../api';
 import type { SessionEnd } from './Terminal';
 
@@ -54,30 +54,65 @@ export function byteOutput(value: Record<string, unknown>, session: string, curs
   return { data: Uint8Array.from(data), cursor: Number(next), ended: end };
 }
 
+/** One pointer-motion report, SGR (`CSI < b;x;y M`) or X10 (`CSI M b x y`), whose button code carries the motion bit; other encodings are sent as they come. */
+export function motionReport(data: Uint8Array): boolean {
+  if (data.length === 6 && data[0] === 27 && data[1] === 91 && data[2] === 77) return ((data[3] - 32) & 32) !== 0;
+  const sgr = data.length <= 24 ? /^\u001b\[<(\d+);\d+;\d+[Mm]$/.exec(String.fromCharCode(...data)) : null;
+  return sgr !== null && (Number(sgr[1]) & 32) !== 0;
+}
+
 export function terminalStreams(session: string, controller: AbortController, ended: (value: SessionEnd) => void) {
   const base = '/runtime/sessions/' + encodeURIComponent(session);
   let cursor: number | null = null;
   let finished = false;
+  let output: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let input: WritableStreamDefaultController | undefined;
+  let queued: { data: Uint8Array; motion: boolean }[] = [];
+  let sending = false;
+  // One input request at a time; everything queued behind it goes in the next single request, in order.
+  const deliver = async () => {
+    while (queued.length && !controller.signal.aborted) {
+      if (finished) throw new Error('The session has ended. The input queued for it was not sent.');
+      const batch = queued;
+      queued = [];
+      const value = await terminalRequest(base + '/input-bytes', { data: batch.flatMap((entry) => Array.from(entry.data)) });
+      const answer = record(value.answer);
+      if (value.session !== session || answer.kind !== 'delivered' || answer.session !== session) throw new Error('Terminal input was not confirmed. Do not resend it.');
+    }
+    queued = [];
+    sending = false;
+  };
+  // An uncertain outcome errors both directions, so the terminal disconnects with the reason; queued input is never sent after it.
+  const failed = (error: unknown) => {
+    queued = [];
+    input?.error(error);
+    output?.error(error);
+  };
   return {
     readable: new ReadableStream<Uint8Array>({
+      start(stream) { output = stream; },
       async pull(stream) {
         const answer = await terminalRequest(base + '/read-bytes', { cursor, follow: true }, controller.signal);
         if (controller.signal.aborted) return;
-        const output = byteOutput(answer, session, cursor);
-        cursor = output.cursor;
-        if (output.data.length) stream.enqueue(output.data);
-        if (output.ended) { finished = true; ended(output.ended); stream.close(); }
+        const read = byteOutput(answer, session, cursor);
+        cursor = read.cursor;
+        if (read.data.length) stream.enqueue(read.data);
+        if (read.ended) { finished = true; ended(read.ended); stream.close(); }
       },
       cancel() { controller.abort(); },
     }),
     writable: new WritableStream<Uint8Array>({
-      async write(data) {
+      start(stream) { input = stream; },
+      // Accepting a chunk queues it, so the next can join it while a request is in flight; a motion report replaces the one queued before it.
+      write(data) {
         if (controller.signal.aborted) throw new Error('The terminal is disconnected.');
         if (finished) throw new Error('The session has ended. No input was sent.');
-        // Writes serialize in the stream; an uncertain outcome errors it, never retries it.
-        const value = await terminalRequest(base + '/input-bytes', { data: Array.from(data) });
-        const answer = record(value.answer);
-        if (value.session !== session || answer.kind !== 'delivered' || answer.session !== session) throw new Error('Terminal input was not confirmed. Do not resend it.');
+        const motion = motionReport(data);
+        if (motion) queued = queued.filter((entry) => !entry.motion);
+        queued.push({ data, motion });
+        if (sending) return;
+        sending = true;
+        void deliver().catch(failed);
       },
     }),
   };

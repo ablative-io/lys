@@ -26,6 +26,7 @@
 .session-stage .terminal { margin-top: 0; }
 .session-empty { padding: 24px; color: var(--text-secondary); }
 .terminal-display { min-width: 0; position: relative; }
+.terminal-renderer { margin: 0 0 6px; color: var(--text-secondary); }
 .terminal-display .terminal-screen { height: 55vh; min-height: 320px; max-height: none; padding: 0; position: relative; white-space: normal; overflow: hidden; }
 @media (max-width: 760px) {
   .session-workspace { grid-template-columns: minmax(0, 1fr); }

@@ -6,7 +6,7 @@ import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 import { byteOutput } from '../src/features/runtime/terminal-transport';
-import { disposed, mockTerminal, written } from './terminal-double';
+import { browser, disposed, listeners, mockTerminal, written } from './terminal-double';
 vi.mock('@gespenst/core', () => ({ createTerminal: mockTerminal }));
 
 const ID = 'op-' + '5'.repeat(32);
@@ -112,6 +112,27 @@ describe('Running sessions', () => {
     expect(live.asked).toHaveLength(2);
     expect(written.map((bytes) => new TextDecoder().decode(bytes)).join('')).toBe('$ echo hi\r\n\u001b[32mhi\u001b[0m\r\n');
     expect(text()).toContain('The process exited, status 0');
+  });
+
+  it('shows the session in a browser without WebGPU and says what draws it instead', async () => {
+    browser.webgpu = false;
+    const live = reads('$ echo hi\r\n');
+    await mount('#/runtime/' + ID, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: live.route });
+    expect($('[role="alert"]')?.textContent ?? '').toBe('');
+    expect(written.map((bytes) => new TextDecoder().decode(bytes)).join('')).toBe('$ echo hi\r\n');
+    expect($('.terminal-screen')?.getAttribute('data-renderer')).toBe('webgl2');
+    expect($('.terminal-renderer')?.textContent).toBe('This browser is not offering WebGPU, so the terminal is drawn with WebGL2 instead.');
+  });
+
+  it('says nothing of the renderer on WebGPU, and names the one it falls back to', async () => {
+    await mount('#/runtime/' + ID, { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }), ['POST ' + base + '/read-bytes']: reads('$ ').route });
+    expect($('.terminal-screen')?.getAttribute('data-renderer')).toBe('webgpu');
+    expect($('.terminal-renderer')).toBeNull();
+    const changed = listeners.get('renderer');
+    if (!changed) throw new Error('the terminal does not follow its renderer');
+    act(() => changed({ backend: 'canvas2d', textShaping: 'browser-canvas' }));
+    expect($('.terminal-screen')?.getAttribute('data-renderer')).toBe('canvas2d');
+    expect($('.terminal-renderer')?.textContent).toBe('This browser is not offering WebGPU, so the terminal is drawn with Canvas 2D instead.');
   });
 
   it('types a line and sends keys to the session', async () => {
