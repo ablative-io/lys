@@ -54,6 +54,7 @@ async function directory() {
   await home();
   expect(document.querySelector('nav[aria-label="Main"] a[href="#/agents/new"]')).toBeNull();
   expect(document.querySelector('.you-page a[href^="#/agents/new"]')).toBeNull();
+  expect(document.querySelector('[data-act="commission"]')).toBeNull();
   const entry = document.querySelector<HTMLAnchorElement>('nav[aria-label="Main"] a[href="#/people"]');
   if (!entry) throw new Error('Missing People and agents link');
   await follow(entry);
