@@ -327,6 +327,9 @@ impl<S: LeafStore> BudgetStore<S> {
         if self.held.charged.contains(&usage.event) {
             return Ok(false);
         }
+        for crossing in &usage.crossed {
+            crossing.checked().map_err(unavailable)?;
+        }
         self.append(Leaf::Used(usage))?;
         Ok(true)
     }

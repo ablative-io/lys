@@ -266,6 +266,9 @@ pub struct Held {
     /// The refusals read from the runners' feeds.
     #[serde(default)]
     pub refusals: crate::refusals_store::Refusals,
+    /// Current context availability, derived once on open and updated with each usage leaf.
+    #[serde(skip)]
+    pub context_availability: crate::budgets_context::Availability,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -428,11 +431,13 @@ impl Held {
             Leaf::Used(mut usage) => {
                 if self.charged.insert(usage.event.clone()) {
                     for crossing in std::mem::take(&mut usage.crossed) {
+                        crossing.checked()?;
                         self.crossings.hold(crossing);
                     }
                     if let (Some(session), Some(figure)) = (&usage.session, usage.context_percent) {
                         self.crossings.context.insert(session.clone(), figure);
                     }
+                    self.context_availability.keep(&usage)?;
                     self.uses.push(usage);
                 }
             }
@@ -532,6 +537,12 @@ impl Held {
             ));
         }
         let mut held = sealed.held;
+        for crossing in &held.crossings.crossed {
+            crossing.checked()?;
+        }
+        for usage in &held.uses {
+            held.context_availability.keep(usage)?;
+        }
         if held.limit_sets.is_empty() {
             for budget in held.budgets.clone() {
                 held.merge_budget(&budget, budget.version)?;

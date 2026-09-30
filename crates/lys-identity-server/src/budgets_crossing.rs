@@ -35,9 +35,13 @@ pub struct Crossing {
     /// The budget's limit.
     #[schema(value_type = f64)]
     pub limit: serde_json::Number,
-    /// The figure that reached it.
-    #[schema(value_type = f64)]
-    pub figure: serde_json::Number,
+    /// The figure that reached it; absent when context could not be measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    pub figure: Option<serde_json::Number>,
+    /// Why an unmeasured context requires a stop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<String>,
     /// The stable position within this holder version.
     #[serde(default)]
     pub limit_index: u64,
@@ -60,6 +64,23 @@ pub struct Crossing {
 }
 
 impl Crossing {
+    /// An unavailable crossing names its cause and asks only a context stop.
+    pub(crate) fn checked(&self) -> Result<(), String> {
+        match (&self.figure, &self.unavailable) {
+            (Some(_), None) => Ok(()),
+            (None, Some(reason))
+                if !reason.is_empty()
+                    && self.measure == Measure::ContextPercent
+                    && self.act == Act::Stop =>
+            {
+                Ok(())
+            }
+            _ => Err(
+                "a crossing needs a measured figure or a named unavailable context Stop".to_owned(),
+            ),
+        }
+    }
+
     /// The operation id of a crossing of `holder`'s `measure` budget at
     /// `version`, in the period or rise `mark` names, for `session`.
     pub fn id(

@@ -324,12 +324,19 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
     let agents = crate::budgets_members::covered(holder, &standings);
     let used = effective
         .iter()
-        .map(|limit| {
-            crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
-        })
+        .map(|limit| current_usage(&held, limit, &agents, &zone, at_ms))
         .collect::<Result<Vec<_>, _>>()?;
-    let unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
+    let mut unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
+    if let Some(reason) = used.iter().find_map(|used| {
+        (used.unit == Measure::ContextPercent)
+            .then_some(used.unavailable.as_ref())
+            .flatten()
+    }) {
+        unavailable.push(UnitUnavailable {
+            unit: Measure::ContextPercent,
+            reason: reason.clone(),
+        });
+    }
     let unconfirmed: Vec<_> = held
         .unconfirmed
         .iter()
@@ -361,12 +368,7 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                     .map_or_else(Vec::new, |limits| held.effective_limits(limits));
                 let used = limits
                     .iter()
-                    .map(|limit| {
-                        crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                            .map_err(|reason| {
-                                ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
-                            })
-                    })
+                    .map(|limit| current_usage(&held, limit, &agents, &zone, at_ms))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {
                     team: holder.id,
@@ -393,6 +395,20 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
         effective_limits: (!unconfirmed.is_empty()).then_some(effective),
         unconfirmed,
     })
+}
+
+fn current_usage(
+    held: &crate::budgets_state::Held,
+    limit: &Limit,
+    agents: &std::collections::BTreeSet<String>,
+    zone: &str,
+    at_ms: i64,
+) -> Result<Used, ServerError> {
+    if limit.unit == Measure::ContextPercent {
+        return Ok(held.context_availability.used(limit, agents, at_ms));
+    }
+    crate::budgets_usage::figure(held, limit, agents, zone, at_ms, None)
+        .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
 }
 
 /// The exact legacy budget version an administrator confirms.

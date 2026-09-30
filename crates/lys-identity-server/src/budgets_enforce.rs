@@ -5,6 +5,9 @@ use std::sync::Arc;
 
 use serde_json::Number;
 
+mod levels;
+use levels::{Levels, levels};
+
 use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_crossing::Crossing;
 use crate::budgets_limits::{Limit, Limits};
@@ -126,11 +129,37 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         if store.held().charged.contains(&usage.event) {
             return Ok(());
         }
-        let crossed = crossings(store.held(), &usage, &standings, &targets, &zone)?;
-        store.charge(Usage { crossed, ..usage })?;
+        let assessed = crossings(store.held(), &usage, &standings, &targets, &zone)?;
+        let mut usage = usage;
+        if let Some(reason) = assessed.missing
+            && !usage
+                .unavailable
+                .iter()
+                .any(|gap| gap.figure == "context_percent" && gap.reason == reason)
+        {
+            usage.unavailable.push(lys_runner::tracking::Unavailable {
+                figure: "context_percent".to_owned(),
+                reason: reason.to_owned(),
+            });
+        }
+        store.charge(Usage {
+            crossed: assessed.crossed,
+            ..usage
+        })?;
         Ok(())
     })?;
     crate::budgets_act::settle(state).await
+}
+
+struct Assessment {
+    crossed: Vec<Crossing>,
+    missing: Option<&'static str>,
+}
+
+struct LimitAt<'a> {
+    collection: &'a Limits,
+    limit: &'a Limit,
+    index: usize,
 }
 
 fn crossings(
@@ -139,87 +168,143 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
-) -> Result<Vec<Crossing>, ServerError> {
-    let mut crossed = Vec::new();
+) -> Result<Assessment, ServerError> {
+    let mut assessed = Assessment {
+        crossed: Vec::new(),
+        missing: None,
+    };
     for collection in &held.limit_sets {
         let agents = crate::budgets_members::covered(&collection.holder, standings);
         if !agents.contains(&usage.agent) {
             continue;
         }
         for (index, limit) in held.effective_limits(collection).iter().enumerate() {
-            let Some(Levels {
-                before,
-                figure,
-                since,
-                account,
-            }) = levels(held, usage, limit, &agents, zone)?
-            else {
+            let Some(level) = levels(held, usage, limit, &agents, zone)? else {
                 continue;
             };
-            let mark = if limit.unit == Measure::ContextPercent {
-                format!("rise {}", usage.event)
+            if let Some(reason) = level.missing {
+                assessed.missing = crate::budgets_context::missing(usage);
+                if limit.act == Act::Stop {
+                    assessed.crossed.extend(dispatch(
+                        held,
+                        usage,
+                        &agents,
+                        targets,
+                        &Dispatch {
+                            collection,
+                            limit,
+                            index,
+                            figure: None,
+                            missing: Some(reason),
+                            account: None,
+                            act: Act::Stop,
+                            is_warning: false,
+                            mark: &format!("unavailable {}", usage.event),
+                        },
+                    )?);
+                }
             } else {
-                format!(
-                    "period {}",
-                    since.ok_or_else(|| unavailable(
-                        "periodic limit has no reported period start"
-                    ))?
-                )
-            };
-            let mut thresholds = vec![(limit.amount.clone(), limit.act, false)];
-            if let Some(percent) = &collection.warn_at {
-                thresholds.insert(
-                    0,
-                    (
-                        warning(limit, percent).map_err(unavailable)?,
-                        Act::Tell,
-                        true,
-                    ),
-                );
-            }
-            for (threshold, act, is_warning) in thresholds {
-                if !reached(limit.unit, &figure, &threshold).map_err(unavailable)? {
-                    continue;
-                }
-                if !is_warning
-                    && before
-                        .as_ref()
-                        .map(|before| reached(limit.unit, before, &threshold))
-                        .transpose()
-                        .map_err(unavailable)?
-                        .unwrap_or(false)
-                {
-                    continue;
-                }
-                let mark = if is_warning && limit.unit == Measure::ContextPercent {
-                    format!(
-                        "session {}",
-                        usage
-                            .session
-                            .as_deref()
-                            .ok_or_else(|| unavailable("a context warning names its session"))?
-                    )
-                } else {
-                    mark.clone()
-                };
-                crossed.extend(dispatch(
+                assessed.crossed.extend(measured_crossings(
                     held,
                     usage,
                     &agents,
                     targets,
-                    &Dispatch {
+                    &LimitAt {
                         collection,
                         limit,
                         index,
-                        figure: &figure,
-                        account: account.as_deref(),
-                        act,
-                        is_warning,
-                        mark: &mark,
                     },
+                    level,
                 )?);
             }
         }
+    }
+    Ok(assessed)
+}
+
+fn measured_crossings(
+    held: &Held,
+    usage: &Usage,
+    agents: &std::collections::BTreeSet<String>,
+    targets: &BTreeMap<String, Target>,
+    position: &LimitAt<'_>,
+    level: Levels,
+) -> Result<Vec<Crossing>, ServerError> {
+    let LimitAt {
+        collection,
+        limit,
+        index,
+    } = *position;
+    let Levels {
+        before,
+        figure,
+        since,
+        account,
+        missing: _,
+    } = level;
+    let mut crossed = Vec::new();
+    let figure = figure.ok_or_else(|| unavailable("a measured level has no figure"))?;
+    let mark = if limit.unit == Measure::ContextPercent {
+        format!("rise {}", usage.event)
+    } else {
+        format!(
+            "period {}",
+            since.ok_or_else(|| unavailable("periodic limit has no reported period start"))?
+        )
+    };
+    let mut thresholds = vec![(limit.amount.clone(), limit.act, false)];
+    if let Some(percent) = &collection.warn_at {
+        thresholds.insert(
+            0,
+            (
+                warning(limit, percent).map_err(unavailable)?,
+                Act::Tell,
+                true,
+            ),
+        );
+    }
+    for (threshold, act, is_warning) in thresholds {
+        if !reached(limit.unit, &figure, &threshold).map_err(unavailable)? {
+            continue;
+        }
+        if !is_warning
+            && before
+                .as_ref()
+                .map(|before| reached(limit.unit, before, &threshold))
+                .transpose()
+                .map_err(unavailable)?
+                .unwrap_or(false)
+        {
+            continue;
+        }
+        let mark = if is_warning && limit.unit == Measure::ContextPercent {
+            format!(
+                "session {}",
+                usage
+                    .session
+                    .as_deref()
+                    .ok_or_else(|| unavailable("a context warning names its session"))?
+            )
+        } else {
+            mark.clone()
+        };
+        crossed.extend(dispatch(
+            held,
+            usage,
+            agents,
+            targets,
+            &Dispatch {
+                collection,
+                limit,
+                index,
+                figure: Some(&figure),
+                missing: None,
+                account: account.as_deref(),
+                act,
+                is_warning,
+                mark: &mark,
+            },
+        )?);
     }
     Ok(crossed)
 }
@@ -309,56 +394,12 @@ fn notice(limit: &Limit, figure: &Number, account: Option<&str>) -> Result<Strin
     })
 }
 
-struct Levels {
-    before: Option<Number>,
-    figure: Number,
-    since: Option<i64>,
-    account: Option<String>,
-}
-
-fn levels(
-    held: &Held,
-    usage: &Usage,
-    limit: &Limit,
-    agents: &std::collections::BTreeSet<String>,
-    zone: &str,
-) -> Result<Option<Levels>, ServerError> {
-    if limit.unit == Measure::ContextPercent {
-        let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
-            return Ok(None);
-        };
-        return Ok(Some(Levels {
-            before: held
-                .crossings
-                .context
-                .get(session)
-                .copied()
-                .map(Number::from),
-            figure: context.into(),
-            since: None,
-            account: None,
-        }));
-    }
-    let before = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, None)
-        .map_err(unavailable)?;
-    let after = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, Some(usage))
-        .map_err(unavailable)?;
-    let Some(figure) = after.figure else {
-        return Ok(None);
-    };
-    Ok(Some(Levels {
-        before: before.figure,
-        figure,
-        since: after.since_ms,
-        account: after.account,
-    }))
-}
-
 struct Dispatch<'a> {
     collection: &'a Limits,
     limit: &'a Limit,
     index: usize,
-    figure: &'a Number,
+    figure: Option<&'a Number>,
+    missing: Option<&'a str>,
     account: Option<&'a str>,
     act: Act,
     is_warning: bool,
@@ -377,6 +418,7 @@ fn dispatch(
         limit,
         index,
         figure,
+        missing,
         account,
         act,
         is_warning,
@@ -396,7 +438,7 @@ fn dispatch(
             || (limit.unit != Measure::ContextPercent && target.live.is_empty())
         {
             vec![None]
-        } else if limit.unit == Measure::ContextPercent {
+        } else if limit.unit == Measure::ContextPercent && usage.session.is_some() {
             vec![usage.session.clone()]
         } else {
             target.live.iter().cloned().map(Some).collect()
@@ -420,7 +462,14 @@ fn dispatch(
             }
             let text = match act {
                 Act::Compact => target.compact.clone(),
-                Act::Notice => Some(notice(limit, figure, account).map_err(unavailable)?),
+                Act::Notice => Some(
+                    notice(
+                        limit,
+                        figure.ok_or_else(|| unavailable("a notice needs a measured figure"))?,
+                        account,
+                    )
+                    .map_err(unavailable)?,
+                ),
                 Act::Stop | Act::Tell => None,
             };
             crossed.push(Crossing {
@@ -429,7 +478,8 @@ fn dispatch(
                 measure: limit.unit,
                 version: collection.version,
                 limit: limit.amount.clone(),
-                figure: figure.clone(),
+                figure: figure.cloned(),
+                unavailable: missing.map(str::to_owned),
                 limit_index: u64::try_from(index).map_err(unavailable)?,
                 warning: is_warning,
                 account: account.map(str::to_owned),
