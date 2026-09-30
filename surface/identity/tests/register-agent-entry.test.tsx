@@ -62,7 +62,7 @@ async function directory() {
 
 describe('Registration entry points', () => {
   it.each([
-    { label: 'Add agent', target: '#/agents/new', form: 'Register an agent' },
+    { label: 'Add agent', target: '#/agents/new', form: 'Add an agent' },
     { label: 'Add person', target: '#/people/new', form: 'Add a person' },
   ])('reaches $label through People and agents by visible links only', async ({ label, target, form }) => {
     await directory();
@@ -83,7 +83,7 @@ describe('Registration entry points', () => {
     const query = new URLSearchParams(location.hash.split('?')[1]);
     expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('answers_to')).toBe(ADA);
-    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Register an agent');
+    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
   });
 
   it('carries an agent’s responsible person and team from its row to registration', async () => {
@@ -95,6 +95,6 @@ describe('Registration entry points', () => {
     expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('team')).toBe('team-crew');
     expect(query.get('answers_to')).toBe(ADA);
-    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Register an agent');
+    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
   });
 });
