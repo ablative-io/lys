@@ -52,17 +52,17 @@ async function follow(anchor: HTMLAnchorElement) {
 
 describe('Registration entry points', () => {
   it.each([
-    { label: '+ Add agent', action: 'agent', form: 'Register an agent' },
-    { label: 'Add a person', action: 'person', form: 'Register a person' },
-  ])('reaches $label from the main menu by its text link', async ({ label, action, form }) => {
+    { label: '+ Add agent', target: '#/agents/new', form: 'Register an agent' },
+    { label: 'Add a person', target: '#/directory/manage?action=person', form: 'Register a person' },
+  ])('reaches $label from the main menu by its text link', async ({ label, target, form }) => {
     await home();
     const main = document.querySelector('nav[aria-label="Main"]');
     if (!main) throw new Error('Missing main menu');
     const entry = link(main, label);
-    expect(entry.getAttribute('href')).toBe('#/directory/manage?action=' + action);
+    expect(entry.getAttribute('href')).toBe(target);
     await follow(entry);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe(form);
-    expect(location.hash).toBe('#/directory/manage?action=' + action);
+    expect(location.hash).toBe(target);
   });
 
   it('carries the responsible person from the top of the team tree to registration', async () => {
@@ -72,7 +72,7 @@ describe('Registration entry points', () => {
     const entry = link(heading, '+ Add agent');
     await follow(entry);
     const query = new URLSearchParams(location.hash.split('?')[1]);
-    expect(query.get('action')).toBe('agent');
+    expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('answers_to')).toBe(ADA);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Register an agent');
   });
@@ -83,7 +83,7 @@ describe('Registration entry points', () => {
     if (!team) throw new Error('Missing Crew team');
     await follow(link(team, '+ Add agent'));
     const query = new URLSearchParams(location.hash.split('?')[1]);
-    expect(query.get('action')).toBe('agent');
+    expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('team')).toBe('team-crew');
     expect(query.get('answers_to')).toBe(ADA);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Register an agent');
