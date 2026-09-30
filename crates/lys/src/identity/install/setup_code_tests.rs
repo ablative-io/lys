@@ -53,6 +53,22 @@ fn without_a_browser_the_code_goes_to_an_owner_only_file() -> TestResult {
 }
 
 #[test]
+fn without_a_browser_the_json_output_names_the_code_file_never_the_code() -> TestResult {
+    let root = tempfile::TempDir::new()?;
+    let layout = Layout::at(root.path().to_path_buf());
+    let mut emitter = Emitter::new(true);
+    hand_over(&layout, CODE, &|_: &str| false, &mut emitter)?;
+    let value = emitter.into_value().ok_or("JSON mode renders one object")?;
+    let path = layout.headless_setup_code();
+    assert_eq!(
+        value["setup_code_file"],
+        path.display().to_string().as_str()
+    );
+    assert!(!value.to_string().contains(CODE));
+    Ok(())
+}
+
+#[test]
 fn the_pending_file_keeps_the_purpose_and_the_digest_never_the_code() -> TestResult {
     let text = pending_text(Purpose::Password, CODE);
     assert!(!text.contains(CODE));

@@ -103,7 +103,7 @@ impl Emitter {
     /// Separated from [`Emitter::finish`] so the shape can be asserted in
     /// tests without capturing stdout — a test that scrapes stdout tends to
     /// pass for the wrong reasons.
-    fn into_value(mut self) -> Option<Value> {
+    pub(crate) fn into_value(mut self) -> Option<Value> {
         if !self.json {
             return None;
         }
