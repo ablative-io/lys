@@ -10,6 +10,8 @@
 
 #[path = "support/harness_description.rs"]
 mod harness_description;
+#[path = "support/stub_program.rs"]
+mod stub_program;
 
 use std::error::Error;
 use std::path::PathBuf;
@@ -40,7 +42,7 @@ struct Table {
     key: [u8; 32],
     serving: Option<Serving>,
     machine: String,
-    _dir: tempfile::TempDir,
+    dir: tempfile::TempDir,
 }
 
 impl Table {
@@ -95,7 +97,7 @@ impl Table {
             key,
             serving: Some(serving),
             machine: String::new(),
-            _dir: dir,
+            dir,
         };
         table.machine = table.named_machine().await?;
         table.profile(session).await?;
@@ -138,11 +140,14 @@ impl Table {
 
     async fn profile(&self, session: &Value) -> TestResult {
         let path = format!("/agents/{}/provisioning", self.agent());
+        let program = stub_program::write(self.dir.path(), stub_program::SHELL)?;
+        let mut harness = harness_description::declared();
+        harness["program"] = json!(program);
         let body = json!({
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
-            "harness": harness_description::declared(),
+            "harness": harness,
             "instructions": "", "note": "", "session": session,
         });
         self.ok(&path, &body).await?;
