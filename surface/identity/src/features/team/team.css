@@ -40,3 +40,4 @@
 .team-settings h2 { margin: 0 0 12px; }
 .team-settings .card { margin-bottom: 12px; }
 .team-settings .head h2 { margin: 0; }
+.team-command { width: 100%; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12px "JetBrains Mono"; }

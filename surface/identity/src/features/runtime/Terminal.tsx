@@ -22,7 +22,7 @@ function endWords(ended: SessionEnd): string {
   return `${how}${status}, ${clock(Math.floor(ended.at / 1000))}.`;
 }
 
-/** bare: the screen, the line and the keys only; the caller shows the name, the state and Stop itself. */
+/** bare: the screen alone, which takes keystrokes itself; the caller shows the name, the state and Stop. */
 export function Terminal({ session, agent, bare = false }: { session: string; agent: string | null; bare?: boolean }) {
   const base = '/runtime/sessions/' + encodeURIComponent(session);
   const [ended, setEnded] = useState<SessionEnd | null>(null);
@@ -72,7 +72,7 @@ export function Terminal({ session, agent, bare = false }: { session: string; ag
       </div>
     </div> : null}
     <GpuTerminal session={session} onEnd={setEnded} onFailure={(error) => setRefused(asRefused(error))} />
-    {!ended ? <>
+    {!ended && !bare ? <>
       <form className="terminal-line" aria-label="Type to the session" onSubmit={(event) => void typed(event)}>
         <input name="line" aria-label="Line to type" autoComplete="off" spellCheck={false} disabled={busy} />
         <button type="submit" className="btn primary" disabled={busy}>Send</button>
