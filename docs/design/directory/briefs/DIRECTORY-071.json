@@ -34,7 +34,8 @@
         "create": [
           "crates/lys-identity-server/tests/teams_nested.rs",
           "crates/lys-identity-server/tests/support/teams_before_nesting_state.rs",
-          "crates/lys-identity-server/tests/support/teams_before_nesting_store.rs"
+          "crates/lys-identity-server/tests/support/teams_before_nesting_store.rs",
+          "crates/lys-identity-server/src/teams_nesting.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/teams_state.rs",
@@ -70,7 +71,8 @@
       "files": {
         "create": [
           "crates/lys-identity-server/src/tree_api.rs",
-          "crates/lys-identity-server/tests/tree_api.rs"
+          "crates/lys-identity-server/tests/tree_api.rs",
+          "crates/lys-identity-server/src/tree_views.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/routes_table.rs",

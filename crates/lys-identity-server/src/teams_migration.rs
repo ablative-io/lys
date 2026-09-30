@@ -34,11 +34,11 @@ fn pending(state: &AppState) -> Result<bool, ServerError> {
     })
 }
 
-/// Confirmations create new-format leaves and wait until rollback is closed.
+/// New-format team events wait until rollback is closed.
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
         return Err(unavailable(
-            "upgrade_pending: membership confirmation is refused while the upgrade is reversible",
+            "upgrade_pending: new-format team events are refused while the upgrade is reversible",
         ));
     }
     Ok(())

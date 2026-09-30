@@ -34,14 +34,14 @@ use crate::read_api::{login, own_person};
 use crate::read_views::Login;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-use crate::teams_state::{Changed, Created, Line, Team};
+use crate::teams_state::{Changed, Line, Team};
 use crate::teams_store::TeamStore;
 
 /// The most characters a team's name carries.
-const NAME_MAX: usize = 100;
+pub(crate) const NAME_MAX: usize = 100;
 
 /// The most characters a team's description carries.
-const DESCRIPTION_MAX: usize = 500;
+pub(crate) const DESCRIPTION_MAX: usize = 500;
 
 /// A team as the routes answer it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -50,6 +50,10 @@ pub struct TeamView {
     pub id: String,
     /// The person who owns it.
     pub owner: String,
+    /// The parent team, null for a top-level team.
+    pub parent: Option<String>,
+    /// The admitted member who leads it, null when none is named.
+    pub lead: Option<String>,
     /// Its name.
     pub name: String,
     /// What it is for; empty when its creator said nothing.
@@ -101,15 +105,7 @@ pub struct TeamsView {
     pub teams: Vec<TeamView>,
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-#[schema(as = TeamCreateBody)]
-pub(crate) struct CreateBody {
-    operation: String,
-    name: String,
-    #[serde(default)]
-    description: String,
-}
+pub(crate) use crate::teams_nesting::CreateBody;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -129,7 +125,8 @@ pub(crate) struct RetireBody {
 /// The team routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/teams", post(create).get(list))
+        .route("/teams", post(crate::teams_nesting::create).get(list))
+        .route("/teams/{id}/nesting", post(crate::teams_nesting::nest))
         .route("/teams/{id}", get(one))
         .route("/teams/{id}/members", post(add))
         .route("/teams/{id}/members/{member}/remove", post(remove))
@@ -137,7 +134,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/teams/{id}/members/{member}/confirm", post(confirm))
 }
 
-fn malformed(reason: impl Into<String>) -> ServerError {
+pub(crate) fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
     }
@@ -163,6 +160,8 @@ fn view(team: &Team) -> TeamView {
     TeamView {
         id: created.id.clone(),
         owner: created.owner.clone(),
+        parent: team.parent.clone(),
+        lead: team.lead.clone(),
         name: created.name.clone(),
         description: created.description.clone(),
         members: team.members.clone(),
@@ -181,7 +180,8 @@ fn view(team: &Team) -> TeamView {
 
 fn recorded(line: &Line) -> Result<Recorded, ServerError> {
     let (act, member) = match line {
-        Line::Created(_) => ("created", None),
+        Line::Created(_) | Line::CreatedV1(_) => ("created", None),
+        Line::NestedV1(_) => ("nested", None),
         Line::Added(changed) => ("added", Some(changed.member.clone())),
         Line::Removed(changed) => ("removed", Some(changed.member.clone())),
         Line::Retired(_) => ("retired", None),
@@ -197,6 +197,8 @@ fn recorded(line: &Line) -> Result<Recorded, ServerError> {
     };
     let (by, at) = match line {
         Line::Created(created) => (created.by.clone(), created.at),
+        Line::CreatedV1(created) => (created.created.by.clone(), created.created.at),
+        Line::NestedV1(nested) => (nested.by.clone(), nested.at),
         Line::Added(changed)
         | Line::Removed(changed)
         | Line::Retired(changed)
@@ -218,7 +220,7 @@ fn recorded(line: &Line) -> Result<Recorded, ServerError> {
 
 /// Keep `line` and answer the team as it stands beside the line its
 /// operation was first kept as.
-fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
+pub(crate) fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
     let operation = line.operation().to_owned();
     let team = store.keep(line)?;
     let first = store
@@ -232,7 +234,7 @@ fn kept(store: &mut TeamStore, line: Line) -> Result<TeamChanged, ServerError> {
     })
 }
 
-fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
+pub(crate) fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
     let text = text.trim();
     if text.chars().count() > most {
         return Err(malformed(format!(
@@ -245,45 +247,16 @@ fn words(name: &str, text: &str, most: usize) -> Result<String, ServerError> {
     Ok(text.to_owned())
 }
 
-fn team_id(id: &str) -> Result<String, ServerError> {
+pub(crate) fn team_id(id: &str) -> Result<String, ServerError> {
     OperationId::from_str(id)
         .map(|id| id.to_string())
         .map_err(|_unread| ServerError::TeamUnknown)
 }
 
-async fn create(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    body: Result<Json<CreateBody>, JsonRejection>,
-) -> Result<Json<TeamChanged>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let id = OperationId::from_str(&body.operation)?.to_string();
-    let name = words("name", &body.name, NAME_MAX)?;
-    if name.is_empty() {
-        return Err(malformed("a team has a name"));
-    }
-    let description = words("description", &body.description, DESCRIPTION_MAX)?;
-    crate::teams_migration::advance(&state)?;
-    with_directory(&state, |directory| {
-        let owner = own_person(directory.projection()?, &actor)?;
-        let line = Line::Created(Created {
-            id,
-            owner: owner.to_string(),
-            name,
-            description,
-            by: login(actor.binding()),
-            at: now(),
-        });
-        with_teams(&state, |store| kept(store, line))
-    })
-    .map(Json)
-}
-
 /// Keep the change `made` makes on team `id`, admitted only for the team's
 /// owner or the administrator; a team the caller may not change is refused
 /// `NotAdmitted`, and one never created `TeamUnknown`.
-fn change(
+pub(crate) fn change(
     state: &AppState,
     actor: &Actor,
     id: &str,

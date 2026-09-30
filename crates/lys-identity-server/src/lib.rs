@@ -132,6 +132,7 @@ pub mod stops_store;
 pub mod surface;
 pub mod teams_api;
 pub mod teams_migration;
+pub mod teams_nesting;
 pub mod teams_state;
 pub mod teams_store;
 

@@ -43,6 +43,7 @@ Behavioural. WHEN a team is created or changed, THE SYSTEM SHALL accept an optio
 - create: crates/lys-identity-server/tests/teams_nested.rs
 - create: crates/lys-identity-server/tests/support/teams_before_nesting_state.rs
 - create: crates/lys-identity-server/tests/support/teams_before_nesting_store.rs
+- create: crates/lys-identity-server/src/teams_nesting.rs
 - modify: crates/lys-identity-server/src/teams_state.rs
 - modify: crates/lys-identity-server/src/teams_store.rs
 - modify: crates/lys-identity-server/src/teams_api.rs
@@ -73,6 +74,7 @@ Behavioural. WHEN a person or agent reads GET /api/tree, THE SYSTEM SHALL answer
 **Files:**
 - create: crates/lys-identity-server/src/tree_api.rs
 - create: crates/lys-identity-server/tests/tree_api.rs
+- create: crates/lys-identity-server/src/tree_views.rs
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/openapi_types.rs

@@ -465,6 +465,7 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
     let changed = api.schema::<TeamChanged>();
     let (team, member) = (api.schema::<TeamBody>(), api.schema::<MemberBody>());
     let retire_team = api.schema::<TeamRetireBody>();
+    let nesting = api.schema::<crate::teams_nesting::NestingBody>();
     let sessions = api.schema::<SessionsView>();
     let ended = api.schema::<EndedView>();
     let certificates = api.schema::<CertificatesView>();
@@ -507,6 +508,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             POST,
             "/teams/{id}/members/{member}/confirm",
             Some(retire_team.clone()),
+            Some(changed.clone()),
+        ),
+        (
+            POST,
+            "/teams/{id}/nesting",
+            Some(nesting),
             Some(changed.clone()),
         ),
         (POST, "/teams/{id}/retire", Some(retire_team), Some(changed)),

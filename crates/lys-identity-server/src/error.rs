@@ -577,6 +577,14 @@ pub enum ServerError {
     /// The member is not in the team.
     #[error("TeamMemberAbsent: that member is not in the team")]
     TeamMemberAbsent,
+    /// The parent would close a team cycle.
+    #[error(
+        "team_parent_cycle: team `{team}` cannot have parent `{parent}` because that closes a cycle"
+    )]
+    TeamParentCycle { team: String, parent: String },
+    /// A lead must remain an admitted member.
+    #[error("team_lead_not_member: agent `{lead}` is not an admitted member of team `{team}`")]
+    TeamLeadNotMember { team: String, lead: String },
     /// The member named is not a person or agent the directory holds, or is retired.
     #[error(
         "TeamMemberUnknown: a member is a person or agent the directory holds and has not retired"

@@ -80,7 +80,7 @@ fn nesting(parent: Option<&str>, lead: Option<&str>) -> Result<Value, Box<dyn Er
 
 #[tokio::test]
 async fn a_team_keeps_its_parent_and_a_lead_who_is_a_member() -> TestResult {
-    let table = Table::start().await?;
+    let mut table = Table::start().await?;
     let root = table.team("root", None).await?;
     let child = table.team("child", Some(&root)).await?;
     let lead = table.seeded.people[0].agents[0].id.to_string();
@@ -102,6 +102,21 @@ async fn a_team_keeps_its_parent_and_a_lead_who_is_a_member() -> TestResult {
         changed,
         "retry writes nothing"
     );
+    table.service.restart().await?;
+    let (status, reopened) = table
+        .service
+        .get(&format!("/teams/{child}"), Some(&table.cookie))
+        .await?;
+    assert_eq!(status, 200, "{reopened}");
+    assert_eq!(reopened["parent"], root);
+    assert_eq!(reopened["lead"], lead);
+    let removed = table
+        .post(
+            &format!("/teams/{child}/members/{lead}/remove"),
+            &json!({"operation": OperationId::generate()?.to_string()}),
+        )
+        .await?;
+    assert_eq!(removed["lead"], Value::Null);
     Ok(())
 }
 
@@ -233,5 +248,50 @@ async fn the_archived_writer_store_and_snapshot_read_as_top_level_without_a_lead
     );
     assert_eq!(answer["parent"], Value::Null);
     assert_eq!(answer["lead"], Value::Null);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_nested_teams_owner_cannot_change_its_parent() -> TestResult {
+    let other = "another-subject";
+    let (service, seeded) =
+        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, other])?)).await?;
+    assert_eq!(seeded.people.len(), 2);
+    let owner = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let other = service
+        .sign_in(Login {
+            subject: other.to_owned(),
+            email: "operator@example.test".to_owned(),
+        })
+        .await?;
+    let parent = OperationId::generate()?.to_string();
+    let child = OperationId::generate()?.to_string();
+    for (id, cookie, parent) in [
+        (&parent, &owner, None),
+        (&child, &other, Some(parent.as_str())),
+    ] {
+        let (status, answer) = service
+            .post(
+                "/teams",
+                Some(cookie),
+                &json!({"operation":id,"name":"team","parent":parent}),
+            )
+            .await?;
+        assert_eq!(status, 200, "{answer}");
+    }
+    let (status, answer) = service
+        .post(
+            &format!("/teams/{parent}/nesting"),
+            Some(&other),
+            &nesting(None, None)?,
+        )
+        .await?;
+    assert_eq!(status, 403, "{answer}");
+    assert_eq!(answer["refusal"], "NotAdmitted");
     Ok(())
 }
