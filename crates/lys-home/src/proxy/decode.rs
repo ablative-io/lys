@@ -1,8 +1,9 @@
 //! Only the recording reader decodes admitted content codings; the raw spool stays encoded.
 
-use std::io::{self, Write};
+use std::collections::VecDeque;
+use std::io::{self, BufRead, Read};
 
-use flate2::write::MultiGzDecoder;
+use flate2::bufread::MultiGzDecoder;
 use flate2::{Decompress, FlushDecompress, Status};
 use hyper::header::{GetAll, HeaderValue};
 use serde_json::Value;
@@ -10,26 +11,16 @@ use serde_json::Value;
 use super::stream::StreamReader;
 use crate::record::call::Api;
 
-#[derive(Debug)]
-struct Feed(StreamReader);
-
-impl Write for Feed {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.feed(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
+/// Limits recording memory and work per compressed response, across all members:
+/// delivered decoded bytes are bounded; the codec's internal 32 KiB window is fixed.
+const DECODED_LIMIT: usize = 16 * 1024 * 1024;
+const CHUNK: usize = 8192;
 
 /// A response-side reader; unsupported or absent codings retain the raw reader.
 #[derive(Debug)]
 enum Coding {
     Plain(Box<StreamReader>),
-    Gzip(Box<MultiGzDecoder<Feed>>),
-    Deflate(Box<Inflater>),
+    Compressed(Box<Decoded>),
 }
 
 /// A response-side reader with one recording-only decoding path.
@@ -48,17 +39,27 @@ impl Reader {
             && let Some(encoding) = encoding
         {
             let encoding = encoding.trim_ascii();
-            if encoding.eq_ignore_ascii_case(b"gzip") {
+            let codec = if encoding.eq_ignore_ascii_case(b"gzip") {
+                Some(Codec::Gzip(Box::new(MultiGzDecoder::new(
+                    Pending::default(),
+                ))))
+            } else if encoding.eq_ignore_ascii_case(b"deflate") {
+                Some(Codec::Deflate(Box::new(Inflater {
+                    codec: Decompress::new(true),
+                    input: Pending::default(),
+                    ended: false,
+                })))
+            } else {
+                None
+            };
+            if let Some(codec) = codec {
                 return Self {
-                    coding: Coding::Gzip(Box::new(MultiGzDecoder::new(Feed(reader)))),
-                };
-            }
-            if encoding.eq_ignore_ascii_case(b"deflate") {
-                return Self {
-                    coding: Coding::Deflate(Box::new(Inflater {
-                        codec: Decompress::new(true),
+                    coding: Coding::Compressed(Box::new(Decoded {
+                        codec,
                         reader,
+                        delivered: 0,
                         ended: false,
+                        failure: None,
                     })),
                 };
             }
@@ -74,21 +75,18 @@ impl Reader {
                 reader.feed(bytes);
                 Ok(())
             }
-            Coding::Gzip(decoder) => decoder.write_all(bytes),
-            Coding::Deflate(decoder) => decoder.decode(bytes, FlushDecompress::None),
+            Coding::Compressed(decoder) => decoder.feed(bytes),
         }
     }
 
     pub(super) fn finish(self) -> io::Result<Option<Vec<Value>>> {
         match self.coding {
             Coding::Plain(reader) => Ok((*reader).finish()),
-            Coding::Gzip(decoder) => Ok((*decoder).finish()?.0.finish()),
-            Coding::Deflate(mut decoder) => {
-                decoder.decode(&[], FlushDecompress::Finish)?;
+            Coding::Compressed(mut decoder) => {
+                decoder.codec.input().finished = true;
+                decoder.drain()?;
                 if !decoder.ended {
-                    return Err(invalid(
-                        "deflate response ended before its compression trailer",
-                    ));
+                    return Err(invalid("compressed response ended before its trailer"));
                 }
                 Ok(decoder.reader.finish())
             }
@@ -96,29 +94,84 @@ impl Reader {
     }
 }
 
+#[derive(Debug, Default)]
+struct Pending {
+    bytes: VecDeque<u8>,
+    finished: bool,
+}
+
+impl BufRead for Pending {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if self.bytes.is_empty() && !self.finished {
+            return Err(io::ErrorKind::WouldBlock.into());
+        }
+        Ok(self.bytes.as_slices().0)
+    }
+
+    fn consume(&mut self, amount: usize) {
+        drop(self.bytes.drain(..amount));
+    }
+}
+
+impl Read for Pending {
+    fn read(&mut self, into: &mut [u8]) -> io::Result<usize> {
+        if into.is_empty() {
+            return Ok(0);
+        }
+        let bytes = self.fill_buf()?;
+        let amount = bytes.len().min(into.len());
+        into[..amount].copy_from_slice(&bytes[..amount]);
+        self.consume(amount);
+        Ok(amount)
+    }
+}
+
+#[derive(Debug)]
+enum Codec {
+    Gzip(Box<MultiGzDecoder<Pending>>),
+    Deflate(Box<Inflater>),
+}
+
+impl Codec {
+    fn input(&mut self) -> &mut Pending {
+        match self {
+            Self::Gzip(codec) => codec.get_mut(),
+            Self::Deflate(codec) => &mut codec.input,
+        }
+    }
+
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Gzip(codec) => codec.read(output),
+            Self::Deflate(codec) => codec.read(output),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Inflater {
     codec: Decompress,
-    reader: StreamReader,
+    input: Pending,
     ended: bool,
 }
 
-impl Inflater {
-    fn decode(&mut self, mut bytes: &[u8], flush: FlushDecompress) -> io::Result<()> {
-        let mut output = [0; 8192];
+impl Read for Inflater {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() || self.ended {
+            return Ok(0);
+        }
         loop {
-            if self.ended {
-                return if bytes.is_empty() {
-                    Ok(())
-                } else {
-                    Err(invalid("bytes follow the deflate compression trailer"))
-                };
-            }
             let input_before = self.codec.total_in();
             let output_before = self.codec.total_out();
+            let flush = if self.input.finished {
+                FlushDecompress::Finish
+            } else {
+                FlushDecompress::None
+            };
+            // Empty input can still release the codec's buffered decoded bytes.
             let status = self
                 .codec
-                .decompress(bytes, &mut output, flush)
+                .decompress(self.input.bytes.as_slices().0, output, flush)
                 .map_err(|error| {
                     invalid(format!("deflate response could not be decoded: {error}"))
                 })?;
@@ -126,26 +179,95 @@ impl Inflater {
                 .map_err(|error| invalid(format!("deflate input count is too large: {error}")))?;
             let produced = usize::try_from(self.codec.total_out() - output_before)
                 .map_err(|error| invalid(format!("deflate output count is too large: {error}")))?;
-            self.reader.feed(&output[..produced]);
-            bytes = &bytes[consumed..];
+            self.input.consume(consumed);
             self.ended = status == Status::StreamEnd;
-            if self.ended {
-                continue;
+            if produced > 0 || self.ended {
+                return Ok(produced);
             }
-            if consumed == 0 && produced == 0 {
-                return if bytes.is_empty() {
-                    Ok(())
+            if consumed == 0 {
+                return if self.input.finished {
+                    Err(invalid(
+                        "deflate response ended before its compression trailer",
+                    ))
                 } else {
-                    Err(invalid("deflate response could not consume its next bytes"))
+                    Err(io::ErrorKind::WouldBlock.into())
                 };
             }
-            if bytes.is_empty() && produced < output.len() {
-                return Ok(());
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Decoded {
+    codec: Codec,
+    reader: StreamReader,
+    delivered: usize,
+    ended: bool,
+    failure: Option<(io::ErrorKind, String)>,
+}
+
+impl Decoded {
+    fn feed(&mut self, bytes: &[u8]) -> io::Result<()> {
+        self.check_failure()?;
+        for chunk in bytes.chunks(CHUNK) {
+            if self.ended {
+                return self.fail(invalid("bytes follow the compression trailer"));
+            }
+            self.codec.input().bytes.extend(chunk);
+            self.drain()?;
+        }
+        Ok(())
+    }
+
+    fn drain(&mut self) -> io::Result<()> {
+        self.check_failure()?;
+        let mut output = [0; CHUNK];
+        while !self.ended {
+            let remaining = DECODED_LIMIT - self.delivered;
+            // A one-byte probe distinguishes an exact-bound trailer from excess output.
+            // The probe is never delivered to the assembler or retained on failure.
+            let capacity = remaining.clamp(1, CHUNK);
+            match self.codec.read(&mut output[..capacity]) {
+                Ok(0) => {
+                    if !self.codec.input().bytes.is_empty() {
+                        return self.fail(invalid("bytes follow the compression trailer"));
+                    }
+                    self.ended = true;
+                }
+                Ok(amount) => {
+                    if amount > remaining {
+                        return self.fail(invalid(format!(
+                            "response_decoded_limit_exceeded: delivered decoded bytes exceed {DECODED_LIMIT}"
+                        )));
+                    }
+                    self.delivered += amount;
+                    self.reader.feed(&output[..amount]);
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(()),
+                Err(error) => return self.fail(error),
             }
         }
+        Ok(())
+    }
+
+    fn check_failure(&self) -> io::Result<()> {
+        match &self.failure {
+            Some((kind, reason)) => Err(io::Error::new(*kind, reason.clone())),
+            None => Ok(()),
+        }
+    }
+
+    fn fail(&mut self, error: io::Error) -> io::Result<()> {
+        self.failure = Some((error.kind(), error.to_string()));
+        self.codec.input().bytes.clear();
+        Err(error)
     }
 }
 
 fn invalid(reason: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, reason.into())
 }
+
+#[cfg(test)]
+#[path = "decode_bound_tests.rs"]
+mod tests;

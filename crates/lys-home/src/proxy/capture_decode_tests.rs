@@ -114,6 +114,16 @@ async fn round_trip_chunks(
         );
     } else {
         assert!(calls[0].response.is_empty());
+        let stored_decoded_text: usize =
+            calls[0]
+                .response
+                .iter()
+                .try_fold(0, |total, part| -> Res<usize> {
+                    let bytes = blocks.get(&Hash::parse(part)?)?;
+                    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+                    Ok(total + value["text"].as_str().map_or(0, str::len))
+                })?;
+        assert!(stored_decoded_text <= DECODED_BOUND);
     }
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(harness.proxy.slots().in_use(), 0);
@@ -184,20 +194,40 @@ async fn missing_or_corrupt_compression_trailers_never_complete_a_call() -> Res 
     round_trip(Some("gzip"), &corrupt, CallStatus::Partial).await
 }
 
-const DECODED_BOUND: usize = 16 * 1024 * 1024;
+pub(super) const DECODED_BOUND: usize = 16 * 1024 * 1024;
 
 fn oversized_response(encoding: &str) -> Res<Vec<u8>> {
-    let padding = vec![b'\n'; DECODED_BOUND + 1 - PLAIN.len()];
+    sized_response(encoding, DECODED_BOUND + 1)
+}
+
+pub(super) fn sized_response(encoding: &str, decoded_size: usize) -> Res<Vec<u8>> {
+    encode_response(encoding, PLAIN, decoded_size)
+}
+
+pub(super) fn gzip_members(decoded_size: usize) -> Res<Vec<u8>> {
+    let first = decoded_size / 2;
+    let mut sent = sized_response("gzip", first)?;
+    sent.extend_from_slice(&encode_response("gzip", &[], decoded_size - first)?);
+    Ok(sent)
+}
+
+fn encode_response(encoding: &str, prefix: &[u8], decoded_size: usize) -> Res<Vec<u8>> {
+    let padding = vec![
+        b'\n';
+        decoded_size
+            .checked_sub(prefix.len())
+            .ok_or("fixture is too short")?
+    ];
     match encoding {
         "gzip" => {
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(PLAIN)?;
+            encoder.write_all(prefix)?;
             encoder.write_all(&padding)?;
             Ok(encoder.finish()?)
         }
         "deflate" => {
             let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(PLAIN)?;
+            encoder.write_all(prefix)?;
             encoder.write_all(&padding)?;
             Ok(encoder.finish()?)
         }
@@ -215,6 +245,21 @@ async fn oversized_gzip_is_partial_and_preserves_the_entire_client_response() ->
 async fn oversized_deflate_is_partial_and_preserves_the_entire_client_response() -> Res {
     let sent = oversized_response("deflate")?;
     round_trip_chunks(Some("deflate"), &sent, CallStatus::Partial, 8192).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn exact_bound_compressed_responses_remain_complete_with_unchanged_client_bytes() -> Res {
+    for encoding in ["gzip", "deflate"] {
+        let sent = sized_response(encoding, DECODED_BOUND)?;
+        round_trip_chunks(Some(encoding), &sent, CallStatus::Complete, 8192).await?;
+    }
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_decoded_bound_counts_all_concatenated_gzip_members_together() -> Res {
+    let sent = gzip_members(DECODED_BOUND + 1)?;
+    round_trip_chunks(Some("gzip"), &sent, CallStatus::Partial, 8192).await
 }
 
 #[test]
@@ -241,7 +286,7 @@ fn oversized_compressed_responses_report_the_named_decoded_bound() -> Res {
     Ok(())
 }
 
-const PLAIN: &[u8] = &[
+pub(super) const PLAIN: &[u8] = &[
     101, 118, 101, 110, 116, 58, 32, 109, 101, 115, 115, 97, 103, 101, 95, 115, 116, 97, 114, 116,
     10, 100, 97, 116, 97, 58, 32, 123, 34, 116, 121, 112, 101, 34, 58, 34, 109, 101, 115, 115, 97,
     103, 101, 95, 115, 116, 97, 114, 116, 34, 44, 34, 109, 101, 115, 115, 97, 103, 101, 34, 58,
