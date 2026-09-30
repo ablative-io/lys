@@ -30,7 +30,7 @@ Let an agent ask for an MCP server declared in the estate by name. Let a person 
 
 ### R1: A seat asks for a declared MCP server by name
 
-Behavioural. WHEN an agent asks for an MCP server by name, THE SYSTEM SHALL record the request against that agent's latest reviewed profile version, SHALL refuse a server the estate does not declare as mcp_server_unknown naming it, and SHALL refuse a server the version already carries as mcp_server_held.
+Behavioural. WHEN an agent asks for an MCP server by name, THE SYSTEM SHALL record the request against that agent's latest reviewed profile version, SHALL refuse a server that no reviewed profile version in the estate carries as mcp_server_unknown naming it, and SHALL refuse a server the version already carries as mcp_server_held.
 
 **Acceptance:**
 - Pikelet's request for the Dot server is recorded and read back pending.
@@ -51,7 +51,7 @@ Behavioural. WHEN an agent asks for an MCP server by name, THE SYSTEM SHALL reco
 
 ### R2: An approval within remit makes a new reviewed profile version
 
-Behavioural. WHEN a person or agent approves a pending request, THE SYSTEM SHALL check through the existing grant admission that the approver holds that server passable for that agent, SHALL refuse otherwise as mcp_beyond_remit naming the approver, the agent and the server, and on success SHALL write a new profile version equal to the latest reviewed version plus that server, recorded as reviewed by the approver, with the previous version kept unchanged.
+Behavioural. WHEN a person or agent approves a pending request, THE SYSTEM SHALL judge remit as what the approver holds, with no new grant kind: an agent approver may pass on only an MCP server that its own latest reviewed profile version carries under that name, copying that server's declaration from it, and a person with directory scope may pass on any server that some reviewed profile version in the estate carries. Otherwise it SHALL refuse as mcp_beyond_remit naming the approver, the agent and the server. On success it SHALL write a new profile version equal to the latest reviewed version plus that server, recorded as reviewed by the approver, with the previous version kept unchanged. The registry of DIRECTORY-075 R3 replaces this lookup when it lands.
 
 **Acceptance:**
 - Archie's approval of the Dot server for Pikelet writes a new version naming it, reviewed by Archie.
