@@ -56,3 +56,62 @@ async fn unknown_teams_are_named_and_never_turn_into_an_unfiltered_list() -> Tes
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn network_team_search_uses_machine_ownership_and_includes_descendants() -> TestResult {
+    let table = Table::start().await?;
+    let root = table.team(None).await?;
+    let child = table.team(Some(&root)).await?;
+    let outside = table.team(None).await?;
+    let root_machine = table.machine("Build root").await?;
+    let child_machine = table.machine("Build child").await?;
+    let other_machine = table.machine("Build outside").await?;
+    table.machine("Build unowned").await?;
+    for (machine, team) in [
+        (&root_machine, &root),
+        (&child_machine, &child),
+        (&other_machine, &outside),
+    ] {
+        let answer = super::post(
+            &table.service,
+            &table.cookie,
+            &format!("/network/machines/{machine}/team"),
+            super::json!({
+                "operation":super::operation()?, "team":team,
+            }),
+        )
+        .await?;
+        assert_eq!(answer["machine"]["team"], team.as_str());
+    }
+    let first = read(
+        &table.service,
+        &table.cookie,
+        &format!("/network?team={root}&q=build&limit=1"),
+    )
+    .await?;
+    assert_eq!(first["total"], 2, "{first}");
+    assert_eq!(rows(&first, "machines")?.len(), 1);
+    let cursor = first["next"].as_str().ok_or("no owned machine cursor")?;
+    let second = read(
+        &table.service,
+        &table.cookie,
+        &format!("/network?team={root}&q=build&limit=1&after={cursor}"),
+    )
+    .await?;
+    assert_eq!(second["total"], 2);
+    assert_eq!(rows(&second, "machines")?.len(), 1);
+    assert_eq!(second.get("next"), Some(&serde_json::Value::Null));
+    let ids: std::collections::BTreeSet<&str> = [&first, &second]
+        .iter()
+        .map(|answer| {
+            answer["machines"][0]["id"]
+                .as_str()
+                .ok_or("owned machine has no id")
+        })
+        .collect::<Result<_, _>>()?;
+    assert_eq!(
+        ids,
+        std::collections::BTreeSet::from([root_machine.as_str(), child_machine.as_str()])
+    );
+    Ok(())
+}
