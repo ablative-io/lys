@@ -39,7 +39,6 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method};
 use axum::routing::post;
 use axum::{Json, Router};
-use lys_identity::LifecycleState;
 use lys_identity::{AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -57,7 +56,7 @@ use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
 use crate::session::now;
 pub(crate) use crate::start_checks::placed;
-use crate::start_checks::reaches;
+use crate::start_checks::{active, reaches, reviewed};
 
 /// The answer of the start-command route.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -181,22 +180,14 @@ async fn start_command(
         if let Some(kept) = admitted(&state, &session, &agent)? {
             return Ok(Admission::Kept(kept, admitted_by));
         }
-        if record.state() != LifecycleState::Active {
-            return Err(ServerError::AgentNotActive {
-                state: record.state().to_string(),
-            });
-        }
+        active(record.state())?;
         let version = with_provisioning(&state, |store| {
             store
                 .profile(&agent)
                 .and_then(|profile| profile.versions.last().cloned())
                 .ok_or(ServerError::LaunchRecordMissing)
         })?;
-        if version.reviewed.is_none() {
-            return Err(ServerError::ProfileNotReviewed {
-                version: version.number,
-            });
-        }
+        reviewed(&version)?;
         let held = crate::roles_api::held_roles(&state, &agent, now())?;
         let runtime = with_network(&state, |store| {
             let machine = placed(store, &machine, (&agent, &held))?;

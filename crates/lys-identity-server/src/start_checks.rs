@@ -1,5 +1,7 @@
 //! The machine placement and network checks shared by start and readiness.
 
+use lys_identity::LifecycleState;
+
 use crate::error::ServerError;
 use crate::network_store::{Machine, NetworkStore};
 use crate::provisioning_store::Version;
@@ -57,4 +59,24 @@ fn url_host(url: &str) -> Option<String> {
         .map_or(authority, |(_user, host)| host);
     let host = located.split(':').next()?.to_ascii_lowercase();
     (!host.is_empty()).then_some(host)
+}
+
+/// A new start requires an active agent.
+pub(crate) fn active(state: LifecycleState) -> Result<(), ServerError> {
+    if state != LifecycleState::Active {
+        return Err(ServerError::AgentNotActive {
+            state: state.to_string(),
+        });
+    }
+    Ok(())
+}
+
+/// A new start requires the exact profile version to have been reviewed.
+pub(crate) fn reviewed(version: &Version) -> Result<(), ServerError> {
+    if version.reviewed.is_none() {
+        return Err(ServerError::ProfileNotReviewed {
+            version: version.number,
+        });
+    }
+    Ok(())
 }
