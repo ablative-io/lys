@@ -1,16 +1,16 @@
 # PROOF-PROXY: a subscription login through a pass-through proxy (HOME-001 R7, R10)
 
-**Status: not yet run. No outcome of the subscription proof is claimed here, neither `completed` nor `failed`.** This page says what is built and how it is tested. It also records the one attempt made from the seat that built it, which was stopped by that seat's own login before any call was made, and it sets out the run that is still owed, with the fields it must fill.
+**Status: the subscription pass-through run completed.** [Issue #129](https://github.com/ablative-io/lys/issues/129) records Claude Code 2.1.284 forwarding successfully, its session key through resume, seven linked calls over four runs, and recovery of an open call after SIGTERM. That run also found that compressed replies were recorded `partial` with no response parts. The recording-side decoder fix is on main as `e99e9f73`; its tests passed in the measured gate on `ec292695`. The issue does not report a provider run after that fix. This page records the issue's evidence; updating it did not run a new subscription proof.
 
 ## What is built
 
 - `crates/lys-home/examples/passthrough.rs`, the R7 pass-through. It forwards every request to the base URL given on its command line, and returns the response unchanged, through the one transport `lys-proxy` uses (`lys_home::proxy::forward::{Upstream, pass_through, serve}`). It writes one line per call on stderr, `{"method", "path", "status", "duration_ms"}`, when the response head arrives. The path is written without its query. It writes no header value and no body byte.
 - `lys-proxy` (`crates/lys-home/src/bin/lys-proxy.rs`, `crates/lys-home/src/proxy/`), the R10 proxy. It forwards by path prefix (`/anthropic`, `/openai`) and records one `lys.call` per model call.
-- The transport. It is HTTP/1 over rustls (ring, Mozilla roots), or plain HTTP to a loopback base, and it sets Hyper's `retry_canceled_requests(false)`. It passes every header as it came except `host`, which it sets to the upstream's authority because the provider serves its own name. It reads one response header, `content-type`, and reads it only to know whether the response is an event stream.
+- The transport. It is HTTP/1 over rustls (ring, Mozilla roots), or plain HTTP to a loopback base, and it sets Hyper's `retry_canceled_requests(false)`. It passes every header as it came except `host`, which it sets to the upstream's authority because the provider serves its own name. The recorder observes `content-type` to identify event streams and `content-encoding` to choose its decoder. It decodes gzip, deflate and concatenated gzip members in full, with no reply-size cap, only on the recording side. Client bytes and their encoding stay unchanged; unsupported encodings are not guessed.
 
 ## What is tested without a provider
 
-Each of these runs against a loopback fake, with no clock in any test. They are in `crates/lys-home/src/proxy/forward_tests.rs`, `link_tests.rs` and `journal_tests.rs`.
+Each of these runs against a loopback fake, with no clock in any test. They are in `crates/lys-home/src/proxy/forward_tests.rs`, `link_tests.rs`, `journal_tests.rs` and `capture_decode_tests.rs`.
 
 | row | test |
 | --- | --- |
@@ -27,6 +27,7 @@ Each of these runs against a loopback fake, with no clock in any test. They are 
 | R10: a journal that cannot be written refuses the call, with zero upstream requests | `a_journal_that_cannot_be_written_refuses_the_call_before_it_is_sent` |
 | R10: a journal lost after admission still forwards, then records `unrecorded` once it can be written | `a_journal_lost_after_admission_forwards_and_records_unrecorded_once_writable` |
 | R10: with a capture bound of 0, a keyed call is `unrecorded` under its own session | `with_no_capture_slot_a_keyed_call_is_unrecorded_under_its_own_session` |
+| R10: compressed streams are decoded for recording while client bytes and encoding stay unchanged; unsupported encodings are not guessed | The eight cases in `capture_decode_tests.rs` cover the Done-when list in #129. The [issue's closure](https://github.com/ablative-io/lys/issues/129#issuecomment-5918644997) records fix `e99e9f73` and the measured green gate `c6af8680` on main `ec292695`: 2719 passed, 0 failed. This is test evidence, not a provider rerun. |
 
 ## The attempt on 28 September 2026
 
@@ -42,7 +43,27 @@ The seat that built this card tried to measure Claude Code's session key first, 
 
 This attempt measured the seat, not the proxy. It is not the R7 proof.
 
-## The run that is owed
+## The recorded subscription run
+
+The Related notes in [#129](https://github.com/ablative-io/lys/issues/129) supply the previously owed run's results. The issue reports the compression defect at `adec73b`, before decoder fix `e99e9f73`.
+
+| field | recorded result |
+| --- | --- |
+| Claude Code version and login | Claude Code `2.1.284`, subscription login |
+| pass-through outcome | `completed` |
+| status codes seen | `HEAD /api/hello` returned 200, then `POST /v1/messages` returned 200 |
+| forwarded headers | Every header forwarded unchanged except `host` |
+| session-key field and spelling | `metadata.user_id` is a JSON object encoded as a string, with `account_uuid`, `device_id` and `session_id`. No identifier values are reproduced here. |
+| session identity and resume | `session_id` equals the session id Claude Code reports; `--resume` sends the same id. `link.rs` already reads this spelling, so no linking change was needed. Its comment still describes the older, unmeasured version `2.1.281`; this run measures `2.1.284`. |
+| runs through `lys-proxy` | Seven calls over four runs: a plain answer, a tool use, a resumed turn and a long answer |
+| recorded linking | Each call had a `lys.call` linked to its session; none were under `unlinked` |
+| stop and restart | SIGTERM stopped the proxy with a call open. Restarting on the same state recorded that call `lost` exactly once. Claude Code retried and finished. |
+| response-recording defect | The gzip response decompressed to a valid stream ending with `message_stop`, but the recorder read the compressed bytes as SSE and recorded `partial` with zero response parts. #129 records six calls with that defect. The linking and recovery results above do not establish complete response recording. |
+| correction and measured checks | `e99e9f73` added full recording-side decoding for gzip and deflate, including concatenated gzip members. The issue's closure records main `ec292695`, gate `c6af8680`, 2719 passed and 0 failed; the original eight compressed-stream cases passed. No decode limit was added. |
+
+The recorded version, outcome, status codes, headers and session-key spelling answer R7's subscription proof and R10's requirement to measure the linking field first. The issue gives counts and outcomes rather than per-call ids, hashes or complete report lines. Those details, and a provider run establishing complete response records after `e99e9f73`, are not supplied here. Tracking issue: [#112](https://github.com/ablative-io/lys/issues/112).
+
+## Procedure for a further provider run
 
 The run needs a seat whose Claude Code subscription login is live. Use the proof account, not a live seat's session, and copy no credential anywhere.
 
@@ -52,4 +73,4 @@ The run needs a seat whose Claude Code subscription login is live. Use the proof
 4. Measure the session key, by field name and spelling only. Record which member of the request body names the Claude Code session in the version measured. `lys-proxy` reads `metadata.user_id` in two spellings, `user_<hex>_account_<uuid>_session_<uuid>` and a JSON object string with `session_id` (`crates/lys-home/src/proxy/link.rs`). If the measured field is neither, `link.rs` changes before `lys-proxy` is relied on.
 5. Run `lys-proxy --home <scratch home> --state <scratch state>` with `ANTHROPIC_BASE_URL=http://127.0.0.1:8484/anthropic`. Record the report line it prints for the call and the `lys.call` entry's status, by id and hash only.
 
-Until steps 1 to 4 are recorded here, R7's proof row and R10's "measured first" condition are open.
+The recorded run above supplies steps 1 to 4's result fields. A further run of step 5 would establish provider response-recording outcomes after the decoder fix and supply the individual report ids and hashes.
