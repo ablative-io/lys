@@ -95,6 +95,7 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
   const held = teams.status === 'ok' ? teams.data.filter((team) => team.state === 'active' && team.members.includes(agent.id)) : [];
   const computer = profile.status === 'ok' ? profile.data?.runs_on : undefined;
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
+  const noInUseComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use');
   const noComputer = network.status === 'ok' && !network.data.some((entry) => entry.state === 'in_use' && entry.runtime !== null
     && (entry.may_run.some((allowed) => allowed.id === agent.id) || Boolean(entry.may_run_roles?.length)));
   const problems = [profile, teams, network, sessions].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
@@ -106,15 +107,15 @@ export function AgentOverview({ agent, details }: { agent: AgentView; details: (
       <dt>Model</dt><dd>{profile.status !== 'ok' ? reading(profile, 'saved settings') : profile.data?.model_access.length ? profile.data.model_access.join(', ') : 'Choose a model when you start'}<p className="note">Saved choice for the next start.</p></dd>
       <dt>Running</dt><dd><Running load={sessions} /></dd>
     </dl>
-  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} />{details(problems)}</>;
+  </section><AgentNextSteps id={agent.id} name={agent.display_name} noComputer={noComputer} noInUseComputer={noInUseComputer} />{details(problems)}</>;
 }
 
 /** Each next act opens the existing form and never makes a change just by visiting. */
-export function AgentNextSteps({ id, name, noComputer }: { id: string; name: string; noComputer: boolean }) {
+export function AgentNextSteps({ id, name, noComputer, noInUseComputer }: { id: string; name: string; noComputer: boolean; noInUseComputer: boolean }) {
   const base = '#/file/' + encodeURIComponent(id) + '/';
   return <nav className="agent-next" aria-label="Next steps">
-    <a data-act="start" href={base + 'provisioning'}><strong>Start</strong><span>{noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : 'Choose its computer and model, then start this agent.'}</span></a>
-    <a href={base + 'budgets'}><strong>Set limits</strong><span>Set how much this agent may use and when it must stop.</span></a>
-    <a href={base + 'access'}><strong>Give access</strong><span>Choose what this agent may reach from access you can give.</span></a>
+    <div className="agent-next-step"><a data-act="start" href={base + 'provisioning'}><strong>Start</strong><span>{noInUseComputer ? 'Lys has no computer to run ' + name + ' on yet.' : noComputer ? 'No computer lets ' + name + ' run yet. Ask for it to be allowed on a computer before starting.' : 'Choose its computer and model, then start this agent.'}</span></a>{noInUseComputer ? <a className="agent-add-computer" href="#/network?add=computer">Add this computer</a> : null}</div>
+    <div className="agent-next-step"><a href={base + 'budgets'}><strong>Set limits</strong><span>Set how much this agent may use and when it must stop.</span></a></div>
+    <div className="agent-next-step"><a href={base + 'access'}><strong>Give access</strong><span>Choose what this agent may reach from access you can give.</span></a></div>
   </nav>;
 }

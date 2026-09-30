@@ -1,5 +1,6 @@
 /** The computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { api, request, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
@@ -53,7 +54,13 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<Show>('all');
-  const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useSearchParams();
+  const adding = search.get('add') === 'computer';
+  const setAdding = (value: boolean) => {
+    const next = new URLSearchParams(search);
+    if (value) next.set('add', 'computer'); else next.delete('add');
+    setSearch(next, { replace: !value });
+  };
   const [picked, setPicked] = useState<string | null>(null);
   const names = new Map(people.people.flatMap((person) => [[person.id, person.display_name] as const, ...person.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   const attention = (computer: Computer) => status(computer).state === 'down';
