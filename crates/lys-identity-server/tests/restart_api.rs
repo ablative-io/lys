@@ -230,6 +230,11 @@ async fn restart_ends_the_old_session_and_keeps_the_latest_reviewed_launch() -> 
 async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> TestResult {
     let held = Held::open().await?;
     let session = operation()?;
+    held.ok(
+        &format!("/agents/{}/runtime/sessions/{session}/reports", held.agent()),
+        &json!({ "operation": operation()?, "machine": held.machine, "state": "starting", "what": "process requested" }),
+    )
+    .await?;
     held.client().ask(&Act::Start {
         launch: Box::new(Launch {
             session: session.clone(),
@@ -299,6 +304,11 @@ async fn restart_refuses_reused_ids_missing_sessions_and_inactive_agents() -> Te
     assert_ne!(status, 200);
     assert_eq!(reused["refusal"], "RuntimeReportReused", "{reused}");
     let absent = operation()?;
+    held.ok(
+        &format!("/agents/{}/runtime/sessions/{absent}/reports", held.agent()),
+        &json!({ "operation": operation()?, "machine": held.machine, "state": "starting" }),
+    )
+    .await?;
     held.ok(
         &format!("/agents/{}/runtime/sessions/{absent}/reports", held.agent()),
         &json!({ "operation": operation()?, "machine": held.machine, "state": "running" }),
