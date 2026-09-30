@@ -426,6 +426,22 @@ async fn review(
         };
         let agent = agent.to_string();
         write_provisioning(&state, |store| {
+            let profile = store
+                .profile(&agent)
+                .filter(|profile| {
+                    profile
+                        .versions
+                        .iter()
+                        .any(|version| version.number == number)
+                })
+                .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
+            let latest = profile.latest();
+            if number != latest {
+                return Err(ServerError::ProfileVersionReplaced {
+                    version: number,
+                    latest,
+                });
+            }
             store.review(&agent, number, review)?;
             let recorded = store
                 .profile(&agent)

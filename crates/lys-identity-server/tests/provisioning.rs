@@ -124,9 +124,16 @@ async fn a_replaced_profile_version_is_refused_without_recording_a_review() -> T
     let (status, unchanged) = table.service.get(&path, Some(&table.bea)).await?;
     assert_eq!(status, 200, "{unchanged}");
     assert_eq!(unchanged["profile"]["version"], 2);
-    for version in unchanged["versions"].as_array().ok_or("no versions")? {
-        assert_eq!(version["reviewed_by"], Value::Null);
-    }
+    let stored = ProvisioningStore::open(&file)?;
+    let unchanged_profile = stored
+        .profile(&table.seeded.people[1].agents[0].id.to_string())
+        .ok_or("no stored profile")?;
+    assert!(
+        unchanged_profile
+            .versions
+            .iter()
+            .all(|version| version.reviewed.is_none())
+    );
     let body = json!({"operation":operation()?});
     let route = format!("{path}/2/review");
     let (status, reviewed) = table.service.post(&route, Some(&table.bea), &body).await?;
@@ -177,8 +184,16 @@ async fn an_old_review_retry_is_refused_after_a_new_version_without_erasing_hist
     assert_eq!(status, 200, "{history}");
     assert_eq!(history["profile"]["version"], 2);
     assert_eq!(history["profile"]["reviewed_by"], Value::Null);
+    let stored = ProvisioningStore::open(&file)?;
+    let kept = stored
+        .profile(&table.seeded.people[1].agents[0].id.to_string())
+        .ok_or("no stored profile")?;
     assert_eq!(
-        history["versions"][0]["reviewed_by"],
+        kept.versions[0]
+            .reviewed
+            .as_ref()
+            .ok_or("old review erased")?
+            .by,
         reviewed["profile"]["reviewed_by"]
     );
     Ok(())

@@ -6,8 +6,8 @@
 use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
-    ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, RECORDED, SIGNED,
-    SIGNED_BODY, UNANSWERED,
+    ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, PROFILE_REVIEW,
+    RECORDED, SIGNED, SIGNED_BODY, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -102,7 +102,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];
-    POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY];
+    POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW];
     POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["runner_protocol_mismatch"]];
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
