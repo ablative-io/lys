@@ -57,6 +57,7 @@ fn started(client: &Client, id: &str, script: &str) -> TestResult {
         arguments: vec!["-c".to_owned(), format!("echo re''ady; {script}")],
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The start-command route: an agent's start command is rendered from its
 //! kept profile for a chosen machine, names the agent and its handle ids and
 //! never a credential's value, is never run, and each refusal is by name.
@@ -252,7 +254,8 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
     let command = start["command"].as_str().ok_or("no command")?;
     let session = start["session"].as_str().ok_or("no session")?;
     assert!(command.starts_with("env "), "{command}");
-    assert!(command.ends_with(" manifold"), "{command}");
+    assert!(command.contains("/opt/seat/bin/claude"), "{command}");
+    assert!(!command.contains("manifold"), "{command}");
     for named in [
         format!("LYS_AGENT={agent}"),
         format!("LYS_SESSION={session}"),

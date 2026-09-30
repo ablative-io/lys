@@ -26,7 +26,7 @@
 
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -185,6 +185,7 @@ pub struct Sessions {
     table: Mutex<Table>,
     changed: Condvar,
     state: StateFile,
+    state_dir: PathBuf,
     scrollback: usize,
 }
 
@@ -273,6 +274,9 @@ impl Sessions {
             table: Mutex::new(table),
             changed: Condvar::new(),
             state,
+            state_dir: state_dir.canonicalize().map_err(|error| {
+                RunnerError::refused("launch_config_refused", error.to_string())
+            })?,
             scrollback,
         });
         let table = sessions.lock();
@@ -337,7 +341,7 @@ impl Sessions {
     /// so is an executable that reports another version.
     pub fn begin(
         self: &Arc<Self>,
-        launch: Launch,
+        mut launch: Launch,
         policy: Option<Policy>,
         tracking: Option<Tracking>,
     ) -> Result<(u32, u64), RunnerError> {
@@ -372,6 +376,7 @@ impl Sessions {
                 format!("session {} is already held", launch.session),
             ));
         }
+        crate::launch_config::prepare(&self.state_dir, &mut launch)?;
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
         let mut session = Session {

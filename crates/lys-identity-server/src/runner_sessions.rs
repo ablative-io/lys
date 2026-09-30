@@ -464,6 +464,7 @@ impl Launcher for DirectoryLauncher {
                 arguments: record.arguments.clone(),
                 directory: record.working_directory.clone(),
                 environment,
+                config: None,
                 columns: COLUMNS,
                 rows: ROWS,
                 rotation,

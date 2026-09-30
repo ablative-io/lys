@@ -6,14 +6,15 @@
 //! takes these bytes as they are. Secrets ride only as use-only handles,
 //! named by handle id, never a value. The start command is text: the agent's
 //! identity, the session it reports under, the machine, the template's hash
-//! and the handle ids, then the machine's runtime. Nothing here runs it.
+//! and the handle ids, then the declared program and native arguments.
+//! Nothing here runs it.
 
 use std::collections::BTreeSet;
 
 use lys_home::harness::rendering::{SecretBinding, render as render_contract, shell_word};
 use lys_home::harness::skills::SkillFile;
 use lys_runner::judge::Policy;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 use crate::launch_harness::fields;
@@ -21,7 +22,7 @@ use crate::launch_permissions::settings as permissions;
 use crate::provisioning_store::Version;
 
 /// One handle the agent holds, as the start command names it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HandleName {
     /// The handle's id, which is not the handle.
     pub id: String,
@@ -85,7 +86,7 @@ pub fn handle_variable(secret: &str, taken: &mut BTreeSet<String>) -> String {
 }
 
 /// Render `start` with the agent's `handles`: the template the home checks
-/// and keeps by hash, and the command a machine's runtime is given.
+/// and keeps by hash, and the native process inputs a runner is given.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
     let fields = fields(start, handles)?;
@@ -115,25 +116,72 @@ pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, Ser
     })?;
     let template = rendered.text;
     let template_sha256 = rendered.sha256;
-    let handle_ids: Vec<&str> = handles.iter().map(|handle| handle.id.as_str()).collect();
-    let words = [
-        "env".to_owned(),
-        format!("LYS_AGENT={}", start.agent),
-        format!("LYS_SESSION={}", start.session),
-        format!("LYS_MACHINE={}", start.machine),
-        format!("LYS_LAUNCH_TEMPLATE={template_sha256}"),
-        format!("LYS_HANDLES={}", handle_ids.join(",")),
-        start.runtime.to_owned(),
-    ];
-    let command = words
-        .iter()
-        .map(|word| shell_word(word))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let launch = from_template(start.version, &template, &template_sha256)?;
+    let command = command(&launch, &template_sha256, handles);
     Ok(Rendered {
         harness: rendered.harness,
         template,
         template_sha256,
         command,
     })
+}
+
+/// Rebuild process inputs from the exact kept template and profile version.
+///
+/// # Errors
+/// Refuses a missing harness, mismatched digest or unrepresentable template.
+pub fn from_template(
+    version: &Version,
+    template: &str,
+    sha256: &str,
+) -> Result<lys_home::harness::rendering_launch::Launch, ServerError> {
+    if lys_home::record::blocks::Hash::of(template.as_bytes()).as_str() != sha256 {
+        return Err(ServerError::LaunchUnrenderable {
+            reason: "the kept template does not hash to its digest".to_owned(),
+        });
+    }
+    let harness = version
+        .settings
+        .harness
+        .as_ref()
+        .ok_or(ServerError::HarnessUndeclared {
+            version: version.number,
+        })?;
+    lys_home::harness::rendering_launch::render(
+        &harness.description.rendering_contract,
+        &harness.program,
+        template,
+    )
+    .map_err(|reason| ServerError::LaunchUnrenderable { reason })
+}
+
+/// Display the deterministic process inputs before the runner binds locations.
+pub fn command(
+    launch: &lys_home::harness::rendering_launch::Launch,
+    sha256: &str,
+    handles: &[HandleName],
+) -> String {
+    let mut environment = launch.environment.clone();
+    environment.insert("LYS_LAUNCH_TEMPLATE".to_owned(), sha256.to_owned());
+    environment.insert(
+        "LYS_HANDLES".to_owned(),
+        handles
+            .iter()
+            .map(|handle| handle.id.as_str())
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    let mut words = vec!["env".to_owned()];
+    words.extend(
+        environment
+            .iter()
+            .map(|(key, value)| format!("{key}={value}")),
+    );
+    words.push(launch.program.clone());
+    words.extend(launch.arguments.clone());
+    words
+        .iter()
+        .map(|word| shell_word(word))
+        .collect::<Vec<_>>()
+        .join(" ")
 }

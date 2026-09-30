@@ -133,6 +133,9 @@ pub struct Launch {
     /// credential never rides here: only a handle's id does.
     #[serde(default)]
     pub environment: BTreeMap<String, String>,
+    /// Native config files carried in this signed launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<crate::launch_config::Config>,
     /// The terminal's width in columns.
     pub columns: u16,
     /// The terminal's height in rows.
