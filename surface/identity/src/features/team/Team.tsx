@@ -6,6 +6,7 @@ import { entries } from '../people/directory';
 import type { Team as TeamRecord } from '../teams/contract';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Terminal } from '../runtime/Terminal';
+import { Settings } from './Settings';
 import '../runtime/terminal.css';
 import './team.css';
 
@@ -48,6 +49,7 @@ export function Team() {
             {loose.map((entry) => <Agent key={entry.id} id={entry.id} known={known} open={open} />)}</section> : null}
         </nav>
         <main className="team-stage">
+          {open ? <Settings key={open} agent={open} /> : null}
           {!open ? <p className="session-empty">Choose an agent to open its terminal.</p>
             : session ? <Terminal key={session.session} session={session.session} agent={open} />
               : <p className="session-empty">{known.name(open)} is not running. <a href={'#/file/' + encodeURIComponent(open)}>Open its file</a> to start it.</p>}
