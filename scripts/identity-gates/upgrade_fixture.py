@@ -14,11 +14,13 @@ class Browser:
         self.port = port
         self.cookie = None
 
-    def ask(self, method, path, body=None, expected_status=200):
+    def ask(self, method, path, body=None, expected_status=200, bearer=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.port)
         headers = {"Content-Type": "application/json"}
         if self.cookie:
             headers["Cookie"] = self.cookie
+        if bearer is not None:
+            headers["Authorization"] = "Bearer " + bearer
         payload = None if body is None else json.dumps(body)
         try:
             connection.request(method, "/api" + path, payload, headers)

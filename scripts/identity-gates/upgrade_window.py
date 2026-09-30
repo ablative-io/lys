@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from upgrade_fixture import Browser, operation
+from upgrade_provenance import verify as verify_provenance
 from upgrade_legacy import verify
 
 MARKER = "lys-disposable-upgrade-proof/v1"
@@ -85,6 +86,10 @@ def check(root):
     pending(root)
     browser = Browser(context["port"])
     browser.cookie = context["cookie"]
+    verify_provenance(browser, context["provenance"])
+    backup = root / "config.previous/identity.json"
+    if hashlib.sha256(backup.read_bytes()).hexdigest() != context["original_config_sha256"]:
+        raise RuntimeError("reversible window backup differs from the old original config")
     fixture = context["legacy"]
     counts = verify(browser, fixture)
     unchanged(context["files"], legacy_files(root, config))

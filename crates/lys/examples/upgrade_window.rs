@@ -35,6 +35,8 @@ struct Arguments {
 enum Mode {
     /// Restart only this marked fixture through the production unit lifecycle.
     Restart,
+    /// Recover this marked fixture through the candidate's production rollback.
+    Recover,
     /// Run the actual upgrade, verify its reversible window, then interrupt it.
     Window {
         #[arg(long)]
@@ -140,6 +142,16 @@ fn run(arguments: Arguments) -> ProbeResult {
     let layout = checked_layout(&arguments.root)?;
     match arguments.mode {
         Mode::Restart => restart(&layout),
+        Mode::Recover => {
+            reversible(&layout)?;
+            upgrade::swap::recover(
+                &layout,
+                &upgrade::units(&layout),
+                &mut Compose,
+                &mut |line| println!("{line}"),
+            )?;
+            Ok(())
+        }
         Mode::Window {
             from,
             surface,

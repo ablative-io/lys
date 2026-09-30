@@ -17,6 +17,7 @@ from upgrade_legacy import seed as seed_legacy, verify as verify_legacy
 from upgrade_window import MARKER, legacy_files, pending, profile_file, unchanged
 from upgrade_negative import exercise as exercise_negative
 from upgrade_restart import settle as settle_restart
+from upgrade_provenance import seed as seed_provenance, verify as verify_provenance
 
 OLD_COMMIT = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
 PROGRAMS = ("lys", "lys-identity-server", "lys-secrets")
@@ -188,14 +189,16 @@ def exercise(args):
         config["cambium_messages"] = bridge
         config_file.write_text(json.dumps(config))
         run(installed, evidence / "reinstall-old.log", env)
-        before = observe(browser, ids)
         old_config = json.loads(config_file.read_text())
+        provenance = seed_provenance(browser, root, old_config, evidence)
+        original_config = config_file.read_bytes()
+        before = observe(browser, ids)
         leaves = app_leaves(root, old_config)
         (evidence / "app-leaves.json").write_text(json.dumps(leaves, indent=2))
         (evidence / "before.json").write_text(json.dumps(before, indent=2))
         files = legacy_files(root, old_config)
         profile = profile_file(root, old_config)
-        context = {"files": files, "legacy": legacy, "port": browser.port, "cookie": browser.cookie,
+        context = {"provenance": provenance, "original_config_sha256": hashlib.sha256(original_config).hexdigest(), "files": files, "legacy": legacy, "port": browser.port, "cookie": browser.cookie,
                    "provisioning": before["provisioning"]}
         (root / ".upgrade-window.json").write_text(json.dumps(context))
         run([str(driver), "--root", str(root), "window", "--from", str(args.candidate_bin),
@@ -209,7 +212,18 @@ def exercise(args):
                                         run, stamp, OLD_COMMIT)
         else:
             # Re-enter the real old installer. Its existing recovery runs before installation.
+            intent_bytes = (root / "install/upgrade.json").read_bytes()
+            (evidence / "candidate-intent-read-by-old.json").write_bytes(intent_bytes)
+            if (root / "config.previous/identity.json").read_bytes() != original_config:
+                raise RuntimeError("candidate backup differs from old original config")
             run(installed, evidence / "recover-old.log", env)
+            if config_file.read_bytes() != original_config:
+                raise RuntimeError("old installer did not restore exact original config")
+            verify_provenance(browser, provenance)
+            (evidence / "old-intent-parser.json").write_text(json.dumps({
+                "reader_commit": OLD_COMMIT, "intent_sha256": hashlib.sha256(intent_bytes).hexdigest(),
+                "old_installer_recovered": True, "configuration_restored_byte_for_byte": True,
+            }, indent=2))
             if (root / "install/upgrade.json").exists():
                 raise RuntimeError("old installer recovery left the upgrade intent standing")
             stamp(root / "bin", OLD_COMMIT)
@@ -228,10 +242,29 @@ def exercise(args):
                 "passed": True, "old_binary": OLD_COMMIT, "domains": list(before),
                 "team": legacy["team"], "personal_budgets": 3,
             }, indent=2))
+            # Independently exercise the candidate's own production recovery path.
+            run([str(driver), "--root", str(root), "window", "--from", str(args.candidate_bin),
+                 "--surface", str(args.candidate_surface), "--verifier",
+                 str(Path(__file__).with_name("upgrade_window.py"))],
+                evidence / "candidate-back-window.log", env, expected=75)
+            if (root / "config.previous/identity.json").read_bytes() != original_config:
+                raise RuntimeError("candidate back-path backup differs from old config")
+            run([str(driver), "--root", str(root), "recover"],
+                evidence / "candidate-recover.log", env)
+            if config_file.read_bytes() != original_config:
+                raise RuntimeError("candidate back path did not restore original config bytes")
+            stamp(root / "bin", OLD_COMMIT)
+            same_records(before, observe(browser, ids))
+            verify_provenance(browser, provenance)
+            (evidence / "candidate-back.json").write_text(json.dumps({
+                "passed": True, "candidate": args.candidate_commit,
+                "old_binary": OLD_COMMIT, "configuration_restored_byte_for_byte": True,
+            }, indent=2))
             post_rollback_files = legacy_files(root, json.loads(config_file.read_text()))
             run([str(args.candidate_bin / "lys"), "identity", "upgrade", "--root", str(root),
                  "--from", str(args.candidate_bin), "--surface", str(args.candidate_surface)],
                 evidence / "upgrade.log", env)
+            verify_provenance(browser, provenance)
             after = observe(browser, ids)
             (evidence / "after.json").write_text(json.dumps(after, indent=2))
             same_records(before, after)
