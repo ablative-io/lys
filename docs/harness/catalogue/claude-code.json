@@ -1,6 +1,7 @@
 {
   "name": "Claude Code",
   "command": "claude",
+  "commands": ["claude"],
   "line": "An agent from Anthropic that helps read, change and test code.",
   "models": [
     {

@@ -43,6 +43,22 @@ describe('The route-backed start form', () => {
     await open(routes({ ...saved, version: 1, reviewed_by: ADA, session: null }));
     expect(document.querySelector<HTMLInputElement>('input[name="program-path"]')?.value).toBe('/opt/forks/claude-fork');
   });
+  it('offers the typed path when no installed copy was found', async () => {
+    const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, builds: [] }] }) });
+    await choose(field('build'), 'another');
+    expect(button()?.disabled).toBe(true);
+    await type(document.querySelector('input[name="program-path"]'), '/opt/forks/claude');
+    await click(button());
+    expect(posted[0].body).toMatchObject({ harness: { program: '/opt/forks/claude' } });
+  });
+  it('chooses an installed fork without changing model, prompt or mode', async () => {
+    const fork = { ...program.builds[0], name: 'Installed fork', program: '/opt/forks/claude', package: 'fork-version' };
+    const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, builds: [...program.builds, fork] }] }) });
+    await choose(field('build'), fork.program + '\n' + fork.package);
+    await click(button());
+    expect(posted[0].body).toMatchObject({ harness: { program: fork.program, package: fork.package, description }, model_access: ['default'], instructions: '', permissions: { default_mode: 'default' } });
+    expect(document.querySelector('input[name="program-path"]')).toBeNull();
+  });
   it('offers known values with defaults, no required text and one submit button', async () => {
     const { posted } = await open(routes());
     expect(field('program')?.value).toBe('Claude Code');

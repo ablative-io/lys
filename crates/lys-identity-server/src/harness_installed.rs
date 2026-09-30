@@ -17,11 +17,19 @@ pub(super) struct Executable {
     pub(super) key: CopyKey,
 }
 
+pub(super) fn command_name(command: &str) -> bool {
+    !command.is_empty()
+        && !matches!(command, "." | "..")
+        && command
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+}
+
 pub(super) fn resolve(command: &str, path: &OsStr) -> Result<Executable, String> {
-    if !matches!(command, "claude" | "codex") {
+    if !command_name(command) {
         return Err(refused(
             "InvalidProgramCommand",
-            "the command is not a standard program",
+            "the command is not a plain executable name",
         ));
     }
     let directories: Vec<PathBuf> = std::env::split_paths(path).collect();

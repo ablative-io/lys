@@ -130,3 +130,69 @@ fn an_absolute_fork_path_and_its_machine_survive_profile_reopen() -> TestResult 
     assert_eq!(kept.versions, vec![wanted]);
     Ok(())
 }
+
+#[test]
+fn a_declared_fork_is_offered_when_the_standard_command_is_missing() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    executable(directory.path(), "another-codex")?;
+    let mut source: Value =
+        serde_json::from_str(include_str!("../../../docs/harness/catalogue/codex.json"))?;
+    source["commands"] = json!(["codex", "another-codex"]);
+    let text = serde_json::to_string(&source)?;
+    let catalogue = Catalogue::read(&[("fixture.json", &text)])?;
+    let answer = catalogue.installed_in(directory.path().as_os_str())?;
+    let program = answer.programs.first().ok_or("program is absent")?;
+    assert!(program.not_found.is_none());
+    assert_eq!(program.builds.len(), 1);
+    assert_eq!(program.builds[0].name, "Installed another-codex");
+    Ok(())
+}
+
+#[test]
+fn older_catalogue_sources_default_to_their_standard_command() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    executable(directory.path(), "codex")?;
+    executable(directory.path(), "cdx")?;
+    let mut source: Value =
+        serde_json::from_str(include_str!("../../../docs/harness/catalogue/codex.json"))?;
+    source
+        .as_object_mut()
+        .ok_or("source is not an object")?
+        .remove("commands");
+    let text = serde_json::to_string(&source)?;
+    let answer =
+        Catalogue::read(&[("older.json", &text)])?.installed_in(directory.path().as_os_str())?;
+    let program = answer.programs.first().ok_or("program is absent")?;
+    assert_eq!(program.commands, ["codex"]);
+    assert_eq!(program.builds.len(), 1);
+    assert_eq!(program.builds[0].name, "Installed codex");
+    Ok(())
+}
+
+#[test]
+fn invalid_command_lists_name_the_catalogue_file() -> TestResult {
+    let source: Value =
+        serde_json::from_str(include_str!("../../../docs/harness/catalogue/codex.json"))?;
+    for commands in [
+        json!([]),
+        json!(["cdx", "codex"]),
+        json!(["codex", "codex"]),
+        json!(["codex", "../cdx"]),
+        json!(["codex", "cdx --flag"]),
+    ] {
+        let mut invalid = source.clone();
+        invalid["commands"] = commands;
+        let text = serde_json::to_string(&invalid)?;
+        match Catalogue::read(&[("invalid.json", &text)]) {
+            Err(lys_identity_server::error::ServerError::HarnessCatalogueUnreadable {
+                file,
+                reason,
+            }) => {
+                assert_eq!(file, "invalid.json");
+                assert!(!reason.is_empty());
+            }
+            other => return Err(format!("invalid commands were not refused: {other:?}").into()),
+        }
+    }
+    Ok(())
+}
