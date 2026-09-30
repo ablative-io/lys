@@ -37,8 +37,8 @@ use tokio::sync::Notify;
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::goals_state::{
-    Answered, DOMAIN, Delivery, Due, Evented, Fired, GoalError, Held, Holder, Item, Line, Marked,
-    Sent, Standing,
+    Answered, Changed, DOMAIN, Delivery, Due, Evented, Fired, GoalError, Held, Holder, Item, Line,
+    Marked, Sent, Standing,
 };
 use crate::routes::{Say, hex};
 use crate::session::now;
@@ -229,6 +229,9 @@ impl<S: LeafStore> GoalStore<S> {
     pub fn set(&mut self, goal: crate::goals_state::Goal) -> Result<Item, ServerError> {
         self.settle()?;
         goal.check()?;
+        if self.held.changed(&goal.id).is_some() {
+            return Err(GoalError::Reused { operation: goal.id }.into());
+        }
         if let Some(item) = self.held.item(&goal.id) {
             let same = crate::goals_state::Goal {
                 set_by: item.goal.set_by.clone(),
@@ -293,6 +296,48 @@ impl<S: LeafStore> GoalStore<S> {
         }
         let id = marked.goal.clone();
         self.append(Line::Marked(marked))?;
+        self.held
+            .item(&id)
+            .cloned()
+            .ok_or(GoalError::Unknown.into())
+    }
+
+    /// Keep an activity or words change under its operation id, retaining the original set.
+    pub fn change(&mut self, changed: Changed) -> Result<Item, ServerError> {
+        self.settle()?;
+        changed.change.check()?;
+        if let Some(kept) = self.held.changed(&changed.operation) {
+            if kept.goal != changed.goal || kept.change != changed.change || kept.by != changed.by {
+                return Err(GoalError::Reused {
+                    operation: changed.operation,
+                }
+                .into());
+            }
+            return self
+                .held
+                .item(&changed.goal)
+                .cloned()
+                .ok_or(GoalError::Unknown.into());
+        }
+        if self.held.kept(&changed.operation)
+            || self.held.marked(&changed.operation).is_some()
+            || self.held.item(&changed.operation).is_some()
+        {
+            return Err(GoalError::Reused {
+                operation: changed.operation,
+            }
+            .into());
+        }
+        let item = self.held.item(&changed.goal).ok_or(GoalError::Unknown)?;
+        if item.standing != Standing::Open {
+            return Err(GoalError::Closed {
+                goal: changed.goal,
+                standing: item.standing.name(),
+            }
+            .into());
+        }
+        let id = changed.goal.clone();
+        self.append(Line::Changed(changed))?;
         self.held
             .item(&id)
             .cloned()
@@ -388,12 +433,18 @@ fn text(item: &Item, at: u64) -> String {
         crate::goals_state::Kind::Expectation => "Expectation",
         crate::goals_state::Kind::Deliverable => "Deliverable",
     };
-    let left = if goal.deadline >= at {
-        format!("{} left", span(goal.deadline - at))
-    } else {
-        format!("{} past its deadline", span(at - goal.deadline))
-    };
-    format!("Reminder from Lys. {kind}: {}. {left}.", goal.words)
+    let words = item.words();
+    match goal.deadline {
+        Some(deadline) => {
+            let left = if deadline >= at {
+                format!("{} left", span(deadline - at))
+            } else {
+                format!("{} past its deadline", span(at - deadline))
+            };
+            format!("Reminder from Lys. {kind}: {words}. {left}.")
+        }
+        None => format!("Reminder from Lys. {kind}: {words}."),
+    }
 }
 
 fn span(seconds: u64) -> String {

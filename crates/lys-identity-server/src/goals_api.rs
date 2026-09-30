@@ -29,7 +29,7 @@ use axum::{Json, Router};
 use lys_identity::grants::{Action, ExerciseRequest, Resource, Route};
 use lys_identity::{AgentId, IdentityId, OperationId};
 use lys_runner::operations::Operation;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
@@ -38,6 +38,8 @@ use crate::goals_state::{
     EvidenceKind, Goal, GoalError, Holder, HolderKind, Item, Kind, Marked, Remind, Standing,
 };
 use crate::goals_store::{Deliver, Delivering, Goals};
+pub use crate::goals_views::GoalsView;
+use crate::goals_views::ItemView;
 use crate::grants::{caller, with_grants};
 use crate::read_api::own_person;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -61,7 +63,8 @@ pub struct SetBody {
     operation: String,
     kind: Kind,
     words: String,
-    deadline: u64,
+    #[serde(default)]
+    deadline: Option<u64>,
     #[serde(default)]
     evidence: Option<EvidenceKind>,
     #[serde(default)]
@@ -82,19 +85,14 @@ pub struct MarkBody {
     evidence: Option<String>,
 }
 
-/// The items held on an agent or a team.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct GoalsView {
-    /// Every item, in the order set.
-    pub goals: Vec<Item>,
-}
-
 /// The goal routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/agents/{id}/goals", get(agent_goals).post(set_agent_goal))
         .route("/teams/{id}/goals", get(team_goals).post(set_team_goal))
         .route("/goals/{goal}/mark", post(mark))
+        .route("/goals/{goal}/active", post(crate::goals_edit::active))
+        .route("/goals/{goal}/words", post(crate::goals_edit::words))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -103,7 +101,7 @@ fn malformed(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn goals(state: &AppState) -> Result<&Goals, ServerError> {
+pub(crate) fn goals(state: &AppState) -> Result<&Goals, ServerError> {
     state.goals.as_ref().ok_or_else(|| {
         GoalError::Unavailable {
             reason: "the configuration names no goals_dir".to_owned(),
@@ -217,7 +215,9 @@ fn read(
 ) -> Result<Json<GoalsView>, ServerError> {
     let (holder, _responsible) = holder(state, headers, kind, id)?;
     let goals = goals(state)?.with(|store| Ok(store.of_holder(&holder)))?;
-    Ok(Json(GoalsView { goals }))
+    Ok(Json(GoalsView {
+        goals: goals.into_iter().map(ItemView::from).collect(),
+    }))
 }
 
 async fn set_agent_goal(
@@ -225,7 +225,7 @@ async fn set_agent_goal(
     headers: HeaderMap,
     Path(id): Path<String>,
     body: Result<Json<SetBody>, JsonRejection>,
-) -> Result<Json<Item>, ServerError> {
+) -> Result<Json<ItemView>, ServerError> {
     set(&state, &headers, (HolderKind::Agent, &id), body).await
 }
 
@@ -234,12 +234,12 @@ async fn set_team_goal(
     headers: HeaderMap,
     Path(id): Path<String>,
     body: Result<Json<SetBody>, JsonRejection>,
-) -> Result<Json<Item>, ServerError> {
+) -> Result<Json<ItemView>, ServerError> {
     set(&state, &headers, (HolderKind::Team, &id), body).await
 }
 
-fn checked(body: &SetBody) -> Result<(), ServerError> {
-    let words = body.words.trim();
+pub(crate) fn checked_words(words: &str) -> Result<String, ServerError> {
+    let words = words.trim();
     if words.is_empty() || words.chars().count() > WORDS_MAX {
         return Err(malformed(format!(
             "words carry between 1 and {WORDS_MAX} characters"
@@ -250,6 +250,11 @@ fn checked(body: &SetBody) -> Result<(), ServerError> {
             "words are one line of text: a reminder types them into a session, so no newline or control character",
         ));
     }
+    Ok(words.to_owned())
+}
+
+fn checked(body: &SetBody) -> Result<(), ServerError> {
+    checked_words(&body.words)?;
     if body.reminders.len() > REMINDERS_MAX {
         return Err(malformed(format!(
             "an item carries at most {REMINDERS_MAX} reminders"
@@ -257,6 +262,9 @@ fn checked(body: &SetBody) -> Result<(), ServerError> {
     }
     for remind in &body.reminders {
         match remind {
+            Remind::Before { .. } if body.deadline.is_none() => {
+                return Err(GoalError::ReminderNeedsDeadline.into());
+            }
             Remind::Before { seconds: 0 } => {
                 return Err(malformed(
                     "a reminder before the deadline is at least 1 second before it",
@@ -281,7 +289,7 @@ async fn set(
     headers: &HeaderMap,
     (kind, id): (HolderKind, &str),
     body: Result<Json<SetBody>, JsonRejection>,
-) -> Result<Json<Item>, ServerError> {
+) -> Result<Json<ItemView>, ServerError> {
     let actor = signed_in(state, headers)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?;
@@ -291,7 +299,7 @@ async fn set(
         own_person(directory.projection()?, &actor)
     })?;
     let at = now();
-    if body.deadline <= at {
+    if body.deadline.is_some_and(|deadline| deadline <= at) {
         return Err(malformed("the deadline has passed"));
     }
     let goal = Goal {
@@ -300,6 +308,7 @@ async fn set(
         kind: body.kind,
         words: body.words.trim().to_owned(),
         deadline: body.deadline,
+        active: true,
         evidence: body.evidence,
         judged_by: body.judged_by,
         reminders: body.reminders,
@@ -318,11 +327,11 @@ async fn set(
                 .cloned()
                 .ok_or_else(|| GoalError::Unknown.into())
         })
-        .map(Json)
+        .map(|item| Json(item.into()))
 }
 
 /// The identity asking: an agent by its signed request, or the signed-in caller.
-fn asker(
+pub(crate) fn asker(
     state: &AppState,
     headers: &HeaderMap,
     uri: &Uri,
@@ -339,7 +348,7 @@ fn asker(
 
 /// Admit `asker` to judge `item`: never an agent it judges; its responsible
 /// person; or the holder of a grant of the action it names on its holder.
-fn judge(state: &AppState, asker: IdentityId, item: &Item) -> Result<(), ServerError> {
+pub(crate) fn judge(state: &AppState, asker: IdentityId, item: &Item) -> Result<(), ServerError> {
     let judged = judged(state, &item.goal.holder)?;
     if let IdentityId::Agent(agent) = asker {
         if judged.contains(&agent.to_string()) {
@@ -387,7 +396,7 @@ async fn mark(
     Path(goal): Path<String>,
     uri: Uri,
     bytes: Bytes,
-) -> Result<Json<Item>, ServerError> {
+) -> Result<Json<ItemView>, ServerError> {
     let body: MarkBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let operation = OperationId::from_str(&body.operation)?;
     if body.standing == Standing::Open {
@@ -419,7 +428,7 @@ async fn mark(
     };
     let item = goals.with(|store| store.mark(marked))?;
     goals.changed.notify_one();
-    Ok(Json(item))
+    Ok(Json(item.into()))
 }
 
 /// Reminders delivered through the runners the service reaches.

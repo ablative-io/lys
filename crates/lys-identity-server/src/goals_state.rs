@@ -13,7 +13,6 @@
 //! runner answered it: pending until an answer is kept, then accepted,
 //! delivered, uncertain or refused. Uncertain is never shown delivered.
 
-use axum::http::StatusCode;
 use lys_runner::operations::{OperationOutcome, OperationState};
 use serde::{Deserialize, Serialize};
 
@@ -22,169 +21,9 @@ pub const DOMAIN: &str = "lys/identity/goals-state/v1";
 
 const FORMAT: &str = "lys-goals-state/v1";
 
-/// Everything the goals refuse, each by name.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GoalError {
-    /// The goals are not configured, or their log could not be read or written.
-    #[error("goals_unavailable: {reason}")]
-    Unavailable {
-        /// Why.
-        reason: String,
-    },
-    /// No goal by that id is visible to the caller.
-    #[error("goal_unknown: no goal by that id is visible to the caller")]
-    Unknown,
-    /// The operation id already names a goal act in other words.
-    #[error(
-        "goal_reused: operation `{operation}` already names a goal act in other words: send this act under a new operation id"
-    )]
-    Reused {
-        /// The operation id.
-        operation: String,
-    },
-    /// The goal is no longer open and takes no other mark.
-    #[error("goal_closed: goal `{goal}` is already {standing}")]
-    Closed {
-        /// The goal.
-        goal: String,
-        /// Its standing.
-        standing: &'static str,
-    },
-    /// The agent a goal judges asked to mark that goal.
-    #[error(
-        "not_your_judgement: agent `{agent}` is judged by this goal and may not mark it; its responsible person or a holder of the relation the goal names does"
-    )]
-    NotYourJudgement {
-        /// The agent.
-        agent: String,
-    },
-    /// A deliverable names no evidence, or is marked met without a claim of it.
-    #[error("evidence_missing: {why}")]
-    EvidenceMissing {
-        /// What is missing.
-        why: &'static str,
-    },
-}
-
-impl GoalError {
-    /// How the refusal is answered over HTTP.
-    pub(crate) fn status(&self) -> StatusCode {
-        match self {
-            Self::Unavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Unknown => StatusCode::NOT_FOUND,
-            Self::Reused { .. } | Self::Closed { .. } => StatusCode::CONFLICT,
-            Self::NotYourJudgement { .. } => StatusCode::FORBIDDEN,
-            Self::EvidenceMissing { .. } => StatusCode::BAD_REQUEST,
-        }
-    }
-}
-
-/// What an item is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalKind)]
-#[serde(rename_all = "snake_case")]
-pub enum Kind {
-    /// An outcome.
-    Goal,
-    /// A standard the holder's work is held to.
-    Expectation,
-    /// A named thing handed over, with the evidence that proves it.
-    Deliverable,
-}
-
-/// What proves a deliverable was handed over.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalEvidence)]
-#[serde(rename_all = "snake_case")]
-pub enum EvidenceKind {
-    /// A landed commit.
-    Commit,
-    /// A document.
-    Document,
-    /// A passing check.
-    Check,
-}
-
-/// Where an item stands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalStanding)]
-#[serde(rename_all = "snake_case")]
-pub enum Standing {
-    /// Not yet judged.
-    Open,
-    /// Judged met.
-    Met,
-    /// Judged missed.
-    Missed,
-    /// Dropped by its responsible person or judge.
-    Dropped,
-}
-
-impl Standing {
-    /// Its name.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Open => "open",
-            Self::Met => "met",
-            Self::Missed => "missed",
-            Self::Dropped => "dropped",
-        }
-    }
-}
-
-/// What holds an item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalHolderKind)]
-#[serde(rename_all = "snake_case")]
-pub enum HolderKind {
-    /// An agent.
-    Agent,
-    /// A team.
-    Team,
-}
-
-/// The agent or team an item is held on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalHolder)]
-#[serde(deny_unknown_fields)]
-pub struct Holder {
-    /// An agent or a team.
-    pub kind: HolderKind,
-    /// Its id.
-    pub id: String,
-}
-
-/// An event a reminder waits on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalEvent)]
-#[serde(rename_all = "snake_case")]
-pub enum Event {
-    /// A session of the holder compacted its context.
-    Compaction,
-}
-
-/// When a reminder falls due.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = GoalReminder)]
-#[serde(tag = "when", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Remind {
-    /// Once, this many seconds before the deadline, and never before the
-    /// item was set.
-    Before {
-        /// Seconds before the deadline.
-        seconds: u64,
-    },
-    /// Every this many seconds from when the item was set, until the deadline.
-    Every {
-        /// Seconds between reminders.
-        seconds: u64,
-    },
-    /// Each time the event is kept for the item.
-    On {
-        /// The event.
-        event: Event,
-    },
-}
+pub use crate::goals_types::{
+    Change, Changed, Event, EvidenceKind, GoalError, Holder, HolderKind, Kind, Remind, Standing,
+};
 
 /// An item as it was set.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -199,8 +38,15 @@ pub struct Goal {
     pub kind: Kind,
     /// Its words.
     pub words: String,
-    /// Its deadline, in seconds since the Unix epoch.
-    pub deadline: u64,
+    /// Its optional deadline, in seconds since the Unix epoch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deadline: Option<u64>,
+    /// Whether reminders are active; old entries are active without adding stored bytes.
+    #[serde(
+        default = "crate::goals_types::active_default",
+        skip_serializing_if = "std::clone::Clone::clone"
+    )]
+    pub active: bool,
     /// For a deliverable, what proves it was handed over.
     pub evidence: Option<EvidenceKind>,
     /// The action on the holder whose grant holders may judge it, besides
@@ -217,8 +63,16 @@ pub struct Goal {
 }
 
 impl Goal {
-    /// The refusal a deliverable naming no evidence is answered with.
+    /// Refuse an item that cannot support its reminders or deliverable evidence.
     pub fn check(&self) -> Result<(), GoalError> {
+        if self.deadline.is_none()
+            && self
+                .reminders
+                .iter()
+                .any(|remind| matches!(remind, Remind::Before { .. }))
+        {
+            return Err(GoalError::ReminderNeedsDeadline);
+        }
         if self.kind == Kind::Deliverable && self.evidence.is_none() {
             return Err(GoalError::EvidenceMissing {
                 why: "a deliverable names the evidence that proves it: a commit, a document or a check",
@@ -371,6 +225,8 @@ pub enum Line {
     Set(Goal),
     /// An item judged.
     Marked(Marked),
+    /// The activity or words of an aim changed.
+    Changed(Changed),
     /// A reminder fired.
     Fired(Fired),
     /// A runner's answer to a delivery.
@@ -407,6 +263,35 @@ pub struct Item {
     pub timers: Vec<Timer>,
     /// Every reminder fired, in the order fired.
     pub fired: Vec<Fired>,
+    /// Changes kept after the original set; absent from old snapshots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<Changed>,
+}
+
+impl Item {
+    /// Whether this aim currently sends reminders.
+    pub fn active(&self) -> bool {
+        self.changes
+            .iter()
+            .rev()
+            .find_map(|changed| match changed.change {
+                Change::Active { active } => Some(active),
+                Change::Words { .. } => None,
+            })
+            .unwrap_or(self.goal.active)
+    }
+
+    /// The current words, retaining the original set for idempotent retries.
+    pub fn words(&self) -> &str {
+        self.changes
+            .iter()
+            .rev()
+            .find_map(|changed| match &changed.change {
+                Change::Words { words } => Some(words.as_str()),
+                Change::Active { .. } => None,
+            })
+            .unwrap_or(&self.goal.words)
+    }
 }
 
 /// A reminder due.
@@ -422,10 +307,11 @@ pub struct Due {
 
 fn first_due(goal: &Goal, remind: &Remind) -> Option<u64> {
     match remind {
-        Remind::Before { seconds } => Some(goal.deadline.saturating_sub(*seconds).max(goal.at)),
-        Remind::Every { seconds } => {
-            Some(goal.at.saturating_add(*seconds)).filter(|due| *due <= goal.deadline)
-        }
+        Remind::Before { seconds } => goal
+            .deadline
+            .map(|deadline| deadline.saturating_sub(*seconds).max(goal.at)),
+        Remind::Every { seconds } => Some(goal.at.saturating_add(*seconds))
+            .filter(|due| goal.deadline.is_none_or(|deadline| *due <= deadline)),
         Remind::On { .. } => None,
     }
 }
@@ -435,7 +321,7 @@ fn after(goal: &Goal, remind: &Remind, fired: u64) -> Option<u64> {
         Remind::Every { seconds } if *seconds > 0 => {
             let steps = fired.saturating_sub(goal.at) / seconds + 1;
             let next = goal.at.saturating_add(steps.saturating_mul(*seconds));
-            Some(next).filter(|due| *due <= goal.deadline)
+            Some(next).filter(|due| goal.deadline.is_none_or(|deadline| *due <= deadline))
         }
         _ => None,
     }
@@ -479,9 +365,18 @@ impl Held {
             .find(|marked| marked.operation == operation)
     }
 
-    /// Whether `operation` names a firing or an event already kept.
+    /// The change kept under an operation id.
+    pub fn changed(&self, operation: &str) -> Option<&Changed> {
+        self.items
+            .iter()
+            .flat_map(|item| &item.changes)
+            .find(|changed| changed.operation == operation)
+    }
+
+    /// Whether `operation` names a firing, event or aim change already kept.
     pub fn kept(&self, operation: &str) -> bool {
-        self.events.iter().any(|event| event == operation)
+        self.changed(operation).is_some()
+            || self.events.iter().any(|event| event == operation)
             || self
                 .items
                 .iter()
@@ -502,7 +397,7 @@ impl Held {
         for item in self
             .items
             .iter()
-            .filter(|item| item.standing == Standing::Open)
+            .filter(|item| item.standing == Standing::Open && item.active())
         {
             for (reminder, timer) in item.timers.iter().enumerate() {
                 if let Some(at) = timer.next_due.filter(|at| *at <= now) {
@@ -521,7 +416,7 @@ impl Held {
     pub fn next_due(&self) -> Option<u64> {
         self.items
             .iter()
-            .filter(|item| item.standing == Standing::Open)
+            .filter(|item| item.standing == Standing::Open && item.active())
             .flat_map(|item| item.timers.iter().filter_map(|timer| timer.next_due))
             .min()
     }
@@ -531,6 +426,7 @@ impl Held {
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         match line {
             Line::Set(goal) => {
+                goal.check().map_err(|error| error.to_string())?;
                 if self.item(&goal.id).is_some() {
                     return Err(format!("goal `{}` is already set", goal.id));
                 }
@@ -548,6 +444,7 @@ impl Held {
                     marked: None,
                     timers,
                     fired: Vec::new(),
+                    changes: Vec::new(),
                 });
             }
             Line::Marked(marked) => {
@@ -560,6 +457,20 @@ impl Held {
                 for timer in &mut item.timers {
                     timer.next_due = None;
                 }
+            }
+            Line::Changed(changed) => {
+                changed.change.check().map_err(|error| error.to_string())?;
+                if self.changed(&changed.operation).is_some() {
+                    return Err(format!(
+                        "operation `{}` already names a change",
+                        changed.operation
+                    ));
+                }
+                let item = self.item_mut(&changed.goal)?;
+                if item.standing != Standing::Open {
+                    return Err(format!("goal `{}` is already closed", changed.goal));
+                }
+                item.changes.push(changed);
             }
             Line::Fired(fired) => self.fire(fired)?,
             Line::Answered(answered) => self.answer(&answered)?,
@@ -633,6 +544,7 @@ impl Held {
     pub fn unsettled(&self) -> Vec<(Sent, String)> {
         self.items
             .iter()
+            .filter(|item| item.active())
             .flat_map(|item| &item.fired)
             .flat_map(|fired| {
                 fired

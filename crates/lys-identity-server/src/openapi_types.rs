@@ -51,7 +51,8 @@ use crate::directory_views::{
     ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
 };
 use crate::goals_api::{GoalsView, MarkBody, SetBody as GoalBody};
-use crate::goals_state::Item as GoalItem;
+use crate::goals_edit::{ActiveBody, WordsBody};
+use crate::goals_views::ItemView as GoalItem;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
@@ -440,6 +441,7 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
 fn goals(api: &mut Api) -> Vec<Entry> {
     let (list, item) = (api.schema::<GoalsView>(), api.schema::<GoalItem>());
     let (set, mark) = (api.schema::<GoalBody>(), api.schema::<MarkBody>());
+    let (active, words) = (api.schema::<ActiveBody>(), api.schema::<WordsBody>());
     vec![
         (GET, "/agents/{id}/goals", None, Some(list.clone())),
         (
@@ -450,6 +452,13 @@ fn goals(api: &mut Api) -> Vec<Entry> {
         ),
         (GET, "/teams/{id}/goals", None, Some(list)),
         (POST, "/teams/{id}/goals", Some(set), Some(item.clone())),
-        (POST, "/goals/{goal}/mark", Some(mark), Some(item)),
+        (POST, "/goals/{goal}/mark", Some(mark), Some(item.clone())),
+        (
+            POST,
+            "/goals/{goal}/active",
+            Some(active),
+            Some(item.clone()),
+        ),
+        (POST, "/goals/{goal}/words", Some(words), Some(item)),
     ]
 }

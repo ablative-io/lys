@@ -1,16 +1,20 @@
 //! Standing aims keep their words, optional deadlines and reversible reminder activity.
 
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_core::Ed25519Identity;
 use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
-use lys_identity_server::goals_state::{Held, Line};
-use lys_identity_server::goals_store::{GoalStore, ORIGIN};
+use lys_identity_server::goals_state::{Changed, Held, Line};
+use lys_identity_server::goals_store::{
+    Deliver, Delivering, GoalStore, Goals, ORIGIN, Undelivered, remind,
+};
+use lys_identity_server::goals_views::ItemView;
 use lys_log_store::{FileLeafStore, LeafStore, Log};
+use lys_runner::operations::{Operation, OperationOutcome, OperationRequest, OperationState};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -341,7 +345,7 @@ fn inactivity_suspends_unsettled_deliveries_without_losing_them() -> TestResult 
 
 #[tokio::test]
 async fn an_old_goal_reads_active_and_keeps_its_original_leaf_bytes_after_edits() -> TestResult {
-    let (service, (agent, goal, dir, original)) = Service::start_with(|config| {
+    let (service, (agent, goal, dir, original, key_file)) = Service::start_with(|config| {
         let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
         let agent = seeded.people[0].agents[0].id.to_string();
         let owner = seeded.people[0].id.to_string();
@@ -355,7 +359,7 @@ async fn an_old_goal_reads_active_and_keeps_its_original_leaf_bytes_after_edits(
         let dir = config.goals_dir.clone().ok_or("goals directory absent")?;
         let mut log = Log::open(FileLeafStore::create(&dir, ORIGIN)?)?;
         log.append(&original)?;
-        Ok((agent, goal, dir, original))
+        Ok((agent, goal, dir, original, config.event_key_file.clone()))
     })
     .await?;
     let cookie = service
@@ -387,6 +391,17 @@ async fn an_old_goal_reads_active_and_keeps_its_original_leaf_bytes_after_edits(
             .ok_or("old leaf absent")?,
         original
     );
+    let reopened = GoalStore::open(&dir, Arc::new(Ed25519Identity::load(&key_file)?))?;
+    let item = ItemView::from(
+        reopened
+            .item(&goal)
+            .ok_or("goal absent after reopen")?
+            .clone(),
+    );
+    let answer = serde_json::to_value(item)?;
+    assert_eq!(answer["goal"]["active"], false);
+    assert_eq!(answer["goal"]["words"], "keep the directory available");
+
     Ok(())
 }
 
@@ -408,6 +423,65 @@ fn an_old_snapshot_keeps_its_bytes_when_migrated_in_memory() -> TestResult {
     assert_eq!(
         store.item("goal-1").ok_or("goal absent")?.goal.deadline,
         decoded.items[0].goal.deadline
+    );
+    Ok(())
+}
+
+struct DeliveredText(Mutex<Vec<String>>);
+
+impl Deliver for DeliveredText {
+    fn sessions(
+        &self,
+        holder: &lys_identity_server::goals_state::Holder,
+    ) -> Result<Vec<String>, String> {
+        assert_eq!(
+            holder.kind,
+            lys_identity_server::goals_state::HolderKind::Agent
+        );
+        assert_eq!(holder.id, "agent-1");
+        Ok(vec!["session-1".to_owned()])
+    }
+
+    fn operate(&self, operation: Operation) -> Delivering<'_> {
+        Box::pin(async move {
+            let OperationRequest::Reminder { text } = operation.request else {
+                return Err(Undelivered::Refused("expected a reminder".to_owned()));
+            };
+            self.0
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(text);
+            Ok(OperationOutcome {
+                operation: operation.operation,
+                session: operation.session,
+                request: "reminder".to_owned(),
+                state: OperationState::Delivered,
+                at: 0,
+                words: "delivered".to_owned(),
+                text: None,
+                ended: None,
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn deadline_free_reminders_use_the_current_words_without_deadline_phrases() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let mut store = GoalStore::open(&dir.path().join("goals"), key)?;
+    store.set(held_goal(None)?.items[0].goal.clone())?;
+    let changed: Changed = serde_json::from_value(json!({
+        "operation":"edit-1", "goal":"goal-1", "change":{"field":"words", "words":"keep the directory available"},
+        "by":"person-1", "at":1030,
+    }))?;
+    store.change(changed)?;
+    let goals = Goals::new(store);
+    let delivered = DeliveredText(Mutex::default());
+    remind(&goals, &delivered, 1060).await?;
+    assert_eq!(
+        *delivered.0.lock().unwrap_or_else(PoisonError::into_inner),
+        ["Reminder from Lys. Goal: keep the directory available."]
     );
     Ok(())
 }

@@ -11,7 +11,7 @@ export type Receipt = { crossing: Crossing; acted: { stands: Stands; words: stri
 export type UsageView = { agent: string; receipts: Receipt[]; last_reported_ms: number | null };
 export type GoalKind = 'goal' | 'expectation' | 'deliverable';
 export type Standing = 'open' | 'met' | 'missed' | 'dropped';
-export type GoalItem = { goal: { id: string; kind: GoalKind; words: string; deadline: number; evidence: 'commit' | 'document' | 'check' | null }; standing: Standing };
+export type GoalItem = { goal: { id: string; kind: GoalKind; words: string; deadline: number | null; active: boolean; evidence: 'commit' | 'document' | 'check' | null }; standing: Standing };
 export type GoalsView = { goals: GoalItem[] };
 
 export const MEASURES: Record<Measure, string> = {

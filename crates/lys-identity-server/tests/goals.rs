@@ -61,7 +61,8 @@ fn goal(id: &str, kind: Kind, at: u64, deadline: u64, reminders: Vec<Remind>) ->
         },
         kind,
         words: "the sign-in page is live".to_owned(),
-        deadline,
+        deadline: Some(deadline),
+        active: true,
         evidence: (kind == Kind::Deliverable).then_some(EvidenceKind::Commit),
         judged_by: None,
         reminders,
@@ -486,10 +487,20 @@ impl Table {
 
     /// The agent's own signed mark of `goal`.
     async fn agent_marks(&self, goal: &str, body: &Value) -> Result<(u16, Value), Box<dyn Error>> {
-        let path = format!("/goals/{goal}/mark");
+        self.agent_post(goal, "mark", 7, body).await
+    }
+
+    async fn agent_post(
+        &self,
+        goal: &str,
+        action: &str,
+        nonce: u8,
+        body: &Value,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
+        let path = format!("/goals/{goal}/{action}");
         let bytes = body.to_string().into_bytes();
         let signed_at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
-        let nonce = hex(&[7; 16]);
+        let nonce = hex(&[nonce; 16]);
         let signed = payload("POST", &path, &bytes, signed_at, &nonce);
         let cose = sign_attestation(&signed, &self.key).to_cose_bytes();
         let header = format!("{} {signed_at} {nonce} {}", self.agent, hex(&cose));
@@ -763,5 +774,37 @@ async fn a_pending_team_reminder_is_not_replayed_to_a_recipient_now_held() -> Te
         "{}",
         sent.words
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn standing_aim_edits_use_the_existing_mark_judgement_authority() -> TestResult {
+    let table = Table::set().await?;
+    let body =
+        json!({"operation":operation()?, "kind":"goal", "words":"keep the directory available"});
+    let (status, item) = table.set_goal(&body).await?;
+    assert_eq!(status, 200, "{item}");
+    let id = item["goal"]["id"].as_str().ok_or("goal id absent")?;
+    for (action, field, value, nonce) in [
+        ("active", "active", json!(false), 1),
+        ("words", "words", json!("keep the service available"), 2),
+    ] {
+        let mut body = json!({"operation":operation()?});
+        body[field] = value;
+        refused(
+            &table.agent_post(id, action, nonce, &body).await?,
+            403,
+            "not_your_judgement",
+        );
+        let path = format!("/goals/{id}/{action}");
+        refused(
+            &table.service.post(&path, Some(&table.ada), &body).await?,
+            403,
+            "not_permitted",
+        );
+        let (status, answer) = table.service.post(&path, Some(&table.bea), &body).await?;
+        assert_eq!(status, 200, "{answer}");
+        assert_eq!(answer["goal"][field], body[field]);
+    }
     Ok(())
 }
