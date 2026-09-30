@@ -32,7 +32,8 @@ identity_leg() {
   fi
   cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
 }
-# The surface leg runs the identity surface's test command, npm ci and then npm test
+# The surface leg installs dependencies, checks types and runs the identity tests:
+# npm ci, npm run typecheck and npm test,
 # with surface/identity as the package directory, so the shell's tests and the
 # mock-up's run on every lys landing. It is never scoped away by a changed-path
 # filter. Without npm it fails by name; it never skips.
@@ -41,7 +42,7 @@ surface_leg() {
     echo "surface_npm_missing: the surface leg needs npm on the PATH to run npm ci and npm test in surface/identity"
     return 1
   fi
-  (cd surface/identity && npm ci && npm test)
+  (cd surface/identity && npm ci && npm run typecheck && npm test)
 }
 leg sh scripts/design/gate.sh
 leg cargo fmt --check
