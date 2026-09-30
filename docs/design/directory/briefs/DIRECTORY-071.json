@@ -1,0 +1,98 @@
+{
+  "id": "DIRECTORY-071",
+  "cluster": "directory",
+  "title": "Teams nest under a parent team with a lead, and one tree read answers each agent's session and settings",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C462",
+    "C463"
+  ],
+  "stories": [
+    "S185"
+  ],
+  "design_anchor": [
+    "ADR-119",
+    "ADR-117",
+    "ADR-113"
+  ],
+  "purpose": "Teams are flat today: a team has an owner and members and no parent (teams_state.rs lines 4 to 9 and 29 to 41), so the organisation Tom runs, himself over Waffles over Archie over Brisket, Crumpet and Pikelet, cannot be drawn. There is no one read that answers who is under whom, which agents are running and what each was started with, so the tree screen has nothing to render.",
+  "task": "Give a team an optional parent team and a lead agent, refusing a cycle by name, with old team records reading as top-level with no lead. Add one read, GET /api/tree, answering the teams the caller owns or leads and everything below them: each team, its lead, its agents, and for each agent whether its session is live, its current goals, the budget it holds and what it has spent against it, and a summary of its latest reviewed profile version. A team's parent and lead decide only what the tree read shows: the owner and lead of a team see it and every team below it. Neither confers any authority, which still comes only from grants. People are not nodes: the person asking is the root and sees only the agents under them. Out: the screen itself, which is designed with Tom at 5190.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "Teams nest under a parent team and name a lead",
+      "spec": "Behavioural. WHEN a team is created or changed, THE SYSTEM SHALL accept an optional parent team id and an optional lead agent id, SHALL refuse a parent that would make a cycle as team_parent_cycle naming both teams, SHALL refuse a lead that is not a member as team_lead_not_member, and SHALL read every team record written before this change as having no parent and no lead. The parent and lead SHALL be carried by a new versioned team event, so every lys-teams-state/v1 snapshot and log line written before it still reads, and SHALL confer no authority.",
+      "acceptance": [
+        "A team created under a parent is answered with that parent.",
+        "Setting a team's parent to its own descendant is refused as team_parent_cycle naming both teams.",
+        "A lead who is not a member is refused by name.",
+        "A team store written by main before this change opens and answers every team with no parent and no lead, tested from that old store.",
+        "Being a team's lead grants nothing that a grant does not."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/teams_nested.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/teams_state.rs",
+          "crates/lys-identity-server/src/teams_store.rs",
+          "crates/lys-identity-server/src/teams_api.rs",
+          "crates/lys-identity-server/src/teams_migration.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C462"
+      ],
+      "stories": [
+        "S185"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "One tree read answers the caller's teams, agents, live sessions and profile summaries",
+      "spec": "Behavioural. WHEN a person or agent reads GET /api/tree, THE SYSTEM SHALL answer, from state it already holds and computed on that request, the teams the caller owns or leads and every team below them, each with its lead and agents, and for each agent whether a runner session is live, its current goals, each budget it holds or its team holds with what has been spent against it, its latest reviewed profile version id, and that version's program, model, MCP server names, writable folders and budget. It SHALL NOT include a team or agent outside the caller's reach, and SHALL answer the same shape through the typed client, to an agent reading its own team as to a person.",
+      "acceptance": [
+        "Tom's read answers Waffles, Archie and Archie's three seats in their nesting.",
+        "Archie's read answers only Archie's team and below.",
+        "A running seat reads live and a stopped seat reads stopped.",
+        "Each agent carries its latest reviewed profile version id and summary.",
+        "The read starts no task and leaves nothing running after it answers.",
+        "Each agent carries its current goals and its budget with the spend against it.",
+        "Archie, reading as an agent, gets his own team and its members' goals without remembering them."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/tree_api.rs",
+          "crates/lys-identity-server/tests/tree_api.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/openapi_types.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C463"
+      ],
+      "stories": [
+        "S185"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT poll, sleep, add a timer, timeout, deadline, watchdog or background loop; every wait ends on the event it waits for, and an idle page and an idle service use no CPU.",
+    "SHALL NOT add unsafe, an ignored test, an allow attribute, an underscore rename or a discarded result.",
+    "SHALL NOT change a stored shape without a migration tested from an old install, and SHALL NOT edit an installed configuration by hand.",
+    "SHALL NOT make Lys depend on Cambium or name a harness detail in code; harness details are data.",
+    "SHALL NOT make people nodes of the tree; the person reading is its root."
+  ],
+  "verification": [
+    "Handwritten main brief passes the design gate on its exit code.",
+    "Built directly by the assigned seat on its own branch in its registered worktree: red first, then green, with fmt, Clippy pedantic, tests and ast-grep.",
+    "The full src_gate runs on Dean at the exact head that lands; the lead reviews that head and gives the landing word.",
+    "Shown to Tom on the dev server at 127.0.0.1:5190 against the live Lys as one step of the night's demonstration."
+  ]
+}

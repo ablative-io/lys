@@ -1,0 +1,88 @@
+{
+  "id": "DIRECTORY-074",
+  "cluster": "directory",
+  "title": "A seat's reviewed profile names its writable folders, the Launch carries them, and the runner confines the session to them",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C469",
+    "C470"
+  ],
+  "stories": [
+    "S188"
+  ],
+  "design_anchor": [
+    "ADR-128",
+    "ADR-133",
+    "ADR-087"
+  ],
+  "purpose": "The runner already builds OS containment from a Lys policy and reports native denials (containment_paths.rs, containment_policy.rs, containment_macos.rs, ADR-128), but the launch never asks for it, so every seat runs with the whole machine open. Tom's ruling is that YOLO mode ends: each seat works only in its own folders.",
+  "task": "Let a profile version name the folders a seat may write. Carry them in the signed runner Launch and have the runner apply containment from them, so a write outside is refused and reported by name. A Launch with no folders behaves as today, so no running seat changes until its profile is moved. Out: moving existing seats onto confinement, which is done one team at a time on Tom's word. Confinement is set per seat in its profile, never for everyone: leads keep the reach their profile gives them, and changing a seat's folders is a new reviewed profile version and a restart.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The Launch carries the profile's writable folders",
+      "spec": "Behavioural. WHEN a profile version names writable folders, THE SYSTEM SHALL carry them in the signed runner Launch rendered from it; a Launch with none SHALL behave exactly as today, and a runner from before this change SHALL refuse a Launch that carries them rather than ignore them.",
+      "acceptance": [
+        "The Launch rendered from a version with folders names them.",
+        "A version with none renders a Launch that behaves as today.",
+        "A runner built before this change refuses a Launch naming folders."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/tests/launch_folders.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/protocol.rs",
+          "crates/lys-identity-server/src/launch_template.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C469"
+      ],
+      "stories": [
+        "S188"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The runner confines the session to those folders",
+      "spec": "Behavioural. WHEN a Launch names writable folders, THE SYSTEM SHALL start the session under the runner's containment with those folders writable and nothing else in the home writable, and SHALL report a write outside them as a native denial naming the path.",
+      "acceptance": [
+        "A confined seat's write inside its folder succeeds.",
+        "Its write outside is refused and reported naming the path.",
+        "An unconfined seat is unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-runner/src/session/lifecycle.rs",
+          "crates/lys-runner/src/containment_paths.rs",
+          "crates/lys-runner/src/containment_policy.rs",
+          "crates/lys-runner/tests/launch_folders.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C470"
+      ],
+      "stories": [
+        "S188"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT poll, sleep, add a timer, timeout, deadline, watchdog or background loop; every wait ends on the event it waits for, and an idle page and an idle service use no CPU.",
+    "SHALL NOT add unsafe, an ignored test, an allow attribute, an underscore rename or a discarded result.",
+    "SHALL NOT change a stored shape without a migration tested from an old install, and SHALL NOT edit an installed configuration by hand.",
+    "SHALL NOT make Lys depend on Cambium or name a harness detail in code; harness details are data.",
+    "SHALL NOT move any running seat onto confinement; that is done on Tom's word, one team at a time."
+  ],
+  "verification": [
+    "Handwritten main brief passes the design gate on its exit code.",
+    "Built directly by the assigned seat on its own branch in its registered worktree: red first, then green, with fmt, Clippy pedantic, tests and ast-grep.",
+    "The full src_gate runs on Dean at the exact head that lands; the lead reviews that head and gives the landing word.",
+    "Shown to Tom on the dev server at 127.0.0.1:5190 against the live Lys as one step of the night's demonstration."
+  ]
+}

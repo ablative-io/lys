@@ -266,6 +266,18 @@
 
 **S158.** As a person running agents, I want to ask for a team for a piece of work and have it provisioned with the right memories, opening conversation, budget, goals and checker, so that I can send it off knowing it will be done and checked within what I can afford.
 
+**S185.** As the person running a team of agents, I want one tree of my teams and agents with each one's session and settings, so that I can see and open any of them in one place.
+
+**S186.** As the person running a team of agents, I want a seat's request for a tool approved only by someone whose remit covers it, so that permissions flow down my tree and never widen on the way.
+
+**S187.** As the person setting agent context and reminders, I want Lys to restart a seat onto its new settings and prompt a seat nobody is watching, so that Argus and Manifold are no longer needed for either.
+
+**S188.** As the person running a team of agents, I want each seat confined to its own folders, so that no seat can write anywhere else on my machine.
+
+**S189.** As the person running a team of agents, I want every setting an agent can have listed and checked, and a list of approved MCP servers, so that I can see an agent's whole configuration and a mistyped setting is refused before it starts.
+
+**S190.** As the person running a team of agents, I want to pick an agent's program, model and mode from named choices, so that I can set an agent up without typing paths, ids or JSON.
+
 ## Installer and operator — Provision and upgrade the internal audit connection
 
 **S163.** As a person installing Lys, I want its internal audit connection provisioned automatically so that I never handle credentials or configure the identity provider.

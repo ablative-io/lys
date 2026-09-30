@@ -448,3 +448,35 @@
 - [ ] **C459** — The service and broker ports are members of the deployment configuration (DIRECTORY-070 R1).
 - [ ] **C460** — An earlier install keeps its ports through upgrade (DIRECTORY-070 R2).
 - [ ] **C461** — The install test runs on free ports in its own folder, two at once, beside a live Lys (DIRECTORY-070 R3).
+
+## Teams nest under a parent team with a lead, and one tree read answers each agent's session and settings (DIRECTORY-071)
+
+- [ ] **C462** — The team store reads a team written before nesting as top-level with no lead. (DIRECTORY-071 R1).
+- [ ] **C463** — The tree read answers only what is under the caller, with each agent's session and settings. (DIRECTORY-071 R2).
+
+## A seat asks for a declared MCP server, a lead approves it within their remit, and the approval makes a new reviewed profile version (DIRECTORY-072)
+
+- [ ] **C464** — A seat's request for a declared MCP server is recorded against its latest reviewed version. (DIRECTORY-072 R1).
+- [ ] **C465** — An approval within the approver's remit makes a new reviewed version; beyond it is refused by name. (DIRECTORY-072 R2).
+
+## Lys restarts a seat from its latest reviewed profile version, a seat can ask to restart itself, and prompts reach a seat with no screen open (DIRECTORY-073)
+
+- [ ] **C466** — A restart ends the live session and starts it from the latest reviewed version. (DIRECTORY-073 R1).
+- [ ] **C467** — A seat can restart itself and no other. (DIRECTORY-073 R2).
+- [ ] **C468** — Compaction requests and reminders reach a session nobody is watching without blocking another. (DIRECTORY-073 R3).
+
+## A seat's reviewed profile names its writable folders, the Launch carries them, and the runner confines the session to them (DIRECTORY-074)
+
+- [ ] **C469** — The signed Launch carries a profile's writable folders. (DIRECTORY-074 R1).
+- [ ] **C470** — A confined session writes only inside its folders and a write outside is refused by name. (DIRECTORY-074 R2).
+
+## Every flag, argument, environment variable and setting of Claude Code and Codex is a typed schema generated from their published docs, and approved MCP servers are a registry (DIRECTORY-075)
+
+- [ ] **C471** — Each harness's flags, arguments, environment variables and settings are Rust generated from its kept docs. (DIRECTORY-075 R1).
+- [ ] **C472** — A profile version is checked against its harness's schema and its settings read lists every setting. (DIRECTORY-075 R2).
+- [ ] **C473** — Approved MCP servers are kept in a registry that requests choose from. (DIRECTORY-075 R3).
+
+## Lys offers the programs it can start and each program's models and modes as named choices, from its own descriptions and what each computer's runner finds installed (DIRECTORY-076)
+
+- [ ] **C474** — Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).
+- [ ] **C475** — Each computer's runner reports where each described program is installed. (DIRECTORY-076 R2).

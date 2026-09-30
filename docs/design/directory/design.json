@@ -4973,6 +4973,176 @@
       "path": "crates/lys/tests/cli_tests/identity_setup.rs",
       "note": "touched by DIRECTORY-070 R3: the setup test takes its service port from the operating system",
       "brief": "DIRECTORY-070"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/teams_nested.rs",
+      "note": "Teams nest under a parent team and name a lead (DIRECTORY-071 R1)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_store.rs",
+      "note": "Teams nest under a parent team and name a lead (DIRECTORY-071 R1)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_api.rs",
+      "note": "Teams nest under a parent team and name a lead (DIRECTORY-071 R1)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_migration.rs",
+      "note": "Teams nest under a parent team and name a lead (DIRECTORY-071 R1)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/tree_api.rs",
+      "note": "One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/tree_api.rs",
+      "note": "One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes_table.rs",
+      "note": "One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_types.rs",
+      "note": "One tree read answers the caller's teams, agents, live sessions and profile summaries (DIRECTORY-071 R2)",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_requests_api.rs",
+      "note": "A seat asks for a declared MCP server by name (DIRECTORY-072 R1)",
+      "brief": "DIRECTORY-072"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/mcp_requests.rs",
+      "note": "A seat asks for a declared MCP server by name (DIRECTORY-072 R1)",
+      "brief": "DIRECTORY-072"
+    },
+    {
+      "path": "crates/lys-identity-server/src/restart_api.rs",
+      "note": "A restart ends the session and starts it from the latest reviewed version (DIRECTORY-073 R1)",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/restart_api.rs",
+      "note": "A restart ends the session and starts it from the latest reviewed version (DIRECTORY-073 R1)",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/input_no_screen.rs",
+      "note": "Compaction and reminders reach a session no screen is reading (DIRECTORY-073 R3)",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/launch_folders.rs",
+      "note": "The Launch carries the profile's writable folders (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-identity-server/src/launch_template.rs",
+      "note": "The Launch carries the profile's writable folders (DIRECTORY-074 R1)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-runner/src/containment_paths.rs",
+      "note": "The runner confines the session to those folders (DIRECTORY-074 R2)",
+      "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-harness-settings/Cargo.toml",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-harness-settings/src/lib.rs",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-harness-settings/src/claude_code.rs",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-harness-settings/src/codex.rs",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-harness-settings/tests/generated.rs",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "scripts/harness-settings/generate.py",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "docs/harness/claude-code.md",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "docs/harness/codex.md",
+      "note": "Each harness's settings are Rust generated from its published docs (DIRECTORY-075 R1)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/harness_settings.rs",
+      "note": "A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_registry.rs",
+      "note": "Approved MCP servers are a registry (DIRECTORY-075 R3)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/mcp_registry.rs",
+      "note": "Approved MCP servers are a registry (DIRECTORY-075 R3)",
+      "brief": "DIRECTORY-075"
+    },
+    {
+      "path": "crates/lys-identity-server/src/harness_catalogue.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/harness_catalogue.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "docs/harness/catalogue/claude-code.json",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "docs/harness/catalogue/codex.json",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-runner/src/installed.rs",
+      "note": "Each computer's runner reports where each described program is installed (DIRECTORY-076 R2)",
+      "brief": "DIRECTORY-076"
+    },
+    {
+      "path": "crates/lys-runner/tests/installed.rs",
+      "note": "Each computer's runner reports where each described program is installed (DIRECTORY-076 R2)",
+      "brief": "DIRECTORY-076"
     }
   ],
   "inventory": [
