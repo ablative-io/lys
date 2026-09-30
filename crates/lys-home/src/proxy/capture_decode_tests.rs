@@ -105,10 +105,10 @@ async fn round_trip(encoding: Option<&'static str>, sent: &[u8], status: CallSta
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(harness.proxy.slots().in_use(), 0);
     connection.abort();
-    if let Err(error) = connection.await {
-        if !error.is_cancelled() {
-            return Err(error.into());
-        }
+    if let Err(error) = connection.await
+        && !error.is_cancelled()
+    {
+        return Err(error.into());
     }
     Ok(())
 }
