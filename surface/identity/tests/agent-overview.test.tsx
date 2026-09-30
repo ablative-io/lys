@@ -27,15 +27,24 @@ const routes = {
   [prefix + '/runtime/sessions']: ok({ sessions: [session] }),
 };
 
-async function open(overrides: Record<string, Route> = {}) {
+async function open(overrides: Record<string, Route> = {}, hash = '#/file/' + SCRIBE) {
   const posted: { path: string; body: unknown }[] = [];
   const requests = serve({ ...routes, ...overrides }, posted);
-  location.hash = '#/file/' + SCRIBE;
+  history.replaceState(null, '', '/' + hash);
   const container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => { root?.render(<App />); });
   return { posted, requests };
+}
+
+async function follow(link: HTMLElement | null) {
+  if (!(link instanceof HTMLAnchorElement)) throw new Error('Navigation link is missing');
+  await act(async () => {
+    const changed = new Promise<void>((resolve) => window.addEventListener('hashchange', () => resolve(), { once: true }));
+    link.click();
+    await changed;
+  });
 }
 
 describe('An agent page explains the agent before its controls', () => {
@@ -101,11 +110,60 @@ describe('An agent page explains the agent before its controls', () => {
   });
 
   it('names the missing computer permission without presenting activation as readiness', async () => {
-    const { posted } = await open({ '/network': ok({ machines: [], reports_served: true }) });
+    const { posted } = await open({ '/network': ok({ machines: [{ id: 'computer-one', name: 'Ward computer', state: 'in_use', runtime: 'runner', may_run: [], may_run_roles: [] }], reports_served: true }) });
     expect($('.file .head')?.textContent).toContain('Scribe is added. Choose Start to finish setting it up.');
     expect($('.file .head')?.textContent).not.toContain('Scribe is ready');
     expect($('[aria-label="Next steps"]')?.textContent).toContain('No computer lets Scribe run yet');
     expect($('[aria-label="Next steps"] a')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    expect(posted).toEqual([]);
+  });
+
+  it.each([
+    { name: 'no computers', machines: [] },
+    { name: 'only a retired computer', machines: [{ id: 'computer-one', name: 'Ward computer', state: 'retired', runtime: 'runner', may_run: [{ id: SCRIBE }], may_run_roles: [] }] },
+  ])('opens the existing add form when Lys has $name', async ({ machines }) => {
+    const { posted } = await open({ '/network': ok({ machines, reports_served: true }), '/network/machines/computer-one/runner': ok({ runner: null }) });
+    expect($('[aria-label="Next steps"]')?.textContent).toContain('Lys has no computer to run Scribe on yet.');
+    const add = $$('[aria-label="Next steps"] a').find((link) => link.textContent === 'Add this computer') ?? null;
+    expect(add?.getAttribute('href')).toBe('#/network?add=computer');
+    expect($('[data-act="start"]')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/provisioning');
+    await follow(add);
+    expect($('form[aria-label="Add a computer"]')).not.toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('keeps an unreadable computer list unknown instead of offering to add a first computer', async () => {
+    const { posted } = await open({ '/network': refused(503, 'NetworkUnavailable', 'The computer list could not be read') });
+    expect($('.agent-details')?.textContent).toContain('NetworkUnavailable');
+    expect($('[aria-label="Next steps"]')?.textContent).not.toContain('Lys has no computer');
+    expect($('[aria-label="Next steps"] a[href="#/network?add=computer"]')).toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('keeps the add-computer deep link administrator-only', async () => {
+    const { posted } = await open({ '/network': ok({ machines: [], reports_served: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator') }, '#/network?add=computer');
+    expect($('.page h1')?.textContent).toBe('Computers');
+    expect($('form[aria-label="Add a computer"]')).toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it.each([
+    { tab: 'provisioning', control: '[aria-label="Start this agent"]' },
+    { tab: 'budgets', control: 'section.usage' },
+    { tab: 'access', control: '[data-act="grant"]' },
+  ])('puts $tab before folded Details without reading receipts', async ({ tab, control }) => {
+    const { posted, requests } = await open({}, '#/file/' + SCRIBE + '/' + tab);
+    const form = $(control);
+    const details = $('.agent-details');
+    if (!form || !(details instanceof HTMLDetailsElement)) throw new Error('Agent settings or Details are missing');
+    expect(form.closest('details')).toBeNull();
+    expect(form.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(details.open).toBe(false);
+    expect(requests).not.toContain('/receipts/4');
+    expect(requests).not.toContain('/receipts/5');
+    const stop = $('.file .head [data-act="stop"]');
+    expect(stop).not.toBeNull();
+    expect(stop?.closest('details')).toBeNull();
     expect(posted).toEqual([]);
   });
 });
