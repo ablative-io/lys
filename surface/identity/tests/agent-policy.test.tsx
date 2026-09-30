@@ -24,7 +24,7 @@ function keeping(start: Policy | null): Record<string, Route> {
       const given = body as { version: number; rules: Policy['rules'] };
       if (given.version !== (kept?.version ?? 0)) return refused(409, 'PolicyVersionConflict', 'crossed');
       kept = { version: given.version + 1, agent: SCRIBE, rules: given.rules };
-      return ok(kept);
+      return ok({ agent: SCRIBE, policy: kept, digest: 'd'.repeat(64), applies: APPLIES } satisfies PolicyView);
     },
   };
 }
@@ -62,7 +62,7 @@ describe('Agent tool policy', () => {
     await type('input[name="resource_id"]', 'vault');
     await type('input[name="action"]', 'read');
     await click($('form[aria-label="Add a rule"] button[type="submit"]'));
-    await click(button('Keep as version 1'));
+    await click(button('Save rules for the next start'));
     expect(posted).toEqual([{ path: policy, body: { version: 0, rules: [
       { id: 'no-shell', tool: 'Bash', kind: 'tool', authority: 'hard' },
       { id: 'secrets-dir', tool: 'Read', kind: 'path_prefix', target: '/srv/secrets', authority: { permission: { resource: { kind: 'secret', id: 'vault' }, action: 'read' } } },
@@ -78,8 +78,8 @@ describe('Agent tool policy', () => {
     await type('input[name="id"]', 'no-shell');
     await type('input[name="tool"]', 'Bash');
     await click($('form[aria-label="Add a rule"] button[type="submit"]'));
-    await click(button('Keep as version 1'));
-    expect($('[role="alert"]')?.textContent).toContain('Someone else changed this policy first');
+    await click(button('Save rules for the next start'));
+    expect($('[role="alert"]')?.textContent).toContain('Someone changed these rules first');
     expect(text()).toContain('No policy set');
   });
 });
