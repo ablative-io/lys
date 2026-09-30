@@ -95,8 +95,19 @@ impl Totals {
             cache_read_tokens: Some(self.cached),
             context_tokens: context,
             running_ms: None,
+            ..Figures::default()
         };
         let mut notes = vec![
+            Unavailable {
+                figure: "dollars_micros".to_owned(),
+                reason:
+                    "Codex reports dollars only through its app-server; Lys does not read it yet"
+                        .to_owned(),
+            },
+            Unavailable {
+                figure: "plan_windows".to_owned(),
+                reason: "codex_rollout_has_no_reported_plan_window".to_owned(),
+            },
             Unavailable {
                 figure: "cache_creation_tokens".to_owned(),
                 reason: "codex_reports_none".to_owned(),
@@ -133,6 +144,18 @@ pub struct SourceState {
     pub totals: Option<Totals>,
     /// The last status-line snapshot kept.
     pub snapshot: Option<Figures>,
+    /// The latest reported cost, retained when a later snapshot omits it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reported_cost_micros: Option<u64>,
+    /// The latest account windows observed in a rollout.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plan_windows: Vec<crate::tracking_budget::PlanWindow>,
+    /// The attribution of the last status-line snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_account: Option<String>,
+    /// The attribution of the last rollout window report.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_account: Option<String>,
 }
 
 /// What a unit consumed, kept with it.

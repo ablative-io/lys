@@ -149,3 +149,183 @@ fn absent_currency_and_plan_reports_are_named_unavailable_instead_of_zero() -> T
     }
     Ok(())
 }
+
+#[test]
+fn an_omitted_cost_report_does_not_erase_the_previous_cumulative_baseline() -> TestResult {
+    let contract = tracking();
+    let reading = Reading {
+        runner: "runner",
+        session: "session",
+        tracking: &contract,
+        accounts: Accounts {
+            current: None,
+            moves: &[],
+            declared: Some("shared-account"),
+        },
+        now: 1_800_000_000_000,
+    };
+    let mut source = SourceState::default();
+    reading
+        .status(
+            &mut source,
+            &status(json!(400), Value::Null),
+            "first".to_owned(),
+        )
+        .ok_or("no first report")?;
+    reading
+        .status(
+            &mut source,
+            &status(Value::Null, Value::Null),
+            "omitted".to_owned(),
+        )
+        .ok_or("no omitted report")?;
+    let mut restored: SourceState = serde_json::from_slice(&serde_json::to_vec(&source)?)?;
+    let next = usage(
+        reading
+            .status(
+                &mut restored,
+                &status(json!(500), Value::Null),
+                "next".to_owned(),
+            )
+            .ok_or("no next report")?,
+    )?;
+    assert_eq!(next["figures"]["dollars_micros"], 100_000_000, "{next}");
+    Ok(())
+}
+
+#[test]
+fn a_cost_reset_is_named_and_never_becomes_a_negative_or_repeated_charge() -> TestResult {
+    let contract = tracking();
+    let reading = Reading {
+        runner: "runner",
+        session: "session",
+        tracking: &contract,
+        accounts: Accounts {
+            current: None,
+            moves: &[],
+            declared: Some("shared-account"),
+        },
+        now: 1_800_000_000_000,
+    };
+    let mut source = SourceState::default();
+    reading
+        .status(
+            &mut source,
+            &status(json!(400), Value::Null),
+            "first".to_owned(),
+        )
+        .ok_or("no first report")?;
+    let reset = usage(
+        reading
+            .status(
+                &mut source,
+                &status(json!(10), Value::Null),
+                "reset".to_owned(),
+            )
+            .ok_or("no reset report")?,
+    )?;
+    assert_eq!(reset["figures"]["dollars_micros"], Value::Null);
+    assert!(
+        reset["unavailable"]
+            .as_array()
+            .ok_or("no unavailable reasons")?
+            .iter()
+            .any(|entry| entry["reason"] == "reported_session_cost_reset"),
+        "{reset}"
+    );
+    let next = usage(
+        reading
+            .status(
+                &mut source,
+                &status(json!(15), Value::Null),
+                "next".to_owned(),
+            )
+            .ok_or("no next report")?,
+    )?;
+    assert_eq!(next["figures"]["dollars_micros"], 5_000_000);
+    Ok(())
+}
+
+#[test]
+fn expired_windows_are_unavailable_even_when_the_source_repeats_them() -> TestResult {
+    let contract = tracking();
+    let reading = Reading {
+        runner: "runner",
+        session: "session",
+        tracking: &contract,
+        accounts: Accounts {
+            current: None,
+            moves: &[],
+            declared: Some("shared-account"),
+        },
+        now: 1_800_000_000_000,
+    };
+    let input = status(
+        json!(0),
+        json!({"seven_day": {"used_percentage": 50, "resets_at": 1_800_000_000}}),
+    );
+    let record = usage(
+        reading
+            .status(&mut SourceState::default(), &input, "expired".to_owned())
+            .ok_or("no expiration record")?,
+    )?;
+    assert_eq!(record["figures"]["plan_windows"], json!([]));
+    assert!(
+        record["unavailable"]
+            .as_array()
+            .ok_or("no unavailable reasons")?
+            .iter()
+            .any(|entry| entry["reason"] == "10080_minute_window_expired"),
+        "{record}"
+    );
+    Ok(())
+}
+
+#[test]
+fn codex_reads_explicit_window_durations_without_a_token_increase() -> TestResult {
+    let contract = Tracking {
+        harness: Harness::Codex,
+        adapter: CODEX_ADAPTER.to_owned(),
+        version: "0.161.0-alpha.3".to_owned(),
+        ..tracking()
+    };
+    let reading = Reading {
+        runner: "runner",
+        session: "session",
+        tracking: &contract,
+        accounts: Accounts {
+            current: None,
+            moves: &[],
+            declared: Some("shared-account"),
+        },
+        now: 1_800_000_000_000,
+    };
+    let input = json!({"type": "event_msg", "payload": {"type": "token_count", "info": null, "rate_limits": {
+        "primary": {"used_percent": 50, "window_minutes": 10080, "resets_at": 1_800_604_800},
+        "secondary": {"used_percent": 25, "window_minutes": 300, "resets_at": 1_800_003_600}
+    }}});
+    let mut source = SourceState::default();
+    let bodies = reading.codex(&mut source, 10, &input);
+    assert_eq!(bodies.len(), 1);
+    let record = usage(bodies.into_iter().next().ok_or("no plan record")?)?;
+    assert_eq!(
+        record["figures"]["plan_windows"][0]["duration_minutes"],
+        10080
+    );
+    assert_eq!(
+        record["figures"]["plan_windows"][1]["duration_minutes"],
+        300
+    );
+    assert_eq!(record["figures"]["dollars_micros"], Value::Null);
+    assert!(
+        record["unavailable"]
+            .as_array()
+            .ok_or("no unavailable reasons")?
+            .iter()
+            .any(|entry| entry["reason"]
+                == "Codex reports dollars only through its app-server; Lys does not read it yet"),
+        "{record}"
+    );
+    assert!(reading.codex(&mut source, 20, &input).is_empty());
+    Ok(())
+}

@@ -22,6 +22,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub use crate::tracking_fields::{
+    Figures, Unavailable, claude_figures, context_of, count, note, status_figures,
+};
+
 use crate::error::RunnerError;
 use crate::rotation::Move;
 use crate::tracking_store::{Body, Coverage, Pending, SourceState, Totals};
@@ -37,8 +41,8 @@ pub const CODEX_ADAPTER: &str = "codex-rollout/1";
 
 /// Each adapter and the harness versions it was measured against.
 pub const MEASURED: [(&str, &[&str]); 2] = [
-    (CLAUDE_ADAPTER, &["2.1.281", "2.1.283"]),
-    (CODEX_ADAPTER, &["0.156.0"]),
+    (CLAUDE_ADAPTER, &["2.1.281", "2.1.283", "2.1.285"]),
+    (CODEX_ADAPTER, &["0.156.0", "0.161.0-alpha.3"]),
 ];
 
 /// A harness the runner tracks.
@@ -143,45 +147,28 @@ pub fn measured(adapter: &str, version: &str) -> Result<(), RunnerError> {
     }
 }
 
-/// The first word of `text` spelled as a version, digits and dots.
+/// The first semantic version, including its reported prerelease suffix.
 pub fn version_in(text: &str) -> Option<String> {
     text.split(|c: char| c.is_whitespace() || c == '(' || c == ')')
         .find(|word| {
-            word.split('.').count() >= 3
-                && word
+            let (release, suffix) = word
+                .split_once('-')
+                .map_or((*word, None), |(release, suffix)| (release, Some(suffix)));
+            release.split('.').count() == 3
+                && release
                     .split('.')
-                    .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+                    .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+                && suffix.is_none_or(|suffix| {
+                    !suffix.is_empty()
+                        && suffix.split('.').all(|part| {
+                            !part.is_empty()
+                                && part
+                                    .bytes()
+                                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                        })
+                })
         })
         .map(str::to_owned)
-}
-
-/// The figures a record measures; each is null when its source does not
-/// carry it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Figures {
-    /// Input tokens not read from a cache.
-    pub input_tokens: Option<u64>,
-    /// Output tokens.
-    pub output_tokens: Option<u64>,
-    /// Tokens written to a cache.
-    pub cache_creation_tokens: Option<u64>,
-    /// Tokens read from a cache.
-    pub cache_read_tokens: Option<u64>,
-    /// The context in use, in tokens.
-    pub context_tokens: Option<u64>,
-    /// Running time, in milliseconds.
-    pub running_ms: Option<u64>,
-}
-
-/// A figure that is null, and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Unavailable {
-    /// The figure.
-    pub figure: String,
-    /// Why, by name.
-    pub reason: String,
 }
 
 /// What a record's figures are.
@@ -275,112 +262,6 @@ pub fn instant(value: &Value) -> Option<u64> {
     let text = value.get("timestamp")?.as_str()?;
     let stamp: jiff::Timestamp = text.parse().ok()?;
     u64::try_from(stamp.as_millisecond()).ok()
-}
-
-/// The unsigned integer at `key` in `value`.
-pub fn count(value: &Value, key: &str) -> Option<u64> {
-    value.get(key).and_then(Value::as_u64)
-}
-
-/// A figure null because `reason`, pushed when `figure` is null.
-pub fn note(figure: &str, present: Option<u64>, reason: &str, notes: &mut Vec<Unavailable>) {
-    if present.is_none() {
-        notes.push(Unavailable {
-            figure: figure.to_owned(),
-            reason: reason.to_owned(),
-        });
-    }
-}
-
-/// The context in use a usage object says: input, cache writes and cache
-/// reads together, when all three are there.
-pub fn context_of(usage: &Value) -> Option<u64> {
-    let input = count(usage, "input_tokens")?;
-    let created = count(usage, "cache_creation_input_tokens")?;
-    let read = count(usage, "cache_read_input_tokens")?;
-    input.checked_add(created)?.checked_add(read)
-}
-
-/// The figures of a Claude Code `message.usage` object, and each missing.
-pub fn claude_figures(usage: &Value) -> (Figures, Vec<Unavailable>) {
-    let figures = Figures {
-        input_tokens: count(usage, "input_tokens"),
-        output_tokens: count(usage, "output_tokens"),
-        cache_creation_tokens: count(usage, "cache_creation_input_tokens"),
-        cache_read_tokens: count(usage, "cache_read_input_tokens"),
-        context_tokens: context_of(usage),
-        running_ms: None,
-    };
-    let mut notes = Vec::new();
-    for (figure, value) in [
-        ("input_tokens", figures.input_tokens),
-        ("output_tokens", figures.output_tokens),
-        ("cache_creation_tokens", figures.cache_creation_tokens),
-        ("cache_read_tokens", figures.cache_read_tokens),
-        ("context_tokens", figures.context_tokens),
-    ] {
-        note(figure, value, "field_absent", &mut notes);
-    }
-    note(
-        "running_ms",
-        None,
-        "measured_from_the_session_process",
-        &mut notes,
-    );
-    (figures, notes)
-}
-
-/// The figures a Claude Code status line's input carries: snapshots of the
-/// context in use and the running time, each null when it is.
-pub fn status_figures(input: &Value) -> (Figures, Vec<Unavailable>) {
-    let window = input.get("context_window");
-    let usage = window
-        .and_then(|window| window.get("current_usage"))
-        .filter(|usage| usage.is_object());
-    let running_ms = input
-        .get("cost")
-        .and_then(|cost| count(cost, "total_duration_ms"));
-    let mut notes = Vec::new();
-    let figures = if let Some(usage) = usage {
-        Figures {
-            input_tokens: None,
-            output_tokens: None,
-            cache_creation_tokens: None,
-            cache_read_tokens: None,
-            context_tokens: context_of(usage),
-            running_ms,
-        }
-    } else {
-        notes.push(Unavailable {
-            figure: "context_tokens".to_owned(),
-            reason: "status_current_usage_null".to_owned(),
-        });
-        Figures {
-            running_ms,
-            ..Figures::default()
-        }
-    };
-    if usage.is_some() {
-        note(
-            "context_tokens",
-            figures.context_tokens,
-            "field_absent",
-            &mut notes,
-        );
-    }
-    note("running_ms", running_ms, "field_absent", &mut notes);
-    for figure in [
-        "input_tokens",
-        "output_tokens",
-        "cache_creation_tokens",
-        "cache_read_tokens",
-    ] {
-        notes.push(Unavailable {
-            figure: figure.to_owned(),
-            reason: "a_snapshot_carries_no_spend".to_owned(),
-        });
-    }
-    (figures, notes)
 }
 
 /// Whether a Claude Code `user` record is a person's prompt, which begins a
@@ -550,25 +431,61 @@ impl Reading<'_> {
                 .map(str::to_owned);
             return Vec::new();
         }
+        let mut bodies = Vec::new();
+        if event == Some("token_count")
+            && let Some(payload) = payload
+        {
+            let mut unavailable = Vec::new();
+            let mut plan_windows = crate::tracking_budget::codex_windows(payload, &mut unavailable);
+            crate::tracking_budget::live(&mut plan_windows, self.now, &mut unavailable);
+            let (account, _) = self.accounts.at(instant(record).unwrap_or(self.now));
+            if plan_windows != source.plan_windows || account != source.plan_account {
+                source.plan_windows.clone_from(&plan_windows);
+                source.plan_account = account;
+                unavailable.push(Unavailable { figure: "dollars_micros".to_owned(), reason: "Codex reports dollars only through its app-server; Lys does not read it yet".to_owned() });
+                bodies.push(self.record(
+                    source,
+                    Origin {
+                        id: format!(
+                            "{CODEX_ADAPTER}:{}:{}:{offset}:plan",
+                            source.bound, source.generation
+                        ),
+                        offset: Some(offset),
+                        turn: source.turn.clone(),
+                        observed_at: instant(record),
+                    },
+                    Measure::Snapshot,
+                    (
+                        Figures {
+                            plan_windows,
+                            ..Figures::default()
+                        },
+                        unavailable,
+                    ),
+                    None,
+                ));
+            }
+        }
         let info = payload.and_then(|payload| payload.get("info"));
         let Some(totals) = info
             .filter(|_| event == Some("token_count"))
             .and_then(|info| info.get("total_token_usage"))
             .and_then(Totals::of)
         else {
-            return Vec::new();
+            return bodies;
         };
         let before = source.totals.replace(totals.clone()).unwrap_or_default();
         let Some(rise) = totals.since(&before) else {
-            return vec![Body::Coverage(Coverage::of(
+            bodies.push(Body::Coverage(Coverage::of(
                 "source_generation",
                 source,
                 Some(offset),
                 "the rollout's totals fell: a reset, counted from here".to_owned(),
-            ))];
+            )));
+            return bodies;
         };
         if rise == Totals::default() {
-            return Vec::new();
+            return bodies;
         }
         let context = info
             .and_then(|info| info.get("last_token_usage"))
@@ -582,17 +499,22 @@ impl Reading<'_> {
             turn: source.turn.clone(),
             observed_at: instant(record),
         };
-        vec![self.record(source, origin, Measure::Spend, rise.figures(context), None)]
+        bodies.push(self.record(source, origin, Measure::Spend, rise.figures(context), None));
+        bodies
     }
 
     /// A status line's snapshot, kept as record `id`; none when it repeats
     /// the last one kept.
     pub fn status(&self, source: &mut SourceState, input: &Value, id: String) -> Option<Body> {
-        let (figures, unavailable) = status_figures(input);
-        if source.snapshot.as_ref() == Some(&figures) {
+        let (mut figures, mut unavailable) = status_figures(input);
+        crate::tracking_budget::live(&mut figures.plan_windows, self.now, &mut unavailable);
+        let (account, _) = self.accounts.at(self.now);
+        if source.snapshot.as_ref() == Some(&figures) && source.snapshot_account == account {
             return None;
         }
         source.snapshot = Some(figures.clone());
+        source.snapshot_account = account;
+        crate::tracking_budget::cost_delta(source, &mut figures, &mut unavailable);
         let model = input
             .get("model")
             .and_then(|model| model.get("id"))

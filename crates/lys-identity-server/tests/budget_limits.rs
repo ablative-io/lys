@@ -189,6 +189,22 @@ async fn a_unit_without_a_reported_source_is_unavailable_and_not_kept() -> TestR
     Ok(())
 }
 
+#[tokio::test]
+async fn pause_is_refused_with_the_four_available_actions() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let before = table.get(&path).await?;
+    let body = json!({"limits": [{"unit": "tokens", "amount": 100, "period": "day", "act": "pause"}], "warn_at": null, "version": 0});
+    let (status, refused) = table.put(&path, &body).await?;
+    assert_eq!(status, 400, "{refused}");
+    let words = refused.to_string();
+    for name in ["pause", "tell", "notice", "compact", "stop"] {
+        assert!(words.contains(name), "{refused}");
+    }
+    assert_eq!(table.get(&path).await?, before);
+    Ok(())
+}
+
 fn files(dir: &Path) -> TestResult<Files> {
     let mut found = BTreeMap::new();
     for entry in std::fs::read_dir(dir)? {
