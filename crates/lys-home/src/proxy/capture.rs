@@ -28,11 +28,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use hyper::body::Bytes;
+use hyper::header::{GetAll, HeaderValue};
 
+use crate::proxy::decode::Reader;
 use crate::proxy::forward::{End, Observer};
 use crate::proxy::journal::{Job, Journal, OpenCall, Sink};
 use crate::proxy::link::{KeyScanner, Link};
-use crate::proxy::stream::StreamReader;
 use crate::record::call::CallStatus;
 
 /// The capture bound: how many calls may hold spooled bodies not yet
@@ -133,7 +134,7 @@ struct CallState {
     response: Option<Spool>,
     capture_failed: bool,
     journal_failed: bool,
-    reader: Option<StreamReader>,
+    reader: Option<Reader>,
     stream: bool,
     finished: bool,
 }
@@ -196,12 +197,16 @@ impl Call {
     /// The observer of the response body on its way to the client; the
     /// response spool is created now, as its head has arrived.
     #[must_use]
-    pub fn response_side(self: &Arc<Self>, stream: bool) -> ResponseSide {
+    pub fn response_side(
+        self: &Arc<Self>,
+        stream: bool,
+        encodings: GetAll<'_, HeaderValue>,
+    ) -> ResponseSide {
         let api = self.open.api;
         let spool = self.capture.join(format!("{}.response", self.open.call_id));
         self.with(|s| {
             s.stream = stream;
-            s.reader = stream.then(|| StreamReader::for_api(api));
+            s.reader = stream.then(|| Reader::for_api(api, encodings));
             if s.slot.is_some() && !s.capture_failed {
                 s.response = Spool::create(spool);
                 s.capture_failed = s.response.is_none();
@@ -237,7 +242,21 @@ impl Call {
             for spool in [&mut s.request, &mut s.response].into_iter().flatten() {
                 spool.close(&mut s.capture_failed);
             }
-            let parts = s.reader.take().and_then(StreamReader::finish);
+            let parts = s.reader.take().and_then(|reader| {
+                if end != End::Complete {
+                    return None;
+                }
+                match reader.finish() {
+                    Ok(parts) => parts,
+                    Err(error) => {
+                        eprintln!(
+                            "lys-proxy: response_decode_failed: call {}: {error}",
+                            self.open.call_id
+                        );
+                        None
+                    }
+                }
+            });
             let unspooled = s.slot.is_none() || s.capture_failed || s.journal_failed;
             let status = match end {
                 End::Dropped => CallStatus::Cancelled,
@@ -297,8 +316,14 @@ pub struct ResponseSide(Arc<Call>);
 impl Observer for ResponseSide {
     fn data(&mut self, bytes: &Bytes) {
         self.0.with(|s| {
-            if let Some(reader) = &mut s.reader {
-                reader.feed(bytes);
+            if let Some(reader) = &mut s.reader
+                && let Err(error) = reader.feed(bytes)
+            {
+                eprintln!(
+                    "lys-proxy: response_decode_failed: call {}: {error}",
+                    self.0.open.call_id
+                );
+                s.reader = None;
             }
             if let Some(spool) = &mut s.response {
                 spool.write(bytes, &mut s.capture_failed);

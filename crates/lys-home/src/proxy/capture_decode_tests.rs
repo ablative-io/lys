@@ -15,6 +15,7 @@ use crate::record::blocks::Hash;
 use crate::record::call::CallStatus;
 
 async fn round_trip(encoding: Option<&'static str>, sent: &[u8], status: CallStatus) -> Res {
+    const PREFIX: usize = 1;
     let sent: Arc<[u8]> = Arc::from(sent);
     let provider_bytes = Arc::clone(&sent);
     let (resume, resumed) = mpsc::channel::<()>(1);
@@ -33,14 +34,14 @@ async fn round_trip(encoding: Option<&'static str>, sent: &[u8], status: CallSta
                     .insert(CONTENT_ENCODING, HeaderValue::from_static(encoding));
             }
             let sending = tokio::spawn(async move {
-                sender.send(Bytes::copy_from_slice(&sent[..12])).await?;
+                sender.send(Bytes::copy_from_slice(&sent[..PREFIX])).await?;
                 resumed
                     .lock()
                     .await
                     .recv()
                     .await
                     .ok_or("client did not acknowledge the prefix")?;
-                for byte in sent[12..].chunks(1) {
+                for byte in sent[PREFIX..].chunks(1) {
                     sender.send(Bytes::copy_from_slice(byte)).await?;
                 }
                 Res::Ok(())
@@ -67,13 +68,13 @@ async fn round_trip(encoding: Option<&'static str>, sent: &[u8], status: CallSta
     );
     let mut body = response.into_body();
     let mut received = Vec::new();
-    while received.len() < 12 {
+    while received.len() < PREFIX {
         let frame = body.frame().await.ok_or("body ended before the prefix")??;
         if let Some(data) = frame.data_ref() {
             received.extend_from_slice(data);
         }
     }
-    assert_eq!(received, sent[..12]);
+    assert_eq!(received, sent[..PREFIX]);
     resume.send(()).await?;
     received.extend_from_slice(&body.collect().await?.to_bytes());
     assert_eq!(received, &*sent);
@@ -139,6 +140,21 @@ async fn unsupported_encodings_are_not_guessed_from_gzip_bytes() -> Res {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_plain_stream_keeps_its_existing_complete_record() -> Res {
     round_trip(None, PLAIN, CallStatus::Complete).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn compressed_bytes_without_an_encoding_are_not_detected_by_their_magic() -> Res {
+    round_trip(None, GZIP, CallStatus::Partial).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trailing_bytes_do_not_complete_a_compressed_response() -> Res {
+    for (encoding, source) in [("gzip", GZIP), ("deflate", DEFLATE)] {
+        let mut trailing = source.to_vec();
+        trailing.extend_from_slice(b"trailing");
+        round_trip(Some(encoding), &trailing, CallStatus::Partial).await?;
+    }
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
