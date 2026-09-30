@@ -42,8 +42,8 @@ describe('No read-again buttons', () => {
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
     await click($$('form[aria-label="Confirm emergency stop"] button[type="submit"]')[0] ?? null);
-    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(2);
-    expect($('#state')?.textContent).toBe('suspended');
+    expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(1);
+    expect($('#state')?.textContent).toBe('Suspended in this stop answer');
     expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
     expect(reloaders()).toEqual([]);
   });

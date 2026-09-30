@@ -11,7 +11,7 @@ describe('People and agents', () => {
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)', "Scribe", "Courier", "Archivist", "Reviewer", "Lamplighter"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
     expect(scribe?.textContent).toContain('agent');
-    expect(scribe?.textContent).toContain('Active');
+    expect(scribe?.textContent).toContain('active');
     expect(scribe?.textContent).toContain('Ada (test person)');
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
   });
