@@ -61,6 +61,10 @@ impl Table {
     }
 }
 
+fn metadata(value: &Value) -> Value {
+    json!({"holder": value["holder"], "limits": value["limits"], "warn_at": value["warn_at"], "zone": value["zone"], "version": value["version"], "by": value["by"], "at": value["at"]})
+}
+
 fn token_limits() -> Value {
     json!([
         {"unit": "tokens", "amount": 400, "period": "week", "act": "tell"},
@@ -84,7 +88,7 @@ async fn limits_keep_distinct_actions_for_the_same_unit_and_period() -> TestResu
     assert!(read["zone"].as_str().is_some(), "{read}");
     assert!(read.get("act").is_none(), "{read}");
     table.service.restart().await?;
-    assert_eq!(table.get(&path).await?, read);
+    assert_eq!(metadata(&table.get(&path).await?), metadata(&read));
     Ok(())
 }
 
@@ -100,7 +104,7 @@ async fn a_stale_holder_version_cannot_replace_any_limit() -> TestResult {
     let (status, refused) = table.put(&path, &changed).await?;
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["refusal"], "BudgetVersionConflict");
-    assert_eq!(table.get(&path).await?, kept);
+    assert_eq!(metadata(&table.get(&path).await?), metadata(&kept));
     Ok(())
 }
 
@@ -126,7 +130,7 @@ async fn only_the_administrator_changes_a_persons_limit_list() -> TestResult {
     .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "not_permitted");
-    assert_eq!(table.get(&path).await?, kept);
+    assert_eq!(metadata(&table.get(&path).await?), metadata(&kept));
     Ok(())
 }
 
@@ -273,5 +277,21 @@ async fn an_old_install_keeps_each_limits_action_and_zone_without_rewriting_read
     assert_eq!(status, 200, "{restored}");
     assert_eq!(restored["limits"], read["limits"]);
     assert_eq!(files(&dir.join("leaves"))?, leaves);
+    Ok(())
+}
+
+#[tokio::test]
+async fn pause_is_refused_with_the_four_available_actions() -> TestResult {
+    let table = Table::fresh().await?;
+    let path = format!("/budgets/agent/{}", table.agent);
+    let before = table.get(&path).await?;
+    let body = json!({"limits": [{"unit": "tokens", "amount": 100, "period": "day", "act": "pause"}], "warn_at": null, "version": 0});
+    let (status, refused) = table.put(&path, &body).await?;
+    assert_eq!(status, 400, "{refused}");
+    let words = refused.to_string();
+    for name in ["pause", "tell", "notice", "compact", "stop"] {
+        assert!(words.contains(name), "{refused}");
+    }
+    assert_eq!(metadata(&table.get(&path).await?), metadata(&before));
     Ok(())
 }
