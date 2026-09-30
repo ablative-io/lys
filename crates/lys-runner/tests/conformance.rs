@@ -99,6 +99,7 @@ fn shell(id: &str) -> Launch {
         arguments: Vec::new(),
         directory: "/".to_owned(),
         environment: BTreeMap::from([("PS1".to_owned(), "$ ".to_owned())]),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

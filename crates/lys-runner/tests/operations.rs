@@ -80,6 +80,7 @@ fn cat(client: &Client, session: &str) -> TestResult {
         arguments: vec!["-c".to_owned(), "stty -echo; echo ready; cat".to_owned()],
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

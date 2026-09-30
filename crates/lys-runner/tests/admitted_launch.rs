@@ -39,6 +39,7 @@ fn launch(session: &str, admitted: Option<Admitted>) -> Launch {
         arguments: vec!["-c".to_owned(), "cat".to_owned()],
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

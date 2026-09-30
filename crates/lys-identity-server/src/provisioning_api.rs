@@ -10,8 +10,9 @@
 //! version under an operation id; an agent is started only from a reviewed
 //! version, and the answer says when the reviewer is the person who set it.
 //!
-//! No runtime applies a profile yet. The answer says so in `enforced`, and
-//! never shows a profile as applied.
+//! A profile is applied only when its complete native start was reported
+//! running by its machine's runner. A newer version remains recorded until
+//! that version runs.
 
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
@@ -302,9 +303,14 @@ pub(crate) fn write_provisioning<T>(
     })
 }
 
-fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> ProvisioningView {
+fn view(
+    state: &AppState,
+    agent: &str,
+    profile: Option<&Profile>,
+    recorded: Option<Recorded>,
+) -> Result<ProvisioningView, ServerError> {
     let versions = profile.map_or(&[][..], |profile| profile.versions.as_slice());
-    ProvisioningView {
+    Ok(ProvisioningView {
         agent: agent.to_owned(),
         profile: versions.last().map(|version| VersionView {
             version: version.number,
@@ -336,9 +342,9 @@ fn view(agent: &str, profile: Option<&Profile>, recorded: Option<Recorded>) -> P
                 note: version.settings.note.clone(),
             })
             .collect(),
-        enforced: false,
+        enforced: crate::launch_api::enforced(state, agent, versions.last())?,
         recorded,
-    }
+    })
 }
 
 async fn read(
@@ -348,7 +354,7 @@ async fn read(
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let agent = seen_agent(&state, &headers, &id)?.agent.to_string();
     with_provisioning(&state, |store| {
-        Ok(Json(view(&agent, store.profile(&agent), None)))
+        Ok(Json(view(&state, &agent, store.profile(&agent), None)?))
     })
 }
 
@@ -386,7 +392,12 @@ async fn set(
             };
             let version = store.set(&agent, from_version, version)?;
             let recorded = Recorded { operation, version };
-            Ok(Json(view(&agent, store.profile(&agent), Some(recorded))))
+            Ok(Json(view(
+                &state,
+                &agent,
+                store.profile(&agent),
+                Some(recorded),
+            )?))
         })
     })
 }
@@ -435,7 +446,7 @@ async fn review(
                     operation: kept.operation.clone(),
                     version: number,
                 });
-            Ok(Json(view(&agent, store.profile(&agent), recorded)))
+            Ok(Json(view(&state, &agent, store.profile(&agent), recorded)?))
         })
     })
 }
