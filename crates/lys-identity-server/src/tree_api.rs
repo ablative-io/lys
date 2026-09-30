@@ -214,8 +214,8 @@ fn goals(
                 standing.agent.clone(),
                 items
                     .into_iter()
-                    .filter(|item| item.standing == GoalStanding::Open)
-                    .map(|item| item.goal.words)
+                    .filter(|item| item.standing == GoalStanding::Open && item.active())
+                    .map(|item| item.words().to_owned())
                     .collect(),
             );
         }
