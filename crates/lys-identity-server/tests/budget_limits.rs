@@ -1,3 +1,5 @@
+//! Limit collections retain independent actions, authority and old-install provenance.
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
