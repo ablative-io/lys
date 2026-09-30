@@ -31,11 +31,33 @@ pub struct Config {
     /// All files supplied by the renderer.
     pub files: Vec<File>,
     /// Argument positions bound to the named files.
+    #[serde(deserialize_with = "positions")]
     pub argument_files: BTreeMap<usize, String>,
     /// Variables bound to files, or to the root when the value is empty.
     pub environment_paths: BTreeMap<String, String>,
     /// Whether the process starts in the config directory.
     pub working_directory: bool,
+}
+
+/// Argument positions as the wire carries them: JSON object keys are strings,
+/// and inside the internally tagged `Act` a string key does not read as a
+/// number, so each key is read as a string and then as a position.
+fn positions<'de, D>(deserializer: D) -> Result<BTreeMap<usize, String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    BTreeMap::<String, String>::deserialize(deserializer)?
+        .into_iter()
+        .map(|(key, path)| {
+            key.parse::<usize>()
+                .map(|index| (index, path))
+                .map_err(|error| {
+                    serde::de::Error::custom(format!(
+                        "argument position `{key}` is not a position: {error}"
+                    ))
+                })
+        })
+        .collect()
 }
 
 fn refused(reason: impl std::fmt::Display) -> RunnerError {

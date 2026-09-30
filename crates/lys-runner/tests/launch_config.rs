@@ -220,6 +220,36 @@ fn the_signature_covers_config_files_and_bindings() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn a_signed_start_that_binds_arguments_to_files_reads_back_unchanged() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let greeting = Greeting::fresh("12");
+    let mut bound = launch();
+    let config = bound.config.as_mut().ok_or("the fixture carries config")?;
+    config.argument_files = BTreeMap::from([
+        (1, "settings.json".to_owned()),
+        (10, "settings.json".to_owned()),
+    ]);
+    let act = Act::Start {
+        launch: Box::new(bound),
+    };
+    let signed = sign_request(&key, &greeting, &act)?;
+    let request: Request = serde_json::from_str(&signed)?;
+    assert!(
+        request
+            .act
+            .contains(r#""argument_files":{"1":"settings.json","10":"settings.json"}"#),
+        "{}",
+        request.act
+    );
+    assert_eq!(
+        verify_request(&signed, &key.public_key_bytes(), &greeting)?,
+        act
+    );
+    Ok(())
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PreviousLaunch {
