@@ -117,7 +117,7 @@ it('keeps the recorded request on screen without replacing it with an older list
   });
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({ relation: 'viewer', ends_at: null, why: 'A newly recorded request' });
-  expect(view.querySelector('section[aria-label="Visible requests"]')?.textContent).toContain('A newly recorded request');
+  expect(view.querySelector('.listing tr[data-href]')?.textContent).toContain('viewer on');
 });
 
 async function clickNamed(view: HTMLElement, name: string) {
