@@ -1,23 +1,20 @@
-/* A tree down the left and the chosen agent filling the rest, with no header. */
-.team-screen { display: grid; grid-template-columns: 260px minmax(0, 1fr); height: 100%; min-height: 0; }
+/* A tree of names down the left and the chosen agent filling the rest. */
+.team-screen { display: grid; grid-template-columns: 200px minmax(0, 1fr); height: 100%; min-height: 0; }
 .team-screen .tree { border-right: 1px solid var(--border-default); padding: 12px 8px; overflow: auto; }
 .tree ul { list-style: none; margin: 0; padding: 0; }
 .tree-under { margin-left: 10px !important; padding-left: 10px !important; border-left: 1px solid var(--border-default); }
-.tree-group { display: block; padding: 6px 6px 2px; font: 500 10px "JetBrains Mono"; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
-.tree-person { color: var(--text-secondary); font-size: 11px; }
-.tree-row { display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text-primary); }
+.tree-label { display: block; padding: 5px 6px 2px; color: var(--text-secondary); }
+.tree-person { color: var(--text-primary); font-weight: 600; }
+.tree-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text-primary); }
 .tree-row:hover { background: var(--surface-hover); }
 .tree-row[aria-current="page"] { background: var(--accent-wash); }
-.tree-row .dot { margin: 6px 0 0; flex: none; }
-.tree-text { display: flex; flex-direction: column; min-width: 0; }
-.tree-name { font-weight: 600; }
-.tree-goal { color: var(--text-muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-controls { display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 10px 21px; }
-.tree-controls .seg { flex-wrap: wrap; }
-.tree-acts { display: flex; flex-wrap: wrap; gap: 4px; }
-.tree-acts .btn { padding: 3px 8px; font-size: 11.5px; }
-.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 8px 12px; }
-.team-stage .terminal { flex: 1; margin: 0; min-height: 0; padding: 8px; }
+.tree-row .dot { flex: none; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage-strip { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--border-default); flex: none; }
+.strip-acts { display: flex; gap: 4px; margin-left: auto; }
+.strip-acts .btn { padding: 3px 8px; font-size: 11.5px; }
+.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.team-stage .terminal { flex: 1; margin: 0; min-height: 0; padding: 0; border: 0; border-radius: 0; }
 .team-stage .terminal-head h2, .team-stage .terminal-head .mono { display: none; }
 .team-stage .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .team-stage .terminal-screen, .team-stage .terminal-display .terminal-screen { flex: 1; height: auto; max-height: none; min-height: 0; }

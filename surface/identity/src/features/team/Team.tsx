@@ -1,4 +1,4 @@
-/** The organisation as a tree beside the chosen agent, with no header: the stage is the agent's terminal, its settings, or its budgets and goals, and the chosen node in the tree carries the switches and actions. */
+/** The organisation as a tree of names beside the chosen agent: one strip of tabs and actions, then the agent's terminal, settings, or budgets and goals. */
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { Refused, api, request, useLoad } from '../../api';
@@ -6,7 +6,6 @@ import { entries } from '../people/directory';
 import type { Entry } from '../people/directory';
 import type { Team as TeamRecord } from '../teams/contract';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
-import type { GoalsView } from '../usage/contract';
 import { Terminal } from '../runtime/Terminal';
 import { Provisioning } from '../provisioning/Provisioning';
 import { AgentUsage } from '../usage/Usage';
@@ -18,14 +17,6 @@ import './team.css';
 const TABS = [['terminal', 'Terminal'], ['settings', 'Settings'], ['budgets', 'Budgets and goals']] as const;
 type Tab = (typeof TABS)[number][0];
 
-/** The first open goal of an agent, read once when its node is drawn. */
-function Goal({ agent }: { agent: string }) {
-  const load = useLoad(async () => request<GoalsView>('/agents/' + encodeURIComponent(agent) + '/goals'), 'team-goal:' + agent);
-  if (load.status !== 'ok') return null;
-  const open = load.data.goals.find((item) => item.standing === 'open');
-  return open ? <span className="tree-goal">{open.goal.words}</span> : null;
-}
-
 function Controls({ agent, tab, session }: { agent: string; tab: Tab; session: RuntimeSession | undefined }) {
   const [said, setSaid] = useState('');
   const compact = async () => {
@@ -34,9 +25,9 @@ function Controls({ agent, tab, session }: { agent: string; tab: Tab; session: R
     catch (error) { setSaid(error instanceof Refused ? error.refusal.reason : String(error)); }
   };
   const base = '#/team/' + encodeURIComponent(agent) + '/';
-  return <div className="tree-controls">
+  return <div className="stage-strip">
     <div className="seg">{TABS.map(([id, words]) => <a key={id} className={tab === id ? 'on' : undefined} href={base + id}>{words}</a>)}</div>
-    <div className="tree-acts">
+    <div className="strip-acts">
       <button type="button" className="btn" disabled={!session} onClick={() => void compact()}>Compact</button>
       <button type="button" className="btn" disabled title="Restart is being built tonight">Restart</button>
       <button type="button" className="btn" disabled title="Asking for an MCP server is being built tonight">Ask for MCP</button>
@@ -48,8 +39,8 @@ function Controls({ agent, tab, session }: { agent: string; tab: Tab; session: R
 function AgentNode({ agent, session, open, tab }: { agent: Entry; session: RuntimeSession | undefined; open: string | undefined; tab: Tab }) {
   return <li><a className="tree-row" aria-current={open === agent.id ? 'page' : undefined} href={'#/team/' + encodeURIComponent(agent.id) + '/' + tab}>
     <span className={'dot ' + (session ? 's-active' : 's-retired')} aria-label={session ? 'running' : 'not running'} />
-    <span className="tree-text"><span className="tree-name">{agent.display_name}</span><Goal agent={agent.id} /></span>
-  </a>{open === agent.id ? <Controls agent={agent.id} tab={tab} session={session} /> : null}</li>;
+    <span className="tree-name">{agent.display_name}</span>
+  </a></li>;
 }
 
 export function Team() {
@@ -76,7 +67,7 @@ export function Team() {
   const inTeams = new Set(teams.flatMap((team) => team.members));
   const persons = people.filter((entry) => entry.kind === 'person' && (entry.id === me.person.id || agents.some((agent) => agent.person?.id === entry.id)));
   const under = (person: string) => <ul className="tree-under">
-    {teams.filter((team) => team.owner === person).map((team) => <li key={team.id}><span className="tree-group">{team.name}</span>
+    {teams.filter((team) => team.owner === person).map((team) => <li key={team.id}><span className="tree-label">{team.name}</span>
       <ul className="tree-under">{team.members.flatMap((id) => { const entry = byId(id); return entry ? [node(entry)] : []; })}</ul></li>)}
     {agents.filter((entry) => !inTeams.has(entry.id) && entry.person?.id === person).map(node)}
   </ul>;
@@ -84,10 +75,10 @@ export function Team() {
   const session = chosen ? live(chosen.id) : undefined;
   return <div className="team-screen">
     <nav className="tree" aria-label="Teams and agents"><ul className="tree-top">
-      {persons.map((person) => <li key={person.id}><span className="tree-group tree-person">{person.display_name}</span>{under(person.id)}</li>)}
+      {persons.map((person) => <li key={person.id}><span className="tree-label tree-person">{person.display_name}</span>{under(person.id)}</li>)}
     </ul></nav>
     <main className="team-stage">
-      {!chosen ? <p className="session-empty">Choose an agent in the tree.</p> : null}
+      {chosen ? <Controls agent={chosen.id} tab={tab} session={session} /> : null}
       {chosen && tab === 'terminal' ? (session ? <Terminal key={session.session} session={session.session} agent={chosen.id} />
         : <Start key={chosen.id} agent={chosen.id} started={() => setRevision((value) => value + 1)} />) : null}
       {chosen && tab === 'settings' ? <Provisioning id={chosen.id} /> : null}
