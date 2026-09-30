@@ -188,4 +188,11 @@ describe('The route-backed start form', () => {
     expect(posted.map((entry) => entry.path)).toEqual([start]);
   });
 
+  it('still confirms approval when the subsequent start is refused', async () => {
+    await open({ ...routes({ ...profile, reviewed_by: null }), ['POST ' + start]: refused(409, 'AgentNotActive', 'Agent is suspended') });
+    await click(button());
+    expect(text()).toContain('Version 1 of these settings is approved');
+    expect(text()).toContain('AgentNotActive');
+  });
+
 });

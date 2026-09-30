@@ -52,7 +52,7 @@ describe('Prepare start', () => {
   it('offers a machine through an active held role and excludes an ended role', async () => {
     const role = { id: 'role-build', holders: [{ holder: SCRIBE, state: 'holding' }] };
     const extra = { '/network': ok({ machines: [{ ...machine, may_run: [], may_run_roles: [role.id] }], reports_served: true }), '/roles': ok({ roles: [role] }) };
-    const posted = await mountStart(receipt, extra); await submit(); expect(posted).toHaveLength(1); close();
+    const posted = await mountStart(receipt, extra); await submit(); expect(posted).toHaveLength(1); close(); sessionStorage.clear();
     await mountStart(receipt, { ...extra, '/roles': ok({ roles: [{ ...role, holders: [{ holder: SCRIBE, state: 'ended' }] }] }) }); expect(text()).toContain('MachineUnavailable'); expect(button('Start this agent')?.hasAttribute('disabled')).toBe(true);
   });
 
