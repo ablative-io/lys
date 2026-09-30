@@ -64,8 +64,11 @@ pub struct McpDecisionView {
     pub decided_at: u64,
 }
 
-fn view<S: LeafStore>(store: &McpRequestStore<S>, mut request: McpRequest) -> McpRequestView {
-    let decision = store.held().decision(&request.id).map(|record| {
+fn view<S: LeafStore>(
+    store: &McpRequestStore<S>,
+    mut request: McpRequest,
+) -> Result<McpRequestView, ServerError> {
+    let decision = store.held().decision(&request.id)?.map(|record| {
         request.state = McpRequestState::Approved;
         McpDecisionView {
             by: record.by.clone(),
@@ -74,7 +77,7 @@ fn view<S: LeafStore>(store: &McpRequestStore<S>, mut request: McpRequest) -> Mc
             decided_at: record.at,
         }
     });
-    McpRequestView { request, decision }
+    Ok(McpRequestView { request, decision })
 }
 
 /// Record and read requests, or approve them within the caller's reach and remit.
@@ -122,7 +125,7 @@ async fn list(
                 .listed(&agent)?
                 .into_iter()
                 .map(|request| view(store, request))
-                .collect(),
+                .collect::<Result<_, _>>()?,
         }))
     })
 }
@@ -150,7 +153,7 @@ async fn ask(
     with_requests(&state, |requests| {
         settle_profiles(&state, requests, &agent_id)?;
         if let Some(kept) = requests.replay(&operation, &agent_id, &server, &by)? {
-            return Ok(Json(view(requests, kept)));
+            return Ok(Json(view(requests, kept)?));
         }
         with_provisioning(&state, |profiles| {
             let known = profiles.profiles().iter().any(|profile| {
@@ -189,7 +192,7 @@ async fn ask(
                 asked_by: by,
                 asked_at: now(),
             })?;
-            Ok(Json(view(requests, asked)))
+            Ok(Json(view(requests, asked)?))
         })
     })
 }
@@ -202,7 +205,7 @@ fn reconcile<S: LeafStore>(
 ) -> Result<(), ServerError> {
     profiles.settle()?;
     requests.settle()?;
-    for intent in requests.pending(agent) {
+    for intent in requests.pending(agent)? {
         match profiles.named(&intent.operation) {
             Some((owner, version)) if owner == agent && version == &intent.version => {
                 requests.event(Event::Decided(intent))?;
@@ -226,7 +229,7 @@ fn settle_profiles(
     requests: &mut McpRequestStore,
     agent: &str,
 ) -> Result<(), ServerError> {
-    if requests.pending(agent).is_empty() {
+    if !requests.has_pending(agent) {
         return Ok(());
     }
     with_provisioning(state, |profiles| reconcile(requests, profiles, agent))
@@ -315,7 +318,7 @@ async fn approve(
     with_requests(&state, |requests| {
         let asked = requests
             .held()
-            .request(&request)
+            .request(&request)?
             .filter(|asked| asked.agent == agent)
             .cloned()
             .ok_or(ServerError::RequestUnknown)?;
@@ -324,9 +327,9 @@ async fn approve(
             .check_operation(&operation, &request, &by.to_string(), &note)?;
         with_provisioning(&state, |profiles| {
             reconcile(requests, profiles, &agent)?;
-            if let Some(decided) = requests.held().decision(&request) {
+            if let Some(decided) = requests.held().decision(&request)? {
                 return if decided.operation == operation {
-                    Ok(Json(view(requests, asked)))
+                    Ok(Json(view(requests, asked)?))
                 } else {
                     Err(ServerError::RequestDecided { request })
                 };
@@ -386,8 +389,8 @@ async fn approve(
             // An uncertain write succeeds only when its exact reviewed version reads back.
             let written = profiles.set(&agent, from_version, version);
             reconcile(requests, profiles, &agent)?;
-            if requests.held().decision(&asked.id).is_some() {
-                return Ok(Json(view(requests, asked)));
+            if requests.held().decision(&asked.id)?.is_some() {
+                return Ok(Json(view(requests, asked)?));
             }
             written?;
             Err(unavailable(
@@ -484,8 +487,8 @@ mod tests {
         let mut requests = McpRequestStore::over(harness.leaves(), key)?;
         let mut profiles = ProvisioningStore::open(&path)?;
         reconcile(&mut requests, &mut profiles, &asked.agent)?;
-        assert_eq!(requests.held().decision(&asked.id), Some(&intended));
-        assert!(requests.pending(&asked.agent).is_empty());
+        assert_eq!(requests.held().decision(&asked.id)?, Some(&intended));
+        assert!(requests.pending(&asked.agent)?.is_empty());
         assert_eq!(
             profiles
                 .profile(&asked.agent)
@@ -524,13 +527,13 @@ mod tests {
         ));
         harness.fail(Fault::None);
         reconcile(&mut requests, &mut profiles, &asked.agent)?;
-        assert!(requests.pending(&asked.agent).is_empty());
-        assert!(requests.held().decision(&asked.id).is_none());
+        assert!(requests.pending(&asked.agent)?.is_empty());
+        assert!(requests.held().decision(&asked.id)?.is_none());
         assert!(profiles.named(&intended.operation).is_none());
         requests.event(Event::Intended(intended.clone()))?;
         profiles.set(&asked.agent, 1, intended.version.clone())?;
         reconcile(&mut requests, &mut profiles, &asked.agent)?;
-        assert_eq!(requests.held().decision(&asked.id), Some(&intended));
+        assert_eq!(requests.held().decision(&asked.id)?, Some(&intended));
         Ok(())
     }
 
@@ -559,12 +562,12 @@ mod tests {
             reconcile(&mut requests, &mut profiles, &asked.agent),
             Err(ServerError::ProvisioningUnavailable { .. })
         ));
-        assert_eq!(requests.held().intent(&asked.id), Some(&intended));
-        assert!(requests.held().decision(&asked.id).is_none());
+        assert_eq!(requests.held().intent(&asked.id)?, Some(&intended));
+        assert!(requests.held().decision(&asked.id)?.is_none());
         std::fs::remove_dir(&path)?;
         std::fs::rename(saved, &path)?;
         reconcile(&mut requests, &mut profiles, &asked.agent)?;
-        assert!(requests.pending(&asked.agent).is_empty());
+        assert!(requests.pending(&asked.agent)?.is_empty());
         Ok(())
     }
 
@@ -580,12 +583,12 @@ mod tests {
         let asked = asked()?;
         requests.ask(asked.clone())?;
         let event = Event::Intended(intent(&asked)?);
-        let bytes = crate::mcp_requests_state::signed_event(event.clone(), &key)?;
+        let bytes = crate::mcp_requests_state::signed_event(&event, &key)?;
         let mut changed: serde_json::Value = serde_json::from_slice(&bytes)?;
         changed["event"]["record"]["note"] = json!("different words");
         for bytes in [
             serde_json::to_vec(&changed)?,
-            crate::mcp_requests_state::signed_event(event, &other_key)?,
+            crate::mcp_requests_state::signed_event(&event, &other_key)?,
         ] {
             let mut held = requests.held().clone();
             let tail = lys_log_store::Tail {
@@ -596,8 +599,8 @@ mod tests {
                 crate::mcp_requests_state::fold(&mut held, &tail, &key),
                 Err(ServerError::McpRequestsUnavailable { .. })
             ));
-            assert!(held.intent(&asked.id).is_none());
-            assert!(held.decision(&asked.id).is_none());
+            assert!(held.intent(&asked.id)?.is_none());
+            assert!(held.decision(&asked.id)?.is_none());
         }
         Ok(())
     }

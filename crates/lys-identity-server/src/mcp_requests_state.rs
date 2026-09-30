@@ -1,6 +1,6 @@
 //! Signed approval intents retain the exact version until both writes settle.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use lys_core::Ed25519Identity;
@@ -58,15 +58,15 @@ pub(crate) enum Event {
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SignedRequest {
-    request: McpRequest,
+struct SignedRequest<T = McpRequest> {
+    request: T,
     attestation: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SignedEvent {
-    event: Event,
+struct SignedEvent<T = Event> {
+    event: T,
     attestation: Vec<u8>,
 }
 
@@ -87,13 +87,18 @@ struct Sealed {
 }
 
 /// Requests retain their original signed shape; later records carry decisions.
-#[cfg_attr(not(test), derive(Clone))]
 #[derive(Default)]
 pub(crate) struct Held {
     /// The unchanged signed requests in recording order.
     pub requests: Vec<McpRequest>,
     /// Approval events in their original order, including withdrawals.
     pub events: Vec<Event>,
+    request_ids: BTreeMap<String, usize>,
+    agent_requests: BTreeMap<String, Vec<usize>>,
+    operations: BTreeMap<String, usize>,
+    decisions: BTreeMap<String, usize>,
+    intents: BTreeMap<String, usize>,
+    pending: BTreeMap<String, BTreeMap<usize, usize>>,
     #[cfg(test)]
     visits: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -108,6 +113,12 @@ impl Clone for Held {
         Self {
             requests: self.requests.clone(),
             events: self.events.clone(),
+            request_ids: self.request_ids.clone(),
+            agent_requests: self.agent_requests.clone(),
+            operations: self.operations.clone(),
+            decisions: self.decisions.clone(),
+            intents: self.intents.clone(),
+            pending: self.pending.clone(),
             visits: std::sync::Arc::clone(&self.visits),
         }
     }
@@ -149,10 +160,10 @@ fn payload<T: Serialize>(domain: &str, record: &T) -> Result<Vec<u8>, ServerErro
 }
 
 pub(crate) fn signed_request(
-    request: McpRequest,
+    request: &McpRequest,
     key: &Ed25519Identity,
 ) -> Result<Vec<u8>, ServerError> {
-    let attestation = sign_attestation(&payload(REQUEST_DOMAIN, &request)?, key).to_cose_bytes();
+    let attestation = sign_attestation(&payload(REQUEST_DOMAIN, request)?, key).to_cose_bytes();
     serde_json::to_vec(&SignedRequest {
         request,
         attestation,
@@ -160,8 +171,8 @@ pub(crate) fn signed_request(
     .map_err(unavailable)
 }
 
-pub(crate) fn signed_event(event: Event, key: &Ed25519Identity) -> Result<Vec<u8>, ServerError> {
-    let attestation = sign_attestation(&payload(DECISION_DOMAIN, &event)?, key).to_cose_bytes();
+pub(crate) fn signed_event(event: &Event, key: &Ed25519Identity) -> Result<Vec<u8>, ServerError> {
+    let attestation = sign_attestation(&payload(DECISION_DOMAIN, event)?, key).to_cose_bytes();
     serde_json::to_vec(&SignedEvent { event, attestation }).map_err(unavailable)
 }
 
@@ -177,74 +188,87 @@ impl Held {
         self.visits.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    pub(crate) fn request(&self, id: &str) -> Option<&McpRequest> {
-        self.requests.iter().find(|request| {
-            #[cfg(test)]
-            self.visit();
-            request.id == id
-        })
-    }
-
-    pub(crate) fn decision(&self, id: &str) -> Option<&Intended> {
-        self.events.iter().find_map(|event| {
-            #[cfg(test)]
-            self.visit();
-            match event {
-                Event::Decided(record) if record.request == id => Some(record),
-                _ => None,
-            }
-        })
-    }
-
-    pub(crate) fn intent(&self, id: &str) -> Option<&Intended> {
-        self.events
-            .iter()
-            .rev()
-            .find(|event| {
+    pub(crate) fn request(&self, id: &str) -> Result<Option<&McpRequest>, ServerError> {
+        self.request_ids
+            .get(id)
+            .map(|index| {
                 #[cfg(test)]
                 self.visit();
-                match event {
-                    Event::Intended(record) | Event::Decided(record) => record.request == id,
-                    Event::Withdrawn { request, .. } => request == id,
+                self.requests
+                    .get(*index)
+                    .ok_or_else(|| unavailable("request index is outside the projection"))
+            })
+            .transpose()
+    }
+
+    pub(crate) fn decision(&self, id: &str) -> Result<Option<&Intended>, ServerError> {
+        self.decisions
+            .get(id)
+            .map(|index| {
+                #[cfg(test)]
+                self.visit();
+                match self.events.get(*index) {
+                    Some(Event::Decided(record)) => Ok(record),
+                    _ => Err(unavailable("decision index names no approval decision")),
                 }
             })
-            .and_then(|event| match event {
-                Event::Intended(record) => Some(record),
-                _ => None,
+            .transpose()
+    }
+
+    pub(crate) fn intent(&self, id: &str) -> Result<Option<&Intended>, ServerError> {
+        self.intents
+            .get(id)
+            .map(|index| {
+                #[cfg(test)]
+                self.visit();
+                match self.events.get(*index) {
+                    Some(Event::Intended(record)) => Ok(record),
+                    _ => Err(unavailable("intent index names no approval intent")),
+                }
             })
+            .transpose()
     }
 
     pub(crate) fn push_request(&mut self, request: McpRequest) -> Result<(), ServerError> {
-        validate(&request).map_err(unavailable)?;
-        if self.request(&request.id).is_some()
-            || self.events.iter().any(|event| {
-                #[cfg(test)]
-                self.visit();
-                match event {
-                    Event::Intended(record) | Event::Decided(record) => {
-                        record.operation == request.id
-                    }
-                    Event::Withdrawn { operation, .. } => operation == &request.id,
-                }
-            })
-        {
-            return Err(unavailable("the log repeats an MCP request operation"));
-        }
-        self.requests.push(request);
+        self.check_request(&request)?;
+        self.apply_request(request);
         Ok(())
     }
 
+    pub(crate) fn check_request(&self, request: &McpRequest) -> Result<(), ServerError> {
+        validate(request).map_err(unavailable)?;
+        if self.request_ids.contains_key(&request.id) || self.operations.contains_key(&request.id) {
+            return Err(unavailable("the log repeats an MCP request operation"));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn apply_request(&mut self, request: McpRequest) {
+        let index = self.requests.len();
+        self.request_ids.insert(request.id.clone(), index);
+        self.agent_requests
+            .entry(request.agent.clone())
+            .or_default()
+            .push(index);
+        self.requests.push(request);
+    }
+
     pub(crate) fn push_event(&mut self, event: Event) -> Result<(), ServerError> {
-        match &event {
+        self.check_event(&event)?;
+        self.apply_event(event)
+    }
+
+    pub(crate) fn check_event(&self, event: &Event) -> Result<(), ServerError> {
+        match event {
             Event::Intended(record) => {
                 OperationId::from_str(&record.operation).map_err(unavailable)?;
                 identity(&record.by)?;
                 let asked = self
-                    .request(&record.request)
+                    .request(&record.request)?
                     .ok_or_else(|| unavailable("approval names no request"))?;
-                if self.intent(&record.request).is_some()
-                    || self.decision(&record.request).is_some()
-                    || self.request(&record.operation).is_some()
+                if self.intent(&record.request)?.is_some()
+                    || self.decision(&record.request)?.is_some()
+                    || self.request(&record.operation)?.is_some()
                     || record.from_version < asked.profile_version
                     || record.from_version.checked_add(1) != Some(record.version.number)
                     || record.version.operation != record.operation
@@ -271,21 +295,101 @@ impl Held {
                 self.check_operation(&record.operation, &record.request, &record.by, &record.note)?;
             }
             Event::Decided(record) => {
-                if self.intent(&record.request) != Some(record) {
+                if self.intent(&record.request)? != Some(record) {
                     return Err(unavailable("decision differs from its retained intent"));
                 }
             }
             Event::Withdrawn { request, operation } => {
                 if self
-                    .intent(request)
+                    .intent(request)?
                     .is_none_or(|record| &record.operation != operation)
                 {
                     return Err(unavailable("withdrawal names no retained intent"));
                 }
             }
         }
+        Ok(())
+    }
+
+    pub(crate) fn apply_event(&mut self, event: Event) -> Result<(), ServerError> {
+        let (request, operation) = match &event {
+            Event::Intended(record) | Event::Decided(record) => {
+                (&record.request, &record.operation)
+            }
+            Event::Withdrawn { request, operation } => (request, operation),
+        };
+        let request_index = *self
+            .request_ids
+            .get(request)
+            .ok_or_else(|| unavailable("event request index is absent"))?;
+        #[cfg(test)]
+        self.visit();
+        let agent = &self
+            .requests
+            .get(request_index)
+            .ok_or_else(|| unavailable("event request index is outside the projection"))?
+            .agent;
+        let index = self.events.len();
+        match &event {
+            Event::Intended(_) => {
+                self.operations.insert(operation.clone(), index);
+                self.intents.insert(request.clone(), index);
+                self.pending
+                    .entry(agent.clone())
+                    .or_default()
+                    .insert(request_index, index);
+            }
+            Event::Decided(_) | Event::Withdrawn { .. } => {
+                self.intents.remove(request);
+                if let Some(pending) = self.pending.get_mut(agent) {
+                    pending.remove(&request_index);
+                    if pending.is_empty() {
+                        self.pending.remove(agent);
+                    }
+                }
+                if matches!(&event, Event::Decided(_)) {
+                    self.decisions.insert(request.clone(), index);
+                }
+            }
+        }
         self.events.push(event);
         Ok(())
+    }
+
+    pub(crate) fn listed(&self, agent: &str) -> Result<Vec<McpRequest>, ServerError> {
+        self.agent_requests
+            .get(agent)
+            .into_iter()
+            .flatten()
+            .map(|index| {
+                #[cfg(test)]
+                self.visit();
+                self.requests
+                    .get(*index)
+                    .cloned()
+                    .ok_or_else(|| unavailable("listed request index is outside the projection"))
+            })
+            .collect()
+    }
+
+    pub(crate) fn pending(&self, agent: &str) -> Result<Vec<Intended>, ServerError> {
+        self.pending
+            .get(agent)
+            .into_iter()
+            .flat_map(BTreeMap::values)
+            .map(|index| {
+                #[cfg(test)]
+                self.visit();
+                match self.events.get(*index) {
+                    Some(Event::Intended(record)) => Ok(record.clone()),
+                    _ => Err(unavailable("pending index names no approval intent")),
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn has_pending(&self, agent: &str) -> bool {
+        self.pending.contains_key(agent)
     }
 
     pub(crate) fn check_operation(
@@ -295,19 +399,18 @@ impl Held {
         by: &str,
         note: &str,
     ) -> Result<(), ServerError> {
-        if self.request(operation).is_some()
-            || self.events.iter().any(|event| {
+        let reused = match self.operations.get(operation) {
+            Some(index) => {
                 #[cfg(test)]
                 self.visit();
-                match event {
-                    Event::Intended(record) | Event::Decided(record) => {
-                        record.operation == operation
-                            && (record.request != request || record.by != by || record.note != note)
-                    }
-                    Event::Withdrawn { .. } => false,
-                }
-            })
-        {
+                let Some(Event::Intended(record)) = self.events.get(*index) else {
+                    return Err(unavailable("operation index names no approval intent"));
+                };
+                record.request != request || record.by != by || record.note != note
+            }
+            None => false,
+        };
+        if self.request_ids.contains_key(operation) || reused {
             return Err(ServerError::RequestReused {
                 request: operation.to_owned(),
             });
@@ -316,10 +419,16 @@ impl Held {
     }
 
     pub(crate) fn encode(&self) -> Result<Vec<u8>, ServerError> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            requests: self.requests.clone(),
-            events: self.events.clone(),
+        #[derive(Serialize)]
+        struct Snapshot<'a> {
+            format: &'a str,
+            requests: &'a [McpRequest],
+            events: &'a [Event],
+        }
+        serde_json::to_vec(&Snapshot {
+            format: FORMAT,
+            requests: &self.requests,
+            events: &self.events,
         })
         .map_err(unavailable)
     }
@@ -344,11 +453,7 @@ pub(crate) fn decoded(bytes: &[u8], count: u64) -> Result<Held, ServerError> {
         ));
     }
     let mut held = Held::default();
-    let mut ids = BTreeSet::new();
     for request in sealed.requests {
-        if !ids.insert(request.id.clone()) {
-            return Err(unavailable("snapshot repeats a request"));
-        }
         held.push_request(request)?;
     }
     for event in sealed.events {

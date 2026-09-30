@@ -164,13 +164,7 @@ impl<S: LeafStore> McpRequestStore<S> {
     /// Requests for an agent, in the order recorded, after settling any uncertain write.
     pub fn listed(&mut self, agent: &str) -> Result<Vec<McpRequest>, ServerError> {
         self.settle()?;
-        Ok(self
-            .held
-            .requests
-            .iter()
-            .filter(|request| request.agent == agent)
-            .cloned()
-            .collect())
+        self.held.listed(agent)
     }
 
     /// Replay an operation only for the same authenticated caller, agent and server.
@@ -182,11 +176,7 @@ impl<S: LeafStore> McpRequestStore<S> {
         by: &str,
     ) -> Result<Option<McpRequest>, ServerError> {
         self.settle()?;
-        match self.held.requests.iter().find(|request| {
-            #[cfg(test)]
-            self.held.visit();
-            request.id == id
-        }) {
+        match self.held.request(id)? {
             Some(request)
                 if request.agent == agent && request.server == server && request.asked_by == by =>
             {
@@ -213,19 +203,21 @@ impl<S: LeafStore> McpRequestStore<S> {
         )? {
             return Ok(kept);
         }
-        let mut next = self.held.clone();
-        next.push_request(request.clone())?;
-        self.append(&signed_request(request.clone(), &self.key)?, next)?;
+        self.held.check_request(&request)?;
+        if self.append(&signed_request(&request, &self.key)?)? {
+            self.held.apply_request(request.clone());
+            self.after_append()?;
+        }
         Ok(request)
     }
 
-    fn append(&mut self, bytes: &[u8], next: Held) -> Result<(), ServerError> {
+    fn append(&mut self, bytes: &[u8]) -> Result<bool, ServerError> {
         let index = self.log.len();
         if let Err(failure) = self.log.append(bytes) {
             self.uncertain = true;
             self.settle()?;
             match self.log.leaf_bytes(index).map_err(unavailable)? {
-                Some(held) if held.as_slice() == bytes => return Ok(()),
+                Some(held) if held.as_slice() == bytes => return Ok(false),
                 Some(_) => {
                     return Err(unavailable(format!(
                         "leaf {index} belongs to another writer: {failure}"
@@ -234,7 +226,10 @@ impl<S: LeafStore> McpRequestStore<S> {
                 None => return Err(unavailable(failure)),
             }
         }
-        self.held = next;
+        Ok(true)
+    }
+
+    fn after_append(&mut self) -> Result<(), ServerError> {
         self.since_snapshot += 1;
         if self.since_snapshot >= SNAPSHOT_EVERY.get() {
             self.write_snapshot()?;
@@ -247,18 +242,23 @@ impl<S: LeafStore> McpRequestStore<S> {
 
     pub(crate) fn event(&mut self, event: Event) -> Result<(), ServerError> {
         self.settle()?;
-        let mut next = self.held.clone();
-        next.push_event(event.clone())?;
-        self.append(&signed_event(event, &self.key)?, next)
+        self.held.check_event(&event)?;
+        if self.append(&signed_event(&event, &self.key)?)? {
+            if let Err(error) = self.held.apply_event(event) {
+                self.uncertain = true;
+                return Err(error);
+            }
+            self.after_append()?;
+        }
+        Ok(())
     }
 
-    pub(crate) fn pending(&self, agent: &str) -> Vec<Intended> {
-        self.held
-            .requests
-            .iter()
-            .filter(|request| request.agent == agent)
-            .filter_map(|request| self.held.intent(&request.id).cloned())
-            .collect()
+    pub(crate) fn pending(&self, agent: &str) -> Result<Vec<Intended>, ServerError> {
+        self.held.pending(agent)
+    }
+
+    pub(crate) fn has_pending(&self, agent: &str) -> bool {
+        self.held.has_pending(agent)
     }
 }
 
@@ -389,15 +389,37 @@ mod tests {
     #[test]
     fn decision_and_intent_lookups_visit_at_most_one_record_each() -> TestResult {
         let held = retained()?;
-        let before = held.work();
-        for asked in &held.requests {
-            assert!(held.decision(&asked.id).is_some());
-            assert!(held.intent(&asked.id).is_none());
-        }
-        assert!(
-            held.work() - before <= 2 * held.requests.len(),
-            "lookups rescanned history"
+        let encoded = held.encode()?;
+        let snapshot: serde_json::Value = serde_json::from_slice(&encoded)?;
+        assert_eq!(
+            snapshot,
+            serde_json::json!({
+                "format": "lys/identity/mcp-requests-state/v2",
+                "requests": held.requests,
+                "events": held.events,
+            })
         );
+        let restored = decoded(
+            &encoded,
+            u64::try_from(held.requests.len() + held.events.len())?,
+        )?;
+        for projection in [&held, &restored] {
+            let before = projection.work();
+            for asked in &projection.requests {
+                assert_eq!(
+                    projection
+                        .decision(&asked.id)?
+                        .ok_or("no decision")?
+                        .request,
+                    asked.id
+                );
+                assert!(projection.intent(&asked.id)?.is_none());
+            }
+            assert!(
+                projection.work() - before <= 2 * projection.requests.len(),
+                "lookups rescanned history"
+            );
+        }
         Ok(())
     }
 
@@ -549,7 +571,7 @@ mod tests {
         drop(reopened);
         let mut reopened = McpRequestStore::over(harness.leaves(), Arc::clone(&key))?;
         assert!(matches!(reopened.start(), Start::Resumed { .. }));
-        assert_eq!(reopened.pending(&asked.agent).len(), 1);
+        assert_eq!(reopened.pending(&asked.agent)?.len(), 1);
         reopened.event(Event::Withdrawn {
             request: asked.id.clone(),
             operation,
