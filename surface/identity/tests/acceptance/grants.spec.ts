@@ -23,7 +23,7 @@
  *   fails and the rows below have to be read against it again.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, $$, choose, click, mount, press, text, unmountAll, unreachable } from '../harness';
+import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from '../harness';
 import { BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_ROOT_G, BEA_SERVICE, GRANTS, ROOT_G, SCRIBE, SERVICE, ok, refused } from '../fixtures';
 
 beforeEach(() => sessionStorage.clear());
@@ -116,7 +116,7 @@ const ROWS: ConformanceRow[] = [
     row: '1.3',
     rule: 'service accounts a person may use are a separate list, permission checked separately',
     check: async () => {
-      await mount('#/me');
+      await mount('#/me?tab=account');
       const accounts = $('#service-accounts');
       expect(accounts).not.toBeNull();
       expect(accounts?.textContent).toContain('Permission to use or lend their credentials is checked separately');
@@ -134,7 +134,7 @@ const ROWS: ConformanceRow[] = [
     row: '1.4',
     rule: '"What you hold" shows each grant, its source, and whether it may be passed on',
     check: async () => {
-      const { requests } = await mount('#/me');
+      const { requests } = await mount('#/me?tab=account');
       expect(requests).toContain('/grants');
       expect(holdRows()).toEqual([
         ['owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
@@ -146,7 +146,7 @@ const ROWS: ConformanceRow[] = [
     row: '1.5',
     rule: 'personal scope for the signed-in person; an administrator may lawfully see others',
     check: async () => {
-      await mount('#/me', BEA_SERVICE);
+      await mount('#/me?tab=account', BEA_SERVICE);
       expect($('h1')?.textContent).toBe('Bea (test person)');
       expect(text()).not.toContain('Ada (test person)');
       expect(document.body.innerHTML).not.toContain(ROOT_G);
@@ -162,7 +162,7 @@ const ROWS: ConformanceRow[] = [
     row: '2.3',
     rule: 'the form shows the source grant, its actions, may-pass-on, and that it ends no later than its source',
     check: async () => {
-      await mount('#/me');
+      await mount('#/me?tab=account');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       const source = $$('#drawer .card')[0].textContent ?? '';
       expect(source).toContain('Source grant');
@@ -176,7 +176,7 @@ const ROWS: ConformanceRow[] = [
     row: '2.4',
     rule: 'everything the person cannot give is listed with its reason',
     check: async () => {
-      await mount('#/me');
+      await mount('#/me?tab=account');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       const reasons = $$('#drawer .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
       expect(reasons).toEqual([
@@ -217,7 +217,7 @@ const ROWS: ConformanceRow[] = [
       expect(text()).not.toContain('never used');
       fresh();
       // A grant with no observed use reads "not seen", never "never used".
-      await mount('#/me', ADMIN);
+      await mount('#/me?tab=account', ADMIN);
       fresh();
       await mount(`#/file/${BEA}/access`, ADMIN);
       expect(text()).toContain('Last used: not seen');
@@ -246,6 +246,8 @@ describe('Keyboard operation (conformance 9.3)', () => {
     await press('g', {}, document.body);
     await press('u', {}, document.body);
     expect(location.hash).toBe('#/me');
+    location.hash = '#/me?tab=account';
+    await settle();
 
     const give = $(`[data-act="delegate"][data-g="${ROOT_G}"]`);
     expect(give?.tagName).toBe('BUTTON');
@@ -254,7 +256,7 @@ describe('Keyboard operation (conformance 9.3)', () => {
     // opens the drawer itself nor navigates a cursor row in its place.
     await press('Enter');
     expect($('#drawer')?.classList.contains('open')).toBe(false);
-    expect(location.hash).toBe('#/me');
+    expect(location.hash).toBe('#/me?tab=account');
 
     // jsdom does not perform the user agent's default activation of a button.
     await click(give);
@@ -282,7 +284,7 @@ describe('Keyboard operation (conformance 9.3)', () => {
 
     // Escape closes the form and focus returns to what opened it.
     fresh();
-    await mount('#/me');
+    await mount('#/me?tab=account');
     const again = $(`[data-act="delegate"][data-g="${ROOT_G}"]`);
     again?.focus();
     await click(again);
@@ -322,7 +324,7 @@ describe('API refusal parity', () => {
     const reason = `RecipientRefused: ${ROOT_G} may not be passed on to a agent`;
     // `ServerError::name()`: the refusal's name is the first word of its message.
     const name = reason.split(':')[0];
-    const { posted } = await mount('#/me', { ...SERVICE, 'POST /grants': refused(403, name, reason) });
+    const { posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /grants': refused(403, name, reason) });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     await click($('[data-act="delegatedo"]'));
     expect(posted).toHaveLength(1);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, press, unmountAll, unreachable } from './harness';
+import { $, $$, click, mount, press, unmountAll, unreachable, settle } from './harness';
 import { ADA, GRANTS, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Grant, RevokeBody } from '../src/generated/grants';
@@ -139,8 +139,10 @@ const scribeHolds = () => ($(`tr[data-href="#/file/${SCRIBE}"]`)?.querySelectorA
 describe('What you hold after a revoke', () => {
   it('row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one', async () => {
     const routes = handbook();
-    await mount('#/me', routes);
+    await mount('#/me?tab=account', routes);
     expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger', 'editor of project:handbook', 'viewer of project:handbook']);
+    location.hash = '#/me';
+    await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity', 'viewer of project:handbook']);
 
     unmountAll();
@@ -150,8 +152,10 @@ describe('What you hold after a revoke', () => {
     expect(posted.filter((p) => p.path.endsWith('/revoke')).map((p) => p.path)).toEqual([`/grants/${HANDBOOK_G}/revoke`]);
 
     unmountAll();
-    await mount('#/me', routes);
+    await mount('#/me?tab=account', routes);
     expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger']);
+    location.hash = '#/me';
+    await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity']);
   });
 });

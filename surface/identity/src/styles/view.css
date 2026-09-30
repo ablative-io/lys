@@ -1,0 +1,42 @@
+/* The watched terminals: a small picture in the corner of every page, or the multiplexer over the whole screen. */
+.view { position: fixed; z-index: 28; background: var(--surface-base); color: var(--text-primary); }
+.view-small { right: 18px; bottom: 18px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
+.view-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; padding: 0 6px 0 4px; }
+.view-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; }
+.view-tab { display: inline-flex; align-items: center; flex: none; border-radius: var(--radius-md); }
+.view-tab[data-on] { background: var(--surface-hover); }
+.view-tab [role="tab"] { height: 28px; padding: 0 4px 0 10px; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.view-tab[data-on] [role="tab"], .view-tab [role="tab"]:hover { color: var(--text-primary); }
+.view-x { width: 22px; height: 28px; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 14px; cursor: pointer; border-radius: var(--radius-sm); }
+.view-x:hover { color: var(--text-primary); }
+.view-acts { display: inline-flex; gap: 2px; flex: none; }
+.view-act { height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.view-act:hover { color: var(--text-primary); background: var(--surface-hover); }
+.view-picture { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.view-picture .peek { width: 100%; }
+.view-picture .peek-name { display: none; }
+.view-picture .peek-frame { border-radius: 0; }
+.view-real { display: flex; flex-direction: column; background: var(--surface-code); }
+.view-real .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; background: none; border: 0; border-radius: 0; }
+.view-real .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.view-real .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
+.view-grip { position: absolute; top: 0; left: 0; width: 18px; height: 18px; z-index: 1; border: 0; background: none; cursor: nwse-resize; }
+.view-grip::before { content: ""; position: absolute; top: 5px; left: 5px; width: 8px; height: 8px; border-top: 2px solid var(--text-muted); border-left: 2px solid var(--text-muted); border-radius: 2px 0 0 0; }
+.view-grip:hover::before { border-color: var(--text-primary); }
+.view-hidden { right: 18px; bottom: 18px; height: 32px; padding: 0 14px; border: 0; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); font: inherit; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; }
+.view-hidden:hover { color: var(--text-primary); }
+.view-open { inset: 0; display: flex; flex-direction: column; background: var(--surface-code); outline: none; }
+.view-open .view-head { flex: none; padding: 6px 12px; background: var(--surface-base); }
+.view-panes { flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--border-default); }
+.view-panes[data-n="1"] { grid-template-columns: 1fr; }
+.view-panes[data-n="2"] { grid-template-columns: 1fr 1fr; }
+.view-panes[data-n="3"], .view-panes[data-n="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.view-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-code); }
+.view-pane-name { flex: none; padding: 8px 12px; font-size: 13px; color: var(--text-primary); }
+.view-machine { color: var(--text-secondary); }
+.view-pane .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; background: none; border: 0; border-radius: 0; }
+.view-pane .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.view-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
+.view-pane .terminal-line { padding: 6px 8px 0; }
+.view-pane .terminal-keys { padding: 6px 8px 8px; }
+.view-more { flex: none; margin: 0; padding: 8px 12px; font-size: 12.5px; color: var(--text-secondary); }

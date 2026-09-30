@@ -1,7 +1,17 @@
-/* The front page: running agents across the top, what waits for you, and your agents as a tree under their teams. */
+/* The front page fills the screen and never scrolls as a whole: the agents as a tree on the left, the running ones as pictures on the right, each panel scrolling inside itself. */
+.you-page { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; }
+.you-page > .head { flex: none; margin-bottom: 8px; }
+.you-page .tabs { flex: none; margin: 8px 0 16px; }
+.you-line { flex: none; margin: 0 0 4px; font-size: 13px; color: var(--text-secondary); }
+.you-line a { color: var(--text-primary); }
+.you-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+.you-panel { min-height: 0; display: flex; flex-direction: column; }
+.you-panel > .section-h { flex: none; margin: 0 0 8px; }
+.you-scroll { flex: 1; min-height: 0; overflow: auto; }
+.you-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px 20px; align-content: start; padding-right: 4px; }
+.you-account { flex: 1; min-height: 0; overflow: auto; }
 .you-quiet { margin: 0; }
-.you-waiting { margin: 0; font-size: 13px; }
-.you-waiting a { color: var(--text-primary); }
+.you-tree { width: 100%; }
 .you-tree td { border-bottom: 0; padding: 0; }
 .you-tree tr[data-href] td { padding: 7px 10px; }
 .you-tree tr[data-href] td:first-child { padding-left: calc(var(--depth, 0) * 18px + 10px); }
@@ -9,9 +19,16 @@
 .you-tree tr[data-href] td:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
 .you-tree tr[data-href] td:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 .you-agent .dot { margin-right: 8px; }
+.you-where, .you-holds { white-space: normal; }
 .you-team td { padding: 10px 0 2px calc(var(--depth, 0) * 18px); }
 .you-fold { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .you-fold:hover { color: var(--text-primary); background: var(--surface-hover); }
 .you-chevron { width: 6px; height: 6px; margin: 0 2px 2px 0; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); transition: transform .12s; }
 .you-fold[aria-expanded="true"] .you-chevron { transform: rotate(45deg); }
 .you-count { font-weight: 400; color: var(--text-muted); }
+.you-peek { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.you-peek .peek { width: 100%; }
+.you-watch { align-self: flex-start; height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.you-watch:hover { color: var(--text-primary); background: var(--surface-hover); }
+.you-watch[aria-pressed="true"] { color: var(--text-primary); }
+.you-tree .you-act { text-align: right; }

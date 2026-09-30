@@ -65,7 +65,7 @@ const routes = (answers: Record<string, CannotGiveAnswer>): Record<string, Route
 });
 
 const open = async (answers: Record<string, CannotGiveAnswer>) => {
-  const m = await mount('#/me', routes(answers));
+  const m = await mount('#/me?tab=account', routes(answers));
   await click($$(`[data-act="delegate"][data-g="${G1}"]`)[0] ?? null);
   return m;
 };

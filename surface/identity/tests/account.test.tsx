@@ -25,7 +25,7 @@ const ACCOUNT = '/directory/people/' + ADA + '/account';
 
 describe('Your Lys account', () => {
   it('changes your email, confirmed by your password', async () => {
-    const { posted } = await mount('#/me', { ...SERVICE, 'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true }) });
+    const { posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true }) });
     expect(text()).toContain('You sign in to Lys with ada@example.test.');
     await fill('Change your email', { 'account-email': ' ada@lovelace.test ', 'account-password': 'Analytical-Engine-1843' });
     await submit('Change your email');
@@ -35,7 +35,7 @@ describe('Your Lys account', () => {
   });
 
   it('refuses two different new passwords before sending anything', async () => {
-    const { posted } = await mount('#/me', SERVICE);
+    const { posted } = await mount('#/me?tab=account', SERVICE);
     await fill('Change your password', { 'account-current-password': 'Old-Password-12345', 'account-new-password': 'New-Password-12345', 'account-new-password-again': 'New-Password-12346' });
     await submit('Change your password');
     expect(posted).toEqual([]);

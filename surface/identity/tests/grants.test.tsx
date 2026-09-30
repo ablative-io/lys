@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { $, $$, choose, click, mount, press, text, unmountAll, unreachable } from './harness';
+import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from './harness';
 import {
   ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE, DIRECTORY, GRANTS, LEDGER_G,
   ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused,
@@ -12,7 +12,7 @@ const holdRows = () => $$('.grid2 > div:first-child table')[0].querySelectorAll(
 
 describe('What you hold', () => {
   it('row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on', async () => {
-    const { requests } = await mount('#/me');
+    const { requests } = await mount('#/me?tab=account');
     expect(requests).toContain('/grants');
     const rows = [...holdRows()].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
     expect(rows).toEqual([
@@ -25,7 +25,7 @@ describe('What you hold', () => {
 
 describe('The delegation form', () => {
   const open = async (routes = SERVICE) => {
-    const m = await mount('#/me', routes);
+    const m = await mount('#/me?tab=account', routes);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     return m;
   };
@@ -177,7 +177,7 @@ describe('The delegation form', () => {
   });
 
   it('Escape closes the drawer and focus returns', async () => {
-    await mount('#/me');
+    await mount('#/me?tab=account');
     const give = $(`[data-act="delegate"][data-g="${ROOT_G}"]`);
     give?.focus();
     await click(give);
@@ -190,7 +190,7 @@ describe('The delegation form', () => {
 
 describe("What you can't give (conformance 2.4)", () => {
   it('lists each with its reason, as the service answers it', async () => {
-    const { requests } = await mount('#/me');
+    const { requests } = await mount('#/me?tab=account');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect(requests).toContain(`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`);
     const reasons = $$('#drawer .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
@@ -320,7 +320,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
   };
 
   it('offers each dated holding of the recipient as an end, and posts that end', async () => {
-    const { posted } = await mount('#/me', routes);
+    const { posted } = await mount('#/me?tab=account', routes);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     await choose($('#dTo'), SCRIBE);
     expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with Scribe assignment (9 Oct)', 'no end']);
@@ -331,7 +331,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
   });
 
   it('greys the choice, saying why, when the recipient holds no dated role', async () => {
-    await mount('#/me');
+    await mount('#/me?tab=account');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     const option = $$('#dLease option')[1];
     expect(option?.hasAttribute('disabled')).toBe(true);
@@ -354,7 +354,7 @@ const fresh = () => {
 
 describe('Two people and their agents (conformance 1.4, 1.5)', () => {
   it('renders one person from their fixture ids, and only the other after the signed-in person changes', async () => {
-    const ada = await mount('#/me');
+    const ada = await mount('#/me?tab=account');
     const meReads = ada.requests.filter((r) => r === '/me').length;
     expect(meReads).toBeGreaterThan(0);
     expect($('h1')?.textContent).toBe('Ada (test person)');
@@ -363,8 +363,8 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
       ['viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(grantIdsOnScreen()).toEqual([ROOT_G]);
-    expect(text()).toContain('Scribe');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
+    expect($('#drawer')?.textContent).toContain('Scribe');
     const adaSource = $$('#drawer .card')[0].textContent ?? '';
     expect(adaSource).toContain('owner of project:identity');
     expect(adaSource).toContain('Actions it allowsedit, grant, view');
@@ -373,15 +373,19 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
 
     fresh();
 
-    const bea = await mount('#/me', BEA_SERVICE);
+    const bea = await mount('#/me?tab=account', BEA_SERVICE);
     // The second session read its own identity for itself; nothing was carried over.
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
     expect(holdText()).toEqual([['editor', 'project:ledger', 'root', 'yes, to agents', 'Give to an agent…']]);
     expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's.
+    location.hash = '#/me';
+    await settle();
     expect(text()).toContain('Reviewer');
     expect(text()).toContain('viewer of project:ledger');
+    location.hash = '#/me?tab=account';
+    await settle();
     await click($(`[data-act="delegate"][data-g="${BEA_ROOT_G}"]`));
     const beaSource = $$('#drawer .card')[0].textContent ?? '';
     expect(beaSource).toContain('editor of project:ledger');
@@ -478,7 +482,7 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
     let ran = 0;
     for (const c of REFUSALS) {
       const name = refusalName(c.reason);
-      const { requests, posted } = await mount('#/me', { ...SERVICE, 'POST /grants': refused(c.status, name, c.reason) });
+      const { requests, posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /grants': refused(c.status, name, c.reason) });
       const before = holdText();
       expect(before).toHaveLength(2);
       const reads = requests.filter((r) => r === '/grants').length;

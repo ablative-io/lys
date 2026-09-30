@@ -36,6 +36,7 @@ describe('Front page', () => {
   it('counts what waits for the person and links to it', async () => {
     await mount('#/me', routes);
     expect($('.you-waiting')?.textContent).toBe('1 request to decide · 2 reviews due');
+    expect($('.you-page')).not.toBeNull();
     expect($$('.you-waiting a').map((a) => a.getAttribute('href'))).toEqual(['#/requests', '#/reviews']);
   });
 
@@ -43,7 +44,7 @@ describe('Front page', () => {
     localStorage.clear();
     await mount('#/me', routes);
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Courier', 'Archivist', 'Scribe']);
-    expect($$('tr[data-href]')[2].textContent).toContain('running on Lab');
+    expect($$('tr[data-href]')[2].textContent).toContain('on Lab');
     expect($$('tr[data-href]')[0].textContent).not.toContain('running');
     expect($('.you-fold')?.textContent).toBe('Crew2');
     await click($('.you-fold'));

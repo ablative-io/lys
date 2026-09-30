@@ -12,7 +12,7 @@ describe('You', () => {
   });
 
   it('keeps sign-in identities and service accounts as separate lists (conformance 1.1, 1.3)', async () => {
-    await mount('#/me');
+    await mount('#/me?tab=account');
     const signIn = $('#signin-identities');
     const service = $('#service-accounts');
     expect(signIn?.querySelector('h2')?.textContent).toBe('Sign-in identities');
@@ -78,6 +78,8 @@ describe('Personal scope', () => {
     unmountAll();
     await mount('#/me', routes);
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
+    unmountAll();
+    await mount('#/me?tab=account', routes);
     const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
       const cells = tr.querySelectorAll('td');
       return `${cells[0].textContent} of ${cells[1].textContent}`;
