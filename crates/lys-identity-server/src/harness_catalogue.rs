@@ -20,7 +20,7 @@ mod installed;
 #[path = "harness_catalogue_tests.rs"]
 mod tests;
 
-type InstalledCopies = BTreeMap<(String, installed::CopyKey), Result<BuildView, String>>;
+type InstalledCopies = BTreeMap<String, (installed::CopyKey, Result<BuildView, String>)>;
 
 /// A model choice, with the programme's default first.
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -205,15 +205,24 @@ impl Catalogue {
                 let executable = match installed::resolve(command, path) {
                     Ok(executable) => executable,
                     Err(reason) => {
+                        cache.remove(command);
                         reasons.push(reason);
                         continue;
                     }
                 };
-                let key = (command.clone(), executable.key.clone());
-                let found = cache
-                    .entry(key)
-                    .or_insert_with(|| installed::version(command, &executable, path));
-                match found {
+                let found = cache.entry(command.clone()).or_insert_with(|| {
+                    (
+                        executable.key.clone(),
+                        installed::version(command, &executable, path),
+                    )
+                });
+                if found.0 != executable.key {
+                    *found = (
+                        executable.key.clone(),
+                        installed::version(command, &executable, path),
+                    );
+                }
+                match &found.1 {
                     Ok(copy) => program.builds.push(copy.clone()),
                     Err(reason) => reasons.push(reason.clone()),
                 }
@@ -233,7 +242,7 @@ impl Catalogue {
         let mut programs = self.installed_in(&path)?.programs;
         if state.provisioning.is_some() {
             crate::provisioning_api::with_provisioning(state, |store| {
-                profile_builds(&mut programs, store, || {});
+                profile_builds(&mut programs, store);
                 Ok(())
             })?;
         }
@@ -244,27 +253,13 @@ impl Catalogue {
 fn profile_builds(
     programs: &mut [ProgramView],
     store: &crate::provisioning_store::ProvisioningStore,
-    mut visited: impl FnMut(),
 ) {
     for program in programs {
-        let builds: BTreeSet<BuildView> = store
-            .profiles()
-            .iter()
-            .flat_map(|profile| &profile.versions)
-            .inspect(|_| visited())
-            .filter(|version| version.reviewed.is_some())
-            .filter_map(|version| version.settings.harness.as_ref())
-            .filter(|harness| {
-                harness.description.rendering_contract == program.description.rendering_contract
-            })
-            .map(|harness| BuildView {
-                name: harness.name.clone(),
-                program: harness.program.clone(),
-                package: harness.package.clone(),
-                source: BuildSource::Profile,
-            })
-            .collect();
-        program.builds.extend(builds);
+        program.builds.extend(
+            store
+                .reviewed_builds(&program.description.rendering_contract)
+                .cloned(),
+        );
     }
 }
 

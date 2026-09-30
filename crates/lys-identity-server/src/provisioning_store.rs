@@ -23,6 +23,20 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::launch_permissions::Permissions;
 
+#[path = "provisioning_builds.rs"]
+mod builds;
+
+#[cfg(test)]
+std::thread_local! {
+    static HISTORY_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+/// Count source access so projection tests detect a retained-history rescan.
+pub(crate) fn history_reads() -> usize {
+    HISTORY_READS.with(std::cell::Cell::get)
+}
+
 /// One MCP server an agent is given: reached at an address, or started as
 /// a command. A version kept before commands has an address and no channel,
 /// which reads as off.
@@ -223,6 +237,7 @@ struct Kept {
 pub struct ProvisioningStore {
     path: PathBuf,
     kept: Kept,
+    reviewed_builds: builds::ReviewedBuilds,
     uncertain: bool,
 }
 
@@ -262,9 +277,12 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
+        let kept = read(path)?;
+        let reviewed_builds = builds::index(&kept.profiles);
         Ok(Self {
             path: path.to_owned(),
-            kept: read(path)?,
+            kept,
+            reviewed_builds,
             uncertain: false,
         })
     }
@@ -272,7 +290,10 @@ impl ProvisioningStore {
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            self.kept = read(&self.path)?;
+            let kept = read(&self.path)?;
+            let reviewed_builds = builds::index(&kept.profiles);
+            self.kept = kept;
+            self.reviewed_builds = reviewed_builds;
             self.uncertain = false;
         }
         Ok(())
@@ -294,7 +315,20 @@ impl ProvisioningStore {
 
     /// Every profile, in the order first set.
     pub fn profiles(&self) -> &[Profile] {
+        #[cfg(test)]
+        HISTORY_READS.with(|reads| reads.set(reads.get() + 1));
         &self.kept.profiles
+    }
+
+    /// Distinct reviewed builds for `contract`, in their catalogue order.
+    pub fn reviewed_builds(
+        &self,
+        contract: &str,
+    ) -> impl Iterator<Item = &crate::harness_catalogue::BuildView> {
+        self.reviewed_builds
+            .get(contract)
+            .into_iter()
+            .flat_map(std::collections::BTreeSet::iter)
     }
 
     /// The profile of `agent`, none while nothing was set for it.
@@ -339,6 +373,7 @@ impl ProvisioningStore {
         }
         let number = latest.saturating_add(1);
         let version = Version { number, ..version };
+        let affected = builds::entry(&version);
         let mut profiles = self.kept.profiles.clone();
         match profiles.iter_mut().find(|profile| profile.agent == agent) {
             Some(profile) => profile.versions.push(version),
@@ -349,6 +384,7 @@ impl ProvisioningStore {
         }
         let skills = self.kept.skills.clone();
         self.write(Kept { profiles, skills })?;
+        builds::insert(&mut self.reviewed_builds, affected);
         Ok(number)
     }
 
@@ -387,8 +423,11 @@ impl ProvisioningStore {
             return Ok(());
         }
         version.reviewed = Some(review);
+        let affected = builds::entry(version);
         let skills = self.kept.skills.clone();
-        self.write(Kept { profiles, skills })
+        self.write(Kept { profiles, skills })?;
+        builds::insert(&mut self.reviewed_builds, affected);
+        Ok(())
     }
 
     /// Keep `skill`; kept already with the same text, it is kept once.
@@ -448,3 +487,7 @@ impl ProvisioningStore {
 #[cfg(test)]
 #[path = "provisioning_compat_tests.rs"]
 mod compatibility_tests;
+
+#[cfg(test)]
+#[path = "provisioning_builds_tests.rs"]
+mod build_tests;
