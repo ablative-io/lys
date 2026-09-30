@@ -56,6 +56,17 @@ describe('Team', () => {
     localStorage.clear();
   });
 
+  it('opens settings over the agent\'s own terminal and closes them from the button', async () => {
+    await mount('#/team/' + SCRIBE, routes);
+    expect($('.team-settings')).toBeNull();
+    await click($$('.team-foot-act').find((el) => el.textContent === 'Settings') ?? null);
+    expect($('.team-settings [role="dialog"], .team-settings')?.getAttribute('aria-label')).toBe('Scribe settings');
+    expect($('.team-settings h3')?.textContent).toBe('Runtime');
+    expect($('.team-pane .terminal')).not.toBeNull();
+    await click($$('.team-settings .btn').find((el) => el.textContent === 'Back to the terminal') ?? null);
+    expect($('.team-settings')).toBeNull();
+  });
+
   it('starts a stopped agent in place, the machine it ran on first, and hands over the command when that machine has no runner', async () => {
     const { posted } = await mount('#/team/' + COURIER, { ...routes, ['POST /agents/' + COURIER + '/start-command']: ok({ agent: COURIER, machine: SHED, command: 'lys start courier', executed: false, left_out: [] }) });
     expect(text()).toContain('Courier is not running.');

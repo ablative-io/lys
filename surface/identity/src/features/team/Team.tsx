@@ -1,9 +1,9 @@
-/** The terminal is the screen: the open agents' terminals fill it edge to edge, split like a multiplexer, each with its own foot line. The tree of names is down the left and folds away; settings open as the drawer over the terminal. */
+/** The terminal is the screen: the open agents' terminals fill it edge to edge, split like a multiplexer, each with its own foot line. The tree of names is down the left and folds away; an agent's settings open over its own terminal and close from a button or Escape. */
 import { useEffect, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Refused, request } from '../../api';
 import { pref, setPref } from '../../shell/prefs';
-import { useShell } from '../../shell/ShellContext';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Terminal } from '../runtime/Terminal';
@@ -45,9 +45,12 @@ function Runtime({ session, changed }: { session: RuntimeSession | undefined; ch
   </section>;
 }
 
-function Settings({ entry, session, changed }: { entry: Entry; session: RuntimeSession | undefined; changed: () => void }) {
-  return <div className="team-settings">
-    <h2>{entry.display_name}</h2>
+function Settings({ entry, session, changed, done }: { entry: Entry; session: RuntimeSession | undefined; changed: () => void; done: () => void }) {
+  const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') { event.stopPropagation(); done(); }
+  };
+  return <div className="team-settings" role="dialog" aria-label={entry.display_name + ' settings'} tabIndex={-1} onKeyDown={onKey} ref={(el) => el?.focus()}>
+    <div className="team-settings-head"><h2>{entry.display_name}</h2><button type="button" className="btn" onClick={done}>Back to the terminal</button></div>
     <Runtime session={session} changed={changed} />
     <Provisioning id={entry.id} />
     <AgentUsage agent={entry.id} />
@@ -61,11 +64,11 @@ function Pane({ entry, session, alone, started }: { entry: Entry; session: Runti
 }
 
 export function Team() {
-  const shell = useShell();
   const { pathname, search } = useLocation();
   const open = openAgents(pathname, search);
   const [revision, setRevision] = useState(0);
   const [treeShown, setTree] = useState(() => pref(TREE, 'shown'));
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const toggleTree = () => {
     const next = treeShown === 'shown' ? 'hidden' : 'shown';
     setPref(TREE, next);
@@ -86,23 +89,26 @@ export function Team() {
   const agents = agentsOf(tree);
   const panes = open.flatMap((id) => agents.filter((entry) => entry.id === id));
   const changed = () => setRevision((value) => value + 1);
-  const settings = (entry: Entry) => shell.openDrawer(<Settings entry={entry} session={liveOf(sessions, entry.id)} changed={changed} />);
   const shown = treeShown === 'shown';
   return <div className="team-screen" data-tree={treeShown}><TeamTree world={load.data} /><div className="team-stage">
     {panes.length
       ? <div className="team-panes" data-n={panes.length}>{panes.map((entry, index) => {
         const session = liveOf(sessions, entry.id);
+        const inSettings = settingsFor === entry.id;
         return <div className="team-pane" key={entry.id}>
-          <Pane entry={entry} session={session} alone={panes.length === 1} started={changed} />
+          <div className="team-pane-body">
+            <Pane entry={entry} session={session} alone={panes.length === 1} started={changed} />
+            {inSettings ? <Settings entry={entry} session={session} changed={changed} done={() => setSettingsFor(null)} /> : null}
+          </div>
           <div className="team-foot">
-            {index === 0 ? <button type="button" className="icon-btn team-foot-tree" aria-pressed={shown} title={shown ? 'Hide the tree' : 'Show the tree'} onClick={toggleTree}>{shown ? '‹' : '›'}</button> : null}
+            {index === 0 ? <button type="button" className="icon-btn team-foot-tree" aria-pressed={shown} title={shown ? 'Hide the list of agents' : 'Show the list of agents'} onClick={toggleTree}>{shown ? '‹' : '›'}</button> : null}
             <span className="team-foot-name">{entry.display_name}</span>
-            {session ? <span className="team-foot-machine">{session.machine_name ?? session.machine}</span> : null}
-            <button type="button" className="team-foot-act" onClick={() => settings(entry)}>settings</button>
-            {panes.length > 1 ? <a className="team-foot-act" href={addressOf(open.filter((id) => id !== entry.id))} title="Close this pane; it keeps running">close</a> : null}
+            {session ? <span className="team-foot-machine">on {session.machine_name ?? session.machine}</span> : null}
+            <button type="button" className="team-foot-act" aria-pressed={inSettings} onClick={() => setSettingsFor(inSettings ? null : entry.id)}>{inSettings ? 'Back to the terminal' : 'Settings'}</button>
+            {panes.length > 1 ? <a className="team-foot-act" href={addressOf(open.filter((id) => id !== entry.id))} title="Close this pane; the agent keeps running">Close</a> : null}
           </div>
         </div>;
       })}</div>
-      : <p className="team-empty dim">{agents.length ? 'Choose an agent from the tree.' : 'No agent answers to you yet.'}</p>}
+      : <p className="team-empty dim">{agents.length ? 'Choose an agent from the list.' : 'No agent answers to you yet.'}</p>}
   </div></div>;
 }

@@ -10,6 +10,7 @@
 .team-panes[data-n="2"] { grid-template-columns: 1fr 1fr; }
 .team-panes[data-n="3"], .team-panes[data-n="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .team-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface-code); }
+.team-pane-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 .team-pane .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; gap: 0; background: none; border: 0; border-radius: 0; }
 .team-pane .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .team-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
@@ -25,14 +26,13 @@
 .team-machine input { grid-row: span 2; }
 .team-start-acts { display: flex; align-items: center; gap: 12px; }
 .team-start-acts .why-not { border: 0; padding: 0; }
-.team-foot { flex: none; display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px 0 8px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
-.team-foot-tree { flex: none; margin-right: 2px; font-size: 16px; line-height: 1; color: var(--text-muted); }
-.team-foot-tree:hover { color: var(--text-primary); }
-.team-foot-name { color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.team-foot-machine { color: var(--text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.team-foot-act { margin-left: auto; font: inherit; color: var(--text-muted); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; }
+.team-foot { flex: none; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 16px 0 10px; font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
+.team-foot-tree { flex: none; width: 32px; height: 32px; font-size: 20px; line-height: 1; }
+.team-foot-name { color: var(--text-primary); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.team-foot-machine { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.team-foot-act { margin-left: auto; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--radius-md); font: inherit; font-size: 13px; color: var(--text-secondary); text-decoration: none; background: none; border: 0; cursor: pointer; }
 .team-foot-act + .team-foot-act { margin-left: 0; }
-.team-foot-act:hover { color: var(--text-primary); }
+.team-foot-act:hover, .team-foot-act[aria-pressed="true"] { color: var(--text-primary); background: var(--surface-hover); }
 .tree-team { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; margin: 8px 0 2px; font: 500 10px "JetBrains Mono"; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); background: none; border: 0; border-radius: var(--radius-md); padding: 0 8px 0 calc(var(--depth, 0) * 14px + 8px); white-space: nowrap; cursor: pointer; text-align: left; }
 .team-tree > div:first-child > .tree-team { margin-top: 0; }
 .tree-team:hover { color: var(--text-primary); background: var(--surface-hover); }
@@ -47,7 +47,9 @@
 .tree-add { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-size: 13px; opacity: .45; }
 .tree-line:hover .tree-add, .tree-add:focus-visible { opacity: 1; }
 .tree-add:hover { background: var(--surface-hover); color: var(--text-primary); }
-.team-settings h2 { margin: 0 0 12px; }
-.team-settings .card { margin-bottom: 12px; }
+.team-settings { position: absolute; inset: 0; overflow: auto; padding: 26px 32px 64px; background: var(--surface-code); outline: none; }
+.team-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.team-settings-head h2 { font-size: 16px; }
+.team-settings .card { margin-bottom: 12px; max-width: 720px; }
 .team-settings .head h2 { margin: 0; }
 .team-command { width: 100%; background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 8px 10px; font: 12px "JetBrains Mono"; }
