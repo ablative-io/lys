@@ -1,27 +1,16 @@
-.tree-split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); gap: 22px; align-items: start; }
-.tree, .tree ul { list-style: none; margin: 0; padding: 0; }
-.tree-root { display: flex; align-items: center; gap: 8px; padding: 6px 0 10px; }
-.tree-team { margin: 4px 0 10px; }
-.tree-label { padding: 6px 0 2px 2px; }
-.tree-under { margin-left: 18px !important; padding-left: 14px !important; border-left: 1px solid var(--border-default); }
-.tree-row { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 7px 10px; border-radius: var(--radius-md); border: 1px solid transparent; background: none; color: var(--text-primary); font: inherit; cursor: pointer; }
+/* A narrow tree and the chosen terminal filling the rest of the screen. */
+.team-screen { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: 100%; min-height: 0; }
+.team-screen .tree { border-right: 1px solid var(--border-default); padding: 18px 10px; overflow: auto; }
+.tree-root { padding: 2px 8px 12px; }
+.tree-team { margin-bottom: 14px; }
+.tree-team .eyebrow { padding: 0 8px 4px; }
+.tree-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text-primary); }
 .tree-row:hover { background: var(--surface-hover); }
-.tree-row.on { background: var(--surface-default); border-color: var(--border-default); }
+.tree-row[aria-current="page"] { background: var(--accent-wash); }
 .tree-row .dot { margin-right: 0; }
 .tree-name { font-weight: 600; }
-.tree-goal { color: var(--text-secondary); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-spend { display: inline-flex; align-items: center; gap: 8px; }
-.tree-bar { display: inline-block; width: 72px; height: 5px; border-radius: 3px; background: var(--surface-hover); overflow: hidden; }
-.tree-bar > span { display: block; height: 100%; background: var(--ok); }
-.tree-bar.warm > span { background: var(--warn); }
-.tree-bar.hot > span { background: var(--danger); }
-.tree-num { font: 11px "JetBrains Mono"; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
-.tree-panel { position: sticky; top: 0; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 18px 20px; }
-.tree-panel h2 { margin: 2px 0 0; }
-.tree-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 16px 0; }
-.tree-facts dt { color: var(--text-muted); font-size: 12px; }
-.tree-facts dd { margin: 0; }
-.tree-facts code { display: inline-block; font: 12px "JetBrains Mono"; background: var(--surface-code); padding: 1px 6px; border-radius: 3px; }
-.tree-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.tree-term { min-height: 180px; background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 14px; font: 12px "JetBrains Mono"; }
-@media (max-width: 900px) { .tree-split { grid-template-columns: 1fr; } .tree-panel { position: static; } }
+.team-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 12px 16px; }
+.team-stage .terminal { flex: 1; margin-top: 0; min-height: 0; }
+.team-stage .terminal-display .terminal-screen, .team-stage .terminal-screen { height: auto; flex: 1; max-height: none; min-height: 0; }
+.team-stage .terminal-display { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+@media (max-width: 760px) { .team-screen { grid-template-columns: 1fr; } .team-screen .tree { border-right: 0; border-bottom: 1px solid var(--border-default); } }

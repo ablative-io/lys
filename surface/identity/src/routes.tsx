@@ -49,7 +49,7 @@ export function AppRoutes() {
       <Route path="/runtime/canvas" element={<SessionCanvas />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
-      <Route path="/team" element={<Team />} />
+      <Route path="/team/:agent?" element={<Team />} />
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/start" element={<StartPage />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
