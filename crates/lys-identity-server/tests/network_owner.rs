@@ -365,7 +365,7 @@ async fn invalid_teams_and_assignment_inputs_are_named_and_leave_ownership_uncha
         json!({"operation": operation()?, "team": null, "by": "forged"}),
     ] {
         let answer = table.service.post(&path, Some(&table.ada), &body).await?;
-        assert_eq!(answer.0, 400, "{}", answer.1);
+        refused(&answer, 400, "RequestMalformed");
     }
     let absent = format!("/network/machines/{}/team", operation()?);
     refused(

@@ -362,7 +362,9 @@ async fn assign_team(
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
         .to_string();
-    let operation = OperationId::from_str(&body.operation)?.to_string();
+    let operation = OperationId::from_str(&body.operation)
+        .map_err(|error| malformed(format!("operation does not read: {error}")))?
+        .to_string();
     let team = body.team.as_deref().map(team_id).transpose()?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;

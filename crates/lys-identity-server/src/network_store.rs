@@ -73,6 +73,7 @@ pub struct Machine {
 /// The ownership act first recorded under an operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = ComputerTeamRecorded)]
 pub struct TeamRecorded {
     /// The operation naming the act.
     pub operation: String,
