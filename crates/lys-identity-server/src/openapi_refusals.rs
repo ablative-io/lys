@@ -114,6 +114,30 @@ pub(crate) const WHICH: &[&str] = &[
 /// A profile review that can approve only the latest recorded version.
 pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 
+/// A start and the status read that settles an already-held session.
+pub(crate) const START_RUNNER: &[&str] = &[
+    "runner_request_unsigned",
+    "runner_request_malformed",
+    "runner_protocol_mismatch",
+    "runner_request_replayed",
+    "runner_request_misaddressed",
+    "runner_unreachable",
+    "runner_reply_malformed",
+    "runner_state_unavailable",
+    "session_invalid",
+    "runner_stopping",
+    "spawn_failed",
+    "size_invalid",
+    "rotation_invalid",
+    "launch_config_refused",
+    "policy_invalid",
+    "policy_rule_duplicate",
+    "policy_target_ambiguous",
+    "policy_target_uninspectable",
+    "policy_digest_mismatch",
+    "session_unknown",
+];
+
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
     "AgentNotVisible",
