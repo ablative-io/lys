@@ -11,7 +11,7 @@ describe('People and agents', () => {
     expect(names()).toEqual(['Ada (test person)', 'Bea (test person)', "Scribe", "Courier", "Archivist", "Reviewer", "Lamplighter"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
     expect(scribe?.textContent).toContain('agent');
-    expect(scribe?.textContent).toContain('active');
+    expect(scribe?.textContent).toContain('Active');
     expect(scribe?.textContent).toContain('Ada (test person)');
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
   });
@@ -94,7 +94,9 @@ describe('People and agents', () => {
       '/directory/people': refused(403, 'NotAdmitted', 'NotAdmitted: x'),
       '/people': refused(403, 'NoPerson', 'NoPerson: your login is bound to no person'),
     });
-    expect($('.why-not b')?.textContent).toBe('NoPerson');
+    expect($('.why-not p')?.textContent).toContain('Ask the administrator to connect it');
+    expect($('.why-not details')?.textContent).toContain('NoPerson');
+    expect($('.why-not details')?.hasAttribute('open')).toBe(false);
     expect(text()).toContain('your login is bound to no person');
     expect(ADA).toMatch(/^person-/);
   });
