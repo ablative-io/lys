@@ -48,7 +48,7 @@ macro_rules! entries {
 /// Every route of the table; `openapi_types.rs` names the types each takes and answers.
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
-    GET "/login" "Begin a sign-in at the issuer" P [];
+    GET "/login" "Redirect to the sign-in screen" P [];
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];

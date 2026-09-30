@@ -14,7 +14,7 @@
 //! # The routes that name no answer, and why
 //!
 //! - `GET /authority` answers `text/plain`, not JSON.
-//! - `GET /login` answers a 303 to the issuer, carrying no body.
+//! - `GET /login` answers a 303 to `/#/sign-in`, carrying no body.
 //! - `GET /callback` answers through `Response`, since it must set the
 //!   session cookie; its body is [`crate::directory_views::SignedInView`],
 //!   which is registered here even though the route names no answer.

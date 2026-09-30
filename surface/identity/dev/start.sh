@@ -4,11 +4,11 @@
 #   dev/start.sh <state-dir> <log-dir>
 #
 # HOST is the address a browser reaches this machine on (default 127.0.0.1).
-# Sign-in goes through the contract tests' fake issuer, which signs every
-# sign-in as the seed's first person, "ada"; the service itself does the whole
-# OIDC exchange. On first start the directory is filled by
-# lys-identity-dev-seed, and dev/seed-grants.sh then gives grants through the
-# grant routes. Never point <state-dir> at records that matter.
+# Grant seeding posts a development placeholder to the password sign-in route.
+# The service carries the exchange with the disposable issuer and returns the
+# session cookie; that issuer signs in as the seed's root authority.
+# The seed fills a fresh directory, then grant seeding uses the grant routes.
+# Never point <state-dir> at records that matter.
 # LYS_DEV_BIN selects existing binaries; by default the release profile is used.
 # LYS_DEV_SKIP_BUILD=1 keeps a screen the caller has already built.
 # Readiness comes from each service's listening line or its process ending.
@@ -29,6 +29,16 @@ case ${LYS_DEV_SKIP_BUILD:-0} in
   0|1) ;;
   *) echo "LYS_DEV_SKIP_BUILD must be 0 or 1" >&2; exit 2 ;;
 esac
+for program in dev_issuer lys-identity-server lys-identity-dev-seed; do
+  if [ ! -x "$BIN/$program" ]; then
+    echo "development binary missing or not executable: $BIN/$program" >&2
+    exit 2
+  fi
+done
+if [ "${LYS_DEV_SKIP_BUILD:-0}" = 1 ] && [ ! -f "$SURFACE/dist/index.html" ]; then
+  echo "skipping the build needs an existing screen in dist" >&2
+  exit 2
+fi
 mkdir -p "$1" "$2"
 STATE=$(cd "$1" && pwd)
 LOGS=$(cd "$2" && pwd)
@@ -96,7 +106,7 @@ start_ready() {
   shift
   ready_dir=$(mktemp -d)
   mkfifo "$ready_dir/output" "$ready_dir/ready"
-  awk -v ready="$ready_dir/ready" '
+  (trap '' HUP; exec awk -v ready="$ready_dir/ready" '
     {
       print
       fflush()
@@ -112,7 +122,7 @@ start_ready() {
         close(ready)
       }
     }
-  ' <"$ready_dir/output" >"$LOGS/$name.log" 2>&1 &
+  ') <"$ready_dir/output" >"$LOGS/$name.log" 2>&1 &
   logger=$!
   nohup "$@" >"$ready_dir/output" 2>&1 &
   pid=$!
