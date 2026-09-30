@@ -32,19 +32,16 @@ export function RefusalLine({ refused }: { refused: Refused }) {
   return <div className="why-not"><b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span></div>;
 }
 
-function Head({ title, sub, busy, refresh }: { title: string; sub: string; busy: boolean; refresh: () => void }) {
-  return <div className="head"><div><div className="eyebrow">Secrets</div><h1>{title}</h1><p className="sub">{sub}</p></div>
-    <button className="btn" disabled={busy} onClick={refresh}>Refresh</button>
-  </div>;
+function Head({ title, sub }: { title: string; sub: string }) {
+  return <div className="head"><div><div className="eyebrow">Secrets</div><h1>{title}</h1><p className="sub">{sub}</p></div></div>;
 }
 
 /* Grants */
 
 export function SecretGrants({ read }: { read: () => Promise<SecretGrantListing> }) {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(read, 'secret-grants:' + revision);
+  const load = useLoad(read, 'secret-grants');
   return <div className="page">
-    <Head title="Who may use what" sub="Grants on the secrets you can see." busy={load.status === 'loading'} refresh={() => setRevision((value) => value + 1)} />
+    <Head title="Who may use what" sub="Grants on the secrets you can see." />
     <Gate load={load} title="Secret grants" ok={(listing) => <GrantRows listing={listing} />} />
   </div>;
 }
@@ -68,10 +65,9 @@ export function GrantRows({ listing }: { listing: SecretGrantListing }) {
 /* Audit */
 
 export function SecretAudit({ read }: { read: () => Promise<SecretAuditLog> }) {
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(read, 'secret-audit:' + revision);
+  const load = useLoad(read, 'secret-audit');
   return <div className="page">
-    <Head title="What happened" sub="The broker's checked record of the secrets you can see, newest first." busy={load.status === 'loading'} refresh={() => setRevision((value) => value + 1)} />
+    <Head title="What happened" sub="The broker's checked record of the secrets you can see, newest first." />
     <Gate load={load} title="Secret audit" ok={(log) => <AuditRows log={log} />} />
   </div>;
 }
@@ -243,13 +239,15 @@ const recipientsOf = (value: string): Recipients => offered(RECIPIENTS, value);
 
 const OWNER_NOTE = 'Only the secret\'s owner can change this. Anyone else is refused.';
 
-export function ScopeChange({ change, secret: initial = '', store = tabStore() }: { change: (secret: string, kind: ScopeKind, name: string, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore }) {
+export function ScopeChange({ change, secret: initial = '', store = tabStore(), changed }: { change: (secret: string, kind: ScopeKind, name: string, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void }) {
   const [secret, setSecret] = useState(initial);
   const [kind, setKind] = useState<ScopeKind>('personal');
   const [name, setName] = useState('');
   const { outcome, run, edited, retry } = useOwnerChange<ScopeChanged>(pendingKey('scope', secret.trim()), store, async (asked, operation) => {
     if (asked.type !== 'scope') throw unconfirmed('The retained change is not a scope change.');
-    return confirmScope(await change(asked.secret, asked.kind, asked.name, operation), asked.secret, scopeAsked(asked.kind, asked.name), operation);
+    const confirmed = confirmScope(await change(asked.secret, asked.kind, asked.name, operation), asked.secret, scopeAsked(asked.kind, asked.name), operation);
+    changed?.();
+    return confirmed;
   });
   const ready = secret.trim() !== '' && name.trim() !== '';
   const submit = (event: FormEvent) => {
@@ -269,7 +267,7 @@ export function ScopeChange({ change, secret: initial = '', store = tabStore() }
     <label className="field">Name<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={name} onChange={(event) => { edited(); setName(event.target.value); }} placeholder={kind === 'personal' ? 'The person\'s id' : 'Its name'} /></label>
     <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
     {retry ? <button className="btn" type="button" onClick={retry}>Retry original change</button> : null}
-    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${scopeWords(answer.scope)}. Refresh current settings to see later changes.`} />
+    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${scopeWords(answer.scope)}.`} />
   </form>;
 }
 
@@ -278,12 +276,14 @@ const RECIPIENT_WORDS: Record<Recipients, string> = {
   people_only: 'people only, never agents',
 };
 
-export function RecipientsChange({ change, secret: initial = '', store = tabStore() }: { change: (secret: string, recipients: Recipients, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore }) {
+export function RecipientsChange({ change, secret: initial = '', store = tabStore(), changed }: { change: (secret: string, recipients: Recipients, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void }) {
   const [secret, setSecret] = useState(initial);
   const [recipients, setRecipients] = useState<Recipients>('people_only');
   const { outcome, run, edited, retry } = useOwnerChange<RecipientsChanged>(pendingKey('recipients', secret.trim()), store, async (asked, operation) => {
     if (asked.type !== 'recipients') throw unconfirmed('The retained change is not a recipients change.');
-    return confirmRecipients(await change(asked.secret, asked.recipients, operation), asked.secret, asked.recipients, operation);
+    const confirmed = confirmRecipients(await change(asked.secret, asked.recipients, operation), asked.secret, asked.recipients, operation);
+    changed?.();
+    return confirmed;
   });
   const ready = secret.trim() !== '';
   const submit = (event: FormEvent) => {
@@ -301,6 +301,6 @@ export function RecipientsChange({ change, secret: initial = '', store = tabStor
     </select></label>
     <button className="btn primary" type="submit" disabled={!maySend(outcome) || !ready}>Save</button>
     {retry ? <button className="btn" type="button" onClick={retry}>Retry original change</button> : null}
-    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${RECIPIENT_WORDS[answer.recipients]}. Refresh current settings to see later changes.`} />
+    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${RECIPIENT_WORDS[answer.recipients]}.`} />
   </form>;
 }

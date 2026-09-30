@@ -1,6 +1,6 @@
 /** Installation connections never imply a live probe or expose an unserved inventory. */
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, text, unreachable } from './harness';
+import { $$, mount, text, unreachable } from './harness';
 import { SERVICE, ok, refused } from './fixtures';
 
 const connections = {
@@ -21,8 +21,7 @@ describe('Connections', () => {
     expect(text()).toContain('http://localhost:18080');
     expect($$('details[open]')).toHaveLength(0);
     expect(unreachable()).toEqual([]);
-    await click($('.head button'));
-    expect(requests.filter((path) => path === '/connections')).toHaveLength(2);
+    expect(requests.filter((path) => path === '/connections')).toHaveLength(1);
     expect(posted).toEqual([]);
   });
   it('names the admission refusal without showing a default integration list', async () => {

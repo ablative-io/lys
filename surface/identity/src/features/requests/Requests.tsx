@@ -19,7 +19,7 @@ export function Requests() {
     return { person: me.person.id, resources, model };
   }, 'request-choices');
   return <div className="page">
-    <div className="head"><div><div className="eyebrow">Access</div><h1>Requests</h1><p className="sub">Ask for access and follow the decision.</p></div><button className="btn" disabled={load.status === 'loading'} onClick={refresh}>Refresh requests</button></div>
+    <div className="head"><div><div className="eyebrow">Access</div><h1>Requests</h1><p className="sub">Ask for access and follow the decision.</p></div></div>
     <Gate load={choices} title="Request choices" ok={(data) => <AskForm {...data} changed={refresh} />} />
     <Gate load={load} title="Requests" ok={(list) => <section aria-label="Visible requests">
       <h2>Requests you can see</h2>
