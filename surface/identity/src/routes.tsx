@@ -7,7 +7,7 @@ import { SecretsPage } from './features/secrets/SecretsPage';
 import { Sessions } from './features/sessions/Sessions';
 import { Reviews } from './features/reviews/Reviews';
 import { Requests } from './features/requests/Requests';
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useParams } from 'react-router';
 import { Access } from './features/access/Access';
 import { IdentityFile } from './features/file/IdentityFile';
 import { You } from './features/me/You';
@@ -18,7 +18,6 @@ import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
-import { StartPage } from './features/start/StartDrawer';
 import { AccountPage } from './features/people/Account';
 import { Apps } from './features/apps/Apps';
 import { RunningSessions } from './features/runtime/Sessions';
@@ -49,7 +48,7 @@ export function AppRoutes() {
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/people" element={<People />} />
-      <Route path="/file/:id/start" element={<StartPage />} />
+      <Route path="/file/:id/start" element={<OneStart />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />
       <Route path="/me" element={<You />} />
       <Route path="/account/:id" element={<AccountPage />} />
@@ -58,4 +57,10 @@ export function AppRoutes() {
       <Route path="*" element={<People />} />
     </Routes>
   );
+}
+
+/** An agent has one start, first on its settings page (#117). */
+function OneStart() {
+  const { id = '' } = useParams();
+  return <Navigate replace to={'/file/' + encodeURIComponent(id) + '/provisioning'} />;
 }
