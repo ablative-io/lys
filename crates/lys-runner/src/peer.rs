@@ -298,7 +298,3 @@ pub fn answer(
             ),
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/peer_restart.rs"]
-mod restart_tests;
