@@ -66,9 +66,9 @@ function FileTabs({ data, tab }: { data: FileData; tab: string }) {
 }
 
 function AgentDetails({ data, tab, reload, problems = [] }: { data: FileData; tab: string; reload: () => void; problems?: Refused[] }) {
-  const [opened, setOpened] = useState(tab !== 'profile');
+  const [opened, setOpened] = useState(tab === 'record');
   const x = data.x;
-  return <details className="agent-details" open={tab !== 'profile' || undefined} onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
+  return <details className="agent-details" open={tab === 'record' || undefined} onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
     <summary>Details</summary>
     {problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null}
     <p className="identity-id">Identity: <code>{x.id}</code></p>
@@ -80,7 +80,7 @@ function AgentDetails({ data, tab, reload, problems = [] }: { data: FileData; ta
       <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a>
     </div>
     <FileTabs data={data} tab={tab} />
-    {opened ? tab === 'profile' || tab === 'record' ? <AgentEvidence data={data} tab={tab} reload={reload} /> : <TabBody tab={tab} data={data} reload={reload} /> : null}
+    {opened ? <AgentEvidence data={data} tab={tab === 'record' ? 'record' : 'profile'} reload={reload} /> : null}
   </details>;
 }
 
@@ -130,7 +130,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
         </div>
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
         {agent ? <div className="pane">
-          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <AgentDetails data={{ ...data, x }} tab={tab} reload={reload} problems={problems} />} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p><AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} /></>}
+          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <AgentDetails data={{ ...data, x }} tab={tab} reload={reload} problems={problems} />} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p>{tab !== 'record' ? <div className="agent-settings"><TabBody tab={tab} data={{ ...data, x }} reload={reload} /></div> : null}<AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} /></>}
         </div> : <><nav className="tabs">
           {TABS.map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''}>
