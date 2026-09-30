@@ -124,18 +124,35 @@ fn reviewed_view(mut answer: Value) -> Result<Value, Box<dyn Error>> {
                 .ok_or("program is not an object")?
                 .remove("not_found"),
         );
-        let command_count = program["commands"]
+        let commands = program["commands"]
             .as_array()
             .ok_or("commands is not an array")?
-            .len();
+            .clone();
+        let command_count = commands.len();
         let builds = program["builds"]
             .as_array_mut()
             .ok_or("builds is not an array")?;
         let mut installed = 0;
+        let mut installed_names = std::collections::BTreeSet::new();
         for (index, build) in builds.iter().enumerate() {
             if build["from"] == "installed" {
                 installed += 1;
                 assert_eq!(index + 1, installed);
+                let name = build["name"]
+                    .as_str()
+                    .ok_or("installed build name is not text")?;
+                assert!(
+                    name.strip_prefix("Installed ").is_some_and(|command| {
+                        commands
+                            .iter()
+                            .any(|declared| declared.as_str() == Some(command))
+                    }),
+                    "installed copy {name} does not name a declared command"
+                );
+                assert!(
+                    installed_names.insert(name),
+                    "installed command {name} is repeated"
+                );
                 assert!(
                     std::path::Path::new(
                         build["program"]
