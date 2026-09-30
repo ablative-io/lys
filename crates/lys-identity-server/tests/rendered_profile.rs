@@ -188,7 +188,7 @@ fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<()
             "number": 1, "operation": "record-profile", "set_by": "operator", "set_at": 1,
             "settings": {
                 "harness": harness_description::declared(),
-                "model_access": [], "tools": [], "skills": [], "mcp_servers": [],
+                "model_access": ["primary-model"], "tools": [], "skills": [], "mcp_servers": [],
                 "instructions": "Exact reviewed instructions.\n", "instructions_mode": mode, "note": ""
             }
         }))?;
