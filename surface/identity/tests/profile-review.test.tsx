@@ -1,6 +1,12 @@
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
+import { ReviewProfile } from '../src/features/provisioning/ReviewProfile';
+import type { ProvisioningProfile } from '../src/features/provisioning/Provisioning';
+import type { Route } from './fixtures';
 /** Profile review receipts distinguish the current request from an earlier review and retain the original target version. */
-import { beforeEach, describe, expect, it } from 'vitest';
-import { click, mount, text, unmountAll } from './harness';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { click, serve, text } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 const path = '/agents/' + SCRIBE + '/provisioning';
 const profile = { version: 1, operation: 'op-' + 'a'.repeat(32), instructions: 'Review these instructions', note: '', model_access: [], tools: [], skills: [], mcp_servers: [], set_by: ADA, set_at: 1790000000, reviewed_by: null, reviewed_at: null, self_reviewed: false };
@@ -8,6 +14,22 @@ const answer = { agent: SCRIBE, recorded: null, profile, versions: [], enforced:
 const routes = { ...SERVICE, [path]: ok(answer) };
 const review = path + '/1/review';
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.textContent === label) ?? null;
+let root: Root | null = null;
+function unmountAll() { act(() => root?.unmount()); root = null; }
+afterEach(unmountAll);
+async function mount(hash: string, supplied: Record<string, Route>) {
+  void hash;
+  const posted: { path: string; body: unknown }[] = [];
+  serve(supplied, posted);
+  const response = supplied[path];
+  if (!response || typeof response === 'function') throw new Error('Profile fixture missing');
+  const latest = (response.body as { profile: ProvisioningProfile }).profile;
+  const element = document.createElement('div');
+  document.body.appendChild(element);
+  root = createRoot(element);
+  await act(async () => { root?.render(<ReviewProfile agent={SCRIBE} person={ADA} profile={latest} changed={() => {}} />); });
+  return { posted };
+}
 beforeEach(() => sessionStorage.clear());
 describe('Profile reviews', () => {
   it('reviews the displayed version only through an explicit action', async () => {
