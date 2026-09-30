@@ -189,7 +189,7 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
           <span>● person · ● agent · ■ app · ◆ resource</span>
         </div>
       </div>
-      <div className="node-card">
+      <div className="node-card detail">
         {!picked ? <><h2>Click anything</h2><p className="note">A person or agent lights up what it can reach. A resource lights up who can reach it. The same answers as the Access page, drawn.</p></>
           : picked.kind === 'resource' ? <><h2>{picked.label}</h2><p className="note">Highlighted: everyone who can reach it, per the permission service.</p>
             {reachedBy.map(([holder, actions]) => <div className="row" key={holder}><span>{nameOf(world, holder)}</span><span className="mono dim">{actions.join(', ')}</span></div>)}
@@ -207,11 +207,11 @@ function Drawing({ world, installed, focus, reach }: { world: GrantWorld; instal
 export function Graph() {
   const { id } = useParams();
   const load = useLoad(readGraph, 'identity-graph');
-  return <div className="page"><div className="eyebrow">Access</div><h1>Graph</h1>
-    <p className="sub">Every person, agent and resource, and the relations between them.</p>
+  return <div className="page fill">
+    <div className="head"><div><div className="eyebrow">Access</div><h1>Graph</h1>
+      <p className="sub">Every person, agent and resource, and the relations between them. Answers are limited to the directory and resources you may see; these reads do not exercise a grant.</p></div></div>
     <Gate load={load} title="Graph" ok={({ world, installed }) => <>
       <Graphed world={world} installed={installed} focus={id} />
-      <p className="note">Answers are limited to the directory and resources you may see. These reads do not exercise a grant.</p>
     </>} />
   </div>;
 }
