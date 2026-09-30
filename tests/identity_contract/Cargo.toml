@@ -16,7 +16,7 @@ lys-core.workspace = true
 lys-identity.workspace = true
 lys-identity-server.workspace = true
 lys-log-store.workspace = true
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

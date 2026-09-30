@@ -159,9 +159,9 @@ exit "$code"
     }
 
     fn start(&self, ports: &[u16; 3]) -> Result<Output, Box<dyn Error>> {
-        let path = std::env::var_os("PATH").ok_or("PATH is missing")?;
+        let search = std::env::var_os("PATH").ok_or("PATH is missing")?;
         let mut parts = vec![self.tools.clone()];
-        parts.extend(std::env::split_paths(&path));
+        parts.extend(std::env::split_paths(&search));
         Ok(Command::new("sh")
             .arg(self.surface.join("dev/start.sh"))
             .arg(self.state())
