@@ -342,7 +342,7 @@ async fn plain_creation_keeps_the_old_event_while_nesting_refuses_a_reversible_u
             let seeded = seed_configured(config, [ADMINISTRATOR, "another-subject"])?;
             assert_eq!(
                 seeded.people.len(),
-                1,
+                2,
                 "the fixture counts seeded people before any team write"
             );
             Ok((
