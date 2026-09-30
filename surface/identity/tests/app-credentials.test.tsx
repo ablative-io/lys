@@ -44,3 +44,10 @@ it('refused custody leaves approval available and never retries automatically',a
   expect(text()).not.toContain('Credentials saved');
   expect(button('Approve Notes fixture')).not.toBeNull();
 });
+it('never puts an issued secret value on the screen, not even behind a toggle',async()=>{
+  await mount('#/apps',{...routes(),'POST /apps/fixture_notes/credentials/save':refused(503,'SecretsUnavailable','unknown outcome')});
+  await click(button('Approve Notes fixture'));
+  for(const toggle of document.querySelectorAll('details'))toggle.open=true;
+  expect(document.body.innerHTML).not.toContain(secret);
+  expect(text()).not.toContain('Show credentials once');
+});
