@@ -7,7 +7,7 @@ export const TABS: [string, string][] = [
 
 /** What each lifecycle state may move to, as the directory's transition table allows. */
 export const ACTIONS: Record<string, string[]> = {
-  registered: ['activate', 'retire'],
+  registered: ['activate'],
   active: ['suspend', 'retire'],
   suspended: ['reinstate', 'retire'],
   retired: [],
