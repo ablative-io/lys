@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { operationId, Refused, request } from '../../api';
 import { field } from '../people/RecordedForm';
+import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
 
 type Decision = { kind: 'approve'; operation: string; route: 'browser'; source: string | null; note: string }
@@ -26,7 +27,7 @@ function load(key: string): Pending {
 }
 
 export function DecisionForm({ entry, person, canIssueRoot, changed }: {
-  entry: AccessRequest; person: string; canIssueRoot: boolean; changed: () => void;
+  entry: AccessRequest; person: string; canIssueRoot: boolean; changed: (answer: AccessRequest) => void;
 }) {
   const key = 'lys.pending.decision.' + person + '.' + entry.id;
   const [pending, setPending] = useState(() => load(key));
@@ -49,12 +50,12 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
         throw new Error('The answer did not confirm this decision. Its original details remain held.');
       }
       sessionStorage.removeItem(key); setPending({ kind: 'empty' }); setAction(null);
-      setDone(kind === 'approve' ? 'Access approved.' : 'Request declined.'); changed();
+      setDone(kind === 'approve' ? 'Access approved.' : 'Request declined.'); changed(answer);
     } catch (error) {
       if (!retry && error instanceof Refused && error.status >= 400 && error.status < 500) {
         sessionStorage.removeItem(key); setPending({ kind: 'empty' });
       }
-      setFailure(error instanceof Refused ? `${error.refusal.refusal}: ${error.refusal.reason}` : error instanceof Error ? error.message : String(error));
+      setFailure(failureWords(error, 'Check the decision details. If the result is unconfirmed, choose Check original decision.'));
     } finally { working.current = false; setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -72,14 +73,15 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
   };
   if (pending.kind === 'damaged') return <p role="alert">A retained decision could not be read. New decisions are blocked until its outcome can be established.</p>;
   return <div>
-    {pending.kind === 'held' ? <div role="status"><p>This decision has no confirmed answer. Checking resubmits only its original operation.</p>
+    {pending.kind === 'held' ? <div role="status"><p>This decision has no confirmed answer. Checking sends the same decision again and cannot create a second one.</p>
       <button type="button" className="btn" disabled={busy} onClick={() => void send(pending.decision, true)}>{busy ? 'Checking…' : 'Check original decision'}</button></div>
       : done ? <p role="status">{done}</p> : action ? <form onSubmit={submit} aria-label="Decide request">
         <h4>{action === 'approve' ? 'Approve this access?' : 'Decline this request?'}</h4>
         {action === 'approve' ? <label className="field">Grant access from<select name="source" required defaultValue="">
-          <option value="">Choose authority</option>{canIssueRoot ? <option value="root">Issue directly as root authority</option> : null}
-          {entry.sources.map((source, index) => <option key={source} value={source}>Your eligible grant {index + 1} · {source}</option>)}
+          <option value="">Choose how you can give this access</option>{canIssueRoot ? <option value="root">Give access directly as the administrator</option> : null}
+          {entry.sources.map((source, index) => <option key={source} value={source}>Your permission {index + 1}</option>)}
         </select></label> : null}
+        {action === 'approve' && entry.sources.length ? <details><summary>Permission details</summary><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></details> : null}
         <label className="field">Reason for your decision<textarea name="note" required maxLength={500} /></label>
         <button type="submit" className="btn primary" disabled={busy}>Confirm {action === 'approve' ? 'approval' : 'decline'}</button>{' '}
         <button type="button" className="btn" disabled={busy} onClick={() => setAction(null)}>Cancel</button>
