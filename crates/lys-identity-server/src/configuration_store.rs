@@ -173,7 +173,7 @@ impl ConfigurationStore {
                 _ => return Err(unavailable(error)),
             }
         } else {
-            self.zone = next.clone();
+            self.zone.clone_from(&next);
         }
         if let Err(error) = self.log.write_snapshot(DOMAIN, &bytes, &self.key) {
             self.uncertain = true;

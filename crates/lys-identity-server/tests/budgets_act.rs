@@ -206,7 +206,7 @@ impl Table {
             if !output["ended"].is_null() {
                 return Ok(text);
             }
-            cursor = output["cursor"].clone();
+            cursor.clone_from(&output["cursor"]);
         }
     }
 

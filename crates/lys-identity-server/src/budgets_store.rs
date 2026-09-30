@@ -177,7 +177,7 @@ impl<S: LeafStore> BudgetStore<S> {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
             self.held = held;
-            self.start = start.clone();
+            self.start.clone_from(&start);
             self.uncertain = false;
             self.after_start(&start);
         }

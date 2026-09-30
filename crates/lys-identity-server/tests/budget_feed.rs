@@ -173,13 +173,13 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
                     Answer::Feed { page: page.clone() }
                 } else {
                     let mut invalid = page.clone();
-                    invalid.cursor = "cursor-bad".to_owned();
+                    "cursor-bad".clone_into(&mut invalid.cursor);
                     invalid.entries.truncate(1);
-                    invalid.entries[0].session = "untracked-session".to_owned();
+                    "untracked-session".clone_into(&mut invalid.entries[0].session);
                     let Body::Usage(record) = &mut invalid.entries[0].body else {
                         return Err("missing fixture usage".to_owned());
                     };
-                    record.session = "untracked-session".to_owned();
+                    "untracked-session".clone_into(&mut record.session);
                     Answer::Feed { page: invalid }
                 };
                 index += 1;
