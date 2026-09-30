@@ -462,7 +462,10 @@ impl Proxy {
         let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());
         match self.upstream.send(base, &rest, request).await {
             Ok(response) => {
-                let side = call.response_side(is_event_stream(response.headers()));
+                let side = call.response_side(
+                    is_event_stream(response.headers()),
+                    response.headers().get_all(hyper::header::CONTENT_ENCODING),
+                );
                 response.map(|body| Tee::new(body, side).boxed_unsync())
             }
             Err(error) => {
