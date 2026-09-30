@@ -240,8 +240,11 @@ fn measured_crossings(
         figure,
         since,
         account,
-        missing: _,
+        missing,
     } = level;
+    if let Some(reason) = missing {
+        return Err(unavailable(reason));
+    }
     let mut crossed = Vec::new();
     let figure = figure.ok_or_else(|| unavailable("a measured level has no figure"))?;
     let mark = if limit.unit == Measure::ContextPercent {
