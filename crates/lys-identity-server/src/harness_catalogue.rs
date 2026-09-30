@@ -76,6 +76,8 @@ pub struct ProgramView {
     pub models: Vec<ModelChoice>,
     /// Named permission modes and their meanings.
     pub modes: Vec<ModeChoice>,
+    /// Native instruction choices supported by the registered renderer.
+    pub instructions_modes: Vec<String>,
     /// The declared-harness capability and rendering contract.
     #[schema(value_type = serde_json::Value)]
     pub description: Description,
@@ -132,6 +134,11 @@ impl Catalogue {
                 line: parsed.line,
                 models: parsed.models,
                 modes: parsed.modes,
+                instructions_modes: vec![
+                    "keep".to_owned(),
+                    "append".to_owned(),
+                    "replace".to_owned(),
+                ],
                 description: parsed.description,
                 builds: Vec::new(),
             });
