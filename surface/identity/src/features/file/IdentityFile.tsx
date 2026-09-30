@@ -5,7 +5,7 @@ import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
 import { EmergencyStop, StopReceipt } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
-import { DirectoryGate as Gate } from '../people/Words';
+import { DirectoryGate as Gate, ErrorWords, ACTION, STATUS } from '../people/Words';
 import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
@@ -48,7 +48,8 @@ async function readPerson(id: string): Promise<FileData> {
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
 
 function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void }) {
-  const { x, agent } = data;
+  const { agent } = data;
+  const x = stop?.agent === data.x.id && stop.state === 'suspended' ? { ...data.x, state: 'suspended' as const } : data.x;
   const kind = x.kind;
   const person = x.person;
   const since = agent?.provenance.registration?.actor.authenticated_at;
@@ -59,7 +60,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
   return (
     <div className="page">
       <div className="eyebrow">
-        <a href="#/people">People and agents</a> / {fileNo(x.id)}
+        <a href="#/people">People and agents</a> / {x.display_name}
       </div>
       <div className="file" data-tab={`${kind} file · ${fileNo(x.id)}`}>
         <div className="head">
@@ -79,14 +80,14 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
-            <span className={'state ' + x.state} id="state">{x.state}</span>
+            <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             {ACTIONS[x.state].map((a) => (
               <button key={a} className={'btn ' + (a === 'suspend' || a === 'retire' ? 'danger' : 'primary')} data-act={a} onClick={() => { location.hash = '/directory/manage?action=status&identity=' + encodeURIComponent(x.id); }}>
-                {a[0].toUpperCase() + a.slice(1)}
+                {ACTION[a]}
               </button>
             ))}
             {kind === 'agent' && x.state === 'active' ? (
-              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Start…</a>
+              <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Choose settings to start this agent</a>
             ) : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
               <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
@@ -117,12 +118,10 @@ export function IdentityFile() {
     return (
       <div className="page">
         <h1>Not found</h1>
-        <p className="sub">{id} is not in the directory, or is not one you may see.</p>
-        <div className="why-not">
-          <b>{load.refused.refusal.refusal}</b> <span className="sec">{load.refused.refusal.reason}</span>
-        </div>
+        <p className="sub">This person or agent is not in the directory, or is not among the records you can see. Ask the administrator to check your access.</p>
+        <ErrorWords problem={load.refused} /><details><summary>Requested file details</summary><code>{id}</code></details>
       </div>
     );
   }
-  return <Gate load={load} title="People and agents" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); setVersion((v) => v + 1); }} />} />;
+  return <Gate load={load} title="this person or agent’s file" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); }} />} />;
 }
