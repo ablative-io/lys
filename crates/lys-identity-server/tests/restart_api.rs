@@ -237,6 +237,7 @@ async fn no_reviewed_profile_refuses_before_ending_the_running_session() -> Test
             arguments: Vec::new(),
             directory: "/".to_owned(),
             environment: BTreeMap::new(),
+            config: None,
             columns: 80,
             rows: 24,
             rotation: None,

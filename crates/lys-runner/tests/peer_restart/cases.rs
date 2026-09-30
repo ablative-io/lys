@@ -58,6 +58,7 @@ impl Held {
                     "LYS_HANDLES".to_owned(),
                     "credential-id-a,credential-id-b".to_owned(),
                 )]),
+                config: None,
                 columns: 80,
                 rows: 24,
                 rotation: None,

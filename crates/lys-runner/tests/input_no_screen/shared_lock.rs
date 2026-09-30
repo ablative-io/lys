@@ -49,6 +49,7 @@ fn launch(session: &str) -> Launch {
         arguments: Vec::new(),
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,
