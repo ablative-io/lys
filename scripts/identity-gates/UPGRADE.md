@@ -1,7 +1,10 @@
 # Real old-install upgrade proof
 
 `upgrade_live.py` creates a private disposable installation using the clean
-`1b568cd90578f5ed5d7d438e628b23724eef7f12` release. It creates records through
+release selected by `--old-commit`. Run separate proofs for the historical
+`1b568cd90578f5ed5d7d438e628b23724eef7f12` baseline required by HOME-037 and
+DIRECTORY-069, and the installed `8c064b62a0c77f0874c203189a2ed3238b7ba57a`.
+It creates records through
 that release's HTTP API, keeps its signed-in cookie across upgrade, invokes the
 candidate's real `lys identity upgrade`, and compares the API readbacks. It also
 checks old app leaves byte for byte and the declared message-service config
@@ -18,6 +21,7 @@ upgrade themselves verify the surface files against that manifest.
 ```
 python3 scripts/identity-gates/upgrade_live.py \
   --old-source /path/to/clean-old-checkout \
+  --old-commit FULL_OLD_COMMIT \
   --old-bin /path/to/clean-old-checkout/target/release \
   --old-surface /path/to/old-surface-package \
   --candidate-bin /path/to/candidate/target/release \
@@ -25,6 +29,22 @@ python3 scripts/identity-gates/upgrade_live.py \
   --candidate-commit FULL_COMMIT \
   --work /path/to/new-private-fixture
 ```
+
+First run the same command with `--prepare-only`. This checks exact binary
+stamps, every surface file's hash and length, and binds each fixture's real Unix
+socket path using the kernel's limit. It starts no installer, reserves no TCP
+port and leaves no work directory. Its output is preparation evidence, never an
+upgrade pass. Use a short work path; the named socket refusal comes before an
+install, rather than after the runner has been started. Then coordinate the
+service window and run without `--prepare-only`.
+
+Preparation also resolves the old and candidate install layouts from their
+exact source revisions. Installed readbacks use `Layout::BINARIES`, which names
+the broker and identity server; the CLI remains in the input artifact package.
+The receipt includes every fixed product path, all verifier modules and their
+hashes, external executables, and an inventory of the harness's path expressions.
+Inputs must exist now. Future fixture logs and rollback paths are checked against
+their source producers; preparation does not pretend those future files exist.
 
 The runner creates separate positive and negative installs under `work/`.
 Evidence is written under each one's `evidence/`. A passing root receipt is
@@ -43,6 +63,12 @@ empty `unconfirmed` field is additive on the unchanged agent budget readback.
 
 An ordinary old provisioning profile includes an MCP server. Its HTTP readback
 and complete stored file must survive the window, rollback and normal upgrade.
+Only the candidate's declared empty `skill_pins`, null `harness` and null
+`permissions` may be added to the HTTP profile; old fields and stored bytes
+remain exact. The old setup creates an Active administrator, which is asserted.
+The ordinary person is activated through the old transition API before a root
+grant is issued. The proof never claims that a Registered administrator was
+admitted after upgrade.
 
 The test-only `upgrade_window` example calls the very same production
 `identity::upgrade::upgrade` used by the CLI. At its existing service-ready
@@ -73,9 +99,18 @@ must write exactly two Held rows and one Checked row, retain every old leaf,
 and persist the new budget snapshot. Another crash and restart must leave all
 these files byte-identical. There is no sleep or PID polling in this proof.
 
-Current boundary: the real installs have not yet been exercised. Running this
-against the complete landed release remains required, as do the separate
-exact-head repository gates.
+Between legs, teardown registers a kernel exit observer before killing each
+verified fixture process and waits for its exit event (kqueue on macOS, pidfd
+on Linux). Docker teardown is also synchronous. The next leg's port check
+uses SO_REUSEADDR and bind/listen, matching the Unix Tokio listeners used by
+both services; a closed connection in TIME_WAIT must not count as a listener.
+An active listener still refuses, naming its address. The check does not
+reserve a port for the installer: this proof requires an exclusive venue.
+
+Current boundary: earlier real-install attempts found harness errors before
+completion. Every required baseline still needs complete positive and negative
+receipts, as well as the separate exact-head repository gates. A successful
+positive leg alone does not establish that the negative leg passed.
 The old build is a clean reconstruction of the recorded live commit; it does not establish
 that the historical working tree that produced the live binary was clean.
 

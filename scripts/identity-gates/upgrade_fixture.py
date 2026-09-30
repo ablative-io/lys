@@ -48,12 +48,17 @@ def populate(browser, root):
     })
     browser.ask("POST", "/sign-in", {"email": email, "password": password})
     signed_in = browser.ask("GET", "/me")["person"]
-    if signed_in["state"] != "registered":
-        raise RuntimeError("old setup fixture must exercise a Registered administrator")
+    if signed_in["state"] != "active":
+        raise RuntimeError("old setup fixture must exercise its Active administrator")
     owner = signed_in["id"]
     person = browser.ask("POST", "/people", {
         "operation": operation(), "display_name": "Preserved Person",
     })["person"]
+    browser.ask("POST", f"/identities/{person}/transitions", {
+        "operation": operation(), "transition": "activate", "reason": "Upgrade grant holder",
+    })
+    if browser.ask("GET", f"/identities/{person}")["state"] != "active":
+        raise RuntimeError("old fixture grant holder was not activated by its transition")
     agent = browser.ask("POST", "/agents", {
         "operation": operation(), "display_name": "Preserved Agent",
     })["agent"]
@@ -138,6 +143,14 @@ def same_records(before, after):
             if value.get("unconfirmed") != []:
                 raise RuntimeError("upgrade changed the budgets confirmation readback")
             value = {key: entry for key, entry in value.items() if key != "unconfirmed"}
+        if name == "provisioning" and isinstance(value.get("profile"), dict):
+            profile = dict(value["profile"])
+            for field, empty in (("skill_pins", []), ("harness", None), ("permissions", None)):
+                if field not in before[name]["profile"] and field in profile:
+                    if profile[field] != empty:
+                        raise RuntimeError(f"upgrade changed the provisioning {field} readback")
+                    del profile[field]
+            value = dict(value, profile=profile)
         if before[name] != value:
             raise RuntimeError(f"upgrade changed the {name} readback")
     if not before["sessions"]["sessions"]:
@@ -145,11 +158,11 @@ def same_records(before, after):
 
 
 def admitted_after_upgrade(browser):
-    """The original Registered administrator's session can still make a real change."""
+    """The original Active administrator's session can still make a real change."""
     person = browser.ask("POST", "/people", {
         "operation": operation(), "display_name": "Created After Upgrade",
     })["person"]
     kept = browser.ask("GET", f"/identities/{person}")
     if kept["id"] != person or kept["display_name"] != "Created After Upgrade":
-        raise RuntimeError("old Registered administrator cannot write and read after upgrade")
+        raise RuntimeError("old Active administrator cannot write and read after upgrade")
     return person

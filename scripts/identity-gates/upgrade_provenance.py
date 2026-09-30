@@ -4,10 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-OLD = "1b568cd90578f5ed5d7d438e628b23724eef7f12"
 
-
-def seed(browser, root, config, evidence):
+def seed(browser, root, config, evidence, old_commit):
     """The real old import endpoint signs this record; this code never encodes or signs it."""
     credential = Path(config["import_credential_file"]).resolve()
     if not credential.is_relative_to(root) or not credential.is_file():
@@ -24,7 +22,7 @@ def seed(browser, root, config, evidence):
         raise RuntimeError("old endpoint did not record v2 service-account authentication")
     index = receipt["log"]["index"]
     signed = browser.ask("GET", f"/receipts/{index}")
-    vector = {"source_commit": OLD, "leaf": index, "actor": actor,
+    vector = {"source_commit": old_commit, "leaf": index, "actor": actor,
               "public_key": browser.ask("GET", "/service-key")["ed25519"],
               "message": signed["message"]}
     vector["sha256"] = hashlib.sha256(bytes.fromhex(vector["message"])).hexdigest()
