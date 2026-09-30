@@ -1120,6 +1120,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
 | `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-identity-server/tests/profile_folders.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/tests/provisioning.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
 
 ## Inventory
 
