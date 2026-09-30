@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn succeeded(output: Output, action: &str) -> TestResult {
+fn succeeded(output: &Output, action: &str) -> TestResult {
     if !output.status.success() {
         return Err(format!(
             "{action} exited {}: {}",
@@ -54,7 +54,7 @@ impl Held {
             std::fs::copy(source.join(name), surface.join(name))?;
         }
         succeeded(
-            Command::new("npm")
+            &Command::new("npm")
                 .arg("ci")
                 .current_dir(&surface)
                 .output()?,
@@ -82,7 +82,7 @@ impl Held {
             let started = dir.path().join(format!("{name}.started"));
             let ended = dir.path().join(format!("{name}.finished"));
             succeeded(
-                Command::new("mkfifo").arg(&started).arg(&ended).output()?,
+                &Command::new("mkfifo").arg(&started).arg(&ended).output()?,
                 "make child lifecycle signals",
             )?;
             finished.push((
@@ -158,10 +158,10 @@ exit "$code"
         Ok(())
     }
 
-    fn start(&self, ports: &[u16; 3]) -> Result<Output, Box<dyn Error>> {
+    fn start(&self, ports: [u16; 3]) -> Result<Output, Box<dyn Error>> {
         let search = std::env::var_os("PATH").ok_or("PATH is missing")?;
-        let mut parts = vec![self.tools.clone()];
-        parts.extend(std::env::split_paths(&search));
+        let mut dirs = vec![self.tools.clone()];
+        dirs.extend(std::env::split_paths(&search));
         Ok(Command::new("sh")
             .arg(self.surface.join("dev/start.sh"))
             .arg(self.state())
@@ -173,7 +173,7 @@ exit "$code"
             .env("LYS_DEV_BIN", &self.binaries)
             .env("LYS_DEV_SKIP_BUILD", "1")
             .env("LYS_DEV_TEST_SIGNALS", self.dir.path())
-            .env("PATH", std::env::join_paths(parts)?)
+            .env("PATH", std::env::join_paths(dirs)?)
             .output()?)
     }
 }
@@ -200,7 +200,7 @@ async fn the_real_development_scripts_seed_their_named_grants_on_fresh_state() -
         listeners[2].local_addr()?.port(),
     ];
     drop(listeners);
-    let start = held.start(&ports)?;
+    let start = held.start(ports)?;
     assert!(
         start.status.success(),
         "start.sh exited {}; seed-grants log: {}",
