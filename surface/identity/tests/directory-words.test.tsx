@@ -1,3 +1,5 @@
+import { budgetsView } from './budget-fixtures';
+import type { Budget } from '../src/features/usage/contract';
 import { act } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -85,10 +87,10 @@ describe('Directory words and write answers', () => {
 
   it('uses the confirmed budget answer and leaves other pending measures alone', async () => {
     const path = '/budgets/person/' + ADA;
-    const effective = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: null, act: 'stop', version: 1, by: 'administrator', at: 1 };
+    const effective: Budget = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: { length: 'day', zone: 'UTC' }, act: 'stop', version: 1, by: 'administrator', at: 1 };
     const requested = { ...effective, limit: 200, version: 2 };
-    const context = { ...effective, measure: 'context_percent', limit: 80 };
-    const world = await show(<PersonalBudgets id={ADA} name="Ada" />, { [path]: ok({ holder: effective.holder, budgets: [requested, context], unconfirmed: [{ requested, effective, reason: 'Waiting for confirmation' }, { requested: { ...context, version: 2 }, effective: context, reason: 'Waiting for confirmation' }] }), ['POST ' + path + '/confirm']: ok({ ...requested, version: 3 }) });
+    const context: Budget = { ...effective, measure: 'context_percent', limit: 80, period: null };
+    const world = await show(<PersonalBudgets id={ADA} name="Ada" />, { [path]: ok(budgetsView(effective.holder, [requested, context], { unconfirmed: [{ requested, effective, reason: 'Waiting for confirmation' }, { requested: { ...context, version: 2 }, effective: context, reason: 'Waiting for confirmation' }] })), ['POST ' + path + '/confirm']: ok({ ...requested, version: 3 }) });
     await click('Apply the new limit of 200 tokens');
     expect(world.requests.filter((entry) => entry === path)).toHaveLength(1);
     expect(document.querySelector('[aria-label="Pending tokens"]')).toBeNull();

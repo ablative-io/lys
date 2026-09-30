@@ -1,4 +1,6 @@
 /** No screen offers a button to read again: a page reads because it opened or because something changed. */
+import { budgetsView } from './budget-fixtures';
+import type { Budget } from '../src/features/usage/contract';
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, click, mount, text } from './harness';
@@ -48,9 +50,9 @@ describe('No read-again buttons', () => {
     expect(reloaders()).toEqual([]);
   });
   it('keeps a refused confirmation\'s reason on screen without reading the budgets again', async () => {
-    const effective = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: null, act: 'stop', version: 1, by: 'administrator', at: 1 };
+    const effective: Budget = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: { length: 'day', zone: 'UTC' }, act: 'stop', version: 1, by: 'administrator', at: 1 };
     const requested = { ...effective, limit: 200, version: 2, by: ADA, at: 2 };
-    const { requests } = await mount('#/file/' + ADA + '/budgets', { ...agentRoutes, [budget]: ok({ holder: effective.holder, budgets: [requested], unconfirmed: [{ requested, effective, reason: 'waiting' }] }), ['POST ' + budget + '/confirm']: refused(409, 'BudgetVersionConflict', 'budget changed') });
+    const { requests } = await mount('#/file/' + ADA + '/budgets', { ...agentRoutes, [budget]: ok(budgetsView(effective.holder, [requested], { unconfirmed: [{ requested, effective, reason: 'waiting' }] })), ['POST ' + budget + '/confirm']: refused(409, 'BudgetVersionConflict', 'budget changed') });
     await click($('section[aria-label="Personal budgets"] button.primary'));
     expect(requests.filter((entry) => entry === budget)).toHaveLength(1);
     expect(text()).toContain('budget changed');

@@ -2,11 +2,10 @@
 import { useRef, useState } from 'react';
 import { api, request, useLoad } from '../../api';
 import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
-import { ACTS, MEASURES, shown } from '../usage/contract';
-import type { Budget, BudgetsView } from '../usage/contract';
+import { ACTS, MEASURES, shown, asLimit } from '../usage/contract';
+import type { Budget, BudgetsView, Limit } from '../usage/contract';
 
-type Unconfirmed = { requested: Budget; effective: Budget; reason: string };
-type PersonalView = BudgetsView & { unconfirmed: Unconfirmed[] };
+type PersonalView = BudgetsView;
 
 export function PersonalBudgets({ id, name }: { id: string; name: string }) {
   const path = '/budgets/person/' + encodeURIComponent(id);
@@ -21,12 +20,12 @@ export function PersonalBudgets({ id, name }: { id: string; name: string }) {
   </section>;
 }
 
-function Details({ budget }: { budget: Budget }) {
+function Details({ limit, version, zone }: { limit: Limit; version: number; zone: string }) {
   return <dl className="facts">
-    <dt>Limit</dt><dd>{shown(budget.measure, budget.limit)}</dd>
-    <dt>Period</dt><dd>{budget.period ? 'Each ' + budget.period.length + ', ' + budget.period.zone : 'No period'}</dd>
-    <dt>When reached</dt><dd>{ACTS[budget.act]}</dd>
-    <dt>Version</dt><dd>{budget.version}</dd>
+    <dt>Limit</dt><dd>{shown(limit.unit, limit.amount)}</dd>
+    <dt>Period</dt><dd>{limit.period ? 'Each ' + limit.period + ', ' + (limit.zone ?? zone) : 'No period'}</dd>
+    <dt>When reached</dt><dd>{ACTS[limit.act]}</dd>
+    <dt>Version</dt><dd>{version}</dd>
   </dl>;
 }
 
@@ -43,7 +42,14 @@ function BudgetReview({ path, initial, administrator }: { path: string; initial:
       setFailure(null);
       const answer = await request<Budget>(path + '/confirm', { measure: budget.measure, version: budget.version });
       if (answer.holder.kind !== budget.holder.kind || answer.holder.id !== budget.holder.id || answer.measure !== budget.measure || answer.version <= budget.version) throw new Error('The answer did not confirm the requested budget. Open this tab again to check its outcome.');
-      setView((current) => ({ ...current, budgets: [...current.budgets.filter((entry) => entry.measure !== answer.measure), answer], unconfirmed: current.unconfirmed.filter((entry) => entry.requested.measure !== answer.measure) }));
+      setView((current) => {
+        const limits = current.limits.map((limit) => limit.unit === answer.measure ? asLimit(answer) : limit);
+        const unconfirmed = current.unconfirmed.filter((entry) => entry.requested.measure !== answer.measure);
+        return { ...current, limits, version: current.version + answer.version - budget.version, by: answer.by, at: answer.at, unconfirmed,
+          effective_limits: unconfirmed.length ? limits.map((limit) => { const pending = unconfirmed.find((entry) => entry.requested.measure === limit.unit); return pending ? asLimit(pending.effective) : limit; }) : undefined,
+          used: current.used.map((used) => used.unit === answer.measure ? { ...used, period: answer.period?.length ?? null, figure: null, since_ms: null, unavailable: 'Usage for the confirmed limit must be read again' } : used),
+        };
+      });
     } catch (error) {
       setFailure(error);
     } finally {
@@ -54,16 +60,16 @@ function BudgetReview({ path, initial, administrator }: { path: string; initial:
   const waiting = new Set(view.unconfirmed.map((entry) => entry.requested.measure));
   return <>
     {failure ? <ErrorWords problem={failure} /> : null}
-    {!view.budgets.length && !view.unconfirmed.length ? <p>No personal budget is set.</p> : null}
-    {view.budgets.filter((budget) => !waiting.has(budget.measure)).map((budget) => <article key={budget.measure} aria-label={MEASURES[budget.measure]}>
-      <h3>{MEASURES[budget.measure]}</h3><p>Enforced budget</p><Details budget={budget} />
+    {!view.limits.length && !view.unconfirmed.length ? <p>No personal budget is set.</p> : null}
+    {view.limits.map((limit, index) => ({ limit, index })).filter(({ limit }) => !waiting.has(limit.unit)).map(({ limit, index }) => <article key={index} aria-label={MEASURES[limit.unit]}>
+      <h3>{MEASURES[limit.unit]}</h3><p>Enforced budget</p><Details limit={limit} version={view.version} zone={view.zone} />
     </article>)}
     {view.unconfirmed.map(({ requested, effective, reason }) => <article key={requested.measure} aria-label={'Pending ' + requested.measure}>
       <h3>{MEASURES[requested.measure]}</h3>
       <p>{reason}</p>
       <div className="grid2">
-        <section aria-label="Currently enforced"><h4>Currently enforced</h4><Details budget={effective} /></section>
-        <section aria-label="Requested change"><h4>Requested change</h4><Details budget={requested} /></section>
+        <section aria-label="Currently enforced"><h4>Currently enforced</h4><Details limit={asLimit(effective)} version={effective.version} zone={view.zone} /></section>
+        <section aria-label="Requested change"><h4>Requested change</h4><Details limit={asLimit(requested)} version={requested.version} zone={view.zone} /></section>
       </div>
       {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Apply the new limit of {shown(requested.measure, requested.limit)} {requested.measure === 'tokens' ? 'tokens' : requested.measure === 'running_ms' ? 'minutes' : 'percent'}</button>
         : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}

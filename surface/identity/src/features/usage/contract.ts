@@ -10,8 +10,7 @@ export type Used = { unit: Measure; period: Length | null; since_ms: number | nu
 export type BudgetBody = { limits: Limit[]; warn_at: number | null; version: number };
 export type Within = { team: string; name: string; limits: Limit[]; used: Used[] };
 export type Unconfirmed = { requested: Budget; effective: Budget; reason: string };
-export type BudgetsView = { holder: Holder; budgets: Budget[] };
-export type LimitBudgetsView = { holder: Holder; limits: Limit[]; warn_at: number | null; zone: string; version: number; by: string | null; at: number | null; used: Used[]; unavailable: { unit: Measure; reason: string }[]; within: Within[]; effective_limits?: Limit[]; unconfirmed: Unconfirmed[] };
+export type BudgetsView = { holder: Holder; limits: Limit[]; warn_at: number | null; zone: string; version: number; by: string | null; at: number | null; used: Used[]; unavailable: { unit: Measure; reason: string }[]; within: Within[]; effective_limits?: Limit[]; unconfirmed: Unconfirmed[] };
 export type Stands = 'accepted' | 'delivered' | 'confirmed' | 'uncertain' | 'refused' | 'told';
 export type Crossing = { operation: string; holder: Holder; measure: Measure; version: number; limit: number; figure: number; limit_index: number; warning: boolean; account?: string; act: BudgetAct; agent: string; at_ms: number };
 export type Receipt = { crossing: Crossing; acted: { stands: Stands; words: string; at_ms: number } | null };
@@ -41,13 +40,17 @@ export const shown = (measure: Measure, limit: number): number => (measure === '
 export const kept = (measure: Measure, given: number): number => (measure === 'running_ms' ? Math.round(given * 60000) : given);
 
 /** Where a budget stands, in plain words, from the latest receipt of its version's crossing. */
-export function standing(budget: Budget, receipts: Receipt[]): { reached: boolean; words: string } {
-  const crossed = receipts.filter((r) => r.crossing.measure === budget.measure && r.crossing.version === budget.version
-    && r.crossing.holder.kind === budget.holder.kind && r.crossing.holder.id === budget.holder.id);
+export function standing(view: BudgetsView, index: number, receipts: Receipt[]): { reached: boolean; words: string } {
+  const limit = view.limits[index];
+  const used = view.used[index];
+  if (!used || used.figure === null) return { reached: false, words: 'Unavailable: ' + (used?.unavailable ?? 'the limit has no reported figure') };
+  const crossed = receipts.filter((r) => !r.crossing.warning && r.crossing.limit_index === index && r.crossing.measure === limit.unit && r.crossing.version === view.version
+    && r.crossing.holder.kind === view.holder.kind && r.crossing.holder.id === view.holder.id
+    && (used.since_ms === null || r.crossing.at_ms >= used.since_ms));
   const latest = crossed[crossed.length - 1];
   if (!latest) return { reached: false, words: 'Held: not reached.' };
   const act = ACTS[latest.crossing.act].toLowerCase();
-  const figure = 'Reached at ' + shown(budget.measure, latest.crossing.figure) + '.';
+  const figure = 'Reached at ' + shown(limit.unit, latest.crossing.figure) + '.';
   if (!latest.acted) return { reached: true, words: figure + ' Nothing is known yet of its act (' + act + ').' };
   switch (latest.acted.stands) {
     case 'confirmed': return { reached: true, words: figure + ' Its act was confirmed: ' + act + '.' };
@@ -65,4 +68,9 @@ export function tracking(usage: UsageView): { complete: boolean; words: string }
     return { complete: false, words: 'Tracking is incomplete: no usage has been reported for this agent, so its budgets cannot be reached.' };
   }
   return { complete: true, words: 'Usage last reported ' + new Date(usage.last_reported_ms).toLocaleString() + '.' };
+}
+
+/** The legacy confirmation retains its full provenance beside the current collection. */
+export function asLimit(budget: Budget): Limit {
+  return { unit: budget.measure, amount: budget.limit, period: budget.period?.length ?? null, act: budget.act, ...(budget.period ? { zone: budget.period.zone } : {}) };
 }

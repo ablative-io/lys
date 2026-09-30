@@ -5,10 +5,11 @@ import { $, click, mount, text } from './harness';
 import { ADA, OWN, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Budget } from '../src/features/usage/contract';
+import { budgetsView } from './budget-fixtures';
 const path = '/budgets/person/' + ADA;
 const effective: Budget = { holder: { kind: 'person', id: ADA }, measure: 'tokens', limit: 100, period: { length: 'day', zone: 'Australia/Melbourne' }, act: 'stop', version: 1, by: 'administrator', at: 1 };
 const requested: Budget = { ...effective, limit: 200, period: { length: 'week', zone: 'Australia/Melbourne' }, act: 'tell', version: 2, by: ADA, at: 2 };
-const pending = { holder: requested.holder, budgets: [requested], unconfirmed: [{ requested, effective, reason: 'An earlier stricter budget remains effective until administrator confirmation.' }] };
+const pending = budgetsView(requested.holder, [requested], { unconfirmed: [{ requested, effective, reason: 'An earlier stricter budget remains effective until administrator confirmation.' }] });
 const confirm = () => $('section[aria-label="Personal budgets"] button.primary');
 const routes = (more: Record<string, Route> = {}): Record<string, Route> => ({ ...SERVICE, [path]: ok(pending), ...more });
 describe('personal budgets', () => {

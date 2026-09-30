@@ -22,7 +22,7 @@ export function AgentUsage({ agent }: { agent: string }) {
     const tracked = tracking(usage);
     return <>
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
-      <UsageBudgets agent={agent} budgets={budgets.budgets} receipts={usage.receipts} changed={changed} />
+      <UsageBudgets agent={agent} budgets={budgets} receipts={usage.receipts} changed={changed} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
     </>;
   }} /></>;

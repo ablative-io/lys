@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { $, choose, click, mount, text, unmountAll } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import type { Budget, GoalItem, Receipt } from '../src/features/usage/contract';
+import type { Budget, BudgetBody, GoalItem, Receipt } from '../src/features/usage/contract';
+
+import { budgetsView } from './budget-fixtures';
 
 const budgets = '/budgets/agent/' + SCRIBE;
 const usage = '/agents/' + SCRIBE + '/usage';
@@ -14,18 +16,20 @@ const file = '#/file/' + SCRIBE + '/budgets';
 
 /** A service that keeps the budgets and goals it is given, as the identity service does. */
 function keeping(receipts: Receipt[] = [], reported: number | null = 1790000000000): Record<string, Route> {
-  const kept: Budget[] = [];
+  let kept = budgetsView(holder);
   const set: GoalItem[] = [];
   return {
     ...SERVICE,
-    [budgets]: () => ok({ holder, budgets: kept }),
+    [budgets]: () => ok(kept),
     ['PUT ' + budgets]: (body) => {
-      const given = body as Omit<Budget, 'holder' | 'by' | 'at'>;
-      const budget: Budget = { ...given, holder, version: given.version + 1, by: SCRIBE, at: 1790000000 };
-      kept.splice(0, kept.length, ...kept.filter((b) => b.measure !== budget.measure), budget);
-      return ok(budget);
+      const given = body as BudgetBody;
+      expect(given.version).toBe(kept.version);
+      expect(Object.keys(given).sort()).toEqual(['limits', 'version', 'warn_at']);
+      kept = { ...kept, ...given, version: given.version + 1, by: SCRIBE, at: 1790000000,
+        used: given.limits.map((limit) => ({ unit: limit.unit, period: limit.period, figure: 0, since_ms: limit.period ? 0 : null, unavailable: null })) };
+      return ok(kept);
     },
-    [usage]: ok({ agent: SCRIBE, receipts, last_reported_ms: reported }),
+    [usage]: ok({ agent: SCRIBE, used: [], receipts, last_reported_ms: reported }),
     [goals]: () => ok({ goals: set }),
     ['POST ' + goals]: (body) => {
       const given = body as { operation: string; kind: GoalItem['goal']['kind']; words: string; deadline: number };
@@ -111,13 +115,46 @@ describe('Usage', () => {
     expect($('section[aria-label="Goals"] table')?.textContent).toContain('Open');
   });
 
+  it('keeps both existing actions and the holder warning when adding a limit', async () => {
+    const limits = [{ unit: 'tokens' as const, amount: 400, period: 'week' as const, act: 'tell' as const },
+      { unit: 'tokens' as const, amount: 500, period: 'week' as const, act: 'stop' as const }];
+    const kept = { ...budgetsView(holder), limits, warn_at: 80, version: 7 };
+    let sent: BudgetBody | null = null;
+    await mount(file, { ...keeping(), [budgets]: ok(kept), ['PUT ' + budgets]: (body) => {
+      sent = body as BudgetBody;
+      return ok({ ...kept, ...sent, version: 8 });
+    } });
+    await type('input[name="limit"]', '600');
+    await submit('Set a budget');
+    expect(sent).toEqual({ limits: [...limits, { unit: 'tokens', amount: 600, period: 'day', act: 'tell' }], warn_at: 80, version: 7 });
+  });
+
+  it('names an unavailable figure without displaying it as a measured zero', async () => {
+    await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens], {
+      used: [{ unit: 'tokens', period: 'day', figure: null, since_ms: 0, unavailable: 'runner token report is missing' }],
+    })) });
+    expect($('section[aria-label="Budgets"] tbody tr')?.children[4]?.textContent).toBe('Unavailable: runner token report is missing');
+  });
+
+  it('matches a receipt to its own limit and excludes warning receipts', async () => {
+    const limits = [tokens, { ...tokens, limit: 1500, act: 'tell' as const }];
+    const receipts = [...reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 }),
+      { ...reached(null)[0], crossing: { ...reached(null)[0].crossing, limit_index: 1, warning: true } }];
+    await mount(file, { ...keeping(receipts), [budgets]: ok(budgetsView(holder, limits, {
+      used: limits.map(() => ({ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null })),
+    })) });
+    const rows = document.querySelectorAll('section[aria-label="Budgets"] tbody tr');
+    expect(rows[0]?.children[4]?.textContent).toContain('Its act was confirmed');
+    expect(rows[1]?.children[4]?.textContent).toBe('Held: not reached.');
+  });
+
   it('says in plain words that a budget was reached and its act confirmed', async () => {
-    await mount(file, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok(budgetsView(holder, [tokens], { used: [{ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null }] })) });
     expect(text()).toContain('Reached at 1200. Its act was confirmed: end the session.');
   });
 
   it('never shows an uncertain act as confirmed', async () => {
-    await mount(file, { ...keeping(reached({ stands: 'uncertain', words: 'runner restarted', at_ms: 1 })), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached({ stands: 'uncertain', words: 'runner restarted', at_ms: 1 })), [budgets]: ok(budgetsView(holder, [tokens], { used: [{ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null }] })) });
     expect(text()).toContain('cannot be known');
     expect(text()).not.toContain('confirmed:');
   });
@@ -144,7 +181,7 @@ describe('Usage', () => {
   });
 
   it('draws no analytics dashboard', async () => {
-    await mount(file, { ...keeping(reached(null)), [budgets]: ok({ holder, budgets: [tokens] }) });
+    await mount(file, { ...keeping(reached(null)), [budgets]: ok(budgetsView(holder, [tokens], { used: [{ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null }] })) });
     expect(document.querySelectorAll('section.usage svg, section.usage canvas')).toHaveLength(0);
   });
 });
