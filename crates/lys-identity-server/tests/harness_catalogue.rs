@@ -160,6 +160,34 @@ fn reviewed_view(mut answer: Value) -> Result<Value, Box<dyn Error>> {
     Ok(answer)
 }
 
+#[test]
+fn installed_command_review_rejects_duplicates_and_undeclared_names() -> TestResult {
+    let mut answer = expected()?;
+    answer["programs"][1]["builds"] = json!([
+        {
+            "name": "Installed codex", "program": "/opt/codex",
+            "package": "codex fixture", "from": "installed"
+        },
+        {
+            "name": "Installed cdx", "program": "/opt/cdx",
+            "package": "cdx fixture", "from": "installed"
+        }
+    ]);
+    assert_eq!(reviewed_view(answer.clone())?, expected()?);
+    let mut undeclared = answer["programs"][1]["builds"][1].clone();
+    undeclared["name"] = json!("Installed another-codex");
+    for copy in [answer["programs"][1]["builds"][0].clone(), undeclared] {
+        let name = copy["name"].clone();
+        let mut invalid = answer.clone();
+        invalid["programs"][1]["builds"][1] = copy;
+        assert!(
+            std::panic::catch_unwind(|| reviewed_view(invalid)).is_err(),
+            "installed command review accepted {name}"
+        );
+    }
+    Ok(())
+}
+
 async fn table() -> Result<(Service, Seeded, String), Box<dyn Error>> {
     let (service, seeded) =
         Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)).await?;
