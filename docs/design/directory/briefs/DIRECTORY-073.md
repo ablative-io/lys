@@ -69,6 +69,7 @@ Behavioural. WHEN a peer on the runner socket asks for a restart, THE RUNNER SHA
 - create: crates/lys-runner/src/session/restart.rs
 - create: crates/lys-runner/src/operations/restart.rs
 - create: crates/lys-runner/tests/peer_restart.rs
+- create: crates/lys-runner/tests/peer_restart/cases.rs
 - modify: crates/lys-runner/src/peer.rs
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/operations.rs

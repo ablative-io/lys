@@ -30,6 +30,9 @@ use crate::protocol::{Ended, Key};
 use crate::session::{Sessions, Table, now_ms};
 use crate::tracking_store::{Body, Commit};
 
+mod restart;
+pub(crate) use restart::{begin_restart, finish_restart};
+
 /// The format of the record of operations.
 pub const FORMAT: &str = "lys-runner-operations/v1";
 
@@ -492,7 +495,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
         .operations
         .held
         .iter()
-        .filter(|held| held.session == id)
+        .filter(|held| held.session == id && held.request != "restart")
         .map(|held| (held.operation.clone(), held.state, held.request.clone()))
         .collect();
     for (operation, state, request) in open {

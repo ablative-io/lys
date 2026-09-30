@@ -47,6 +47,7 @@ use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
 mod lifecycle;
+mod restart;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;

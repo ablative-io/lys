@@ -18,9 +18,8 @@
 //! statement about processes of one user on one machine: it does not stand
 //! against that same user tampering with the harness.
 //!
-//! A peer may ask two acts and no other: the judge's question about a tool
-//! call and the collector's delivery of what the harness signalled. Neither
-//! carries a signature and neither reaches a server-signed act. What a body
+//! A peer may ask the judge about a tool call, deliver a harness signal,
+//! or restart its own held launch. None reaches a server-signed act. What a body
 //! says of its session changes nothing: the record is the proved session's
 //! or none. A hook's prompt text and a notice's message text are never kept.
 
@@ -248,6 +247,14 @@ pub enum PeerAct {
     Judge(JudgeAsk),
     /// Keep what the harness signalled.
     Collect(Collected),
+    /// Restart only the session the socket proof names.
+    Restart {
+        /// The stable operation identity.
+        operation: String,
+        /// An untrusted session claim; the socket proof chooses the session.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session: Option<String>,
+    },
 }
 
 /// A peer's request line.
@@ -287,6 +294,15 @@ pub fn answer(
         }
     };
     match request.peer {
+        PeerAct::Restart { operation, .. } => peer_of(stream)
+            .map_err(|error| RunnerError::refused("not_a_session", error.to_string()))
+            .and_then(|(pid, uid)| {
+                restart_with(sessions, &System, (pid, uid, own_user()), &operation)
+            })
+            .map_or_else(
+                |error| Answer::refusal(&error),
+                |outcome| Answer::Operation { outcome },
+            ),
         PeerAct::Judge(asked) => Answer::Judged {
             verdict: crate::refusal_log::answer(sessions, stream, &asked, left),
         },
@@ -298,3 +314,22 @@ pub fn answer(
             ),
     }
 }
+
+pub(crate) fn restart_with(
+    sessions: &Arc<Sessions>,
+    processes: &dyn Processes,
+    identity: (u32, u32, u32),
+    operation: &str,
+) -> Result<crate::operations::OperationOutcome, RunnerError> {
+    let leaders = sessions.leaders();
+    let session = prove_with(processes, identity, &leaders)
+        .map_err(|error| RunnerError::refused("not_a_session", error.to_string()))?;
+    let leader = leaders
+        .get(&session)
+        .ok_or_else(|| RunnerError::refused("not_a_session", "the proved session has no leader"))?;
+    sessions.restart_proved(&session, operation, leader)
+}
+
+#[cfg(test)]
+#[path = "../tests/peer_restart/cases.rs"]
+mod restart_tests;

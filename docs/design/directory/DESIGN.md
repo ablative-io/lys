@@ -1125,6 +1125,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-runner/src/session/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/src/operations/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 | `crates/lys-runner/tests/peer_restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/tests/peer_restart/cases.rs` | Peer proof, held launch and operation replay through an injected process tree | DIRECTORY-073 |
 
 ## Inventory
 

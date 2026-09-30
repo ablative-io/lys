@@ -5133,6 +5133,11 @@
       "path": "crates/lys-runner/tests/peer_restart.rs",
       "note": "Prove a peer restart of its own held launch",
       "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/peer_restart/cases.rs",
+      "note": "Peer proof, held launch and operation replay through an injected process tree",
+      "brief": "DIRECTORY-073"
     }
   ],
   "inventory": [
