@@ -297,7 +297,7 @@ pub(crate) async fn register_agent(
 ) -> Result<Json<AgentRegistered>, ServerError> {
     if !headers.contains_key(axum::http::header::AUTHORIZATION) {
         let actor = signed_in(&state, &headers)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        state.admission.administrator(&actor)?;
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
@@ -313,7 +313,7 @@ pub(crate) async fn register_agent(
                 }
             };
             let responsible =
-                registration_person(projection, own, body.answers_to.as_deref(), administrator)?;
+                registration_person(projection, own, body.answers_to.as_deref(), true)?;
             let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
             Ok(Json(AgentRegistered {
                 agent: id.to_string(),
