@@ -62,21 +62,13 @@ fn version_names_the_crate_version_and_the_head_commit() -> TestResult {
 const STAMPED: [&str; 4] = ["lys", "lys-identity-server", "lys-secrets", "lys-home"];
 
 #[test]
-fn every_stamped_crate_calls_shared_stamp_without_copied_logic() -> TestResult {
+fn every_stamped_crate_carries_the_same_build_script() -> TestResult {
     let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let ours = std::fs::read(crates.join("lys").join("build.rs"))?;
     let mut compared = 0;
     for name in STAMPED {
-        let source = std::fs::read_to_string(crates.join(name).join("build.rs"))?;
-        let code = source
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert_eq!(
-            code, "fn main() {\nlys_build_stamp::emit();\n}",
-            "{name}/build.rs must call the shared stamp"
-        );
+        let theirs = std::fs::read(crates.join(name).join("build.rs"))?;
+        assert_eq!(theirs, ours, "{name}/build.rs differs from lys/build.rs");
         compared += 1;
     }
     assert_eq!(compared, STAMPED.len());

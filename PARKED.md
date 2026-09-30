@@ -17,7 +17,7 @@ The earlier, superseded regression also has an outstanding result:
 - Measured head: `2bc7704027d098c2a10649de55e8b0255d5c6467`.
 
 Cancellation requested with `aion cancel 6ccdf91d-5cd4-426c-86df-269e5d7ea8bc --reason "053 parked 30 Sep 18:38 for the team-tree work"`; command exit 0, accepted true, and Aion readback status Cancelled. Cancellation is not a red or green result. The earlier superseded run remains separately recorded. Neither run establishes completion. The branch contains the build-script regression only; the exported-tree and dirty-tree behavior tests are retained unchanged. No implementation, stored-record writer, live installation, or surface was changed. DIRECTORY-053's migrations, shared stamp and stated-commit behavior remain open. DIRECTORY-054 has not started. Resume only on a new direction from Archie.
-||||||| 14a072e
+
 
 # Parked delivery work
 
