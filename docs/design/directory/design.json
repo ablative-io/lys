@@ -5118,6 +5118,21 @@
       "path": "crates/lys-runner/tests/input_no_screen/shared_lock.rs",
       "note": "A full input pipe leaves a second session answering without a clock (DIRECTORY-073 R3)",
       "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/src/session/restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/src/operations/restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
+    },
+    {
+      "path": "crates/lys-runner/tests/peer_restart.rs",
+      "note": "Prove a peer restart of its own held launch",
+      "brief": "DIRECTORY-073"
     }
   ],
   "inventory": [

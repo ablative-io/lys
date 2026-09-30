@@ -1122,6 +1122,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-runner/src/input.rs` | Per-session ordered writes complete by signal without holding the shared session table (DIRECTORY-073 R3) | DIRECTORY-073 |
 | `crates/lys-runner/tests/input_no_screen/shared_lock.rs` | A full input pipe leaves a second session answering without a clock (DIRECTORY-073 R3) | DIRECTORY-073 |
+| `crates/lys-runner/src/session/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/src/operations/restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
+| `crates/lys-runner/tests/peer_restart.rs` | Prove a peer restart of its own held launch | DIRECTORY-073 |
 
 ## Inventory
 
