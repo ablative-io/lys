@@ -24,10 +24,6 @@ pub(crate) fn missing(usage: &Usage) -> Option<&'static str> {
     }
 }
 
-#[cfg(test)]
-#[path = "budgets_context_tests.rs"]
-mod tests;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Reading {
     at_ms: i64,
@@ -150,3 +146,7 @@ impl Availability {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "budgets_context_tests.rs"]
+mod tests;
