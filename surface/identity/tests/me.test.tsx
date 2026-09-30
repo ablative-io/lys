@@ -79,8 +79,8 @@ describe('Personal scope', () => {
     await mount('#/me', routes);
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
     const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
-      const cells = tr.querySelectorAll('td');
-      return `${cells[1].textContent} of ${cells[2].textContent}`;
+      const exactly = tr.querySelectorAll('td .mono');
+      return `${exactly[0].textContent} of ${exactly[1].textContent}`;
     });
     expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
     expect(holds).not.toContain('viewer of project:atlas');
@@ -109,7 +109,7 @@ function withInstallGrants(): typeof SERVICE {
 
 describe('What you hold', () => {
   const rows = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) =>
-    [...tr.querySelectorAll('td')].slice(0, 4).map((td) => td.textContent));
+    [tr.querySelector('td')?.firstChild?.textContent, ...[...tr.querySelectorAll('td .mono')].map((span) => span.textContent), tr.querySelectorAll('td')[1].textContent]);
 
   it('starts each row with what the grant lets the person do, from the actions it carries, then the relation, object and source', async () => {
     await mount('#/me', withInstallGrants());

@@ -14,9 +14,9 @@ describe('What you hold', () => {
   it('row_1_4_what_you_hold_shows_each_grant_its_source_and_whether_it_may_be_passed_on', async () => {
     const { requests } = await mount('#/me');
     expect(requests).toContain('/grants');
-    const rows = [...holdRows()].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
+    const rows = holdText();
     expect(rows).toEqual([
-      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
+      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
       ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(unreachable()).toEqual([]);
@@ -340,7 +340,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
 });
 
 /** The hold table as text, one array per row. */
-const holdText = () => [...holdRows()].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
+const holdText = () => [...holdRows()].map((tr) => { const [first, ...rest] = [...tr.querySelectorAll('td')]; return [first.firstChild?.textContent, ...[...first.querySelectorAll('.mono')].map((span) => span.textContent), ...rest.map((td) => td.textContent)]; });
 
 /** Every grant id the page put in the DOM, from the buttons that carry one. */
 const grantIdsOnScreen = () => $$('[data-g]').map((el) => el.dataset.g);
@@ -359,7 +359,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(meReads).toBeGreaterThan(0);
     expect($('h1')?.textContent).toBe('Ada (test person)');
     expect(holdText()).toEqual([
-      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
+      ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes', 'Give to an agent…'],
       ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
     ]);
     expect(grantIdsOnScreen()).toEqual([ROOT_G]);
@@ -377,7 +377,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     // The second session read its own identity for itself; nothing was carried over.
     expect(bea.requests.filter((r) => r === '/me')).toHaveLength(meReads);
     expect($('h1')?.textContent).toBe('Bea (test person)');
-    expect(holdText()).toEqual([['You can view and edit project ledger.', 'editor', 'project:ledger', 'root', 'yes, to agents', 'Give to an agent…']]);
+    expect(holdText()).toEqual([['You can view and edit project ledger.', 'editor', 'project:ledger', 'root', 'yes', 'Give to an agent…']]);
     expect(grantIdsOnScreen()).toEqual([BEA_ROOT_G]);
     // Her agent, and what it holds under her root grant, not Ada's.
     expect(text()).toContain('Reviewer');

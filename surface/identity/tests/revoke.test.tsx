@@ -129,8 +129,8 @@ function handbook(): Record<string, Route> {
 
 /** What you hold on You, each row by its relation and resource only. */
 const held = () => [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
-  const cells = tr.querySelectorAll('td');
-  return `${cells[1].textContent} of ${cells[2].textContent}`;
+  const exactly = tr.querySelectorAll('td .mono');
+  return `${exactly[0].textContent} of ${exactly[1].textContent}`;
 });
 
 /** What Scribe holds, as its row under Your agents on You lists it. */
