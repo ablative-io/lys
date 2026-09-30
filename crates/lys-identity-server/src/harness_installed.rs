@@ -27,7 +27,13 @@ pub(super) fn resolve(command: &str, path: &OsStr) -> Result<Executable, String>
     let directories: Vec<PathBuf> = std::env::split_paths(path).collect();
     if path.is_empty()
         || directories.is_empty()
-        || directories.iter().any(|entry| !entry.is_absolute())
+        || directories.iter().any(|entry| {
+            !entry.is_absolute()
+                || match entry.to_str() {
+                    Some(text) => text.chars().any(char::is_control),
+                    None => true,
+                }
+        })
     {
         return Err(refused(
             "UnsafeSearchPath",
@@ -47,6 +53,15 @@ pub(super) fn resolve(command: &str, path: &OsStr) -> Result<Executable, String>
         }
         let absolute = std::fs::canonicalize(&candidate)
             .map_err(|error| refused("ProgramPathUnreadable", error))?;
+        if absolute
+            .to_str()
+            .is_none_or(|text| text.chars().any(char::is_control))
+        {
+            return Err(refused(
+                "ProgramPathUnreadable",
+                "the executable path is not plain UTF-8",
+            ));
+        }
         executable = Some(Executable {
             key: (
                 absolute,

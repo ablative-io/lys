@@ -118,10 +118,12 @@ fn reviewed_view(mut answer: Value) -> Result<Value, Box<dyn Error>> {
         if let Some(reason) = program.get("not_found") {
             assert!(!reason.as_str().ok_or("not_found is not text")?.is_empty());
         }
-        program
-            .as_object_mut()
-            .ok_or("program is not an object")?
-            .remove("not_found");
+        drop(
+            program
+                .as_object_mut()
+                .ok_or("program is not an object")?
+                .remove("not_found"),
+        );
         let builds = program["builds"]
             .as_array_mut()
             .ok_or("builds is not an array")?;
@@ -540,5 +542,23 @@ fn a_copy_installed_after_a_missing_read_is_discovered() -> TestResult {
     fake_command(directory.path(), "printf 'new-version\\n'")?;
     let found = serde_json::to_value(catalogue.installed_in(directory.path().as_os_str())?)?;
     assert_eq!(found["programs"][0]["builds"][0]["package"], "new-version");
+    Ok(())
+}
+
+#[test]
+fn a_path_with_control_characters_is_not_used_for_discovery() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let unsafe_path = directory.path().join("unsafe\nentry");
+    std::fs::create_dir(&unsafe_path)?;
+    fake_command(&unsafe_path, "printf 'must-not-run\\n'")?;
+    let answer =
+        serde_json::to_value(discovery_catalogue()?.installed_in(unsafe_path.as_os_str())?)?;
+    assert_eq!(answer["programs"][0]["builds"], json!([]));
+    assert!(
+        answer["programs"][0]["not_found"]
+            .as_str()
+            .ok_or("missing reason")?
+            .contains("UnsafeSearchPath")
+    );
     Ok(())
 }
