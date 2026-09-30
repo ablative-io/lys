@@ -183,6 +183,15 @@ fn publish(state: &Path, session: &str, config: &Config) -> Result<PathBuf, Runn
         }
     }
     let staged = own.join("config-writing");
+    match fs::symlink_metadata(&staged) {
+        Ok(metadata) if metadata.is_dir() => {
+            fs::remove_dir_all(&staged)
+                .map_err(|error| refused(format!("removing unpublished config: {error}")))?;
+        }
+        Ok(_) => return Err(refused("the unpublished config is not an owned directory")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(refused(error)),
+    }
     fs::create_dir(&staged).map_err(refused)?;
     let written = fs::set_permissions(&staged, fs::Permissions::from_mode(0o700))
         .map_err(refused)

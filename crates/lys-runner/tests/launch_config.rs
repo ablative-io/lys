@@ -167,6 +167,29 @@ fn an_interrupted_staging_directory_is_replaced_before_publication() -> TestResu
 }
 
 #[test]
+fn an_unpublished_symlink_is_refused_without_removing_its_target() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let outside = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 1024)?;
+    let own = dir.path().join("sessions/config-session");
+    std::fs::create_dir_all(&own)?;
+    std::fs::write(outside.path().join("retained"), b"outside contents")?;
+    symlink(outside.path(), own.join("config-writing"))?;
+    let error = sessions
+        .start(launch())
+        .err()
+        .ok_or("unpublished symlink was accepted")?;
+    sessions.stop_all();
+    assert_eq!(error.name(), "launch_config_refused");
+    assert_eq!(
+        std::fs::read(outside.path().join("retained"))?,
+        b"outside contents"
+    );
+    assert!(!own.join("config").exists());
+    Ok(())
+}
+
+#[test]
 fn the_signature_covers_config_files_and_bindings() -> TestResult {
     let dir = tempfile::tempdir()?;
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
