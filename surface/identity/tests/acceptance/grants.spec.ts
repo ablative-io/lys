@@ -137,8 +137,8 @@ const ROWS: ConformanceRow[] = [
       const { requests } = await mount('#/me');
       expect(requests).toContain('/grants');
       expect(holdRows()).toEqual([
-        ['owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
-        ['viewer', 'project:ledger', 'root', 'no', ''],
+        ['You can view, edit and grant project identity.', 'owner', 'project:identity', 'root', 'yes, to agents', 'Give to an agent…'],
+        ['You can view project ledger.', 'viewer', 'project:ledger', 'root', 'no', ''],
       ]);
     },
   },

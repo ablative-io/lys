@@ -42,6 +42,29 @@ export const grantNo = (id: string): string => 'G/' + id.slice(id.indexOf('-') +
 
 export const onText = (g: Grant): string => resourceText(g.resource);
 
+/**
+ * A resource named in a sentence: a directory collection as the directory's,
+ * an identity the caller may see by its name, anything else as its kind and id.
+ */
+export const objectText = (w: GrantWorld, r: ResourceRef): string => {
+  if (r.kind === 'directory') return `the directory's ${r.id}`;
+  const who = w.who.get(r.id);
+  return `${r.kind} ${who ? who.name : r.id}`;
+};
+
+/**
+ * What `g` lets its holder do, from the actions the grant itself carries, which
+ * are the actions the service checks when it is exercised: the widest-held
+ * action first, as the model carries them (view before edit before grant).
+ */
+export function mayText(w: GrantWorld, g: Grant): string {
+  if (!g.actions.length) return `You can take no action on ${objectText(w, g.resource)}.`;
+  const carriers = (a: string) => Object.values(w.model.relations).filter((actions) => actions.includes(a)).length;
+  const actions = [...g.actions].sort((a, b) => carriers(b) - carriers(a) || a.localeCompare(b));
+  const listed = actions.length === 1 ? actions[0] : `${actions.slice(0, -1).join(', ')} and ${actions[actions.length - 1]}`;
+  return `You can ${listed} ${objectText(w, g.resource)}.`;
+}
+
 /** A resource as the mock-up's pickers name it: a project or organisation by its id, anything else as `name (type)`. */
 export const resourceLabel = (r: ResourceRef): string =>
   r.kind === 'project' || r.kind === 'organisation' ? resourceText(r) : `${r.id} (${r.kind})`;

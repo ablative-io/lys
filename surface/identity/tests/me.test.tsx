@@ -80,7 +80,7 @@ describe('Personal scope', () => {
     expect($$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe', 'Courier', 'Archivist']);
     const holds = [...$$('.grid2 > div:first-child table')[0].querySelectorAll('tbody tr')].map((tr) => {
       const cells = tr.querySelectorAll('td');
-      return `${cells[0].textContent} of ${cells[1].textContent}`;
+      return `${cells[1].textContent} of ${cells[2].textContent}`;
     });
     expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
     expect(holds).not.toContain('viewer of project:atlas');
