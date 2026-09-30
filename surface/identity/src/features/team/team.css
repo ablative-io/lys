@@ -16,3 +16,12 @@
 .team-stage .terminal-screen { flex: 1; max-height: none; }
 .team-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .team-stage .terminal-head h2, .team-stage .terminal-head .mono { display: none; }
+/* No blocks: the chosen name is marked by its colour and weight, actions are words, and the terminal carries no card around it. */
+.tree-row, .tree-row:hover, .tree-row[aria-current="page"] { background: none; border-color: transparent; }
+.tree-row { color: var(--text-secondary); }
+.tree-row:hover { color: var(--text-primary); }
+.tree-row[aria-current="page"] { color: var(--text-primary); font-weight: 600; }
+.team-acts .btn { background: none; border: 0; padding: 4px 6px; color: var(--text-secondary); }
+.team-acts .btn:hover:not(:disabled) { color: var(--text-primary); background: none; }
+.team-acts .btn:disabled { color: var(--text-muted); }
+.team-stage .terminal { background: none; border: 0; padding: 0; border-radius: 0; }
