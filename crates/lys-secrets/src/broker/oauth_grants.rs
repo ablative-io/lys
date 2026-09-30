@@ -131,41 +131,6 @@ impl<P: PermissionCheck> Broker<P> {
         Ok(())
     }
 
-    /// Reconnects the OAuth grant sealed as `name` with `grant`, a new
-    /// consent by its owner, for example to a new client: from here the
-    /// grant's client, subject and tokens are the new consent's. Recorded as
-    /// one refresh line naming the client.
-    ///
-    /// # Errors
-    ///
-    /// `LendingNotPermitted` when `owner` does not own it, `SecretUnknown`
-    /// when no OAuth grant is sealed as `name`, the store's refusals and
-    /// the audit log's.
-    pub fn reconnect_oauth(
-        &mut self,
-        name: &str,
-        owner: &str,
-        grant: &OAuthGrant,
-    ) -> Result<(), SecretsError> {
-        self.owns(owner, name)?;
-        if self.store.entry(name).map(|entry| entry.class) != Some(EntryClass::OAuth) {
-            return Err(SecretsError::SecretUnknown {
-                name: name.to_owned(),
-            });
-        }
-        self.store
-            .replace(&self.store_key, name, &grant.to_sealed()?)?;
-        let outcome = format!("reconnected to client {}", grant.provenance().client_id);
-        self.record(
-            AuditKind::Refresh,
-            (None, Some(owner), Some(name)),
-            None,
-            None,
-            &outcome,
-        )?;
-        Ok(())
-    }
-
     /// The OAuth grant behind the handle `id`, for revoking it upstream
     /// after a drop. `None` when the handle's secret is not one.
     ///
