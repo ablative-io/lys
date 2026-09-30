@@ -182,6 +182,7 @@ async fn the_programmes_read_has_a_typed_openapi_answer() -> TestResult {
     let schemas = &document["components"]["schemas"];
     for member in [
         "name",
+        "command",
         "line",
         "models",
         "modes",
@@ -215,6 +216,49 @@ async fn codex_is_offered_with_all_native_instruction_modes() -> TestResult {
             .iter()
             .any(|program| program["name"] == "Codex")
     );
+    Ok(())
+}
+
+#[test]
+fn a_missing_or_invalid_standard_command_names_its_catalogue_file() -> TestResult {
+    let mut source: Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    source
+        .as_object_mut()
+        .ok_or("catalogue is not an object")?
+        .remove("command");
+    let text = serde_json::to_string(&source)?;
+    named_refusal(
+        Catalogue::read(&[("missing-command.json", &text)]),
+        "missing-command.json",
+    )?;
+    for command in [
+        "",
+        "/opt/fixture/claude",
+        "claude --flag",
+        "cdx",
+        "codex",
+        "claude\n",
+    ] {
+        source["command"] = json!(command);
+        let text = serde_json::to_string(&source)?;
+        named_refusal(
+            Catalogue::read(&[("invalid-command.json", &text)]),
+            "invalid-command.json",
+        )?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn standard_commands_are_served_without_machine_paths() -> TestResult {
+    let (service, seeded, cookie) = table().await?;
+    drop(seeded);
+    let (status, answer) = service.get("/harnesses", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["programs"][0]["command"], "claude");
+    assert_eq!(answer["programs"][1]["command"], "codex");
     Ok(())
 }
 
