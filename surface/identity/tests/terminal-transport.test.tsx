@@ -1,6 +1,6 @@
 /** Raw terminal transport rejects ambiguous windows and stops input after an uncertain outcome. */
 import { describe, expect, it, vi } from 'vitest';
-import { byteOutput, terminalRequest, terminalStreams } from '../src/features/runtime/terminal-transport';
+import { byteOutput, motionReport, terminalRequest, terminalStreams } from '../src/features/runtime/terminal-transport';
 
 const session = 'running-fixture';
 const envelope = (patch: Record<string, unknown> = {}) => ({
@@ -24,21 +24,68 @@ describe('Raw terminal transport', () => {
     await expect(terminalRequest('/input-bytes', { data: [65] })).rejects.toMatchObject({ status: 403, refusal: { refusal: 'not_permitted' } });
   });
 
-  it('never sends queued input after the first input has an unknown outcome', async () => {
+  it('never sends queued input after an input has an unknown outcome, and disconnects the terminal with the reason', async () => {
     const sent: unknown[] = [];
+    let lose = () => {};
     vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
-      if (path.endsWith('/read-bytes')) return Promise.resolve(new Response(JSON.stringify({ ...envelope(), receipt: { index: 1 } })));
+      if (path.endsWith('/read-bytes')) return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('read closed'))));
       sent.push(JSON.parse(String(init?.body)));
-      return Promise.reject(new Error('lost response'));
+      return new Promise<Response>((_resolve, reject) => { lose = () => reject(new Error('lost response')); });
     });
-    const streams = terminalStreams(session, new AbortController(), () => {});
+    const controller = new AbortController();
+    const streams = terminalStreams(session, controller, () => {});
     const writer = streams.writable.getWriter();
-    const first = writer.write(new Uint8Array([0, 255]));
-    const second = writer.write(new Uint8Array([66]));
-    const firstFailed = expect(first).rejects.toThrow('lost response');
-    const secondFailed = expect(second).rejects.toThrow('lost response');
-    await Promise.all([firstFailed, secondFailed]);
+    await writer.write(new Uint8Array([0, 255]));
+    await writer.write(new Uint8Array([66]));
+    const read = expect(streams.readable.getReader().read()).rejects.toThrow('lost response');
+    lose();
+    await expect(writer.closed).rejects.toThrow('lost response');
+    await read;
     expect(sent).toEqual([{ data: [0, 255] }]);
+    controller.abort();
+  });
+
+  it('knows a pointer-motion report from a press, a wheel turn or a key, in SGR and X10 encodings', () => {
+    const bytes = (value: string) => new TextEncoder().encode(value);
+    expect(motionReport(bytes('\u001b[<35;10;5M'))).toBe(true);
+    expect(motionReport(bytes('\u001b[<32;10;5M'))).toBe(true);
+    expect(motionReport(bytes('\u001b[<0;10;5M'))).toBe(false);
+    expect(motionReport(bytes('\u001b[<0;10;5m'))).toBe(false);
+    expect(motionReport(bytes('\u001b[<64;10;5M'))).toBe(false);
+    expect(motionReport(new Uint8Array([27, 91, 77, 32 + 35, 32 + 10, 32 + 5]))).toBe(true);
+    expect(motionReport(new Uint8Array([27, 91, 77, 32, 32 + 10, 32 + 5]))).toBe(false);
+    expect(motionReport(bytes('l'))).toBe(false);
+    expect(motionReport(bytes('\u001b[A'))).toBe(false);
+  });
+
+  it('sends input queued behind a request in the next single request, in order, keeping only the newest pointer motion', async () => {
+    const encode = (value: string) => Array.from(new TextEncoder().encode(value));
+    const motion = (x: number) => encode('\u001b[<35;' + x + ';5M');
+    const press = encode('\u001b[<0;9;5M');
+    const sent: number[][] = [];
+    const answers: (() => void)[] = [];
+    let arrived = () => {};
+    vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
+      if (path.endsWith('/read-bytes')) return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('read closed'))));
+      sent.push((JSON.parse(String(init?.body)) as { data: number[] }).data);
+      arrived();
+      return new Promise<Response>((resolve) => answers.push(() => resolve(new Response(JSON.stringify({ session, answer: { kind: 'delivered', session }, receipt: { index: sent.length } })))));
+    });
+    const request = () => new Promise<void>((resolve) => { arrived = resolve; });
+    const controller = new AbortController();
+    const writer = terminalStreams(session, controller, () => {}).writable.getWriter();
+    const first = request();
+    const writes = [motion(1), encode('l'), motion(2), press, motion(3), encode('s'), motion(4)].map((bytes) => writer.write(new Uint8Array(bytes)));
+    await first;
+    expect(sent).toEqual([motion(1)]);
+    const second = request();
+    answers[0]();
+    await second;
+    expect(sent).toEqual([motion(1), [...encode('l'), ...press, ...encode('s'), ...motion(4)]]);
+    answers[1]();
+    await Promise.all(writes);
+    expect(sent).toHaveLength(2);
+    controller.abort();
   });
 
   it('does not send input after the runner reports the process ended', async () => {

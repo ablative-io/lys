@@ -85,6 +85,7 @@ fn shell(session: &str, script: &str) -> Launch {
         arguments: vec!["-c".to_owned(), script.to_owned()],
         directory: "/".to_owned(),
         environment: BTreeMap::new(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

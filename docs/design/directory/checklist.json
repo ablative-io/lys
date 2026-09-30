@@ -1810,6 +1810,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Lys offers the programs it can start and each program's models and modes as named choices, from its own descriptions and what each computer's runner finds installed (DIRECTORY-076)",
+      "items": [
+        {
+          "id": "C474",
+          "text": "Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).",
+          "done": false
+        },
+        {
+          "id": "C475",
+          "text": "Each computer's runner reports where each described program is installed. (DIRECTORY-076 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

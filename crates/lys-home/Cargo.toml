@@ -12,6 +12,7 @@ categories = ["database-implementations"]
 
 [dependencies]
 clap.workspace = true
+flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
 # The little proxy's transport (HOME-001 R7, R10): HTTP/1 over rustls with
 # ring and the Mozilla roots, each pinned at the version already in the lock.
 http-body-util = "=0.1.5"

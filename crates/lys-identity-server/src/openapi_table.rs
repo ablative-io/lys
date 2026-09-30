@@ -6,8 +6,8 @@
 use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
-    ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, RECORDED, SIGNED,
-    SIGNED_BODY, UNANSWERED,
+    ADMIN, ADMIN_BODY, AGENT, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON, PROFILE_REVIEW,
+    RECORDED, SIGNED, SIGNED_BODY, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -48,7 +48,7 @@ macro_rules! entries {
 /// Every route of the table; `openapi_types.rs` names the types each takes and answers.
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
-    GET "/login" "Begin a sign-in at the issuer" P [];
+    GET "/login" "Redirect to the sign-in screen" P [];
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
@@ -96,13 +96,14 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED];
+    GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]];
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]];
     GET "/skills" "The skills Lys keeps" S [SIGNED];
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY];
-    POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY];
+    POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW];
     POST "/agents/{id}/start-command" "An agent's start command" S [SIGNED_BODY, &["AgentNotVisible", "MachineCannotReach"], &["LaunchRecordMissing", "MachineNotForAgent", "MachineRetired", "MachineUnknown", "MachineWithoutRuntime", "NotAdmitted"], &["HarnessUndeclared", "LaunchUnrenderable", "McpHandleUnsupported", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"], &["runner_protocol_mismatch"]];
     POST "/agents/{id}/runtime/sessions/{session}/reports" "A runtime report" G [AGENT, &["NotAdmitted"], &["AgentNotVisible", "RequestMalformed"]];
     GET "/agents/{id}/runtime/sessions" "An agent's runtime sessions" S [SIGNED, &["AgentNotVisible"]];
@@ -163,12 +164,14 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/service-accounts" "The service accounts" S [SIGNED];
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]];
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];
+    GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "goals_unavailable"]];
     GET "/teams" "Every team" S [SIGNED];
-    POST "/teams" "Create a team" S [SIGNED_BODY];
+    POST "/teams" "Create a team" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     GET "/teams/{id}" "One team" S [SIGNED];
     POST "/teams/{id}/members" "Add a team member" S [SIGNED_BODY, &["AgentNotVisible", "NotAdmitted", "not_permitted"]];
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]];
+    POST "/teams/{id}/nesting" "Replace a team parent and lead" S [SIGNED_BODY, &["team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     POST "/teams/{id}/retire" "Retire a team" S [SIGNED_BODY];
     GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]];
     GET "/secrets" "The secrets" S [SIGNED, &["NoPerson", "SecretsUnavailable"]];

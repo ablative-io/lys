@@ -72,7 +72,9 @@ describe('Sign-in providers', () => {
     await input('form[aria-label="Set a sign-in provider"] input[placeholder]', 'contoso.onmicrosoft.com');
     await click(button('Set Microsoft'));
     expect(posted).toEqual([{ path: '/sign-in-providers', body: { provider: 'microsoft', client_id: 'app-id', client_secret: 'secret', tenant: 'contoso.onmicrosoft.com' } }]);
-    expect(text()).toContain('SignInProvidersRefused');
+    expect(text()).toContain('The sign-in service did not accept these settings');
+    expect(text()).toContain('Check the settings issued by the provider');
+    expect(text()).not.toContain('SignInProvidersRefused');
     expect(posted).toHaveLength(1);
   });
   it('says when the service has no issuer API to set providers through', async () => {
@@ -81,7 +83,9 @@ describe('Sign-in providers', () => {
       '/connections': ok(connections),
       '/sign-in-providers': refused(503, 'SignInProvidersUnavailable', 'the configuration names no sign_in_providers'),
     });
-    expect(text()).toContain('SignInProvidersUnavailable');
+    expect(text()).toContain('Lys could not read or change its sign-in services');
+    expect(text()).toContain('Check the service configuration');
+    expect(text()).not.toContain('SignInProvidersUnavailable');
     expect($$('form[aria-label="Set a sign-in provider"]')).toHaveLength(0);
   });
 });

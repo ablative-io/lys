@@ -1,7 +1,7 @@
 /** Personal budgets keep the requested change beside the limits still enforced until an administrator confirms. */
 import { useRef, useState } from 'react';
-import { api, Refused, request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { api, request, useLoad } from '../../api';
+import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
 import { ACTS, MEASURES, shown } from '../usage/contract';
 import type { Budget, BudgetsView } from '../usage/contract';
 
@@ -9,26 +9,16 @@ type Unconfirmed = { requested: Budget; effective: Budget; reason: string };
 type PersonalView = BudgetsView & { unconfirmed: Unconfirmed[] };
 
 export function PersonalBudgets({ id, name }: { id: string; name: string }) {
-  const [revision, setRevision] = useState(0);
   const path = '/budgets/person/' + encodeURIComponent(id);
-  return <section className="card" aria-label="Personal budgets">
-    <h2>Budgets for {name}</h2>
-    <p>These limits apply across this person’s agents. A requested change does not replace the enforced budget until an administrator confirms it.</p>
-    <PersonalBudgetRead key={id + ':' + revision} path={path} refresh={() => setRevision((value) => value + 1)} />
-  </section>;
-}
-
-function PersonalBudgetRead({ path, refresh }: { path: string; refresh: () => void }) {
   const load = useLoad(async () => {
     const [view, people] = await Promise.all([request<PersonalView>(path), api.people()]);
     return { view, administrator: people.scope === 'directory' };
   }, path);
-  return <>
-    <Gate load={load} title="Personal budgets" ok={({ view, administrator }) =>
-      <BudgetReview path={path} view={view} administrator={administrator} refresh={refresh} />
-    } />
-    {load.status === 'refused' ? <button className="btn" onClick={refresh}>Read budgets again</button> : null}
-  </>;
+  return <section className="card" aria-label="Personal budgets">
+    <h2>Limits across {name}’s agents</h2>
+    <p>A requested change does not replace the enforced budget until an administrator applies it.</p>
+    <Gate load={load} title="Personal budgets" ok={({ view, administrator }) => <BudgetReview key={id} path={path} initial={view} administrator={administrator} />} />
+  </section>;
 }
 
 function Details({ budget }: { budget: Budget }) {
@@ -40,19 +30,22 @@ function Details({ budget }: { budget: Budget }) {
   </dl>;
 }
 
-function BudgetReview({ path, view, administrator, refresh }: { path: string; view: PersonalView; administrator: boolean; refresh: () => void }) {
+function BudgetReview({ path, initial, administrator }: { path: string; initial: PersonalView; administrator: boolean }) {
+  const [view, setView] = useState(initial);
+  const [failure, setFailure] = useState<unknown>(null);
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
   const confirm = async (budget: Budget) => {
-    if (sending.current || failure) return;
+    if (sending.current) return;
     sending.current = true;
     setBusy(true);
     try {
-      await request<Budget>(path + '/confirm', { measure: budget.measure, version: budget.version });
-      refresh();
+      setFailure(null);
+      const answer = await request<Budget>(path + '/confirm', { measure: budget.measure, version: budget.version });
+      if (answer.holder.kind !== budget.holder.kind || answer.holder.id !== budget.holder.id || answer.measure !== budget.measure || answer.version <= budget.version) throw new Error('The answer did not confirm the requested budget. Open this tab again to check its outcome.');
+      setView((current) => ({ ...current, budgets: [...current.budgets.filter((entry) => entry.measure !== answer.measure), answer], unconfirmed: current.unconfirmed.filter((entry) => entry.requested.measure !== answer.measure) }));
     } catch (error) {
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      setFailure(error);
     } finally {
       sending.current = false;
       setBusy(false);
@@ -60,6 +53,7 @@ function BudgetReview({ path, view, administrator, refresh }: { path: string; vi
   };
   const waiting = new Set(view.unconfirmed.map((entry) => entry.requested.measure));
   return <>
+    {failure ? <ErrorWords problem={failure} /> : null}
     {!view.budgets.length && !view.unconfirmed.length ? <p>No personal budget is set.</p> : null}
     {view.budgets.filter((budget) => !waiting.has(budget.measure)).map((budget) => <article key={budget.measure} aria-label={MEASURES[budget.measure]}>
       <h3>{MEASURES[budget.measure]}</h3><p>Enforced budget</p><Details budget={budget} />
@@ -71,10 +65,9 @@ function BudgetReview({ path, view, administrator, refresh }: { path: string; vi
         <section aria-label="Currently enforced"><h4>Currently enforced</h4><Details budget={effective} /></section>
         <section aria-label="Requested change"><h4>Requested change</h4><Details budget={requested} /></section>
       </div>
-      {administrator ? <button className="btn primary" disabled={busy || Boolean(failure)} onClick={() => void confirm(requested)}>Confirm requested {MEASURES[requested.measure].toLowerCase()}</button>
+      {administrator ? <button className="btn primary" disabled={busy} onClick={() => void confirm(requested)}>Apply the new limit of {shown(requested.measure, requested.limit)} {requested.measure === 'tokens' ? 'tokens' : requested.measure === 'running_ms' ? 'minutes' : 'percent'}</button>
         : <p>An administrator must confirm this change. The currently enforced budget remains in place.</p>}
     </article>)}
     {busy ? <p role="status">Sending the confirmation; the stored result is not yet known.</p> : null}
-    {failure ? <div role="alert"><p>{failure}</p><p>Read the budgets again to check what was recorded before making another change.</p><button className="btn" onClick={refresh}>Read budgets again</button></div> : null}
   </>;
 }

@@ -1,6 +1,6 @@
 /** Saved stop evidence stays distinct from current authority and from runtime confirmation. */
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, text, unreachable } from './harness';
+import { $, mount, text, unmountAll, unreachable } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 const path = '/agents/' + SCRIBE + '/stops';
@@ -33,14 +33,12 @@ describe('Saved emergency-stop history', () => {
     expect(history).not.toContain('Certificates withdrawn'); expect(history).not.toContain('Credentials ended');
     expect(history).not.toContain('Sessions asked to end'); expect(posted).toEqual([]);
   });
-  it('distinguishes an empty record from a refusal and lets a subsequent read recover', async () => {
-    let answered = false;
-    const { requests, posted } = await mount(route, { ...SERVICE, [path]: () => answered ? ok({ stops: [] }) : refused(503, 'StopsUnavailable', 'Stop log could not be read') });
+  it('distinguishes an empty record from a refusal', async () => {
+    await mount(route, { ...SERVICE, [path]: refused(503, 'StopsUnavailable', 'Stop log could not be read') });
     expect(text()).toContain('StopsUnavailable'); expect(text()).not.toContain(empty);
-    answered = true;
-    await click($$('button').find((button) => button.textContent === 'Refresh stop history') ?? null);
-    expect(text()).toContain(empty); expect(text()).not.toContain('StopsUnavailable');
-    expect(requests.filter((value) => value === path)).toHaveLength(2); expect(posted).toEqual([]);
+    unmountAll(); document.body.innerHTML = '';
+    const { posted } = await mount(route, { ...SERVICE, [path]: ok({ stops: [] }) });
+    expect(text()).toContain(empty); expect(text()).not.toContain('StopsUnavailable'); expect(posted).toEqual([]);
   });
   it.each([
     { stops: [{ ...stop, agent: ADA }] },

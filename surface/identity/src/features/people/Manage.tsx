@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from './Words';
 import { ACTIONS } from '../file/tabs';
 import { field, RecordedForm, TextField } from './RecordedForm';
 import './manage.css';

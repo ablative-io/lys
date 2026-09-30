@@ -126,6 +126,54 @@ describe('Lys setup page', () => {
     used.unmount();
   });
 
+  it('asks for the setup code when the address carries none, names where the install put it, and opens setup with it as the link does', async () => {
+    const page = await render({
+      'POST /setup/open': (body) => (body as { code: string }).code === 'Zq81mTn4Rw0pLk7H'
+        ? ok({ purpose: 'first-run', email: null, policy: POLICY })
+        : refused(401, 'SetupCodeRefused', 'SetupCodeRefused: x'),
+      'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
+    }, '');
+    expect(page.posted).toEqual([]);
+    expect($('[role="alert"]')).toBeNull();
+    expect($('label[for="setup-code"]')?.textContent).toBe('Setup code');
+    expect($('#setup-code-where')?.textContent).toBe(
+      'The install put it in a file named setup-code, in the folder Lys is installed in on the machine Lys runs on; the install’s output names that file. Only the account that ran the install can read it.');
+    expect(unstyled()).toEqual([]);
+
+    await fill({ code: 'wrong' });
+    await submit('Setup code');
+    expect($('[role="alert"]')?.textContent).toBe('This setup code is not valid or was already used. Run lys identity setup-code on the machine Lys runs on for a fresh one.');
+    expect($('#setup-code')).not.toBeNull();
+
+    await fill({ code: ' Zq81mTn4Rw0pLk7H\n' });
+    await submit('Setup code');
+    expect(page.posted.filter((entry) => entry.path === '/setup/open')).toEqual([
+      { path: '/setup/open', body: { code: 'wrong' } },
+      { path: '/setup/open', body: { code: 'Zq81mTn4Rw0pLk7H' } },
+    ]);
+    expect($('#setup-code')).toBeNull();
+    await fill({ display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1843' });
+    await submit('Set up Lys');
+    expect(page.posted.filter((entry) => entry.path === '/setup/administrator')).toEqual([{ path: '/setup/administrator', body: {
+      code: 'Zq81mTn4Rw0pLk7H', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/),
+      display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
+    } }]);
+    expect(page.finished()).toBe(1);
+    page.unmount();
+  });
+
+  it('says an entered code needs entering, and that setup attempts are limited, in setup words', async () => {
+    const page = await render({ 'POST /setup/open': refused(429, 'SignInThrottled', 'SignInThrottled: too many sign-ins failed from this address; wait a little, then try again') }, '');
+    await submit('Setup code');
+    expect($('[role="alert"]')?.textContent).toBe('Enter the setup code.');
+    expect(page.posted).toEqual([]);
+    await fill({ code: 'Zq81mTn4Rw0pLk7H' });
+    await submit('Setup code');
+    expect($('[role="alert"]')?.textContent).toBe('Lys takes five setup attempts a minute, and that many have been made. Wait a minute, then try again.');
+    expect($('#setup-code')).not.toBeNull();
+    page.unmount();
+  });
+
   it('sets the administrator a new password with a password code', async () => {
     const page = await render({
       'POST /setup/open': ok({ purpose: 'password', email: 'ada@example.test', policy: POLICY }),

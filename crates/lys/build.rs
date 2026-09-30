@@ -1,17 +1,7 @@
-//! Stamps the commit this crate is built from into `LYS_BUILD`, which every
-//! binary's `--version` prints as `NAME VERSION (LYS_BUILD)`.
-//!
-//! The value is the 40-character commit `git rev-parse HEAD` names, followed
-//! by `; dirty` when `git status --porcelain` lists any change. A build with
-//! no git tree to read, or whose manifest the tree it finds does not track
-//! (an exported tree unpacked inside some other repository), says
-//! `not built from a git commit`: never an empty or invented value. The
-//! stamp is taken again when HEAD, the branch it names, or the index moves.
-//!
-//! The same file stands in `crates/lys`, `crates/lys-identity-server`,
-//! `crates/lys-secrets` and `crates/lys-home`, byte for byte; a test holds
-//! them equal. It uses the standard library only, so a crate built from an
-//! exported tree builds it the same way.
+//! Records build provenance so exported sources remain distinguishable.
+//! Explicit provenance is validated and marked as stated; when a tracked
+//! checkout supplies independent provenance, the two must agree.
+//! All binaries share this implementation to keep provenance consistent.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -19,7 +9,7 @@ use std::process::{Command, Stdio};
 /// The words a build with no commit to read carries.
 const NO_COMMIT: &str = "not built from a git commit";
 
-/// What `git` says in `dir`, trimmed, when it runs and succeeds.
+/// Reads independent provenance only when the command succeeds.
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let output = Command::new("git")
         .args(["--no-optional-locks"])
@@ -37,10 +27,7 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
         .map(|text| text.trim().to_string())
 }
 
-/// The files in the git tree `dir` is in whose change should take the stamp
-/// again: HEAD, the index, the packed refs, the branch HEAD names and the
-/// directory of branches, where a first commit makes the branch appear.
-/// Empty when there is no git tree.
+/// Watches repository changes so cached builds retain current provenance.
 fn watched(dir: &Path) -> Vec<String> {
     let mut paths = vec![
         "HEAD".to_string(),
@@ -66,29 +53,58 @@ fn watched(dir: &Path) -> Vec<String> {
     watched
 }
 
-/// The stamp for a crate whose manifest is in `dir`, with the files whose
-/// change should take it again. A tree with no commit yet is watched too,
-/// so its first commit takes the stamp again.
-fn stamp(dir: &Path) -> (String, Vec<String>) {
+/// Validates explicit provenance before it can enter the stamp.
+fn stated() -> Result<Option<String>, String> {
+    let commit = match std::env::var("LYS_BUILD_COMMIT") {
+        Ok(commit) => commit,
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err("LYS_BUILD_COMMIT must be 40 lowercase hexadecimal characters".into());
+        }
+    };
+    if commit.len() != 40
+        || !commit
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err("LYS_BUILD_COMMIT must be 40 lowercase hexadecimal characters".into());
+    }
+    Ok(Some(commit))
+}
+
+/// Distinguishes explicit provenance from independently read provenance.
+fn stamp(dir: &Path) -> Result<(String, Vec<String>), String> {
+    let stated = stated()?;
     let watched = watched(dir);
     let tracked = git(dir, &["ls-files", "--error-unmatch", "Cargo.toml"]).is_some();
     let commit = git(dir, &["rev-parse", "HEAD"])
         .filter(|commit| commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()));
     let Some(commit) = commit.filter(|_| tracked) else {
-        return (NO_COMMIT.to_string(), watched);
+        let value = stated.map_or_else(
+            || NO_COMMIT.to_string(),
+            |commit| format!("{commit}; stated"),
+        );
+        return Ok((value, watched));
     };
-    let dirty = git(dir, &["status", "--porcelain"]).is_some_and(|changes| !changes.is_empty());
-    let value = if dirty {
-        format!("{commit}; dirty")
+    let mut value = if let Some(stated) = stated {
+        if stated != commit {
+            return Err("LYS_BUILD_COMMIT disagrees with the Git HEAD commit".into());
+        }
+        format!("{commit}; stated")
     } else {
         commit
     };
-    (value, watched)
+    let dirty = git(dir, &["status", "--porcelain"]).is_some_and(|changes| !changes.is_empty());
+    if dirty {
+        value.push_str("; dirty");
+    }
+    Ok((value, watched))
 }
 
-fn main() {
+fn main() -> Result<(), String> {
     let dir = std::env::var_os("CARGO_MANIFEST_DIR").map_or_else(|| ".".into(), PathBuf::from);
-    let (value, watched) = stamp(&dir);
+    println!("cargo:rerun-if-env-changed=LYS_BUILD_COMMIT");
+    let (value, watched) = stamp(&dir)?;
     println!("cargo:rerun-if-changed=build.rs");
     for path in watched {
         if Path::new(&path).exists() {
@@ -96,4 +112,5 @@ fn main() {
         }
     }
     println!("cargo:rustc-env=LYS_BUILD={value}");
+    Ok(())
 }

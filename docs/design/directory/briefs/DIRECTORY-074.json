@@ -30,11 +30,15 @@
       ],
       "files": {
         "create": [
-          "crates/lys-runner/tests/launch_folders.rs"
+          "crates/lys-runner/tests/launch_folders.rs",
+          "crates/lys-identity-server/tests/profile_folders.rs"
         ],
         "modify": [
           "crates/lys-runner/src/protocol.rs",
-          "crates/lys-identity-server/src/launch_template.rs"
+          "crates/lys-identity-server/src/launch_template.rs",
+          "crates/lys-identity-server/src/provisioning_store.rs",
+          "crates/lys-identity-server/src/provisioning_api.rs",
+          "crates/lys-identity-server/tests/provisioning.rs"
         ],
         "delete": []
       },

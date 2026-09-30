@@ -1,9 +1,10 @@
 /** Resolve an existing approval intent without creating another decision or grant operation. */
 import { useRef, useState } from 'react';
-import { Refused, request } from '../../api';
+import { request } from '../../api';
+import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
 
-export function HeldApproval({ entry, changed }: { entry: AccessRequest; changed: () => void }) {
+export function HeldApproval({ entry, changed }: { entry: AccessRequest; changed: (answer: AccessRequest) => void }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
   const working = useRef(false);
@@ -12,11 +13,11 @@ export function HeldApproval({ entry, changed }: { entry: AccessRequest; changed
     try {
       const answer = await request<AccessRequest>('/requests/' + encodeURIComponent(entry.id) + '/reconcile', {});
       if (answer.id !== entry.id) throw new Error('The answer names another request. This approval remains unconfirmed.');
-      changed();
-    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+      changed(answer);
+    } catch (error) { setFailure(failureWords(error, 'Choose Check pending approval to check this same decision; do not make another decision.')); }
     finally { working.current = false; setBusy(false); }
   };
-  const who = entry.approvers.find((person) => person.id === entry.held_by)?.display_name ?? entry.held_by;
+  const who = entry.approvers.find((person) => person.id === entry.held_by)?.display_name ?? 'a person whose name is unavailable';
   return <div role="status"><p>An approval by {who} is being settled. A new decision cannot replace it.</p>
     <button className="btn" disabled={busy} onClick={() => void check()}>{busy ? 'Checking…' : 'Check pending approval'}</button>
     {failure ? <p role="alert">{failure}</p> : null}

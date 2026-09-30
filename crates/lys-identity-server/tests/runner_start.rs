@@ -10,168 +10,22 @@
 //! the runner holds that digest. Every wait ends on an
 //! answer, never a clock.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+#[path = "support/runner_start.rs"]
+mod support;
+use support::{Table, operation};
 
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::sync::Arc;
 
-use axum::Router;
-use axum::extract::Request;
-use axum::response::{IntoResponse, Response};
-use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::OperationId;
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::secrets_api::SecretsSettings;
 use lys_runner::dial::Dial;
 use lys_runner::protocol::hex;
-use lys_runner::{Act, Answer, Client, Options, Runner, Serving};
-use serde_json::{Value, json};
+use lys_runner::{Act, Answer, Client, Options, Runner};
+use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-async fn broker(request: Request) -> Response {
-    if request.uri().path() != "/_lys/handles" {
-        return axum::Json(json!({})).into_response();
-    }
-    axum::Json(json!({ "holder": "any", "handles": [
-        { "id": "h-live", "secret": "git-host token", "max_uses": 10, "used": 1,
-          "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0, "parent": null },
-    ]}))
-    .into_response()
-}
-
-fn operation() -> Result<String, Box<dyn Error>> {
-    Ok(OperationId::generate()?.to_string())
-}
-
-struct Table {
-    service: Service,
-    seeded: Seeded,
-    ada: String,
-    dir: tempfile::TempDir,
-    serving: Option<Serving>,
-    server_key: Arc<Ed25519Identity>,
-}
-
-impl Table {
-    async fn set() -> Result<Self, Box<dyn Error>> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let address = listener.local_addr()?;
-        tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
-        let dir = tempfile::tempdir()?;
-        let key_file = dir.path().join("secrets-service.key");
-        Ed25519Identity::load_or_generate(&key_file)?;
-        let settings = SecretsSettings {
-            broker: format!("http://{address}"),
-            service: "identity".to_owned(),
-            service_key_file: key_file,
-        };
-        let socket = dir.path().join("runner.sock");
-        let state = dir.path().join("runner-state");
-        let adjusted = socket.clone();
-        let (service, (seeded, serving, server_key)) = Service::start_adjusted(
-            GRANT_MODEL,
-            None,
-            Some(settings),
-            None,
-            move |config| config.runner_socket = Some(adjusted),
-            move |config| {
-                let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
-                let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-                let runner = Runner::open(&Options {
-                    socket,
-                    state,
-                    server_key: key.public_key_bytes(),
-                    scrollback: 1 << 16,
-                })?;
-                Ok((seeded, runner.spawn(), key))
-            },
-        )
-        .await?;
-        let ada = service
-            .sign_in(Login {
-                subject: ADMINISTRATOR.to_owned(),
-                email: "ada@example.test".to_owned(),
-            })
-            .await?;
-        let table = Self {
-            service,
-            seeded,
-            ada,
-            dir,
-            serving: Some(serving),
-            server_key,
-        };
-        table.profile().await?;
-        Ok(table)
-    }
-
-    fn agent(&self) -> String {
-        self.seeded.people[0].agents[0].id.to_string()
-    }
-
-    async fn ok(&self, path: &str, body: &Value) -> Result<Value, Box<dyn Error>> {
-        let (status, answer) = self.service.post(path, Some(&self.ada), body).await?;
-        if status != 200 {
-            return Err(format!("{path} answered {status}: {answer}").into());
-        }
-        Ok(answer)
-    }
-
-    async fn profile(&self) -> TestResult {
-        let path = format!("/agents/{}/provisioning", self.agent());
-        let body = json!({
-            "operation": operation()?, "from_version": 0,
-            "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
-            "mcp_servers": [], "instructions": "", "note": "",
-            "harness": harness_description::declared(),
-        });
-        self.ok(&path, &body).await?;
-        self.ok(
-            &format!("{path}/1/review"),
-            &json!({ "operation": operation()? }),
-        )
-        .await?;
-        Ok(())
-    }
-
-    /// Name a machine that runs the agent's shell, with `runner` as its
-    /// runner when one is given.
-    async fn machine(&self, runner: Option<Value>) -> Result<String, Box<dyn Error>> {
-        let id = operation()?;
-        let body = json!({
-            "operation": id, "name": "Box", "kind": "laptop", "runtime": "sh",
-            "slots": 1, "may_run": [self.agent()], "may_reach": [],
-        });
-        self.ok("/network/machines", &body).await?;
-        if let Some(runner) = runner {
-            self.ok(
-                &format!("/network/machines/{id}/runner"),
-                &json!({ "runner": runner }),
-            )
-            .await?;
-        }
-        Ok(id)
-    }
-
-    async fn start(&self, machine: &str) -> Result<(u16, Value), Box<dyn Error>> {
-        let path = format!("/agents/{}/start-command", self.agent());
-        let body = json!({ "machine": machine, "operation": operation()? });
-        self.service.post(&path, Some(&self.ada), &body).await
-    }
-
-    fn close(mut self) -> TestResult {
-        if let Some(serving) = self.serving.take() {
-            serving.stop()?;
-        }
-        Ok(())
-    }
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> TestResult {
@@ -202,6 +56,56 @@ async fn a_start_on_a_machine_with_the_runner_runs_and_is_listed_running() -> Te
         return Err("the runner answered no status".into());
     };
     assert!(status.sessions[0].ended.is_none(), "{status:?}");
+    let Answer::Matched { .. } = client.ask(&Act::Wait {
+        session: session.to_owned(),
+        cursor: Some(0),
+        pattern: "profile-read".to_owned(),
+        regex: false,
+    })?
+    else {
+        return Err("the declared program did not read its profile".into());
+    };
+    let config = table
+        .dir
+        .path()
+        .join("runner-state/sessions")
+        .join(session)
+        .join("config");
+    let settings: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(config.join("settings.json"))?)?;
+    assert_eq!(settings["env"]["LYS_AGENT"], table.agent());
+    assert_eq!(settings["env"]["LYS_HANDLE_GIT_HOST_TOKEN"], "h-live");
+    assert_eq!(std::fs::read(config.join("instructions.txt"))?, b"");
+    let (status, provisioning) = table
+        .service
+        .get(
+            &format!("/agents/{}/provisioning", table.agent()),
+            Some(&table.ada),
+        )
+        .await?;
+    assert_eq!(status, 200, "{provisioning}");
+    assert_eq!(provisioning["enforced"], true);
+    let path = format!("/agents/{}/provisioning", table.agent());
+    table
+        .ok(
+            &path,
+            &json!({
+                "operation": operation()?, "from_version": 1,
+                "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [],
+                "instructions": "The next profile has not run.", "note": "",
+                "harness": provisioning["profile"]["harness"],
+            }),
+        )
+        .await?;
+    table
+        .ok(
+            &format!("{path}/2/review"),
+            &json!({"operation": operation()?}),
+        )
+        .await?;
+    let (status, next) = table.service.get(&path, Some(&table.ada)).await?;
+    assert_eq!(status, 200, "{next}");
+    assert_eq!(next["enforced"], false);
     table.close()
 }
 

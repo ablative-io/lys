@@ -25,7 +25,7 @@ describe('Keep access', () => {
   });
   it('shows the named refusal when the grant no longer stands', async () => {
     await mount('#/reviews', { ...routes, ['POST ' + path]: refused(409, 'GrantNotDue', 'This grant has ended') });
-    await click(button('Keep access')); await click(button('Confirm keep')); expect(text()).toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
+    await click(button('Keep access')); await click(button('Confirm keep')); expect(text()).toContain('This grant has ended'); expect(text()).not.toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
   });
   it('does not offer a recording action when the store is unavailable', async () => {
     await mount('#/reviews', { ...routes, '/reviews': ok({ ...view, decisions_recorded: false }) }); expect(button('Keep access')).toBeNull(); expect(text()).toContain('Keep decisions are unavailable');

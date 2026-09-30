@@ -51,6 +51,7 @@ pub mod containment_stdio;
 pub mod dial;
 pub mod error;
 pub mod judge;
+pub mod launch_config;
 pub mod operations;
 pub mod peer;
 pub mod protocol;

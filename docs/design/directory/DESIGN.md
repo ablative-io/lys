@@ -1120,6 +1120,31 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/harness_settings.rs` | A profile version is checked against its harness's schema and its settings read in full (DIRECTORY-075 R2) | DIRECTORY-075 |
 | `crates/lys-identity-server/src/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
 | `crates/lys-identity-server/tests/mcp_registry.rs` | Approved MCP servers are a registry (DIRECTORY-075 R3) | DIRECTORY-075 |
+| `crates/lys-identity-server/src/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/tests/harness_catalogue.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/claude-code.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `docs/harness/catalogue/codex.json` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-runner/src/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
+| `crates/lys-runner/tests/installed.rs` | Each computer's runner reports where each described program is installed (DIRECTORY-076 R2) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/routes.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/error.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/error_status.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/src/openapi_types.rs` | Lys answers the programs it can start, with their models and modes as named choices (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-home/src/harness/rendering.rs` | The programme catalogue reads registration through the rendering resolver (DIRECTORY-076 R1) | DIRECTORY-076 |
+| `crates/lys-identity-server/tests/profile_folders.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_store.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/tests/provisioning.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_store.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error_status.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/lib.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_nesting.rs` | Versioned nesting events and their admitted mutations (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/tree_views.rs` | Typed summaries computed from held state for the tree read (DIRECTORY-071). | DIRECTORY-071 |
 
 ## Inventory
 

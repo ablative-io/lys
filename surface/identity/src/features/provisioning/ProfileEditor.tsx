@@ -1,109 +1,94 @@
-/** A profile version is recorded with every member the start carries: the declared harness, each MCP server as an address or a command with its channel, and the settings file's permissions. */
+/** The agent's settings, as the form it is changed in: each label says what the start does with the value; choices come from the service, never typed as JSON. */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { operationId } from '../../api';
-import { field } from '../people/RecordedForm';
 import { useRoleChange } from '../roles/useRoleChange';
 import { ChangeStatus } from '../roles/ChangeStatus';
-import type { HarnessDescription, McpServer, Permissions, ProvisioningAnswer, ProvisioningProfile } from './Provisioning';
+import type { Choices } from './choices';
+import type { ProvisioningAnswer, ProvisioningProfile } from './Provisioning';
+import { ServiceRows, draftOf, serverOf } from './ServiceRows';
+import type { ServiceDraft } from './ServiceRows';
 
-const lines = (data: FormData, name: string) => field(data, name).split('\n').map((line) => line.trim()).filter(Boolean);
-type Draft = McpServer & { key: number; kind: 'address' | 'command' };
+const lines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
+const unique = (values: string[]) => values.filter((value, index) => values.indexOf(value) === index);
 
-function server(data: FormData, draft: Draft): McpServer {
-  const name = field(data, 'server-name-' + draft.key);
-  const channel = field(data, 'server-channel-' + draft.key) === 'wake' ? 'wake' : 'off';
-  if (!name) throw new Error('Each MCP server needs a name.');
-  if (draft.kind === 'address') {
-    const url = field(data, 'server-url-' + draft.key); const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('MCP server ' + name + ' needs an HTTP or HTTPS address without an embedded username or password.');
-    return { name, url, channel };
-  }
-  const program = field(data, 'server-program-' + draft.key); const cwd = field(data, 'server-cwd-' + draft.key);
-  const envText = field(data, 'server-env-' + draft.key) || '{}';
-  let env: unknown;
-  try { env = JSON.parse(envText); } catch { throw new Error('The environment of MCP server ' + name + ' is not JSON.'); }
-  if (!env || typeof env !== 'object' || Array.isArray(env)) throw new Error('The environment of MCP server ' + name + ' is not a JSON object.');
-  if (!program) throw new Error('MCP server ' + name + ' needs the program it is started with.');
-  let args: unknown;
-  try { args = JSON.parse(field(data, 'server-args-' + draft.key) || '[]'); } catch { throw new Error('The arguments of MCP server ' + name + ' are not JSON.'); }
-  if (!Array.isArray(args) || !args.every((arg) => typeof arg === 'string')) throw new Error('The arguments of MCP server ' + name + ' are not a JSON array of strings.');
-  return { name, command: { program, args, ...(cwd ? { cwd } : {}), env: env as NonNullable<McpServer['command']>['env'] }, channel };
-}
-
-function permissions(data: FormData): Permissions | null {
-  const given: Permissions = { allow: lines(data, 'perm-allow'), deny: lines(data, 'perm-deny'), ask: lines(data, 'perm-ask'), additional_directories: lines(data, 'perm-dirs') };
-  const mode = field(data, 'perm-mode');
-  if (mode) given.default_mode = mode;
-  const empty = !mode && [given.allow, given.deny, given.ask, given.additional_directories].every((list) => !list?.length);
-  return empty ? null : given;
-}
-
-export function ProfileEditor({ id, path, person, profile, changed }: { id: string; path: string; person: string; profile: ProvisioningProfile | null; changed: () => void }) {
-  const [servers, setServers] = useState<Draft[]>((profile?.mcp_servers ?? []).map((value, key) => ({ ...value, key, kind: value.command ? 'command' : 'address' })));
-  const [nextKey, setNextKey] = useState(servers.length);
+export function ProfileEditor({ id, path, person, profile, choices, changed, readOnly }: { id: string; path: string; person: string; profile: ProvisioningProfile | null; choices: Choices; changed: () => void; readOnly: boolean }) {
+  const held = profile?.permissions;
+  const declared = profile?.harness ?? null;
+  const [programName, setProgramName] = useState(declared?.name ?? '');
+  const [build, setBuild] = useState(declared ? declared.program + '\n' + declared.package : '');
+  const [models, setModels] = useState<string[]>(profile?.model_access ?? []);
+  const [skills, setSkills] = useState<string[]>(profile?.skills ?? []);
+  const [services, setServices] = useState<ServiceDraft[]>((profile?.mcp_servers ?? []).map(draftOf));
   const [error, setError] = useState('');
+  const program = choices.programs?.find((entry) => entry.name === programName) ?? null;
   const change = useRoleChange<ProvisioningAnswer>('lys.pending.provisioning.' + person + '.' + id, path,
     (answer, body) => answer.agent === id && (answer.recorded ? answer.recorded.operation === body.operation && answer.recorded.version === Number(body.from_version) + 1 : answer.profile !== null && answer.profile.operation === body.operation && answer.profile.version === Number(body.from_version) + 1), changed);
-  const kind = (key: number, next: Draft['kind']) => setServers((values) => values.map((entry) => entry.key === key ? { ...entry, kind: next } : entry));
+  const harness = () => {
+    if (!programName) return null;
+    if (!program) {
+      if (declared && declared.name === programName) return declared;
+      throw new Error('Lys does not list the program ' + programName + ', so it cannot be chosen.');
+    }
+    const [binary, pkg] = build.split('\n');
+    if (!binary) throw new Error('Choose which installed copy of ' + program.name + ' this agent uses.');
+    return { name: program.name, description: program.description, program: binary, package: pkg ?? '' };
+  };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (change.blocked) return;
     try {
       const data = new FormData(event.currentTarget);
-      const mcp_servers = servers.map((draft) => server(data, draft));
-      if (new Set(mcp_servers.map((entry) => entry.name)).size !== mcp_servers.length) throw new Error('Give each MCP server a different name.');
-      const program = field(data, 'harness-program'); const pkg = field(data, 'harness-package');
-      if (Boolean(program) !== Boolean(pkg)) throw new Error('Declare the harness with both its program and its package, or leave both empty.');
-      const name = field(data, 'harness-name');
-      let description: HarnessDescription | null = null;
-      if (program) {
-        if (!name) throw new Error('Name the harness build.');
-        try { description = JSON.parse(field(data, 'harness-description')); } catch { throw new Error('The harness description must be a JSON object.'); }
-        if (!description || typeof description !== 'object' || Array.isArray(description)) throw new Error('The harness description must be a JSON object.');
-      }
-      const harness = program ? { name, description, program, package: pkg } : null;
+      const text = (name: string) => String(data.get(name) ?? '').trim();
+      const mcp_servers = services.map(serverOf);
+      if (new Set(mcp_servers.map((entry) => entry.name)).size !== mcp_servers.length) throw new Error('Give each connected service a different name.');
+      const mode = text('mode');
+      const permissions = { allow: unique(lines(text('allow'))), deny: lines(text('deny')), ask: lines(text('ask')), additional_directories: lines(text('folders')), ...(mode ? { default_mode: mode } : {}) };
+      const empty = !mode && [permissions.allow, permissions.deny, permissions.ask, permissions.additional_directories].every((list) => !list.length);
+      const runsOn = text('runs_on'); const writable = text('writable');
       setError('');
-      change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: lines(data, 'model_access'), tools: lines(data, 'tools'), skills: lines(data, 'skills'), mcp_servers, instructions: field(data, 'instructions'), note: field(data, 'note'), harness, permissions: permissions(data) });
+      change.submit({ operation: operationId(), from_version: profile?.version ?? 0, model_access: models.length || !program?.models.length ? models : [program.models[0].id], tools: [], skills, mcp_servers,
+        instructions: text('instructions'), note: text('note'), harness: harness(), permissions: empty ? null : permissions,
+        ...(runsOn ? { runs_on: runsOn } : {}), ...(writable ? { writable } : {}) });
     } catch (failure) { setError(String(failure)); }
   };
-  const held = profile?.permissions;
-  return <form className="card recorded-form" aria-label="Record provisioning profile" onSubmit={submit}><h3>{profile ? 'Record a new version' : 'Set up a profile'}</h3>
-    <fieldset disabled={change.blocked} style={{ border: 0, padding: 0 }}>
-      <label className="field">Instructions<textarea name="instructions" defaultValue={profile?.instructions ?? ''} rows={5} placeholder="How this agent should carry out its work" /></label>
-      <details><summary>Harness</summary><p>The build this agent is started with. A start is refused until one is declared.</p>
-        <label className="field">Harness name<input name="harness-name" defaultValue={profile?.harness?.name ?? ''} /></label>
-        <label className="field">Build description (JSON)<textarea name="harness-description" rows={12} defaultValue={profile?.harness?.description ? JSON.stringify(profile.harness.description, null, 2) : ''} /></label>
-        <p>Use the build's declared model limits, permission modes, MCP capabilities and rendering contract. Its name is only a label.</p>
-        <label className="field">Program<input name="harness-program" defaultValue={profile?.harness?.program ?? ''} placeholder="/absolute/path/to/program" /></label>
-        <label className="field">Package<input name="harness-package" defaultValue={profile?.harness?.package ?? ''} placeholder="The package the program is verified against" /></label>
-      </details>
-      <details><summary>Models, tools, skills and MCP servers</summary><p>One name per line. These declarations do not give permission to use a service.</p>
-        <label className="field">Model access<textarea name="model_access" defaultValue={profile?.model_access.join('\n') ?? ''} /></label>
-        <label className="field">Tools<textarea name="tools" defaultValue={profile?.tools.join('\n') ?? ''} /></label>
-        <label className="field">Skills<textarea name="skills" defaultValue={profile?.skills.join('\n') ?? ''} /></label>
-        {servers.map((draft) => <fieldset key={draft.key} aria-label={'MCP server ' + (draft.name || draft.key)}>
-          <label className="field">Server name<input name={'server-name-' + draft.key} defaultValue={draft.name} required /></label>
-          <label className="field">Started as<select value={draft.kind} onChange={(event) => kind(draft.key, event.target.value === 'command' ? 'command' : 'address')}><option value="address">An address</option><option value="command">A command</option></select></label>
-          {draft.kind === 'address' ? <label className="field">Server address<input name={'server-url-' + draft.key} type="url" defaultValue={draft.url ?? ''} required /></label> : <>
-            <label className="field">Program<input name={'server-program-' + draft.key} defaultValue={draft.command?.program ?? ''} required /></label>
-            <label className="field">Arguments (a JSON array of strings, exactly as passed)<textarea name={'server-args-' + draft.key} defaultValue={JSON.stringify(draft.command?.args ?? [])} /></label>
-            <label className="field">Directory<input name={'server-cwd-' + draft.key} defaultValue={draft.command?.cwd ?? ''} /></label>
-            <label className="field">Environment (a JSON object; a secret as {'{"handle": "<secret name>"}'})<textarea name={'server-env-' + draft.key} defaultValue={JSON.stringify(draft.command?.env ?? {}, null, 2)} /></label>
-          </>}
-          <label className="field">Its messages<select name={'server-channel-' + draft.key} defaultValue={draft.channel ?? 'off'}><option value="off">Never wake the agent</option><option value="wake">Wake an idle agent</option></select></label>
-          <button type="button" className="btn" onClick={() => setServers((values) => values.filter((entry) => entry.key !== draft.key))}>Remove server</button>
-        </fieldset>)}
-        <button type="button" className="btn" onClick={() => { setServers((values) => [...values, { key: nextKey, kind: 'address', name: '', url: '' }]); setNextKey((value) => value + 1); }}>Add MCP server</button>
-      </details>
-      <details><summary>Permissions</summary><p>Rules as the settings file reads them: a tool name, or a tool name with one specifier in brackets. One per line.</p>
-        <label className="field">Allow<textarea name="perm-allow" defaultValue={held?.allow?.join('\n') ?? ''} /></label>
-        <label className="field">Deny<textarea name="perm-deny" defaultValue={held?.deny?.join('\n') ?? ''} /></label>
-        <label className="field">Ask<textarea name="perm-ask" defaultValue={held?.ask?.join('\n') ?? ''} /></label>
-        <label className="field">Permission mode<input name="perm-mode" defaultValue={held?.default_mode ?? ''} placeholder="A mode declared by this build" /></label>
-        <label className="field">Additional directories, absolute<textarea name="perm-dirs" defaultValue={held?.additional_directories?.join('\n') ?? ''} /></label>
-      </details>
-      <label className="field">Reason for this version<input name="note" required placeholder="What changed and why" /></label>
-      <button type="submit" className="btn primary">Record profile</button>
+  const toggle = (list: string[], value: string, on: boolean) => on ? unique([...list, value]) : list.filter((entry) => entry !== value);
+  const modelChoices = program?.models ?? models.map((model) => ({ id: model, label: model }));
+  return <form className="card recorded-form" aria-label="This agent's settings" onSubmit={submit}>
+    <fieldset disabled={readOnly || change.blocked} style={{ border: 0, padding: 0 }}>
+      <label className="field">Computer<span className="hint">Which computer this agent works on. It starts there unless you pick another when you start it.</span>
+        <select name="runs_on" defaultValue={profile?.runs_on ?? ''}><option value="">Chosen at each start</option>{choices.machines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label>
+      <label className="field">Folder it may change<span className="hint">The one folder this agent can change. Leave empty and it can change anything your account can. Not enforced yet.</span>
+        <input name="writable" defaultValue={profile?.writable ?? ''} placeholder="/Users/you/agents/this-agent" /></label>
+      <label className="field">Program<span className="hint">The program that does this agent's work. A start is refused until one is chosen.</span>
+        <select value={programName} onChange={(event) => { setProgramName(event.target.value); setBuild(''); setModels([]); }}><option value="">Not chosen</option>
+          {(choices.programs ?? (declared ? [{ name: declared.name, line: '' }] : [])).map((entry) => <option key={entry.name} value={entry.name}>{entry.name}{entry.line ? ' — ' + entry.line : ''}</option>)}</select>
+        {choices.programs === null ? <span className="hint">Lys cannot list its programs yet ({choices.programsMissing}); the program already saved is kept.</span> : null}</label>
+      {program ? <label className="field">Installed copy<span className="hint">Where {program.name} is on the computer, as Lys found it. The start runs exactly this file.</span>
+        <select value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose</option>{program.builds.map((entry) => <option key={entry.program + entry.package} value={entry.program + '\n' + entry.package}>{entry.program} · {entry.package}</option>)}</select>
+        {!program.builds.length ? <span className="hint">No computer has reported where {program.name} is installed yet.</span> : null}</label> : null}
+      <label className="field">Model<span className="hint">Which AI model it uses, passed to the program as --model.</span>
+        <select value={models[0] ?? (program?.models[0]?.id ?? '')} onChange={(event) => setModels(unique([event.target.value, ...models.slice(1)].filter(Boolean)))}>{program ? null : <option value="">The program's default</option>}{modelChoices.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}</select></label>
+      {models[0] ? <div className="field">Backup models<span className="hint">Used in order if the first is unavailable, passed as --fallback-model.</span>
+        {modelChoices.filter((model) => model.id !== models[0]).map((model) => <label key={model.id}><input type="checkbox" checked={models.slice(1).includes(model.id)} onChange={(event) => setModels([models[0], ...toggle(models.slice(1), model.id, event.target.checked)])} /> {model.label}</label>)}</div> : null}
+      <label className="field">Standing instructions<span className="hint">Written to instructions.md and added to the end of the program's own system prompt each time the agent starts. They do not replace it.</span>
+        <textarea name="instructions" rows={6} defaultValue={profile?.instructions ?? ''} /></label>
+      <div className="field">Skills<span className="hint">At each start Lys writes each chosen skill into the agent's own settings folder as skills/name/SKILL.md, as the text saved with these settings. The program sees each skill's name and summary when it starts and reads the whole text when a job matches it.</span>
+        {choices.skills === null ? skills.map((skill) => <span key={skill}>{skill}</span>) : choices.skills.map((skill) => <label key={skill}><input type="checkbox" checked={skills.includes(skill)} onChange={(event) => setSkills(toggle(skills, skill, event.target.checked))} /> {skill}</label>)}</div>
+      <div className="field">Connected services<span className="hint">Other programs this agent can use, written into the start's MCP settings file.</span>
+        <ServiceRows drafts={services} setDrafts={setServices} secrets={choices.secrets} /></div>
+      <label className="field">Can do without asking<span className="hint">Written into the agent's settings file as its allow rules: one per line, a tool's name, or a tool's name with one detail in brackets.</span>
+        <textarea name="allow" rows={3} defaultValue={unique([...(held?.allow ?? []), ...(profile?.tools ?? [])]).join('\n')} /></label>
+      <label className="field">Must ask first<span className="hint">Written as its ask rules: it stops and asks before doing these.</span>
+        <textarea name="ask" rows={2} defaultValue={held?.ask?.join('\n') ?? ''} /></label>
+      <label className="field">Never allowed<span className="hint">Written as its deny rules: refused even when asked.</span>
+        <textarea name="deny" rows={2} defaultValue={held?.deny?.join('\n') ?? ''} /></label>
+      <label className="field">How much it decides alone<span className="hint">The program's permission mode.</span>
+        <select name="mode" key={program?.name ?? ''} defaultValue={held?.default_mode ?? program?.modes[0]?.id ?? ''}>{program ? null : <option value="">The program's default</option>}
+          {(program?.modes ?? (held?.default_mode ? [{ id: held.default_mode, meaning: '' }] : [])).map((mode) => <option key={mode.id} value={mode.id}>{mode.meaning ? mode.id + ' — ' + mode.meaning : mode.id}</option>)}</select></label>
+      <label className="field">Other folders it may work in<span className="hint">Folders outside its own it can open and use, one per line. Written into its settings file as additional directories.</span>
+        <textarea name="folders" rows={2} defaultValue={held?.additional_directories?.join('\n') ?? ''} /></label>
+      {readOnly ? <p className="note">Only a directory administrator can change these settings.</p> : <><label className="field">What you changed and why<span className="hint">Kept with this version of the settings.</span><input name="note" required /></label>
+      <button type="submit" className="btn primary">Save these settings</button></>}
     </fieldset>{error ? <p role="alert">{error}</p> : null}<ChangeStatus change={change} />
   </form>;
 }

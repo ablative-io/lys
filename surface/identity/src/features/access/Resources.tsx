@@ -1,7 +1,7 @@
 /** Resources and grant counts judged by the server within the caller's visibility. */
 import { useState } from 'react';
 import { request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 interface ResourceSummary { kind: string; id: string; standing: number; ended: number; holders: number }
 interface ResourcesView { kinds: string[]; resources: ResourceSummary[]; revision: number; judged_at: number }

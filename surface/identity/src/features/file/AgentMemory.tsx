@@ -1,7 +1,6 @@
 /** Agent home metadata shows provenance and context receipts without exposing memory notes or transcripts. */
-import { useState } from 'react';
 import { request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 
 export interface MemoryAnswer {
   agent: string;
@@ -14,14 +13,13 @@ export interface MemoryAnswer {
 }
 const date = (value: string) => new Date(value).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', timeZoneName: 'short' });
 export function AgentMemory({ id }: { id: string }) {
-  const [revision, setRevision] = useState(0);
   const load = useLoad(async () => {
     const answer = await request<MemoryAnswer>('/agents/' + encodeURIComponent(id) + '/memory');
     if (answer.agent !== id || answer.visible_to.agent !== id || answer.notes_shown !== false || typeof answer.home !== 'boolean' || !Array.isArray(answer.memories) || !Array.isArray(answer.skipped)) throw new Error('The memory answer did not name this agent and its visibility.');
     if (!answer.home && (answer.memories.length || answer.skipped.length || answer.last_given !== null)) throw new Error('The memory answer contains records without an agent home.');
     return answer;
-  }, 'agent-memory:' + id + ':' + revision);
-  return <><div className="head"><div><h2>Memory and home</h2><p>Where this agent’s memories came from and the last context it received.</p></div><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh memory</button></div>
+  }, 'agent-memory:' + id);
+  return <><div className="head"><div><h2>Memory and home</h2><p>Where this agent’s memories came from and the last context it received.</p></div></div>
     <Gate load={load} title="Memory and home" ok={(answer) => <>
       <section className="card"><h3>Who can see this record</h3><p>The agent, {answer.visible_to.responsible ? <a href={'#/file/' + answer.visible_to.responsible}>its responsible person</a> : 'no responsible person currently recorded'}{answer.visible_to.administrator ? ', and directory administrators' : ''}.</p><p className="note">Memory notes and conversation transcripts are not shown here.</p></section>
       {!answer.home ? <section className="card"><p>No home has been recorded for this agent.</p></section> : <>

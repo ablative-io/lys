@@ -14,7 +14,7 @@
 //! # The routes that name no answer, and why
 //!
 //! - `GET /authority` answers `text/plain`, not JSON.
-//! - `GET /login` answers a 303 to the issuer, carrying no body.
+//! - `GET /login` answers a 303 to `/#/sign-in`, carrying no body.
 //! - `GET /callback` answers through `Response`, since it must set the
 //!   session cookie; its body is [`crate::directory_views::SignedInView`],
 //!   which is registered here even though the route names no answer.
@@ -297,6 +297,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     vec![
         (
             GET,
+            "/harnesses",
+            None,
+            Some(api.schema::<crate::harness_catalogue::CatalogueView>()),
+        ),
+        (
+            GET,
             "/runtime/message-edges",
             Some(api.schema::<crate::message_edges::EdgeQuery>()),
             Some(api.schema::<crate::message_edges::EdgePage>()),
@@ -465,6 +471,7 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
     let changed = api.schema::<TeamChanged>();
     let (team, member) = (api.schema::<TeamBody>(), api.schema::<MemberBody>());
     let retire_team = api.schema::<TeamRetireBody>();
+    let nesting = api.schema::<crate::teams_nesting::NestingBody>();
     let sessions = api.schema::<SessionsView>();
     let ended = api.schema::<EndedView>();
     let certificates = api.schema::<CertificatesView>();
@@ -488,6 +495,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             Some(retire),
             Some(account),
         ),
+        (
+            GET,
+            "/tree",
+            None,
+            Some(api.schema::<crate::tree_views::TreeView>()),
+        ),
         (GET, "/teams", None, Some(api.schema::<TeamsView>())),
         (POST, "/teams", Some(team), Some(changed.clone())),
         (GET, "/teams/{id}", None, Some(api.schema::<TeamView>())),
@@ -507,6 +520,12 @@ fn accounts_teams_and_sessions(api: &mut Api) -> Vec<Entry> {
             POST,
             "/teams/{id}/members/{member}/confirm",
             Some(retire_team.clone()),
+            Some(changed.clone()),
+        ),
+        (
+            POST,
+            "/teams/{id}/nesting",
+            Some(nesting),
             Some(changed.clone()),
         ),
         (POST, "/teams/{id}/retire", Some(retire_team), Some(changed)),

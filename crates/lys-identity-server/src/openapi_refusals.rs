@@ -110,3 +110,6 @@ pub(crate) const WHICH: &[&str] = &[
     "not_your_app",
     "kind_not_registered",
 ];
+
+/// A profile review that can approve only the latest recorded version.
+pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];

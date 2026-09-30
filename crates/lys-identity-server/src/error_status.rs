@@ -70,8 +70,11 @@ impl IntoResponse for ServerError {
 }
 
 impl ServerError {
-    /// The refusal's name: the first word of its message.
+    /// The stable refusal name, derived from the message unless its words stand alone.
     pub fn name(&self) -> String {
+        if matches!(self, Self::ProfileVersionReplaced { .. }) {
+            return "ProfileVersionReplaced".to_owned();
+        }
         let text = self.to_string();
         text.split(':').next().unwrap_or_default().to_owned()
     }
@@ -130,6 +133,7 @@ impl ServerError {
             | Self::HoldingOver { .. }
             | Self::HoldingChanged
             | Self::ProvisioningChanged { .. }
+            | Self::ProfileVersionReplaced { .. }
             | Self::ProvisioningReused { .. }
             | Self::CertificateReused { .. }
             | Self::CertificateWithdrawn { .. }
@@ -153,6 +157,8 @@ impl ServerError {
             | Self::PolicyVersionConflict { .. }
             | Self::TeamRetired { .. }
             | Self::TeamMemberHeld
+            | Self::TeamParentCycle { .. }
+            | Self::TeamLeadNotMember { .. }
             | Self::TeamMemberAbsent
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }
@@ -180,6 +186,7 @@ impl ServerError {
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
             Self::ConfigInvalid { .. }
+            | Self::HarnessCatalogueUnreadable { .. }
             | Self::DirectoryUnavailable { .. }
             | Self::RequestsUnavailable { .. }
             | Self::NetworkUnavailable { .. }

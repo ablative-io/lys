@@ -85,6 +85,121 @@ impl Table {
 }
 
 #[tokio::test]
+async fn a_replaced_profile_version_is_refused_without_recording_a_review() -> TestResult {
+    let table = Table::set().await?;
+    let path = table.route(1);
+    for from in [0, 1] {
+        let (status, answer) = table
+            .service
+            .post(
+                &path,
+                Some(&table.ada),
+                &profile(&operation()?, from, "Recorded version."),
+            )
+            .await?;
+        assert_eq!(status, 200, "{answer}");
+    }
+    let file = table.service.dir.path().join("provisioning.json");
+    let before = std::fs::read(&file)?;
+    for cookie in [&table.bea, &table.ada] {
+        let answer = table
+            .service
+            .post(
+                &format!("{path}/1/review"),
+                Some(cookie),
+                &json!({"operation":operation()?}),
+            )
+            .await?;
+        refused(&answer, 409, "ProfileVersionReplaced");
+        assert_eq!(
+            answer.1["reason"],
+            "version 1 has been replaced by version 2; approve the latest"
+        );
+        assert_eq!(
+            std::fs::read(&file)?,
+            before,
+            "a refused review changes no profile bytes"
+        );
+    }
+    let (status, unchanged) = table.service.get(&path, Some(&table.bea)).await?;
+    assert_eq!(status, 200, "{unchanged}");
+    assert_eq!(unchanged["profile"]["version"], 2);
+    let stored = ProvisioningStore::open(&file)?;
+    let unchanged_profile = stored
+        .profile(&table.seeded.people[1].agents[0].id.to_string())
+        .ok_or("no stored profile")?;
+    assert!(
+        unchanged_profile
+            .versions
+            .iter()
+            .all(|version| version.reviewed.is_none())
+    );
+    let body = json!({"operation":operation()?});
+    let route = format!("{path}/2/review");
+    let (status, reviewed) = table.service.post(&route, Some(&table.bea), &body).await?;
+    assert_eq!(status, 200, "{reviewed}");
+    assert_eq!(
+        reviewed["profile"]["reviewed_by"],
+        table.seeded.people[1].id.to_string()
+    );
+    let after = std::fs::read(&file)?;
+    let (status, retry) = table.service.post(&route, Some(&table.bea), &body).await?;
+    assert_eq!(status, 200, "{retry}");
+    assert_eq!(retry, reviewed);
+    assert_eq!(
+        std::fs::read(&file)?,
+        after,
+        "a latest-version retry writes nothing"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_old_review_retry_is_refused_after_a_new_version_without_erasing_history() -> TestResult
+{
+    let table = Table::set().await?;
+    let path = table.route(1);
+    let first = profile(&operation()?, 0, "First version.");
+    let (status, answer) = table.service.post(&path, Some(&table.ada), &first).await?;
+    assert_eq!(status, 200, "{answer}");
+    let old_review = json!({"operation":operation()?});
+    let old_route = format!("{path}/1/review");
+    let (status, reviewed) = table
+        .service
+        .post(&old_route, Some(&table.bea), &old_review)
+        .await?;
+    assert_eq!(status, 200, "{reviewed}");
+    let second = profile(&operation()?, 1, "Replacement version.");
+    let (status, answer) = table.service.post(&path, Some(&table.ada), &second).await?;
+    assert_eq!(status, 200, "{answer}");
+    let file = table.service.dir.path().join("provisioning.json");
+    let before = std::fs::read(&file)?;
+    let refused_retry = table
+        .service
+        .post(&old_route, Some(&table.bea), &old_review)
+        .await?;
+    refused(&refused_retry, 409, "ProfileVersionReplaced");
+    assert_eq!(std::fs::read(&file)?, before);
+    let (status, history) = table.service.get(&path, Some(&table.bea)).await?;
+    assert_eq!(status, 200, "{history}");
+    assert_eq!(history["profile"]["version"], 2);
+    assert_eq!(history["profile"]["reviewed_by"], Value::Null);
+    let stored = ProvisioningStore::open(&file)?;
+    let kept = stored
+        .profile(&table.seeded.people[1].agents[0].id.to_string())
+        .ok_or("no stored profile")?;
+    assert_eq!(
+        kept.versions[0]
+            .reviewed
+            .as_ref()
+            .ok_or("old review erased")?
+            .by,
+        reviewed["profile"]["reviewed_by"]
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_administrator_sets_a_profile_and_each_change_is_a_version() -> TestResult {
     let table = Table::set().await?;
     let path = table.route(0);
@@ -267,6 +382,8 @@ fn version(operation: &str, note: &str) -> Version {
             harness: None,
             skill_pins: Vec::new(),
             permissions: None,
+            runs_on: None,
+            writable: None,
         },
         set_by: "person-a".to_owned(),
         set_at: 10,

@@ -236,6 +236,7 @@ fn old_install_gains_runner_and_later_upgrades_keep_sessions_and_keys() -> TestR
         arguments: vec![],
         directory: scratch.work().display().to_string(),
         environment: std::collections::BTreeMap::default(),
+        config: None,
         columns: 80,
         rows: 24,
         rotation: None,

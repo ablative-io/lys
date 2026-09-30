@@ -4,7 +4,9 @@
  *
  * The setup page is opened by the install with a one-time code in the
  * address fragment. The code is taken from the address once and the address
- * is replaced without it, so it is never left where a person reads it.
+ * is replaced without it, so it is never left where a person reads it. When
+ * no browser could be opened the install writes the code to a file instead,
+ * and the page opened without a code asks for it.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -36,18 +38,49 @@ export function forgetSetupCode(): void {
 interface Policy { length_min: number; length_max: number; words: string }
 interface Opened { purpose: 'first-run' | 'password'; email: string | null; policy: Policy }
 
+const closed = (failure: unknown) => failure instanceof Refused && failure.refusal.refusal === 'SetupClosed';
+
 function setupRefusal(failure: unknown): string {
-  if (failure instanceof Refused && failure.refusal.refusal === 'SetupClosed') return 'Lys is already set up. Sign in instead.';
+  if (closed(failure)) return 'Lys is already set up. Sign in instead.';
   if (failure instanceof Refused && failure.refusal.refusal === 'SetupCodeRefused') {
-    return 'This setup link is not valid or was already used. Run lys identity setup-code on this machine for a fresh one.';
+    return 'This setup code is not valid or was already used. Run lys identity setup-code on the machine Lys runs on for a fresh one.';
+  }
+  // Every setup route counts against one limit of five a minute (docs/SIGN-IN-ADMISSION.md).
+  if (failure instanceof Refused && failure.refusal.refusal === 'SignInThrottled') {
+    return 'Lys takes five setup attempts a minute, and that many have been made. Wait a minute, then try again.';
   }
   return reasonOf(failure);
 }
 
+/** The setup code typed in, for a page opened without one. */
+function CodeEntry({ refusal, take }: { refusal: string; take: (code: string) => void }) {
+  const [error, setError] = useState('');
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get('code') ?? '').trim();
+    if (!code) { setError('Enter the setup code.'); return; }
+    setError('');
+    take(code);
+  }
+  const why = error || refusal;
+  return <form className="recorded-form sign-in-form" aria-label="Setup code" onSubmit={submit} noValidate>
+    <div className="field">
+      <label htmlFor="setup-code">Setup code</label>
+      <input id="setup-code" name="code" autoComplete="off" spellCheck={false} required aria-describedby="setup-code-where" />
+      <p id="setup-code-where" className="note">The install put it in a file named setup-code, in the folder Lys is installed in on the machine Lys runs on; the install’s output names that file. Only the account that ran the install can read it.</p>
+    </div>
+    {why ? <p role="alert" className="why-not">{why}</p> : null}
+    <button className="btn primary" type="submit">Check the code</button>
+  </form>;
+}
+
 /** Lys's setup page: the first administrator, or the administrator's new password. */
-export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }: { code: string; done?: () => void }) {
+export function FirstRunSetup({ code: linked, done = () => location.replace(SIGNED_IN) }: { code: string; done?: () => void }) {
+  const [code, setCode] = useState(linked);
   const [opened, setOpened] = useState<Opened | null>(null);
-  const [refusal, setRefusal] = useState(code ? '' : 'This page needs the setup link the install opened. Run lys identity setup-code on this machine for a fresh one.');
+  const [refusal, setRefusal] = useState('');
+  // A typed code that is refused is asked for again; a closed setup ends the page either way.
+  const [entryRefusal, setEntryRefusal] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const operation = useRef(operationId());
@@ -56,10 +89,15 @@ export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }
     let live = true;
     request<Opened>('/setup/open', { code }).then(
       (answer) => { if (live) setOpened(answer); },
-      (failure: unknown) => { if (live) setRefusal(setupRefusal(failure)); },
+      (failure: unknown) => {
+        if (!live) return;
+        if (linked || closed(failure)) { setRefusal(setupRefusal(failure)); return; }
+        setEntryRefusal(setupRefusal(failure));
+        setCode('');
+      },
     );
     return () => { live = false; };
-  }, [code]);
+  }, [code, linked]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,7 +133,8 @@ export function FirstRunSetup({ code, done = () => location.replace(SIGNED_IN) }
     <div className="eyebrow">Welcome to Lys</div>
     <h1>{firstRun ? 'Set up Lys' : 'Choose a new password'}</h1>
     {refusal ? <div role="alert" className="why-not"><p>{refusal}</p><a className="btn" href="/#/sign-in">Go to sign in</a></div> : null}
-    {!refusal && !opened ? <p className="dim">Opening setup…</p> : null}
+    {!refusal && !code ? <CodeEntry refusal={entryRefusal} take={(typed) => { setEntryRefusal(''); setCode(typed); }} /> : null}
+    {!refusal && code && !opened ? <p className="dim">Opening setup…</p> : null}
     {opened ? <form className="recorded-form sign-in-form" aria-label={firstRun ? 'Set up Lys' : 'New password'} onSubmit={submit} aria-busy={busy} noValidate>
       <p className="sub">{firstRun ? 'You will be the administrator. Choose how you sign in.' : `Set a new password for ${opened.email ?? 'the administrator'}.`}</p>
       {firstRun ? <div className="field">

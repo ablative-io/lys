@@ -23,24 +23,21 @@
 //! a machine unknown, retired, without a runtime or not listing the agent.
 //!
 //! On a machine whose record names a runner, the kept start is then run by
-//! that runner, as `/bin/sh -c` and the command, and the answer carries the
+//! that runner, using signed process inputs and config files, and the answer carries the
 //! runner's word beside the command: the session is kept running once the
 //! runner says its process is up. On a machine that names none, the command
 //! is answered as it always was, and nothing runs. The service itself
 //! never runs anything: it asks the runner over its socket.
 
-use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, Method};
+use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
-use lys_identity::LifecycleState;
-use lys_identity::{AgentId, IdentityId, OperationId};
+use lys_identity::{Actor, AgentId, IdentityId, OperationId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -48,15 +45,16 @@ use crate::agent_policy_api::with_policies;
 use crate::error::ServerError;
 use crate::grants::caller;
 use crate::launch_harness::skill_files;
-use crate::launch_template::{HandleName, Start, handle_variable, render};
+use crate::launch_template::{HandleName, Start, render};
 use crate::network_api::with_network;
-use crate::network_store::{Machine, NetworkStore};
 use crate::provisioning_api::with_provisioning;
 use crate::provisioning_store::Version;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
 use crate::session::now;
+pub(crate) use crate::start_checks::placed;
+use crate::start_checks::{active, handles, reaches, reviewed};
 
 /// The answer of the start-command route.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -101,73 +99,6 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/agents/{id}/start-command", post(start_command))
 }
 
-/// The machine `id`, when it takes `agent`: known, in use, with a runtime,
-/// and listing the agent among those that may run on it.
-pub(crate) fn placed<'a>(
-    store: &'a NetworkStore,
-    id: &str,
-    (agent, held): (&str, &[String]),
-) -> Result<&'a Machine, ServerError> {
-    let machine = store.machine(id).ok_or(ServerError::MachineUnknown)?;
-    if machine.retired.is_some() {
-        return Err(ServerError::MachineRetired);
-    }
-    if machine.runtime.is_none() {
-        return Err(ServerError::MachineWithoutRuntime);
-    }
-    let by_role = machine.may_run_roles.iter().any(|role| held.contains(role));
-    if !by_role && !machine.may_run.iter().any(|named| named == agent) {
-        return Err(ServerError::MachineNotForAgent);
-    }
-    Ok(machine)
-}
-
-/// The handles `agent` holds that are not dropped, as the broker lists them
-/// to the signed-in person, each with the variable the launch sets.
-async fn handles(
-    state: &AppState,
-    headers: &HeaderMap,
-    agent: &str,
-) -> Result<Vec<HandleName>, ServerError> {
-    let path = format!("/_lys/handles?holder={agent}");
-    let answer = crate::secrets_api::ask(state, headers, Method::GET, &path, Bytes::new()).await?;
-    let unread = |reason: &str| ServerError::SecretsUnavailable {
-        reason: format!("the broker's handle list does not read: {reason}"),
-    };
-    let listed = answer
-        .get("handles")
-        .and_then(Value::as_array)
-        .ok_or_else(|| unread("it holds no handles list"))?;
-    let mut held: Vec<(String, String)> = Vec::new();
-    for handle in listed {
-        let dropped = handle
-            .get("dropped")
-            .and_then(Value::as_bool)
-            .ok_or_else(|| unread("a handle does not say whether it was dropped"))?;
-        if dropped {
-            continue;
-        }
-        let text = |name: &str| {
-            handle
-                .get(name)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| unread(&format!("a handle has no {name}")))
-        };
-        held.push((text("id")?, text("secret")?));
-    }
-    held.sort();
-    let mut taken = BTreeSet::new();
-    Ok(held
-        .into_iter()
-        .map(|(id, secret)| HandleName {
-            env: handle_variable(&secret, &mut taken),
-            id,
-            secret,
-        })
-        .collect())
-}
-
 async fn start_command(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -180,16 +111,28 @@ async fn start_command(
         body.map_err(|refused| ServerError::RequestMalformed {
             reason: refused.body_text(),
         })?;
-    let session = OperationId::from_str(&operation)?.to_string();
+    start_for(&state, &headers, &actor, agent, &machine, &operation).await
+}
+
+/// Give every admitted start the same checks, kept report and runner call.
+pub(crate) async fn start_for(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    actor: &Actor,
+    agent: AgentId,
+    machine: &str,
+    operation: &str,
+) -> Result<Json<Value>, ServerError> {
+    let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
-    let admission = with_directory(&state, |directory| {
+    let admission = with_directory(state, |directory| {
         let directory = directory.projection()?;
-        let admitted_by = caller(&state, &headers, directory)?.to_string();
+        let admitted_by = caller(state, headers, directory)?.to_string();
         let parsed = AgentId::from_str(&agent)?;
         let record = directory
             .record(IdentityId::Agent(parsed))
             .ok_or(ServerError::AgentNotVisible)?;
-        let answers = state.admission.administrator(&actor).is_ok()
+        let answers = state.admission.administrator(actor).is_ok()
             || directory
                 .person_for(actor.binding())
                 .is_some_and(|person| record.responsible() == Some(person));
@@ -198,28 +141,20 @@ async fn start_command(
                 reason: "only the administrator or the person responsible for the agent is given its start command",
             });
         }
-        if let Some(kept) = admitted(&state, &session, &agent)? {
+        if let Some(kept) = admitted(state, &session, &agent)? {
             return Ok(Admission::Kept(kept, admitted_by));
         }
-        if record.state() != LifecycleState::Active {
-            return Err(ServerError::AgentNotActive {
-                state: record.state().to_string(),
-            });
-        }
-        let version = with_provisioning(&state, |store| {
+        active(record.state())?;
+        let version = with_provisioning(state, |store| {
             store
                 .profile(&agent)
                 .and_then(|profile| profile.versions.last().cloned())
                 .ok_or(ServerError::LaunchRecordMissing)
         })?;
-        if version.reviewed.is_none() {
-            return Err(ServerError::ProfileNotReviewed {
-                version: version.number,
-            });
-        }
-        let held = crate::roles_api::held_roles(&state, &agent, now())?;
-        let runtime = with_network(&state, |store| {
-            let machine = placed(store, &machine, (&agent, &held))?;
+        reviewed(&version)?;
+        let held = crate::roles_api::held_roles(state, &agent, now())?;
+        let runtime = with_network(state, |store| {
+            let machine = placed(store, machine, (&agent, &held))?;
             reaches(machine, &version)?;
             machine
                 .runtime
@@ -230,33 +165,21 @@ async fn start_command(
     })?;
     let (version, runtime, admitted_by) = match admission {
         Admission::Kept(kept, admitted_by) => {
-            let rotation = with_provisioning(&state, |store| {
-                Ok(store
-                    .profile(&agent)
-                    .and_then(|profile| profile.versions.last())
-                    .and_then(|version| version.settings.session.as_ref())
-                    .and_then(|session| session.accounts.clone()))
-            })?;
-            return run(&state, kept, &admitted_by, rotation).await;
+            return run(state, kept, &admitted_by).await;
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
-    let rotation = version
-        .settings
-        .session
-        .as_ref()
-        .and_then(|session| session.accounts.clone());
-    let handles = handles(&state, &headers, &agent).await?;
-    let skills = with_provisioning(&state, |store| skill_files(store, &version))?;
+    let handles = handles(state, headers, &agent).await?;
+    let skills = with_provisioning(state, |store| skill_files(store, &version))?;
     let policy = match state.policies {
-        Some(_) => with_policies(&state, |store| Ok(store.held().latest(&agent).cloned()))?,
+        Some(_) => with_policies(state, |store| Ok(store.held().latest(&agent).cloned()))?,
         None => None,
     };
     let rendered = render(
         &Start {
             agent: &agent,
             session: &session,
-            machine: &machine,
+            machine,
             runtime: &runtime,
             version: &version,
             skills: &skills,
@@ -266,7 +189,7 @@ async fn start_command(
     )?;
     let view = serde_json::to_value(StartCommandView {
         agent: agent.clone(),
-        machine: machine.clone(),
+        machine: machine.to_owned(),
         runtime,
         session: session.clone(),
         provisioning_version: version.number,
@@ -281,12 +204,12 @@ async fn start_command(
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
     })?;
-    let kept = with_runtime(&state, |store| {
+    let kept = with_runtime(state, |store| {
         store.report(Report {
             operation: session.clone(),
             session: session.clone(),
             agent: Some(agent.clone()),
-            machine: machine.clone(),
+            machine: machine.to_owned(),
             state: Reported::Starting,
             what: format!("start admitted, template {}", rendered.template_sha256),
             confirmation: String::new(),
@@ -299,7 +222,7 @@ async fn start_command(
         .first()
         .and_then(|first| first.launch.clone())
         .ok_or(ServerError::RuntimeReportReused { operation: session })?;
-    run(&state, kept, &admitted_by, rotation).await
+    run(state, kept, &admitted_by).await
 }
 
 /// Run the start `view` answers on its machine's runner, when the machine
@@ -310,7 +233,6 @@ async fn run(
     state: &Arc<AppState>,
     view: Value,
     admitted_by: &str,
-    rotation: Option<lys_runner::Rotation>,
 ) -> Result<Json<Value>, ServerError> {
     let member = |name: &str| {
         view.get(name)
@@ -320,24 +242,9 @@ async fn run(
                 reason: format!("the kept start names no {name}"),
             })
     };
-    let (agent, machine, session, command) = (
-        member("agent")?,
-        member("machine")?,
-        member("session")?,
-        member("command")?,
-    );
-    let policy = crate::agent_policy_api::launch_policy(state, &agent)?;
-    let launch = lys_runner::Launch {
-        session,
-        program: SHELL.to_owned(),
-        arguments: vec!["-c".to_owned(), command],
-        directory: String::new(),
-        environment: std::collections::BTreeMap::new(),
-        columns: crate::runner_sessions::COLUMNS,
-        rows: crate::runner_sessions::ROWS,
-        rotation,
-        policy,
-    };
+    let (agent, machine) = (member("agent")?, member("machine")?);
+    let mut launch = with_provisioning(state, |store| kept_launch(store, &view))?;
+    launch.policy = crate::agent_policy_api::launch_policy(state, &agent)?;
     let ran = crate::runner_sessions::run_on_runner(state, (&agent, &machine, admitted_by), launch)
         .await?;
     let mut view = view;
@@ -346,43 +253,6 @@ async fn run(
     }
     Ok(Json(view))
 }
-
-/// Refuse by name the first host a server of `version` is reached at that
-/// `machine`'s egress list does not name. A command server is started on
-/// the machine and reached over its own streams, so it names no host here.
-fn reaches(machine: &Machine, version: &Version) -> Result<(), ServerError> {
-    for server in version
-        .settings
-        .mcp_servers
-        .iter()
-        .filter(|server| server.command.is_none())
-    {
-        let host = url_host(&server.url).ok_or_else(|| ServerError::LaunchUnrenderable {
-            reason: format!(
-                "server `{}` is reached at `{}`, which names no host",
-                server.name, server.url
-            ),
-        })?;
-        if !machine.may_reach.contains(&host) {
-            return Err(ServerError::MachineCannotReach { host });
-        }
-    }
-    Ok(())
-}
-
-/// The host of `url`, lower-cased, without scheme, credentials, port or path.
-fn url_host(url: &str) -> Option<String> {
-    let (_scheme, rest) = url.split_once("://")?;
-    let authority = rest.split(['/', '?', '#']).next()?;
-    let located = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_user, host)| host);
-    let host = located.split(':').next()?.to_ascii_lowercase();
-    (!host.is_empty()).then_some(host)
-}
-
-/// The shell a runner runs a start command with.
-const SHELL: &str = "/bin/sh";
 
 /// A start already admitted, or what a new one is rendered from.
 enum Admission {
@@ -406,5 +276,166 @@ fn admitted(state: &AppState, session: &str, agent: &str) -> Result<Option<Value
             .ok_or_else(|| ServerError::RuntimeReportReused {
                 operation: session.to_owned(),
             })
+    })
+}
+
+/// Build the signed launch using only the kept template and its exact version.
+///
+/// # Errors
+/// Refuses unreadable starts, missing kept versions and invalid template bytes.
+pub fn kept_launch(
+    store: &crate::provisioning_store::ProvisioningStore,
+    view: &Value,
+) -> Result<lys_runner::Launch, ServerError> {
+    let text = |member: &str| {
+        view.get(member)
+            .and_then(Value::as_str)
+            .ok_or_else(|| ServerError::LaunchUnrenderable {
+                reason: format!("the kept start names no {member}"),
+            })
+    };
+    let number = view
+        .get("provisioning_version")
+        .and_then(Value::as_u64)
+        .and_then(|number| u32::try_from(number).ok())
+        .ok_or_else(|| ServerError::LaunchUnrenderable {
+            reason: "the kept start names no profile version".to_owned(),
+        })?;
+    let version = store
+        .profile(text("agent")?)
+        .and_then(|profile| {
+            profile
+                .versions
+                .iter()
+                .find(|version| version.number == number)
+        })
+        .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
+    reviewed(version)?;
+    let mut native = crate::launch_template::from_template(
+        version,
+        text("template")?,
+        text("template_sha256")?,
+    )?;
+    let handles: Vec<HandleName> =
+        serde_json::from_value(view.get("handles").cloned().ok_or_else(|| {
+            ServerError::LaunchUnrenderable {
+                reason: "the kept start names no handles".to_owned(),
+            }
+        })?)
+        .map_err(|error| ServerError::LaunchUnrenderable {
+            reason: format!("the kept handles do not read: {error}"),
+        })?;
+    native.environment.insert(
+        "LYS_LAUNCH_TEMPLATE".to_owned(),
+        text("template_sha256")?.to_owned(),
+    );
+    native.environment.insert(
+        "LYS_HANDLES".to_owned(),
+        handles
+            .iter()
+            .map(|handle| handle.id.as_str())
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    let files = native
+        .files
+        .into_iter()
+        .map(|file| lys_runner::launch_config::File {
+            path: file.path,
+            text: file.text,
+            sha256: file.sha256,
+        })
+        .collect();
+    Ok(lys_runner::Launch {
+        session: text("session")?.to_owned(),
+        program: native.program,
+        arguments: native.arguments,
+        directory: String::new(),
+        environment: native.environment,
+        config: Some(lys_runner::launch_config::Config {
+            files,
+            argument_files: native.argument_files,
+            environment_paths: native.environment_paths,
+            working_directory: true,
+        }),
+        columns: crate::runner_sessions::COLUMNS,
+        rows: crate::runner_sessions::ROWS,
+        rotation: version
+            .settings
+            .session
+            .as_ref()
+            .and_then(|session| session.accounts.clone()),
+        policy: None,
+    })
+}
+
+/// A latest reviewed profile is applied only after its whole native launch ran.
+pub(crate) fn enforced(
+    state: &AppState,
+    agent: &str,
+    version: Option<&Version>,
+) -> Result<bool, ServerError> {
+    let Some(version) = version.filter(|version| version.reviewed.is_some()) else {
+        return Ok(false);
+    };
+    if state.runtime.is_none() {
+        return Ok(false);
+    }
+    with_runtime(state, |store| {
+        for tracked in store
+            .sessions()
+            .iter()
+            .filter(|tracked| tracked.agent.as_deref() == Some(agent))
+        {
+            let Some(latest) = tracked.latest() else {
+                continue;
+            };
+            if latest.state != Reported::Running
+                || latest.reported_by != format!("the runner of machine {}", tracked.machine)
+                || !latest.what.starts_with("the runner started process ")
+            {
+                continue;
+            }
+            let Some(view) = tracked.first().and_then(|first| first.launch.as_ref()) else {
+                continue;
+            };
+            if view.get("provisioning_version").and_then(Value::as_u64)
+                != Some(u64::from(version.number))
+                || !view
+                    .get("left_out")
+                    .and_then(Value::as_array)
+                    .is_some_and(Vec::is_empty)
+            {
+                continue;
+            }
+            let template = view
+                .get("template")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ServerError::LaunchUnrenderable {
+                    reason: "the running start names no template".to_owned(),
+                })?;
+            let digest = view
+                .get("template_sha256")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ServerError::LaunchUnrenderable {
+                    reason: "the running start names no template digest".to_owned(),
+                })?;
+            let native = crate::launch_template::from_template(version, template, digest)?;
+            let handles: Vec<HandleName> =
+                serde_json::from_value(view.get("handles").cloned().ok_or_else(|| {
+                    ServerError::LaunchUnrenderable {
+                        reason: "the running start names no handles".to_owned(),
+                    }
+                })?)
+                .map_err(|error| ServerError::LaunchUnrenderable {
+                    reason: error.to_string(),
+                })?;
+            if view.get("command").and_then(Value::as_str)
+                == Some(crate::launch_template::command(&native, digest, &handles).as_str())
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     })
 }

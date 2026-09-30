@@ -8,6 +8,14 @@ use lys_identity::grants::GrantError;
 /// Everything the service refuses.
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
+    /// A catalogue description could not be read before serving.
+    #[error("harness_catalogue_unreadable: {file}: {reason}")]
+    HarnessCatalogueUnreadable {
+        /// The description that could not be read.
+        file: String,
+        /// What made it unreadable.
+        reason: String,
+    },
     /// A directory refusal.
     #[error(transparent)]
     Identity(#[from] IdentityError),
@@ -222,6 +230,14 @@ pub enum ServerError {
     ProfileVersionUnknown {
         /// The version asked for.
         version: u32,
+    },
+    /// A recorded version was replaced and cannot be approved for a new start.
+    #[error("version {version} has been replaced by version {latest}; approve the latest")]
+    ProfileVersionReplaced {
+        /// The recorded version whose review was requested.
+        version: u32,
+        /// The latest recorded version, which must be reviewed instead.
+        latest: u32,
     },
     /// The agent's latest profile version is not reviewed, so it is not started.
     #[error(
@@ -577,6 +593,14 @@ pub enum ServerError {
     /// The member is not in the team.
     #[error("TeamMemberAbsent: that member is not in the team")]
     TeamMemberAbsent,
+    /// The parent would close a team cycle.
+    #[error(
+        "team_parent_cycle: team `{team}` cannot have parent `{parent}` because that closes a cycle"
+    )]
+    TeamParentCycle { team: String, parent: String },
+    /// A lead must remain an admitted member.
+    #[error("team_lead_not_member: agent `{lead}` is not an admitted member of team `{team}`")]
+    TeamLeadNotMember { team: String, lead: String },
     /// The member named is not a person or agent the directory holds, or is retired.
     #[error(
         "TeamMemberUnknown: a member is a person or agent the directory holds and has not retired"

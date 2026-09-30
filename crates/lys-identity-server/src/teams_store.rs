@@ -243,6 +243,8 @@ impl<S: LeafStore> TeamStore<S> {
             return self.standing(line.team());
         }
         self.held.allows(&line).map_err(|refused| match refused {
+            Refused::ParentCycle { team, parent } => ServerError::TeamParentCycle { team, parent },
+            Refused::LeadNotMember { team, lead } => ServerError::TeamLeadNotMember { team, lead },
             Refused::Unknown => ServerError::TeamUnknown,
             Refused::Retired => ServerError::TeamRetired {
                 team: line.team().to_owned(),

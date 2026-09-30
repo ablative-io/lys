@@ -3,8 +3,9 @@ import { useParams } from 'react-router';
 import { Refused, api, useLoad } from '../../api';
 import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
-import { EmergencyStop } from './EmergencyStop';
-import { Gate } from '../signin/Gate';
+import { EmergencyStop, StopReceipt } from './EmergencyStop';
+import type { StopAnswer } from './EmergencyStop';
+import { DirectoryGate as Gate } from '../people/Words';
 import { fileNo } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
@@ -46,7 +47,7 @@ async function readPerson(id: string): Promise<FileData> {
 
 const readFile = (id: string): Promise<FileData> => (kindOf(id) === 'agent' ? readAgent(id) : readPerson(id));
 
-function File({ data, tab, reload }: { data: FileData; tab: string; reload: () => void }) {
+function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void }) {
   const { x, agent } = data;
   const kind = x.kind;
   const person = x.person;
@@ -88,10 +89,11 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
               <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Prepare a start from the reviewed profile">Start…</a>
             ) : null}
             {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
-              <EmergencyStop id={x.id} active={x.state === 'active'} stopped={reload} />
+              <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
             ) : null}
           </div>
         </div>
+        {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
         <nav className="tabs">
           {TABS.map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''}>
@@ -109,6 +111,7 @@ function File({ data, tab, reload }: { data: FileData; tab: string; reload: () =
 export function IdentityFile() {
   const { id = '', tab = 'profile' } = useParams();
   const [version, setVersion] = useState(0);
+  const [stop, setStop] = useState<StopAnswer | null>(null);
   const load = useLoad(() => readFile(id), id + '#' + version);
   if (load.status === 'refused' && load.refused.status === 404 && load.refused.refusal.refusal !== 'Unanswered') {
     return (
@@ -121,5 +124,5 @@ export function IdentityFile() {
       </div>
     );
   }
-  return <Gate load={load} title="People and agents" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} />} />;
+  return <Gate load={load} title="People and agents" ok={(data) => <File data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); setVersion((v) => v + 1); }} />} />;
 }
