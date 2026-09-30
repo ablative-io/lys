@@ -307,6 +307,18 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     vec![
         (
             GET,
+            "/agents/{id}/mcp-requests",
+            None,
+            Some(api.schema::<crate::mcp_requests_api::McpRequestList>()),
+        ),
+        (
+            POST,
+            "/agents/{id}/mcp-requests",
+            Some(api.schema::<crate::mcp_requests_api::McpAskBody>()),
+            Some(api.schema::<crate::mcp_requests_store::McpRequest>()),
+        ),
+        (
+            GET,
             "/harnesses",
             None,
             Some(api.schema::<crate::harness_catalogue::CatalogueView>()),
