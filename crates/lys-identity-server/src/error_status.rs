@@ -157,6 +157,8 @@ impl ServerError {
             | Self::PolicyVersionConflict { .. }
             | Self::TeamRetired { .. }
             | Self::TeamMemberHeld
+            | Self::TeamParentCycle { .. }
+            | Self::TeamLeadNotMember { .. }
             | Self::TeamMemberAbsent
             | Self::GrantNotDue { .. }
             | Self::NoLiveSession { .. }

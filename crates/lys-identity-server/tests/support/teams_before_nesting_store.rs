@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The teams as they are kept: a leaf store of their own, one leaf for each
 //! team created, each member added or removed and each team retired, written
 //! before the act is answered. A leaf is stored whole or not at all.
@@ -15,6 +16,9 @@
 //! [`SNAPSHOT_EVERY`] leaves and at once after a rebuild, so a start reads the
 //! snapshot and only the leaves after it. A snapshot refused, or a state that
 //! does not read back, sends the start to every leaf, by name, never silently.
+
+/// The frozen writer revision used by the compatibility proof.
+pub const SOURCE_COMMIT: &str = "088351303e6b6d04ac3200ddb5bf86e243d91ddb";
 
 use std::path::Path;
 use std::sync::Arc;
@@ -243,8 +247,6 @@ impl<S: LeafStore> TeamStore<S> {
             return self.standing(line.team());
         }
         self.held.allows(&line).map_err(|refused| match refused {
-            Refused::ParentCycle { team, parent } => ServerError::TeamParentCycle { team, parent },
-            Refused::LeadNotMember { team, lead } => ServerError::TeamLeadNotMember { team, lead },
             Refused::Unknown => ServerError::TeamUnknown,
             Refused::Retired => ServerError::TeamRetired {
                 team: line.team().to_owned(),

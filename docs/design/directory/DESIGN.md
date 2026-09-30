@@ -1136,6 +1136,15 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/provisioning_store.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
 | `crates/lys-identity-server/src/provisioning_api.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
 | `crates/lys-identity-server/tests/provisioning.rs` | The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1) | DIRECTORY-074 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/tests/support/teams_before_nesting_store.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_state.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/error_status.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/openapi_table.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/lib.rs` | Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/teams_nesting.rs` | Versioned nesting events and their admitted mutations (DIRECTORY-071). | DIRECTORY-071 |
+| `crates/lys-identity-server/src/tree_views.rs` | Typed summaries computed from held state for the tree read (DIRECTORY-071). | DIRECTORY-071 |
 
 ## Inventory
 

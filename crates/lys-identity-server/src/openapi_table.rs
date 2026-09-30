@@ -164,12 +164,14 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/service-accounts" "The service accounts" S [SIGNED];
     POST "/service-accounts" "Create a service account" S [SIGNED_BODY, &["NotAdmitted"], &["ServiceAccountReused"]];
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];
+    GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "goals_unavailable"]];
     GET "/teams" "Every team" S [SIGNED];
-    POST "/teams" "Create a team" S [SIGNED_BODY];
+    POST "/teams" "Create a team" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     GET "/teams/{id}" "One team" S [SIGNED];
     POST "/teams/{id}/members" "Add a team member" S [SIGNED_BODY, &["AgentNotVisible", "NotAdmitted", "not_permitted"]];
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]];
+    POST "/teams/{id}/nesting" "Replace a team parent and lead" S [SIGNED_BODY, &["team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
     POST "/teams/{id}/retire" "Retire a team" S [SIGNED_BODY];
     GET "/resources" "The resources grants are on" S [SIGNED, &["NotAdmitted"]];
     GET "/secrets" "The secrets" S [SIGNED, &["NoPerson", "SecretsUnavailable"]];

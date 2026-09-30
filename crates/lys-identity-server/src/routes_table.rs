@@ -48,6 +48,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::goals_api::routes())
         .merge(crate::service_accounts_api::routes())
         .merge(crate::teams_api::routes())
+        .merge(crate::tree_api::routes())
         .merge(crate::resources_api::routes())
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())

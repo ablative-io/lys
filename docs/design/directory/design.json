@@ -5188,6 +5188,51 @@
       "path": "crates/lys-identity-server/tests/provisioning.rs",
       "note": "The reviewed profile keeps optional machine placement and one writable folder, preserving old stores (DIRECTORY-074 R1)",
       "brief": "DIRECTORY-074"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/support/teams_before_nesting_state.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/support/teams_before_nesting_store.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_state.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/error_status.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_table.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/lib.rs",
+      "note": "Team nesting, named refusals, route schema and the historical writer proof (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/teams_nesting.rs",
+      "note": "Versioned nesting events and their admitted mutations (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
+    },
+    {
+      "path": "crates/lys-identity-server/src/tree_views.rs",
+      "note": "Typed summaries computed from held state for the tree read (DIRECTORY-071).",
+      "brief": "DIRECTORY-071"
     }
   ],
   "inventory": [
@@ -5315,7 +5360,7 @@
   "constraints": [
     {
       "id": "CN1",
-      "text": "The documents-only boundary applies to the original directory planning task, not to published implementation briefs. A published DIRECTORY implementation brief authorises only its exact requirement file walls, including named source, tests, configuration and documentation files. No implementation author may widen those walls silently. The historical IDENTITY-001 record is not rewritten. Tom’s 29 September 07:51 direction, relayed by Waffles, removes lead brief sign-off as a prerequisite to dispatch; the design gate and automatic card review and full delivery gates remain required."
+      "text": "The documents-only boundary applies to the original directory planning task, not to published implementation briefs. A published DIRECTORY implementation brief authorises only its exact requirement file walls, including named source, tests, configuration and documentation files. No implementation author may widen those walls silently. The historical IDENTITY-001 record is not rewritten. Tom\u2019s 29 September 07:51 direction, relayed by Waffles, removes lead brief sign-off as a prerequisite to dispatch; the design gate and automatic card review and full delivery gates remain required."
     },
     {
       "id": "CN2",
@@ -5347,7 +5392,7 @@
     },
     {
       "id": "CN9",
-      "text": "A row that needs a file outside its wall stops and names it. The lead amends the handwritten brief on main and passes the design gate before that additional file is edited; a new module needs an exact file manifest within its named responsibility. Under Tom’s 29 September 07:51 direction, relayed by Waffles, no separate lead review or sign-off is required before dispatch. Automatic card review and full delivery gates remain required. An active run keeps its captured contract; changed words must be reconciled with its result before publication or landing."
+      "text": "A row that needs a file outside its wall stops and names it. The lead amends the handwritten brief on main and passes the design gate before that additional file is edited; a new module needs an exact file manifest within its named responsibility. Under Tom\u2019s 29 September 07:51 direction, relayed by Waffles, no separate lead review or sign-off is required before dispatch. Automatic card review and full delivery gates remain required. An active run keeps its captured contract; changed words must be reconciled with its result before publication or landing."
     },
     {
       "id": "CN10",

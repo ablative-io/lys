@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! What the teams' log folds to, and how that fold is sealed in the log's
 //! signed snapshot so a start reads only the leaves after it.
 //!
@@ -14,6 +15,9 @@
 //! confirms or removes it. The check is recorded once, so it never runs
 //! again.
 
+/// The frozen writer revision used by the compatibility proof.
+pub const SOURCE_COMMIT: &str = "088351303e6b6d04ac3200ddb5bf86e243d91ddb";
+
 use serde::{Deserialize, Serialize};
 
 use crate::read_views::Login;
@@ -21,8 +25,7 @@ use crate::read_views::Login;
 /// The snapshot domain the teams' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/teams-state/v1";
 
-const FORMAT: &str = "lys-teams-state/v2";
-const BEFORE_NESTING: &str = "lys-teams-state/v1";
+const FORMAT: &str = "lys-teams-state/v1";
 
 /// A team as it was created.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,10 +93,6 @@ pub struct Checked {
 pub enum Line {
     /// A team created.
     Created(Created),
-    /// A creation carrying explicit nesting under its versioned event.
-    CreatedV1(crate::teams_nesting::CreatedV1),
-    /// A parent and lead changed under their versioned event.
-    NestedV1(crate::teams_nesting::NestedV1),
     /// A member added.
     Added(Changed),
     /// A member removed.
@@ -113,8 +112,6 @@ impl Line {
     pub fn operation(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
-            Self::CreatedV1(created) => &created.created.id,
-            Self::NestedV1(nested) => &nested.operation,
             Self::Added(changed)
             | Self::Removed(changed)
             | Self::Retired(changed)
@@ -128,8 +125,6 @@ impl Line {
     pub fn team(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
-            Self::CreatedV1(created) => &created.created.id,
-            Self::NestedV1(nested) => &nested.team,
             Self::Added(changed)
             | Self::Removed(changed)
             | Self::Retired(changed)
@@ -145,8 +140,6 @@ impl Line {
         let mut line = self.clone();
         match &mut line {
             Self::Created(created) => created.at = at,
-            Self::CreatedV1(created) => created.created.at = at,
-            Self::NestedV1(nested) => nested.at = at,
             Self::Added(changed)
             | Self::Removed(changed)
             | Self::Retired(changed)
@@ -160,8 +153,6 @@ impl Line {
     fn received(&self) -> u64 {
         match self {
             Self::Created(created) => created.at,
-            Self::CreatedV1(created) => created.created.at,
-            Self::NestedV1(nested) => nested.at,
             Self::Added(changed)
             | Self::Removed(changed)
             | Self::Retired(changed)
@@ -183,12 +174,6 @@ impl Line {
 pub struct Team {
     /// How it was created.
     pub created: Created,
-    /// Its parent; absent in stores written before nesting.
-    #[serde(default)]
-    pub parent: Option<String>,
-    /// Its lead; absent in stores written before nesting.
-    #[serde(default)]
-    pub lead: Option<String>,
     /// Its members, in the order added.
     pub members: Vec<String>,
     /// How it was retired, null while it is in use.
@@ -233,10 +218,6 @@ pub enum Refused {
     NotHeld,
     /// The memberships were already checked.
     Checked,
-    /// The requested parent closes a cycle.
-    ParentCycle { team: String, parent: String },
-    /// The requested lead is not an admitted member.
-    LeadNotMember { team: String, lead: String },
 }
 
 impl Held {
@@ -251,13 +232,7 @@ impl Held {
             .iter()
             .find_map(|team| {
                 if team.created.id == operation {
-                    return Some(
-                        team.changes
-                            .iter()
-                            .find(|line| matches!(line, Line::CreatedV1(_)))
-                            .cloned()
-                            .unwrap_or_else(|| Line::Created(team.created.clone())),
-                    );
+                    return Some(Line::Created(team.created.clone()));
                 }
                 team.changes
                     .iter()
@@ -275,23 +250,6 @@ impl Held {
 
     /// Whether `line` may be kept on the teams as they stand, by reason.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
-        match line {
-            Line::CreatedV1(created) => {
-                return crate::teams_nesting::allows(
-                    self,
-                    &created.created.id,
-                    created.parent.as_deref(),
-                    created.lead.as_deref(),
-                );
-            }
-            Line::NestedV1(nested) => crate::teams_nesting::allows(
-                self,
-                &nested.team,
-                nested.parent.as_deref(),
-                nested.lead.as_deref(),
-            )?,
-            _ => {}
-        }
         match line {
             Line::Checked(_) if self.checked.is_some() => return Err(Refused::Checked),
             Line::Created(_) | Line::Checked(_) => return Ok(()),
@@ -339,24 +297,10 @@ impl Held {
             Line::Created(created) => {
                 self.teams.push(Team {
                     created,
-                    parent: None,
-                    lead: None,
                     members: Vec::new(),
                     retired: None,
                     held: Vec::new(),
                     changes: Vec::new(),
-                });
-                return Ok(());
-            }
-            Line::CreatedV1(created) => {
-                self.teams.push(Team {
-                    created: created.created.clone(),
-                    parent: created.parent.clone(),
-                    lead: created.lead.clone(),
-                    members: Vec::new(),
-                    retired: None,
-                    held: Vec::new(),
-                    changes: vec![Line::CreatedV1(created)],
                 });
                 return Ok(());
             }
@@ -376,23 +320,11 @@ impl Held {
             Line::Removed(changed) => {
                 team.members.retain(|member| *member != changed.member);
                 team.held.retain(|held| held.member != changed.member);
-                if team.lead.as_ref() == Some(&changed.member) {
-                    team.lead = None;
-                }
             }
             Line::Retired(changed) => team.retired = Some(changed.clone()),
-            Line::Held(hold) => {
-                if team.lead.as_ref() == Some(&hold.member) {
-                    team.lead = None;
-                }
-                team.held.push(hold.clone());
-            }
+            Line::Held(hold) => team.held.push(hold.clone()),
             Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
-            Line::NestedV1(nested) => {
-                team.parent = nested.parent.clone();
-                team.lead = nested.lead.clone();
-            }
-            Line::Created(_) | Line::CreatedV1(_) | Line::Checked(_) => {}
+            Line::Created(_) | Line::Checked(_) => {}
         }
         team.changes.push(line);
         Ok(())
@@ -423,7 +355,7 @@ impl Held {
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("teams state: {error}"))?;
-        if sealed.format != FORMAT && sealed.format != BEFORE_NESTING {
+        if sealed.format != FORMAT {
             return Err(format!(
                 "teams state is in format {}, not {FORMAT}",
                 sealed.format
