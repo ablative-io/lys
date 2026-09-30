@@ -37,7 +37,11 @@
         "modify": [
           "crates/lys-identity-server/src/lib.rs",
           "crates/lys-identity-server/src/routes_table.rs",
-          "crates/lys-identity-server/src/openapi_table.rs"
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/error.rs",
+          "crates/lys-identity-server/src/error_status.rs",
+          "crates/lys-identity-server/src/openapi_types.rs"
         ],
         "delete": []
       },

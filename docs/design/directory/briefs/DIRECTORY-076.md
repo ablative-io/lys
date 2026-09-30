@@ -44,6 +44,10 @@ Behavioural. WHEN a signed-in person reads the programs, THE SYSTEM SHALL answer
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/error.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
 
 **Checklist:**
 - C474 — Lys answers the programs it can start, with their models and modes as named choices. (DIRECTORY-076 R1).

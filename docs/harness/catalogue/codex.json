@@ -1,0 +1,70 @@
+{
+  "name": "Codex",
+  "line": "An agent from OpenAI that helps read, change and test code.",
+  "models": [
+    {
+      "id": "gpt-6.1-sol",
+      "label": "GPT-6.1 Sol"
+    },
+    {
+      "id": "gpt-6-astra",
+      "label": "GPT-6 Astra"
+    },
+    {
+      "id": "gpt-6-luna",
+      "label": "GPT-6 Luna"
+    },
+    {
+      "id": "gpt-6-sol",
+      "label": "GPT-6 Sol"
+    }
+  ],
+  "modes": [
+    {
+      "id": "read-only",
+      "meaning": "Reads files and runs commands within a sandbox that cannot change files."
+    },
+    {
+      "id": "workspace-write",
+      "meaning": "Reads files and changes the workspace; command network access is off by default."
+    },
+    {
+      "id": "danger-full-access",
+      "meaning": "Runs commands without the filesystem or network sandbox; approval settings still apply."
+    }
+  ],
+  "description": {
+    "models": {
+      "minimum": 1,
+      "maximum": 1,
+      "further_encoding": {
+        "kind": "array"
+      }
+    },
+    "permissions": {
+      "modes": [
+        "read-only",
+        "workspace-write",
+        "danger-full-access"
+      ],
+      "rule_forms": []
+    },
+    "mcp": {
+      "transports": [
+        "http",
+        "stdio"
+      ],
+      "working_directory": true,
+      "handle_variables": true,
+      "channel_policies": [
+        "off"
+      ]
+    },
+    "rendering_contract": "codex/template-v1"
+  },
+  "sources": [
+    "https://learn.chatgpt.com/docs/models",
+    "https://learn.chatgpt.com/docs/config-file/config-reference",
+    "https://learn.chatgpt.com/docs/agent-approvals-security"
+  ]
+}
