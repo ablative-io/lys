@@ -18,7 +18,7 @@ export const PAGES: [string, string][] = [
   ['People and agents', '#/people'], ['Roles', '#/roles'], ['Resources', '#/resources'], ['Access', '#/access'],
   ['Requests', '#/requests'], ['Reviews', '#/reviews'], ['Credentials', '#/vault'], ['Connections', '#/connections'],
   ['Sessions', '#/sessions'], ['Model', '#/model'], ['Try a change', '#/model/try'], ['Configuration', '#/settings'],
-  ['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Network', '#/network'], ['You', '#/me'],
+  ['Graph', '#/graph'], ['Secrets', '#/secrets'], ['Network', '#/network'], ['You', '#/me'], ['Agent canvas', '#/canvas'],
 ];
 
 export function Palette() {

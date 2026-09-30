@@ -86,6 +86,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
                 {ACTION[a]}
               </button>
             ))}
+            {kind === 'agent' ? <a className="btn" data-act="canvas" href={'#/canvas/' + encodeURIComponent(x.id)}>Open in the canvas</a> : null}
             {kind === 'agent' && x.state === 'active' ? (
               <a className="btn primary" data-act="start" href={'#/file/' + encodeURIComponent(x.id) + '/provisioning'} title="Start this agent">Start this agent</a>
             ) : null}

@@ -1,5 +1,4 @@
 /** The Sessions screen: every running agent session the caller may see, as its runner says, each opened to its live terminal with a line to type into, common keys and Stop. A session its runner saw end is not listed; nothing is inferred from a clock. */
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -8,7 +7,7 @@ import type { Held } from '../../shell/org';
 import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { problemWords } from '../people/Words';
 import { readTeams } from '../teams/Teams';
-import { api, request, useLoad } from '../../api';
+import { api, request, useLive } from '../../api';
 import { Gate } from '../signin/Gate';
 import { clock } from '../file/time';
 import type { RuntimeSession } from './RuntimeSessions';
@@ -32,12 +31,10 @@ async function readRunning() {
 
 export function RunningSessions() {
   const { session } = useParams();
-  const [revision, setRevision] = useState(0);
-  const load = useLoad(readRunning, 'runtime-live:' + revision);
+  const load = useLive(readRunning, 'runtime-live');
   return <div className="page fill">
     <div className="head">
       <div><div className="eyebrow">Running now</div><h1>Running sessions</h1><p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p></div>
-      <div className="chain"><a className="btn" href="#/runtime/canvas">Open agent canvas</a><button type="button" className="btn" onClick={() => setRevision((value) => value + 1)}>Ask the runners again</button></div>
     </div>
     <Gate load={load} title="Running sessions" ok={(data) => <Running {...data} session={session} />} />
   </div>;
