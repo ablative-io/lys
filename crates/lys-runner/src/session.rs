@@ -71,6 +71,10 @@ pub(crate) struct Live {
     pid: u32,
 }
 
+#[cfg(test)]
+#[path = "../tests/input_no_screen/shared_lock.rs"]
+mod input_no_screen;
+
 impl Live {
     /// End the process and everything it started, naming a failure in the
     /// runner's log: the exit, when it comes, is what answers.

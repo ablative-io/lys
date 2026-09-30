@@ -71,17 +71,23 @@ Behavioural. WHEN a session asks for a restart presenting its own session creden
 
 ### R3: Compaction and reminders reach a session no screen is reading
 
-Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits.
+Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits. Each session has its own ordered write path. A full input pipe never holds the shared session table; completion arrives by signal, with no timeout.
 
 **Acceptance:**
 - A compaction request reaches a session with no viewer and the session compacts.
 - A goal reminder reaches a session with no viewer.
 - A second session keeps answering while the first is being written to.
+- A signal-controlled full input pipe leaves the shared session table available and a second session answers before that pipe is released.
 
 **Files:**
 - create: crates/lys-identity-server/tests/input_no_screen.rs
+- create: crates/lys-runner/src/input.rs
+- create: crates/lys-runner/tests/input_no_screen/shared_lock.rs
 - modify: crates/lys-identity-server/src/budgets_act.rs
 - modify: crates/lys-identity-server/src/goals_api.rs
+- modify: crates/lys-runner/src/session.rs
+- modify: crates/lys-runner/src/operations.rs
+- modify: crates/lys-runner/src/lib.rs
 
 **Checklist:**
 - C468 — Compaction requests and reminders reach a session nobody is watching without blocking another. (DIRECTORY-073 R3).

@@ -74,19 +74,25 @@
     {
       "id": "R3",
       "title": "Compaction and reminders reach a session no screen is reading",
-      "spec": "Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits.",
+      "spec": "Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder falls due, for a session that no client is reading, THE SYSTEM SHALL deliver it through the runner's input at the turn boundary as it does for a watched session, and SHALL NOT block the runner or any other session while it waits. Each session has its own ordered write path. A full input pipe never holds the shared session table; completion arrives by signal, with no timeout.",
       "acceptance": [
         "A compaction request reaches a session with no viewer and the session compacts.",
         "A goal reminder reaches a session with no viewer.",
-        "A second session keeps answering while the first is being written to."
+        "A second session keeps answering while the first is being written to.",
+        "A signal-controlled full input pipe leaves the shared session table available and a second session answers before that pipe is released."
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/tests/input_no_screen.rs"
+          "crates/lys-identity-server/tests/input_no_screen.rs",
+          "crates/lys-runner/src/input.rs",
+          "crates/lys-runner/tests/input_no_screen/shared_lock.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/budgets_act.rs",
-          "crates/lys-identity-server/src/goals_api.rs"
+          "crates/lys-identity-server/src/goals_api.rs",
+          "crates/lys-runner/src/session.rs",
+          "crates/lys-runner/src/operations.rs",
+          "crates/lys-runner/src/lib.rs"
         ],
         "delete": []
       },
