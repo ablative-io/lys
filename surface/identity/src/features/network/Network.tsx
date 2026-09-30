@@ -1,62 +1,111 @@
-/** The served machine registry and explicit retirement, without inventing runtime liveness. */
+/** The computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
 import { useState } from 'react';
-import { api, Refused, request, useLoad } from '../../api';
+import { api, request, useLoad } from '../../api';
+import type { PeopleView } from '../../generated';
+import { Listing } from '../../shell/Listing';
+import type { Column } from '../../shell/Listing';
+import { groupByTeam, inWhose } from '../../shell/org';
+import type { Held, OrgTeam, Whose } from '../../shell/org';
+import { useWhose, WhoseSelect } from '../../shell/Whose';
+import { problemWords } from '../people/Words';
+import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Gate } from '../signin/Gate';
-import { clock } from '../file/time';
+import { readTeams } from '../teams/Teams';
 import { AddMachine } from './AddMachine';
 import type { Machine, NetworkView } from './contract';
+import { MachineDetail, status } from './MachineDetail';
+import type { RunnerRecord } from './MachineDetail';
 
-type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
-function starts(machine: Machine, runner: RunnerRecord | null): string {
-  if (machine.state === 'retired') return 'Retired: no agent can be started on it.';
-  if (runner?.kind === 'lys') return 'Lys starts agents here through its own Lys runner.';
-  if (runner?.kind === 'dialled') return 'Lys starts agents here through the Lys runner that connects from it, holding key ' + runner.key.slice(0, 8) + '….';
-  if (runner?.kind === 'socket') return 'Lys starts agents here through the runner listening at ' + runner.path + '.';
-  if (machine.runtime !== null) return 'No Lys runner is recorded for it, so a start here gives you a command to run on it yourself.';
-  return 'Lys does not start agents here.';
+/** One computer with what Lys knows of it now. */
+export interface Computer { machine: Machine; runner: RunnerRecord | null; running: RuntimeSession[] | null; reports: boolean }
+
+type Show = 'all' | 'attention';
+
+async function readComputers(): Promise<Computer[]> {
+  const view = await request<NetworkView>('/network');
+  const runners = await Promise.all(view.machines.map((machine) => request<{ runner: RunnerRecord | null }>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then((answer) => answer.runner)));
+  const live = await request<{ sessions: RuntimeSession[] }>('/runtime/live').then((answer) => answer.sessions, () => null);
+  return view.machines.map((machine, index) => ({ machine, runner: runners[index], reports: view.reports_served, running: live?.filter((session) => session.machine === machine.id && session.shown !== 'stopped') ?? null }));
 }
 
-function Retire({ machine, changed }: { machine: Machine; changed: () => void }) {
-  const [confirm, setConfirm] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
-  const retire = async () => {
-    if (busy) return; setBusy(true); setFailure('');
-    try {
-      const answer = await request<Machine>('/network/machines/' + encodeURIComponent(machine.id) + '/retire', {});
-      if (answer.id !== machine.id || answer.state !== 'retired') throw new Error('Retirement is not confirmed. Reload this page to see whether it was retired.');
-      changed();
-    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
-    finally { setBusy(false); }
-  };
-  return <div>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><button className="btn danger" disabled={busy} onClick={() => void retire()}>Confirm retirement</button>{' '}<button className="btn" disabled={busy} onClick={() => setConfirm(false)}>Cancel</button></>
-    : <button className="btn" onClick={() => setConfirm(true)}>Retire this computer</button>}{failure ? <p role="alert">{failure}</p> : null}</div>;
+/** A computer belongs where the agents that may start on it belong. */
+const held = (computer: Computer): Held => ({ id: computer.machine.id, person: null, also: computer.machine.may_run.map((agent) => agent.id) });
+
+function inScope(whose: Whose, teams: OrgTeam[], me: string, people: PeopleView, computer: Computer): boolean {
+  if (whose.kind !== 'mine') return inWhose(whose, teams, me, held(computer));
+  const mine = new Set(people.people.filter((person) => person.id === me).flatMap((person) => person.agents.map((agent) => agent.id)));
+  return computer.machine.named_by === me || computer.machine.may_run.some((agent) => mine.has(agent.id));
 }
 
 export function Network() {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
-  const refresh = (message?: string) => { if (message) setNotice(message); setRevision((value) => value + 1); };
-  const load = useLoad(async () => {
-    const view = await request<NetworkView>('/network');
-    const runners = await Promise.all(view.machines.map((machine) => request<{ runner: RunnerRecord | null }>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then((answer) => answer.runner)));
-    return { ...view, runners };
-  }, 'network:' + revision);
-  const authority = useLoad(async () => ({ people: await api.people(), me: await api.me() }), 'network-authority');
-  const admin = authority.status === 'ok' && authority.data.people.scope === 'directory';
-  return <div className="page"><div className="head"><div><h1>Computers</h1><p className="sub">The computers Lys can start agents on, and which agents may start on each.</p></div></div>
-    {notice ? <p role="status">{notice}</p> : null}
-    <Gate load={load} title="Network" ok={(data) => <>
-      {!data.machines.length ? <p>No computers have been added.</p> : data.machines.map((machine, index) => <section className="card" key={machine.id}>
-        <h2>{machine.name} <span className="note">{machine.kind}{machine.state === 'retired' ? ' · retired' : ''}</span></h2>
-        <p>{starts(machine, data.runners[index])}</p>
-        <p>{data.reports_served ? 'Last heard from: ' + (machine.last_report_at === null ? 'never' : clock(machine.last_report_at)) + '.' : 'This Lys does not collect runner reports, so it cannot say when this computer was last heard from.'}</p>
-        {machine.runtime !== null ? <p>Agents that may start here: {[...machine.may_run.map((agent) => agent.display_name), ...(machine.may_run_roles ?? []).map((role) => 'anyone holding ' + role)].join(', ') || 'none yet, so every start here is refused'}.</p> : null}
-        <p>Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
-        {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={refresh} /> : null}
-      </section>)}
-    </>} />
-    {admin && authority.status === 'ok' && load.status === 'ok' ? <AddMachine person={authority.data.me.person.id} agents={authority.data.people.people.flatMap((person) => person.agents)} changed={refresh} /> : null}
-    {authority.status === 'refused' ? <p className="why-not">{authority.refused.refusal.refusal}: {authority.refused.message}</p> : null}
+  const load = useLoad(async () => ({
+    computers: await readComputers(), people: await api.people(), me: await api.me(),
+    teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
+  }), 'network:' + revision);
+  return <div className="page fill">
+    <Gate load={load} title="Computers" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} notice={notice} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
   </div>;
+}
+
+function Computers({ computers, people, me, teams, teamsRefused, notice, refresh }: { computers: Computer[]; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; notice: string; refresh: (message: string) => void }) {
+  const admin = people.scope === 'directory';
+  const [whose, setWhose] = useWhose(admin);
+  const [show, setShow] = useState<Show>('all');
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const names = new Map(people.people.flatMap((person) => [[person.id, person.display_name] as const, ...person.agents.map((agent) => [agent.id, agent.display_name] as const)]));
+  const attention = (computer: Computer) => status(computer).state === 'down';
+  const scoped = computers.filter((computer) => inScope(whose, teams, me.person.id, people, computer)).filter((computer) => show === 'all' || attention(computer));
+  const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
+  const selected = computers.find((computer) => computer.machine.id === picked) ?? scoped[0] ?? null;
+  const count = (n: number) => n.toLocaleString('en-AU');
+  const up = computers.filter((computer) => status(computer).state === 'up').length;
+  const running = computers.reduce((sum, computer) => sum + (computer.running?.length ?? 0), 0);
+  const columns: Column<Computer>[] = [
+    { head: 'Computer', cell: (computer) => computer.machine.name },
+    { head: 'Status', cell: (computer) => { const now = status(computer); return <><span className={'dot ' + (now.state === 'up' ? 's-active' : now.state === 'down' ? 's-suspended' : 's-retired')} />{now.words}</>; } },
+    { head: 'Running now', cell: (computer) => computer.running === null ? <span className="dim">cannot tell</span> : computer.running.length ? count(computer.running.length) + (computer.running.length === 1 ? ' agent' : ' agents') : <span className="dim">nothing</span> },
+    { head: 'May start here', cell: (computer) => <span className="sec">{mayStart(computer.machine)}</span> },
+  ];
+  const changed = (message: string) => { setAdding(false); refresh(message); };
+  return <>
+    <div className="head">
+      <div><div className="eyebrow">Where agents run</div><h1>Computers</h1><p className="sub">Every computer Lys may start agents on, and what is running there now.</p></div>
+      {admin && !adding ? <button className="btn primary" onClick={() => setAdding(true)}>+ Add a computer</button> : null}
+    </div>
+    <div className="stat-strip">
+      <div className="stat"><div className="n">{count(computers.filter((computer) => computer.machine.state !== 'retired').length)}</div><div className="l">computers</div></div>
+      <div className="stat"><div className="n">{count(up)}</div><div className="l">up now</div></div>
+      <div className="stat"><div className="n" style={computers.some(attention) ? { color: 'var(--warn)' } : undefined}>{count(computers.filter(attention).length)}</div><div className="l">not heard from</div></div>
+      <div className="stat"><div className="n">{count(running)}</div><div className="l">agents running</div></div>
+    </div>
+    {notice ? <p role="status">{notice}</p> : null}
+    {teamsRefused ? <p className="why-not">Teams cannot be read, so computers are listed without their team. {teamsRefused}</p> : null}
+    <div className="body">
+      <Listing<Computer> groups={groups} columns={columns} id={(computer) => computer.machine.id} href={(computer) => '#/network?computer=' + computer.machine.id}
+        words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers"
+        holds={(items) => count(items.length) + (items.length === 1 ? ' computer' : ' computers')}
+        selected={selected?.machine.id ?? null} select={(computer) => { setPicked(computer.machine.id); setAdding(false); }} open={(computer) => { setPicked(computer.machine.id); setAdding(false); }}
+        tools={<>
+          <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
+          <div className="seg">{([['all', 'All'], ['attention', 'Not heard from']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
+        </>} />
+      <div className="detail">
+        {adding && admin ? <AddMachine person={me.person.id} agents={people.people.flatMap((person) => person.agents)} changed={changed} cancel={() => setAdding(false)} />
+          : selected ? <MachineDetail computer={selected} admin={admin} names={names} changed={changed} /> : <p className="dim">{computers.length ? 'Choose a computer.' : 'No computers yet. Add the one Lys runs on to start agents here.'}</p>}
+      </div>
+    </div>
+  </>;
+}
+
+/** Who may start agents on a computer, in a line that stays short however many there are. */
+export function mayStart(machine: Machine): string {
+  if (machine.runtime === null) return 'Lys does not start agents here.';
+  const roles = (machine.may_run_roles ?? []).map((role) => 'anyone holding ' + role);
+  const agents = machine.may_run.map((agent) => agent.display_name);
+  const listed = agents.length > 3 ? [...agents.slice(0, 2), agents.length - 2 + ' more agents'] : agents;
+  const all = [...listed, ...roles];
+  return all.length ? all.join(', ') : 'No agent may start here yet.';
 }

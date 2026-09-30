@@ -25,8 +25,13 @@ fn profile(from: u32) -> Result<Value, Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_replaced_profile_is_refused_naming_the_latest_version() -> TestResult {
-    let (service, seeded) =
-        Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR])?)).await?;
+    let (service, seeded) = Service::start_with(|config| {
+        Ok(seed_configured(
+            config,
+            [ADMINISTRATOR, "reviewer-subject"],
+        )?)
+    })
+    .await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
@@ -44,7 +49,7 @@ async fn a_replaced_profile_is_refused_naming_the_latest_version() -> TestResult
         .post(&format!("{path}/1/review"), Some(&cookie), &review)
         .await?;
     assert_eq!(status, 409, "{body}");
-    assert_eq!(body["refusal"], "ProvisioningChanged", "{body}");
+    assert_eq!(body["refusal"], "ProfileVersionReplaced", "{body}");
     assert!(
         body["reason"]
             .as_str()

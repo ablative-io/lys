@@ -53,18 +53,20 @@ pub fn render(
     text: &str,
     instructions_mode: InstructionsMode,
 ) -> Result<Launch, String> {
-    if contract != "claude-code/template-v1" {
+    if !matches!(contract, "claude-code/template-v1" | "codex/template-v1") {
         return Err(format!("unknown rendering contract `{contract}`"));
     }
     if !program.starts_with('/') || program.chars().any(char::is_control) {
         return Err("the declared program is not an absolute plain path".to_owned());
     }
+    if contract == "codex/template-v1" {
+        return super::codex::launch::render(program, text, instructions_mode);
+    }
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
     let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
-    let mcp = serde_json::to_string_pretty(&serde_json::json!({"mcpServers": template.mcp}))
-        .map_err(|error| error.to_string())?
-        + "\n";
+    let mcp =
+        serde_json::to_string_pretty(&template.mcp).map_err(|error| error.to_string())? + "\n";
     let mut files = vec![
         file("mcp.json", mcp),
         file("settings.json", settings),

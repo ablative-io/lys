@@ -85,3 +85,19 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .check select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 8px; font: 12.5px "DM Sans"; }
 .check .answer { min-height: 40px; display: flex; gap: 14px; align-items: center; margin-top: 12px; }
 .check .why { color: var(--text-secondary); font-size: 12px; }
+
+/* A page fills the window and never scrolls; its list and its detail each scroll on their own. */
+.page.fill { height: 100%; box-sizing: border-box; padding-bottom: 18px; display: flex; flex-direction: column; overflow: hidden; }
+.fill > .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; }
+.fill > .body.one { grid-template-columns: minmax(0, 1fr); }
+.fill .listing { display: flex; flex-direction: column; min-height: 0; }
+.fill .pane, .fill .detail { overflow: auto; min-height: 0; overscroll-behavior: contain; }
+.tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
+.tools .search { width: 280px; }
+.tools .count { margin-left: auto; }
+.whose select, .tools select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 8px; font: 12.5px "DM Sans"; }
+tr.group th { position: sticky; top: 0; z-index: 1; background: var(--surface-base); padding-top: 14px; font-weight: 400; }
+tr.group .group-name { font-weight: 600; color: var(--text-primary); margin-right: 10px; }
+.btn.under { min-height: 0; padding: 0 8px; margin-left: 10px; font-size: 11.5px; }
+tr.more td { border-bottom: 0; }
+@media (max-width: 900px) { .fill > .body { grid-template-columns: minmax(0, 1fr); } .fill .detail { display: none; } }

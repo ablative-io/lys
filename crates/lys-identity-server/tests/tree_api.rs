@@ -88,7 +88,7 @@ async fn the_tree_requires_authentication() -> TestResult {
         Ok(seed_configured(config, [ADMINISTRATOR, "another-subject"])?)
     })
     .await?;
-    assert_eq!(seeded.people.len(), 1);
+    assert_eq!(seeded.people.len(), 2);
     let (status, answer) = service.get("/tree", None).await?;
     assert_eq!(status, 401, "{answer}");
     assert_eq!(answer["refusal"], "NotSignedIn");
@@ -142,7 +142,9 @@ async fn agent_tree(
         .header(HEADER, format!("{agent} {at} {nonce} {}", hex(&cose)))
         .send()
         .await?;
-    Ok((response.status().as_u16(), response.json().await?))
+    let status = response.status().as_u16();
+    let answer = serde_json::from_slice(&response.bytes().await?)?;
+    Ok((status, answer))
 }
 
 #[tokio::test]
@@ -152,6 +154,7 @@ async fn an_agent_lead_reads_descendants_and_other_members_without_gaining_mutat
     use base64::engine::general_purpose::STANDARD;
     use lys_core::Ed25519Identity;
     use lys_core::ca::create_certificate_request;
+    use std::sync::Arc;
 
     let other = "another-subject";
     let (service, seeded) =
@@ -200,7 +203,9 @@ async fn an_agent_lead_reads_descendants_and_other_members_without_gaining_mutat
     )
     .await?;
     post(&service, &owner, &format!("/teams/{child}/goals"), json!({"operation": operation()?, "kind":"goal", "words":"the child's current goal", "deadline":u64::MAX})).await?;
-    let key = Ed25519Identity::load_or_generate(&service.dir.path().join("agent.key"))?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(
+        &service.dir.path().join("agent.key"),
+    )?);
     post(&service, &other_cookie, &format!("/agents/{lead}/certificates"), json!({"operation":operation()?, "request":STANDARD.encode(create_certificate_request(&key,&lead)?)})).await?;
     let (status, answer) = agent_tree(&service, &lead, &key, 9).await?;
     assert_eq!(status, 200, "{answer}");

@@ -1,22 +1,24 @@
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api, useLoad } from '../../api';
-import type { Scope } from '../../generated';
-import { keyable } from '../../shell/keyable';
+import type { PeopleView } from '../../generated';
+import { Listing } from '../../shell/Listing';
+import type { Column } from '../../shell/Listing';
+import { groupByTeam, inWhose } from '../../shell/org';
+import type { OrgTeam } from '../../shell/org';
+import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { useShell } from '../../shell/ShellContext';
 import type { KindFilter } from '../../shell/ShellContext';
-import { DirectoryGate as Gate } from './Words';
+import { DirectoryGate as Gate, problemWords } from './Words';
 import { entries, needsNewPerson } from './directory';
 import type { Entry } from './directory';
+import { readTeams } from '../teams/Teams';
 import { Reach, readDirectoryReach } from './reach';
-import type { DirectoryReach } from './reach';
-import type { Load } from '../../api';
 import { Preview } from './Preview';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
-import type { RolesLoad } from '../roles/AssignedRoles';
 
 function PeopleHead() {
   const shell = useShell();
@@ -58,21 +60,51 @@ function Stat({ n, l, warn }: { n: number; l: string; warn?: boolean }) {
   );
 }
 
-function List({ all, scope }: { all: Entry[]; scope: Scope }) {
+/** A person's row carries their agents folded under it; an agent's row names the person it answers to. */
+type Row = Entry & { agents: Entry[] };
+
+function rowsOf(view: PeopleView, kind: KindFilter): Row[] {
+  const all = entries(view);
+  const agentsOf = (id: string) => all.filter((x) => x.kind === 'agent' && x.person?.id === id);
+  if (kind === 'agent') return all.filter((x) => x.kind === 'agent').map((x) => ({ ...x, agents: [] }));
+  return all.filter((x) => x.kind === 'person').map((x) => ({ ...x, agents: kind === 'person' ? [] : agentsOf(x.id) }));
+}
+
+const held = (x: Entry) => ({ id: x.id, person: x.person?.id ?? null });
+
+function holds(rows: Row[]): string {
+  const people = rows.filter((x) => x.kind === 'person').length;
+  const agents = rows.reduce((sum, x) => sum + (x.kind === 'agent' ? 1 : x.agents.length), 0);
+  const words = [people ? people.toLocaleString('en-AU') + (people === 1 ? ' person' : ' people') : '', agents ? agents.toLocaleString('en-AU') + (agents === 1 ? ' agent' : ' agents') : ''];
+  return words.filter(Boolean).join(', ') || 'no one yet';
+}
+
+function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: string }) {
   const reach = useLoad(readDirectoryReach, 'directory-reach');
   const roles = useLoad(readRoles, 'directory-roles');
   const shell = useShell();
   const navigate = useNavigate();
-  const list = all.filter((x) => shell.filterKind === 'all' || x.kind === shell.filterKind);
-  const rows = list.map((x) => '#/file/' + x.id);
-  const key = rows.join(',');
+  const admin = view.scope === 'directory';
+  const [whose, setWhose] = useWhose(admin);
+  const all = entries(view);
+  const names = new Map(all.map((x) => [x.id, x.display_name]));
+  const scoped = rowsOf(view, shell.filterKind).filter((x) => inWhose(whose, teams, me, held(x)));
+  const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
+  const [shown, setShown] = useState<string[]>([]);
   useEffect(() => {
-    shell.setRows(rows);
+    shell.setRows(shown);
     return () => shell.setRows([]);
-  }, [key]);
-  const cursor = Math.min(shell.cursor, Math.max(0, list.length - 1));
-  const sel = list[cursor];
+  }, [shown.join(',')]);
+  const selectedHref = shown[Math.min(shell.cursor, Math.max(0, shown.length - 1))] ?? null;
+  const selected = all.find((x) => '#/file/' + x.id === selectedHref) ?? null;
   const active = (kind: string) => all.filter((x) => x.kind === kind && x.state === 'active').length;
+  const columns: Column<Row>[] = [
+    { head: 'Name', cell: (x) => x.display_name },
+    { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
+    { head: 'State', cell: (x) => <><span className={'dot s-' + x.state} />{x.state}</> },
+    { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
+    { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
+  ];
   return (
     <>
       <div className="stat-strip">
@@ -81,67 +113,27 @@ function List({ all, scope }: { all: Entry[]; scope: Scope }) {
         <Stat n={all.filter(needsNewPerson).length} l="with no one answering" warn />
         <RuntimeCounts />
       </div>
-      <div className="split">
-        <div>
-          <table>
-            <thead>
-              <tr><th>Name</th><th>Kind</th><th>Role</th><th>State</th><th>Answers to</th><th>Reaches</th></tr>
-            </thead>
-            <tbody>
-              {list.map((x, i) => (
-                <Row key={x.id} x={x} roles={roles} reach={reach} i={i} cursor={cursor} open={() => navigate('/file/' + x.id)} />
-              ))}
-            </tbody>
-          </table>
-          {list.length ? null : <div className="dim" style={{ marginTop: 10 }}>No one here yet.</div>}
-          <p className="note" style={{ marginTop: 8 }}>j and k move, Enter opens. Hover a row to preview it.</p>
-          <p className="note">Reach is checked by the permission service for visible resources. Roles show each current assignment and its held version; they do not grant access.</p>
-          {scope === 'personal' ? (
-            <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>
-          ) : null}
-        </div>
-        <div className="preview">{sel ? <Preview x={sel} roles={roles} reach={reach} /> : null}</div>
+      {admin ? null : <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>}
+      <div className="body">
+        <Listing<Row>
+          groups={groups} columns={columns} id={(x) => x.id} href={(x) => '#/file/' + x.id} words={(x) => x.display_name}
+          noun={shell.filterKind === 'agent' ? 'agents' : shell.filterKind === 'person' ? 'people' : 'people and agents'}
+          holds={holds} under={shell.filterKind === 'all' ? (x) => x.agents.map((agent) => ({ ...agent, agents: [] })) : undefined} underNoun={(n) => n + (n === 1 ? ' agent' : ' agents')} underHead={shell.filterKind === 'all' ? 'Agents' : undefined}
+          selected={selected?.id ?? null} select={(x) => shell.setCursor(Math.max(0, shown.indexOf('#/file/' + x.id)))} open={(x) => navigate('/file/' + x.id)}
+          tools={<WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />} shown={setShown}
+        />
+        <div className="detail">{selected ? <Preview x={selected} roles={roles} reach={reach} /> : null}</div>
       </div>
     </>
   );
 }
 
-function Row({ x, roles, reach, i, cursor, open }: { x: Entry; roles: RolesLoad; reach: Load<DirectoryReach>; i: number; cursor: number; open: () => void }) {
-  const shell = useShell();
-  return (
-    <tr
-      className={i === cursor ? 'cursor' : ''}
-      data-href={'#/file/' + x.id}
-      data-pick={i}
-      onMouseOver={() => i !== cursor && shell.setCursor(i)}
-      onFocus={() => i !== cursor && shell.setCursor(i)}
-      {...keyable(open)}
-    >
-      <td>{x.display_name}</td>
-      <td><span className={'kind ' + x.kind}>{x.kind}</span></td>
-      <td className="sec"><RoleSummary load={roles} id={x.id} /></td>
-      <td><span className={'dot s-' + x.state} />{x.state}</td>
-      <td className="sec">
-        {x.person ? (
-          <>
-            {x.person.display_name}
-            {needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}
-          </>
-        ) : (
-          <span className="dim">—</span>
-        )}
-      </td>
-      <td><Reach load={reach} id={x.id} compact /></td>
-    </tr>
-  );
-}
-
 export function People() {
   const shell = useShell();
-  const load = useLoad(api.people, 'people');
+  const load = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
   if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
-      <div className="page">
+      <div className="page fill">
         <PeopleHead />
         {shell.filterKind === 'found' ? <RuntimeSessions found /> : <Teams />}
       </div>
@@ -152,9 +144,10 @@ export function People() {
       load={load}
       title="Directory"
       ok={(d) => (
-        <div className="page">
+        <div className="page fill">
           <PeopleHead />
-          <List all={entries(d)} scope={d.scope} />
+          {d.teams.refused ? <p className="why-not">Teams cannot be read, so everyone is listed without their team. {d.teams.refused}</p> : null}
+          <List view={d.view} teams={d.teams.teams} me={d.me.person.id} />
         </div>
       )}
     />

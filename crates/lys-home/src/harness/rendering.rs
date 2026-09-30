@@ -40,7 +40,7 @@ pub struct RenderRefusal {
     pub reason: String,
 }
 
-fn refused(
+pub(super) fn refused(
     fields: &LaunchFields,
     member: &str,
     reason: &(impl ToString + ?Sized),
@@ -54,11 +54,13 @@ fn refused(
 
 enum Contract {
     Native,
+    Codex,
 }
 
 fn resolve(contract: &str) -> Option<Contract> {
     match contract {
         "claude-code/template-v1" => Some(Contract::Native),
+        "codex/template-v1" => Some(Contract::Codex),
         _ => None,
     }
 }
@@ -77,6 +79,9 @@ pub fn render(
 ) -> Result<RenderedTemplate, RenderRefusal> {
     match resolve(&fields.harness.description.rendering_contract) {
         Some(Contract::Native) => native_template(fields, skills, permissions, secrets),
+        Some(Contract::Codex) => {
+            super::codex::launch_template::render(fields, skills, permissions, secrets)
+        }
         None => Err(refused(
             fields,
             "description.rendering_contract",
@@ -199,7 +204,7 @@ mod tests {
     #[test]
     fn only_registered_contracts_are_answered_as_registered() {
         assert!(registered("claude-code/template-v1"));
-        assert!(!registered("codex/template-v1"));
+        assert!(registered("codex/template-v1"));
         assert!(!registered("Claude Code"));
         assert!(!registered(""));
     }

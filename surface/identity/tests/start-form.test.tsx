@@ -76,7 +76,7 @@ describe('The route-backed start form', () => {
   });
   it('names a missing declared build rather than inventing an executable', async () => {
     const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, builds: [] }] }) });
-    expect(text()).toContain('ProgramBuildUnavailable');
+    expect(text()).toContain('Claude Code is not installed on this computer');
     expect(button()?.disabled).toBe(true);
     expect(posted).toEqual([]);
   });
@@ -203,6 +203,21 @@ describe('The route-backed start form', () => {
     await click(button());
     expect(text()).toContain('StartVersionChanged');
     expect(text()).not.toContain('Its Lys runner has it running');
+  });
+
+  it('shows the served reason when an installed copy cannot be offered', async () => {
+    const reason = 'VersionCommandFailed: exit status: 7';
+    const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, builds: [], not_found: reason }] }) });
+    expect(text()).toContain('Claude Code is not installed on this computer');
+    expect(text()).toContain(reason);
+    expect(button()?.disabled).toBe(true);
+    expect(posted).toEqual([]);
+  });
+  it('names the selected program when its installed copy is missing', async () => {
+    await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, name: 'Codex', builds: [] }] }) });
+    expect(text()).toContain('Codex is not installed on this computer');
+    expect(text()).not.toContain('Claude Code is not installed');
+    expect(button()?.disabled).toBe(true);
   });
 
 });
