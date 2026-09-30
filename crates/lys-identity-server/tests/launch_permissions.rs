@@ -262,3 +262,40 @@ async fn a_profile_with_no_permissions_writes_environment_only() -> TestResult {
     assert_eq!(members, ["env"]);
     Ok(())
 }
+
+/// The template a start renders, without the per-start identity in its
+/// environment slot (agent, session, machine and version).
+fn rendered_without_identity(started: &Value) -> Result<Vec<u8>, Box<dyn Error>> {
+    let text = started["template"].as_str().ok_or("no template")?;
+    let mut template: Value = serde_json::from_str(text)?;
+    let slots = template["slots"]
+        .as_object_mut()
+        .ok_or("template has no slots")?;
+    slots.remove("env").ok_or("template has no env slot")?;
+    Ok(serde_json::to_vec_pretty(&template)?)
+}
+
+#[tokio::test]
+async fn a_tool_and_the_same_allow_rule_render_byte_identical_starts() -> TestResult {
+    let table = Table::set().await?;
+    let (status, set) = table.record(0, &json!(["Bash"]), &permissions()).await?;
+    assert_eq!(status, 200, "{set}");
+    table.review(1).await?;
+    let (status, as_tool) = table.start("Tool box").await?;
+    assert_eq!(status, 200, "{as_tool}");
+    let mut folded = permissions();
+    folded["allow"] = json!(["Read", "Bash"]);
+    let (status, set) = table.record(1, &json!([]), &folded).await?;
+    assert_eq!(status, 200, "{set}");
+    table.review(2).await?;
+    let (status, as_rule) = table.start("Rule box").await?;
+    assert_eq!(status, 200, "{as_rule}");
+    assert_eq!(as_tool["provisioning_version"], 1);
+    assert_eq!(as_rule["provisioning_version"], 2);
+    assert_eq!(
+        rendered_without_identity(&as_tool)?,
+        rendered_without_identity(&as_rule)?,
+        "folding a tool into the allow rules changes nothing the start renders"
+    );
+    Ok(())
+}
