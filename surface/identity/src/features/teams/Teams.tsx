@@ -13,7 +13,7 @@ export function Teams() {
   const [revision, setRevision] = useState(0); const [notice, setNotice] = useState('');
   const changed = (message: string) => { setNotice(message); setRevision((value) => value + 1); };
   const load = useLoad(async () => ({ teams: await request<{ teams: Team[] }>('/teams'), me: await api.me(), people: await api.people() }), 'teams:' + revision);
-  return <section><div className="head"><div><h2>Teams</h2><p>Group people and agents who work together. Membership does not grant access.</p></div><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh teams</button></div>{notice ? <p role="status">{notice}</p> : null}
+  return <section><div className="head"><div><h2>Teams</h2><p>Group people and agents who work together. Membership does not grant access.</p></div></div>{notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Teams" ok={({ teams, me, people }) => <>
       {teams.teams.length ? teams.teams.map((team) => <section className="card" key={team.id}><h3>{team.name} <span className="note">{team.state}</span></h3><p>{team.description}</p><p>Owner: <a href={'#/file/' + team.owner}>{entries(people).find((entry) => entry.id === team.owner)?.display_name ?? team.owner}</a></p>
         {team.members.length ? <ul>{team.members.map((id) => <li key={id}><a href={'#/file/' + id}>{entries(people).find((entry) => entry.id === id)?.display_name ?? id}</a>{team.held?.find((held) => held.member === id) ? <p className="why-not">Awaiting administrator confirmation. Team reminders and budget actions do not include this member. {team.held.find((held) => held.member === id)?.reason}</p> : null}</li>)}</ul> : <p>No members yet.</p>}

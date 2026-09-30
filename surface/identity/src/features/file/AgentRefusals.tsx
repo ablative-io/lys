@@ -1,5 +1,4 @@
 /** The tool calls an agent was refused, newest first, with the runners whose refusals have been read. */
-import { useState } from 'react';
 import { request, useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
 import type { RefusalRecord, RefusalsView } from './policyContract';
@@ -14,16 +13,14 @@ function lift(refusal: RefusalRecord): string {
 }
 
 export function AgentRefusals({ id }: { id: string }) {
-  const [revision, setRevision] = useState(0);
   const load = useLoad(async () => {
     const view = await request<RefusalsView>('/agents/' + encodeURIComponent(id) + '/refusals');
     if (view.agent !== id || !Array.isArray(view.refusals) || !Array.isArray(view.read_from)) throw new Error('The refusals answer did not name this agent.');
     return view;
-  }, 'agent-refusals:' + id + ':' + revision);
+  }, 'agent-refusals:' + id);
   return (
     <>
-      <div className="head"><div><h2>Refused tool calls</h2><p>What this agent's policy stopped, newest first.</p></div>
-        <button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh refusals</button></div>
+      <div className="head"><div><h2>Refused tool calls</h2><p>What this agent's policy stopped, newest first.</p></div></div>
       <Gate load={load} title="Refused tool calls" ok={(view) => (
         <section className="card">
           <p className="note" data-coverage>

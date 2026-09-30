@@ -40,13 +40,13 @@ describe('personal budgets', () => {
     expect(world.posted).toEqual([]);
   });
   for (const [status, kind, reason] of [[503, 'BudgetsUnavailable', 'upgrade_pending'], [409, 'BudgetVersionConflict', 'budget changed'], [500, 'BudgetsUnavailable', 'outcome unreadable']] as const) {
-    it('requires a read after ' + kind + ' ' + status, async () => {
+    it('reads the budgets again after ' + kind + ' ' + status, async () => {
       const world = await mount('#/file/' + ADA + '/budgets', routes({ ['POST ' + path + '/confirm']: refused(status, kind, reason) }));
       await click(confirm());
       expect(text()).toContain(kind + ': ' + reason);
       expect(text()).toContain('Currently enforced');
       expect(text()).toContain('Requested change');
-      expect((confirm() as HTMLButtonElement).disabled).toBe(true);
+      expect(world.requests.filter((entry) => entry === path)).toHaveLength(2);
       expect(world.posted).toHaveLength(1);
     });
   }
@@ -91,7 +91,6 @@ describe('personal budgets', () => {
     expect(text()).toContain('cannot read recorded budget');
     expect(document.querySelector('article[aria-label="Pending tokens"]')).toBeNull();
     expect(text()).not.toContain('Enforced budget');
-    expect(text()).toContain('Read budgets again');
   });
 
   it('removes stale confirmation controls while the authoritative follow-up read is pending', async () => {

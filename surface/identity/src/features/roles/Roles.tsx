@@ -17,7 +17,7 @@ export function Roles() {
   const load = useLoad(() => request<{ roles: Role[] }>('/roles'), 'roles:' + revision);
   const authority = useLoad(async () => ({ people: await api.people(), me: await api.me(), model: await api.model() }), 'role-authority');
   const admin = authority.status === 'ok' && authority.data.people.scope === 'directory';
-  return <div className="page"><div className="head"><div><div className="eyebrow">Directory</div><h1>Roles</h1><p className="sub">Responsibilities, working practices and access templates, with a history for every version.</p></div><button className="btn" onClick={() => setRevision((value) => value + 1)}>Refresh roles</button></div>
+  return <div className="page"><div className="head"><div><div className="eyebrow">Directory</div><h1>Roles</h1><p className="sub">Responsibilities, working practices and access templates, with a history for every version.</p></div></div>
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Roles" ok={({ roles }) => {
       const role = id ? roles.find((entry) => entry.id === id) : undefined;
