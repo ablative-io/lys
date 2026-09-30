@@ -73,7 +73,7 @@ impl Sessions {
         session.generation += 1;
         session.pid = Some(spawned.pid);
         session.live = Some(Live {
-            writer: spawned.writer,
+            writer: crate::input::Input::new(spawned.writer),
             master: spawned.master,
             pid: spawned.pid,
         });

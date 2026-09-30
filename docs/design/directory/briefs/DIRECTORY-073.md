@@ -88,6 +88,7 @@ Behavioural. WHEN a budget asks for a compaction or notice, or a goal reminder f
 - modify: crates/lys-runner/src/session.rs
 - modify: crates/lys-runner/src/operations.rs
 - modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/session/lifecycle.rs
 
 **Checklist:**
 - C468 — Compaction requests and reminders reach a session nobody is watching without blocking another. (DIRECTORY-073 R3).

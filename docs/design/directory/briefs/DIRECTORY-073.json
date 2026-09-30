@@ -92,7 +92,8 @@
           "crates/lys-identity-server/src/goals_api.rs",
           "crates/lys-runner/src/session.rs",
           "crates/lys-runner/src/operations.rs",
-          "crates/lys-runner/src/lib.rs"
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/session/lifecycle.rs"
         ],
         "delete": []
       },
