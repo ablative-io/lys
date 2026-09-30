@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { $, $$, serve, text } from './harness';
+import { $, $$, serve } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
