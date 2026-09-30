@@ -25,15 +25,15 @@ function Controls({ agent, tab, session }: { agent: string; tab: Tab; session: R
     catch (error) { setSaid(error instanceof Refused ? error.refusal.reason : String(error)); }
   };
   const base = '#/team/' + encodeURIComponent(agent) + '/';
-  return <div className="stage-strip">
-    <div className="seg">{TABS.map(([id, words]) => <a key={id} className={tab === id ? 'on' : undefined} href={base + id}>{words}</a>)}</div>
-    <div className="strip-acts">
+  return <nav className="tabs team-tabs" aria-label="Agent views">
+    {TABS.map(([id, words]) => <a key={id} className={tab === id ? 'on' : undefined} href={base + id}>{words}</a>)}
+    <span className="team-acts">
+      {said ? <span role="status" className="dim">{said}</span> : null}
       <button type="button" className="btn" disabled={!session} onClick={() => void compact()}>Compact</button>
       <button type="button" className="btn" disabled title="Restart is being built tonight">Restart</button>
       <button type="button" className="btn" disabled title="Asking for an MCP server is being built tonight">Ask for MCP</button>
-    </div>
-    {said ? <span role="status" className="dim">{said}</span> : null}
-  </div>;
+    </span>
+  </nav>;
 }
 
 function AgentNode({ agent, session, open, tab }: { agent: Entry; session: RuntimeSession | undefined; open: string | undefined; tab: Tab }) {
