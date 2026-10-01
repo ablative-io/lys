@@ -10,6 +10,8 @@
 pub mod accounts;
 pub mod admission;
 mod agent_grants_api;
+pub mod agent_pass;
+pub mod agent_pass_store;
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_sight;
@@ -209,3 +211,6 @@ mod sign_in_flights;
 mod sign_in_attempts;
 
 mod sign_in_address;
+
+#[cfg(test)]
+mod agent_pass_tests;
