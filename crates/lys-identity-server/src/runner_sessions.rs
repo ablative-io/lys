@@ -314,26 +314,16 @@ pub async fn run_on_runner(
         runner: runner.clone(),
     };
     let session = launch.session.clone();
-    let already_issued = crate::agent_pass::store(state)?.has_session(&session)?;
-    let act = if already_issued {
-        Act::Status {
-            session: Some(session.clone()),
-        }
-    } else {
-        let agent_id = AgentId::from_str(agent)?;
-        let record = launch
-            .environment
-            .get("LYS_LAUNCH_RECORD")
-            .map_or(session.as_str(), String::as_str);
-        let pass = crate::agent_pass::store(state)?.issue(agent_id, record, &session)?;
-        Act::Start {
-            launch: Box::new(launch),
-            lys_mcp: Some(lys_runner::protocol::LysMcp {
-                url: format!("{}/api/mcp", state.oidc.public_origin()),
-                pass: pass.to_string(),
-            }),
-        }
+    let act = {
+        let mut passes = crate::agent_pass::store(state)?;
+        crate::runner_start_pass::act(
+            &mut passes,
+            AgentId::from_str(agent)?,
+            state.oidc.public_origin(),
+            launch,
+        )?
     };
+    let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
@@ -344,26 +334,35 @@ pub async fn run_on_runner(
         }
         other => other,
     };
-    if answer.is_err() {
-        crate::agent_pass::end_session(state, &session)?;
-    }
+    let ending = if answer.is_err() {
+        crate::agent_pass::end_session(state, &session)
+    } else {
+        Ok(())
+    };
     let outcome = answer
         .as_ref()
         .map_or_else(ServerError::name, |answer| kind(answer).to_owned());
-    keep_act(
-        state,
-        RunnerAct {
-            act: "start".to_owned(),
-            caller: caller.to_owned(),
-            session: driven.session.clone(),
-            agent: agent.to_owned(),
-            machine: machine.to_owned(),
-            at: now(),
-            text: None,
-            keys: Vec::new(),
-            outcome,
-        },
-    )?;
+    let outcome = if missing_config {
+        format!("{outcome}; LysMcpConfigMissing")
+    } else {
+        outcome
+    };
+    crate::runner_start_pass::record_after_end(ending, || {
+        keep_act(
+            state,
+            RunnerAct {
+                act: "start".to_owned(),
+                caller: caller.to_owned(),
+                session: driven.session.clone(),
+                agent: agent.to_owned(),
+                machine: machine.to_owned(),
+                at: now(),
+                text: None,
+                keys: Vec::new(),
+                outcome,
+            },
+        )
+    })?;
     let (pid, started_at, ended) = match answer? {
         Answer::Started {
             pid, started_at, ..

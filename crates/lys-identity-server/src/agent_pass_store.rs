@@ -215,6 +215,9 @@ impl Passes {
         if launch.is_empty() || session.is_empty() || launch.len() > 128 || session.len() > 128 {
             return Err(unavailable("invalid launch or session identifier"));
         }
+        if self.stored.passes.len() >= LIMIT {
+            return Err(unavailable("agent pass capacity exceeded"));
+        }
         let mut random = Zeroizing::new([0; 32]);
         OsRng
             .try_fill_bytes(&mut *random)
@@ -227,9 +230,6 @@ impl Passes {
         self.stored
             .passes
             .retain(|_, entry| entry.launch != launch && entry.session != session);
-        if self.stored.passes.len() >= LIMIT {
-            return Err(unavailable("agent pass capacity exceeded"));
-        }
         self.stored.passes.insert(
             key,
             Entry {

@@ -167,6 +167,7 @@ pub mod runner_client;
 mod runner_dial;
 pub mod runner_operate;
 pub mod runner_sessions;
+mod runner_start_pass;
 pub mod runtime_api;
 pub mod runtime_state;
 pub mod runtime_store;

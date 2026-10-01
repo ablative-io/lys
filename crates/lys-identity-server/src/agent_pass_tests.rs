@@ -118,3 +118,37 @@ fn agent_pass_failed_end_does_not_revive_on_reopen() -> Result<(), Box<dyn Error
     assert!(Passes::open(file)?.lookup(&pass).is_err());
     Ok(())
 }
+
+#[test]
+fn agent_pass_full_capacity_refuses_before_dropping_an_existing_binding()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let file = dir.path().join("passes.json");
+    let agent = AgentId::from_bytes([1; 16]);
+    let pass = "a".repeat(43);
+    let key = format!("{:x}", Sha256::digest(pass.as_bytes()));
+    let mut entries = serde_json::Map::new();
+    for index in 0..1024 {
+        let digest = if index == 0 {
+            key.clone()
+        } else {
+            format!("{:x}", Sha256::digest(index.to_string().as_bytes()))
+        };
+        entries.insert(digest, serde_json::json!({"agent":agent.to_string(), "launch":format!("launch-{index}"), "session":format!("session-{index}")}));
+    }
+    std::fs::write(
+        &file,
+        serde_json::to_vec(&serde_json::json!({"format":"lys-agent-passes/v1", "passes":entries}))?,
+    )?;
+    let before = std::fs::read(&file)?;
+    let mut passes = Passes::open(file.clone())?;
+    passes.reconcile(|_, _, _| true)?;
+    assert!(
+        passes
+            .issue(agent, "launch-0", "session-replacement")
+            .is_err()
+    );
+    assert_eq!(passes.lookup(&pass)?, agent);
+    assert_eq!(std::fs::read(file)?, before);
+    Ok(())
+}
