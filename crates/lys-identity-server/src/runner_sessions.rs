@@ -6,7 +6,6 @@
 //! and stopped only once its runner said the process ended: each is kept as
 //! the runtime report the runner's answer confirms, never inferred.
 
-use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -465,35 +464,34 @@ impl Launcher for DirectoryLauncher {
                 machine: record.machine.clone(),
                 runner,
             };
-            let rotation = match crate::runner_api::session_settings(&self.0, &record.agent) {
-                Ok(settings) => settings.and_then(|settings| settings.accounts),
-                Err(refused) => return Some(Err(refused)),
-            };
             let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
                 Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let runtime = match crate::network_api::with_network(&self.0, |store| {
+                store
+                    .machine(&record.machine)
+                    .and_then(|machine| machine.runtime.clone())
+                    .ok_or(ServerError::MachineWithoutRuntime)
+            }) {
+                Ok(runtime) => runtime,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let launch = match crate::provisioning_api::with_provisioning(&self.0, |store| {
+                crate::launch_record_config::build(
+                    store,
+                    record,
+                    driven.session.clone(),
+                    &runtime,
+                    policy,
+                )
+            }) {
+                Ok(launch) => launch,
                 Err(refused) => return Some(Err(refused)),
             };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
-            let environment = BTreeMap::from([
-                ("LYS_AGENT".to_owned(), record.agent.clone()),
-                ("LYS_SESSION".to_owned(), driven.session.clone()),
-                ("LYS_LAUNCH_RECORD".to_owned(), record.id.clone()),
-                ("LYS_HANDLES".to_owned(), record.credential_ids.join(",")),
-            ]);
-            let launch = Launch {
-                session: driven.session,
-                program: record.executable.clone(),
-                arguments: record.arguments.clone(),
-                directory: record.working_directory.clone(),
-                environment,
-                config: None,
-                columns: COLUMNS,
-                rows: ROWS,
-                rotation,
-                policy,
-            };
             Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
         })
     }

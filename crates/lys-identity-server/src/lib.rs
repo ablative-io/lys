@@ -101,6 +101,7 @@ pub mod launch_api;
 pub mod launch_fields;
 pub mod launch_harness;
 pub mod launch_permissions;
+mod launch_record_config;
 pub mod launch_template;
 pub mod link_audit_api;
 pub mod list_page;
