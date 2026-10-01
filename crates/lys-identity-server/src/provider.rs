@@ -45,9 +45,11 @@ use crate::session::now;
 
 /// How long a code lives when the configuration says nothing, in seconds:
 /// the ten minutes RFC 6749 (section 4.1.2) recommends as a code's longest
-/// life. An ID token and an access token have no lifetime of their own: each
-/// ends when the Lys sign-in it states ends.
+/// life. Access tokens are checked against the issuing session on use.
 pub const CODE_SECONDS: u64 = 600;
+
+/// Offline identity assertions must be renewed through a live sign-in.
+const ID_TOKEN_SECONDS: u64 = 300;
 
 /// A product registered as a client of Lys.
 #[derive(Debug, Clone, Deserialize)]
@@ -81,6 +83,7 @@ fn code_seconds() -> u64 {
 
 /// A code Lys answered a product with.
 struct Grant {
+    session_id: String,
     client_id: String,
     redirect_uri: String,
     challenge: String,
@@ -95,6 +98,7 @@ struct Grant {
 
 /// An access token Lys issued, for the user information route.
 struct Access {
+    session_id: String,
     subject: String,
     expires_at: u64,
 }
@@ -329,6 +333,7 @@ async fn authorize(
         codes.insert(
             code.clone(),
             Grant {
+                session_id: session.id,
                 client_id: client.client_id.clone(),
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
@@ -436,7 +441,7 @@ fn exchange(
     let (client_id, secret) = presented(headers, &form).ok_or(ServerError::ClientUnknown)?;
     let client = provider.authenticated(&client_id, &secret)?;
     let at = now();
-    let (subject, nonce, authenticated_at, expires_at) = {
+    let (subject, nonce, authenticated_at, expires_at, session_id) = {
         let mut codes = held(&provider.codes);
         let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
         if grant.client_id != client.client_id {
@@ -461,14 +466,18 @@ fn exchange(
             grant.nonce.clone(),
             grant.authenticated_at,
             grant.sign_in_ends_at,
+            grant.session_id.clone(),
         )
     };
+    if !state.sessions.is_live(&session_id)? {
+        return Err(ServerError::CodeExpired);
+    }
     let mut claims = json!({
         "iss": provider.issuer,
         "sub": subject,
         "aud": client.client_id,
         "iat": at,
-        "exp": expires_at,
+        "exp": expires_at.min(at.saturating_add(ID_TOKEN_SECONDS)),
         "auth_time": authenticated_at,
     });
     if let Some(nonce) = nonce {
@@ -481,6 +490,7 @@ fn exchange(
         tokens.insert(
             access.clone(),
             Access {
+                session_id,
                 subject,
                 expires_at,
             },
@@ -504,12 +514,18 @@ async fn userinfo(
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .ok_or(ServerError::TokenUnknown)?;
-    let tokens = held(&provider.tokens);
-    let access = tokens
-        .get(bearer.trim())
-        .filter(|access| access.expires_at > now())
-        .ok_or(ServerError::TokenUnknown)?;
-    Ok(Json(json!({ "sub": access.subject })))
+    let (subject, session_id) = {
+        let tokens = held(&provider.tokens);
+        let access = tokens
+            .get(bearer.trim())
+            .filter(|access| access.expires_at > now())
+            .ok_or(ServerError::TokenUnknown)?;
+        (access.subject.clone(), access.session_id.clone())
+    };
+    if !state.sessions.is_live(&session_id)? {
+        return Err(ServerError::TokenUnknown);
+    }
+    Ok(Json(json!({ "sub": subject })))
 }
 
 #[cfg(test)]
