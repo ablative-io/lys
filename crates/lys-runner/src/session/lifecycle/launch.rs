@@ -11,7 +11,7 @@ use portable_pty::Child;
 use serde_json::Value;
 
 use super::super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
-use super::{Wake, accounts, append, plan, stop_follower, transcript_parent, window_limit};
+use super::{Wake, accounts, append, plan, stop_follower, transcript_parent};
 use crate::error::RunnerError;
 use crate::peer::Leader;
 use crate::protocol::{Ended, EndedHow, Launch};
