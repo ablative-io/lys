@@ -40,7 +40,7 @@ export async function addAgent(initial: PendingAgent, caller: string, keep: (pen
   let pending = initial;
   keep(pending);
   if (!pending.agent) {
-    const answer = await request<unknown>('/agents', { operation: pending.register, display_name: pending.name, ...(pending.answersTo ? { answers_to: pending.answersTo } : {}) });
+    const answer = await request<unknown>('/agents', { operation: pending.register, display_name: pending.name, ...(pending.answersTo && pending.answersTo !== caller ? { answers_to: pending.answersTo } : {}) });
     confirmReceipt(answer, pending.register, '/agents');
     if (!object(answer) || typeof answer.agent !== 'string' || !/^agent-[0-9a-f]{32}$/.test(answer.agent)
       || answer.responsible !== (pending.answersTo ?? caller) || !object(answer.receipt) || answer.receipt.identity !== answer.agent || answer.receipt.change_kind !== 2) {
