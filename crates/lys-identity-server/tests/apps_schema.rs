@@ -15,7 +15,7 @@ use std::sync::Arc;
 mod bench;
 
 use identity_contract::apps::{
-    Auth, NOTES, TestResult, get, login, ok, op, post, put, refused, registered, registration,
+    Auth, BEA, NOTES, TestResult, get, login, ok, op, post, put, refused, registered, registration,
     root, seeded, workspace_schema,
 };
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
@@ -44,7 +44,7 @@ async fn a_registration_naming_a_service_account_without_their_store_is_refused_
         None,
         None,
         |config| config.service_accounts_dir = None,
-        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+        |config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?),
     )
     .await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;

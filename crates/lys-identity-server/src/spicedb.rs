@@ -88,10 +88,6 @@ impl std::fmt::Debug for SpiceDbConnection {
 }
 
 impl SpiceDbConnection {
-    pub(crate) fn endpoint(&self) -> &str {
-        &self.endpoint
-    }
-
     /// Read the configured credential once. Load a new connection to reload it;
     /// existing engines retain the credential they were opened with.
     pub fn load(settings: &SpiceDbSettings) -> Result<Self, GrantError> {
