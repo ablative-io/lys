@@ -15,6 +15,10 @@ use lys_runner::state::{Kept, KeptSession};
 use lys_runner::{EndedHow, Launch, Sessions};
 use serde_json::json;
 
+#[path = "support/restart_child.rs"]
+mod restart_child;
+use restart_child::PtyChild;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn process(pid: u32) -> Result<rustix::process::Pid, Box<dyn Error>> {
@@ -284,8 +288,8 @@ fn a_restart_never_signals_a_group_whose_start_identity_changed() -> TestResult 
 #[test]
 fn a_restart_ends_only_a_group_with_its_recorded_start_identity() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let mut child = BlockedChild::start()?;
-    let pid = child.child.id();
+    let mut child = PtyChild::start()?;
+    let pid = child.id();
     record_group(
         dir.path(),
         pid,
@@ -300,7 +304,7 @@ fn a_restart_ends_only_a_group_with_its_recorded_start_identity() -> TestResult 
         .ended
         .as_ref()
         .ok_or("RestartEndMissing")?;
-    let exit = child.child.wait()?;
+    let exit = child.wait()?;
     child.close()?;
     assert_eq!(exit.signal(), Some(9), "the owned group really ended");
     assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
@@ -355,6 +359,42 @@ fn a_restart_ends_an_orphaned_member_and_preserves_an_unrelated_group() -> TestR
     assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
     assert_eq!(ended.status, None);
     assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
+    assert_eq!(
+        ended.reason.as_deref(),
+        Some(format!("leaderless process group {pid}").as_str())
+    );
+    Ok(())
+}
+
+#[test]
+fn a_restart_names_and_preserves_a_member_in_another_session() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut child = BlockedChild::start()?;
+    let pid = child.child.id();
+    record_group(
+        dir.path(),
+        pid,
+        Leader {
+            pid,
+            start: start_identity(pid)?,
+        },
+    )?;
+    let restarted = Sessions::open(dir.path(), 4096)?;
+    let status = restarted.status(None)?;
+    let ended = status.sessions[0]
+        .ended
+        .as_ref()
+        .ok_or("RestartEndMissing")?;
+    let survived = child.answers()?;
+    child.close()?;
+    assert!(
+        survived,
+        "a member outside the recorded session is left running"
+    );
+    assert_eq!(ended.signal, None);
+    let reason = ended.reason.as_ref().ok_or("UnprovedMemberReasonMissing")?;
+    assert!(reason.contains(&format!("process {pid} not ended")));
+    assert!(reason.contains("process_session_mismatch"));
     Ok(())
 }
 
