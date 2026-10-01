@@ -100,7 +100,7 @@ function Computers({ computers, people, me, teams, teamsRefused, notice, refresh
           <div className="seg">{([['all', 'All'], ['attention', 'Not heard from']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} onClick={() => setShow(key)}>{label}</button>)}</div>
         </>} />
       <div className="detail">
-        {adding && admin ? <AddMachine person={me.person.id} agents={people.people.flatMap((person) => person.agents)} changed={changed} cancel={() => setAdding(false)} />
+        {adding && admin ? <AddMachine person={me.person.id} changed={changed} cancel={() => setAdding(false)} />
           : selected ? <MachineDetail computer={selected} admin={admin} names={names} changed={changed} /> : <p className="dim">{computers.length ? 'Choose a computer.' : 'No computers yet. Add the one Lys runs on to start agents here.'}</p>}
       </div>
     </div>
