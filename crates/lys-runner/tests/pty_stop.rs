@@ -44,6 +44,11 @@ impl Harness {
 
 impl Drop for Harness {
     fn drop(&mut self) {
+        match self.0.child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {}
+            Err(error) => eprintln!("harness cleanup status: {error}"),
+        }
         if let Err(error) = self.0.child.kill() {
             eprintln!("harness cleanup signal: {error}");
         }
