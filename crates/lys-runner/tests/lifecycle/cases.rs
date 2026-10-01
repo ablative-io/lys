@@ -88,7 +88,9 @@ fn a_stream_wait_holds_no_session_table_lock() -> TestResult {
     let writer = std::fs::OpenOptions::new().write(true).open(&path)?;
     let available = sessions.table.try_lock().is_ok();
     drop(writer);
-    joined.join().map_err(|_| "stream reader panicked")?;
+    joined
+        .join()
+        .map_err(|panic| format!("stream reader panicked: {panic:?}"))?;
     sessions.stop_all();
     assert!(available, "transcript I/O held the global session table");
     Ok(())
