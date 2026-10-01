@@ -15,10 +15,13 @@
 //! answer is open, and a body-taking route that names no body.
 
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
+use axum::Router;
+use axum::body::Bytes;
+use axum::http::{HeaderValue, header};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::{Json, Router};
 use lys_openapi::{Api, Auth, Method, Route};
 use serde_json::Value;
 
@@ -90,6 +93,8 @@ pub fn api() -> Api {
 
 /// The document, generated from the table.
 pub fn document() -> Result<Value, ServerError> {
+    #[cfg(test)]
+    cache_tests::built();
     let mut document = api()
         .document()
         .map_err(|faults| ServerError::ConfigInvalid {
@@ -119,6 +124,44 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/openapi.json", get(served))
 }
 
-async fn served() -> Result<Json<Value>, ServerError> {
-    document().map(Json)
+static DOCUMENT: OnceLock<Result<Bytes, String>> = OnceLock::new();
+
+/// Validate and encode the document before any request is served.
+pub(crate) fn prepare() -> Result<&'static Bytes, ServerError> {
+    DOCUMENT
+        .get_or_init(|| {
+            let value = document().map_err(|error| error.to_string())?;
+            encode(&value).map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map_err(|reason| ServerError::ConfigInvalid {
+            reason: reason.clone(),
+        })
 }
+
+fn encode(value: &Value) -> Result<Bytes, ServerError> {
+    let faults = lys_openapi::validate(value);
+    if !faults.is_empty() {
+        return Err(ServerError::ConfigInvalid {
+            reason: format!("the OpenAPI document is invalid: {}", faults.join("; ")),
+        });
+    }
+    serde_json::to_vec(value)
+        .map(Bytes::from)
+        .map_err(|error| ServerError::ConfigInvalid {
+            reason: format!("the OpenAPI document could not be encoded: {error}"),
+        })
+}
+
+async fn served() -> Result<Response, ServerError> {
+    let mut answer = prepare()?.clone().into_response();
+    answer.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    Ok(answer)
+}
+
+#[cfg(test)]
+#[path = "openapi_cache_tests.rs"]
+mod cache_tests;
