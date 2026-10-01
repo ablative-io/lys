@@ -223,6 +223,14 @@ pub enum ServerError {
         /// The reused operation.
         operation: String,
     },
+    /// The operation already names an agent allowance act in different words.
+    #[error(
+        "MachineAgentsReused: operation `{operation}` already names another computer allowance; a new allowance needs a new operation"
+    )]
+    MachineAgentsReused {
+        /// The reused operation.
+        operation: String,
+    },
     /// The signed-in sessions could not be kept or read back.
     #[error("SessionsUnavailable: {reason}")]
     SessionsUnavailable {

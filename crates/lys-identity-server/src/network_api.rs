@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::error_team::TeamError;
 use crate::grants::caller;
-use crate::network_store::{Machine, NetworkStore, Retirement, TeamRecorded};
+use crate::network_store::{AgentsRecorded, Machine, NetworkStore, Retirement, TeamRecorded};
 use crate::read_api::own_person;
 use crate::read_views::AgentSummary;
 use crate::routes::{AppState, signed_in, with_directory};
@@ -121,6 +121,24 @@ pub struct MachineTeamChanged {
     pub recorded: TeamRecorded,
 }
 
+/// One agent's allowance on a computer.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentBody {
+    operation: String,
+    agent: String,
+    allow: bool,
+}
+
+/// The current computer beside the original agent allowance receipt.
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct MachineAgentsChanged {
+    /// The computer as it stands now.
+    pub machine: MachineView,
+    /// The act this operation first recorded.
+    pub recorded: AgentsRecorded,
+}
+
 fn required_team<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<String>, D::Error> {
@@ -134,6 +152,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/network/machines", post(name))
         .route("/network/machines/{id}/retire", post(retire))
         .route("/network/machines/{id}/team", post(assign_team))
+        .route("/network/machines/{id}/agents", post(change_agent))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -421,6 +440,48 @@ async fn assign_team(
             })?;
             let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
             Ok(Json(MachineTeamChanged {
+                machine: view(directory, machine, last.get(&id).copied()),
+                recorded,
+            }))
+        })
+    })
+}
+
+async fn change_agent(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Result<Json<AgentBody>, JsonRejection>,
+) -> Result<Json<MachineAgentsChanged>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    state.admission.administrator(&actor)?;
+    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let id = OperationId::from_str(&id)
+        .map_err(|error| malformed(format!("computer id does not read: {error}")))?
+        .to_string();
+    let operation = OperationId::from_str(&body.operation)
+        .map_err(|error| malformed(format!("operation does not read: {error}")))?
+        .to_string();
+    let agent = AgentId::from_str(&body.agent)?;
+    with_directory(&state, |directory| {
+        let directory = directory.projection()?;
+        let by = own_person(directory, &actor)?.to_string();
+        if directory.record(IdentityId::Agent(agent)).is_none() {
+            return Err(ServerError::AgentNotVisible);
+        }
+        let last = last_reports(&state)?;
+        with_network(&state, |store| {
+            let recorded = store.change_agent(AgentsRecorded {
+                operation,
+                machine: id.clone(),
+                agent: agent.to_string(),
+                allow: body.allow,
+                by,
+                at: now(),
+                original_may_run: None,
+            })?;
+            let machine = store.machine(&id).ok_or(ServerError::MachineUnknown)?;
+            Ok(Json(MachineAgentsChanged {
                 machine: view(directory, machine, last.get(&id).copied()),
                 recorded,
             }))

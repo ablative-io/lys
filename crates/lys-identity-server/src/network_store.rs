@@ -87,6 +87,28 @@ pub struct TeamRecorded {
     pub at: u64,
 }
 
+/// The agent allowance act first recorded under an operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = ComputerAgentsRecorded)]
+pub struct AgentsRecorded {
+    /// The operation naming the act.
+    pub operation: String,
+    /// The computer whose allowance changed.
+    pub machine: String,
+    /// The agent whose allowance changed.
+    pub agent: String,
+    /// Whether the agent may run on the computer.
+    pub allow: bool,
+    /// The person who made the act.
+    pub by: String,
+    /// When the act was first recorded, in seconds since the Unix epoch.
+    pub at: u64,
+    /// The creation allowance, held only by the computer's first allowance receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_may_run: Option<Vec<String>>,
+}
+
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Kept {
@@ -97,12 +119,15 @@ struct Kept {
     runners: BTreeMap<String, RunnerRecord>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     team_changes: BTreeMap<String, TeamRecorded>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    agent_changes: BTreeMap<String, AgentsRecorded>,
 }
 
 /// The machines, read from their file and written to it.
 pub struct NetworkStore {
     path: PathBuf,
     kept: Kept,
+    original_agents: BTreeMap<String, Vec<String>>,
     uncertain: bool,
 }
 
@@ -126,6 +151,34 @@ fn read(path: &Path) -> Result<Kept, ServerError> {
         .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))
 }
 
+fn original_agents(kept: &Kept) -> Result<BTreeMap<String, Vec<String>>, ServerError> {
+    let mut original = BTreeMap::new();
+    for (operation, recorded) in &kept.agent_changes {
+        if operation != &recorded.operation {
+            return Err(unavailable(
+                "an agent allowance receipt names a different operation",
+            ));
+        }
+        if let Some(agents) = &recorded.original_may_run
+            && original
+                .insert(recorded.machine.clone(), agents.clone())
+                .is_some()
+        {
+            return Err(unavailable(
+                "a computer's creation allowance is recorded more than once",
+            ));
+        }
+    }
+    for recorded in kept.agent_changes.values() {
+        if !original.contains_key(&recorded.machine) {
+            return Err(unavailable(
+                "a changed computer has no recorded creation allowance",
+            ));
+        }
+    }
+    Ok(original)
+}
+
 fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let beside = path.with_extension("writing");
     let mut file = fs::File::create(&beside)?;
@@ -142,9 +195,12 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl NetworkStore {
     /// The machines kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
+        let kept = read(path)?;
+        let original_agents = original_agents(&kept)?;
         Ok(Self {
             path: path.to_owned(),
-            kept: read(path)?,
+            kept,
+            original_agents,
             uncertain: false,
         })
     }
@@ -152,7 +208,10 @@ impl NetworkStore {
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            self.kept = read(&self.path)?;
+            let kept = read(&self.path)?;
+            let original_agents = original_agents(&kept)?;
+            self.kept = kept;
+            self.original_agents = original_agents;
             self.uncertain = false;
         }
         Ok(())
@@ -188,7 +247,15 @@ impl NetworkStore {
         self.settle()?;
         machine.creation_team.clone_from(&machine.team);
         match self.machine(&machine.id) {
-            Some(kept) if same_words(kept, &machine) => Ok(()),
+            Some(kept)
+                if same_words(
+                    kept,
+                    &machine,
+                    self.original_agents.get(&machine.id).map(Vec::as_slice),
+                ) =>
+            {
+                Ok(())
+            }
             Some(_) => Err(ServerError::MachineReused {
                 machine: machine.id,
             }),
@@ -235,6 +302,63 @@ impl NetworkStore {
         Ok(recorded)
     }
 
+    /// The original allowance receipt, if this operation has been recorded.
+    pub fn agent_recorded(&self, operation: &str) -> Option<&AgentsRecorded> {
+        self.kept.agent_changes.get(operation)
+    }
+
+    /// Keep allowance and receipt together. A repeat writes nothing and never reapplies the act.
+    pub fn change_agent(
+        &mut self,
+        mut recorded: AgentsRecorded,
+    ) -> Result<AgentsRecorded, ServerError> {
+        self.settle()?;
+        if let Some(first) = self.agent_recorded(&recorded.operation) {
+            if first.machine == recorded.machine
+                && first.agent == recorded.agent
+                && first.allow == recorded.allow
+                && first.by == recorded.by
+            {
+                return Ok(first.clone());
+            }
+            return Err(ServerError::MachineAgentsReused {
+                operation: recorded.operation,
+            });
+        }
+        let mut next = self.kept.clone();
+        let machine = next
+            .machines
+            .iter_mut()
+            .find(|machine| machine.id == recorded.machine)
+            .ok_or(ServerError::MachineUnknown)?;
+        if machine.retired.is_some() {
+            return Err(ServerError::MachineRetired);
+        }
+        if machine.runtime.is_none() {
+            return Err(ServerError::MachineWithoutRuntime);
+        }
+        recorded.original_may_run = if self.original_agents.contains_key(&recorded.machine) {
+            None
+        } else {
+            Some(machine.may_run.clone())
+        };
+        if recorded.allow {
+            if !machine.may_run.contains(&recorded.agent) {
+                machine.may_run.push(recorded.agent.clone());
+            }
+        } else {
+            machine.may_run.retain(|agent| agent != &recorded.agent);
+        }
+        next.agent_changes
+            .insert(recorded.operation.clone(), recorded.clone());
+        self.write(next)?;
+        if let Some(agents) = &recorded.original_may_run {
+            self.original_agents
+                .insert(recorded.machine.clone(), agents.clone());
+        }
+        Ok(recorded)
+    }
+
     /// Retire the machine `id`. A machine already retired stays as it was retired.
     pub fn retire(&mut self, id: &str, retirement: Retirement) -> Result<(), ServerError> {
         self.settle()?;
@@ -278,11 +402,14 @@ impl NetworkStore {
 }
 
 /// Whether two namings are the same machine, whenever each was named.
-fn same_words(kept: &Machine, named: &Machine) -> bool {
-    let original = Machine {
+fn same_words(kept: &Machine, named: &Machine, original_agents: Option<&[String]>) -> bool {
+    let mut original = Machine {
         team: kept.creation_team.clone(),
         ..kept.clone()
     };
+    if let Some(agents) = original_agents {
+        original.may_run = agents.to_vec();
+    }
     let timeless = Machine {
         named_at: kept.named_at,
         retired: kept.retired.clone(),

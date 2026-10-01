@@ -60,7 +60,10 @@ use crate::grant_contract::{
 use crate::grants_reach::{ReachAnswer, ReachBody};
 use crate::launch_api::{Launch, StartCommandView};
 use crate::link_audit_api::{Asked, Delivery};
-use crate::network_api::{MachineTeamChanged, MachineView, NameBody, NetworkView, TeamBody};
+use crate::network_api::{
+    AgentBody, MachineAgentsChanged, MachineTeamChanged, MachineView, NameBody, NetworkView,
+    TeamBody,
+};
 use crate::openapi_table::{GET, POST};
 use crate::provisioning_api::{ProvisioningView, ReviewBody, SetBody as ProfileBody};
 use crate::read_views::{AgentView, MeView, PeopleView};
@@ -354,6 +357,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             "/network/machines/{id}/team",
             Some(api.schema::<TeamBody>()),
             Some(api.schema::<MachineTeamChanged>()),
+        ),
+        (
+            POST,
+            "/network/machines/{id}/agents",
+            Some(api.schema::<AgentBody>()),
+            Some(api.schema::<MachineAgentsChanged>()),
         ),
         (
             GET,
