@@ -8,7 +8,8 @@ use super::launch_fields::InstructionsMode;
 use crate::record::blocks::Hash;
 
 /// One file, relative to the session's config directory.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct File {
     /// Its relative location.
     pub path: String,
@@ -16,6 +17,15 @@ pub struct File {
     pub text: String,
     /// The contents' digest.
     pub sha256: String,
+}
+
+impl std::fmt::Debug for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("File")
+            .field("path", &self.path)
+            .field("sha256", &self.sha256)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Process inputs and files rebuilt deterministically from a kept template.

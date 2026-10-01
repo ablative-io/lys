@@ -131,6 +131,7 @@ pub struct StartService {
     launches: Mutex<LaunchRecords>,
     clock: fn() -> u64,
     launcher: Option<Box<dyn Launcher>>,
+    pass_state: Option<Arc<AppState>>,
 }
 
 impl StartService {
@@ -148,6 +149,7 @@ impl StartService {
             launches: Mutex::new(launches),
             clock,
             launcher: None,
+            pass_state: None,
         }
     }
 
@@ -324,14 +326,7 @@ async fn start(
         Ok(given) => given,
         Err(refused) => return refused,
     };
-    let body = given.to_json();
-    let Some(launcher) = service.launcher.as_ref() else {
-        return json(StatusCode::OK, body);
-    };
-    match launcher.launch(&given, &caller).await {
-        None => json(StatusCode::OK, body),
-        Some(ran) => ran_answer(&body, ran),
-    }
+    launch_given(&service, given, &caller).await
 }
 
 /// The given start's answer with the runner's word beside it: its
@@ -367,17 +362,37 @@ async fn start_again(
     headers: HeaderMap,
     UrlPath(source): UrlPath<String>,
 ) -> Response {
-    answer(service, &headers, move |service, launches, caller| {
-        give_again(
-            launches,
-            &service.owners(),
-            caller,
-            &source,
-            (service.clock)(),
-        )
-        .map(|given| given.to_json())
-    })
-    .await
+    let given = answer_with(
+        Arc::clone(&service),
+        &headers,
+        move |service, launches, caller| {
+            give_again(
+                launches,
+                &service.owners(),
+                caller,
+                &source,
+                (service.clock)(),
+            )
+            .map(|given| (given, caller.to_owned()))
+        },
+    )
+    .await;
+    let (given, caller) = match given {
+        Ok(given) => given,
+        Err(refused) => return refused,
+    };
+    launch_given(&service, given, &caller).await
+}
+
+async fn launch_given(service: &StartService, given: Given, caller: &str) -> Response {
+    let body = given.to_json();
+    match service.launcher.as_ref() {
+        Some(launcher) => match launcher.launch(&given, caller).await {
+            Some(ran) => ran_answer(&body, ran),
+            None => json(StatusCode::OK, body),
+        },
+        None => json(StatusCode::OK, body),
+    }
 }
 
 async fn withdrawn(
@@ -393,7 +408,16 @@ async fn withdrawn(
             &launch_record,
             (service.clock)(),
         )
-        .map(|state| state.to_json())
+        .and_then(|state| {
+            if let Some(app) = &service.pass_state {
+                crate::agent_pass::end_launch(app, &launch_record).map_err(|error| {
+                    StartError::Unavailable {
+                        reason: error.to_string(),
+                    }
+                })?;
+            }
+            Ok(state.to_json())
+        })
     })
     .await
 }
@@ -590,12 +614,13 @@ pub fn directory_service(
             credential_id,
         },
     };
-    let service = StartService::new(
+    let mut service = StartService::new(
         owners,
         Box::new(Directory(Arc::clone(state))),
         launches,
         crate::session::now,
     );
+    service.pass_state = Some(Arc::clone(state));
     let runs = crate::runner_sessions::DirectoryLauncher(Arc::clone(state));
     Ok(Arc::new(service.with_launcher(Box::new(runs))))
 }

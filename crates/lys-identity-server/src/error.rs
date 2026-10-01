@@ -392,6 +392,12 @@ pub enum ServerError {
         /// Which check refused it.
         reason: &'static str,
     },
+    /// An unknown, ended or mixed run pass was refused.
+    #[error("AgentPassRefused: {reason}")]
+    AgentPassRefused {
+        /// The check that refused it, without credential material.
+        reason: String,
+    },
     /// The agent is not active, so it is not started.
     #[error("AgentNotActive: the agent is {state} and only an active agent is started")]
     AgentNotActive {

@@ -49,6 +49,7 @@ fn launch(session: &str, admitted: Option<Admitted>) -> Launch {
 
 fn start(client: &Client, launch: Launch) -> Result<Result<Answer, String>, RunnerError> {
     match client.ask(&Act::Start {
+        lys_mcp: None,
         launch: Box::new(launch),
     }) {
         Ok(answer) => Ok(Ok(answer)),

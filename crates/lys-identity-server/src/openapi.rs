@@ -55,7 +55,11 @@ pub(crate) fn route(
         }
     }
     // The ingress guard judges credentials before the route.
-    for refusal in ["OperatorRefused", "AgentSignatureRefused"] {
+    for refusal in [
+        "OperatorRefused",
+        "AgentSignatureRefused",
+        "AgentPassRefused",
+    ] {
         if !named.contains(&refusal) {
             named.push(refusal);
         }

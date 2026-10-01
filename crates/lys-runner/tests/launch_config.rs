@@ -59,6 +59,7 @@ fn signed_config_is_written_under_the_session_and_read_by_its_process() -> TestR
     .spawn();
     let client = Client::new(socket, key);
     let Answer::Started { .. } = client.ask(&Act::Start {
+        lys_mcp: None,
         launch: Box::new(launch()),
     })?
     else {
@@ -198,6 +199,7 @@ fn the_signature_covers_config_files_and_bindings() -> TestResult {
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
     let greeting = Greeting::fresh("11");
     let act = Act::Start {
+        lys_mcp: None,
         launch: Box::new(launch()),
     };
     let signed = sign_request(&key, &greeting, &act)?;
@@ -232,6 +234,7 @@ fn a_signed_start_that_binds_arguments_to_files_reads_back_unchanged() -> TestRe
         (10, "settings.json".to_owned()),
     ]);
     let act = Act::Start {
+        lys_mcp: None,
         launch: Box::new(bound),
     };
     let signed = sign_request(&key, &greeting, &act)?;
@@ -289,11 +292,203 @@ fn a_start_request_keeps_the_existing_wire_bytes() -> TestResult {
         serde_json::to_string(&launch)?
     );
     let act = Act::Start {
+        lys_mcp: None,
         launch: Box::new(launch),
     };
     assert_eq!(serde_json::to_string(&act)?, legacy);
     let decoded: Act = serde_json::from_str(&legacy)?;
     assert_eq!(decoded, act);
     assert_eq!(serde_json::to_string(&decoded)?, legacy);
+    Ok(())
+}
+
+const RUN_PASS: &str = "fixture-p77-run-pass-only";
+
+#[derive(PartialEq)]
+struct Redacted<T>(T);
+
+impl<T> std::fmt::Debug for Redacted<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("config contents redacted")
+    }
+}
+
+fn mcp_launch(codex: bool) -> Launch {
+    let mut launch = launch();
+    launch.arguments = vec!["-c".to_owned(), "printf p77-ready; exec cat".to_owned()];
+    let (path, root, text) = if codex {
+        ("config.toml", "CODEX_HOME", "mcp_servers = {}\n")
+    } else {
+        ("mcp.json", "CLAUDE_CONFIG_DIR", r#"{"mcpServers":{}}"#)
+    };
+    launch.config = Some(Config {
+        files: vec![File {
+            path: path.to_owned(),
+            text: text.to_owned(),
+            sha256: hex(&Sha256::digest(text.as_bytes())),
+        }],
+        argument_files: BTreeMap::new(),
+        environment_paths: BTreeMap::from([(root.to_owned(), String::new())]),
+        working_directory: true,
+    });
+    launch
+}
+
+fn check_records(path: &std::path::Path, native: &std::path::Path) -> TestResult {
+    for child in std::fs::read_dir(path)? {
+        let child = child?;
+        let path = child.path();
+        if path == native {
+            continue;
+        }
+        if child.file_type()?.is_dir() {
+            check_records(&path, native)?;
+        } else if child.file_type()?.is_file() {
+            let bytes = std::fs::read(path)?;
+            assert!(
+                !bytes
+                    .windows(RUN_PASS.len())
+                    .any(|part| part == RUN_PASS.as_bytes())
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn signed_run_pass_reaches_only_the_generated_config_for_both_harnesses() -> TestResult {
+    for codex in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let sessions = Sessions::open(dir.path(), 1024)?;
+        let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+        let greeting = Greeting::fresh("77");
+        let act = Act::Start {
+            launch: Box::new(mcp_launch(codex)),
+            lys_mcp: Some(lys_runner::protocol::LysMcp {
+                url: "https://service.invalid/api/mcp".to_owned(),
+                pass: RUN_PASS.to_owned(),
+            }),
+        };
+        let signed = sign_request(&key, &greeting, &act)?;
+        let request: Request = serde_json::from_str(&signed)?;
+        assert!(!format!("{act:?} {request:?}").contains(RUN_PASS));
+        let answer = lys_runner::socket::dispatch(
+            &sessions,
+            &key.public_key_bytes(),
+            &greeting,
+            &signed,
+            &std::sync::atomic::AtomicBool::new(false),
+        );
+        assert!(matches!(answer, Answer::Started { .. }));
+        assert!(!format!("{answer:?}").contains(RUN_PASS));
+        sessions.stop_all()?;
+        let name = if codex { "config.toml" } else { "mcp.json" };
+        let native = dir.path().join("sessions/config-session/config").join(name);
+        let text = std::fs::read_to_string(&native)?;
+        if codex {
+            assert!(text.contains("lys-agent-pass"));
+            assert!(text.contains(RUN_PASS));
+        } else {
+            let config: serde_json::Value = serde_json::from_str(&text)?;
+            assert_eq!(
+                Redacted(&config["mcpServers"]["lys"]),
+                Redacted(
+                    &serde_json::json!({"type":"http","url":"https://service.invalid/api/mcp","headers":{"lys-agent-pass":RUN_PASS}})
+                )
+            );
+        }
+        check_records(dir.path(), &native)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn an_invalid_signed_original_config_is_refused_before_pass_insertion() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 1024)?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let greeting = Greeting::fresh("78");
+    let mut launch = mcp_launch(false);
+    launch.config.as_mut().ok_or("no config")?.files[0].sha256 = "wrong".to_owned();
+    let act = Act::Start {
+        launch: Box::new(launch),
+        lys_mcp: Some(lys_runner::protocol::LysMcp {
+            url: "https://service.invalid/api/mcp".to_owned(),
+            pass: RUN_PASS.to_owned(),
+        }),
+    };
+    let answer = lys_runner::socket::dispatch(
+        &sessions,
+        &key.public_key_bytes(),
+        &greeting,
+        &sign_request(&key, &greeting, &act)?,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert!(
+        matches!(&answer, Answer::Refused { refusal, .. } if refusal == "launch_config_refused")
+    );
+    assert!(!format!("{answer:?}").contains(RUN_PASS));
+    assert!(!dir.path().join("sessions").exists());
+    sessions.stop_all()?;
+    check_records(dir.path(), &dir.path().join("absent"))?;
+    Ok(())
+}
+
+#[test]
+fn malformed_signed_pass_payload_does_not_echo_secret_fields() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+    let greeting = Greeting::fresh("79");
+    let act = serde_json::json!({"act":"start","launch":mcp_launch(false),"lys_mcp":{"url":"https://service.invalid/api/mcp","pass":RUN_PASS,RUN_PASS:true}}).to_string();
+    let signature = hex(&key.sign(&lys_runner::protocol::signed_bytes(
+        1,
+        &greeting.runner,
+        &greeting.challenge,
+        &act,
+    )));
+    let request = Request {
+        version: 1,
+        runner: greeting.runner.clone(),
+        challenge: greeting.challenge.clone(),
+        act,
+        signature,
+    };
+    let error = lys_runner::protocol::verify_parsed(&request, &key.public_key_bytes(), &greeting)
+        .err()
+        .ok_or("unknown credential field accepted")?;
+    assert_eq!(error.name(), "runner_request_malformed");
+    assert!(!format!("{request:?} {error:?} {error}").contains(RUN_PASS));
+    Ok(())
+}
+
+#[test]
+fn signed_start_without_pass_leaves_both_native_configs_unchanged() -> TestResult {
+    for codex in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let sessions = Sessions::open(dir.path(), 1024)?;
+        let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
+        let greeting = Greeting::fresh("80");
+        let launch = mcp_launch(codex);
+        let file = launch.config.as_ref().ok_or("no config")?.files[0].clone();
+        let act = Act::Start {
+            launch: Box::new(launch),
+            lys_mcp: None,
+        };
+        let answer = lys_runner::socket::dispatch(
+            &sessions,
+            &key.public_key_bytes(),
+            &greeting,
+            &sign_request(&key, &greeting, &act)?,
+            &std::sync::atomic::AtomicBool::new(false),
+        );
+        assert!(matches!(answer, Answer::Started { .. }));
+        sessions.stop_all()?;
+        let text = std::fs::read_to_string(
+            dir.path()
+                .join("sessions/config-session/config")
+                .join(file.path),
+        )?;
+        assert_eq!(Redacted(text), Redacted(file.text));
+    }
     Ok(())
 }
