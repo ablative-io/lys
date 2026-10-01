@@ -50,6 +50,7 @@ fn account_api(issuer: &FakeRauthy) -> Result<SignInProviders, Box<dyn Error>> {
 async fn account_update_refuses_each_missing_mandatory_member_before_put() -> TestResult {
     let issuer = FakeRauthy::start().await?;
     let api = account_api(&issuer)?;
+    let mut checked = 0;
     for field in [
         "email",
         "language",
@@ -102,7 +103,9 @@ async fn account_update_refuses_each_missing_mandatory_member_before_put() -> Te
             before,
             "{field}: held records survive without a PUT"
         );
+        checked += 1;
     }
+    assert_eq!(checked, 6);
     Ok(())
 }
 
@@ -131,6 +134,7 @@ async fn account_update_preserves_other_values_and_never_copies_a_held_password(
 async fn account_update_keeps_absent_optionals_distinct_from_explicit_null() -> TestResult {
     let issuer = FakeRauthy::start().await?;
     let api = account_api(&issuer)?;
+    let mut checked = 0;
     for present in [false, true] {
         let mut request = held_account();
         let fields = request.as_object_mut().ok_or("an account object")?;
@@ -154,7 +158,9 @@ async fn account_update_keeps_absent_optionals_distinct_from_explicit_null() -> 
             .find(|user| user["id"] == id)
             .ok_or("the account is still held")?;
         assert_eq!(actual, &expected, "explicit null present: {present}");
+        checked += 1;
     }
+    assert_eq!(checked, 2);
     Ok(())
 }
 
