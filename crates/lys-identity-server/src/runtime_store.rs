@@ -277,6 +277,11 @@ impl<S: LeafStore> RuntimeStore<S> {
         self.held.live_count()
     }
 
+    /// Latest report times shared without copying session history.
+    pub fn last_reports(&self) -> Arc<BTreeMap<String, u64>> {
+        self.held.last_reports()
+    }
+
     /// Selected agents' activity, detached from the mutable index and report history.
     pub fn agents_with_sessions(
         &mut self,

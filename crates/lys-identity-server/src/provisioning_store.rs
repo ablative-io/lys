@@ -1,7 +1,6 @@
 //! The provisioning profiles as they are kept: one file holding, for each
-//! agent, every version of what it is set up with, replaced whole and
-//! atomically at each change. A start reads that one file and nothing else,
-//! whatever was changed before.
+//! agent, every version of what it is set up with. A snapshot and appended
+//! changes share that file, and a start reads both before answering.
 //!
 //! A change is written before it is answered. When a write fails, what the
 //! file holds is read again before anything else is answered, so memory
@@ -32,6 +31,9 @@ mod edits;
 
 #[path = "provisioning_index.rs"]
 mod index;
+
+#[path = "provisioning_journal.rs"]
+mod journal;
 
 #[cfg(test)]
 std::thread_local! {
@@ -281,6 +283,8 @@ pub struct ProvisioningStore {
     path: PathBuf,
     kept: Kept,
     indexes: Arc<index::Indexes>,
+    journal: bool,
+    since_snapshot: u64,
     uncertain: bool,
 }
 
@@ -290,18 +294,9 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
     }
 }
 
+#[cfg(test)]
 fn read(path: &Path) -> Result<Kept, ServerError> {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(Kept::default());
-        }
-        Err(error) => {
-            return Err(unavailable(format!("reading {}: {error}", path.display())));
-        }
-    };
-    serde_json::from_slice(&bytes)
-        .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))
+    journal::read(path).map(|(kept, _, _)| kept)
 }
 
 fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -320,12 +315,14 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
-        let kept = read(path)?;
+        let (kept, journal, since_snapshot) = journal::read(path)?;
         let indexes = Arc::new(index::Indexes::rebuild(&kept));
         Ok(Self {
             path: path.to_owned(),
             kept,
             indexes,
+            journal,
+            since_snapshot,
             uncertain: false,
         })
     }
@@ -333,15 +330,18 @@ impl ProvisioningStore {
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let kept = read(&self.path)?;
+            let (kept, journal, since_snapshot) = journal::settle(&self.path)?;
             let indexes = Arc::new(index::Indexes::rebuild(&kept));
             self.kept = kept;
             self.indexes = indexes;
+            self.journal = journal;
+            self.since_snapshot = since_snapshot;
             self.uncertain = false;
         }
         Ok(())
     }
 
+    #[cfg(test)]
     fn publish(&mut self, bytes: &[u8]) -> Result<(), ServerError> {
         if let Err(failure) = replace(&self.path, bytes) {
             self.uncertain = true;
@@ -355,14 +355,32 @@ impl ProvisioningStore {
     }
 
     fn commit(&mut self, edit: edits::Edit) -> Result<(), ServerError> {
-        let bytes = edits::encode(&self.kept, &edit)?;
-        self.publish(&bytes)?;
+        if self.since_snapshot >= lys_identity::SNAPSHOT_EVERY.get() {
+            self.checkpoint()?;
+        }
+        let appended = self.journal;
+        let written = if self.journal {
+            journal::append(&self.path, &edit)
+        } else {
+            let bytes = edits::encode(&self.kept, &edit)?;
+            journal::snapshot(&self.path, &bytes)
+        };
+        if let Err(error) = written {
+            self.uncertain = true;
+            self.settle()?;
+            return Err(error);
+        }
+        self.journal = true;
+        self.since_snapshot = if appended { self.since_snapshot + 1 } else { 0 };
         let changed = edits::apply(&mut self.kept, edit)
             .and_then(|change| Arc::make_mut(&mut self.indexes).update(&self.kept, change));
         if let Err(error) = changed {
             self.uncertain = true;
             self.settle()?;
             return Err(error);
+        }
+        if self.since_snapshot >= lys_identity::SNAPSHOT_EVERY.get() {
+            self.checkpoint()?;
         }
         Ok(())
     }
@@ -373,6 +391,25 @@ impl ProvisioningStore {
         self.publish(&bytes)?;
         self.indexes = Arc::new(index::Indexes::rebuild(&next));
         self.kept = next;
+        self.journal = false;
+        self.since_snapshot = 0;
+        Ok(())
+    }
+
+    /// Replace the change log with a durable snapshot during maintenance.
+    pub fn checkpoint(&mut self) -> Result<(), ServerError> {
+        self.settle()?;
+        let bytes = serde_json::to_vec(&self.kept)
+            .map_err(|error| unavailable(format!("encoding provisioning checkpoint: {error}")))?;
+        if let Err(error) = journal::snapshot(&self.path, &bytes) {
+            self.uncertain = true;
+            self.settle()?;
+            return Err(unavailable(format!(
+                "writing provisioning checkpoint: {error}"
+            )));
+        }
+        self.journal = true;
+        self.since_snapshot = 0;
         Ok(())
     }
 
@@ -561,3 +598,7 @@ mod build_tests;
 #[cfg(test)]
 #[path = "provisioning_index_tests.rs"]
 mod index_tests;
+
+#[cfg(test)]
+#[path = "provisioning_journal_tests.rs"]
+mod journal_tests;
