@@ -164,7 +164,7 @@ pub fn build(
         .open(root.join(format!("{key}.lock")))
         .map_err(|error| format!("go_cache_lock_open_failed: {error}"))?;
     let waiting = Instant::now();
-    lock.lock()
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)
         .map_err(|error| format!("go_cache_lock_failed: {error}"))?;
     profile("lock", waiting);
     let entry = root.join(key);
