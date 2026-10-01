@@ -221,6 +221,10 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
     ("post /network/machines/{id}/retire", "takes no body"),
     ("post /sessions/{id}/end", "takes no body"),
     (
+        "post /grants/{id}/tokens/{token_id}/revoke",
+        "takes no body: the token is named in the path",
+    ),
+    (
         "post /directory/people/{id}/sessions/{session}/end",
         "takes no body",
     ),

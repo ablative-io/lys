@@ -389,3 +389,65 @@ fn draft_routes_advertise_their_request_and_response_schemas() -> Result {
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn an_unknown_a_decided_an_invalid_and_an_oversized_draft_are_refused_by_name() -> Result {
+    let table = Table::start().await?;
+    let owner = &table;
+    let approve = |draft: String, hash: Value| async move {
+        owner
+            .service
+            .post(
+                &format!("/drafts/{draft}/approve"),
+                Some(&owner.owner),
+                &json!({"operation": operation()?, "creation_hash": hash, "application": operation()?}),
+            )
+            .await
+    };
+    let before = table.service.log_size().await?;
+    let (status, answer) =
+        approve(OperationId::generate()?.to_string(), json!("00".repeat(32))).await?;
+    assert_eq!(
+        (status, answer["refusal"].clone()),
+        (404, json!("DraftNotFound")),
+        "{answer}"
+    );
+    assert_eq!(table.service.log_size().await?, before);
+
+    let (draft, _, _, created) = table.create().await?;
+    let (status, answer) = approve(draft.to_string(), created["creation_hash"].clone()).await?;
+    assert_eq!(status, 200, "{answer}");
+    let decided = table.service.log_size().await?;
+    let (status, answer) = approve(draft.to_string(), created["creation_hash"].clone()).await?;
+    assert_eq!(
+        (status, answer["refusal"].clone()),
+        (409, json!("DraftNotPending")),
+        "{answer}"
+    );
+    assert_eq!(table.service.log_size().await?, decided);
+
+    let mut invalid = table.body(OperationId::generate()?);
+    invalid["target"]["action"] = json!("");
+    // A draft just inside the request bound whose leaf, holding the request
+    // and the prepared body both, is over the event bound.
+    let mut large = table.body(OperationId::generate()?);
+    large["body"] = json!(format!(
+        "{{ \"display_name\": \"{}\" }}",
+        "x".repeat(35_000)
+    ));
+    for (draft, refusal) in [(invalid, "DraftChangeInvalid"), (large, "EventTooLarge")] {
+        let body = draft.to_string().into_bytes();
+        let (header, _) = table.header(&body)?;
+        let (status, answer) = table
+            .service
+            .post_signed("/drafts", (crate::agent_signature::HEADER, &header), body)
+            .await?;
+        assert_eq!(
+            (status, answer["refusal"].clone()),
+            (409, json!(refusal)),
+            "{answer}"
+        );
+        assert_eq!(table.service.log_size().await?, decided);
+    }
+    Ok(())
+}

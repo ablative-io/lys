@@ -237,11 +237,20 @@ fn test_sources() -> Result<String, Box<dyn Error>> {
         root.join("tests"),
         root.join("tests/shared"),
         root.join("../../tests/identity_contract/tests"),
+        root.join("src"),
     ] {
         for entry in std::fs::read_dir(&dir)? {
             let path = entry?.path();
             let is_openapi = path.file_name().is_some_and(|name| name == "openapi.rs");
-            if path.extension().is_some_and(|extension| extension == "rs") && !is_openapi {
+            // Under src only the route test modules count, never the code
+            // that names a refusal.
+            let is_test = !path.starts_with(root.join("src"))
+                || path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with("_tests.rs"));
+            if path.extension().is_some_and(|extension| extension == "rs") && !is_openapi && is_test
+            {
                 text.push_str(&std::fs::read_to_string(&path)?);
             }
         }

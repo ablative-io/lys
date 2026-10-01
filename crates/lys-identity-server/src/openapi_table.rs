@@ -74,7 +74,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants/{id}/tokens" "Issue a credential for one grant" C [SIGNED_BODY, &["GrantTokenResponsibleRequired", "GrantTokenExpiryInvalid", "GrantTokenStoreFull", "GrantTokenUnavailable", "GrantTokenUnknown"]];
     POST "/grants/{id}/tokens/{token_id}/revoke" "Revoke one grant credential" C [SIGNED, &["GrantTokenResponsibleRequired", "GrantTokenUnavailable", "GrantTokenUnknown"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
-    GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "AppsUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
+    GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
     POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused"]];
