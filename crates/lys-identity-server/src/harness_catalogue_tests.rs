@@ -36,7 +36,7 @@ fn catalogue_get_does_not_visit_retained_profile_history() -> TestResult {
     estate(&path, 24)?;
     let store = ProvisioningStore::open(&path)?;
     let catalogue = Catalogue::embedded()?;
-    let mut programs = catalogue.programs.clone();
+    let mut programs = catalogue.programs;
     let before = history_reads();
     profile_builds(&mut programs, &store);
     let codex = programs

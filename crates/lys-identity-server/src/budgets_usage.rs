@@ -242,7 +242,7 @@ impl Reading<'_> {
                     .get(agent)
                     .is_some_and(crate::runtime_store::SessionActivity::never_ran)
             }) && !held.index.has_usage(agent)
-                && !incoming.is_some_and(|usage| usage.agent == agent)
+                && incoming.is_none_or(|usage| usage.agent != agent)
         };
         if limit.unit == Measure::PlanPercent {
             return plan(limit, agents, &uses, at_ms, purpose, &never_run);
