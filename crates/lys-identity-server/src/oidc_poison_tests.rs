@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::{ClientId, ClientSecret, Flights, Mutex, Oidc, RedirectUrl};
 use serde_json::json;
 use std::error::Error;

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::{DialHub, Leave, Queued, withdraw_on_leave};
 use std::error::Error;
 use std::sync::Arc;
