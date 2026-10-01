@@ -7,7 +7,8 @@ use std::sync::Arc;
 use identity_contract::harness::ADMINISTRATOR;
 use lys_core::Ed25519Identity;
 use lys_identity::{
-    Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+    Actor, AgentId, AuthMethod, Change, IdentityEvent, IdentityId, LifecycleState, LoginBinding,
+    OperationId, PersonId, Profile, Provenance, Transition,
 };
 use lys_identity_server::config::Config;
 use lys_identity_server::read_views::Login;
@@ -41,39 +42,46 @@ pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
     );
     let mut directory = open_directory(config)?;
     let mut people = Vec::new();
+    let mut events = Vec::new();
     for index in 0..240 {
-        let (person, _) = directory.register_person(
-            actor.clone(),
-            OperationId::generate()?,
-            Profile::new(&format!("Person {index:03}"))?,
-            1,
-        )?;
-        directory.transition(
-            actor.clone(),
-            OperationId::generate()?,
+        let person = PersonId::generate()?;
+        events.push(event(
+            &actor,
             IdentityId::Person(person),
-            Transition::Activate,
-            "",
-            1,
-        )?;
+            Change::RegisterPerson {
+                profile: Profile::new(&format!("Person {index:03}"))?,
+            },
+        )?);
+        events.push(event(
+            &actor,
+            IdentityId::Person(person),
+            Change::Transition {
+                transition: Transition::Activate,
+                from: LifecycleState::Registered,
+                to: LifecycleState::Active,
+                reason: String::new(),
+            },
+        )?);
         if index == 0 {
-            directory.bind_login(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                1,
-            )?;
+            events.push(event(
+                &actor,
+                IdentityId::Person(person),
+                Change::BindLogin {
+                    binding: LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                },
+            )?);
         }
         let mut agents = Vec::new();
         for number in 0..5 {
-            let (agent, _) = directory.register_agent(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                Profile::new(&format!("Agent {index:03}-{number}"))?,
-                1,
-            )?;
+            let agent = AgentId::generate()?;
+            events.push(event(
+                &actor,
+                IdentityId::Agent(agent),
+                Change::RegisterAgent {
+                    responsible: person,
+                    profile: Profile::new(&format!("Agent {index:03}-{number}"))?,
+                },
+            )?);
             agents.push(agent.to_string());
         }
         people.push(Person {
@@ -81,6 +89,7 @@ pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
             agents,
         });
     }
+    directory.commit_batch(&events)?;
     drop(directory);
     let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
     let mut store = TeamStore::open(
@@ -128,4 +137,12 @@ pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
         teams.push(id);
     }
     Ok(Fixture { people, teams })
+}
+
+fn event(
+    actor: &Actor,
+    identity: IdentityId,
+    change: Change,
+) -> Result<IdentityEvent, lys_identity::IdentityError> {
+    IdentityEvent::new(OperationId::generate()?, actor.clone(), identity, 1, change)
 }

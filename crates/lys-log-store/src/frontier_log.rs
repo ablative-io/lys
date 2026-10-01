@@ -25,8 +25,8 @@
 //! # The same integrity routine as `Log`
 //!
 //! Opening reconciles the tree with the store's pin exactly as
-//! [`Log::open`](crate::Log::open) does: equal is clean, exactly one extra leaf
-//! whose prefix reaches the pinned root is an interrupted append and is
+//! [`Log::open`](crate::Log::open) does: equal is clean, a contiguous tail
+//! whose prefix reaches the pinned root is an interrupted append or batch and is
 //! repaired and reported, and anything else is
 //! [`StoreError::PinMismatch`]. Appends store the leaf before the pin, and a
 //! handle whose pin write failed is poisoned.
@@ -120,7 +120,7 @@ impl Reading {
         if size == pinned.tree_size && root == pinned.root {
             return Ok(None);
         }
-        if size == pinned.tree_size.saturating_add(1) && self.root_at_pin == Some(pinned.root) {
+        if size > pinned.tree_size && self.root_at_pin == Some(pinned.root) {
             return Ok(Some(PinnedRoot {
                 tree_size: size,
                 root,
@@ -265,6 +265,38 @@ impl<S: LeafStore> FrontierLog<S> {
         })?;
         self.poisoned = false;
         Ok((index, leaf_hash))
+    }
+
+    /// Append consecutive leaves durably, then advance the pin once.
+    /// An empty batch writes nothing; a failed batch holds this handle until reopen.
+    ///
+    /// # Errors
+    /// As [`Self::append`], or [`StoreError::BatchSizeOverflow`] before writing.
+    pub fn append_batch(&mut self, leaves: &[&[u8]]) -> StoreResult<Vec<(u64, [u8; 32])>> {
+        if self.poisoned {
+            return Err(StoreError::Poisoned);
+        }
+        let first = self.frontier.size();
+        let end = crate::store::batch_end(first, leaves.len())?;
+        if leaves.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.poisoned = true;
+        self.store.put_leaves(first, leaves)?;
+        let mut appended = Vec::with_capacity(leaves.len());
+        for (index, bytes) in (first..end).zip(leaves) {
+            let hash = self.frontier.push(bytes);
+            if let Some(tree) = self.proofs.get_mut() {
+                tree.push_leaf_hash(hash);
+            }
+            appended.push((index, hash));
+        }
+        self.store.pin(PinnedRoot {
+            tree_size: self.frontier.size(),
+            root: self.frontier.root(),
+        })?;
+        self.poisoned = false;
+        Ok(appended)
     }
 
     /// The raw bytes of the leaf at `index`, read from the store, or `None`

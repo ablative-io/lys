@@ -60,8 +60,8 @@
 //! That situation cannot arise here, because **catching up happens when the log
 //! opens, before any write is attempted.** A [`Log`](crate::Log) does not
 //! persist its own tree length; it rebuilds the tree from stored leaves at open
-//! and reconciles it with the pin, which repairs exactly the
-//! one-leaf-ahead state that crash leaves behind. By the time a caller can call
+//! and reconciles it with the pin, which repairs the
+//! contiguous unpinned tail that an interrupted append or batch leaves behind. By the time a caller can call
 //! `put_leaf` again, its tree already covers leaf `N`.
 //!
 //! So a refusal at `N` means something else entirely: **another writer holds
@@ -70,7 +70,14 @@
 //! overwriting each other's idea of the log. Reopen instead, and the position
 //! that writer took will be part of the tree.
 
-use crate::error::StoreResult;
+use crate::error::{StoreError, StoreResult};
+
+pub(crate) fn batch_end(index: u64, count: usize) -> StoreResult<u64> {
+    u64::try_from(count)
+        .ok()
+        .and_then(|count| index.checked_add(count))
+        .ok_or(StoreError::BatchSizeOverflow { index, count })
+}
 
 /// The pinned `(tree_size, root)` a store carries alongside its leaves.
 ///
@@ -156,6 +163,21 @@ pub trait LeafStore {
     /// [`StoreError::LeafWouldLeaveGap`]: crate::StoreError::LeafWouldLeaveGap
     /// [`StoreError::Io`]: crate::StoreError::Io
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()>;
+
+    /// Store consecutive leaves, making every leaf durable before success.
+    /// An error may leave a contiguous prefix stored; reopen before retrying.
+    /// An empty batch writes nothing. The default uses individual durable writes.
+    ///
+    /// # Errors
+    /// The errors from [`Self::put_leaf`], or [`StoreError::BatchSizeOverflow`]
+    /// before any write when the range cannot be represented.
+    fn put_leaves(&mut self, index: u64, leaves: &[&[u8]]) -> StoreResult<()> {
+        let end = batch_end(index, leaves.len())?;
+        for (index, bytes) in (index..end).zip(leaves) {
+            self.put_leaf(index, bytes)?;
+        }
+        Ok(())
+    }
 
     /// The currently pinned `(tree_size, root)`.
     ///

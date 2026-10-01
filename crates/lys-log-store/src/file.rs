@@ -125,6 +125,7 @@ use sha2::{Digest, Sha256};
 use crate::error::{StoreError, StoreResult};
 use crate::store::{LeafStore, PinnedRoot};
 
+mod batch;
 mod leaves;
 
 #[cfg(test)]
@@ -495,12 +496,19 @@ impl LeafStore for FileLeafStore {
         )
     }
 
+    fn put_leaves(&mut self, index: u64, leaves: &[&[u8]]) -> StoreResult<()> {
+        self.put_batch(index, leaves)
+    }
+
     fn pinned(&self) -> PinnedRoot {
         self.pinned
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
         self.refuse_if_read_only("pin")?;
+        if let Some(index) = self.durability_uncertain {
+            return Err(StoreError::ReopenRequired { index });
+        }
         if pin.tree_size < self.pinned.tree_size {
             return Err(StoreError::PinWentBackwards {
                 pinned: self.pinned.tree_size,

@@ -499,7 +499,7 @@ fn a_log_opens_over_a_read_only_store_at_its_pin_and_changes_no_byte() {
 }
 
 #[test]
-fn a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write() {
+fn a_read_only_store_two_leaves_past_its_pin_reports_pending_repair_without_a_write() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("log");
     let mut log = open_file_log(&dir);
@@ -511,19 +511,17 @@ fn a_read_only_store_two_leaves_past_its_pin_is_refused_without_a_write() {
     let before = tree_bytes(&dir);
     let store = FileLeafStore::open_read_only(&dir).unwrap();
     assert_eq!(store.extent(), 2);
-    let err = Log::open(store).unwrap_err();
-    assert!(
-        matches!(
-            err,
-            StoreError::PinMismatch {
-                pinned_size: 0,
-                rebuilt_size: 2,
-                ..
-            }
-        ),
-        "{err}"
-    );
-    assert_eq!(tree_bytes(&dir), before, "the refusal changed no file");
+    let mut log = Log::open_at_pin(store).unwrap();
+    assert_eq!(log.tree().len(), 0);
+    assert_eq!(log.pending_repair(), Some(2));
+    assert!(matches!(
+        log.append(b"later"),
+        Err(StoreError::AppendAwaitsRepair {
+            pinned_tree_size: 0,
+            leaves: 2,
+        })
+    ));
+    assert_eq!(tree_bytes(&dir), before, "the read changed no file");
 }
 
 #[test]

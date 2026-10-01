@@ -218,6 +218,30 @@ impl<S: LeafStore> EventLog<S> {
         })
     }
 
+    /// Append signed events with one final pin, preserving their individual coordinates.
+    /// A failed batch holds every current read until [`Self::reconcile`] adopts
+    /// its durable prefix. An empty batch performs no writes.
+    ///
+    /// # Errors
+    /// As [`Self::append`].
+    pub fn append_batch(
+        &mut self,
+        events: &[SignedEvent],
+    ) -> Result<Vec<Coordinate>, IdentityError> {
+        let index = self.certain()?.len();
+        let Some(first) = events.first() else {
+            return Ok(Vec::new());
+        };
+        let bytes: Vec<_> = events.iter().map(SignedEvent::bytes).collect();
+        self.ledger.append_batch(&bytes).map_err(|failure| {
+            self.pending = Some(Pending {
+                index,
+                bytes: first.bytes().to_vec(),
+            });
+            unavailable(&failure)
+        })
+    }
+
     /// Resolve a held uncertain append from a fresh open of the store, reading
     /// only the leaves from its index on, and adopt every one of them. Answers
     /// `None` when nothing was held. The hold stays until every step has

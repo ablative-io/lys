@@ -38,6 +38,14 @@ use std::path::PathBuf;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StoreError {
+    /// The requested batch would exceed the range of leaf indices.
+    #[error("batch of {count} leaves at {index} exceeds the leaf index range")]
+    BatchSizeOverflow {
+        /// The first requested index.
+        index: u64,
+        /// The number of requested leaves.
+        count: usize,
+    },
     /// A filesystem or backend operation failed. Carries the operation and
     /// path in `context` so the failure is actionable without a backtrace.
     #[error("{context}: {source}")]
