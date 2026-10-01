@@ -348,7 +348,10 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
         sessions: sessions.as_ref(),
         at_ms: jiff::Timestamp::now().as_millisecond(),
     };
-    with_budgets(state, |store| view_held(store.held(), &read))
+    with_budgets(state, |store| {
+        store.reconcile_context(sessions.as_ref())?;
+        view_held(store.held(), &read)
+    })
 }
 
 struct ViewRead<'a> {
@@ -454,7 +457,9 @@ fn current_usage(
     sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Used, ServerError> {
     if limit.unit == Measure::ContextPercent {
-        return Ok(held.context_availability.used(limit, agents, at_ms));
+        return Ok(held
+            .context_availability
+            .used_live(limit, agents, at_ms, sessions));
     }
     crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, at_ms, None, sessions)
         .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
@@ -558,3 +563,7 @@ fn source_gaps(
     }
     Ok(unavailable)
 }
+
+#[cfg(test)]
+#[path = "budgets_live_context_tests.rs"]
+mod live_context_tests;

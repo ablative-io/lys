@@ -160,3 +160,26 @@ fn future_reports_name_a_gap_until_the_observation_time_reaches_them() -> Result
     assert_eq!(current.unavailable, None);
     Ok(())
 }
+
+#[test]
+fn a_confirmed_end_removes_its_reading_and_gap_from_the_heap() -> Result<(), String> {
+    let mut held = Availability::default();
+    held.keep(&usage("one", Some("old"), Some(95), 1))?;
+    held.keep(&usage("two", Some("live"), Some(40), 2))?;
+    held.remove("agent", "old")?;
+    let agent = held.agents.get("agent").ok_or("missing agent")?;
+    assert_eq!(agent.sessions.len(), 1);
+    assert!(!agent.figures.contains_key(&95));
+    assert_eq!(held.used(&limit(), &agents(), 3).figure, Some(40.into()));
+    held.keep(&usage("three", Some("old"), None, 3))?;
+    held.remove("agent", "old")?;
+    assert!(
+        held.agents
+            .get("agent")
+            .ok_or("missing agent")?
+            .missing
+            .is_empty()
+    );
+    assert_eq!(held.used(&limit(), &agents(), 4).figure, Some(40.into()));
+    Ok(())
+}

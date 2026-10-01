@@ -116,7 +116,10 @@ fn shutdown_does_not_need_the_listener_path_to_exist() -> TestResult {
 fn an_accept_failure_leaves_the_listener_answering_the_next_connection() -> TestResult {
     let dir = tempfile::tempdir()?;
     let mut runner = runner(dir.path())?;
-    runner.accept_error = Some(std::io::Error::from(std::io::ErrorKind::ConnectionAborted));
+    runner.accept_error = Some((
+        0,
+        std::io::Error::from(std::io::ErrorKind::ConnectionAborted),
+    ));
     let serving = runner.spawn();
     let path = dir.path().join("runner.sock");
     let mut first = BufReader::new(UnixStream::connect(&path)?);
@@ -126,6 +129,29 @@ fn an_accept_failure_leaves_the_listener_answering_the_next_connection() -> Test
     let mut next = BufReader::new(UnixStream::connect(&path)?);
     assert!(next.read_line(&mut greeting)? > 0);
     assert!(greeting.contains("challenge"), "{greeting}");
+    drop(next);
+    serving.stop()?;
+    Ok(())
+}
+
+#[test]
+fn descriptor_exhaustion_recovers_when_an_existing_connection_exits() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut runner = runner(dir.path())?;
+    runner.accept_error = Some((1, std::io::Error::from_raw_os_error(nix::libc::EMFILE)));
+    let serving = runner.spawn();
+    let path = dir.path().join("runner.sock");
+    let mut first = BufReader::new(UnixStream::connect(&path)?);
+    let mut line = String::new();
+    first.read_line(&mut line)?;
+    let mut refused = BufReader::new(UnixStream::connect(&path)?);
+    line.clear();
+    assert_eq!(refused.read_line(&mut line)?, 0);
+    drop(refused);
+    let mut next = BufReader::new(UnixStream::connect(&path)?);
+    drop(first);
+    assert!(next.read_line(&mut line)? > 0);
+    assert!(line.contains("challenge"), "{line}");
     drop(next);
     serving.stop()?;
     Ok(())
