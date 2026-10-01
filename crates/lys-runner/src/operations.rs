@@ -30,6 +30,9 @@ use crate::protocol::{Ended, Key};
 use crate::session::{Sessions, Table, now_ms};
 use crate::tracking_store::{Body, Commit};
 
+#[cfg(test)]
+#[path = "../tests/operations_index/cases.rs"]
+mod index_tests;
 mod restart;
 pub(crate) use restart::{begin_restart, finish_restart};
 

@@ -14,6 +14,10 @@ use crate::session::{Sessions, Table, accounts, append, now_ms};
 use crate::tracking::{Harness, Reading};
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
+#[cfg(test)]
+#[path = "../tests/collector_binding/cases.rs"]
+mod binding_tests;
+
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
