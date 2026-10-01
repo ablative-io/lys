@@ -57,7 +57,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
-    POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];
+    POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]];
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
