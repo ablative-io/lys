@@ -147,6 +147,8 @@ pub mod reviews_api;
 pub mod reviews_state;
 pub mod reviews_store;
 pub mod roles_api;
+#[cfg(test)]
+mod roles_pass_tests;
 pub mod roles_records;
 pub mod roles_store;
 pub mod roles_views;
@@ -155,6 +157,8 @@ mod route_actions;
 mod route_actions_tests;
 #[cfg(test)]
 mod route_group_scope_tests;
+#[cfg(test)]
+mod route_named_scope_tests;
 pub mod routes;
 mod routes_startup;
 pub mod routes_table;
