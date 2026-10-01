@@ -232,9 +232,8 @@ pub fn confirmation(ended: &Ended) -> String {
 
 /// Keep `driven`'s end as its runner saw it, once.
 pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<(), ServerError> {
-    crate::agent_pass::end_session(state, &driven.session)?;
     if state.runtime.is_none() {
-        return Ok(());
+        return crate::agent_pass::end_session(state, &driven.session);
     }
     with_runtime(state, |store| {
         if store
@@ -251,6 +250,7 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
         );
         store.report(report).map(drop)
     })?;
+    crate::agent_pass::end_session(state, &driven.session)?;
     crate::budgets_context::finish(state, &driven.agent, &driven.session)
 }
 

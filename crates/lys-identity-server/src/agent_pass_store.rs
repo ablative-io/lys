@@ -5,7 +5,7 @@ use lys_identity::AgentId;
 use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -36,6 +36,7 @@ pub struct Passes {
     file: PathBuf,
     stored: Stored,
     failed: bool,
+    reconciled: bool,
 }
 
 fn unavailable(error: impl std::fmt::Display) -> ServerError {
@@ -129,10 +130,12 @@ impl Passes {
             },
             Err(error) => return Err(unavailable(error)),
         };
+        let reconciled = stored.passes.is_empty();
         Ok(Self {
             file,
             stored,
             failed: false,
+            reconciled,
         })
     }
 
@@ -141,9 +144,40 @@ impl Passes {
             Err(unavailable(
                 "agent pass table requires reopening after a failed durable change",
             ))
+        } else if !self.reconciled {
+            Err(unavailable(
+                "agent pass table awaits authoritative startup reconciliation",
+            ))
         } else {
             Ok(())
         }
+    }
+
+    pub(crate) fn launches(&self) -> HashSet<&str> {
+        self.stored
+            .passes
+            .values()
+            .map(|entry| entry.launch.as_str())
+            .collect()
+    }
+
+    pub(crate) fn reconcile(
+        &mut self,
+        mut live: impl FnMut(&str, &str, &str) -> bool,
+    ) -> Result<(), ServerError> {
+        if self.failed {
+            return self.ready();
+        }
+        self.reconciled = false;
+        let before = self.stored.passes.len();
+        self.stored
+            .passes
+            .retain(|_, entry| live(&entry.agent, &entry.launch, &entry.session));
+        if before != self.stored.passes.len() {
+            self.save()?;
+        }
+        self.reconciled = true;
+        Ok(())
     }
 
     pub(crate) fn lookup(&self, pass: &str) -> Result<AgentId, ServerError> {
