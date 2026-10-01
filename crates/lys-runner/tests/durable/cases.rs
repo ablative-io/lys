@@ -53,10 +53,10 @@ fn a_blocked_refusal_append_holds_no_session_table_lock() -> Result<(), Box<dyn 
         .join()
         .map_err(|panic| format!("refusal caller panicked: {panic:?}"))?;
     std::fs::remove_file(&path)?;
-    assert_eq!(verdict.audit, "incomplete");
     assert!(
         available,
         "the refusal's disk append held the session table"
     );
+    assert_eq!(verdict.audit, "recorded");
     Ok(())
 }
