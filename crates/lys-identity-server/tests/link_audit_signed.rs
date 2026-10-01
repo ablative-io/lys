@@ -398,16 +398,19 @@ async fn a_session_of_the_source_still_delivers_and_asks() -> TestResult {
 }
 
 #[tokio::test]
-async fn a_request_carrying_a_session_and_a_signature_is_judged_by_the_signature() -> TestResult {
+async fn a_request_carrying_a_session_and_a_signature_is_refused_before_either_is_judged()
+-> TestResult {
     let table = Table::set().await?;
     let session = table.service.sign_in(login(LINK_AUDIT_SOURCE)).await?;
     let before = table.recorded().await?;
 
+    // Neither credential lends to the other: the pair is refused whole,
+    // whichever of them would have been admitted alone.
     let body = table.delivery("op-1");
     let header = table.other.header(DELIVER, &body, &nonce(9))?;
     let carried = [(HEADER, header.as_str()), ("cookie", session.as_str())];
     let answer = table.service.post_carrying(DELIVER, &carried, body).await?;
-    refused(&answer, 403, "NotAdmitted");
+    refused(&answer, 401, "AgentSignatureRefused");
     assert_eq!(table.recorded().await?, before);
 
     let body = table.delivery("op-1");
@@ -416,6 +419,13 @@ async fn a_request_carrying_a_session_and_a_signature_is_judged_by_the_signature
         (HEADER, header.as_str()),
         ("cookie", table.other.responsible.as_str()),
     ];
+    let answer = table.service.post_carrying(DELIVER, &carried, body).await?;
+    refused(&answer, 401, "AgentSignatureRefused");
+    assert_eq!(table.recorded().await?, before);
+
+    let body = table.delivery("op-1");
+    let header = table.admitted.header(DELIVER, &body, &nonce(11))?;
+    let carried = [(HEADER, header.as_str())];
     let (status, answer) = table.service.post_carrying(DELIVER, &carried, body).await?;
     assert_eq!(status, 200, "{answer}");
     let event = table.event(&answer).await?;
