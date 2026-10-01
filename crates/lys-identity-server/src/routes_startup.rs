@@ -16,6 +16,7 @@ use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::Sessions;
 
 pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+    crate::openapi::prepare()?;
     let catalogue = Arc::new(crate::harness_catalogue::Catalogue::embedded()?);
     let operator_token = crate::operator::token(config, &*say)?;
     let mut directory = open_directory(config)?;
@@ -185,7 +186,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );
     let served = match &config.surface_dir {
-        Some(dir) => crate::surface::serving(dir.clone(), api),
+        Some(dir) => crate::surface::serving(dir.clone(), api)?,
         None => api,
     };
     Ok(served

@@ -19,3 +19,15 @@ async fn a_second_document_read_does_not_generate_the_schema_again() -> Result<(
     assert_eq!(BUILDS.get(), first);
     Ok(())
 }
+
+#[test]
+fn an_invalid_document_is_refused_before_it_can_be_cached() -> Result<(), Box<dyn Error>> {
+    let mut document = super::document()?;
+    document["paths"]["/apps"]["post"]["requestBody"]["content"]["application/json"]["schema"]["$ref"] =
+        serde_json::json!("#/components/schemas/Missing");
+    assert!(matches!(
+        super::encode(&document),
+        Err(crate::error::ServerError::ConfigInvalid { .. })
+    ));
+    Ok(())
+}
