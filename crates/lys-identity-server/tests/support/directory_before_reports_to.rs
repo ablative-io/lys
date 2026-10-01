@@ -97,8 +97,16 @@ fn snapshot(
         array(Vec::new()),
     ]);
     let state = array(vec![uint(STATE_VERSION), uint(folded), projection]);
+    let mut owner = Vec::new();
+    ciborium::into_writer(&state, &mut owner)?;
+    // The fixture has fewer leaves than the first checkpoint interval, so
+    // its only checkpoint is the empty frontier at zero.
+    if folded >= 1024 {
+        return Err("legacy fixture exceeds its frozen checkpoint interval".into());
+    }
+    let wrapped = array(vec![uint(1), array(vec![bytes(&[])]), bytes(&owner)]);
     let mut encoded = Vec::new();
-    ciborium::into_writer(&state, &mut encoded)?;
+    ciborium::into_writer(&wrapped, &mut encoded)?;
     Ok(encoded)
 }
 
