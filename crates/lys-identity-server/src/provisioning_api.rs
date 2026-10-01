@@ -496,14 +496,11 @@ async fn review(
         };
         let agent = agent.to_string();
         write_provisioning(&state, |store| {
+            store
+                .version(&agent, number)
+                .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
             let profile = store
                 .profile(&agent)
-                .filter(|profile| {
-                    profile
-                        .versions
-                        .iter()
-                        .any(|version| version.number == number)
-                })
                 .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
             let latest = profile.latest();
             if number != latest {
@@ -514,8 +511,7 @@ async fn review(
             }
             store.review(&agent, number, review)?;
             let recorded = store
-                .profile(&agent)
-                .and_then(|profile| profile.versions.iter().find(|kept| kept.number == number))
+                .version(&agent, number)
                 .and_then(|kept| kept.reviewed.as_ref())
                 .map(|kept| Recorded {
                     operation: kept.operation.clone(),
