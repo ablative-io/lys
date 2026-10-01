@@ -77,42 +77,23 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
     }
     let agent = usage.agent.clone();
     let zone = crate::configuration_api::organisation(state)?.zone;
-    let selected = session_coverage(state, &agent, &standings)?;
-    let sessions = crate::runtime_api::session_agents(state, &selected)?;
-    let targets: BTreeMap<_, _> = selected
-        .iter()
-        .map(|agent| {
-            let live = sessions
-                .as_ref()
-                .and_then(|sessions| sessions.get(agent))
-                .map(|activity| activity.live_sessions().iter().cloned().collect())
-                .unwrap_or_default();
-            (agent.clone(), Target { live })
-        })
-        .collect();
-    let mut incoming = Some(usage);
-    loop {
-        let snapshot = with_budgets(state, |store| {
-            let usage = incoming
-                .as_ref()
-                .ok_or_else(|| unavailable("the usage was already committed"))?;
-            if store.held().charged.contains(&usage.event) {
-                return Ok(None);
-            }
-            Ok(Some((
-                store.revision(),
-                crossings(
-                    store.held(),
-                    usage,
-                    &standings,
-                    &targets,
-                    &zone,
-                    sessions.as_ref(),
-                )?,
-            )))
-        })?;
-        let Some((revision, mut assessed)) = snapshot else {
-            return crate::budgets_act::settle_for(state, &agent).await;
+    let sessions = crate::runtime_api::session_agents(state)?;
+    let mut targets = BTreeMap::new();
+    for standing in &standings {
+        let live = if state.runtime.is_some() {
+            crate::runtime_api::with_runtime(state, |store| {
+                Ok(store
+                    .sessions()
+                    .iter()
+                    .filter(|tracked| {
+                        tracked.agent.as_deref() == Some(standing.agent.as_str())
+                            && !tracked.stopped()
+                    })
+                    .map(|tracked| tracked.session.clone())
+                    .collect())
+            })?
+        } else {
+            Vec::new()
         };
         resolve_commands(state, &mut assessed.crossed)?;
         let committed = with_budgets_mut(state, |store| {
@@ -128,58 +109,16 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         if let Some(pending) = committed {
             return crate::budgets_act::settle_crossings(state, pending).await;
         }
-    }
-}
-
-fn resolve_commands(state: &AppState, crossed: &mut [Crossing]) -> Result<(), ServerError> {
-    let mut commands = BTreeMap::new();
-    for crossing in crossed {
-        if crossing.act == Act::Compact {
-            if !commands.contains_key(&crossing.agent) {
-                let command = crate::runner_api::session_settings(state, &crossing.agent)?
-                    .and_then(|settings| settings.compact);
-                commands.insert(crossing.agent.clone(), command);
-            }
-            crossing.text = commands.get(&crossing.agent).cloned().flatten();
-        }
-    }
-    Ok(())
-}
-
-fn commit_assessment(
-    store: &mut crate::budgets_store::BudgetStore,
-    incoming: &mut Option<Usage>,
-    revision: u64,
-    assessed: Assessment,
-    sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
-    agent: &str,
-) -> Result<Option<Vec<Crossing>>, ServerError> {
-    if store.revision() != revision {
-        return Ok(None);
-    }
-    let mut usage = incoming
-        .take()
-        .ok_or_else(|| unavailable("the usage was already committed"))?;
-    if let Some(reason) = assessed.missing
-        && !usage
-            .unavailable
-            .iter()
-            .any(|gap| gap.figure == "context_percent" && gap.reason == reason)
-    {
-        usage.unavailable.push(lys_runner::tracking::Unavailable {
-            figure: "context_percent".to_owned(),
-            reason: reason.to_owned(),
-        });
-    }
-    let other: Vec<_> = assessed
-        .crossed
-        .iter()
-        .filter(|crossing| crossing.agent != *agent)
-        .cloned()
-        .collect();
-    store.charge(Usage {
-        crossed: assessed.crossed,
-        ..usage
+        let crossed = crossings(
+            store.held(),
+            &usage,
+            &standings,
+            &targets,
+            &zone,
+            sessions.as_deref(),
+        )?;
+        store.charge(Usage { crossed, ..usage })?;
+        Ok(())
     })?;
     store.reconcile_context(sessions)?;
     let mut pending = store.held().crossings.unsettled_for(agent);
@@ -221,19 +160,22 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
-    sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
-) -> Result<Assessment, ServerError> {
-    let mut assessed = Assessment {
-        crossed: Vec::new(),
-        missing: None,
-    };
+    sessions: Option<&std::collections::BTreeSet<String>>,
+) -> Result<Vec<Crossing>, ServerError> {
+    let mut crossed = Vec::new();
     for collection in &held.limit_sets {
         let agents = crate::budgets_members::covered(&collection.holder, standings);
         if !agents.contains(&usage.agent) {
             continue;
         }
         for (index, limit) in held.effective_limits(collection).iter().enumerate() {
-            let Some(level) = levels(held, usage, limit, &agents, zone, sessions)? else {
+            let Some(Levels {
+                before,
+                figure,
+                since,
+                account,
+            }) = levels(held, usage, limit, &agents, zone, sessions)?
+            else {
                 continue;
             };
             if let Some(reason) = level.missing {
@@ -373,8 +315,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let selected = session_coverage(state, agent, &standings)?;
-    let sessions = crate::runtime_api::session_agents(state, &selected)?;
+    let sessions = crate::runtime_api::session_agents(state)?;
     with_budgets(state, |store| {
         for collection in &store.held().limit_sets {
             let agents = crate::budgets_members::covered(&collection.holder, &standings);
@@ -392,7 +333,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                     &zone,
                     at_ms,
                     None,
-                    sessions.as_ref(),
+                    sessions.as_deref(),
                 )
                 .map_err(unavailable)?;
                 let figure = match used.figure {
@@ -443,4 +384,183 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
         }
         Ok(())
     })
+}
+
+fn notice(limit: &Limit, figure: &Number, account: Option<&str>) -> Result<String, String> {
+    Ok(match limit.unit {
+        Measure::ContextPercent => format!(
+            "Lys: context is at {figure}%; the budget is {}%.",
+            limit.amount
+        ),
+        Measure::PlanPercent => format!(
+            "Lys: account {} is at {figure}% of its shared {} plan; the budget is {}%.",
+            account.ok_or("a reported plan figure names its account")?,
+            limit
+                .period
+                .ok_or("a reported plan figure names its period")?
+                .name(),
+            limit.amount
+        ),
+        Measure::Dollars => format!(
+            "Lys: reported dollar spend is ${figure}; the budget is ${}.",
+            limit.amount
+        ),
+        Measure::Tokens | Measure::RunningMs => format!(
+            "Lys: {} is at {figure}; the budget is {}.",
+            limit.unit.name(),
+            limit.amount
+        ),
+    })
+}
+
+struct Levels {
+    before: Option<Number>,
+    figure: Number,
+    since: Option<i64>,
+    account: Option<String>,
+}
+
+fn levels(
+    held: &Held,
+    usage: &Usage,
+    limit: &Limit,
+    agents: &std::collections::BTreeSet<String>,
+    zone: &str,
+    sessions: Option<&std::collections::BTreeSet<String>>,
+) -> Result<Option<Levels>, ServerError> {
+    if limit.unit == Measure::ContextPercent {
+        let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
+            return Ok(None);
+        };
+        return Ok(Some(Levels {
+            before: held
+                .crossings
+                .context
+                .get(session)
+                .copied()
+                .map(Number::from),
+            figure: context.into(),
+            since: None,
+            account: None,
+        }));
+    }
+    let before = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        None,
+        sessions,
+    )
+    .map_err(unavailable)?;
+    let after = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        Some(usage),
+        sessions,
+    )
+    .map_err(unavailable)?;
+    let Some(figure) = after.figure else {
+        return Ok(None);
+    };
+    Ok(Some(Levels {
+        before: before.figure,
+        figure,
+        since: after.since_ms,
+        account: after.account,
+    }))
+}
+
+struct Dispatch<'a> {
+    collection: &'a Limits,
+    limit: &'a Limit,
+    index: usize,
+    figure: &'a Number,
+    account: Option<&'a str>,
+    act: Act,
+    is_warning: bool,
+    mark: &'a str,
+}
+
+fn dispatch(
+    held: &Held,
+    usage: &Usage,
+    agents: &std::collections::BTreeSet<String>,
+    targets: &BTreeMap<String, Target>,
+    request: &Dispatch<'_>,
+) -> Result<Vec<Crossing>, ServerError> {
+    let Dispatch {
+        collection,
+        limit,
+        index,
+        figure,
+        account,
+        act,
+        is_warning,
+        mark,
+    } = *request;
+    let mut crossed = Vec::new();
+    let recipients = if limit.unit == Measure::ContextPercent {
+        std::collections::BTreeSet::from([usage.agent.clone()])
+    } else {
+        agents.clone()
+    };
+    for agent in recipients {
+        let target = targets
+            .get(&agent)
+            .ok_or_else(|| unavailable("a covered agent has no target snapshot"))?;
+        let sessions = if act == Act::Tell
+            || (limit.unit != Measure::ContextPercent && target.live.is_empty())
+        {
+            vec![None]
+        } else if limit.unit == Measure::ContextPercent {
+            vec![usage.session.clone()]
+        } else {
+            target.live.iter().cloned().map(Some).collect()
+        };
+        for session in sessions {
+            let identity = format!("limit {index} warning {is_warning} recipient {agent} {mark}");
+            let operation = Crossing::id(
+                &collection.holder,
+                limit.unit,
+                collection.version,
+                &identity,
+                session.as_deref().unwrap_or_default(),
+            );
+            if held
+                .crossings
+                .crossed
+                .iter()
+                .any(|crossing| crossing.operation == operation)
+            {
+                continue;
+            }
+            let text = match act {
+                Act::Compact => target.compact.clone(),
+                Act::Notice => Some(notice(limit, figure, account).map_err(unavailable)?),
+                Act::Stop | Act::Tell => None,
+            };
+            crossed.push(Crossing {
+                operation,
+                holder: collection.holder.clone(),
+                measure: limit.unit,
+                version: collection.version,
+                limit: limit.amount.clone(),
+                figure: figure.clone(),
+                limit_index: u64::try_from(index).map_err(unavailable)?,
+                warning: is_warning,
+                account: account.map(str::to_owned),
+                act,
+                agent: agent.clone(),
+                session,
+                text,
+                at_ms: usage.at_ms,
+            });
+        }
+    }
+    Ok(crossed)
 }

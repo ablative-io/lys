@@ -144,15 +144,14 @@ pub(crate) fn with_runtime<T>(
     act(&mut store)
 }
 
-/// Selected agents' session activity; absent when no runtime history is configured.
+/// Lifetime session knowledge; absent when no runtime history is configured.
 pub(crate) fn session_agents(
     state: &AppState,
-    selected: &BTreeSet<String>,
-) -> Result<Option<BTreeMap<String, SessionActivity>>, ServerError> {
+) -> Result<Option<Arc<BTreeSet<String>>>, ServerError> {
     if state.runtime.is_none() {
         return Ok(None);
     }
-    with_runtime(state, |store| store.agents_with_sessions(selected)).map(Some)
+    with_runtime(state, RuntimeStore::agents_with_sessions).map(Some)
 }
 
 /// When a runtime last reported a session on each machine, by machine id;

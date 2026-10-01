@@ -302,70 +302,26 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let teams = if holder.kind == HolderKind::Agent && state.teams.is_some() {
-        crate::teams_api::with_teams(state, |store| Ok(store.teams().to_vec()))?
-    } else {
-        Vec::new()
-    };
-    let mut agents = crate::budgets_members::covered(holder, &standings);
-    if holder.kind == HolderKind::Agent {
-        let standing = standings
-            .iter()
-            .find(|standing| standing.agent == holder.id);
-        for team in teams.iter().filter(|team| {
-            standing.is_some_and(|standing| standing.teams.contains(&team.created.id))
-        }) {
-            agents.extend(crate::budgets_members::covered(
-                &Holder {
-                    kind: HolderKind::Team,
-                    id: team.created.id.clone(),
-                },
-                &standings,
-            ));
-        }
-    }
-    let sessions = crate::runtime_api::session_agents(state, &agents)?;
-    let read = ViewRead {
-        holder,
-        zone: &zone,
-        standings: &standings,
-        teams: &teams,
-        sessions: sessions.as_ref(),
-        at_ms: jiff::Timestamp::now().as_millisecond(),
-    };
-    with_budgets(state, |store| {
-        store.reconcile_context(sessions.as_ref())?;
-        view_held(store.held(), &read)
-    })
-}
-
-struct ViewRead<'a> {
-    holder: &'a Holder,
-    zone: &'a str,
-    standings: &'a [crate::budgets_state::Standing],
-    teams: &'a [crate::teams_state::Team],
-    sessions: Option<&'a std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
-    at_ms: i64,
-}
-
-fn view_held(
-    held: &crate::budgets_state::Held,
-    read: &ViewRead<'_>,
-) -> Result<BudgetsView, ServerError> {
-    let ViewRead {
-        holder,
-        zone,
-        standings,
-        teams,
-        sessions,
-        at_ms,
-    } = *read;
+    let sessions = crate::runtime_api::session_agents(state)?;
+    let held = with_budgets(state, |store| Ok(store.held().clone()))?;
+    let at_ms = jiff::Timestamp::now().as_millisecond();
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
     let agents = crate::budgets_members::covered(holder, standings);
     let used = effective
         .iter()
-        .map(|limit| current_usage(held, limit, &agents, zone, at_ms, sessions))
+        .map(|limit| {
+            crate::budgets_usage::figure_with_sessions(
+                &held,
+                limit,
+                &agents,
+                &zone,
+                at_ms,
+                None,
+                sessions.as_deref(),
+            )
+            .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let mut unavailable = source_gaps(held, &agents, zone, at_ms)?;
     if let Some(reason) = used.iter().find_map(|used| {
@@ -404,7 +360,20 @@ fn view_held(
                     .map_or_else(Vec::new, |limits| held.effective_limits(limits));
                 let used = limits
                     .iter()
-                    .map(|limit| current_usage(held, limit, &agents, zone, at_ms, sessions))
+                    .map(|limit| {
+                        crate::budgets_usage::figure_with_sessions(
+                            &held,
+                            limit,
+                            &agents,
+                            &zone,
+                            at_ms,
+                            None,
+                            sessions.as_deref(),
+                        )
+                        .map_err(|reason| {
+                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                        })
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {
                     team: holder.id,
