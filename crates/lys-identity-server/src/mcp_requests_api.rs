@@ -267,13 +267,7 @@ fn declaration(
                 .administrator(&signed_in(state, headers)?)
                 .is_ok() =>
         {
-            profiles
-                .profiles()
-                .iter()
-                .flat_map(|profile| &profile.versions)
-                .filter(|version| version.reviewed.is_some())
-                .flat_map(|version| &version.settings.mcp_servers)
-                .find(|server| server.name == asked.server)
+            profiles.declared_server(&asked.server)
         }
         IdentityId::Person(_) | IdentityId::ServiceAccount(_) => None,
     };

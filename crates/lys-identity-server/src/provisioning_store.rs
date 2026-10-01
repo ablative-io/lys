@@ -29,6 +29,18 @@ mod builds;
 #[cfg(test)]
 std::thread_local! {
     static HISTORY_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static PROFILE_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static SKILL_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static HISTORY_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn index_work() -> (usize, usize, usize) {
+    (
+        PROFILE_COPIES.with(std::cell::Cell::get),
+        SKILL_COPIES.with(std::cell::Cell::get),
+        HISTORY_VISITS.with(std::cell::Cell::get),
+    )
 }
 
 #[cfg(test)]
@@ -90,7 +102,7 @@ pub enum Setting {
 }
 
 /// A skill Lys keeps: its text under its name, by the hash of its bytes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SkillText {
     /// Its name, one visible path component.
@@ -101,6 +113,19 @@ pub struct SkillText {
     pub len: u64,
     /// The SHA-256 of the text's bytes, as lowercase hex.
     pub sha256: String,
+}
+
+impl Clone for SkillText {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        SKILL_COPIES.with(|copies| copies.set(copies.get() + 1));
+        Self {
+            name: self.name.clone(),
+            text: self.text.clone(),
+            len: self.len,
+            sha256: self.sha256.clone(),
+        }
+    }
 }
 
 /// The skill a profile version names, pinned to the text it was recorded with.
@@ -209,13 +234,24 @@ pub struct Review {
 }
 
 /// An agent's profile: every version, in order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
     /// The agent.
     pub agent: String,
     /// Its versions, in order from 1.
     pub versions: Vec<Version>,
+}
+
+impl Clone for Profile {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        PROFILE_COPIES.with(|copies| copies.set(copies.get() + 1));
+        Self {
+            agent: self.agent.clone(),
+            versions: self.versions.clone(),
+        }
+    }
 }
 
 impl Profile {
@@ -345,9 +381,27 @@ impl ProvisioningStore {
             profile
                 .versions
                 .iter()
-                .find(|version| version.operation == operation)
+                .find(|version| {
+                    #[cfg(test)]
+                    HISTORY_VISITS.with(|visits| visits.set(visits.get() + 1));
+                    version.operation == operation
+                })
                 .map(|version| (profile.agent.as_str(), version))
         })
+    }
+
+    /// The first reviewed declaration in profile and version order.
+    pub(crate) fn declared_server(&self, name: &str) -> Option<&McpServer> {
+        self.profiles()
+            .iter()
+            .flat_map(|profile| &profile.versions)
+            .filter(|version| {
+                #[cfg(test)]
+                HISTORY_VISITS.with(|visits| visits.set(visits.get() + 1));
+                version.reviewed.is_some()
+            })
+            .flat_map(|version| &version.settings.mcp_servers)
+            .find(|server| server.name == name)
     }
 
     /// Keep `settings` as the version of `agent` after `from`, under
@@ -491,3 +545,7 @@ mod compatibility_tests;
 #[cfg(test)]
 #[path = "provisioning_builds_tests.rs"]
 mod build_tests;
+
+#[cfg(test)]
+#[path = "provisioning_index_tests.rs"]
+mod index_tests;
