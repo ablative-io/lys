@@ -317,6 +317,7 @@ async fn a_pass_cannot_borrow_credentials_or_reach_undeclared_or_kept_routes() -
         assert_eq!(response.status().as_u16(), 403);
         let body: Value = response.json().await?;
         assert_eq!(body["refusal"], "ResponsibilityKept");
+        assert_eq!(body["can_grant"], json!([]), "{body}");
         assert_eq!(body["fields"]["route"], path);
     }
     Ok(())

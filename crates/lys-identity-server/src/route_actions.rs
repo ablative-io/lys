@@ -1,6 +1,6 @@
 //! Pass calls exercise the declared action through the grants' authority.
 
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use lys_identity::IdentityId;
 use lys_identity::grants::{ExerciseRequest, GrantError, Route};
@@ -24,16 +24,10 @@ pub(crate) fn admit(
         return Ok(());
     }
     if state.kept_responsibilities.keeps(method, path) {
-        return Err(Box::new(
-            (
-                StatusCode::FORBIDDEN,
-                axum::Json(serde_json::json!({
-                    "refusal":"ResponsibilityKept", "reason":"a person keeps this responsibility",
-                    "fields":{"route":path}
-                })),
-            )
-                .into_response(),
-        ));
+        return Err(Box::new(crate::who_can_grant::refusal(
+            crate::who_can_grant::AuthorityRefusal::ResponsibilityKept { route: path },
+            &[],
+        )));
     }
     let (resource, action) = crate::openapi_table::token_scope(method, path)
         .map_err(|error| Box::new(error.into_response()))?;
@@ -58,7 +52,7 @@ pub(crate) fn admit(
         );
         let (permit, _) = match decision {
             Ok(permit) => permit,
-            Err(error @ GrantError::NotHeld { .. }) => {
+            Err(error) if names_grantors(&error) => {
                 let holders = crate::who_can_grant::for_judged(
                     &mut judged,
                     agent,
@@ -90,3 +84,14 @@ pub(crate) fn admit(
         None => Ok(()),
     }
 }
+
+fn names_grantors(error: &GrantError) -> bool {
+    matches!(
+        error,
+        GrantError::NotHeld { .. } | GrantError::Revoked { .. } | GrantError::Expired { .. }
+    )
+}
+
+#[cfg(test)]
+#[path = "route_refusal_tests.rs"]
+mod tests;

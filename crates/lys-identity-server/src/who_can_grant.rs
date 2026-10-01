@@ -194,9 +194,39 @@ pub(crate) fn for_judged(
     Ok(answer)
 }
 
-/// Add grantor names while retaining the grant refusal's ordinary HTTP answer.
+/// An authority refusal that may name eligible grantors.
+pub enum AuthorityRefusal<'a> {
+    /// The grants authority refused the call.
+    Grant(GrantError),
+    /// The route's responsibility remains with a person.
+    ResponsibilityKept {
+        /// The refused route.
+        route: &'a str,
+    },
+}
+
+impl From<GrantError> for AuthorityRefusal<'_> {
+    fn from(error: GrantError) -> Self {
+        Self::Grant(error)
+    }
+}
+
+/// Add grantor names while retaining the refusal's ordinary HTTP answer.
 #[must_use]
-pub fn refusal(error: GrantError, holders: &[CanGrant]) -> Response {
+pub fn refusal<'a>(error: impl Into<AuthorityRefusal<'a>>, holders: &[CanGrant]) -> Response {
+    let error = match error.into() {
+        AuthorityRefusal::Grant(error) => error,
+        AuthorityRefusal::ResponsibilityKept { route } => {
+            return (
+                axum::http::StatusCode::FORBIDDEN,
+                Json(serde_json::json!({
+                    "refusal":"ResponsibilityKept", "reason":"a person keeps this responsibility",
+                    "fields":{"route":route}, "can_grant":[],
+                })),
+            )
+                .into_response();
+        }
+    };
     let error = ServerError::from(error);
     (
         error.status(),
