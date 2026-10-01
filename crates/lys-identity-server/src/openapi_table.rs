@@ -210,6 +210,8 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]];
+    GET "/mcp" "MCP server stream availability" G [SIGNED];
+    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
 };

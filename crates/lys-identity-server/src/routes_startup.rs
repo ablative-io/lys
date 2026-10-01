@@ -206,6 +206,14 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             .layer(axum::Extension(catalogue))
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );
+    let dispatcher = api.clone().layer(axum::middleware::from_fn_with_state(
+        Arc::clone(&state),
+        crate::operator::guard,
+    ));
+    let api = api.merge(guarded(crate::mcp_endpoint::routes(
+        dispatcher,
+        &crate::sign_in::lys_origin(config)?,
+    )?));
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir, api)?,
         None => api,

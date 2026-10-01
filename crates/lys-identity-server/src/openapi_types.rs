@@ -122,7 +122,10 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
     let people = api.schema::<PeopleView>();
     let agent = api.schema::<AgentView>();
     api.schema::<SignedInView>();
+    let mcp = api.schema::<crate::mcp_endpoint::Envelope>();
     vec![
+        (GET, "/mcp", None, Some(mcp.clone())),
+        (POST, "/mcp", Some(mcp.clone()), Some(mcp)),
         (
             GET,
             "/changes",
