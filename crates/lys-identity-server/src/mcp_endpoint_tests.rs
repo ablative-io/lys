@@ -114,7 +114,7 @@ async fn a_signed_mcp_call_cannot_borrow_an_administrator_cookie() -> Result<(),
         .body(bytes)
         .send()
         .await?;
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     let refused: Value = response.json().await?;
     assert_eq!(refused["refusal"], "AgentSignatureRefused", "{refused}");
     assert!(
