@@ -30,9 +30,8 @@ impl PtyChild {
     }
 
     pub(super) fn wait(&mut self) -> Result<ExitStatus, Box<dyn Error>> {
-        Ok(self
-            .held
-            .child
+        let child: &mut dyn portable_pty::Child = self.held.child.as_mut();
+        Ok(child
             .downcast_mut::<Child>()
             .ok_or("NativePtyChildMissing")?
             .wait()?)
