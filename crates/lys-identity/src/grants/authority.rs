@@ -47,6 +47,9 @@ pub struct ExerciseRequest {
     pub action: Action,
 }
 
+/// The reason a one-time grant's revocation names.
+pub const ONE_TIME_SPENT: &str = "a one-time grant is spent by its first use";
+
 /// A request to revoke a grant, and with it everything derived from it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevokeRequest {
@@ -377,6 +380,45 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
         }
         permit.use_event = Some(used);
+        Ok(permit)
+    }
+
+    /// [`Grants::check`] for a grant that may be one-time: when `once` names
+    /// the permitted grant, its use must be recorded and the grant is then
+    /// revoked by its issuer before this answers, so it admits exactly one
+    /// exercise. A one-time use that cannot be recorded is refused.
+    pub fn check_once(
+        &mut self,
+        directory: &Projection,
+        request: &ExerciseRequest,
+        at: u64,
+        at_least: Option<u64>,
+        once: &dyn Fn(GrantId) -> bool,
+    ) -> Result<Permit, GrantError> {
+        let permit = self.check(directory, request, at, at_least)?;
+        if !once(permit.grant) {
+            return Ok(permit);
+        }
+        if let Some(Err(error)) = &permit.use_event {
+            return Err(error.clone());
+        }
+        let issuer = self
+            .book
+            .grant(permit.grant)
+            .ok_or_else(|| GrantError::GrantUnknown {
+                grant: permit.grant.to_string(),
+            })?
+            .parts()
+            .issuer;
+        self.commit(GrantEvent::new(
+            OperationId::generate()?,
+            issuer,
+            at,
+            GrantChange::Revoke {
+                grant: permit.grant,
+                reason: ONE_TIME_SPENT.to_owned(),
+            },
+        )?)?;
         Ok(permit)
     }
 

@@ -30,7 +30,7 @@ pub mod types;
 pub mod usage;
 
 pub use admission::{DelegateRequest, RootRequest, Route};
-pub use authority::{ExerciseRequest, Grants, Permit, Recorded, RevokeRequest};
+pub use authority::{ExerciseRequest, Grants, ONE_TIME_SPENT, Permit, Recorded, RevokeRequest};
 pub use cannot_give::{
     CannotGiveItem, CannotGiveList, CannotGiveReason, CannotGiveRequest, CannotGiveSubject,
     SERVICE_ACCOUNT,
