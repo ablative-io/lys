@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
 import { StartAgent } from '../runtime/StartAgent';
@@ -7,12 +8,21 @@ import type { PeopleView } from '../../generated';
 export function ProfileEditor({ id, profile, choices, people, readOnly = false }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
 }) {
+  return <ProfileFields profile={profile} choices={choices} render={(fields, settings, refusal) => <section className="card" aria-label="Start this agent">
+    {fields}<StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} known={{ people, machines: choices.machines }} />
+  </section>} />;
+}
+
+export function ProfileFields({ profile, choices, strict = false, render }: {
+  profile: ProvisioningProfile | null; choices: Choices; strict?: boolean;
+  render: (fields: ReactNode, settings: Record<string, unknown>, refusal: string) => ReactNode;
+}) {
   const available = choices.programs ?? [];
   const [programName, setProgram] = useState(profile?.harness?.name ?? (available.length === 1 ? available[0].name : choices.programs?.length === 1 ? choices.programs[0].name : ''));
   const program = choices.programs?.find((entry) => entry.name === programName);
-  const [model, setModel] = useState(profile?.model_access[0] ?? program?.models[0]?.id ?? '');
-  const [mode, setMode] = useState(profile?.permissions?.default_mode ?? program?.modes[0]?.id ?? '');
-  const [prompt, setPrompt] = useState(profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
+  const [model, setModel] = useState(profile?.model_access[0] ?? (strict && program?.models.length !== 1 ? '' : program?.models[0]?.id ?? ''));
+  const [mode, setMode] = useState(profile?.permissions?.default_mode ?? (strict && program?.modes.length !== 1 ? '' : program?.modes[0]?.id ?? ''));
+  const [prompt, setPrompt] = useState(strict ? profile?.instructions_mode ?? (program?.instructions_modes?.length === 1 ? program.instructions_modes[0] : '') : profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
   const [promptChanged, setPromptChanged] = useState(false);
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
   const builds = program?.builds ?? [];
@@ -41,10 +51,10 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false }
     ...(profile?.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
     ...(profile?.session ? { session: profile.session } : {}),
   };
-  return <section className="card" aria-label="Start this agent">
+  const fields = <>
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = choices.programs?.find((entry) => entry.name === event.target.value);
-      setProgram(event.target.value); setModel(next?.models[0]?.id ?? ''); setMode(next?.modes[0]?.id ?? ''); setPrompt('keep'); setPromptChanged(true);
+      setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setMode(strict && next?.modes.length !== 1 ? '' : next?.modes[0]?.id ?? ''); setPrompt(strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
       setBuild(next?.builds.length === 1 ? next.builds[0].program + '\n' + next.builds[0].package : '');
       setProgramPath('');
     }}>
@@ -55,9 +65,9 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false }
     {build === 'another' ? <label className="field">Program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
     <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
     <label className="field">What this agent may do<select name="mode" value={mode} onChange={(event) => setMode(event.target.value)}>{!program?.modes.some((entry) => entry.id === mode) ? <option value={mode}>{mode || 'Choose a mode'}</option> : null}{program?.modes.map((entry) => <option key={entry.id} value={entry.id}>{entry.meaning}</option>)}</select></label>
-    <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
-    {prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
+    <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
+    {prompt && prompt !== 'keep' ? <label className="field">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
     <p>Lys makes this agent’s own folder when it starts.</p>
-    <StartAgent agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} known={{ people, machines: choices.machines }} />
-  </section>;
+  </>;
+  return render(fields, settings, refusal);
 }
