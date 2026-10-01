@@ -357,3 +357,179 @@ async fn a_granted_agent_adds_an_operated_member_and_creates_only_under_a_held_p
     assert_eq!(answer["refusal"], "HoldingNotHeld", "{answer}");
     Ok(())
 }
+
+#[test]
+fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
+    use crate::apps_bench_scratch::memory::MemoryStore;
+    use crate::apps_store::AppStore;
+    use crate::grants::{Decision, Judged, decide};
+    use crate::spicedb::Relationships;
+    use lys_identity::grants::{
+        Action, DelegateRequest, ExerciseRequest, GrantChange, GrantId, Grants,
+        MemoryRelationships, Model, PassOn, RecipientKind, Relation, Resource, RootRequest, Route,
+        Window,
+    };
+    let directory_leaves = MemoryStore::empty();
+    let mut directory = Directory::open(
+        Box::new(move || MemoryStore::open(Arc::clone(&directory_leaves), "directory")),
+        Ed25519Identity::ephemeral(),
+    )?;
+    let binding = LoginBinding::new("https://issuer.test", "owner")?;
+    let owner = Actor::new(binding.clone(), Provenance::new(AuthMethod::Oidc, 1));
+    let (person, _) = directory.setup_person(
+        owner.clone(),
+        OperationId::generate()?,
+        Profile::new("Owner")?,
+        1,
+    )?;
+    let (agent, _) = directory.register_agent(
+        owner.clone(),
+        OperationId::generate()?,
+        person,
+        Profile::new("Caller")?,
+        2,
+    )?;
+    directory.transition(
+        owner,
+        OperationId::generate()?,
+        IdentityId::Agent(agent),
+        Transition::Activate,
+        "",
+        3,
+    )?;
+    let projection = directory.projection()?;
+    let model = Model::new(
+        1,
+        [
+            (Relation::new("writer")?, [Action::new("write")?].into()),
+            (Relation::new("operator")?, [Action::new("operate")?].into()),
+        ],
+    )?;
+    let grant_leaves = MemoryStore::empty();
+    let mut grants = Grants::open(
+        Box::new(move || MemoryStore::open(Arc::clone(&grant_leaves), "grants")),
+        Ed25519Identity::ephemeral(),
+        Relationships::Memory(MemoryRelationships::default()),
+        model,
+        person,
+    )?;
+    let app_leaves = MemoryStore::empty();
+    let mut apps = AppStore::over(
+        Box::new(move || MemoryStore::open(Arc::clone(&app_leaves), crate::apps_store::ORIGIN)),
+        Arc::new(Ed25519Identity::ephemeral()),
+    )?;
+    let give = |grants: &mut Grants<MemoryStore, Relationships>,
+                resource: Resource,
+                relation: &str,
+                action: &str|
+     -> TestResult<GrantId> {
+        let root = grants.issue_root(
+            projection,
+            &RootRequest {
+                operation: OperationId::generate()?,
+                caller: IdentityId::Person(person),
+                route: Route::Api,
+                holder: person,
+                resource: resource.clone(),
+                relation: Relation::new(relation)?,
+                pass_on: PassOn::To {
+                    actions: [Action::new(action)?].into(),
+                    recipients: [RecipientKind::Agent].into(),
+                },
+                window: Window::new(0, None)?,
+            },
+            4,
+        )?;
+        let GrantChange::Issue(root) = root.event.change() else {
+            return Err("root grant was not issued".into());
+        };
+        let given = grants.delegate(
+            projection,
+            &DelegateRequest {
+                operation: OperationId::generate()?,
+                caller: IdentityId::Person(person),
+                route: Route::Api,
+                source: root.id(),
+                recipient: IdentityId::Agent(agent),
+                responsible: person,
+                resource,
+                relation: Relation::new(relation)?,
+                pass_on: PassOn::UseOnly,
+                window: Window::new(0, None)?,
+            },
+            4,
+        )?;
+        let GrantChange::Issue(given) = given.event.change() else {
+            return Err("member grant was not issued".into());
+        };
+        Ok(given.id())
+    };
+    let team = Resource::new("team", "team")?;
+    let team_grant = give(&mut grants, team.clone(), "writer", "write")?;
+    let actor = Actor::new(binding, Provenance::new(AuthMethod::AgentPass(agent), 5));
+    let mut judged = Judged {
+        directory: projection,
+        grants: &mut grants,
+        root: person,
+        apps: &mut apps,
+    };
+    decide(
+        &mut judged,
+        &ExerciseRequest {
+            caller: IdentityId::Agent(agent),
+            route: Route::Api,
+            resource: team,
+            action: Action::new("write")?,
+        },
+        5,
+        None,
+        Decision::Exercise,
+    )?;
+    let member = ExerciseRequest {
+        caller: IdentityId::Agent(actor.provenance().agent().ok_or("pass caller absent")?),
+        route: Route::Api,
+        resource: Resource::new("agent", "member")?,
+        action: Action::new("operate")?,
+    };
+    let revision = judged.grants.revision();
+    for decision in [Decision::Explain, Decision::Exercise] {
+        let answer = super::giving::decide_member(&mut judged, &member, 5, decision);
+        assert!(
+            matches!(
+                answer,
+                Err(lys_identity::grants::GrantError::NotHeld { .. })
+            ),
+            "team write substituted for member operate: {answer:?}"
+        );
+    }
+    assert_eq!(judged.grants.revision(), revision);
+    let member_grant = give(
+        judged.grants,
+        member.resource.clone(),
+        "operator",
+        "operate",
+    )?;
+    let revision = judged.grants.revision();
+    super::giving::decide_member(&mut judged, &member, 5, Decision::Explain)?;
+    assert_eq!(judged.grants.revision(), revision);
+    super::giving::decide_member(&mut judged, &member, 5, Decision::Exercise)?;
+    assert_eq!(
+        judged
+            .grants
+            .book()
+            .record(member_grant)
+            .ok_or("member grant missing")?
+            .uses(),
+        1
+    );
+    assert_eq!(
+        judged
+            .grants
+            .book()
+            .record(team_grant)
+            .ok_or("team grant missing")?
+            .uses(),
+        1
+    );
+    Ok(())
+}
