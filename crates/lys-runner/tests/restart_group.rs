@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
 use std::os::unix::process::ExitStatusExt;
@@ -15,6 +16,114 @@ use lys_runner::{EndedHow, Launch, Sessions};
 use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn process(pid: u32) -> Result<rustix::process::Pid, Box<dyn Error>> {
+    rustix::process::Pid::from_raw(i32::try_from(pid)?)
+        .ok_or_else(|| "FixtureProcessIdInvalid".into())
+}
+
+struct OrphanedChild {
+    leader: lys_runner::pty::Spawned,
+    child: u32,
+    input: Option<File>,
+    output: Option<BufReader<File>>,
+    closed: bool,
+}
+
+impl OrphanedChild {
+    fn start(dir: &std::path::Path) -> Result<Self, Box<dyn Error>> {
+        let input = dir.join("input");
+        let output = dir.join("output");
+        let made = Command::new("/usr/bin/mkfifo")
+            .args([&input, &output])
+            .status()?;
+        if !made.success() {
+            return Err(format!("FixturePipesFailed: {made}").into());
+        }
+        let arguments = vec![
+            "-c".to_owned(),
+            "/bin/sh -c 'trap \"\" HUP; printf \"%s\\n\" \"$$\"; IFS= read -r line; printf \"reply:%s\\n\" \"$line\"; IFS= read -r line' < \"$1\" > \"$2\" & wait".to_owned(),
+            "orphan-fixture".to_owned(),
+            input.to_string_lossy().into_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+        let leader = lys_runner::pty::spawn(&lys_runner::pty::Spawn {
+            program: "/bin/sh",
+            arguments: &arguments,
+            directory: "/",
+            environment: &BTreeMap::new(),
+            columns: 80,
+            rows: 24,
+        })?;
+        let mut held = Self {
+            leader,
+            child: 0,
+            input: None,
+            output: None,
+            closed: false,
+        };
+        held.input = Some(OpenOptions::new().write(true).open(input)?);
+        let mut pipe = BufReader::new(File::open(output)?);
+        let mut ready = String::new();
+        pipe.read_line(&mut ready)?;
+        held.child = ready.trim().parse()?;
+        process(held.child)?;
+        held.output = Some(pipe);
+        Ok(held)
+    }
+
+    fn end_leader(&mut self) -> TestResult {
+        rustix::process::kill_process(process(self.leader.pid)?, rustix::process::Signal::KILL)?;
+        self.leader.child.wait()?;
+        Ok(())
+    }
+
+    fn answers(&mut self) -> Result<bool, Box<dyn Error>> {
+        let sent = self
+            .input
+            .as_mut()
+            .ok_or("FixtureInputMissing")?
+            .write_all(b"alive\n");
+        match sent {
+            Ok(()) => {
+                let mut answer = String::new();
+                self.output
+                    .as_mut()
+                    .ok_or("FixtureOutputMissing")?
+                    .read_line(&mut answer)?;
+                Ok(answer == "reply:alive\n")
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(false),
+            Err(error) => Err(format!("OrphanProbeFailed: {error}").into()),
+        }
+    }
+
+    fn close(&mut self) -> TestResult {
+        if !self.closed {
+            match rustix::process::kill_process_group(
+                process(self.leader.pid)?,
+                rustix::process::Signal::KILL,
+            ) {
+                Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+                Err(error) => return Err(format!("OrphanCleanupFailed: {error}").into()),
+            }
+            self.leader.child.wait()?;
+            if let Some(output) = &mut self.output {
+                std::io::copy(output, &mut std::io::sink())?;
+            }
+            self.closed = true;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for OrphanedChild {
+    fn drop(&mut self) {
+        if let Err(error) = self.close() {
+            eprintln!("OrphanCleanupFailed: {error}");
+        }
+    }
+}
 
 struct BlockedChild {
     child: Child,
@@ -198,6 +307,54 @@ fn a_restart_ends_only_a_group_with_its_recorded_start_identity() -> TestResult 
     assert_eq!(ended.status, None);
     assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
     assert_eq!(ended.reason, None);
+    Ok(())
+}
+
+#[test]
+fn a_restart_ends_an_orphaned_member_and_preserves_an_unrelated_group() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut orphan = OrphanedChild::start(dir.path())?;
+    let mut unrelated = BlockedChild::start()?;
+    let pid = orphan.leader.pid;
+    let child_session = rustix::process::getsid(Some(process(orphan.child)?))?;
+    let child_group = rustix::process::getpgid(Some(process(orphan.child)?))?;
+    record_group(
+        dir.path(),
+        pid,
+        Leader {
+            pid,
+            start: start_identity(pid)?,
+        },
+    )?;
+    orphan.end_leader()?;
+    let restarted = Sessions::open(dir.path(), 4096)?;
+    let status = restarted.status(None)?;
+    let ended = status.sessions[0]
+        .ended
+        .as_ref()
+        .ok_or("RestartEndMissing")?;
+    let orphan_survived = orphan.answers()?;
+    let unrelated_survived = unrelated.answers()?;
+    orphan.close()?;
+    unrelated.close()?;
+    assert_eq!(
+        child_session,
+        process(pid)?,
+        "the child belongs to the recorded session"
+    );
+    assert_eq!(
+        child_group,
+        process(pid)?,
+        "the child retained its leader's group"
+    );
+    assert!(
+        !orphan_survived,
+        "the owned child must end after its leader has exited"
+    );
+    assert!(unrelated_survived, "another group must survive the restart");
+    assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
+    assert_eq!(ended.status, None);
+    assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
     Ok(())
 }
 
