@@ -39,7 +39,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::{Arc, RwLock};
 
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
@@ -101,16 +101,25 @@ impl GrantSetup {
     }
 
     /// Lys's own model as the apps log last gave it.
-    pub fn model(&self) -> Model {
-        self.model
+    pub fn model(&self) -> Result<Model, ServerError> {
+        Ok(self
+            .model
             .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+            .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                reason: format!("the app model lock is poisoned: {error}"),
+            })?
+            .clone())
     }
 
     /// Hold `model` as Lys's own model from now on.
-    pub fn hold_model(&self, model: Model) {
-        *self.model.write().unwrap_or_else(PoisonError::into_inner) = model;
+    pub fn hold_model(&self, model: Model) -> Result<(), ServerError> {
+        *self
+            .model
+            .write()
+            .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                reason: format!("the app model lock is poisoned: {error}"),
+            })? = model;
+        Ok(())
     }
 
     fn open(&self, root_authority: PersonId, model: Model) -> Result<GrantState, ServerError> {
@@ -207,7 +216,7 @@ fn with_directory_grants_model<A, T>(
         let administrator =
             state
                 .admission
-                .administrator_login()
+                .administrator_login()?
                 .ok_or(ServerError::NotAdmitted {
                     reason: "no administrator is set up yet, so there is no root authority to judge a grant under",
                 })?;
@@ -216,12 +225,23 @@ fn with_directory_grants_model<A, T>(
             .ok_or(ServerError::NotAdmitted {
                 reason: "the configured administrator's login is bound to no person, so there is no root authority to judge a grant under",
             })?;
-        let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut apps =
+            state
+                .apps
+                .lock()
+                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                    reason: format!("the apps lock is poisoned: {error}"),
+                })?;
         apps.settle()?;
         if require_model {
             state.grant_setup.require_model(apps.model_revision())?;
         }
-        let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut slot = state
+            .grants
+            .lock()
+            .map_err(|error| GrantError::LogUnavailable {
+                reason: format!("the grants lock is poisoned: {error}"),
+            })?;
         let grants = if let Some(grants) = &mut *slot {
             grants
         } else {
@@ -355,7 +375,7 @@ async fn model(
     headers: HeaderMap,
 ) -> Result<Json<ModelView>, ServerError> {
     signed_in(&state, &headers)?;
-    Ok(Json(ModelView::from(&state.grant_setup.model())))
+    Ok(Json(ModelView::from(&state.grant_setup.model()?)))
 }
 
 async fn read(

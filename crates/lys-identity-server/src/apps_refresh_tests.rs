@@ -123,10 +123,10 @@ fn publication_refuses_a_model_that_moved_and_retry_publishes_the_current_one() 
         .err()
         .ok_or("stale publication admitted")?;
     assert_eq!(error.name(), "apps_unavailable");
-    assert_eq!(table.setup.model().version(), 1);
+    assert_eq!(table.setup.model()?.version(), 1);
     assert!(table.setup.require_model(2).is_err());
     table.refresh(|_, _| Ok(()))?;
-    assert_eq!(table.setup.model().version(), 2);
+    assert_eq!(table.setup.model()?.version(), 2);
     table.setup.require_model(2)?;
     Ok(())
 }
@@ -178,4 +178,29 @@ fn a_line_without_an_app_id_is_refused_by_name() {
         at: 1,
     }));
     assert_eq!(result, Err("this line names no app".to_owned()));
+}
+
+#[test]
+fn an_interrupted_model_change_refuses_reads_and_subsequent_publication() -> TestResult {
+    let table = Table::new()?;
+    let original = table.setup.model()?;
+    let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if let Ok(mut model) = table.setup.model.write() {
+            *model = original.clone();
+            panic!("model change interrupted");
+        }
+    }));
+    assert!(interrupted.is_err());
+    let read = table.setup.model().err().ok_or("poisoned model was read")?;
+    assert_eq!(read.name(), "apps_unavailable");
+    assert_eq!(read.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+    let write = table
+        .setup
+        .hold_model(original)
+        .err()
+        .ok_or("poisoned model was replaced")?;
+    assert_eq!(write.name(), "apps_unavailable");
+    assert_eq!(write.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+    assert!(table.setup.model().is_err());
+    Ok(())
 }

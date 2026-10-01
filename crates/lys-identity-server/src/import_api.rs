@@ -5,7 +5,7 @@
 //! remain administrator-only; a loader never becomes its owner to issue one.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
@@ -124,7 +124,9 @@ fn recorded_refusal(
         .and_then(|store| {
             store
                 .lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .map_err(|error| ServerError::ServiceAccountsUnavailable {
+                    reason: format!("the service accounts lock is poisoned: {error}"),
+                })?
                 .record_import_refusal(record)
         });
     let (audit, audit_failure, status) = match recorded {

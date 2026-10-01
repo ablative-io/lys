@@ -20,7 +20,7 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -80,8 +80,13 @@ impl Benches {
         })
     }
 
-    fn open(&self) -> std::sync::MutexGuard<'_, BTreeMap<String, Bench>> {
-        self.open.lock().unwrap_or_else(PoisonError::into_inner)
+    fn open(&self) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, Bench>>, ServerError> {
+        self.open.lock().map_err(|error| {
+            AppError::AppsUnavailable {
+                reason: format!("the benches lock is poisoned: {error}"),
+            }
+            .into()
+        })
     }
 }
 
@@ -205,10 +210,11 @@ async fn open(
     AppSchema::parse(&body.app, &body.schema).map_err(AppError::from)?;
     let (id, _) = new_secret()?;
     let dir = state.benches.dir.join(&id);
+    let mut benches = state.benches.open()?;
     std::fs::create_dir_all(&dir).map_err(|error| AppError::AppsUnavailable {
         reason: format!("the bench's namespace could not be made: {error}"),
     })?;
-    state.benches.open().insert(
+    benches.insert(
         id.clone(),
         Bench {
             app: body.app.clone(),
@@ -224,7 +230,7 @@ async fn open(
 fn bench(state: &AppState, id: &str, by: &By) -> Result<Bench, ServerError> {
     state
         .benches
-        .open()
+        .open()?
         .get(id)
         .filter(|bench| bench.opened_by == *by)
         .cloned()
@@ -257,7 +263,7 @@ async fn ask(
         answer_in(&draft, &examples)
     };
     let Some(settings) = engine else {
-        return answer(&state.grant_setup.model()).map(Json);
+        return answer(&state.grant_setup.model()?).map(Json);
     };
     with_engine(
         &state.benches.asking,
@@ -345,7 +351,7 @@ async fn close(
     bench(&state, &id, &by)?;
     let closed = state
         .benches
-        .open()
+        .open()?
         .remove(&id)
         .ok_or(AppError::BenchUnknown)?;
     std::fs::remove_dir_all(&closed.dir).map_err(|error| AppError::AppsUnavailable {
@@ -357,3 +363,7 @@ async fn close(
 #[cfg(test)]
 #[path = "apps_bench_lock_tests.rs"]
 mod lock_tests;
+
+#[cfg(test)]
+#[path = "apps_bench_poison_tests.rs"]
+mod poison_tests;

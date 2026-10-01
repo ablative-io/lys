@@ -291,7 +291,9 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
     let mut acts = state
         .acts
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+        .map_err(|error| ServerError::RuntimeUnavailable {
+            reason: format!("runner act store unavailable: {error}"),
+        })?;
     acts.keep(act)
 }
 
