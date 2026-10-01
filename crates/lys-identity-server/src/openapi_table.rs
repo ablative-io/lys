@@ -53,7 +53,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
-    POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld"]];
+    POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]];
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
