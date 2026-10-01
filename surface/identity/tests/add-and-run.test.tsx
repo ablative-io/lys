@@ -6,33 +6,41 @@ import { App } from '../src/App';
 import { $, serve, type } from './harness';
 import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import type { Answer, Route } from './fixtures';
-import type { NameMachine } from '../src/features/network/contract';
+import type { Machine, NameMachine } from '../src/features/network/contract';
 
 const agent = 'agent-' + 'f'.repeat(32);
 const prefix = '/agents/' + agent;
 const key = 'lys.add-and-run.' + ADA;
 const stages = ['register', 'activate', 'profile', 'review', 'machine', 'runner', 'start'] as const;
-type Stage = typeof stages[number];
-const words: Record<Stage, string> = { register: 'registering the agent', activate: 'activating the agent', profile: 'saving the settings', review: 'approving the settings', machine: 'adding this computer', runner: 'recording this computer’s runner', start: 'starting the agent' };
+type Stage = typeof stages[number] | 'admission';
+const words: Record<Stage, string> = { register: 'registering the agent', activate: 'activating the agent', profile: 'saving the settings', review: 'approving the settings', machine: 'adding this computer', runner: 'recording this computer’s runner', admission: 'allowing the agent on this computer', start: 'starting the agent' };
 const description = { models: { minimum: 1, maximum: 1, further_encoding: { kind: 'array' } }, permissions: { modes: ['default'], rule_forms: [] }, mcp: { transports: ['stdio'], working_directory: false, handle_variables: false, channel_policies: ['off'] }, rendering_contract: 'test' };
 const program = { name: 'Care program', line: 'Agent program', description, models: [{ id: 'care', label: 'Care model' }], modes: [{ id: 'default', meaning: 'Ask before changes' }], instructions_modes: ['keep'], builds: [{ name: 'Installed', program: '/opt/bin/care', package: 'care', from: 'runner' }] };
 let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; });
 
-function service(failure?: Stage, runnerState: 'running' | 'ended' | 'absent' = 'running') {
+function service(failure?: Stage, runnerState: 'running' | 'ended' | 'absent' = 'running', computers: Machine[] = []) {
   let profile: Record<string, unknown> | null = null;
   let computer: Record<string, unknown> | null = null;
   let session = '';
+  let sessionMachine = '';
+  let existing = computers.map((machine) => ({ ...machine, may_run: [...machine.may_run] }));
   let failed = false;
   const applied = new Map<string, Answer>();
   const routes: Record<string, Route> = { ...SERVICE,
-    '/openapi.json': ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { operation: {}, display_name: {} } } } } } } } } }),
-    '/network': () => ok({ machines: computer ? [computer] : [], reports_served: true }),
+    '/openapi.json': ok({ paths: {
+      '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { operation: {}, display_name: {} } } } } } } },
+      ...(computers.length ? { '/network/machines/{id}/agents': { post: {
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['operation', 'agent', 'allow'], properties: { operation: { type: 'string' }, agent: { type: 'string' }, allow: { type: 'boolean' } } } } } },
+        responses: { '200': { content: { 'application/json': { schema: { type: 'object', required: ['machine', 'recorded'], properties: { machine: { type: 'object' }, recorded: { type: 'object' } } } } } } },
+      } } } : {}),
+    } }),
+    '/network': () => ok({ machines: existing.length ? existing : computer ? [computer] : [], reports_served: true }),
     '/harnesses': ok({ programs: [program] }), '/skills': ok({ skills: [] }), '/secrets': ok({ secrets: [] }),
     ['/directory/agents/' + agent]: ok({ ...SCRIBE_VIEW, id: agent, display_name: 'Clover' }),
     [prefix + '/provisioning']: () => ok({ agent, profile, versions: [], enforced: false }),
-    [prefix + '/runtime/sessions']: () => ok({ sessions: session && runnerState === 'running' ? [{ agent, session, machine: computer?.id, machine_name: 'Ward computer', runtime: 'lys-runner', shown: 'running', last_report_at: 1, stopped: null, stop_asked_at: null }] : [] }),
+    [prefix + '/runtime/sessions']: () => ok({ sessions: session && runnerState === 'running' ? [{ agent, session, machine: sessionMachine, machine_name: computer?.name ?? existing.find((machine) => machine.id === sessionMachine)?.name, runtime: 'lys-runner', shown: 'running', last_report_at: 1, stopped: null, stop_asked_at: null }] : [] }),
   };
   const answer = (stage: Stage, body: unknown, build: () => Answer): Answer => {
     const stamp = stage + JSON.stringify(body);
@@ -57,8 +65,19 @@ function service(failure?: Stage, runnerState: 'running' | 'ended' | 'absent' = 
     routes['POST /network/machines/' + given.operation + '/runner'] = (runner) => answer('runner', runner, () => ok({ machine: given.operation, ...(runner as object) }));
     return ok(computer);
   });
+  for (const machine of computers) {
+    routes['/network/machines/' + machine.id + '/runner'] = ok({ machine: machine.id, runner: { kind: 'lys' } });
+    routes['POST /network/machines/' + machine.id + '/agents'] = (body) => answer('admission', body, () => {
+      const given = body as { operation: string; agent: string; allow: boolean };
+      const original = existing.find((entry) => entry.id === machine.id);
+      if (!original) throw new Error('The computer fixture is missing');
+      const current = { ...original, may_run: [...original.may_run, { id: given.agent, display_name: 'Clover', state: 'active' as const }] };
+      existing = existing.map((entry) => entry.id === machine.id ? current : entry);
+      return ok({ machine: current, recorded: { ...given, machine: machine.id, by: ADA, at: 1, original_may_run: original.may_run.map((entry) => entry.id) } });
+    });
+  }
   routes['POST ' + prefix + '/start-command'] = (body) => answer('start', body, () => {
-    const given = body as { operation: string; machine: string }; session = given.operation;
+    const given = body as { operation: string; machine: string }; session = given.operation; sessionMachine = given.machine;
     return ok({ agent, machine: given.machine, runtime: 'lys-runner', session, provisioning_version: 1, harness: program.name, handles: [], template: '{}', template_sha256: 'digest', command: 'care', left_out: [], executed: false,
       ...(runnerState === 'absent' ? {} : { runner: { session, state: runnerState, pid: 1, started_at: 1 } }) });
   });
@@ -80,6 +99,19 @@ async function remount(routes: Record<string, Route>) {
 async function names() {
   await type($('[name="display_name"]'), 'Clover');
   await type($('[name="computer_name"]'), 'Ward computer');
+}
+function existingComputer(digit = 'e', name = 'Front desk'): Machine {
+  return { id: 'op-' + digit.repeat(32), name, kind: 'Computer', runtime: 'lys-runner', slots: 0,
+    may_run: [{ id: SCRIBE_VIEW.id, display_name: SCRIBE_VIEW.display_name, state: 'active' }], may_run_roles: [], may_reach: [],
+    named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: 1 };
+}
+async function chooseComputer(value: string) {
+  const select = $('[name="computer"]');
+  if (!(select instanceof HTMLSelectElement)) throw new Error('The computer choice is missing');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(select, value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 }
 async function submit(twice = false) {
   const form = $('form[aria-label="Add an agent"]');
@@ -240,5 +272,110 @@ describe('Add and run on the first computer', () => {
     expect(($('[name="program"]') as HTMLSelectElement).value).toBe('');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
     expect(posted).toEqual([]);
+  });
+});
+
+describe('Add and run on an existing computer', () => {
+  it('uses six confirmed stages on the named computer without creating or assigning a role', async () => {
+    const computer = existingComputer();
+    const server = service(undefined, 'running', [computer]);
+    const { posted, requests } = await open(server.routes);
+    expect($('[name="computer_name"]')).toBeNull();
+    expect(document.body.textContent).toContain(computer.name);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    await type($('[name="display_name"]'), 'Clover');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    expect($('form button[type="submit"]')?.textContent).toBe('Add Clover and run it on this computer');
+    await submit(true);
+    expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines/' + computer.id + '/agents', prefix + '/start-command']);
+    expect(posted[4].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), agent, allow: true });
+    expect(posted[5].body).toMatchObject({ machine: computer.id });
+    expect(server.applied.size).toBe(6);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+    expect(document.body.textContent).toContain('Running, as its runner last reported');
+    expect($('a[href="#/runtime/' + (posted[5].body as { operation: string }).operation + '"]')).not.toBeNull();
+    expect(requests.filter((path) => path === '/network')).toHaveLength(1);
+  });
+
+  it.each(['admission', 'start'] as const)('replays the exact saved %s on the original computer after remount', async (stage) => {
+    const computer = existingComputer();
+    const server = service(stage, 'running', [computer]);
+    const first = await open(server.routes);
+    await type($('[name="display_name"]'), 'Clover'); await submit();
+    const index = stage === 'admission' ? 4 : 5;
+    expect(first.posted).toHaveLength(index + 1);
+    expect(sessionStorage.getItem(key)).not.toBeNull();
+    plain(stage);
+    const original = first.posted[index];
+    const next = await remount(server.routes); await submit();
+    expect(next.posted[0]).toEqual(original);
+    expect(next.posted).toHaveLength(6 - index);
+    expect(next.posted[next.posted.length - 1].body).toMatchObject({ machine: computer.id });
+    expect(server.applied.size).toBe(6);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+    expect(document.body.textContent).toContain('Running, as its runner last reported');
+  });
+
+  it.each([
+    { field: 'operation', value: 'op-' + '0'.repeat(32) },
+    { field: 'machine', value: 'op-' + '0'.repeat(32) },
+    { field: 'agent', value: SCRIBE_VIEW.id },
+    { field: 'allow', value: false },
+    { field: 'by', value: 'person-' + '0'.repeat(32) },
+  ])('does not start when the allowance receipt has a different $field', async ({ field, value }) => {
+    const computer = existingComputer();
+    const server = service(undefined, 'running', [computer]);
+    const path = 'POST /network/machines/' + computer.id + '/agents';
+    const route = server.routes[path];
+    if (typeof route !== 'function') throw new Error('The allowance fixture is missing');
+    server.routes[path] = (body) => {
+      const answer = route(body);
+      const payload = answer.body as { machine: Machine; recorded: Record<string, unknown> };
+      return ok({ ...payload, recorded: { ...payload.recorded, [field]: value } });
+    };
+    const { posted } = await open(server.routes);
+    await type($('[name="display_name"]'), 'Clover'); await submit();
+    expect(posted).toHaveLength(5);
+    expect(posted[4].path).toBe('/network/machines/' + computer.id + '/agents');
+    expect(location.hash).toBe('#/agents/new');
+    expect(sessionStorage.getItem(key)).not.toBeNull();
+    plain('admission', 'MachineAdmissionReceiptMismatch');
+    expect(document.body.textContent).not.toContain('Running, as its runner last reported');
+  });
+
+  it('requires an explicit computer choice when more than one local runner is served', async () => {
+    const first = existingComputer('a', 'Front desk');
+    const second = existingComputer('b', 'Ward computer');
+    const { posted } = await open(service(undefined, 'running', [first, second]).routes);
+    expect($('[name="computer_name"]')).toBeNull();
+    expect(($('[name="computer"]') as HTMLSelectElement).value).toBe('');
+    await type($('[name="display_name"]'), 'Clover');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(posted).toEqual([]);
+    await chooseComputer(second.id);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    await submit();
+    expect(posted).toHaveLength(6);
+    expect(posted[4].path).toBe('/network/machines/' + second.id + '/agents');
+    expect(posted[5].body).toMatchObject({ machine: second.id });
+    expect(location.hash).toBe('#/file/' + agent);
+  });
+
+  it.each([
+    { kind: 'socket', path: '/tmp/runner.sock' },
+    null,
+  ])('does not offer add and run when an in-use computer has no confirmed local runner', async (runner) => {
+    const computer = existingComputer();
+    const server = service(undefined, 'running', [computer]);
+    server.routes['/network/machines/' + computer.id + '/runner'] = ok({ machine: computer.id, runner });
+    const { posted } = await open(server.routes);
+    await type($('[name="display_name"]'), 'Clover');
+    expect($('[name="computer_name"]')).toBeNull();
+    expect($('form button[type="submit"]')?.textContent).not.toContain('and run');
+    expect(document.body.textContent).toContain('runner');
+    await submit();
+    expect(posted.filter((entry) => entry.path === '/network/machines' || entry.path.endsWith('/agents') && entry.path.startsWith('/network/') || entry.path.endsWith('/start-command'))).toEqual([]);
   });
 });
