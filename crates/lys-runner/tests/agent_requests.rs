@@ -14,6 +14,7 @@ mod tests {
     use lys_identity_server::certificates_store::{CertificateStore, Issued};
     use lys_identity_server::routes::open_directory;
     use lys_runner::dial::agent::{AgentClient, AgentLease, LeaseProof, Proof};
+    use lys_runner::dial::mcp::{McpClient, ToolCall};
     use lys_secrets::{
         Broker, BrokerPaths, Checked, EntryClass, Holder, IssuedHandle, LocalGrants, Presentation,
         Secret, SecretRelation, Used, new_operation_id, request_digest, to_hex,
@@ -315,7 +316,9 @@ mod tests {
         let lease = lease()?;
         let (broker, task) = broker_server(Arc::clone(&lease)).await?;
         let agent = table.agent.clone();
-        let path = format!("/agents/{agent}/runtime/sessions/op-00112233445566778899aabbccddeeff/reports?scope=exact");
+        let path = format!(
+            "/agents/{agent}/runtime/sessions/op-00112233445566778899aabbccddeeff/reports?scope=exact"
+        );
         let body=json!({"operation":operation()?,"state":"starting","machine":table.machine,"what":"request"}).to_string().into_bytes();
         let client = AgentClient::new(&table.service.base, &broker, None)?;
         let (answer, header) = tokio::task::spawn_blocking(move || {
@@ -404,6 +407,267 @@ mod tests {
             )
             .expect_err("mixed authority");
         assert_eq!(error.name(), "AgentCookieRefused");
+        Ok(())
+    }
+
+    async fn mcp_request(
+        headers: axum::http::HeaderMap,
+        body: axum::body::Bytes,
+    ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+        use sha2::{Digest, Sha256};
+        assert_eq!(headers.get_all("content-type").iter().count(), 1);
+        assert_eq!(headers["content-type"], "application/json");
+        assert_eq!(headers["accept"], "application/json, text/event-stream");
+        assert_eq!(headers["mcp-protocol-version"], "2025-11-25");
+        assert!(!headers.contains_key("cookie"));
+        let signature: Vec<_> = headers["lys-agent-signature"]
+            .to_str()
+            .expect("signature text")
+            .split(' ')
+            .collect();
+        assert_eq!(signature.len(), 4);
+        assert_eq!(signature[0], "agent.test");
+        let digest = lys_runner::protocol::hex(&Sha256::digest(&body));
+        let signed = format!(
+            "lys-identity/agent-request/v1\nPOST\n/mcp\n{digest}\n{}\n{}",
+            signature[1], signature[2]
+        );
+        let cose = lys_secrets::from_hex(signature[3]).expect("COSE hex");
+        lys_core::attestation::verify_attestation_bytes_by_signer(
+            &cose,
+            signed.as_bytes(),
+            &Ed25519Identity::from_seed(&[9; 32].into()).public_key_bytes(),
+        )
+        .expect("exact request verifies");
+        let value: serde_json::Value = serde_json::from_slice(&body).expect("RPC JSON");
+        assert_eq!(value["jsonrpc"], "2.0");
+        match value["method"].as_str().expect("RPC method") {
+            "tools/list" => {
+                assert_eq!(value["id"], 1);
+                assert!(value.get("params").is_none());
+            }
+            "tools/call" => {
+                if value["id"] == 2 {
+                    assert_eq!(
+                        value["params"],
+                        json!({"name":"change", "arguments":{
+                            "method":"POST", "path":"/agents/agent.test/reports?scope=exact",
+                            "body":{"message":"exact\nbytes", "number":3}
+                        }})
+                    );
+                } else {
+                    assert_eq!(value["id"], 3);
+                    assert_eq!(
+                        value["params"],
+                        json!({"name":"read", "arguments":{
+                            "method":"GET", "path":"/agents/agent.test"
+                        }})
+                    );
+                    return (
+                        axum::http::StatusCode::FORBIDDEN,
+                        axum::Json(json!({"refusal":"NotGranted", "reason":"no read grant"})),
+                    );
+                }
+            }
+            other => panic!("unexpected RPC method {other}"),
+        }
+        (
+            axum::http::StatusCode::OK,
+            axum::Json(
+                json!({"jsonrpc":"2.0", "id":value["id"], "result":{"received":value["method"]}}),
+            ),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mcp_list_and_call_sign_the_exact_json_rpc_requests() -> TestResult {
+        let lease = lease()?;
+        let (broker, broker_task) = broker_server(Arc::clone(&lease)).await?;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let server = format!("http://{}", listener.local_addr()?);
+        let app = axum::Router::new().route("/mcp", axum::routing::post(mcp_request));
+        let server_task = tokio::spawn(async move { axum::serve(listener, app).await });
+        tokio::task::spawn_blocking(move || -> Result<(), lys_runner::error::RunnerError> {
+            let client = McpClient::new(AgentClient::new(&server, &broker, None)?);
+            let lease = AgentLease {
+                agent: "agent.test",
+                secret: "agent-key",
+                proof: lease.as_ref(),
+            };
+            let listed = client.tools_list(&lease, 1, &[])?;
+            assert_eq!(listed.status, 200);
+            let value: serde_json::Value =
+                serde_json::from_slice(&listed.body).expect("list reply");
+            assert_eq!(value["result"]["received"], "tools/list");
+            let body = json!({"message":"exact\nbytes", "number":3});
+            let called = client.tools_call(
+                &lease,
+                2,
+                &ToolCall {
+                    name: "change",
+                    method: "POST",
+                    path: "/agents/agent.test/reports?scope=exact",
+                    body: Some(&body),
+                },
+                &[],
+            )?;
+            assert_eq!(called.status, 200);
+            let value: serde_json::Value =
+                serde_json::from_slice(&called.body).expect("call reply");
+            assert_eq!(value["result"]["received"], "tools/call");
+            let refused = client.tools_call(
+                &lease,
+                3,
+                &ToolCall {
+                    name: "read",
+                    method: "GET",
+                    path: "/agents/agent.test",
+                    body: None,
+                },
+                &[],
+            )?;
+            assert_eq!(refused.status, 403);
+            let value: serde_json::Value =
+                serde_json::from_slice(&refused.body).expect("refusal reply");
+            assert_eq!(
+                value,
+                json!({"refusal":"NotGranted", "reason":"no read grant"})
+            );
+            Ok(())
+        })
+        .await??;
+        broker_task.abort();
+        server_task.abort();
+        assert!(broker_task.await.expect_err("aborted").is_cancelled());
+        assert!(server_task.await.expect_err("aborted").is_cancelled());
+        Ok(())
+    }
+
+    struct NoProof;
+    impl LeaseProof for NoProof {
+        fn present(&self, _: &[u8]) -> Result<Proof, lys_runner::error::RunnerError> {
+            panic!("invalid MCP request reached signing")
+        }
+    }
+    #[test]
+    fn mcp_invalid_requests_and_cookies_never_reach_signing() -> TestResult {
+        let client = McpClient::new(AgentClient::new(
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:9",
+            None,
+        )?);
+        let lease = AgentLease {
+            agent: "agent.test",
+            secret: "agent-key",
+            proof: &NoProof,
+        };
+        assert_eq!(
+            client
+                .tools_list(&lease, 1, &[("Cookie", "administrator=fixture")])
+                .expect_err("cookie")
+                .name(),
+            "AgentCookieRefused"
+        );
+        assert_eq!(
+            client
+                .tools_call(
+                    &lease,
+                    2,
+                    &ToolCall {
+                        name: "read",
+                        method: "GET",
+                        path: "/agents",
+                        body: None,
+                    },
+                    &[("Cookie", "administrator=fixture")]
+                )
+                .expect_err("call cookie")
+                .name(),
+            "AgentCookieRefused"
+        );
+        for (name, method, path) in [
+            ("", "GET", "/agents"),
+            ("read", "TRACE", "/agents"),
+            ("read", "GET", "//other/agents"),
+            ("read", "GET", "/agents#fragment"),
+            ("read", "GET", "/agents\r\nInjected: value"),
+        ] {
+            let call = ToolCall {
+                name,
+                method,
+                path,
+                body: None,
+            };
+            assert_eq!(
+                client
+                    .tools_call(&lease, 1, &call, &[])
+                    .expect_err("invalid")
+                    .name(),
+                "McpRequestInvalid"
+            );
+        }
+        assert_eq!(
+            client
+                .tools_list(&lease, 1, &[("Content-Type", "text/plain")])
+                .expect_err("reserved metadata")
+                .name(),
+            "McpRequestInvalid"
+        );
+        let body = json!("x".repeat(2 * 1024 * 1024));
+        assert_eq!(
+            client
+                .tools_call(
+                    &lease,
+                    1,
+                    &ToolCall {
+                        name: "change",
+                        method: "POST",
+                        path: "/agents",
+                        body: Some(&body)
+                    },
+                    &[]
+                )
+                .expect_err("bounded")
+                .name(),
+            "McpRequestInvalid"
+        );
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mcp_revoked_lease_refuses_before_the_mcp_server_is_contacted() -> TestResult {
+        let lease = lease()?;
+        lease
+            .broker
+            .lock()
+            .expect("fixture broker")
+            .drop_handle(&lease.issued.id)?;
+        let (broker, task) = broker_server(Arc::clone(&lease)).await?;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        listener.set_nonblocking(true)?;
+        let server = format!("http://{}", listener.local_addr()?);
+        let name = tokio::task::spawn_blocking(move || {
+            let client = McpClient::new(AgentClient::new(&server, &broker, None)?);
+            let lease = AgentLease {
+                agent: "agent.test",
+                secret: "agent-key",
+                proof: lease.as_ref(),
+            };
+            Ok::<_, lys_runner::error::RunnerError>(
+                client
+                    .tools_list(&lease, 1, &[])
+                    .expect_err("revoked")
+                    .name(),
+            )
+        })
+        .await??;
+        assert_eq!(name, "HandleDropped");
+        assert_eq!(
+            listener.accept().expect_err("no upstream send").kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        task.abort();
+        assert!(task.await.expect_err("aborted").is_cancelled());
         Ok(())
     }
 }

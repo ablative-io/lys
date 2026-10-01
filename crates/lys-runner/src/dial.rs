@@ -28,6 +28,7 @@
 
 pub mod agent;
 mod dispatch;
+pub mod mcp;
 mod transport;
 
 use std::path::PathBuf;
