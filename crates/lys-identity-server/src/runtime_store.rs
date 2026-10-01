@@ -17,7 +17,7 @@
 //! snapshot and only the leaves after it. A snapshot refused, or a state that
 //! does not read back, sends the start to every leaf, by name, never silently.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -60,10 +60,18 @@ type Opened<S> = (FrontierLog<S>, Held, Start);
 #[derive(Clone, Default)]
 pub struct SessionActivity {
     live: usize,
+    sessions: BTreeSet<String>,
     stopped_at: Option<u64>,
 }
 
 impl SessionActivity {
+    pub(crate) fn unreported_session(&self, reported: impl Fn(&str) -> bool) -> Option<&str> {
+        self.sessions
+            .iter()
+            .find(|session| !reported(session))
+            .map(String::as_str)
+    }
+
     pub(crate) fn active_since(&self, since_ms: Option<i64>) -> bool {
         self.live > 0
             || since_ms.is_none_or(|since| {
@@ -192,13 +200,20 @@ impl<S: LeafStore> RuntimeStore<S> {
                 .agent
                 .as_ref()
                 .filter(|_| matches!(report.state, Reported::Starting | Reported::Stopped))
-                .map(|agent| (agent.clone(), report.state, report.at));
+                .map(|agent| {
+                    (
+                        agent.clone(),
+                        report.session.clone(),
+                        report.state,
+                        report.at,
+                    )
+                });
             if let Err(reason) = self.held.hold(report) {
                 self.uncertain = true;
                 return Err(unavailable(reason));
             }
-            if let Some((agent, state, at)) = transition
-                && let Err(error) = self.session_transition(agent, state, at)
+            if let Some((agent, session, state, at)) = transition
+                && let Err(error) = self.session_transition(agent, session, state, at)
             {
                 self.uncertain = true;
                 return Err(error);
@@ -236,6 +251,7 @@ impl<S: LeafStore> RuntimeStore<S> {
     fn session_transition(
         &mut self,
         agent: String,
+        session: String,
         state: Reported,
         at: u64,
     ) -> Result<(), ServerError> {
@@ -244,12 +260,18 @@ impl<S: LeafStore> RuntimeStore<S> {
             .or_default();
         match state {
             Reported::Starting => {
+                if !activity.sessions.insert(session) {
+                    return Err(unavailable("started session is already in the live index"));
+                }
                 activity.live = activity
                     .live
                     .checked_add(1)
                     .ok_or_else(|| unavailable("live session count overflows"))?;
             }
             Reported::Stopped => {
+                if !activity.sessions.remove(&session) {
+                    return Err(unavailable("stopped session is absent from the live index"));
+                }
                 activity.live = activity
                     .live
                     .checked_sub(1)
@@ -346,6 +368,11 @@ fn session_agents(held: &Held) -> Result<Arc<BTreeMap<String, SessionActivity>>,
                     .map_or(latest.at, |at| at.max(latest.at)),
             );
         } else {
+            if !activity.sessions.insert(tracked.session.clone()) {
+                return Err(unavailable(
+                    "a live session is repeated in the runtime state",
+                ));
+            }
             activity.live = activity
                 .live
                 .checked_add(1)
