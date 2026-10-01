@@ -46,6 +46,7 @@ use super::private_files;
 use crate::commands::output::Emitter;
 
 pub mod adopt;
+pub mod data_kept;
 pub mod intent;
 pub mod render;
 mod runner;

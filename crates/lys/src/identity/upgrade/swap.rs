@@ -31,7 +31,7 @@ use super::super::private_files;
 use super::intent::{Intent, Kept, Step};
 use super::render::RenderedFile;
 use super::runner::Restart;
-use super::{Engine, Unit, adopt, launch, record_build};
+use super::{Engine, Unit, adopt, data_kept, launch, record_build};
 
 fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityError {
     IdentityError::new(
@@ -291,6 +291,7 @@ fn swap_in(
 ) -> IdentityResult<()> {
     stop_all(units, say)?;
     intent.done(layout, Step::Stopped)?;
+    data_kept::keep(layout, intent)?;
     keep_binaries(layout, intent)?;
     place_binaries(layout, plan.from, plan.names, intent)?;
     keep_configuration(layout, intent)?;
@@ -351,6 +352,7 @@ pub fn back(
         rename(&kept_bin, &bin, "restore previous binaries")?;
         say("the previous binaries are back in bin/");
     }
+    data_kept::restore(layout, intent, say)?;
     if intent.has(Step::ConfigurationKept) {
         restore_configuration(layout, &intent.files)?;
         say("the previous configuration and compose files are back");

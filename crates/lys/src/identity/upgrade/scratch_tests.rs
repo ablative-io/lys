@@ -49,6 +49,11 @@ pub enum Behaviour {
     Serves,
     /// Exits before it is ready.
     ExitsEarly,
+    /// Says ready and keeps running, unless a later build migrated the
+    /// directory's data: then exits, as a build that cannot read it does.
+    ServesUnmigrated,
+    /// Migrates the directory's data, then exits before it is ready.
+    MigratesThenExits,
 }
 
 /// Writes the stub `name` answering `--version` with `commit` into `dir`.
@@ -60,6 +65,15 @@ pub fn stub(dir: &Path, name: &str, commit: &str, behaviour: Behaviour) -> TestR
              echo \"{name} {commit} ready\"\nexec cat \"$1\"\n"
         ),
         Behaviour::ExitsEarly => format!("echo \"{name} {commit} failing\"\nexit 3\n"),
+        Behaviour::ServesUnmigrated => format!(
+            "log=\"$(dirname \"$2\")/data/directory/log\"\n\
+             if grep -q migrated \"$log\"; then echo \"{name} {commit} cannot read migrated data\"; exit 4; fi\n\
+             echo \"{name} {commit} ready\"\nexec cat \"$1\"\n"
+        ),
+        Behaviour::MigratesThenExits => format!(
+            "echo migrated >> \"$(dirname \"$2\")/data/directory/log\"\n\
+             echo \"{name} {commit} failing\"\nexit 3\n"
+        ),
     };
     let script = format!(
         "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{name} 0.2.0 ({commit})\"; exit 0; fi\n{body}"

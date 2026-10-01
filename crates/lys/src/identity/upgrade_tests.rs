@@ -6,7 +6,7 @@
 use super::scratch::{
     A, B, Behaviour, Fixed, Recorder, Scratch, TestResult, build, package, ready_lines, stub,
 };
-use super::{Parts, upgrade, version};
+use super::{Parts, launch, record_build, upgrade, version};
 use crate::identity::error::ErrorKind;
 use crate::identity::install::layout::{BINARIES, Layout};
 
@@ -171,3 +171,44 @@ fn a_version_line_gives_its_commit_and_dirty_state() -> TestResult {
 
 #[path = "upgrade/runner_tests.rs"]
 mod runner;
+
+#[test]
+fn an_upgrade_that_fails_after_migrating_puts_back_the_data_and_the_previous_build_starts()
+-> TestResult {
+    let scratch = Scratch::laid_out()?;
+    stub(&scratch.layout.bin_dir(), BINARIES[0], A, Behaviour::Serves)?;
+    stub(
+        &scratch.layout.bin_dir(),
+        BINARIES[1],
+        A,
+        Behaviour::ServesUnmigrated,
+    )?;
+    for unit in &scratch.units {
+        assert!(launch(&scratch.layout, unit, false)?, "A did not start");
+    }
+    record_build(&scratch.layout, &BINARIES, &mut |_| {})?;
+    let before = scratch.untouchable()?;
+    let migrating = scratch.work().join("b");
+    stub(&migrating, BINARIES[0], B, Behaviour::Serves)?;
+    stub(&migrating, BINARIES[1], B, Behaviour::MigratesThenExits)?;
+    let mut said = Vec::new();
+    let refused = scratch
+        .upgrade(&migrating, None, &mut Recorder::default(), &mut said)
+        .err()
+        .ok_or("a service that exited was taken as ready")?;
+    assert_eq!(refused.kind(), ErrorKind::UpgradeFailed, "{refused}");
+    let service_log = std::fs::read_to_string(&scratch.units[1].log)?;
+    assert!(
+        service_log.contains(&format!("lys-identity-server {B} failing")),
+        "B ran and migrated: {service_log}"
+    );
+    assert_eq!(scratch.untouchable()?, before, "the data A last ran on");
+    assert_eq!(scratch.running()?, ready_lines(A), "{said:?}");
+    assert!(
+        said.iter()
+            .any(|line| line == "the data the previous build last ran on is back"),
+        "{said:?}"
+    );
+    assert!(!scratch.layout.upgrade_intent().exists());
+    Ok(())
+}

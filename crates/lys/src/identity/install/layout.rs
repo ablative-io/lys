@@ -173,6 +173,11 @@ impl Layout {
         self.root.join("data")
     }
 
+    /// The data an upgrade started from, kept for a put-back.
+    pub fn data_previous_dir(&self) -> PathBuf {
+        self.root.join("data.previous")
+    }
+
     /// The URL a person opens.
     pub fn service_url() -> String {
         format!("http://localhost:{SERVICE_PORT}")

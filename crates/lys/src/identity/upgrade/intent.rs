@@ -27,6 +27,8 @@ use super::super::private_files;
 pub enum Step {
     /// The service and then the broker were stopped.
     Stopped,
+    /// `data/` was copied whole to `data.previous/`.
+    DataKept,
     /// `bin/` was moved to `bin.previous/`.
     BinariesKept,
     /// Every new binary was placed in `bin/` and read back.
