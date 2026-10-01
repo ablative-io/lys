@@ -285,6 +285,9 @@ pub struct ReceiptView {
     pub version: u64,
     /// The identity that made the request.
     pub caller: String,
+    /// The boss whose source grant the responsible person passed on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_holder: Option<String>,
     /// The change kind's wire code.
     pub change_kind: u64,
     /// SHA-256 over the event body, as lowercase hex.
@@ -321,6 +324,7 @@ impl From<&Recorded> for RecordedView {
             receipt: ReceiptView {
                 version: receipt.version,
                 caller: receipt.caller.to_string(),
+                source_holder: None,
                 change_kind: receipt.change_kind,
                 payload_commitment: hex(&receipt.payload_commitment),
                 payload_commitment_hash: "sha-256",

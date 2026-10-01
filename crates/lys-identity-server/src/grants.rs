@@ -410,8 +410,37 @@ pub(crate) async fn delegate(
                 grant: request.source.to_string(),
             },
         )?;
+        let source_holder = judged
+            .grants
+            .book()
+            .grant(request.source)
+            .filter(|source| source.holder() != caller)
+            .map(|source| {
+                lys_identity::grants::admission::delegation_authority(
+                    judged.directory,
+                    source,
+                    caller,
+                    request.recipient,
+                )?;
+                let pending = crate::operator::upgrade_pending(&state).map_err(|error| {
+                    ServerError::DirectoryUnavailable {
+                        reason: format!("boss delegation cannot read upgrade intent: {error}"),
+                    }
+                })?;
+                if pending {
+                    return Err(ServerError::NotAdmitted {
+                        reason: "upgrade_pending: boss delegation waits until the upgrade commits",
+                    });
+                }
+                Ok(source.holder().to_string())
+            })
+            .transpose()?;
         match judged.grants.delegate(judged.directory, &request, now()) {
-            Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
+            Ok(recorded) => {
+                let mut answer = RecordedView::from(&recorded);
+                answer.receipt.source_holder = source_holder;
+                Ok(Json(answer))
+            }
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }
     })
@@ -587,8 +616,8 @@ async fn cannot_give(
         judged
             .grants
             .book()
-            .grant(request.source)
-            .filter(|source| source.holder() == caller)
+            .record(request.source)
+            .filter(|record| sees(&judged, caller, record))
             .ok_or(ServerError::GrantNotVisible)?;
         if !names_recipient(&judged, caller, request.recipient) {
             let unknown = ServerError::from(IdentityError::IdentityUnknown {

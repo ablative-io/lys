@@ -34,7 +34,7 @@ use std::fmt;
 
 use lys_log_store::LeafStore;
 
-use super::admission::{Route, effective};
+use super::admission::{Route, delegation_authority, effective};
 use super::authority::Grants;
 use super::error::GrantError;
 use super::model::Model;
@@ -202,12 +202,7 @@ pub fn cannot_give(
         .ok_or_else(|| GrantError::SourceUnknown {
             grant: request.source.to_string(),
         })?;
-    if source.holder() != request.caller {
-        return Err(GrantError::NotHolder {
-            caller: request.caller.to_string(),
-            grant: request.source.to_string(),
-        });
-    }
+    delegation_authority(directory, source, request.caller, request.recipient)?;
     if directory.record(request.recipient).is_none() {
         return Err(IdentityError::IdentityUnknown {
             identity: request.recipient.to_string(),
@@ -216,7 +211,7 @@ pub fn cannot_give(
     }
     let kind = RecipientKind::of(request.recipient);
     let mut items = Vec::new();
-    for record in book.held_by(request.caller) {
+    for record in book.held_by(source.holder()) {
         let grant = record.grant();
         if effective(book, directory, grant.id(), at).is_err() {
             continue;
@@ -243,7 +238,7 @@ pub fn cannot_give(
         .collect();
     for (relation, actions) in model.relations_on(source.resource().kind()) {
         let covered = book
-            .held_by(request.caller)
+            .held_by(source.holder())
             .map(GrantRecord::grant)
             .filter(|grant| grant.resource() == source.resource())
             .any(|grant| actions.is_subset(grant.actions()));
