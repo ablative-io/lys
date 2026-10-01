@@ -162,7 +162,7 @@ fn change(out: &mut Vec<u8>, value: &Change) {
 
 /// The actor's map: keys 1 to 4, and the agent's id under key 5 when an agent
 /// signed the request. An OIDC actor is written as it always was.
-fn actor(out: &mut Vec<u8>, value: &Actor) {
+pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
     let provenance = value.provenance();
     let principal = provenance
         .agent()
@@ -362,7 +362,7 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
 /// The actor an actor's map names: keys 1 to 4, and the agent's id under key
 /// 5 for an agent signature or service-account bearer. Code 3 without key 5
 /// is the operator; code 3 with a 16-byte key 5 is a service account.
-fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
+pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
     const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names a principal";
     let named = matches!(&value, Value::Map(pairs) if pairs.len() == 5);
     let ([issuer, subject, method, authenticated_at], agent) = if named {
