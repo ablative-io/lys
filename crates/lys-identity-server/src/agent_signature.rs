@@ -20,7 +20,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::http::HeaderMap;
 use lys_core::attestation::verify_attestation_bytes_by_signer;
-use lys_core::ca::certificate_subject_public_key;
 use lys_identity::projection::Projection;
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, Provenance};
 use sha2::{Digest, Sha256};
@@ -93,7 +92,7 @@ pub fn signed_agent(
         return Err(refused("the agent is not active"));
     }
     let signed = payload(method, path, body, signed_at, nonce);
-    let keys = certified_keys(state, &agent.to_string())?;
+    let keys = certified_keys(state, &agent.to_string(), now / 1000)?;
     let verified = keys
         .iter()
         .any(|key| verify_attestation_bytes_by_signer(&cose, &signed, key).is_ok());
@@ -118,18 +117,24 @@ pub fn signed_agent(
     Ok(Some(agent))
 }
 
-/// The keys of `agent`'s certificates that are not withdrawn.
-fn certified_keys(state: &AppState, agent: &str) -> Result<Vec<[u8; 32]>, ServerError> {
+/// The keys of the agent's currently valid, unwithdrawn certificates.
+fn certified_keys(state: &AppState, agent: &str, at: u64) -> Result<Vec<[u8; 32]>, ServerError> {
     let Some(store) = state.certificates.as_ref() else {
         return Err(refused("no certificate log is configured"));
     };
-    let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-    Ok(store
-        .certificates()
-        .filter(|entered| entered.issued.agent == agent && entered.withdrawn.is_none())
-        .filter_map(|entered| unbase64(&entered.issued.der))
-        .filter_map(|der| certificate_subject_public_key(&der).ok())
-        .collect())
+    let certificates = store
+        .lock()
+        .map_err(|error| ServerError::CertificatesUnavailable {
+            reason: format!("the certificate store is unavailable: {error}"),
+        })?
+        .signing_certificates(agent)?;
+    let mut keys = Vec::with_capacity(certificates.len());
+    for certificate in certificates {
+        if let Some(key) = certificate.key_at(at)? {
+            keys.push(key);
+        }
+    }
+    Ok(keys)
 }
 
 fn now_ms() -> Result<u64, ServerError> {
@@ -158,21 +163,4 @@ fn unhex(text: &str) -> Option<Vec<u8>> {
         .step_by(2)
         .map(|at| u8::from_str_radix(text.get(at..at + 2)?, 16).ok())
         .collect()
-}
-
-fn unbase64(text: &str) -> Option<Vec<u8>> {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = Vec::new();
-    let mut buffer = 0_u32;
-    let mut bits = 0_u32;
-    for letter in text.bytes().filter(|letter| *letter != b'=') {
-        let value = ALPHABET.iter().position(|known| *known == letter)?;
-        buffer = (buffer << 6) | u32::try_from(value).ok()?;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            out.push(u8::try_from((buffer >> bits) & 0xff).ok()?);
-        }
-    }
-    Some(out)
 }
