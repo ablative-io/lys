@@ -19,20 +19,21 @@ impl Overlay {
         self.teams.get(id)
     }
 
+    pub(super) fn view<'a>(&'a self, base: &'a Held, team: &'a Team) -> &'a Team {
+        self.teams
+            .get(&team.created.id)
+            .filter(|_| {
+                base.team(&team.created.id)
+                    .is_some_and(|first| std::ptr::eq(first, team))
+            })
+            .unwrap_or(team)
+    }
+
     pub(super) fn teams(&self, base: &Held) -> &[Team] {
         self.catalogue.get_or_init(|| {
             base.teams
                 .iter()
-                .map(|team| {
-                    self.teams
-                        .get(&team.created.id)
-                        .filter(|_| {
-                            base.team(&team.created.id)
-                                .is_some_and(|first| std::ptr::eq(first, team))
-                        })
-                        .unwrap_or(team)
-                        .clone()
-                })
+                .map(|team| self.view(base, team).clone())
                 .collect()
         })
     }

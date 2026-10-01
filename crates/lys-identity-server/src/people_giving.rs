@@ -61,11 +61,15 @@ fn admitted(team: &Team, member: &str) -> bool {
         && !team.held.iter().any(|held| held.member == member)
 }
 
-pub(crate) fn holds(teams: &[Team], agent: AgentId, person: PersonId) -> Result<(), ServerError> {
+pub(crate) fn holds<'a>(
+    teams: impl IntoIterator<Item = &'a Team>,
+    agent: AgentId,
+    person: PersonId,
+) -> Result<(), ServerError> {
     let agent = agent.to_string();
     let person = person.to_string();
     if teams
-        .iter()
+        .into_iter()
         .any(|team| admitted(team, &agent) && admitted(team, &person))
     {
         return Ok(());
@@ -117,7 +121,7 @@ pub(super) fn profile(
                 reason: format!("the teams lock is poisoned: {error}"),
             })?;
             teams.settle()?;
-            holds(teams.teams(), agent, person)?;
+            holds(teams.teams_iter(), agent, person)?;
             decide(&mut judged, &request, at, None, Decision::Exercise)?;
             Ok(teams)
         },

@@ -230,6 +230,15 @@ impl<S: LeafStore> TeamStore<S> {
             })
     }
 
+    /// Every effective team in creation order, borrowed without materializing a catalogue.
+    pub fn teams_iter(&self) -> impl Iterator<Item = &Team> {
+        self.held.teams.iter().map(|team| {
+            self.overlay
+                .as_ref()
+                .map_or(team, |overlay| overlay.view(&self.held, team))
+        })
+    }
+
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
         self.overlay

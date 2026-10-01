@@ -52,6 +52,60 @@ fn unhex(value: &str) -> TestResult<Vec<u8>> {
         .collect()
 }
 
+fn joined<T>(worker: std::thread::ScopedJoinHandle<'_, T>) -> T {
+    match worker.join() {
+        Ok(result) => result,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
+fn prepare_stores(
+    log: &std::path::Path,
+    key_file: &std::path::Path,
+    apps_dir: &std::path::Path,
+    certificates_dir: Option<&std::path::Path>,
+    teams_dir: Option<&std::path::Path>,
+    key: &Arc<Ed25519Identity>,
+) -> TestResult {
+    std::thread::scope(|scope| -> TestResult {
+        let configuration = scope.spawn(|| {
+            crate::configuration_store::ConfigurationStore::open(
+                &log.with_file_name("organisation"),
+                Arc::clone(key),
+            )
+        });
+        let acts = scope.spawn(|| {
+            crate::runner_acts::ActStore::open(&log.with_file_name("runner-acts"), Arc::clone(key))
+        });
+        let launches = scope.spawn(|| -> Result<_, Box<dyn Error + Send + Sync>> {
+            Ok(lys_identity::start::LaunchRecords::open(
+                &log.with_file_name("launch-records"),
+                Ed25519Identity::load(key_file)?,
+            )?)
+        });
+        let apps = scope.spawn(|| crate::apps_store::AppStore::open(apps_dir, Arc::clone(key)));
+        let certificates = scope.spawn(|| -> Result<_, Box<dyn Error + Send + Sync>> {
+            Ok(crate::certificates_store::CertificateStore::open(
+                certificates_dir.ok_or("certificate fixture is disabled")?,
+                Arc::clone(key),
+            )?)
+        });
+        let teams = scope.spawn(|| -> Result<_, Box<dyn Error + Send + Sync>> {
+            Ok(crate::teams_store::TeamStore::open(
+                teams_dir.ok_or("team fixture is disabled")?,
+                Arc::clone(key),
+            )?)
+        });
+        joined(configuration)?;
+        joined(acts)?;
+        joined(launches).map_err(|error| error as Box<dyn Error>)?;
+        joined(apps)?;
+        joined(certificates).map_err(|error| error as Box<dyn Error>)?;
+        joined(teams).map_err(|error| error as Box<dyn Error>)?;
+        Ok(())
+    })
+}
+
 struct Table {
     service: Service,
     client: reqwest::Client,
@@ -170,32 +224,13 @@ impl Table {
             },
             |config| {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-                crate::configuration_store::ConfigurationStore::open(
-                    &config.log_dir.with_file_name("organisation"),
-                    Arc::clone(&key),
-                )?;
-                crate::runner_acts::ActStore::open(
-                    &config.log_dir.with_file_name("runner-acts"),
-                    Arc::clone(&key),
-                )?;
-                lys_identity::start::LaunchRecords::open(
-                    &config.log_dir.with_file_name("launch-records"),
-                    Ed25519Identity::load(&config.event_key_file)?,
-                )?;
-                crate::apps_store::AppStore::open(&config.apps_dir(), Arc::clone(&key))?;
-                crate::certificates_store::CertificateStore::open(
-                    config
-                        .certificates_dir
-                        .as_deref()
-                        .ok_or("certificate fixture is disabled")?,
-                    Arc::clone(&key),
-                )?;
-                crate::teams_store::TeamStore::open(
-                    config
-                        .teams_dir
-                        .as_deref()
-                        .ok_or("team fixture is disabled")?,
-                    Arc::clone(&key),
+                prepare_stores(
+                    &config.log_dir,
+                    &config.event_key_file,
+                    &config.apps_dir(),
+                    config.certificates_dir.as_deref(),
+                    config.teams_dir.as_deref(),
+                    &key,
                 )?;
                 FileLeafStore::create(&config.log_dir, &config.log_origin)?;
                 let path = config.log_dir.clone();
