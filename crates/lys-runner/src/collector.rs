@@ -14,6 +14,8 @@ use crate::session::{Sessions, Table, accounts, append, now_ms};
 use crate::tracking::{Harness, Reading};
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
+pub(crate) mod status;
+
 #[cfg(test)]
 #[path = "../tests/collector_binding/cases.rs"]
 mod binding_tests;
@@ -63,7 +65,7 @@ impl Sessions {
     ) -> Result<String, RunnerError> {
         let result = match collected {
             Collected::Hook { event, input } => self.hook(id, event, input),
-            Collected::StatusLine { input } => self.status_line(id, input),
+            Collected::StatusLine { input } => return self.status_line(id, input),
             Collected::Notify { notification } => self.notified(id, notification),
         };
         self.writer.barrier()?;
@@ -199,6 +201,7 @@ impl Sessions {
         if held.as_ref().is_some_and(|held| held.path == path) {
             return Ok(format!("{path} is already bound"));
         }
+        status::flush_status(table, id)?;
         let offset = if from_start {
             0
         } else {
@@ -247,48 +250,6 @@ impl Sessions {
         append(table, id, bodies, Some(source))?;
         self.follow(table, id);
         Ok(words)
-    }
-
-    fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
-        let mut guard = self.lock();
-        let table = &mut *guard;
-        let session = table
-            .sessions
-            .get(id)
-            .ok_or_else(|| crate::session::unknown(id))?;
-        let Some(tracking) = session.guard.tracking.as_ref() else {
-            return Ok("the session is not tracked: nothing is kept".to_owned());
-        };
-        let Some(mut source) = table.feed.source(id).cloned() else {
-            return Ok("no stream is bound yet: the snapshot is not kept".to_owned());
-        };
-        if text(input, "session_id") != Some(source.bound.as_str()) {
-            return Err(RunnerError::refused(
-                "session_mismatch",
-                "the status line names another session than the one it is proved to be",
-            ));
-        }
-        let reading = Reading {
-            runner: self.runner(),
-            session: id,
-            tracking,
-            accounts: accounts(session, tracking),
-            now: now_ms(),
-        };
-        let record = format!("status-line:{id}:{}", table.feed.end());
-        let Some(body) = reading.status(&mut source, input, record) else {
-            return Ok("the snapshot repeats the last one kept".to_owned());
-        };
-        let bodies = vec![body];
-        let leader = crate::session::window_limit(table, id, &bodies);
-        append(table, id, bodies, Some(source))?;
-        drop(guard);
-        self.writer.barrier()?;
-        if let Some(leader) = leader {
-            crate::pty::end(&leader)?;
-        }
-        self.wake();
-        Ok("a context snapshot kept; it adds no spend".to_owned())
     }
 
     /// Keep a Codex after-turn notification: bind its thread's rollout the
@@ -373,7 +334,7 @@ impl Sessions {
         }
         self.read_source(id, None);
         let mut table = self.lock();
-        append(&mut table, id, vec![boundary("turn_end", turn)], None)?;
+        flushed_at(&mut table, self.runner(), id, "turn_end", turn)?;
         if let Some(session) = table.sessions.get_mut(id) {
             session.guard.idle = true;
         }
@@ -392,24 +353,42 @@ pub(crate) fn flushed(
     id: &str,
     name: &str,
 ) -> Result<(), RunnerError> {
-    let source = table.feed.source(id).cloned();
-    let pending = table.sessions.get(id).and_then(|session| {
-        let tracking = session.guard.tracking.as_ref()?;
-        let mut source = source.clone()?;
-        let reading = Reading {
-            runner,
-            session: id,
-            tracking,
-            accounts: accounts(session, tracking),
-            now: now_ms(),
-        };
-        let body = reading.flush(&mut source)?;
-        Some((body, source))
-    });
-    match pending {
-        Some((body, source)) => append(table, id, vec![body, boundary(name, None)], Some(source)),
-        None => append(table, id, vec![boundary(name, None)], None),
+    flushed_at(table, runner, id, name, None)
+}
+
+fn flushed_at(
+    table: &mut Table,
+    runner: &str,
+    id: &str,
+    name: &str,
+    turn: Option<String>,
+) -> Result<(), RunnerError> {
+    let mut source = table.feed.source(id).cloned();
+    let mut bodies = Vec::new();
+    if let Some(source) = &mut source {
+        if let Some(body) = status::pending(table, id, source)? {
+            bodies.push(body);
+        }
+        if let Some(session) = table.sessions.get(id) {
+            if let Some(tracking) = &session.guard.tracking {
+                let reading = Reading {
+                    runner,
+                    session: id,
+                    tracking,
+                    accounts: accounts(session, tracking),
+                    now: now_ms(),
+                };
+                if let Some(body) = reading.flush(source) {
+                    bodies.push(body);
+                }
+            }
+        }
     }
+    let commit = if bodies.is_empty() { None } else { source };
+    bodies.push(boundary(name, turn));
+    append(table, id, bodies, commit)?;
+    status::clear(table, id);
+    Ok(())
 }
 
 /// The directory name Claude Code keeps a working directory's sessions
