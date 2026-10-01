@@ -33,7 +33,7 @@ fn tracked(
         rotation: None,
         policy: None,
     })?;
-    let mut table = sessions.lock();
+    let mut table = sessions.lock()?;
     table
         .sessions
         .get_mut("session")
@@ -92,7 +92,7 @@ fn a_stream_wait_holds_no_session_table_lock() -> TestResult {
         .join()
         .map_err(|panic| format!("stream reader panicked: {panic:?}"))?;
     std::fs::remove_file(&path)?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert!(available, "transcript I/O held the global session table");
     Ok(())
 }
@@ -104,7 +104,7 @@ fn quoted_limit_words_with_a_forty_percent_status_do_not_rotate_claude() -> Test
     std::fs::write(&path, b"")?;
     let sessions = tracked(dir.path(), "printf 'ready\\n'; exec cat", &path)?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -127,7 +127,7 @@ fn quoted_limit_words_with_a_forty_percent_status_do_not_rotate_claude() -> Test
         },
     )?;
     let tripped = {
-        let mut table = sessions.lock();
+        let mut table = sessions.lock()?;
         let session = table.sessions.get_mut("session").ok_or("session missing")?;
         session
             .output
@@ -143,7 +143,7 @@ fn quoted_limit_words_with_a_forty_percent_status_do_not_rotate_claude() -> Test
             .ok_or("rotation missing")?
             .tripped()
     };
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert!(
         !tripped,
         "quoted terminal words rotated a structured Claude session"
@@ -165,8 +165,8 @@ fn an_ordinary_stop_counts_the_usage_written_on_term() -> TestResult {
     );
     let sessions = tracked(dir.path(), &script, &path)?;
     let ended = sessions.end("session", &AtomicBool::new(false))?;
-    let entries = sessions.lock().feed.page(None)?.entries;
-    sessions.stop_all();
+    let entries = sessions.lock()?.feed.page(None)?.entries;
+    sessions.stop_all()?;
     assert_eq!(ended.status, Some(0), "{ended:?}");
     assert!(
         entries
@@ -185,7 +185,7 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
     std::fs::write(&path, b"")?;
     let sessions = tracked(dir.path(), "printf 'ready\\n'; exec cat", &path)?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -206,7 +206,7 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
         },
     )?;
     let rotation = sessions
-        .lock()
+        .lock()?
         .sessions
         .get("session")
         .ok_or("session missing")?
@@ -215,7 +215,7 @@ fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
         .ok_or("rotation missing")?
         .clone();
     let tripped = rotation.tripped() || !rotation.moves().is_empty();
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert!(
         tripped,
         "the collector did not apply the declared account-window limit"

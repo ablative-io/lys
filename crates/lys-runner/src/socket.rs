@@ -287,7 +287,7 @@ impl Serving {
 
     /// Stop uses its held signal channel even after the listener path disappears.
     pub fn stop(self) -> Result<(), RunnerError> {
-        self.sessions.stop_all();
+        let stopped = self.sessions.stop_all();
         let sent = self.stop.send(true);
         #[cfg(test)]
         if let Some(probe) = self.shutdown_probe {
@@ -297,6 +297,7 @@ impl Serving {
             socket_failed(format!("the serving thread ended abnormally: {panic:?}"))
         })?;
         sent.map_err(socket_failed)?;
+        stopped?;
         self.sessions.writer.barrier()?;
         match std::fs::remove_file(&self.socket) {
             Ok(()) => Ok(()),
@@ -472,7 +473,10 @@ impl Cancellation {
         let table = self.sessions.lock();
         self.left.store(true, Ordering::SeqCst);
         self.sessions.wake();
-        drop(table);
+        match table {
+            Ok(table) => drop(table),
+            Err(error) => crate::error::said(&error.to_string()),
+        }
         if let Some(session) = &self.output_session {
             if let Err(error) = self.sessions.wake_session(session) {
                 crate::error::said(&format!(
@@ -552,12 +556,12 @@ async fn grant_channel(
     stream: &tokio::net::UnixStream,
     stop: &mut tokio::sync::watch::Receiver<bool>,
 ) -> Result<(), RunnerError> {
-    let channel = crate::refusals::Channel::new(sessions);
-    let ready = channel.ready();
+    let channel = crate::refusals::Channel::new(sessions)?;
+    let ready = channel.ready()?;
     let mut pending = Vec::new();
     while !*stop.borrow() {
         let notified = ready.notified();
-        let Some(question) = channel.next() else {
+        let Some(question) = channel.next()? else {
             tokio::select! {
                 () = notified => continue,
                 incoming = read_line(stream, &mut pending) => match incoming? {
@@ -767,7 +771,7 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
                         .map_or(Some(()), |more| more.then_some(()))
                 })?;
             }
-            let reader = sessions.lock().feed.reader();
+            let reader = sessions.lock()?.feed.reader();
             let page = reader.page(cursor.as_deref())?;
             Ok(Answer::Feed { page })
         }

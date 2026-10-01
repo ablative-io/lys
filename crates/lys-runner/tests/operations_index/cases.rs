@@ -84,7 +84,7 @@ fn an_expired_terminal_outcome_leaves_the_runner_heap() -> Result<(), Box<dyn Er
     let dir = tempfile::tempdir()?;
     old_install(dir.path(), 1)?;
     let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
-    assert!(sessions.lock().operations.get("notice-000000").is_none());
+    assert!(sessions.lock()?.operations.get("notice-000000").is_none());
     let log = std::fs::read(dir.path().join("operations.jsonl"))?;
     assert!(String::from_utf8(log)?.contains("notice-000000"));
     Ok(())
@@ -119,5 +119,69 @@ fn terminal_retention_ends_at_twenty_four_hours() -> Result<(), Box<dyn Error>> 
     operations.prune(super::RETAIN_MS + 1);
     assert!(operations.get("notice-000000").is_none());
     assert!(operations.repeated("notice-000000").is_err());
+    Ok(())
+}
+
+#[test]
+fn poisoned_session_state_refuses_operations_and_grant_channels() -> Result<(), Box<dyn Error>> {
+    use std::sync::{Arc, atomic::AtomicBool};
+
+    use crate::error::RunnerError;
+    use crate::refusals::{Channel, GrantAnswer, GrantQuestion};
+
+    fn poisoned<T>(result: Result<T, RunnerError>) -> Result<(), Box<dyn Error>> {
+        let error = result.err().ok_or("poisoned state was used")?;
+        assert_eq!(error.name(), "session_table_poisoned", "{error}");
+        Ok(())
+    }
+
+    let dir = tempfile::tempdir()?;
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    let channel = Channel::new(&sessions)?;
+    let held = Arc::clone(&sessions);
+    let poison = std::thread::spawn(move || {
+        let table = held.lock();
+        assert!(table.is_ok());
+        panic!("abandon the session state during a mutation");
+    });
+    assert!(poison.join().is_err());
+
+    poisoned(sessions.outcome("notice"))?;
+    poisoned(sessions.operate(super::Operation {
+        operation: "notice".to_owned(),
+        session: "session".to_owned(),
+        request: super::OperationRequest::Notice {
+            text: "message".to_owned(),
+        },
+    }))?;
+    poisoned(Channel::new(&sessions))?;
+    poisoned(channel.ready())?;
+    poisoned(channel.next())?;
+    let question = GrantQuestion {
+        attempt: "attempt".to_owned(),
+        session: "session".to_owned(),
+        agent: "agent".to_owned(),
+        policy_version: 1,
+        rule: "rule".to_owned(),
+        resource: crate::judge::NamedResource {
+            kind: "path".to_owned(),
+            id: "records".to_owned(),
+        },
+        action: "read".to_owned(),
+    };
+    let answer = GrantAnswer {
+        attempt: question.attempt.clone(),
+        session: question.session.clone(),
+        policy_version: question.policy_version,
+        rule: question.rule.clone(),
+        permitted: true,
+        grantor: None,
+        words: String::new(),
+    };
+    poisoned(channel.answer(&question, &serde_json::to_string(&answer)?))?;
+    let error = crate::refusals::ask(&sessions, question, &AtomicBool::new(false))
+        .err()
+        .ok_or("a grant was asked using poisoned state")?;
+    assert_eq!(error.name(), "session_table_poisoned", "{error}");
     Ok(())
 }

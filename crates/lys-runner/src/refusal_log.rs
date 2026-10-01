@@ -20,6 +20,7 @@ use std::sync::atomic::AtomicBool;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::error::RunnerError;
 use crate::judge::{Asked, Judgement, Needed, judge};
 use crate::peer::Leader;
 use crate::refusals::{JudgeAsk, REFUSAL_VERSION, RefusalRecord, Verdict, ask, question};
@@ -59,25 +60,61 @@ pub fn answer(
     asked: &JudgeAsk,
     left: &AtomicBool,
 ) -> Verdict {
-    let session = match crate::peer::prove(stream, &sessions.leaders()) {
-        Ok(session) => session,
+    let mut connection = crate::peer::Connection::default();
+    let proof = match crate::peer::peer_of(stream).and_then(|(pid, uid)| {
+        connection.proved_with(
+            sessions,
+            &crate::peer::System,
+            (pid, uid, crate::peer::own_user()),
+        )
+    }) {
+        Ok(proof) => proof,
         Err(unproved) => {
             return Verdict::denied(
-                "peer_unproved",
+                &unproved.name(),
                 format!("the asker is not proved to be a session of this runner: {unproved}"),
                 "not_attributed",
             );
         }
     };
-    let Some(guard) = sessions.guard(&session) else {
+    answer_proved(
+        sessions,
+        &proof.session,
+        proof.generation,
+        &proof.leader,
+        asked,
+        left,
+    )
+}
+
+pub(crate) fn answer_proved(
+    sessions: &Sessions,
+    session: &str,
+    generation: u64,
+    leader: &Leader,
+    asked: &JudgeAsk,
+    left: &AtomicBool,
+) -> Verdict {
+    let guard = match sessions.peer_guard(session, generation, leader) {
+        Ok(Some(guard)) => guard,
+        Ok(None) => {
+            return Verdict::denied(
+                "peer_unproved",
+                "the proved session changed before judging".to_owned(),
+                "not_attributed",
+            );
+        }
+        Err(error) => return unavailable(&error),
+    };
+    let Some(policy) = guard.policy else {
         return Verdict::pass(None);
     };
-    let Some(policy) = guard.policy.clone() else {
-        return Verdict::pass(None);
+    let attempt = attempt_of(session, asked);
+    let key = attempt_key(session, &attempt);
+    let reader = match sessions.read_lock() {
+        Ok(table) => table.feed.attempt_reader(&key),
+        Err(error) => return unavailable(&error),
     };
-    let attempt = attempt_of(&session, asked);
-    let key = attempt_key(&session, &attempt);
-    let reader = sessions.lock().feed.attempt_reader(&key);
     match reader.map_or(Ok(None), |reader| reader.attempt(&key)) {
         Ok(Some(record)) => return Verdict::of(&record, "reused"),
         Ok(None) => {}
@@ -110,7 +147,7 @@ pub fn answer(
             words,
         },
         Judgement::Ask { needed, target } => {
-            let who = (attempt.as_str(), session.as_str(), policy.agent.as_str());
+            let who = (attempt.as_str(), session, policy.agent.as_str());
             match lifted(sessions, who, policy.version, &needed, left) {
                 None => return Verdict::pass(Some(policy.version)),
                 Some(denial) => Denial { target, ..denial },
@@ -121,7 +158,7 @@ pub fn answer(
         version: REFUSAL_VERSION,
         source: sessions.runner().to_owned(),
         attempt: attempt.clone(),
-        session: session.clone(),
+        session: session.to_owned(),
         agent: policy.agent.clone(),
         at: now_ms(),
         tool: asked.tool_name.clone(),
@@ -134,7 +171,11 @@ pub fn answer(
         grantor: denial.grantor,
         words: denial.words,
     };
-    keep(sessions, &session, &attempt, &record)
+    keep(sessions, session, &attempt, &record)
+}
+
+fn unavailable(error: &RunnerError) -> Verdict {
+    Verdict::denied(&error.name(), error.to_string(), "not_attributed")
 }
 
 /// Ask each permission in turn; answer `None` when every one is given now,
@@ -150,7 +191,7 @@ fn lifted(
         let (check, grantor, words) = match ask(sessions, question(who, version, need), left) {
             Ok(answer) if answer.permitted => continue,
             Ok(answer) => (
-                "grant_refused",
+                "grant_refused".to_owned(),
                 answer.grantor,
                 format!(
                     "rule `{}` denies it without {} on {}:{}: {}",
@@ -158,7 +199,7 @@ fn lifted(
                 ),
             ),
             Err(reason) => (
-                "grant_state_unavailable",
+                reason.name(),
                 None,
                 format!(
                     "rule `{}` needs {} on {}:{}, and the live grant authority did not answer: {reason}",
@@ -167,7 +208,7 @@ fn lifted(
             ),
         };
         return Some(Denial {
-            check: check.to_owned(),
+            check,
             rule: Some(need.rule.clone()),
             target: String::new(),
             permission: Some(need.clone()),
@@ -186,7 +227,10 @@ pub(crate) fn keep(
     attempt: &str,
     record: &RefusalRecord,
 ) -> Verdict {
-    let mut table = sessions.lock();
+    let mut table = match sessions.read_lock() {
+        Ok(table) => table,
+        Err(error) => return unavailable(&error),
+    };
     let key = attempt_key(session, attempt);
     if let Some(reader) = table.feed.attempt_reader(&key) {
         drop(table);
@@ -199,7 +243,10 @@ pub(crate) fn keep(
                 return verdict;
             }
         }
-        table = sessions.lock();
+        table = match sessions.read_lock() {
+            Ok(table) => table,
+            Err(error) => return unavailable(&error),
+        };
     }
     let commit = Commit {
         source: None,
@@ -219,7 +266,10 @@ pub(crate) fn keep(
             Verdict::of(record, "recorded")
         }
         Err(error) => {
-            let mut table = sessions.lock();
+            let mut table = match sessions.read_lock() {
+                Ok(table) => table,
+                Err(error) => return unavailable(&error),
+            };
             let gap = table.gaps.entry(session.to_owned()).or_default();
             gap.lost += 1;
             gap.since.get_or_insert(record.at);
@@ -252,25 +302,27 @@ pub struct AuditGap {
 
 impl Sessions {
     /// The leaders of every running session, by session.
-    pub fn leaders(&self) -> BTreeMap<String, Leader> {
-        self.lock()
+    pub fn leaders(&self) -> Result<BTreeMap<String, Leader>, RunnerError> {
+        Ok(self
+            .read_lock()?
             .sessions
             .iter()
             .filter(|(_, session)| session.ended.is_none())
             .filter_map(|(id, session)| Some((id.clone(), session.guard.leader.clone()?)))
-            .collect()
+            .collect())
     }
 
     /// What session `id` was started with beside its launch.
-    pub fn guard(&self, id: &str) -> Option<Guard> {
-        self.lock()
+    pub fn guard(&self, id: &str) -> Result<Option<Guard>, RunnerError> {
+        Ok(self
+            .read_lock()?
             .sessions
             .get(id)
-            .map(|session| session.guard.clone())
+            .map(|session| session.guard.clone()))
     }
 
     /// Each session whose audit has a gap, and the gap.
-    pub fn gaps(&self) -> BTreeMap<String, AuditGap> {
-        self.lock().gaps.clone()
+    pub fn gaps(&self) -> Result<BTreeMap<String, AuditGap>, RunnerError> {
+        Ok(self.read_lock()?.gaps.clone())
     }
 }

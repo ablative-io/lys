@@ -23,7 +23,7 @@ impl Sessions {
             ));
         }
         let (outcome, fresh) = {
-            let mut table = self.lock();
+            let mut table = self.lock()?;
             if table.stopping {
                 return Err(RunnerError::refused(
                     "runner_stopping",
@@ -60,7 +60,7 @@ impl Sessions {
             self.relaunch(id)?;
             Ok(ended)
         });
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let outcome = finish_restart(&mut table, operation, result);
         drop(table);
         self.writer.barrier()?;
@@ -69,7 +69,7 @@ impl Sessions {
     }
 
     fn relaunch(self: &Arc<Self>, id: &str) -> Result<(), RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         if table.stopping {
             return Err(RunnerError::refused(
                 "runner_stopping",

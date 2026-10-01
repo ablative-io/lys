@@ -367,7 +367,16 @@ impl Sessions {
                 ),
             }),
         };
-        let mut table = self.lock();
+        let mut table = match self.lock() {
+            Ok(table) => table,
+            Err(error) => {
+                if let Err(finish) = output.finish(generation, ended) {
+                    crate::error::said(&format!("session {id}: output_exit_failed: {finish}"));
+                }
+                self.wake();
+                return Err(error);
+            }
+        };
         let mut recorded = Ok(());
         if let Some(session) = table
             .sessions
@@ -400,7 +409,7 @@ impl Sessions {
         started_at: Option<u64>,
         follow: bool,
     ) -> Result<bool, RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
         if table.stopping || session.generation != generation {
             return Ok(false);
@@ -417,7 +426,7 @@ impl Sessions {
             id: id.to_owned(),
         };
         let prepared = self.run(plan)?;
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
         if table.stopping || session.generation != generation {
             drop(table);
@@ -475,7 +484,9 @@ impl Sessions {
             match output.push(generation, &buffer[..read]) {
                 Ok(true) => {
                     let leader = {
-                        let mut table = self.lock();
+                        let Some(mut table) = self.lock_logged() else {
+                            return;
+                        };
                         table
                             .sessions
                             .get_mut(id)
@@ -520,8 +531,10 @@ impl Sessions {
     ) {
         let waited = child.wait();
         let at = now_ms();
-        let cleanup = self
-            .lock()
+        let Some(table) = self.lock_logged() else {
+            return;
+        };
+        let cleanup = table
             .sessions
             .get(id)
             .filter(|session| session.generation == generation)
@@ -533,6 +546,7 @@ impl Sessions {
                         .is_some_and(crate::rotation::RotationState::tripped)
             })
             .and_then(|session| session.guard.leader.clone());
+        drop(table);
         if let Some(leader) = cleanup {
             match crate::pty::end_left_group(&leader) {
                 Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => {}
@@ -552,7 +566,9 @@ impl Sessions {
             ));
         }
         self.read_source(id, None);
-        let mut table = self.lock();
+        let Some(mut table) = self.lock_logged() else {
+            return;
+        };
         let status_flushed = crate::collector::status::flush_status(&mut table, id);
         if let Err(error) = &status_flushed {
             crate::error::said(&format!(
@@ -608,7 +624,10 @@ impl Sessions {
                         ));
                     }
                 }
-                table = self.lock();
+                let Some(next_table) = self.lock_logged() else {
+                    return;
+                };
+                table = next_table;
             } else {
                 crate::error::said(&format!(
                     "session {id} reached its usage limit on the last of its accounts"
@@ -721,11 +740,17 @@ impl Sessions {
             .name("runner-transcript".to_owned())
             .spawn(move || {
                 sessions.read_source(&owned, None);
+                if sessions.table.is_poisoned() {
+                    return;
+                }
                 for next in woken {
                     match next {
                         Wake::Changed => sessions.read_source(&owned, None),
                         Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
                         Wake::Stop => break,
+                    }
+                    if sessions.table.is_poisoned() {
+                        break;
                     }
                 }
                 drop(watcher);
@@ -740,7 +765,9 @@ impl Sessions {
     /// line, and keep what it yields with the new cursor as one unit.
     pub(crate) fn read_source(&self, id: &str, lost: Option<&str>) {
         loop {
-            let table = self.lock();
+            let Some(table) = self.lock_logged() else {
+                return;
+            };
             let Some(session) = table.sessions.get(id) else {
                 return;
             };
@@ -779,7 +806,9 @@ impl Sessions {
             if bodies.is_empty() && source == before {
                 return;
             }
-            let mut table = self.lock();
+            let Some(mut table) = self.lock_logged() else {
+                return;
+            };
             if table.feed.source(id) != Some(&before) {
                 drop(table);
                 continue;

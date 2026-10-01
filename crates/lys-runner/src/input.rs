@@ -2,7 +2,7 @@
 //! terminal writer; a full terminal never holds the shared session table.
 
 use std::io::Write;
-use std::sync::{Arc, Mutex, PoisonError, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 
 use crate::error::RunnerError;
 
@@ -60,7 +60,12 @@ impl Input {
         durable: Option<crate::durable::Writer>,
         complete: impl FnOnce(Result<(), RunnerError>) + Send + 'static,
     ) -> Result<(), RunnerError> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut state = self.state.lock().map_err(|error| {
+            RunnerError::refused(
+                "input_state_poisoned",
+                format!("input state lock poisoned: {error}"),
+            )
+        })?;
         if state.sender.is_none() {
             let writer = state.writer.take().ok_or_else(|| {
                 RunnerError::refused("input_worker_failed", "the input worker could not start")
@@ -108,5 +113,29 @@ fn run(mut writer: Box<dyn Write + Send>, receiver: mpsc::Receiver<Span>) {
                 .map_err(|error| RunnerError::refused("write_failed", error.to_string()))
         });
         (span.complete)(result);
+    }
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::Input;
+
+    #[test]
+    fn poisoned_input_refuses_a_span_without_starting_a_worker() {
+        let input = Input::new(Box::new(std::io::sink()));
+        let poisoned = input.clone();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let mut state = match poisoned.state.lock() {
+                Ok(state) => state,
+                Err(error) => panic!("fixture_lock_poisoned: {error}"),
+            };
+            state.writer = None;
+            panic!("injected partial input update");
+        }));
+        assert!(panic.is_err());
+        match input.write(b"never written".to_vec()) {
+            Err(error) => assert_eq!(error.name(), "input_state_poisoned"),
+            Ok(()) => panic!("poisoned input accepted a span"),
+        }
     }
 }

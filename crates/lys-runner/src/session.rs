@@ -28,7 +28,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak, mpsc};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
@@ -53,6 +53,10 @@ mod restart;
 #[cfg(test)]
 #[path = "../tests/session_start/cases.rs"]
 mod start_tests;
+
+#[cfg(test)]
+#[path = "../tests/session_poison/cases.rs"]
+mod poison_tests;
 
 #[cfg(test)]
 type SpawnProbe = Box<dyn FnOnce() + Send>;
@@ -218,9 +222,16 @@ pub(super) struct Starting {
 
 impl Drop for Starting {
     fn drop(&mut self) {
-        self.sessions.lock().starting.remove(&self.id);
-        self.sessions.wake();
+        if let Some(mut table) = self.sessions.lock_logged() {
+            table.starting.remove(&self.id);
+            drop(table);
+            self.sessions.wake();
+        }
     }
+}
+
+fn table_poisoned(error: impl std::fmt::Display) -> RunnerError {
+    RunnerError::refused("session_table_poisoned", error.to_string())
 }
 
 pub(crate) fn unknown(id: &str) -> RunnerError {
@@ -339,7 +350,7 @@ impl Sessions {
                 spawn_probe: Mutex::new(None),
             }
         });
-        let table = sessions.lock();
+        let table = sessions.lock()?;
         sessions.persist(&table)?;
         drop(table);
         sessions.writer.barrier()?;
@@ -351,18 +362,84 @@ impl Sessions {
         self.state.runner()
     }
 
-    pub(crate) fn lock(&self) -> MutexGuard<'_, Table> {
-        #[cfg(test)]
-        lifecycle::output_tests::table_locked();
-        let mut table = self.table.lock().unwrap_or_else(PoisonError::into_inner);
-        table.operations.prune(now_ms());
-        table
+    pub(crate) fn peer_leader(
+        &self,
+        pid: u32,
+    ) -> Result<Option<(String, u64, Leader)>, RunnerError> {
+        let table = self.read_lock()?;
+        if table.stopping {
+            return Ok(None);
+        }
+        Ok(table.sessions.iter().find_map(|(id, session)| {
+            let leader = session.guard.leader.as_ref()?;
+            (session.ended.is_none()
+                && !session.ending
+                && session.live.is_some()
+                && leader.pid == pid)
+                .then(|| (id.clone(), session.generation, leader.clone()))
+        }))
     }
 
-    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> MutexGuard<'a, Table> {
-        self.changed
-            .wait(table)
-            .unwrap_or_else(PoisonError::into_inner)
+    pub(crate) fn peer_matches(
+        &self,
+        id: &str,
+        generation: u64,
+        leader: &Leader,
+    ) -> Result<bool, RunnerError> {
+        let table = self.read_lock()?;
+        Ok(!table.stopping
+            && table.sessions.get(id).is_some_and(|session| {
+                session.ended.is_none()
+                    && !session.ending
+                    && session.live.is_some()
+                    && session.generation == generation
+                    && session.guard.leader.as_ref() == Some(leader)
+            }))
+    }
+
+    pub(crate) fn peer_guard(
+        &self,
+        id: &str,
+        generation: u64,
+        leader: &Leader,
+    ) -> Result<Option<Guard>, RunnerError> {
+        let table = self.read_lock()?;
+        Ok(table.sessions.get(id).and_then(|session| {
+            (!table.stopping
+                && session.ended.is_none()
+                && !session.ending
+                && session.live.is_some()
+                && session.generation == generation
+                && session.guard.leader.as_ref() == Some(leader))
+            .then(|| session.guard.clone())
+        }))
+    }
+
+    pub(crate) fn read_lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
+        #[cfg(test)]
+        lifecycle::output_tests::table_locked();
+        self.table.lock().map_err(table_poisoned)
+    }
+
+    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
+        let mut table = self.read_lock()?;
+        table.operations.prune(now_ms());
+        Ok(table)
+    }
+
+    pub(crate) fn lock_logged(&self) -> Option<MutexGuard<'_, Table>> {
+        match self.lock() {
+            Ok(table) => Some(table),
+            Err(error) => {
+                crate::error::said(&error.to_string());
+                self.wake();
+                None
+            }
+        }
+    }
+
+    fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> Result<MutexGuard<'a, Table>, RunnerError> {
+        self.changed.wait(table).map_err(table_poisoned)
     }
 
     /// Wake everything waiting on the table: a caller left, or a thing changed.
@@ -374,7 +451,7 @@ impl Sessions {
 
     /// Wake a cancelled output request and the shared control waiters.
     pub fn wake_session(&self, id: &str) -> Result<(), RunnerError> {
-        let table = self.lock();
+        let table = self.lock()?;
         let output = Arc::clone(&table.sessions.get(id).ok_or_else(|| unknown(id))?.output);
         self.changed.notify_all();
         drop(table);
@@ -436,7 +513,7 @@ impl Sessions {
             .clone()
             .map(RotationState::new)
             .transpose()?;
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         if table.stopping {
             return Err(RunnerError::refused(
                 "runner_stopping",
@@ -495,7 +572,15 @@ impl Sessions {
             )
         })?;
         let started_at = session.started_at;
-        let mut table = self.lock();
+        let mut table = match self.lock() {
+            Ok(table) => table,
+            Err(error) => {
+                if let Err(cleanup) = pending.cancel() {
+                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {cleanup}"));
+                }
+                return Err(error);
+            }
+        };
         if table.stopping {
             drop(table);
             pending.cancel()?;
@@ -526,7 +611,7 @@ impl Sessions {
         left: &AtomicBool,
         mut check: impl FnMut(&mut Table) -> Option<T>,
     ) -> Result<T, RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         loop {
             if let Some(answer) = check(&mut table) {
                 return Ok(answer);
@@ -543,14 +628,14 @@ impl Sessions {
                     "the runner is stopping",
                 ));
             }
-            table = self.wait(table);
+            table = self.wait(table)?;
         }
     }
 
     /// Type `bytes` into session `id`.
     pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
         let writer = {
-            let mut table = self.lock();
+            let mut table = self.lock()?;
             let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
             session.live(id)?.writer.clone()
         };
@@ -577,7 +662,7 @@ impl Sessions {
 
     /// Resize session `id`'s terminal.
     pub fn resize(&self, id: &str, columns: u16, rows: u16) -> Result<(), RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
         crate::pty::resize(&*session.live(id)?.master, columns, rows)?;
         session.columns = columns;
@@ -595,7 +680,7 @@ impl Sessions {
     ) -> Result<T, RunnerError> {
         let output = Arc::clone(
             &self
-                .lock()
+                .lock()?
                 .sessions
                 .get(id)
                 .ok_or_else(|| unknown(id))?
@@ -607,7 +692,7 @@ impl Sessions {
     /// End session `id`'s process and answer once its exit is seen.
     pub fn end(&self, id: &str, left: &AtomicBool) -> Result<Ended, RunnerError> {
         {
-            let mut table = self.lock();
+            let mut table = self.lock()?;
             let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
             if session.ended.is_none() {
                 session.ending = true;
@@ -623,7 +708,7 @@ impl Sessions {
 
     /// What the runner holds: every session, or the one named.
     pub fn status(&self, only: Option<&str>) -> Result<StatusView, RunnerError> {
-        let table = self.lock();
+        let table = self.lock()?;
         let sessions = match only {
             Some(id) => vec![
                 table
@@ -647,8 +732,8 @@ impl Sessions {
 
     /// End every running session and answer once each exit is seen; the
     /// runner then starts nothing more.
-    pub fn stop_all(&self) {
-        let mut table = self.lock();
+    pub fn stop_all(&self) -> Result<(), RunnerError> {
+        let mut table = self.lock()?;
         table.stopping = true;
         for (id, session) in &mut table.sessions {
             if let Err(error) = session.output.stop() {
@@ -671,13 +756,12 @@ impl Sessions {
                 .values()
                 .any(|session| session.ended.is_none())
         {
-            table = self.wait(table);
+            table = self.wait(table)?;
         }
-        self.persist_logged(&table);
+        self.persist(&table)?;
         drop(table);
-        if let Err(error) = self.writer.barrier() {
-            crate::error::said(&format!("runner_shutdown_record_failed: {error}"));
-        }
+        self.writer.barrier()?;
         self.wake();
+        Ok(())
     }
 }

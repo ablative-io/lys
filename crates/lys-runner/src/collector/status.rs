@@ -129,7 +129,7 @@ pub(crate) fn flush_status(table: &mut Table, id: &str) -> Result<bool, RunnerEr
 
 impl Sessions {
     pub(super) fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let session = table
             .sessions
             .get(id)

@@ -45,17 +45,17 @@ fn parentless_binding_is_refused_and_audited_before_installing_a_follower()
         policy: None,
     })?;
     let result = sessions.bind(
-        &mut sessions.lock(),
+        &mut *sessions.lock()?,
         "session",
         ("source-without-parent.jsonl", "native"),
         true,
     );
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert_eq!(
         result.err().ok_or("parentless binding accepted")?.name(),
         "transcript_parent_missing"
     );
-    let table = sessions.lock();
+    let table = sessions.lock()?;
     assert!(table.feed.source("session").is_none());
     assert!(
         table

@@ -27,6 +27,7 @@ use std::sync::atomic::AtomicBool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::error::RunnerError;
 use crate::judge::{NamedResource, Needed};
 use crate::session::Sessions;
 
@@ -241,11 +242,14 @@ pub fn ask(
     sessions: &Sessions,
     question: GrantQuestion,
     left: &AtomicBool,
-) -> Result<GrantAnswer, String> {
+) -> Result<GrantAnswer, RunnerError> {
     let named = key(&question);
-    let mut table = sessions.lock();
+    let mut table = sessions.lock()?;
     if table.desk.live.is_empty() {
-        return Err("no grant authority is attached to this runner".to_owned());
+        return Err(RunnerError::refused(
+            "grant_state_unavailable",
+            "no grant authority is attached to this runner",
+        ));
     }
     table.desk.asked.push_back(question);
     let ready = Arc::clone(&table.desk.ready);
@@ -262,11 +266,11 @@ pub fn ask(
         };
         lost.then(|| Err("the grant authority's channel closed before it answered".to_owned()))
     });
-    let mut table = sessions.lock();
+    let mut table = sessions.lock()?;
     table.desk.taken.remove(&named);
     table.desk.asked.retain(|waiting| key(waiting) != named);
     drop(table);
-    answered.unwrap_or_else(|left| Err(format!("the question ended unanswered: {left}")))
+    answered?.map_err(|reason| RunnerError::refused("grant_state_unavailable", reason))
 }
 
 pub(crate) struct Channel {
@@ -275,26 +279,28 @@ pub(crate) struct Channel {
 }
 
 impl Channel {
-    pub(crate) fn new(sessions: &Arc<Sessions>) -> Self {
-        let mut table = sessions.lock();
+    pub(crate) fn new(sessions: &Arc<Sessions>) -> Result<Self, crate::error::RunnerError> {
+        let mut table = sessions.lock()?;
         let id = table.desk.next;
         table.desk.next += 1;
         table.desk.live.insert(id);
-        Self {
+        Ok(Self {
             sessions: Arc::clone(sessions),
             id,
-        }
+        })
     }
 
-    pub(crate) fn ready(&self) -> Arc<tokio::sync::Notify> {
-        Arc::clone(&self.sessions.lock().desk.ready)
+    pub(crate) fn ready(&self) -> Result<Arc<tokio::sync::Notify>, crate::error::RunnerError> {
+        Ok(Arc::clone(&self.sessions.lock()?.desk.ready))
     }
 
-    pub(crate) fn next(&self) -> Option<GrantQuestion> {
-        let mut table = self.sessions.lock();
-        let question = table.desk.asked.pop_front()?;
+    pub(crate) fn next(&self) -> Result<Option<GrantQuestion>, crate::error::RunnerError> {
+        let mut table = self.sessions.lock()?;
+        let Some(question) = table.desk.asked.pop_front() else {
+            return Ok(None);
+        };
         table.desk.taken.insert(key(&question), self.id);
-        Some(question)
+        Ok(Some(question))
     }
 
     pub(crate) fn answer(
@@ -315,7 +321,7 @@ impl Channel {
             crate::error::RunnerError::refused("grant_answer_invalid", reason.clone())
         });
         self.sessions
-            .lock()
+            .lock()?
             .desk
             .answers
             .insert(key(question), answer);
@@ -326,8 +332,11 @@ impl Channel {
 
 impl Drop for Channel {
     fn drop(&mut self) {
-        let mut table = self.sessions.lock();
+        let Some(mut table) = self.sessions.lock_logged() else {
+            return;
+        };
         table.desk.live.remove(&self.id);
+        drop(table);
         self.sessions.wake();
     }
 }
@@ -337,7 +346,9 @@ impl Drop for Channel {
 /// asked, until the connection closes.
 pub fn serve(sessions: &Arc<Sessions>, stream: &UnixStream) {
     let channel = {
-        let mut table = sessions.lock();
+        let Some(mut table) = sessions.lock_logged() else {
+            return;
+        };
         let channel = table.desk.next;
         table.desk.next += 1;
         table.desk.live.insert(channel);
@@ -349,7 +360,9 @@ pub fn serve(sessions: &Arc<Sessions>, stream: &UnixStream) {
         Ok(reading) => carry(sessions, stream, BufReader::new(reading), channel, &never),
         Err(error) => error.to_string(),
     };
-    let mut table = sessions.lock();
+    let Some(mut table) = sessions.lock_logged() else {
+        return;
+    };
     table.desk.live.remove(&channel);
     drop(table);
     sessions.wake();
@@ -401,7 +414,12 @@ fn carry(
                     Err("the authority answered another attempt, rule or policy version".to_owned())
                 }
             });
-        sessions.lock().desk.answers.insert(named, answer);
+        let mut table = match sessions.lock() {
+            Ok(table) => table,
+            Err(error) => return error.to_string(),
+        };
+        table.desk.answers.insert(named, answer);
+        drop(table);
         sessions.wake();
     }
 }

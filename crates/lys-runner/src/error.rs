@@ -1,6 +1,6 @@
-//! The runner's refusals, each by name. The name is the first word of the
-//! message, before its colon, and is what a caller keys on; the words after
-//! it are for a person. No refusal carries a key, an account value or the
+//! The runner's refusals, each by a stable name held in its error shape.
+//! Callers key on that name; its explanatory words are for a person.
+//! No refusal carries a key, an account value or the
 //! text a session was given.
 
 /// Every way the runner, its client or its dial bridge refuses.
@@ -109,10 +109,26 @@ pub enum RunnerError {
 }
 
 impl RunnerError {
-    /// The refusal's name: the first word of its message.
+    /// The stable refusal name, independent of its explanatory words.
     pub fn name(&self) -> String {
-        let text = self.to_string();
-        text.split(':').next().unwrap_or_default().to_owned()
+        match self {
+            Self::Unsigned { .. } => "runner_request_unsigned",
+            Self::Malformed { .. } => "runner_request_malformed",
+            Self::ProtocolMismatch { .. } => "runner_protocol_mismatch",
+            Self::Replayed { .. } => "runner_request_replayed",
+            Self::Misaddressed { .. } => "runner_request_misaddressed",
+            Self::Unreachable { .. } => "runner_unreachable",
+            Self::ReplyMalformed { .. } => "runner_reply_malformed",
+            Self::Refused { refusal, .. } => return refusal.clone(),
+            Self::State { .. } => "runner_state_unavailable",
+            Self::StateHeld { .. } => "runner_state_held",
+            Self::AlreadyRunning { .. } => "runner_already_running",
+            Self::Socket { .. } => "runner_socket_unavailable",
+            Self::Key { .. } => "runner_key_unavailable",
+            Self::DialStale { .. } => "runner_dial_stale",
+            Self::Dial { .. } => "runner_dial_failed",
+        }
+        .to_owned()
     }
 
     /// The refusal `refusal`, in `words`.
@@ -128,15 +144,39 @@ impl RunnerError {
 /// Where the runner's log lines go beside its standard error.
 pub type Sink = Box<dyn Fn(&str) + Send + Sync>;
 
-static SINK: std::sync::Mutex<Option<Sink>> = std::sync::Mutex::new(None);
+type HeldSink = Option<std::sync::Arc<Sink>>;
+
+static SINK: std::sync::Mutex<HeldSink> = std::sync::Mutex::new(None);
 
 /// Send every line the runner says to `sink` as well as to its standard
 /// error, replacing any sink given before: how a process that holds a
 /// runner keeps its log, and how a test reads every line it said.
-pub fn also_to(sink: Sink) {
-    *SINK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sink);
+///
+/// # Errors
+/// Returns `runner_log_unavailable` if the sink lock is poisoned.
+pub fn also_to(sink: Sink) -> Result<(), RunnerError> {
+    install_sink(&SINK, sink)
+}
+
+fn install_sink(slot: &std::sync::Mutex<HeldSink>, sink: Sink) -> Result<(), RunnerError> {
+    let mut held = slot.lock().map_err(|error| {
+        RunnerError::refused(
+            "runner_log_unavailable",
+            format!("log sink lock poisoned: {error}"),
+        )
+    })?;
+    *held = Some(std::sync::Arc::new(sink));
+    Ok(())
+}
+
+fn read_sink(slot: &std::sync::Mutex<HeldSink>) -> Result<HeldSink, RunnerError> {
+    let held = slot.lock().map_err(|error| {
+        RunnerError::refused(
+            "runner_log_unavailable",
+            format!("log sink lock poisoned: {error}"),
+        )
+    })?;
+    Ok(held.as_ref().map(std::sync::Arc::clone))
 }
 
 /// Say `line` on the runner's standard error, which the install keeps as
@@ -147,11 +187,112 @@ pub fn also_to(sink: Sink) {
 pub fn said(line: &str) {
     let line = format!("lys-runner {line}");
     eprintln!("{line}");
-    if let Some(sink) = SINK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .as_ref()
-    {
-        sink(&line);
+    match read_sink(&SINK) {
+        Ok(Some(sink)) => sink(&line),
+        Ok(None) => {}
+        Err(error) => eprintln!("lys-runner {error}"),
+    }
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::{HeldSink, install_sink, read_sink};
+
+    #[test]
+    fn a_poisoned_log_sink_is_named_and_never_called_or_replaced() {
+        let slot = std::sync::Mutex::new(HeldSink::None);
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut held = match slot.lock() {
+                Ok(held) => held,
+                Err(error) => panic!("fixture_lock_poisoned: {error}"),
+            };
+            *held = Some(std::sync::Arc::new(Box::new(|_| {
+                panic!("poisoned sink was called");
+            })));
+            panic!("injected partial sink update");
+        }));
+        assert!(panic.is_err());
+        match read_sink(&slot) {
+            Err(error) => assert_eq!(error.name(), "runner_log_unavailable"),
+            Ok(_) => panic!("poisoned sink was exposed"),
+        }
+        match install_sink(&slot, Box::new(|_| {})) {
+            Err(error) => assert_eq!(error.name(), "runner_log_unavailable"),
+            Ok(()) => panic!("poisoned sink was replaced without reopening"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::RunnerError;
+
+    #[test]
+    fn refusal_names_come_from_the_error_shape_and_preserve_given_names() {
+        let reason = || "detail: another detail".to_owned();
+        let cases = [
+            (
+                RunnerError::Unsigned { reason: reason() },
+                "runner_request_unsigned",
+            ),
+            (
+                RunnerError::Malformed { reason: reason() },
+                "runner_request_malformed",
+            ),
+            (
+                RunnerError::ProtocolMismatch { theirs: 2, ours: 1 },
+                "runner_protocol_mismatch",
+            ),
+            (
+                RunnerError::Replayed { reason: reason() },
+                "runner_request_replayed",
+            ),
+            (
+                RunnerError::Misaddressed { reason: reason() },
+                "runner_request_misaddressed",
+            ),
+            (
+                RunnerError::Unreachable { reason: reason() },
+                "runner_unreachable",
+            ),
+            (
+                RunnerError::ReplyMalformed { reason: reason() },
+                "runner_reply_malformed",
+            ),
+            (
+                RunnerError::refused("authority:qualified", reason()),
+                "authority:qualified",
+            ),
+            (
+                RunnerError::State { reason: reason() },
+                "runner_state_unavailable",
+            ),
+            (
+                RunnerError::StateHeld { state: reason() },
+                "runner_state_held",
+            ),
+            (
+                RunnerError::AlreadyRunning { socket: reason() },
+                "runner_already_running",
+            ),
+            (
+                RunnerError::Socket { reason: reason() },
+                "runner_socket_unavailable",
+            ),
+            (
+                RunnerError::Key { reason: reason() },
+                "runner_key_unavailable",
+            ),
+            (
+                RunnerError::DialStale { reason: reason() },
+                "runner_dial_stale",
+            ),
+            (RunnerError::Dial { reason: reason() }, "runner_dial_failed"),
+        ];
+        let mut names = std::collections::BTreeSet::new();
+        for (error, expected) in cases {
+            assert_eq!(error.name(), expected);
+            assert!(names.insert(error.name()), "a refusal name is duplicated");
+        }
     }
 }

@@ -76,7 +76,7 @@ impl Sessions {
         match event {
             "SessionStart" => self.bind_claude(id, input),
             "UserPromptSubmit" => {
-                let mut table = self.lock();
+                let mut table = self.lock()?;
                 if let Some(session) = table.sessions.get_mut(id) {
                     session.guard.idle = false;
                 }
@@ -89,7 +89,7 @@ impl Sessions {
             "Stop" | "SessionEnd" => {
                 self.read_source(id, None);
                 let name = if event == "Stop" { "turn_end" } else { "session_end" };
-                let mut table = self.lock();
+                let mut table = self.lock()?;
                 flushed(&mut table, self.runner(), id, name)?;
                 if event == "Stop" {
                     if let Some(session) = table.sessions.get_mut(id) {
@@ -102,7 +102,7 @@ impl Sessions {
                 Ok(format!("{name} kept"))
             }
             "PreCompact" => {
-                let mut table = self.lock();
+                let mut table = self.lock()?;
                 append(&mut table, id, vec![boundary("compacting", None)], None)?;
                 crate::operations::compacting(&mut table, id);
                 drop(table);
@@ -130,7 +130,7 @@ impl Sessions {
                 "the hook names no session id and transcript".to_owned(),
             ));
         };
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let session = table
             .sessions
             .get(id)
@@ -265,7 +265,7 @@ impl Sessions {
             })?;
         let turn = text(notification, "turn-id").map(str::to_owned);
         let lookup = {
-            let table = self.lock();
+            let table = self.lock()?;
             let source = table
                 .feed
                 .source(id)
@@ -300,7 +300,7 @@ impl Sessions {
             let path = rollout_since(Path::new(&home), thread, launched, now_ms())?
                 .display()
                 .to_string();
-            let mut table = self.lock();
+            let mut table = self.lock()?;
             let session = table
                 .sessions
                 .get(id)
@@ -333,7 +333,7 @@ impl Sessions {
             }
         }
         self.read_source(id, None);
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         flushed_at(&mut table, self.runner(), id, "turn_end", turn)?;
         if let Some(session) = table.sessions.get_mut(id) {
             session.guard.idle = true;

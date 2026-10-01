@@ -69,7 +69,7 @@ impl Held {
     }
 
     fn tree(&self, session: &str) -> Result<Tree, Box<dyn Error>> {
-        let leaders = self.sessions.leaders();
+        let leaders = self.sessions.leaders()?;
         let leader = leaders.get(session).ok_or("session has no leader")?;
         Ok(Tree {
             parents: BTreeMap::from([(u32::MAX, leader.pid)]),
@@ -82,7 +82,7 @@ impl Held {
 
     fn leader(&self, session: &str) -> Result<Leader, Box<dyn Error>> {
         self.sessions
-            .leaders()
+            .leaders()?
             .get(session)
             .cloned()
             .ok_or_else(|| "session has no leader".into())
@@ -91,7 +91,9 @@ impl Held {
 
 impl Drop for Held {
     fn drop(&mut self) {
-        self.sessions.stop_all();
+        if let Err(error) = self.sessions.stop_all() {
+            crate::error::said(&format!("restart fixture could not stop: {error}"));
+        }
     }
 }
 
@@ -102,7 +104,7 @@ fn a_proved_peer_restarts_its_own_launch_with_unchanged_credentials() -> Result<
     let before = held.leader("own")?;
     let launch = held
         .sessions
-        .lock()
+        .lock()?
         .sessions
         .get("own")
         .ok_or("session missing")?
@@ -122,7 +124,7 @@ fn a_proved_peer_restarts_its_own_launch_with_unchanged_credentials() -> Result<
     assert_ne!(held.leader("own")?, before);
     assert_eq!(
         held.sessions
-            .lock()
+            .lock()?
             .sessions
             .get("own")
             .ok_or("session missing")?
@@ -158,7 +160,7 @@ fn a_body_naming_another_session_restarts_only_the_proved_session() -> Result<()
 #[test]
 fn an_unproved_peer_is_refused_without_restarting_any_session() -> Result<(), Box<dyn Error>> {
     let held = Held::open()?;
-    let before = held.sessions.leaders();
+    let before = held.sessions.leaders()?;
     let tree = Tree {
         parents: BTreeMap::from([(u32::MAX, 1)]),
         starts: BTreeMap::new(),
@@ -166,7 +168,7 @@ fn an_unproved_peer_is_refused_without_restarting_any_session() -> Result<(), Bo
     let error = restart_with(&held.sessions, &tree, (u32::MAX, 5, 5), "restart-own")
         .expect_err("unproved peer restarted a session");
     assert_eq!(error.name(), "not_a_session");
-    assert_eq!(held.sessions.leaders(), before);
+    assert_eq!(held.sessions.leaders()?, before);
     Ok(())
 }
 
@@ -209,7 +211,7 @@ fn a_replayed_operation_answers_the_kept_restart_once() -> Result<(), Box<dyn Er
 fn a_proved_session_with_no_held_launch_is_refused_by_name() -> Result<(), Box<dyn Error>> {
     let held = Held::open()?;
     held.sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("own")
         .ok_or("session missing")?

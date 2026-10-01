@@ -104,7 +104,7 @@ fn invalid_contents_are_refused_before_any_config_is_written() -> TestResult {
         assert_eq!(error.name(), "launch_config_refused");
         assert!(!dir.path().join("sessions").exists());
         assert!(sessions.status(None)?.sessions.is_empty());
-        sessions.stop_all();
+        sessions.stop_all()?;
     }
     Ok(())
 }
@@ -121,7 +121,7 @@ fn a_config_is_never_written_through_a_symlink() -> TestResult {
         .ok_or("symlink was accepted")?;
     assert_eq!(error.name(), "launch_config_refused");
     assert_eq!(std::fs::read_dir(outside.path())?.count(), 0);
-    sessions.stop_all();
+    sessions.stop_all()?;
     Ok(())
 }
 
@@ -145,7 +145,7 @@ fn a_failed_spawn_can_retry_only_identical_kept_config() -> TestResult {
         "launch_config_refused"
     );
     sessions.start(launch())?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     Ok(())
 }
 
@@ -159,7 +159,7 @@ fn an_interrupted_staging_directory_is_replaced_before_publication() -> TestResu
     std::fs::write(staged.join("settings.json"), b"incomplete settings")?;
     std::fs::write(staged.join("partial/unfinished"), b"unpublished")?;
     sessions.start(launch())?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert_eq!(
         std::fs::read(own.join("config/settings.json"))?,
         b"exact settings"
@@ -182,7 +182,7 @@ fn an_unpublished_symlink_is_refused_without_removing_its_target() -> TestResult
         .start(launch())
         .err()
         .ok_or("unpublished symlink was accepted")?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert_eq!(error.name(), "launch_config_refused");
     assert_eq!(
         std::fs::read(outside.path().join("retained"))?,

@@ -579,7 +579,9 @@ fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<(), RunnerErr
             ));
             return;
         };
-        let mut table = sessions.lock();
+        let Some(mut table) = sessions.lock_logged() else {
+            return;
+        };
         finish(&mut table, &operation, result);
         drop(table);
         if let Err(error) = sessions.writer.barrier() {
@@ -717,12 +719,14 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
 impl Sessions {
     /// Accept `operation` under its stable id, answering how it stands.
     pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
-        let mut table = self.lock();
+        let mut table = self.lock()?;
         let mut outcome = accept(&mut table, operation)?;
         drop(table);
         self.writer.barrier()?;
         if outcome.request == "stop" && outcome.state == OperationState::Accepted {
-            outcome = stop(&mut self.lock(), &outcome.session, &outcome.operation)?;
+            let mut table = self.lock()?;
+            outcome = stop(&mut table, &outcome.session, &outcome.operation)?;
+            drop(table);
             self.writer.barrier()?;
         }
         self.wake();
@@ -743,7 +747,7 @@ impl Sessions {
     /// How operation `operation` stands, as the record keeps it.
     pub fn outcome(&self, operation: &str) -> Result<OperationOutcome, RunnerError> {
         let outcome = self
-            .lock()
+            .lock()?
             .operations
             .get(operation)
             .cloned()
