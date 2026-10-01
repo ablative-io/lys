@@ -11,6 +11,7 @@ pub mod checkpoints;
 pub mod directory;
 pub mod directory_migration;
 mod directory_state;
+pub mod draft_event;
 pub mod encoding;
 pub mod error;
 pub mod event;
@@ -44,4 +45,6 @@ pub use operation::OperationId;
 pub use profile::Profile;
 pub use provenance::{Actor, AuthMethod, Provenance};
 pub use restart::SNAPSHOT_EVERY;
-pub use signer::{Entry, SignedEvent, sign_event, sign_install_event, verify_event};
+pub use signer::{
+    Entry, SignedEvent, sign_draft_event, sign_event, sign_install_event, verify_event,
+};

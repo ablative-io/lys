@@ -95,12 +95,21 @@ pub(crate) fn encode(projection: &Projection) -> Value {
                 .collect(),
             |source| text(source),
         ),
+        super::draft::state::encode(projection),
     ])
 }
 
 /// The projection a state value holds, with its login indexes rebuilt.
 pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
-    let [records, operations, link_sources] = tuple::<3>(value, "a directory projection")?;
+    let mut parts = list(value, "a directory projection")?;
+    let drafts = if parts.len() == 4 {
+        parts
+            .pop()
+            .ok_or_else(|| "a directory projection lacks drafts".to_owned())?
+    } else {
+        array(Vec::new())
+    };
+    let [records, operations, link_sources] = tuple::<3>(array(parts), "a directory projection")?;
     let mut projection = Projection::new();
     for held in list(records, "the directory records")? {
         let (id, record) = read_record(held)?;
@@ -145,6 +154,7 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
     projection
         .rebuild_reporting_indexes()
         .map_err(|error| error.to_string())?;
+    super::draft::state::decode(&mut projection, drafts)?;
     Ok(projection)
 }
 

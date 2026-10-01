@@ -10,9 +10,9 @@ use crate::error::ServerError;
 
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
-        IdentityError::IdentityUnknown { .. } | IdentityError::AnswersToUnknown { .. } => {
-            StatusCode::NOT_FOUND
-        }
+        IdentityError::IdentityUnknown { .. }
+        | IdentityError::AnswersToUnknown { .. }
+        | IdentityError::DraftNotFound { .. } => StatusCode::NOT_FOUND,
         IdentityError::AnswersToInactive { .. } => StatusCode::FORBIDDEN,
         IdentityError::AppendUncertain { .. }
         | IdentityError::LogUnavailable { .. }
@@ -42,7 +42,11 @@ pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
         | IdentityError::StateMismatch { .. }
         | IdentityError::OperationReused { .. }
         | IdentityError::LinkSourceSeen { .. }
-        | IdentityError::ReceiptInvalid { .. } => StatusCode::CONFLICT,
+        | IdentityError::ReceiptInvalid { .. }
+        | IdentityError::DraftHashMismatch
+        | IdentityError::DraftNotPending { .. }
+        | IdentityError::DraftChangeInvalid { .. }
+        | IdentityError::DraftEntry => StatusCode::CONFLICT,
     }
 }
 

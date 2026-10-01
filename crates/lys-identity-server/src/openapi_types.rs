@@ -103,6 +103,7 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
         None,
         Some(api.schema::<crate::grant_tokens::Revoked>()),
     ));
+    entries.extend(crate::drafts_api::types(api));
     entries.push(restart_types(api));
     entries.extend(grants_and_reviews(api));
     entries.extend(roles_and_requests(api));

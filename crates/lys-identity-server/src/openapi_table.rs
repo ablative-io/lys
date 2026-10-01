@@ -56,6 +56,10 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
     POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]];
+    POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused", "EventTooLarge"]];
+    POST "/drafts/{id}/approve" "Record approval without applying the action" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
+    POST "/drafts/{id}/refuse" "Refuse one immutable draft" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
+    POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed", "EventTooLarge"]];
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];

@@ -175,6 +175,11 @@ fn identity(error: &IdentityError) -> &str {
         IdentityError::LinkSourceSeen { .. } => "LinkSourceSeen",
         IdentityError::ReceiptInvalid { .. } => "ReceiptInvalid",
         IdentityError::KeyUnavailable { .. } => "KeyUnavailable",
+        IdentityError::DraftHashMismatch => "DraftHashMismatch",
+        IdentityError::DraftNotFound { .. } => "DraftNotFound",
+        IdentityError::DraftNotPending { .. } => "DraftNotPending",
+        IdentityError::DraftChangeInvalid { .. } => "DraftChangeInvalid",
+        IdentityError::DraftEntry => "DraftEntry",
     }
 }
 

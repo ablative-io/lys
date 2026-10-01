@@ -16,6 +16,7 @@
 use ciborium::Value;
 use lys_core::Ed25519Identity;
 
+use crate::draft_event::{self, DraftEvent};
 use crate::encoding::{
     MAJOR_ARRAY, MAJOR_NEGATIVE, MAJOR_TAG, as_bytes, as_uint, bytes, cbor, decode_body,
     encode_body, head, malformed, map, payload_commitment, text, uint,
@@ -30,6 +31,10 @@ pub const CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v1+cbor";
 pub const SERVICE_ACCOUNT_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v2+cbor";
 /// The envelope of an install event, recorded by the directory service itself.
 pub const INSTALL_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v3+cbor";
+/// The distinct envelope for immutable drafts and their decisions.
+pub const DRAFT_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v1+cbor";
+/// The envelope retaining original request bytes and terminal decisions.
+pub const DRAFT_V2_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v2+cbor";
 
 fn content_type(event: &IdentityEvent) -> &'static str {
     if event.version() == 2 {
@@ -89,6 +94,8 @@ pub enum Entry {
     Identity(IdentityEvent),
     /// A change to the install as a whole, recorded by the service itself.
     Install(InstallEvent),
+    /// A prepared change or a decision bound to its hash.
+    Draft(Box<DraftEvent>),
 }
 
 /// An event with the exact bytes that were signed, ready to append or just verified.
@@ -116,6 +123,7 @@ impl SignedEvent {
         match &self.entry {
             Entry::Identity(event) => Ok(event),
             Entry::Install(_) => Err(IdentityError::InstallEntry),
+            Entry::Draft(_) => Err(IdentityError::DraftEntry),
         }
     }
 
@@ -174,6 +182,26 @@ fn seal(
     })
 }
 
+/// Validate and sign a canonical draft payload with the directory service key.
+pub fn sign_draft_event(
+    event: DraftEvent,
+    service_key: &Ed25519Identity,
+) -> Result<SignedEvent, IdentityError> {
+    event.validate_new()?;
+    let body = draft_event::encode(&event);
+    let media_type = if event.version() == 2 {
+        DRAFT_V2_CONTENT_TYPE
+    } else {
+        DRAFT_CONTENT_TYPE
+    };
+    seal(
+        &body,
+        media_type,
+        Entry::Draft(Box::new(event)),
+        service_key,
+    )
+}
+
 /// Verify `message` against the directory service's public key and return the event it carries.
 pub fn verify_event(
     message: &[u8],
@@ -194,6 +222,8 @@ pub fn verify_event(
     if parts.protected != protected_header(&kid, CONTENT_TYPE)
         && parts.protected != protected_header(&kid, SERVICE_ACCOUNT_CONTENT_TYPE)
         && parts.protected != protected_header(&kid, INSTALL_CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, DRAFT_CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, DRAFT_V2_CONTENT_TYPE)
     {
         return Err(IdentityError::EventMalformed {
             reason: "the protected header is not the identity-event header",
@@ -212,15 +242,24 @@ pub fn verify_event(
     {
         return Err(IdentityError::SignatureInvalid);
     }
-    let (entry, media_type) =
-        if install_event::body_version(&parts.payload)? == Some(INSTALL_EVENT_VERSION) {
-            let event = install_event::decode(&parts.payload)?;
-            (Entry::Install(event), INSTALL_CONTENT_TYPE)
+    let (entry, media_type) = if parts.protected == protected_header(&kid, DRAFT_CONTENT_TYPE)
+        || parts.protected == protected_header(&kid, DRAFT_V2_CONTENT_TYPE)
+    {
+        let draft = draft_event::decode(&parts.payload)?;
+        let media_type = if draft.version() == 2 {
+            DRAFT_V2_CONTENT_TYPE
         } else {
-            let event = decode_body(&parts.payload)?;
-            let media_type = content_type(&event);
-            (Entry::Identity(event), media_type)
+            DRAFT_CONTENT_TYPE
         };
+        (Entry::Draft(Box::new(draft)), media_type)
+    } else if install_event::body_version(&parts.payload)? == Some(INSTALL_EVENT_VERSION) {
+        let event = install_event::decode(&parts.payload)?;
+        (Entry::Install(event), INSTALL_CONTENT_TYPE)
+    } else {
+        let event = decode_body(&parts.payload)?;
+        let media_type = content_type(&event);
+        (Entry::Identity(event), media_type)
+    };
     if parts.protected != protected_header(&kid, media_type) {
         return Err(malformed(
             "the identity event body version differs from its envelope",
@@ -284,3 +323,11 @@ pub fn load_service_key(path: &std::path::Path) -> Result<Ed25519Identity, Ident
         reason: error.to_string(),
     })
 }
+
+#[cfg(test)]
+#[path = "draft_event_tests.rs"]
+mod draft_tests;
+
+#[cfg(test)]
+#[path = "draft_decision_tests.rs"]
+mod decision_tests;
