@@ -260,6 +260,7 @@ impl ServerError {
             Self::Goal(error) => error.status(),
             Self::Team(error) => error.status(),
             Self::Budget(error) => error.status(),
+            Self::Holding(error) => error.status(),
         }
     }
 }

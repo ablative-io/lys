@@ -20,6 +20,7 @@ fn server(error: &ServerError) -> &str {
     match error {
         ServerError::Team(error) => team(error),
         ServerError::Budget(error) => budget(error),
+        ServerError::Holding(error) => error.name(),
         ServerError::HarnessCatalogueUnreadable { .. } => "harness_catalogue_unreadable",
         ServerError::Identity(error) => identity(error),
         ServerError::Grant(error) => grant(error),
