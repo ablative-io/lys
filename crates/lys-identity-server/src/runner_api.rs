@@ -38,7 +38,7 @@ use serde_json::{Value, json};
 use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::provisioning_store::SessionSettings;
-use crate::routes::{AppState, signed_in, with_directory};
+use crate::routes::{AppState, signed_in};
 use crate::runner_acts::{Digested, RunnerAct};
 use crate::runner_client::RunnerRecord;
 use crate::runner_sessions::{Driven, driven, ended_in, keep_act, kind, operator, record_end};
