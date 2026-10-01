@@ -15,6 +15,10 @@
 
 use lys_runner::operations::{OperationOutcome, OperationState};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+#[path = "goals_index.rs"]
+mod index;
 
 #[cfg(test)]
 #[path = "goals_operation_tests.rs"]
@@ -333,12 +337,38 @@ fn after(goal: &Goal, remind: &Remind, fired: u64) -> Option<u64> {
 
 /// The goals as their log folds them, in the order set.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The items.
     pub items: Vec<Item>,
     /// The operation ids of the events kept.
     pub events: Vec<String>,
+    #[serde(skip)]
+    index: Arc<index::Index>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    items: Vec<Item>,
+    events: Vec<String>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let index = Arc::new(index::Index::of(&records.items, &records.events));
+        Self {
+            items: records.items,
+            events: records.events,
+            index,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -351,55 +381,44 @@ struct Sealed {
 impl Held {
     /// The item `id`.
     pub fn item(&self, id: &str) -> Option<&Item> {
-        self.items
-            .iter()
-            .inspect(|_| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
-            })
-            .find(|item| item.goal.id == id)
+        self.index
+            .items
+            .get(id)
+            .and_then(|position| self.items.get(*position))
+    }
+
+    fn position(&self, id: &str) -> Result<usize, String> {
+        self.index
+            .items
+            .get(id)
+            .copied()
+            .ok_or_else(|| format!("no goal `{id}` is held"))
     }
 
     fn item_mut(&mut self, id: &str) -> Result<&mut Item, String> {
+        let position = self.position(id)?;
         self.items
-            .iter_mut()
-            .find(|item| item.goal.id == id)
+            .get_mut(position)
             .ok_or_else(|| format!("no goal `{id}` is held"))
     }
 
     /// The judgement kept under `operation`.
     pub fn marked(&self, operation: &str) -> Option<&Marked> {
         self.items
-            .iter()
-            .filter_map(|item| item.marked.as_ref())
-            .inspect(|_| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
-            })
-            .find(|marked| marked.operation == operation)
+            .get(*self.index.marked.get(operation)?)?
+            .marked
+            .as_ref()
     }
 
     /// The change kept under an operation id.
     pub fn changed(&self, operation: &str) -> Option<&Changed> {
-        self.items
-            .iter()
-            .flat_map(|item| &item.changes)
-            .inspect(|_| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
-            })
-            .find(|changed| changed.operation == operation)
+        let (item, change) = self.index.changed.get(operation)?;
+        self.items.get(*item)?.changes.get(*change)
     }
 
     /// Whether `operation` names a firing, event or aim change already kept.
     pub fn kept(&self, operation: &str) -> bool {
-        self.changed(operation).is_some()
-            || self.events.iter().any(|event| event == operation)
-            || self
-                .items
-                .iter()
-                .flat_map(|item| &item.fired)
-                .any(|fired| fired.operation == operation)
+        self.index.kept.contains(operation)
     }
 
     /// Every item held on `holder`, in the order set.
@@ -456,6 +475,9 @@ impl Held {
                         next_due: first_due(&goal, remind),
                     })
                     .collect();
+                Arc::make_mut(&mut self.index)
+                    .items
+                    .insert(goal.id.clone(), self.items.len());
                 self.items.push(Item {
                     goal,
                     standing: Standing::Open,
@@ -466,6 +488,8 @@ impl Held {
                 });
             }
             Line::Marked(marked) => {
+                let position = self.position(&marked.goal)?;
+                let operation = marked.operation.clone();
                 let item = self.item_mut(&marked.goal)?;
                 if item.standing != Standing::Open || marked.standing == Standing::Open {
                     return Err(format!("goal `{}` cannot be marked so", marked.goal));
@@ -475,6 +499,7 @@ impl Held {
                 for timer in &mut item.timers {
                     timer.next_due = None;
                 }
+                Arc::make_mut(&mut self.index).mark(position, &operation);
             }
             Line::Changed(changed) => {
                 changed.change.check().map_err(|error| error.to_string())?;
@@ -488,7 +513,10 @@ impl Held {
                 if item.standing != Standing::Open {
                     return Err(format!("goal `{}` is already closed", changed.goal));
                 }
-                item.changes.push(changed);
+                let change = item.changes.len();
+                let position = self.position(&changed.goal)?;
+                Arc::make_mut(&mut self.index).change(position, change, &changed.operation);
+                self.items[position].changes.push(changed);
             }
             Line::Fired(fired) => self.fire(fired)?,
             Line::Answered(answered) => self.answer(&answered)?,
@@ -497,6 +525,9 @@ impl Held {
                     return Err(format!("operation `{}` is already kept", evented.operation));
                 }
                 self.events.push(evented.operation.clone());
+                Arc::make_mut(&mut self.index)
+                    .kept
+                    .insert(evented.operation.clone());
                 for goal in &evented.goals {
                     let item = self.item_mut(goal)?;
                     if item.standing != Standing::Open {
@@ -524,6 +555,7 @@ impl Held {
                 fired.operation
             ));
         }
+        let position = self.position(&fired.goal)?;
         let item = self.item_mut(&fired.goal)?;
         let goal = item.goal.clone();
         let timer = item
@@ -531,17 +563,24 @@ impl Held {
             .get_mut(fired.reminder)
             .ok_or_else(|| format!("goal `{}` has no reminder {}", goal.id, fired.reminder))?;
         timer.next_due = after(&goal, &timer.remind, fired.fired);
-        item.fired.push(fired);
+        let firing = item.fired.len();
+        Arc::make_mut(&mut self.index).fire(position, firing, &fired);
+        self.items[position].fired.push(fired);
         Ok(())
     }
 
     fn answer(&mut self, answered: &Answered) -> Result<(), String> {
+        let (item, firing, delivery) = self
+            .index
+            .sent
+            .get(&answered.operation)
+            .copied()
+            .ok_or_else(|| format!("no delivery `{}` is held", answered.operation))?;
         let sent = self
             .items
-            .iter_mut()
-            .flat_map(|item| item.fired.iter_mut())
-            .flat_map(|fired| fired.sent.iter_mut())
-            .find(|sent| sent.operation == answered.operation)
+            .get_mut(item)
+            .and_then(|item| item.fired.get_mut(firing))
+            .and_then(|fired| fired.sent.get_mut(delivery))
             .ok_or_else(|| format!("no delivery `{}` is held", answered.operation))?;
         sent.state = answered.state;
         sent.words.clone_from(&answered.words);
@@ -551,15 +590,13 @@ impl Held {
 
     /// The delivery asked under `operation`.
     pub fn sent(&self, operation: &str) -> Option<&Sent> {
+        let (item, firing, delivery) = self.index.sent.get(operation)?;
         self.items
-            .iter()
-            .flat_map(|item| &item.fired)
-            .flat_map(|fired| &fired.sent)
-            .inspect(|_| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
-            })
-            .find(|sent| sent.operation == operation)
+            .get(*item)?
+            .fired
+            .get(*firing)?
+            .sent
+            .get(*delivery)
     }
 
     /// Every delivery still asked of a runner, with the text it types.
@@ -591,9 +628,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("goals state: {error}"))
     }

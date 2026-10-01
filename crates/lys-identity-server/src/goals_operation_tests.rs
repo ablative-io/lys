@@ -76,10 +76,13 @@ fn goal_operation_and_entity_lookups_visit_no_history_after_restore_and_tail_wri
     let bytes = held.encode()?;
     let mut restored = Held::decode(&bytes)?;
     assert_eq!(restored.encode()?, bytes);
+    let copied = restored.clone();
+    assert!(std::sync::Arc::ptr_eq(&restored.index, &copied.index));
     restored.hold(Line::Set(goal("tail")))?;
     reset();
     assert!(restored.item("goal-255").is_some());
     assert!(restored.item("tail").is_some());
+    assert!(copied.item("tail").is_none());
     assert!(restored.marked("mark-255").is_some());
     assert!(restored.changed("change-255").is_some());
     assert!(restored.kept("firing-255"));
@@ -101,5 +104,59 @@ fn goal_operation_and_entity_lookups_visit_no_history_after_restore_and_tail_wri
         0,
         "goal lookup walked unrelated history"
     );
+    Ok(())
+}
+
+#[test]
+fn reused_delivery_and_mark_ids_keep_the_first_item_location() -> Result<(), Box<dyn Error>> {
+    let mut held = Held::default();
+    held.hold(Line::Set(goal("one")))?;
+    held.hold(Line::Set(goal("two")))?;
+    for id in ["two", "one"] {
+        held.hold(Line::Fired(Fired {
+            operation: format!("fire-{id}"),
+            goal: id.to_owned(),
+            reminder: 0,
+            due: 2,
+            fired: 2,
+            late: false,
+            text: id.to_owned(),
+            refused: None,
+            sent: vec![Sent {
+                session: id.to_owned(),
+                operation: "delivery".to_owned(),
+                state: Delivery::Pending,
+                words: String::new(),
+                at: 2,
+            }],
+        }))?;
+        held.hold(Line::Marked(Marked {
+            operation: "mark".to_owned(),
+            goal: id.to_owned(),
+            standing: Standing::Met,
+            by: "person".to_owned(),
+            words: id.to_owned(),
+            evidence: None,
+            at: 3,
+        }))?;
+    }
+    held.hold(Line::Answered(Answered {
+        operation: "delivery".to_owned(),
+        state: Delivery::Delivered,
+        words: "kept".to_owned(),
+        at: 4,
+    }))?;
+    assert_eq!(
+        held.sent("delivery").map(|sent| sent.session.as_str()),
+        Some("one")
+    );
+    assert_eq!(held.items[1].fired[0].sent[0].state, Delivery::Pending);
+    assert_eq!(
+        held.marked("mark").map(|mark| mark.goal.as_str()),
+        Some("one")
+    );
+    let restored = Held::decode(&held.encode()?)?;
+    assert_eq!(restored.sent("delivery"), held.sent("delivery"));
+    assert_eq!(restored.marked("mark"), held.marked("mark"));
     Ok(())
 }
