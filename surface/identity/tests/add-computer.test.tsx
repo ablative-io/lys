@@ -60,6 +60,16 @@ async function retry() {
   await act(async () => { button.click(); });
 }
 
+function plain(code: string) {
+  const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
+  expect(details?.textContent).toContain(code);
+  expect(details?.open).toBe(false);
+  const face = document.body.cloneNode(true) as HTMLElement;
+  for (const detail of face.querySelectorAll('details')) detail.remove();
+  expect(face.textContent).not.toContain(code);
+  expect(face.textContent).toContain('Lys could not confirm this computer addition.');
+}
+
 const legacy: NameMachine = { operation: 'op-' + 'c'.repeat(32), name: 'Earlier computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [SCRIBE], may_run_roles: ['role-one'], may_reach: ['mcp.example.test'] };
 
 describe('Naming the computer Lys runs on', () => {
@@ -90,6 +100,7 @@ describe('Naming the computer Lys runs on', () => {
     const first = await open(routes); await submit();
     expect(first.posted).toHaveLength(2);
     expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
+    plain('RunnerUnavailable');
     const original = first.posted[1];
     routes['POST ' + original.path] = (body) => ok({ machine: (first.posted[0].body as NameMachine).operation, ...(body as object) });
     const next = await remount(routes); await retry();
@@ -120,6 +131,7 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('runner');
     expect(document.body.textContent).not.toContain('Lys will start agents on it');
     expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
+    plain('RunnerReceiptMismatch');
   });
 
   it('does not clear the local-runner phase when its answer names another machine', async () => {
@@ -129,6 +141,7 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('RunnerReceiptMismatch');
     expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
     expect(document.body.textContent).not.toContain('Lys will start agents on it');
+    plain('RunnerReceiptMismatch');
   });
 
   it('names corrupt pending state and sends no replacement request', async () => {
@@ -137,6 +150,7 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('PendingMachineUnreadable');
     expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
     expect(posted).toEqual([]);
+    plain('PendingMachineUnreadable');
   });
 
   it('blocks a second submit while naming and runner recording are in progress', async () => {
