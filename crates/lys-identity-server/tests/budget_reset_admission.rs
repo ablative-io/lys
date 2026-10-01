@@ -41,6 +41,25 @@ impl Table {
         uses: Vec<Usage>,
         has_session: bool,
     ) -> TestResult<Self> {
+        Self::with_period(measure, uses, has_session, Length::Week).await
+    }
+
+    async fn with_period(
+        measure: Measure,
+        uses: Vec<Usage>,
+        has_session: bool,
+        length: Length,
+    ) -> TestResult<Self> {
+        Self::with_session_history(measure, uses, has_session, length, false).await
+    }
+
+    async fn with_session_history(
+        measure: Measure,
+        uses: Vec<Usage>,
+        has_session: bool,
+        length: Length,
+        stopped: bool,
+    ) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
             let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
@@ -53,7 +72,7 @@ impl Table {
                         .ok_or("no runtime directory")?,
                     Arc::clone(&key),
                 )?;
-                runtime.report(Report {
+                let first = Report {
                     operation: OperationId::generate()?.to_string(),
                     session: OperationId::generate()?.to_string(),
                     agent: Some(agent.clone()),
@@ -64,7 +83,17 @@ impl Table {
                     reported_by: seed.people[0].id.to_string(),
                     at: 1,
                     launch: None,
-                })?;
+                };
+                runtime.report(first.clone())?;
+                if stopped {
+                    runtime.report(Report {
+                        operation: OperationId::generate()?.to_string(),
+                        state: Reported::Stopped,
+                        at: 2,
+                        confirmation: "session stopped".to_owned(),
+                        ..first
+                    })?;
+                }
             }
             let mut store = BudgetStore::open(
                 config

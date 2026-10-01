@@ -17,7 +17,7 @@
 //! snapshot and only the leaves after it. A snapshot refused, or a state that
 //! does not read back, sends the start to every leaf, by name, never silently.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -47,7 +47,7 @@ pub struct RuntimeStore<S: LeafStore = FileLeafStore> {
     key: Arc<Ed25519Identity>,
     log: FrontierLog<S>,
     held: Held,
-    agents_with_sessions: Arc<BTreeSet<String>>,
+    agents_with_sessions: Arc<BTreeMap<String, SessionActivity>>,
     start: Start,
     since_snapshot: u64,
     snapshot_failure: Option<String>,
@@ -57,48 +57,14 @@ pub struct RuntimeStore<S: LeafStore = FileLeafStore> {
 /// A log opened and folded: the log, what it folds to, and how it started.
 type Opened<S> = (FrontierLog<S>, Held, Start);
 
-#[derive(Default)]
-struct SessionIndex {
-    agents: BTreeMap<String, SessionActivity>,
-    copies: Arc<AtomicUsize>,
-}
-
-impl Clone for SessionIndex {
-    fn clone(&self) -> Self {
-        self.copies.fetch_add(1, Ordering::Relaxed);
-        Self {
-            agents: self.agents.clone(),
-            copies: Arc::clone(&self.copies),
-        }
-    }
-}
-
 /// Derived session activity, bounded to one entry per agent.
 #[derive(Clone, Default)]
 pub struct SessionActivity {
     live: usize,
-    sessions: BTreeSet<String>,
     stopped_at: Option<u64>,
 }
 
 impl SessionActivity {
-    /// The live session ids, without their report history.
-    pub fn live_sessions(&self) -> &BTreeSet<String> {
-        &self.sessions
-    }
-
-    pub(crate) fn unreported_session(&self, reported: impl Fn(&str) -> bool) -> Option<&str> {
-        self.sessions
-            .iter()
-            .find(|session| !reported(session))
-            .map(String::as_str)
-    }
-
-    /// Whether the runtime has never reported a session for this agent.
-    pub(crate) fn never_ran(&self) -> bool {
-        self.live == 0 && self.sessions.is_empty() && self.stopped_at.is_none()
-    }
-
     pub(crate) fn active_since(&self, since_ms: Option<i64>) -> bool {
         self.live > 0
             || since_ms.is_none_or(|since| {
@@ -147,7 +113,7 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
-        let agents_with_sessions = session_agents(&held);
+        let agents_with_sessions = session_agents(&held)?;
         let mut store = Self {
             reopen,
             key,
@@ -208,7 +174,7 @@ impl<S: LeafStore> RuntimeStore<S> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
-            self.agents_with_sessions = session_agents(&held);
+            self.agents_with_sessions = session_agents(&held)?;
             self.held = held;
             self.start = start.clone();
             self.uncertain = false;
@@ -223,17 +189,20 @@ impl<S: LeafStore> RuntimeStore<S> {
         let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
-            let new_agent = report
+            let transition = report
                 .agent
                 .as_ref()
-                .filter(|agent| !self.agents_with_sessions.contains(*agent))
-                .cloned();
+                .filter(|_| matches!(report.state, Reported::Starting | Reported::Stopped))
+                .map(|agent| (agent.clone(), report.state, report.at));
             if let Err(reason) = self.held.hold(report) {
                 self.uncertain = true;
                 return Err(unavailable(reason));
             }
-            if let Some(agent) = new_agent {
-                Arc::make_mut(&mut self.agents_with_sessions).insert(agent);
+            if let Some((agent, state, at)) = transition
+                && let Err(error) = self.session_transition(agent, state, at)
+            {
+                self.uncertain = true;
+                return Err(error);
             }
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
@@ -258,9 +227,42 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 
     /// Agents with a durably recorded session, shared without copying their history.
-    pub fn agents_with_sessions(&mut self) -> Result<Arc<BTreeSet<String>>, ServerError> {
+    pub fn agents_with_sessions(
+        &mut self,
+    ) -> Result<Arc<BTreeMap<String, SessionActivity>>, ServerError> {
         self.settle()?;
         Ok(Arc::clone(&self.agents_with_sessions))
+    }
+
+    fn session_transition(
+        &mut self,
+        agent: String,
+        state: Reported,
+        at: u64,
+    ) -> Result<(), ServerError> {
+        let activity = Arc::make_mut(&mut self.agents_with_sessions)
+            .entry(agent)
+            .or_default();
+        match state {
+            Reported::Starting => {
+                activity.live = activity
+                    .live
+                    .checked_add(1)
+                    .ok_or_else(|| unavailable("live session count overflows"))?;
+            }
+            Reported::Stopped => {
+                activity.live = activity
+                    .live
+                    .checked_sub(1)
+                    .ok_or_else(|| unavailable("stopped session has no live session count"))?;
+                activity.stopped_at =
+                    Some(activity.stopped_at.map_or(at, |earlier| earlier.max(at)));
+            }
+            Reported::Running | Reported::StopAsked => {
+                return Err(unavailable("a non-transition reached the session index"));
+            }
+        }
+        Ok(())
     }
 
     /// The session named `session`.
@@ -346,13 +348,30 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 }
 
-fn session_agents(held: &Held) -> Arc<BTreeSet<String>> {
-    Arc::new(
-        held.sessions
-            .iter()
-            .filter_map(|tracked| tracked.agent.clone())
-            .collect(),
-    )
+fn session_agents(held: &Held) -> Result<Arc<BTreeMap<String, SessionActivity>>, ServerError> {
+    let mut agents: BTreeMap<String, SessionActivity> = BTreeMap::new();
+    for tracked in &held.sessions {
+        let Some(agent) = &tracked.agent else {
+            continue;
+        };
+        let latest = tracked
+            .latest()
+            .ok_or_else(|| unavailable("a runtime session has no reports"))?;
+        let activity = agents.entry(agent.clone()).or_default();
+        if latest.state == Reported::Stopped {
+            activity.stopped_at = Some(
+                activity
+                    .stopped_at
+                    .map_or(latest.at, |at| at.max(latest.at)),
+            );
+        } else {
+            activity.live = activity
+                .live
+                .checked_add(1)
+                .ok_or_else(|| unavailable("live session count overflows"))?;
+        }
+    }
+    Ok(Arc::new(agents))
 }
 
 /// Open the log from its snapshot, or from every leaf when the snapshot or

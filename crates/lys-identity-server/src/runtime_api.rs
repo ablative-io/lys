@@ -16,7 +16,7 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -147,7 +147,7 @@ pub(crate) fn with_runtime<T>(
 /// Lifetime session knowledge; absent when no runtime history is configured.
 pub(crate) fn session_agents(
     state: &AppState,
-) -> Result<Option<Arc<BTreeSet<String>>>, ServerError> {
+) -> Result<Option<Arc<BTreeMap<String, SessionActivity>>>, ServerError> {
     if state.runtime.is_none() {
         return Ok(None);
     }
