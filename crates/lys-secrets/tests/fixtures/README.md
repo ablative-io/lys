@@ -31,3 +31,15 @@ pack. A test creates its own store and installs the recorded audit log.
 This preserves independent writable test directories without regenerating
 the large signed history. The fixture format is test tooling; it does not
 change any signed production format.
+
+Ordinary tests read the recorded archive and manifest from this directory.
+They reject missing artifacts, unknown fields or formats, wrong counts,
+archive or frame hashes, truncated frames, trailing bytes, and mismatched
+key or pinned root. They never generate the archive as a fallback.
+
+Each log-window case unpacks into its own temporary directory. Archive
+frames borrow one bounded input buffer; no shared cache or cache lock is
+used. The empty broker is created through its normal API, then its audit
+files are replaced with the recorded frames. Copying frames makes no
+explicit disk sync and calls no audit append. The original paging,
+full-signature-audit, tamper and snapshot-resume assertions remain intact.
