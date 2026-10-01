@@ -558,3 +558,7 @@ fn source_gaps(
     }
     Ok(unavailable)
 }
+
+#[cfg(test)]
+#[path = "budgets_live_context_tests.rs"]
+mod live_context_tests;
