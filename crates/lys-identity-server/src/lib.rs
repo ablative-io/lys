@@ -12,6 +12,7 @@ pub mod admission;
 mod agent_grants_api;
 pub mod agent_pass;
 pub mod agent_pass_store;
+
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_sight;
@@ -122,6 +123,8 @@ mod openapi_table;
 mod openapi_typed;
 mod openapi_types;
 pub mod operator;
+#[cfg(test)]
+mod pass_provenance_tests;
 pub mod provider;
 pub mod provisioning_api;
 pub mod provisioning_store;

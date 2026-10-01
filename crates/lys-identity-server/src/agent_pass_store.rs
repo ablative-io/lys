@@ -1,7 +1,7 @@
 //! Bounded run-pass digests; admission reads cached state and endings are durable.
 use crate::error::ServerError;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use lys_identity::AgentId;
+use lys_identity::{AgentId, Provenance};
 use rand::{TryRngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -146,18 +146,29 @@ impl Passes {
         }
     }
 
-    pub(crate) fn lookup(&self, pass: &str) -> Result<AgentId, ServerError> {
+    fn entry(&self, pass: &str) -> Result<&Entry, ServerError> {
         self.ready()?;
         if pass.len() != 43 {
             return Err(refused());
         }
-        self.stored
-            .passes
-            .get(&digest(pass))
-            .ok_or_else(refused)?
+        self.stored.passes.get(&digest(pass)).ok_or_else(refused)
+    }
+
+    pub(crate) fn lookup(&self, pass: &str) -> Result<AgentId, ServerError> {
+        self.entry(pass)?
             .agent
             .parse()
             .map_err(|error| unavailable(format!("stored agent identifier is invalid: {error}")))
+    }
+
+    pub(crate) fn lookup_run(&self, pass: &str) -> Result<(AgentId, Provenance), ServerError> {
+        let entry = self.entry(pass)?;
+        let agent = entry
+            .agent
+            .parse::<AgentId>()
+            .map_err(|error| unavailable(format!("stored agent identifier is invalid: {error}")))?;
+        let provenance = Provenance::by_pass(agent, &entry.launch, &entry.session)?;
+        Ok((agent, provenance))
     }
 
     /// Whether this run already has a pass, without retaining its secret.

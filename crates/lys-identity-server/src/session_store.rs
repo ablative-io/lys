@@ -48,13 +48,37 @@ struct StoredActor {
     authenticated_at: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum RunMethod {
+    AgentPass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredRunActor {
+    issuer: String,
+    subject: String,
+    method: RunMethod,
+    agent: String,
+    launch: String,
+    session: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SessionActor {
+    Authenticated(StoredActor),
+    AgentPass(StoredRunActor),
+}
+
 /// One session, as stored, under the SHA-256 of its cookie secret.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StoredSession {
     key: String,
     id: String,
-    actor: StoredActor,
+    actor: SessionActor,
     started_at: u64,
     ends_at: u64,
 }
@@ -70,6 +94,49 @@ struct StoredSessions {
 fn unavailable(path: &Path, what: &str) -> ServerError {
     ServerError::SessionsUnavailable {
         reason: format!("{}: {what}", path.display()),
+    }
+}
+
+impl SessionActor {
+    fn of(actor: &Actor) -> Result<Self, ServerError> {
+        if let Provenance::AgentPass {
+            agent,
+            launch,
+            session,
+        } = actor.provenance()
+        {
+            return Ok(Self::AgentPass(StoredRunActor {
+                issuer: actor.binding().issuer().to_owned(),
+                subject: actor.binding().subject().to_owned(),
+                method: RunMethod::AgentPass,
+                agent: agent.to_string(),
+                launch: launch.clone(),
+                session: session.clone(),
+            }));
+        }
+        StoredActor::of(actor).map(Self::Authenticated)
+    }
+
+    fn actor(&self, path: &Path) -> Result<Actor, ServerError> {
+        match self {
+            Self::Authenticated(actor) => actor.actor(path),
+            Self::AgentPass(actor) => {
+                let agent = actor.agent.parse::<AgentId>().map_err(|error| {
+                    unavailable(path, &format!("a stored agent does not read: {error}"))
+                })?;
+                Ok(Actor::new(
+                    LoginBinding::new(&actor.issuer, &actor.subject).map_err(|error| {
+                        unavailable(path, &format!("a stored login does not read: {error}"))
+                    })?,
+                    Provenance::by_pass(agent, &actor.launch, &actor.session).map_err(|error| {
+                        unavailable(
+                            path,
+                            &format!("stored pass provenance does not read: {error}"),
+                        )
+                    })?,
+                ))
+            }
+        }
     }
 }
 
@@ -97,7 +164,11 @@ impl StoredActor {
             subject: actor.binding().subject().to_owned(),
             method,
             agent,
-            authenticated_at: provenance.authenticated_at(),
+            authenticated_at: provenance.authenticated_at().ok_or_else(|| {
+                ServerError::AgentPassRefused {
+                    reason: "a run-pass actor cannot use timed session encoding".to_owned(),
+                }
+            })?,
         })
     }
 
@@ -184,7 +255,7 @@ pub fn save<S: BuildHasher>(
             Ok(StoredSession {
                 key: key.clone(),
                 id: entry.id.clone(),
-                actor: StoredActor::of(&entry.actor)?,
+                actor: SessionActor::of(&entry.actor)?,
                 started_at: entry.started_at,
                 ends_at: entry.ends_at,
             })
@@ -227,3 +298,7 @@ fn beside(path: &Path) -> PathBuf {
     name.push(".writing");
     path.with_file_name(name)
 }
+
+#[cfg(test)]
+#[path = "session_provenance_tests.rs"]
+mod tests;
