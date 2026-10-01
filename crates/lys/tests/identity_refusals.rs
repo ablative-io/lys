@@ -8,15 +8,14 @@
 
 pub mod identity_support;
 
-use std::time::{Duration, Instant};
+use std::process::Command;
+
+use tokio::net::TcpSocket;
 
 use identity_support::compose::{self, require_runtime};
 use identity_support::fixtures::{Deployment, TestResult, output_text, succeeded};
 
 const REMOTE_HOST: &str = "192.0.2.10";
-
-/// How long Rauthy, started with no reachable database, is given to answer.
-const RAUTHY_ANSWERS_WITHIN: Duration = Duration::from_secs(20);
 
 fn remote_database(text: &str) -> String {
     text.lines()
@@ -139,22 +138,39 @@ fn a_network_database_address_is_carried_into_both_services() -> TestResult {
 #[test]
 fn id001_deploy_refusal_unavailable_database_is_named() -> TestResult {
     require_runtime()?;
-    let deployment = Deployment::new("unavailable", |text| remote_database(&text))?;
+    // Binding without listening reserves the port while every connect is refused.
+    let unavailable = TcpSocket::new_v4()?;
+    unavailable.bind("127.0.0.1:0".parse()?)?;
+    let address = unavailable.local_addr()?;
+    let deployment = Deployment::new("unavailable", |text| {
+        remote_database(&text)
+            .replace(REMOTE_HOST, "127.0.0.1")
+            .replace("port = 5432", &format!("port = {}", address.port()))
+            .replace("127.0.0.1:5432", &address.to_string())
+    })?;
     compose::render(&deployment)?;
-    compose::up(&deployment, &["rauthy"])?;
-    // Rauthy is given until the deadline to come up and answer; health is
-    // read as soon as it answers anything but unreachable.
-    let deadline = Instant::now() + RAUTHY_ANSWERS_WITHIN;
-    let health = loop {
-        let health = deployment.lys("health")?;
-        let reached = !output_text(&health)
-            .lines()
-            .any(|line| line.starts_with("rauthy unready: rauthy_unreachable"));
-        if reached || Instant::now() >= deadline {
-            break health;
-        }
-        std::thread::sleep(Duration::from_secs(2));
-    };
+    succeeded(
+        &compose::compose(&deployment, &["create", "rauthy"])?,
+        "create the unavailable-database service",
+    )?;
+    let listed = compose::compose(&deployment, &["ps", "--all", "--quiet", "rauthy"])?;
+    succeeded(&listed, "find the unavailable-database container")?;
+    let container = String::from_utf8(listed.stdout)?;
+    let container = container.trim();
+    if container.is_empty() || container.split_whitespace().count() != 1 {
+        return Err("unavailable_database_container_missing: expected one Rauthy container".into());
+    }
+    succeeded(
+        &Command::new("docker")
+            .args(["update", "--restart=no", container])
+            .output()?,
+        "disable restarting the failed test service",
+    )?;
+    compose::start(&deployment, "rauthy")?;
+    let exited = Command::new("docker").args(["wait", container]).output()?;
+    succeeded(&exited, "wait for the unavailable-database service to exit")?;
+    assert_ne!(String::from_utf8(exited.stdout)?.trim().parse::<u32>()?, 0);
+    let health = deployment.lys("health")?;
     let text = output_text(&health);
     assert!(!health.status.success(), "{text}");
     assert!(
