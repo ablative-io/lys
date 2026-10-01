@@ -173,3 +173,43 @@ fn staged_holds_finish_durably_and_survive_restart() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn borrowed_team_reads_match_pending_migration_without_copying_the_catalogue() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let mut store = TeamStore::open(&dir.path().join("teams"), key)?;
+    store.held = populated()?;
+    store.held.teams[0].lead = Some("member".to_owned());
+    let lines = vec![held("borrow-hold", "team-0"), checked("borrow-check")];
+    let mut expected = store.held.clone();
+    for line in &lines {
+        expected.hold(line.clone())?;
+    }
+    store.stage_migration(lines)?;
+    crate::teams_state::reset_team_copies();
+    let borrowed: Vec<_> = store.teams_iter().collect();
+    assert_eq!(borrowed.len(), 64);
+    for (actual, expected) in borrowed.iter().zip(&expected.teams) {
+        assert_eq!(*actual, expected);
+    }
+    assert_eq!(
+        crate::teams_state::team_copies(),
+        0,
+        "a borrowed read must not build the catalogue"
+    );
+    assert!(std::ptr::eq(
+        borrowed[0],
+        store.team("team-0").ok_or("no migrated team")?
+    ));
+    assert!(std::ptr::eq(
+        borrowed[63],
+        store.held.team("team-63").ok_or("no base team")?
+    ));
+    assert_eq!(borrowed, store.teams().iter().collect::<Vec<_>>());
+    store.stage_migration(Vec::new())?;
+    let borrowed: Vec<_> = store.teams_iter().collect();
+    assert_eq!(borrowed, store.held.teams.iter().collect::<Vec<_>>());
+    assert_eq!(borrowed.len(), 64);
+    Ok(())
+}

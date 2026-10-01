@@ -71,7 +71,7 @@ fn admitted(
             reason: format!("the teams lock is poisoned: {error}"),
         })?;
         teams.settle()?;
-        crate::routes::people_giving::holds(teams.teams(), agent, person)?;
+        crate::routes::people_giving::holds(teams.teams_iter(), agent, person)?;
         if decision == Decision::Exercise {
             decide(&mut judged, &request, at, None, decision)?;
             if !enabled {
