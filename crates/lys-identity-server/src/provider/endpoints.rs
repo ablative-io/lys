@@ -169,7 +169,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::CodeUnknown
         | ServerError::VerifierWrong
         | ServerError::RedirectUnregistered => "invalid_grant",
-        ServerError::RequestMalformed { .. } => "invalid_request",
+        ServerError::RequestMalformed { .. } | ServerError::Holding(..) => "invalid_request",
         ServerError::Team(..)
         | ServerError::Budget(..)
         | ServerError::HarnessCatalogueUnreadable { .. }

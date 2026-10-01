@@ -31,6 +31,10 @@ pub mod budgets_context;
 pub mod budgets_crossing;
 pub mod budgets_enforce;
 pub mod budgets_feed;
+mod budgets_giving;
+pub mod budgets_holding;
+#[cfg(test)]
+mod budgets_holding_tests;
 pub mod budgets_index;
 pub mod budgets_legacy;
 pub mod budgets_limits;
@@ -56,6 +60,7 @@ pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
 pub mod error_budget;
+pub mod error_holding;
 mod error_names;
 #[cfg(test)]
 mod error_names_tests;

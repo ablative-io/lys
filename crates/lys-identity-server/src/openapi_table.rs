@@ -59,7 +59,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
-    POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];
+    POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]];
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
@@ -128,9 +128,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
+    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
     GET "/teams/{id}/budget" "A team's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
+    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
@@ -169,7 +169,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]];
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
-    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown", "SessionsUnavailable", "ProviderUnavailable"]];
+    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "ProviderUnavailable"]];
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];
@@ -183,9 +183,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/service-accounts/{id}/retire" "Retire a service account" S [SIGNED_BODY, &["ServiceAccountRetired", "ServiceAccountUnknown"]];
     GET "/tree" "The caller's owned and led teams and descendants" G [AGENT, SIGNED, &["TeamsUnavailable", "RolesUnavailable", "ProvisioningUnavailable", "RuntimeUnavailable", "BudgetsUnavailable", "ConfigurationUnavailable", "goals_unavailable"]];
     GET "/teams" "Every team" S [SIGNED];
-    POST "/teams" "Create a team" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
+    POST "/teams" "Create a team" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "NoPerson"]];
     GET "/teams/{id}" "One team" S [SIGNED];
-    POST "/teams/{id}/members" "Add a team member" S [SIGNED_BODY, &["AgentNotVisible", "NotAdmitted", "not_permitted"]];
+    POST "/teams/{id}/members" "Add a team member" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["AgentNotVisible", "NotAdmitted", "not_permitted", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "TeamsUnavailable", "NoPerson"]];
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]];
     POST "/teams/{id}/nesting" "Replace a team parent and lead" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];

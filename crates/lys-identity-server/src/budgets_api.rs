@@ -10,9 +10,10 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
-use axum::http::HeaderMap;
+use axum::body::{Body, Bytes};
+use axum::extract::rejection::BytesRejection;
+use axum::extract::{FromRequest, OriginalUri, Path, State};
+use axum::http::{HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{Actor, AgentId, IdentityId};
@@ -207,11 +208,11 @@ async fn read(
 async fn set(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
     Path((kind, id)): Path<(String, String)>,
-    body: Result<Json<BudgetBody>, JsonRejection>,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let Json(body) = body.map_err(|rejected| {
+    let bytes = body.map_err(|rejected| {
         ServerError::Budget(BudgetError::BudgetRefused {
             refusal: "budget_malformed",
             words: rejected.body_text(),
@@ -221,21 +222,24 @@ async fn set(
         kind: kind_of(&kind)?,
         id,
     };
-    let by = authorised(&state, &actor, &holder)?;
-    if holder.kind == HolderKind::Person && !crate::routes::is_administrator(&state, &actor)? {
-        return Err(ServerError::NotPermitted {
-            reason: format!(
-                "a person's budget limits that person, so only an administrator sets the budget on person {}",
-                holder.id
-            ),
-        });
-    }
+    let giver =
+        crate::budgets_giving::giver(&state, &headers, ("PUT", uri.path(), &bytes), &holder)?;
+    let mut request = Request::new(Body::from(bytes));
+    *request.headers_mut() = headers;
+    let Json(body) = Json::<BudgetBody>::from_request(request, &state)
+        .await
+        .map_err(|rejected| {
+            ServerError::Budget(BudgetError::BudgetRefused {
+                refusal: "budget_malformed",
+                words: rejected.body_text(),
+            })
+        })?;
     let limits = Limits {
         holder: holder.clone(),
         limits: body.limits,
         warn_at: body.warn_at,
         version: body.version,
-        by,
+        by: giver.by(),
         at: now(),
     }
     .checked()
@@ -249,45 +253,7 @@ async fn set(
     let standings = crate::budgets_members::standings(&state)?;
     let agents = crate::budgets_members::covered(&holder, &standings);
     let at_ms = jiff::Timestamp::now().as_millisecond();
-    with_budgets(&state, |store| {
-        let old = store.held().limit_set(&holder);
-        let held = old.map_or(0, |limits| limits.version);
-        if held != body.version {
-            return Err(ServerError::Budget(BudgetError::BudgetVersionConflict {
-                held,
-                expected: body.version,
-            }));
-        }
-        for limit in &limits.limits {
-            if limit.zone.is_some()
-                && old.is_none_or(|old| {
-                    !old.limits.iter().any(|earlier| {
-                        earlier.unit == limit.unit
-                            && earlier.period == limit.period
-                            && earlier.zone == limit.zone
-                    })
-                })
-            {
-                return Err(ServerError::Budget(BudgetError::BudgetRefused{ refusal: "BudgetZoneRefused", words: "new limits use the organisation zone; only an existing explicit migrated zone may be retained".to_owned() }));
-            }
-            if matches!(limit.unit, Measure::Dollars | Measure::PlanPercent) {
-                let used =
-                    crate::budgets_usage::source_figure(store.held(), limit, &agents, &zone, at_ms)
-                        .map_err(|reason| {
-                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
-                        })?;
-                if let Some(reason) = used.unavailable {
-                    return Err(ServerError::Budget(BudgetError::BudgetRefused {
-                        refusal: "BudgetUnitUnavailable",
-                        words: format!("{} in {:?}: {reason}", limit.unit.name(), limit.period),
-                    }));
-                }
-            }
-        }
-        Ok(())
-    })?;
-    crate::budgets_migration::require_committed(&state)?;
-    with_budgets_mut(&state, |store| store.set_limits(limits, body.version))?;
+    crate::budgets_giving::append(&state, &giver, limits, body.version, &zone, &agents, at_ms)?;
     view(&state, &holder).map(Json)
 }
 
@@ -311,10 +277,18 @@ async fn team_budget(
 async fn set_team_budget(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    uri: OriginalUri,
     Path(id): Path<String>,
-    body: Result<Json<BudgetBody>, JsonRejection>,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
-    set(State(state), headers, Path(("team".to_owned(), id)), body).await
+    set(
+        State(state),
+        headers,
+        uri,
+        Path(("team".to_owned(), id)),
+        body,
+    )
+    .await
 }
 
 /// All budget reads share the same source validation and team aggregate computation.

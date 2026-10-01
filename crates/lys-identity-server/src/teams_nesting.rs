@@ -5,8 +5,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
+use axum::body::Bytes;
+use axum::extract::rejection::{BytesRejection, JsonRejection};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::HeaderMap;
 use lys_identity::{Actor, AgentId, OperationId};
 use serde::{Deserialize, Serialize};
@@ -134,10 +135,12 @@ fn position(
 pub(crate) async fn create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    body: Result<Json<CreateBody>, JsonRejection>,
+    OriginalUri(uri): OriginalUri,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let bytes = body.map_err(|refused| malformed(refused.body_text()))?;
+    let actor = crate::teams_api::giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    let body: CreateBody = crate::teams_api::giving::json(headers, bytes).await?;
     let id = OperationId::from_str(&body.operation)?.to_string();
     let name = words("name", &body.name, NAME_MAX)?;
     if name.is_empty() {
@@ -147,6 +150,18 @@ pub(crate) async fn create(
     let (parent, lead) = position(body.parent.as_deref(), body.lead)?;
     if parent.is_some() || lead.is_some() {
         crate::teams_migration::require_committed(&state)?;
+    }
+    if actor.provenance().agent().is_some() {
+        return crate::teams_api::giving::create(
+            &state,
+            &actor,
+            id,
+            name,
+            description,
+            parent,
+            lead,
+        )
+        .map(Json);
     }
     parent_owned(&state, &actor, parent.as_deref())?;
     crate::teams_migration::advance(&state)?;

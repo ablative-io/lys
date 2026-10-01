@@ -14,6 +14,9 @@ pub enum ServerError {
     /// A budget or organisation setting refusal, preserving its response.
     #[error(transparent)]
     Budget(#[from] crate::error_budget::BudgetError),
+    /// A giver's holding does not cover the requested gift.
+    #[error(transparent)]
+    Holding(#[from] crate::error_holding::HoldingError),
     /// A catalogue description could not be read before serving.
     #[error("harness_catalogue_unreadable: {file}: {reason}")]
     HarnessCatalogueUnreadable {

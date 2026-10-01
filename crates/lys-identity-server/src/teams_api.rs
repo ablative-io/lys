@@ -21,8 +21,9 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
+use axum::body::Bytes;
+use axum::extract::rejection::{BytesRejection, JsonRejection};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -37,6 +38,13 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
 use crate::teams_state::{Changed, Line, Team};
 use crate::teams_store::TeamStore;
+
+#[path = "teams_giving.rs"]
+pub(crate) mod giving;
+
+#[cfg(test)]
+#[path = "teams_giving_tests.rs"]
+mod giving_tests;
 
 /// The most characters a team's name carries.
 pub(crate) const NAME_MAX: usize = 100;
@@ -360,13 +368,23 @@ fn changed(
 async fn add(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
     Path(id): Path<String>,
-    body: Result<Json<MemberBody>, JsonRejection>,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    let bytes = body.map_err(|refused| malformed(refused.body_text()))?;
+    let actor = giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    let body: MemberBody = giving::json(headers.clone(), bytes).await?;
     let id = team_id(&id)?;
     let member = body.member.trim().to_owned();
+    if actor.provenance().agent().is_some() {
+        return giving::add(
+            &state,
+            &actor,
+            changed(&body.operation, id, member, login(actor.binding()))?,
+        )
+        .map(Json);
+    }
     may_add(&state, &headers, &actor, &member)?;
     change(&state, &actor, &id, |team, by| {
         changed(&body.operation, team, member, by).map(Line::Added)

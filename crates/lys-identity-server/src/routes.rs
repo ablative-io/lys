@@ -9,7 +9,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-use axum::extract::{Path, State};
+use axum::body::Bytes;
+use axum::extract::rejection::BytesRejection;
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::{HeaderMap, header};
 use axum::{Json, Router};
 use lys_identity::{
@@ -32,6 +34,13 @@ use crate::oidc::Oidc;
 use crate::reviews_store::ReviewStore;
 use crate::service_accounts_store::ServiceAccountStore;
 use crate::session::{Sessions, now};
+
+#[path = "people_giving.rs"]
+pub(crate) mod people_giving;
+
+#[cfg(test)]
+#[path = "people_giving_tests.rs"]
+mod people_giving_tests;
 
 /// Everything a request is served from.
 pub struct AppState {
@@ -407,16 +416,24 @@ pub(crate) async fn read(
 pub(crate) async fn change_profile(
     State(state): State<Shared>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
     Path(id): Path<String>,
-    Json(body): Json<Named>,
+    body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    let bytes = body.map_err(|error| malformed(error.body_text()))?;
+    let actor = people_giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    if actor.provenance().agent().is_none() {
+        crate::routes::administrator(&state, &actor)?;
+    }
+    let body = people_giving::body(headers, bytes).await?;
     let (id, op, profile) = (
         identity_id(&id)?,
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
+    if actor.provenance().agent().is_some() {
+        return people_giving::profile(&state, &actor, id, op, profile).map(Json);
+    }
     with_directory(&state, |directory| {
         let receipt = directory.change_profile(actor, op, id, profile, now())?;
         Ok(Json(ReceiptAnswer {
