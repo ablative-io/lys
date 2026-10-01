@@ -28,7 +28,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
-use lys_identity::grants::AppSchema;
+use lys_identity::grants::{AppSchema, Model};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -38,6 +38,7 @@ use crate::apps_binding::{Acting, acting, new_secret};
 use crate::apps_error::AppError;
 use crate::apps_state::By;
 use crate::error::ServerError;
+use crate::grants::{GrantSetup, GrantState};
 use crate::routes::AppState;
 use crate::spicedb::SpiceDb;
 
@@ -255,21 +256,39 @@ async fn ask(
     let Some(settings) = engine else {
         return answer_in(&bench.dir.join(asking), &draft, &examples).map(Json);
     };
-    let held = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
-    let left = SpiceDb::clear_scratch(settings).map_err(|error| AppError::AppsUnavailable {
-        reason: format!(
-            "the scratch scopes an earlier question left could not be removed: {error}"
-        ),
+    with_engine(&state.grants, &state.grant_setup, |model| {
+        let draft = Draft {
+            lys: model,
+            ..draft
+        };
+        let left = SpiceDb::clear_scratch(settings).map_err(|error| AppError::AppsUnavailable {
+            reason: format!(
+                "the scratch scopes an earlier question left could not be removed: {error}"
+            ),
+        })?;
+        if left > 0 {
+            tracing::warn!(
+                scopes = left,
+                "scratch scopes an earlier question left were removed"
+            );
+        }
+        answer_in(&bench.dir.join(asking), &draft, &examples)
+    })
+    .map(Json)
+}
+
+fn with_engine<T>(
+    grants: &Mutex<Option<GrantState>>,
+    setup: &GrantSetup,
+    call: impl FnOnce(&Model) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    let held = grants.lock().map_err(|error| AppError::AppsUnavailable {
+        reason: format!("the bench's grants are unavailable: {error}"),
     })?;
-    if left > 0 {
-        tracing::warn!(
-            scopes = left,
-            "scratch scopes an earlier question left were removed"
-        );
-    }
-    let answered = answer_in(&bench.dir.join(asking), &draft, &examples);
+    let model = setup.model();
+    let answered = call(&model);
     drop(held);
-    answered.map(Json)
+    answered
 }
 
 async fn close(
@@ -289,3 +308,7 @@ async fn close(
     })?;
     Ok(Json(serde_json::json!({"closed": id})))
 }
+
+#[cfg(test)]
+#[path = "apps_bench_lock_tests.rs"]
+mod lock_tests;
