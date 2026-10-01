@@ -1,8 +1,8 @@
 //! A bench question answered by the real check against a scratch copy of the
 //! draft, in a throwaway namespace of the permission service.
 //!
-//! The namespace is a directory of its own under the bench's, holding an
-//! apps store, a grant log and a signing key made for it alone, and the
+//! The namespace holds memory-only apps and grant logs with ephemeral signing
+//! keys made for it alone, and the
 //! permission engine the service runs its grants on: when `SpiceDB` is
 //! configured, a scratch scope of it (`spicedb_scope`) that the draft's
 //! kinds, the example placements and the example grants are written into,
@@ -18,12 +18,10 @@
 //! batch route makes for every check: the kind and the action admitted by
 //! the apps, and the grants' `decide` reaching from the resource to each
 //! parent it is placed in. The answer is that decision's, the path read back
-//! from the grant it names. The namespace, its scratch scope with it, is
-//! removed before the answer is given, and a namespace that cannot be
-//! removed is refused by name.
+//! from the grant it names. Its scratch engine scope is removed before the
+//! answer is given; cleanup failures are refused by name.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::sync::Arc;
 
 use lys_core::Ed25519Identity;
@@ -36,7 +34,6 @@ use lys_identity::{
     Actor, AuthMethod, Change, IdentityEvent, IdentityId, LoginBinding, OperationId, PersonId,
     Profile, Provenance,
 };
-use lys_log_store::FileLeafStore;
 use serde_json::Value;
 
 use crate::apps_bench::{BenchAnswer, Example, Holding, Placement, Question};
@@ -45,7 +42,7 @@ use crate::apps_error::AppError;
 use crate::apps_state::{Approved, By, Client, Line, LysRecorded, Placed, Registered};
 use crate::apps_store::AppStore;
 use crate::error::ServerError;
-use crate::grants::{GrantState, Judged};
+use crate::grants::Judged;
 use crate::grants_batch::{CheckWire, one};
 use crate::session::now;
 use crate::spicedb::scope::scope_for;
@@ -54,6 +51,11 @@ use crate::spicedb::{Relationships, SpiceDb, SpiceDbConnection};
 /// The issuer the scratch directory's example logins are bound at. It names
 /// no real issuer and no one signs in through it.
 const EXAMPLE_ISSUER: &str = "https://bench.lys.invalid";
+
+#[path = "apps_bench_memory.rs"]
+mod memory;
+use memory::MemoryStore;
+type ScratchGrants = Grants<MemoryStore, Relationships>;
 
 /// The origin the scratch grant log is created with.
 const GRANT_ORIGIN: &str = "lys/identity/bench/grants";
@@ -98,30 +100,28 @@ fn resource(example: &Example) -> Result<Resource, ServerError> {
     Ok(Resource::new(&example.kind, &example.id)?)
 }
 
-/// Answer `examples.question` against `draft` in a namespace made at `dir`,
-/// which does not exist yet, removing the namespace before answering.
-pub fn answer_in(
-    dir: &Path,
-    draft: &Draft<'_>,
-    examples: &Examples<'_>,
-) -> Result<BenchAnswer, ServerError> {
-    std::fs::create_dir_all(dir).map_err(unavailable)?;
+/// Answer the question in process-only stores and remove its engine scope
+/// before returning. No scratch key, leaf or snapshot reaches disk.
+pub fn answer_in(draft: &Draft<'_>, examples: &Examples<'_>) -> Result<BenchAnswer, ServerError> {
     let (random, _) = new_secret()?;
     let scope = scope_for(&random);
-    let answered = answer(dir, draft, examples, &scope);
+    let answered = answer(draft, examples, &scope);
     let scratch = draft
         .engine
         .map_or(Ok(()), |settings| SpiceDb::remove_scratch(settings, &scope));
-    std::fs::remove_dir_all(dir).map_err(unavailable)?;
     scratch.map_err(unavailable)?;
     answered
 }
 
 /// The scratch apps store: the app `lys` with the service's own model, and
 /// the draft approved.
-fn apps(dir: &Path, draft: &Draft<'_>, at: u64) -> Result<AppStore, ServerError> {
-    let key = Ed25519Identity::load_or_generate(&dir.join("key")).map_err(unavailable)?;
-    let mut apps = AppStore::open(&dir.join("apps"), Arc::new(key))?;
+fn apps(draft: &Draft<'_>, at: u64) -> Result<AppStore<MemoryStore>, ServerError> {
+    let key = Arc::new(Ed25519Identity::ephemeral());
+    let leaves = MemoryStore::empty();
+    let mut apps = AppStore::over(
+        Box::new(move || MemoryStore::open(Arc::clone(&leaves), crate::apps_store::ORIGIN)),
+        key,
+    )?;
     let relations = draft
         .lys
         .relations()
@@ -201,20 +201,18 @@ fn directory(
 /// The scratch grants, on the scratch scope `scope` of the service's
 /// `SpiceDB` when the draft names one, as the service opens its own.
 fn grants(
-    dir: &Path,
     draft: &Draft<'_>,
     (model, root): (Model, PersonId),
     scope: &str,
-) -> Result<GrantState, ServerError> {
-    let log = dir.join("grants");
-    FileLeafStore::create(&log, GRANT_ORIGIN).map_err(unavailable)?;
-    let key = Ed25519Identity::load(&dir.join("key")).map_err(unavailable)?;
+) -> Result<ScratchGrants, ServerError> {
+    let leaves = MemoryStore::empty();
+    let key = Ed25519Identity::ephemeral();
     let relationships = match draft.engine {
         Some(settings) => Relationships::SpiceDb(SpiceDb::open_scratch(settings, &model, scope)?),
         None => Relationships::Memory(MemoryRelationships::default()),
     };
     let mut grants = Grants::open(
-        Box::new(move || FileLeafStore::open(&log)),
+        Box::new(move || MemoryStore::open(Arc::clone(&leaves), GRANT_ORIGIN)),
         key,
         relationships,
         model,
@@ -229,7 +227,7 @@ fn grants(
 /// Place each example resource in its parent, as the placements route does:
 /// in the apps log, and in the permission engine when it is `SpiceDB`.
 fn place(
-    (apps, grants): (&mut AppStore, &GrantState),
+    (apps, grants): (&mut AppStore<MemoryStore>, &ScratchGrants),
     draft: &Draft<'_>,
     placements: &[Placement],
     at: u64,
@@ -271,15 +269,14 @@ fn place(
 }
 
 fn answer(
-    dir: &Path,
     draft: &Draft<'_>,
     examples: &Examples<'_>,
     scope: &str,
 ) -> Result<BenchAnswer, ServerError> {
     let at = now();
-    let mut apps = apps(dir, draft, at)?;
+    let mut apps = apps(draft, at)?;
     let (directory, root, people) = directory(examples, at)?;
-    let mut grants = grants(dir, draft, (apps.model()?, root), scope)?;
+    let mut grants = grants(draft, (apps.model()?, root), scope)?;
     place((&mut apps, &grants), draft, examples.placements, at)?;
     let mut held = BTreeMap::new();
     for holding in examples.holdings {
@@ -357,3 +354,7 @@ fn answer(
         refusal: decided.refusal,
     })
 }
+
+#[cfg(test)]
+#[path = "apps_bench_memory_tests.rs"]
+mod memory_tests;

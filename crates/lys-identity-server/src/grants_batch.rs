@@ -162,8 +162,8 @@ fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, Server
 }
 
 /// The answer to one check, decided as the batch decides every one.
-pub(crate) fn one(
-    judged: &mut Judged<'_>,
+pub(crate) fn one<S: lys_log_store::LeafStore>(
+    judged: &mut Judged<'_, S>,
     acting_for: Option<&str>,
     check: &CheckWire,
     at: u64,
