@@ -460,7 +460,7 @@ fn stop(table: &mut Table, id: &str, operation: &str) -> Result<OperationOutcome
     };
     session.ending = true;
     if let Some(live) = &session.live {
-        live.end(id);
+        live.kill()?;
     }
     let outcome = table.operations.set(
         operation,

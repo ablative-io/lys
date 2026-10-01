@@ -78,3 +78,34 @@ fn operation_state_change_bytes_do_not_grow_with_history() -> Result<(), Box<dyn
     assert!(small > 0 && small < 1024);
     Ok(())
 }
+
+#[test]
+fn an_expired_terminal_outcome_leaves_the_runner_heap() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    old_install(dir.path(), 1)?;
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    assert!(sessions.lock().operations.get("notice-000000").is_none());
+    let log = std::fs::read(dir.path().join("operations.jsonl"))?;
+    assert!(String::from_utf8(log)?.contains("notice-000000"));
+    Ok(())
+}
+
+#[test]
+fn an_expired_operation_id_is_refused_after_a_restart() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    old_install(dir.path(), 1)?;
+    drop(crate::session::Sessions::open(dir.path(), 4096)?);
+    let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
+    let result = sessions.operate(super::Operation {
+        operation: "notice-000000".to_owned(),
+        session: "session".to_owned(),
+        request: super::OperationRequest::Notice {
+            text: "again".to_owned(),
+        },
+    });
+    let error = result
+        .err()
+        .ok_or("an expired id was accepted or replayed")?;
+    assert!(error.to_string().contains("operation_repeated"), "{error}");
+    Ok(())
+}
