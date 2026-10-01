@@ -44,14 +44,7 @@ fn window(percent: &str, reset: u64) -> Result<PlanWindow, Box<dyn Error>> {
 #[test]
 fn only_a_full_live_window_trips_the_structured_limit() -> TestResult {
     let state = rotation()?;
-    for percent in [
-        "0",
-        "40",
-        "99.99",
-        "99.9999999999999999999",
-        "100.01",
-        "-100",
-    ] {
+    for percent in ["0", "40", "99.99", "99.9999999999999", "100.01", "-100"] {
         assert!(!state.windows_in(&[window(percent, 11)?], 10), "{percent}");
     }
     for percent in ["100", "100.0", "1e2"] {
