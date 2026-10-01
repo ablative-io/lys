@@ -97,6 +97,29 @@ fn accepts(headers: &HeaderMap, media: &str) -> bool {
 }
 
 async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Response {
+    if request
+        .headers()
+        .contains_key(crate::agent_signature::HEADER)
+        && request
+            .headers()
+            .get_all(header::COOKIE)
+            .iter()
+            .any(|value| {
+                value.to_str().is_ok_and(|cookies| {
+                    cookies.split(';').any(|cookie| {
+                        cookie
+                            .trim()
+                            .split_once('=')
+                            .is_some_and(|(name, _)| name == crate::session::COOKIE)
+                    })
+                })
+            })
+    {
+        return ServerError::AgentSignatureRefused {
+            reason: "an agent signature cannot carry a session cookie",
+        }
+        .into_response();
+    }
     if let Err((status, reason)) = transport(request.headers(), &endpoint) {
         return fault(&Value::Null, status, -32600, reason);
     }
