@@ -276,6 +276,43 @@ describe('Add and run on the first computer', () => {
 });
 
 describe('Add and run on an existing computer', () => {
+  it('migrates the earlier saved envelope without replacing its registration or planned computer', async () => {
+    const old = { version: 1, person: ADA, step: 'registration', pending: null,
+      registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: ADA, team: null, membership: null, activated: false },
+      settings: { harness: { name: program.name, program: '/opt/bin/care', package: 'care', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', instructions_mode: 'keep', note: '' },
+      machine: { body: { operation: 'op-' + '3'.repeat(32), name: 'Ward computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null },
+    };
+    sessionStorage.setItem(key, JSON.stringify(old));
+    const server = service(); const { posted } = await open(server.routes);
+    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 2 });
+    expect(posted).toEqual([]);
+    await submit();
+    expect(posted).toHaveLength(7);
+    expect(posted[0].body).toEqual({ operation: old.registration.register, display_name: old.registration.name });
+    expect(posted[1].body).toMatchObject({ operation: old.registration.activate });
+    expect(posted[4].body).toEqual({ ...old.machine.body, may_run: [agent] });
+    expect(server.applied.size).toBe(7);
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(location.hash).toBe('#/file/' + agent);
+  });
+
+  it.each(['missing', 'changed', 'different-placement'] as const)('refuses a version-two request with a %s computer binding', async (binding) => {
+    const computer = existingComputer();
+    const different = 'op-' + '0'.repeat(32);
+    const body: Record<string, unknown> = { operation: 'op-' + '4'.repeat(32), ...(binding === 'missing' ? {} : { machine: different }) };
+    const retained = { version: 2, person: ADA, step: 'admission',
+      registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent, answersTo: ADA, team: null, membership: null, activated: true },
+      settings: { harness: { name: program.name, program: '/opt/bin/care', package: 'care', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', instructions_mode: 'keep', note: '' },
+      placement: { kind: 'existing', computer, admission: { operation: 'op-' + '5'.repeat(32), agent, allow: true } },
+      pending: { stage: 'start', path: prefix + '/start-command', body, machine: binding === 'different-placement' ? different : computer.id, version: 1 },
+    };
+    sessionStorage.setItem(key, JSON.stringify(retained));
+    const { posted } = await open(service(undefined, 'running', [computer]).routes);
+    expect(document.body.textContent).toContain('PendingAddAndRunUnreadable');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    await submit(); expect(posted).toEqual([]);
+  });
+
   it('uses six confirmed stages on the named computer without creating or assigning a role', async () => {
     const computer = existingComputer();
     const server = service(undefined, 'running', [computer]);
