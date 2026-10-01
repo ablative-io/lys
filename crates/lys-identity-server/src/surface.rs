@@ -7,7 +7,7 @@
 //! reads, so it is answered with the page. A path that steps outside the
 //! directory is never read.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::sync::Arc;
 
 use axum::Router;
@@ -26,8 +26,8 @@ use cache::Screens;
 pub const PAGE: &str = "index.html";
 
 /// `api` under `/api`, and the screens in `dir` at the root.
-pub fn serving(dir: PathBuf, api: Router) -> Result<Router, ServerError> {
-    let installed = Arc::new(Screens::load(&dir)?);
+pub fn serving(dir: &Path, api: Router) -> Result<Router, ServerError> {
+    let installed = Arc::new(Screens::load(dir)?);
     let screens = Router::new()
         .route("/", get(page))
         .route("/{*path}", get(file))
