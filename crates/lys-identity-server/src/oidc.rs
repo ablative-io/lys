@@ -7,7 +7,7 @@
 
 use crate::sign_in_flights::Flights;
 use std::net::IpAddr;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::time::Instant;
 
 use lys_identity::{Actor, AuthMethod, LoginBinding, Provenance};
@@ -158,7 +158,9 @@ impl Oidc {
             )
             .set_pkce_challenge(challenge)
             .url();
-        let mut in_flight = pool.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut in_flight = pool
+            .lock()
+            .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?;
         in_flight.insert(
             state.secret().clone(),
             (verifier, nonce),
@@ -169,15 +171,16 @@ impl Oidc {
     }
 
     /// Forget the sign-in in flight under `state`, which will not be finished.
-    pub fn abandon(&self, state: &str) {
+    pub fn abandon(&self, state: &str) -> Result<(), ServerError> {
         self.in_flight
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
             .remove(state);
         self.provider_flights
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
             .remove(state);
+        Ok(())
     }
 
     /// Finish a sign-in from the issuer's answer, validating its ID token.
@@ -185,14 +188,14 @@ impl Oidc {
         let password = self
             .in_flight
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
             .take(state, Instant::now());
         let (verifier, nonce) = match password {
             Ok(flow) => flow,
             Err(ServerError::SignInStateUnknown) => self
                 .provider_flights
                 .lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .map_err(|error| failed(&format!("sign-in flights unavailable: {error}")))?
                 .take(state, Instant::now())?,
             Err(error) => return Err(error),
         };
@@ -233,3 +236,7 @@ impl Oidc {
         Ok(Actor::new(binding, Provenance::new(AuthMethod::Oidc, at)))
     }
 }
+
+#[cfg(test)]
+#[path = "oidc_poison_tests.rs"]
+mod poison_tests;

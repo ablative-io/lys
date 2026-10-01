@@ -181,7 +181,7 @@ impl Line {
 }
 
 /// One team, with its members and its retirement once it has one.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Team {
     /// How it was created.
@@ -201,6 +201,37 @@ pub struct Team {
     pub held: Vec<Hold>,
     /// Every line kept on it after its creation, in order.
     pub changes: Vec<Line>,
+}
+
+impl Clone for Team {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        TEAM_COPIES.with(|copies| copies.set(copies.get() + 1));
+        Self {
+            created: self.created.clone(),
+            parent: self.parent.clone(),
+            lead: self.lead.clone(),
+            members: self.members.clone(),
+            retired: self.retired.clone(),
+            held: self.held.clone(),
+            changes: self.changes.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEAM_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_team_copies() {
+    TEAM_COPIES.set(0);
+}
+
+#[cfg(test)]
+pub(crate) fn team_copies() -> usize {
+    TEAM_COPIES.get()
 }
 
 /// The teams as their log folds them, in the order created.

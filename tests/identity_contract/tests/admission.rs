@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! R3: the configured administrator admitted, every other caller refused by
 //! name, and an email or a first visit never admitted (`ID001_ADMIN`).
 
@@ -115,7 +117,7 @@ async fn a_first_visit_is_sent_to_lys_and_admits_nobody() -> TestResult {
         .await?;
     assert_eq!(status, 400, "{body}");
     assert_eq!(body["refusal"], "SignInStateUnknown");
-    service.issuer.sign_in_as(login(ADMINISTRATOR));
+    service.issuer.sign_in_as(login(ADMINISTRATOR))?;
     let signed_in = browser
         .post(format!("{}/sign-in", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")

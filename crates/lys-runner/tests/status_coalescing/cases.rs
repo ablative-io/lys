@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -12,7 +14,7 @@ fn changed_status_ticks_keep_one_latest_snapshot_at_the_turn_boundary() -> Resul
     let dir = tempfile::tempdir()?;
     let sessions = tracked(dir.path())?;
     let contract = sessions
-        .lock()
+        .lock()?
         .sessions
         .get("session")
         .ok_or("session missing")?
@@ -55,7 +57,7 @@ fn changed_status_ticks_keep_one_latest_snapshot_at_the_turn_boundary() -> Resul
         },
     )?;
     let boundary = snapshots(&sessions)?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert!(
         ticks.is_empty(),
         "status ticks appended {} audit records",
@@ -75,7 +77,7 @@ fn changed_status_ticks_keep_one_latest_snapshot_at_the_turn_boundary() -> Resul
 
 fn snapshots(sessions: &Sessions) -> Result<Vec<crate::tracking::UsageRecord>, Box<dyn Error>> {
     Ok(sessions
-        .lock()
+        .lock()?
         .feed
         .page(None)?
         .entries
@@ -109,7 +111,7 @@ fn a_full_window_is_on_disk_before_the_leader_is_signalled() -> Result<(), Box<d
     let dir = tempfile::tempdir()?;
     let sessions = tracked(dir.path())?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -140,7 +142,7 @@ fn a_full_window_is_on_disk_before_the_leader_is_signalled() -> Result<(), Box<d
         },
     );
     let disk = evidence.recv()?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     result?;
     let records = disk?
         .lines()
@@ -157,7 +159,7 @@ fn a_full_window_stops_its_leader_even_when_flushing_fails() -> Result<(), Box<d
     let dir = tempfile::tempdir()?;
     let sessions = tracked(dir.path())?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -201,7 +203,7 @@ fn a_full_window_stops_its_leader_even_when_flushing_fails() -> Result<(), Box<d
     } else {
         None
     };
-    sessions.stop_all();
+    sessions.stop_all()?;
     super::status::BEFORE_END.with(|probe| *probe.borrow_mut() = None);
     assert_eq!(
         result
@@ -227,7 +229,7 @@ fn overflow_is_named_and_leaves_the_prior_snapshot_available() -> Result<(), Box
     let sessions = tracked(dir.path())?;
     tick(&sessions, "native", 18_446_744_073_709)?;
     let result = tick(&sessions, "native", 1);
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert_eq!(
         result.err().ok_or("overflow accepted")?.name(),
         "status_cost_overflow"
@@ -247,7 +249,7 @@ fn account_and_source_changes_flush_before_new_attribution() -> Result<(), Box<d
     let sessions = tracked(dir.path())?;
     tick(&sessions, "native", 1)?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -261,14 +263,14 @@ fn account_and_source_changes_flush_before_new_attribution() -> Result<(), Box<d
     let next = dir.path().join("next.jsonl");
     std::fs::write(&next, b"")?;
     sessions.bind(
-        &mut sessions.lock(),
+        &mut *sessions.lock()?,
         "session",
         (&next.display().to_string(), "second"),
         true,
     )?;
     let before = snapshots(&sessions)?;
     tick(&sessions, "second", 3)?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     let kept = snapshots(&sessions)?;
     assert_eq!(before.len(), 2);
     assert_eq!(kept.len(), 3);
@@ -298,7 +300,7 @@ fn a_replaced_stream_flushes_the_old_generation_without_losing_its_cost_baseline
     sessions.read_source("session", None);
     let before = snapshots(&sessions)?;
     tick(&sessions, "native", 2)?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     let kept = snapshots(&sessions)?;
     assert_eq!(before.len(), 1);
     assert_eq!(kept.len(), 2);
@@ -326,7 +328,7 @@ fn tracked(directory: &std::path::Path) -> Result<std::sync::Arc<Sessions>, Box<
         policy: None,
     })?;
     {
-        let mut table = sessions.lock();
+        let mut table = sessions.lock()?;
         table
             .sessions
             .get_mut("session")

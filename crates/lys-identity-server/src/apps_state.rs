@@ -13,6 +13,14 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
+
+#[path = "apps_index.rs"]
+mod index;
+
+#[cfg(test)]
+#[path = "apps_operation_tests.rs"]
+mod operation_tests;
 
 use crate::apps_binding::{Binding, Registrar};
 use crate::read_views::Login;
@@ -349,8 +357,8 @@ pub enum Refused {
 }
 
 /// The apps as their log folds them, in the order registered.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The apps.
     pub apps: Vec<App>,
@@ -359,6 +367,51 @@ pub struct Held {
     /// Every registrar credential, in the order made; a service account's
     /// latest is the one it holds.
     pub registrars: Vec<Registrar>,
+    #[serde(skip)]
+    index: Arc<index::Index>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    apps: Vec<App>,
+    placements: Vec<Placed>,
+    registrars: Vec<Registrar>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let index = Arc::new(index::Index::of(
+            &records.apps,
+            &records.placements,
+            &records.registrars,
+        ));
+        Self {
+            apps: records.apps,
+            placements: records.placements,
+            registrars: records.registrars,
+            index,
+        }
+    }
+}
+
+impl Clone for Held {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        operation_tests::copied();
+        Self {
+            apps: self.apps.clone(),
+            placements: self.placements.clone(),
+            registrars: self.registrars.clone(),
+            index: Arc::clone(&self.index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -371,41 +424,32 @@ struct Sealed {
 impl Held {
     /// The app named `id`.
     pub fn app(&self, id: &str) -> Option<&App> {
-        self.apps.iter().find(|app| app.registered.app == id)
+        self.apps.get(*self.index.apps.get(id)?)
     }
 
     /// The parent a resource of `kind` and `id` is placed in.
     pub fn parent(&self, kind: &str, id: &str) -> Option<&Placed> {
-        self.placements
-            .iter()
-            .find(|placed| placed.child_kind == kind && placed.child_id == id)
+        self.placements.get(self.index.parent(kind, id)?)
     }
 
     /// The line kept under `operation`, whichever kind it is.
     pub fn operation(&self, operation: &str) -> Option<Line> {
-        for app in &self.apps {
-            if app.registered.operation == operation {
-                return Some(Line::Registered(app.registered.clone()));
+        let location = *self.index.operations.get(operation)?;
+        #[cfg(test)]
+        operation_tests::visited();
+        match location {
+            index::Location::Registered(app) => self
+                .apps
+                .get(app)
+                .map(|app| Line::Registered(app.registered.clone())),
+            index::Location::History(app, line) => self.apps.get(app)?.history.get(line).cloned(),
+            index::Location::Placed(placed) => {
+                self.placements.get(placed).cloned().map(Line::Placed)
             }
-            if let Some(line) = app
-                .history
-                .iter()
-                .find(|line| line.operation() == operation)
-            {
-                return Some(line.clone());
+            index::Location::Registrar(registrar) => {
+                self.registrars.get(registrar).cloned().map(Line::Registrar)
             }
         }
-        let placed = self
-            .placements
-            .iter()
-            .find(|line| line.operation == operation);
-        if let Some(placed) = placed {
-            return Some(Line::Placed(placed.clone()));
-        }
-        self.registrars
-            .iter()
-            .find(|line| line.operation == operation)
-            .map(|registrar| Line::Registrar(registrar.clone()))
     }
 
     /// Whether `line` may be kept on the apps as they stand, by reason.
@@ -438,33 +482,61 @@ impl Held {
         }
         self.allows(&line)
             .map_err(|refused| format!("line `{}` is refused: {refused:?}", line.operation()))?;
-        match line {
-            Line::Lys(lys) => self.apps.push(lys_app(lys)),
-            Line::Registered(registered) => self.apps.push(App {
-                registered,
-                approved: None,
-                declined: None,
-                retired: None,
-                versions: Vec::new(),
-                pending: None,
-                history: Vec::new(),
-            }),
-            Line::Placed(placed) => self.placements.push(placed),
-            Line::Registrar(registrar) => self.registrars.push(registrar),
+        let operation = line.operation().to_owned();
+        let location = match line {
+            Line::Lys(lys) => {
+                let position = self.apps.len();
+                let app = lys_app(lys);
+                Arc::make_mut(&mut self.index).app(&app.registered.app, position);
+                self.apps.push(app);
+                index::Location::Registered(position)
+            }
+            Line::Registered(registered) => {
+                let position = self.apps.len();
+                Arc::make_mut(&mut self.index).app(&registered.app, position);
+                self.apps.push(App {
+                    registered,
+                    approved: None,
+                    declined: None,
+                    retired: None,
+                    versions: Vec::new(),
+                    pending: None,
+                    history: Vec::new(),
+                });
+                index::Location::Registered(position)
+            }
+            Line::Placed(placed) => {
+                let position = self.placements.len();
+                Arc::make_mut(&mut self.index).placement(&placed, position);
+                self.placements.push(placed);
+                index::Location::Placed(position)
+            }
+            Line::Registrar(registrar) => {
+                let position = self.registrars.len();
+                self.registrars.push(registrar);
+                index::Location::Registrar(position)
+            }
             other => {
                 let id = other
                     .app()
-                    .ok_or_else(|| "this line names no app".to_owned())?
-                    .to_owned();
+                    .ok_or_else(|| "this line names no app".to_owned())?;
+                let position = self
+                    .index
+                    .apps
+                    .get(id)
+                    .copied()
+                    .ok_or_else(|| format!("app `{id}` was never registered"))?;
                 let app = self
                     .apps
-                    .iter_mut()
-                    .find(|app| app.registered.app == id)
+                    .get_mut(position)
                     .ok_or_else(|| format!("app `{id}` was never registered"))?;
                 apply(app, &other);
+                let history = app.history.len();
                 app.history.push(other);
+                index::Location::History(position, history)
             }
-        }
+        };
+        Arc::make_mut(&mut self.index).operation(&operation, location);
         Ok(())
     }
 
@@ -481,9 +553,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("apps state: {error}"))
     }

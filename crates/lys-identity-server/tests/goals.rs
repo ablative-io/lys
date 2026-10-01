@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Goals, expectations and deliverables: a due reminder is delivered once
 //! under the runner's operation id; a restart keeps each timer's due
 //! instant, and one that fell due while the service was stopped fires once,
@@ -12,7 +14,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
@@ -123,7 +125,7 @@ impl Deliver for Runner {
             let OperationRequest::Reminder { text } = operation.request else {
                 return Err(Undelivered::Refused("not a reminder".to_owned()));
             };
-            let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut held = self.held.lock().expect("fixture lock poisoned");
             if let Some((kept, outcome)) = held.get(&operation.operation) {
                 if *kept != text {
                     return Err(Undelivered::Refused("operation_reused".to_owned()));

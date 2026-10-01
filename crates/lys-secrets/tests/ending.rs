@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! A person ending a handle held for them: only the person the holder acts
 //! for may end it, anyone else but its holder is answered as for a handle
 //! never issued, a handle lent on from it ends with it and the audit log
@@ -48,10 +50,16 @@ fn relation(identity: &str, secret: &str) -> SecretRelation {
 fn granted() -> LocalGrants {
     let grants = LocalGrants::new();
     for identity in [BOT, TOM, HELPER] {
-        grants.grant(relation(identity, "token"));
+        grants
+            .grant(relation(identity, "token"))
+            .expect("local grants lock must be healthy");
     }
-    grants.grant_as(Relation::Lend, relation(BOT, "token"));
-    grants.grant_as(Relation::Member, relation(BOT, "person/person:dana"));
+    grants
+        .grant_as(Relation::Lend, relation(BOT, "token"))
+        .expect("local grants lock must be healthy");
+    grants
+        .grant_as(Relation::Member, relation(BOT, "person/person:dana"))
+        .expect("local grants lock must be healthy");
     grants
 }
 

@@ -46,6 +46,7 @@ mod certificate_keys;
 pub mod certificates_api;
 mod certificates_issue;
 pub mod certificates_store;
+mod changes;
 pub mod config;
 pub mod configuration_api;
 pub mod configuration_store;
@@ -54,6 +55,9 @@ pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
 pub mod error_budget;
+mod error_names;
+#[cfg(test)]
+mod error_names_tests;
 mod error_status;
 pub mod error_team;
 mod estate_api;

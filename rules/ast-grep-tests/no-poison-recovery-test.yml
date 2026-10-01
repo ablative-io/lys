@@ -1,0 +1,7 @@
+id: no-poison-recovery
+valid:
+  - 'fn lock(m: &Mutex<State>) { m.lock().map_err(|error| named(error))?; }'
+invalid:
+  - 'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(PoisonError::into_inner); }'
+  - 'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(std::sync::PoisonError::into_inner); }'
+  - 'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(|error| error.into_inner()); }'

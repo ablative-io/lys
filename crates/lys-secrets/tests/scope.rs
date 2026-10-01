@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Scopes: a personal secret belongs to its person, whatever grants exist;
 //! another person, or that person's agent, can neither discover, read, be
 //! issued nor be lent it, and knowing its name grants nothing. A team
@@ -100,21 +102,27 @@ fn a_personal_secret_is_closed_to_every_other_person_and_their_agents() -> TestR
         "agent:dana-bot",
     ] {
         for secret in ["tom-token", "dana-token"] {
-            grants.grant(relation(identity, secret, "person:tom"));
+            grants
+                .grant(relation(identity, secret, "person:tom"))
+                .expect("local grants lock must be healthy");
         }
         for record in ["tom-notes", "dana-notes"] {
-            grants.grant_as(Relation::Read, relation(identity, record, "person:tom"));
+            grants
+                .grant_as(Relation::Read, relation(identity, record, "person:tom"))
+                .expect("local grants lock must be healthy");
         }
     }
     for person in ["tom", "dana"] {
-        grants.grant_as(
-            Relation::Member,
-            relation(
-                &format!("agent:{person}-bot"),
-                &format!("person/person:{person}"),
-                &format!("person:{person}"),
-            ),
-        );
+        grants
+            .grant_as(
+                Relation::Member,
+                relation(
+                    &format!("agent:{person}-bot"),
+                    &format!("person/person:{person}"),
+                    &format!("person:{person}"),
+                ),
+            )
+            .expect("local grants lock must be healthy");
     }
 
     for (person, other) in people {
@@ -187,12 +195,16 @@ fn leaving_a_scope_ends_the_use_and_a_team_secret_is_open_to_its_members_only() 
     assert_eq!(refusal(Scope::parse("guild:x")), "InvalidScope");
     let grants = broker.permissions();
     for identity in ["person:tom", "agent:tom-bot"] {
-        grants.grant(relation(identity, "ledger", "person:dana"));
+        grants
+            .grant(relation(identity, "ledger", "person:dana"))
+            .expect("local grants lock must be healthy");
     }
-    grants.grant_as(
-        Relation::Member,
-        relation("person:tom", "team/accounts", "person:dana"),
-    );
+    grants
+        .grant_as(
+            Relation::Member,
+            relation("person:tom", "team/accounts", "person:dana"),
+        )
+        .expect("local grants lock must be healthy");
     let tom = party(&keys, "person:tom")?;
     let tom_bot = party(&keys, "agent:tom-bot")?;
 
@@ -210,7 +222,8 @@ fn leaving_a_scope_ends_the_use_and_a_team_secret_is_open_to_its_members_only() 
     broker.use_handle(&handle.token, &sign(&handle, &tom)?, Secret::len)?;
     broker
         .permissions()
-        .revoke_as(Relation::Member, "person:tom", "team/accounts");
+        .revoke_as(Relation::Member, "person:tom", "team/accounts")
+        .expect("local grants lock must be healthy");
     assert_eq!(
         refusal(broker.use_handle(&handle.token, &sign(&handle, &tom)?, Secret::len)),
         "PermissionDenied"
@@ -227,7 +240,8 @@ fn a_handles_revocation_is_told_only_to_those_who_may_discover_its_secret() -> T
     broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
     broker
         .permissions()
-        .grant(relation("person:dana", "token", "person:dana"));
+        .grant(relation("person:dana", "token", "person:dana"))
+        .expect("local grants lock must be healthy");
     broker.set_scope(
         "person:dana",
         "token",

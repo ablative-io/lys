@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Derived handles: only an owner or a holder of the lend relation lends,
 //! the recipient must itself be permitted, a derived handle stays inside
 //! its ancestry's uses, window and spend, a drop above ends it, and a
@@ -63,7 +65,9 @@ fn lending_needs_ownership_or_the_lend_relation_and_stays_inside_its_ancestry() 
         "agent:dana-bot",
         "agent:tom-bot",
     ] {
-        grants.grant(relation(identity));
+        grants
+            .grant(relation(identity))
+            .expect("local grants lock must be healthy");
     }
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
@@ -85,7 +89,8 @@ fn lending_needs_ownership_or_the_lend_relation_and_stays_inside_its_ancestry() 
     );
     broker
         .permissions()
-        .grant_as(Relation::Lend, relation("person:tom"));
+        .grant_as(Relation::Lend, relation("person:tom"))
+        .expect("local grants lock must be healthy");
     let lent = broker.derive(
         &tom_handle.token,
         &sign(&tom_handle, &tom)?,
@@ -141,7 +146,9 @@ fn a_people_only_secret_is_never_handed_to_an_agent() -> TestResult {
     };
     let grants = LocalGrants::new();
     for identity in ["person:dana", "agent:dana-bot"] {
-        grants.grant(relation(identity));
+        grants
+            .grant(relation(identity))
+            .expect("local grants lock must be healthy");
     }
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
@@ -191,7 +198,9 @@ fn a_line_of_derived_handles_is_refused_past_the_depth_it_is_counted() -> TestRe
         anchor: keys.join("audit.anchor"),
     };
     let grants = LocalGrants::new();
-    grants.grant(relation("person:dana"));
+    grants
+        .grant(relation("person:dana"))
+        .expect("local grants lock must be healthy");
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal("token", "person:dana", &Secret::from_slice(b"value"))?;
     let dana = party(&keys, "person:dana")?;

@@ -112,9 +112,15 @@ fn only_the_holder_and_the_person_acted_for_discover_a_lease_and_only_the_person
     let grants = broker.permissions();
     let acted_for = Scope::Personal(PERSON_A.to_owned()).target();
     let organisation = Scope::Organisation(ORGANISATION.to_owned()).target();
-    grants.grant_as(Relation::Member, relation(AGENT_A, &acted_for, PERSON_A));
-    grants.grant_as(Relation::Member, relation(AGENT_A, &organisation, PERSON_A));
-    grants.grant(relation(AGENT_A, B_ORG, PERSON_B));
+    grants
+        .grant_as(Relation::Member, relation(AGENT_A, &acted_for, PERSON_A))
+        .expect("local grants lock must be healthy");
+    grants
+        .grant_as(Relation::Member, relation(AGENT_A, &organisation, PERSON_A))
+        .expect("local grants lock must be healthy");
+    grants
+        .grant(relation(AGENT_A, B_ORG, PERSON_B))
+        .expect("local grants lock must be healthy");
     let lease = broker.issue(&holder(dir.path(), AGENT_A)?, B_ORG, 5, NOW_MS + 60_000)?;
     assert!(
         broker.sees(&person(PERSON_B, TEAM_B), B_ORG),

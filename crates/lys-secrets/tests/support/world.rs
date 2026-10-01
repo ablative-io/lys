@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The broker every refusal test starts from: a fresh store and log under a
 //! temporary directory, a clock fixed at `NOW_MS`, and the in-process grants
 //! the test names. Nothing here signs; a holder and its key live in
@@ -56,11 +58,13 @@ impl World {
 pub fn granted(identity: &str, secrets: &[&str]) -> LocalGrants {
     let grants = LocalGrants::new();
     for secret in secrets {
-        grants.grant(SecretRelation {
-            identity: identity.to_owned(),
-            secret: (*secret).to_owned(),
-            granted_by: Some(GRANTOR.to_owned()),
-        });
+        grants
+            .grant(SecretRelation {
+                identity: identity.to_owned(),
+                secret: (*secret).to_owned(),
+                granted_by: Some(GRANTOR.to_owned()),
+            })
+            .expect("local grants lock must be healthy");
     }
     grants
 }

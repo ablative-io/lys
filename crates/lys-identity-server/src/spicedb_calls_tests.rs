@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use super::SpiceDb;
 
@@ -47,7 +47,7 @@ fn engine() -> Result<(String, Heard), Box<dyn Error>> {
             }
             heard
                 .lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .expect("fixture lock poisoned")
                 .push(path.unwrap_or_default());
             let answer = serde_json::json!({ "schemaText": HELD }).to_string();
             let mut socket = reader.into_inner();
@@ -83,7 +83,7 @@ fn reading_the_kinds_is_one_schema_read_in_a_scope_and_outside_one() -> Result<(
         (Some("lys/b0123456789abcdef"), ["fixture.doc"]),
     ];
     for (scope, kinds) in expected {
-        let before = paths.lock().unwrap_or_else(PoisonError::into_inner).len();
+        let before = paths.lock().expect("fixture lock poisoned").len();
         let engine = at(endpoint.clone(), scope);
         assert_eq!(
             engine.kinds()?,
@@ -93,7 +93,7 @@ fn reading_the_kinds_is_one_schema_read_in_a_scope_and_outside_one() -> Result<(
                 .collect::<BTreeSet<_>>(),
             "{scope:?}"
         );
-        let heard = paths.lock().unwrap_or_else(PoisonError::into_inner);
+        let heard = paths.lock().expect("fixture lock poisoned");
         assert_eq!(heard[before..], ["/v1/schema/read"], "{scope:?}");
     }
     Ok(())

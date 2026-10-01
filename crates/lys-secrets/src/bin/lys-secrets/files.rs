@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lys_secrets::{
@@ -192,6 +192,21 @@ struct Pin {
     rows: Option<Arc<[GrantRow]>>,
 }
 
+struct Span<'a> {
+    grants: &'a FileGrants,
+    open: bool,
+}
+
+impl Drop for Span<'_> {
+    fn drop(&mut self) {
+        if self.open
+            && let Err(error) = self.grants.pin_open(false)
+        {
+            eprintln!("lys-secrets: closing grants span: {error}");
+        }
+    }
+}
+
 impl Clone for FileGrants {
     /// The same file, with no span pinned and nothing counted.
     fn clone(&self) -> Self {
@@ -211,21 +226,37 @@ impl FileGrants {
 
     /// Runs `work` with the grants file read at most once, by the first
     /// check `work` asks: one request's checks all see one reading of it.
-    pub fn pinned<T>(&self, work: impl FnOnce() -> T) -> T {
-        self.pin_open(true);
+    pub fn pinned<T>(&self, work: impl FnOnce() -> T) -> Result<T, SecretsError> {
+        self.pin_open(true)?;
+        let mut span = Span {
+            grants: self,
+            open: true,
+        };
         let done = work();
-        self.pin_open(false);
-        done
+        self.pin_open(false)?;
+        span.open = false;
+        Ok(done)
     }
 
     /// Opens or closes the pinned span, and lets go of any rows read in it.
-    fn pin_open(&self, open: bool) {
-        let mut pin = self.pin.lock().unwrap_or_else(PoisonError::into_inner);
+    fn pin_open(&self, open: bool) -> Result<(), SecretsError> {
+        let mut pin = self
+            .pin
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
         *pin = Pin { open, rows: None };
+        Ok(())
     }
 
     fn rows(&self) -> Result<Arc<[GrantRow]>, SecretsError> {
-        let mut pin = self.pin.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut pin = self
+            .pin
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
         if let Some(rows) = &pin.rows {
             return Ok(Arc::clone(rows));
         }
@@ -248,7 +279,12 @@ impl FileGrants {
 
     fn write(&self, rows: &[GrantRow]) -> Result<(), SecretsError> {
         let bytes = serde_json::to_vec_pretty(rows).map_err(json_error("grants file"))?;
-        let mut pin = self.pin.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut pin = self
+            .pin
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
         pin.rows = None;
         drop(pin);
         fs::write(&self.path, bytes).map_err(io_error(format!("writing {}", self.path.display())))
@@ -350,5 +386,62 @@ impl PermissionCheck for FileGrants {
 
     fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied> {
         self.check(Relation::Member, identity, target)
+    }
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::*;
+
+    #[test]
+    fn poisoned_file_grants_refuse_checks_and_changes() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("grants");
+        let grants = FileGrants::new(path.clone());
+        grants.set(Relation::Use, "agent", "secret", Some("person"))?;
+        let durable = fs::read(&path)?;
+        let interrupted = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let mut pin = grants.pin.lock().expect("healthy initial grants cache");
+                    pin.rows = Some(Arc::from(Vec::<GrantRow>::new()));
+                    panic!("interrupted grants cache mutation");
+                })
+                .join()
+        });
+        assert!(interrupted.is_err());
+        assert!(matches!(
+            grants.list(),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        assert!(matches!(
+            grants.set(Relation::Use, "other", "secret", Some("person")),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        let refused = grants
+            .check(Relation::Use, "agent", "secret")
+            .expect_err("poisoned cache cannot authorise");
+        assert!(refused.reason.contains("StatePoisoned:"));
+        assert_eq!(fs::read(path)?, durable);
+        Ok(())
+    }
+
+    #[test]
+    fn interrupted_pinned_span_discards_the_previous_reading()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("grants");
+        let grants = FileGrants::new(path.clone());
+        grants.set(Relation::Use, "agent", "secret", Some("person"))?;
+        let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _answer = grants.pinned(|| {
+                assert_eq!(grants.list().expect("initial grant rows").len(), 1);
+                panic!("interrupted grants span");
+            });
+        }));
+        assert!(interrupted.is_err());
+        fs::write(path, b"[]")?;
+        assert!(grants.list()?.is_empty());
+        Ok(())
     }
 }

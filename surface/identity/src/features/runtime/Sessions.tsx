@@ -1,3 +1,5 @@
+import { refreshLive } from '../../live';
+import { readTogether } from '../../reads';
 /** The Sessions screen: every running agent session the caller may see, as its runner says, each opened to its live terminal with a line to type into, common keys and Stop. A session its runner saw end is not listed; nothing is inferred from a clock. */
 import { useNavigate, useParams } from 'react-router';
 import { Listing } from '../../shell/Listing';
@@ -19,13 +21,14 @@ export interface Unanswered { session: string; machine: string; refusal: string;
 
 /** Everything the screen reads at once: the sessions, and the names and teams to group them by. */
 async function readRunning() {
-  const answer = await request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live');
+  const { answer, people, me, teams } = await readTogether({
+    answer: request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live'),
+    people: api.people(), me: api.me(),
+    teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
+  });
   if (!Array.isArray(answer.sessions)) throw new Error('The service did not answer a session list.');
   if (!Array.isArray(answer.unanswered)) throw new Error('The service did not say which runners did not answer.');
   if (answer.sessions.some((entry) => entry.shown === 'stopped')) throw new Error('The service listed a stopped session as running.');
-  const people = await api.people();
-  const me = await api.me();
-  const teams = await readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) }));
   return { ...answer, people, me, teams };
 }
 
@@ -34,7 +37,7 @@ export function RunningSessions() {
   const load = useLive(readRunning, 'runtime-live');
   return <div className="page fill">
     <div className="head">
-      <div><div className="eyebrow">Running now</div><h1>Running sessions</h1><p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p></div>
+      <div><div className="eyebrow">Running now</div><h1>Running sessions</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}<p className="sub">Choose an agent to watch or type in its terminal. Switching leaves the other sessions running.</p></div>
     </div>
     <Gate load={load} title="Running sessions" ok={(data) => <Running {...data} session={session} />} />
   </div>;

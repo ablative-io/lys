@@ -50,7 +50,7 @@ macro_rules! entries {
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
     GET "/login" "Redirect to the sign-in screen" P [];
-    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
+    GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
     POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]];
@@ -141,8 +141,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/network/machines/{id}/runner" "A machine's runner" S [SIGNED, &["MachineUnknown"]];
     POST "/network/machines/{id}/runner" "Name a machine's runner" S [ADMIN_BODY, &["MachineUnknown"]];
     GET "/runner/protocol" "The runner protocol" P [];
-    POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale"]];
-    POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale"]];
+    POST "/runner/dial/{machine}/next" "A dialled runner's next request" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
+    POST "/runner/dial/{machine}/replies/{ticket}" "A dialled runner's reply" P [&["runner_dial_refused", "runner_dial_stale", "runner_unreachable"]];
     GET "/runner-receipts/{index}" "A runner act's receipt" P [&["RequestMalformed"]];
     GET "/agents/{id}/usage" "An agent's budget crossings and what came of each" S [SIGNED, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown"]];
     POST "/agents/{id}/usage" "Report a use an agent made" S [SIGNED_BODY, BUDGET_READ, &["AgentNotVisible", "RuntimeSessionUnknown", "RuntimeUnavailable", "ProvisioningUnavailable"]];
@@ -153,18 +153,18 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable"]];
-    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled"]];
+    POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
-    POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused"]];
-    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused"]];
-    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused"]];
+    POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
+    POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
+    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
     POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]];
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
-    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
+    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown", "SessionsUnavailable", "ProviderUnavailable"]];
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];
@@ -209,5 +209,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable"]];
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
+    GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]];
+    GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
 };

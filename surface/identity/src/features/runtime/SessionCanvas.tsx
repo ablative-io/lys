@@ -1,3 +1,4 @@
+import { refreshLive } from '../../live';
 /** A keyboard-accessible canvas of permitted sessions and recorded connections, with one live terminal open at a time. */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
@@ -78,7 +79,7 @@ export function SessionCanvas() {
   const load = useLive(readSessionGraph, 'session-canvas');
   const messages = useLoad(firstMessagePage, 'canvas-message-edges');
   return <div className="page fill session-canvas-page">
-    <div className="head"><div><div className="eyebrow">Running</div><h1>Agent canvas</h1>
+    <div className="head"><div><div className="eyebrow">Running</div><h1>Agent canvas</h1>{load.status === 'refused' ? <button type="button" onClick={refreshLive}>Reconnect</button> : null}
       <p className="sub">Open an agent’s terminal beside its team memberships and recorded grants. Closing a view leaves the process running. Team membership does not grant access; dashed grant connections no longer stand.</p></div></div>
     <Gate load={load} title="Agent canvas" ok={(graph) => <>
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! One proxied call moves the audit log's anchor once, at its settlement
 //! line, where it once moved it at every line the call wrote (SECRETS-005
 //! R3). The anchor file itself is read back: it names the whole log after
@@ -28,11 +30,13 @@ fn paths(dir: &Path) -> BrokerPaths {
 
 fn granted() -> LocalGrants {
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "token".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "token".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     grants
 }
 

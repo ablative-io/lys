@@ -1,6 +1,7 @@
 //! History cannot multiply emergency-stop or named-operation lookup work.
 
 use std::error::Error;
+use std::time::{Duration, Instant};
 
 use super::{Work, count, reset};
 use crate::{read_views::Login, reviews_state, service_accounts_state, stops_state};
@@ -52,6 +53,32 @@ fn stop_fold_and_lookups_visit_only_the_named_records() -> TestResult {
     );
     assert!(held.operation("missing").is_none());
     assert!(count(Work::Stop) <= 2);
+    Ok(())
+}
+
+#[test]
+fn a_hundred_thousand_stops_fold_without_history_visits_under_two_seconds() -> TestResult {
+    let records: Vec<_> = (0..100_000)
+        .map(|index| stop(format!("history-{index}"), "agent"))
+        .collect();
+    let mut held = stops_state::Held::default();
+    reset();
+    let started = Instant::now();
+    for record in records {
+        held.hold(record)?;
+    }
+    let elapsed = started.elapsed();
+    assert_eq!(held.stops.len(), 100_000);
+    assert_eq!(count(Work::Stop), 0, "the fold visited earlier stops");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "100000 stops folded in {elapsed:?}"
+    );
+    assert!(held.operation("history-0").is_some());
+    assert!(held.operation("history-99999").is_some());
+    assert!(held.operation("missing").is_none());
+    assert_eq!(count(Work::Stop), 2);
+    eprintln!("100000 stops: fold={elapsed:?}, history visits=0, lookup visits=2");
     Ok(())
 }
 

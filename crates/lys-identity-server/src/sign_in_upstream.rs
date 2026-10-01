@@ -20,7 +20,7 @@
 //! name, never on a page of the issuer.
 
 use std::net::IpAddr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 use std::time::Instant;
 
 use axum::extract::{Path, Query, State};
@@ -88,7 +88,7 @@ impl IssuerSignIn {
         {
             Ok(location) => Ok(location),
             Err(error) => {
-                oidc.abandon(&state);
+                oidc.abandon(&state)?;
                 Err(error)
             }
         }
@@ -154,7 +154,10 @@ impl IssuerSignIn {
         }
         let upstream = query_value(&provider_url, "state")
             .ok_or_else(|| failed("the provider's address carries no state"))?;
-        let mut held = self.upstream.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = self
+            .upstream
+            .lock()
+            .map_err(|error| failed(format!("provider sign-in flights unavailable: {error}")))?;
         held.insert(
             upstream,
             Upstream {
@@ -183,10 +186,10 @@ impl IssuerSignIn {
         let held = self
             .upstream
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| failed(format!("provider sign-in flights unavailable: {error}")))?
             .take(upstream, Instant::now())?;
         if !crate::provider_browser::matches(&held.browser, &browser) {
-            oidc.abandon(&held.state);
+            oidc.abandon(&held.state)?;
             return Err(ServerError::SignInStateUnknown);
         }
         let body = json!({
@@ -213,11 +216,11 @@ impl IssuerSignIn {
         match outcome {
             Ok((code, answered)) if answered == held.state => oidc.finish(code, &held.state).await,
             Ok(_) => {
-                oidc.abandon(&held.state);
+                oidc.abandon(&held.state)?;
                 Err(ServerError::SignInStateUnknown)
             }
             Err(error) => {
-                oidc.abandon(&held.state);
+                oidc.abandon(&held.state)?;
                 Err(error)
             }
         }
@@ -334,7 +337,7 @@ async fn finish(
             crate::provider_browser::digest(headers)?,
         )
         .await?;
-    crate::session_admission::begin(state, actor)
+    crate::session_admission::begin(state, actor).await
 }
 
 async fn callback(

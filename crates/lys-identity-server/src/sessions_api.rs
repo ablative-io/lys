@@ -118,7 +118,7 @@ fn sessions_of(
         let person = person_of(projection)?;
         let mut entries = state
             .sessions
-            .live(|actor| belongs(projection, person, actor));
+            .live(|actor| belongs(projection, person, actor))?;
         entries.sort_by(|a, b| {
             b.started_at
                 .cmp(&a.started_at)

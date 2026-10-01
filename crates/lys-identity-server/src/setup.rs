@@ -234,7 +234,7 @@ fn pending(settings: &SetupSettings) -> Result<Option<PendingCode>, ServerError>
 fn admit(state: &AppState, code: &str, purpose: Purpose) -> Result<(), ServerError> {
     let settings = settings(state)?;
     let held = pending(settings)?;
-    let administrator = state.admission.administrator_login().is_some();
+    let administrator = state.admission.administrator_login()?.is_some();
     if purpose == Purpose::FirstRun && administrator {
         return Err(ServerError::SetupClosed);
     }
@@ -268,7 +268,7 @@ fn purpose_of(state: &AppState, code: &str) -> Result<Purpose, ServerError> {
     let held = pending(settings(state)?)?;
     let purpose = match held {
         Some(held) => held.purpose,
-        None if state.admission.administrator_login().is_some() => {
+        None if state.admission.administrator_login()?.is_some() => {
             return Err(ServerError::SetupClosed);
         }
         None => return Err(ServerError::SetupCodeRefused),
@@ -309,7 +309,7 @@ async fn open(
     let purpose = purpose_of(&state, &body.code)?;
     let email = match purpose {
         Purpose::FirstRun => settings(&state)?.email.clone(),
-        Purpose::Password => match state.admission.administrator_login() {
+        Purpose::Password => match state.admission.administrator_login()? {
             Some(login) => {
                 let api = crate::sign_in_providers::api(&state)?;
                 Some(accounts::email_of(api, login.subject()).await?)
@@ -399,7 +399,7 @@ async fn make_administrator(
     crate::import_bootstrap::ensure(&state)?;
     spend(settings)?;
     drop(turn);
-    let cookie = crate::session_admission::begin(&state, actor)?;
+    let cookie = crate::session_admission::begin(&state, actor).await?;
     let answer = PersonRegistered {
         person: person.to_string(),
         receipt: receipt_view(&receipt),
@@ -430,7 +430,7 @@ async fn new_password(
     admit(&state, &body.code, Purpose::Password)?;
     let login = state
         .admission
-        .administrator_login()
+        .administrator_login()?
         .ok_or(ServerError::SetupCodeRefused)?;
     let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
@@ -444,7 +444,7 @@ async fn new_password(
     let actor = state.sign_in.password(&state.oidc, &attempt).await?;
     spend(settings(&state)?)?;
     drop(turn);
-    begin_session(&state, &actor)
+    begin_session(&state, &actor).await
 }
 
 /// Browser-owned operation id and the name to display; identity claims are forbidden.

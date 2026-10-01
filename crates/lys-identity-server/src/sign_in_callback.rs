@@ -21,7 +21,7 @@ pub(crate) async fn callback(
 ) -> Result<Response, ServerError> {
     let actor = state.oidc.finish(answer.code, &answer.state).await?;
     if wants_page(&headers) {
-        let cookie = crate::session_admission::begin(&state, actor)?;
+        let cookie = crate::session_admission::begin(&state, actor).await?;
         return Ok((
             StatusCode::SEE_OTHER,
             [
@@ -31,7 +31,7 @@ pub(crate) async fn callback(
         )
             .into_response());
     }
-    crate::sign_in::begin_session(&state, &actor)
+    crate::sign_in::begin_session(&state, &actor).await
 }
 
 /// Whether the caller is a browser following the sign-in, which is taken to the

@@ -34,7 +34,7 @@ export function confirmAdmission(value: unknown, machine: string, body: MachineA
 }
 
 export async function machineAdmissionServed(): Promise<boolean> {
-  return machineAdmissionOf(await request<unknown>('/openapi.json'));
+  return machineAdmissionOf(await request<unknown>('/surface-contract'));
 }
 
 export function machineAdmissionOf(document: unknown): boolean {

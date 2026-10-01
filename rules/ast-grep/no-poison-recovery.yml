@@ -1,0 +1,11 @@
+id: no-poison-recovery
+language: rust
+severity: error
+message: "Refuse poisoned state by name; reopen durable state before answering again."
+ignores:
+  - "vendor/**"
+rule:
+  any:
+    - pattern: PoisonError::into_inner
+    - pattern: std::sync::PoisonError::into_inner
+    - pattern: $LOCK.unwrap_or_else(|$ERROR| $ERROR.into_inner())

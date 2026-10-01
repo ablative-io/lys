@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Application approval and secret custody retain refusal and replay evidence.
 
 use super::*;
@@ -37,11 +39,7 @@ async fn only_administrator_can_save_a_current_app_secret_and_the_broker_gets_a_
     assert_eq!(prepared[0].path, "/_lys/apps/prepare");
     signed_as_received(&prepared[0], &setup.key)?;
     assert!(!String::from_utf8_lossy(&prepared[0].body).contains(secret));
-    setup
-        .log
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clear();
+    setup.log.lock().expect("fixture lock poisoned").clear();
     let replay = ok(post(
         &setup.service,
         &format!("/apps/{app}/approve"),

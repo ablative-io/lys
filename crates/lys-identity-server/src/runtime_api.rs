@@ -18,7 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
@@ -135,7 +135,11 @@ pub(crate) fn with_runtime<T>(
         .ok_or_else(|| ServerError::RuntimeUnavailable {
             reason: "the configuration names no runtime_dir".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::RuntimeUnavailable {
+            reason: format!("the runtime lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
@@ -153,21 +157,11 @@ pub(crate) fn session_agents(
 
 /// When a runtime last reported a session on each machine, by machine id;
 /// none when the configuration names no runtime reports.
-pub(crate) fn last_reports(state: &AppState) -> Result<BTreeMap<String, u64>, ServerError> {
-    let mut last = BTreeMap::new();
+pub(crate) fn last_reports(state: &AppState) -> Result<Arc<BTreeMap<String, u64>>, ServerError> {
     if state.runtime.is_none() {
-        return Ok(last);
+        return Ok(Arc::new(BTreeMap::new()));
     }
-    with_runtime(state, |store| {
-        for tracked in store.sessions() {
-            if let Some(report) = tracked.latest() {
-                let at = last.entry(tracked.machine.clone()).or_insert(report.at);
-                *at = (*at).max(report.at);
-            }
-        }
-        Ok(())
-    })?;
-    Ok(last)
+    with_runtime(state, |store| Ok(store.last_reports()))
 }
 
 fn words(name: &str, text: &str) -> Result<String, ServerError> {
@@ -220,13 +214,25 @@ fn report(
     })
 }
 
-pub(crate) fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
-    let (first, latest) = (tracked.first()?, tracked.latest()?);
-    let machine = state.network.as_ref().and_then(|store| {
-        let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-        store.machine(&tracked.machine).cloned()
-    });
-    Some(SessionView {
+pub(crate) fn view(
+    state: &AppState,
+    tracked: &Tracked,
+) -> Result<Option<SessionView>, ServerError> {
+    let (Some(first), Some(latest)) = (tracked.first(), tracked.latest()) else {
+        return Ok(None);
+    };
+    let machine = match &state.network {
+        Some(store) => {
+            let store = store
+                .lock()
+                .map_err(|error| ServerError::NetworkUnavailable {
+                    reason: format!("the network lock is poisoned: {error}"),
+                })?;
+            store.machine(&tracked.machine).cloned()
+        }
+        None => None,
+    };
+    Ok(Some(SessionView {
         session: tracked.session.clone(),
         agent: tracked.agent.clone(),
         machine: tracked.machine.clone(),
@@ -249,6 +255,18 @@ pub(crate) fn view(state: &AppState, tracked: &Tracked) -> Option<SessionView> {
         }),
         stop_asked_at: tracked.stop_asked_at(),
         reported_by: first.reported_by.clone(),
+    }))
+}
+
+pub(crate) fn views<'a>(
+    state: &AppState,
+    mut tracked: impl Iterator<Item = &'a Tracked>,
+) -> Result<Vec<SessionView>, ServerError> {
+    tracked.try_fold(Vec::new(), |mut answers, tracked| {
+        if let Some(answer) = view(state, tracked)? {
+            answers.push(answer);
+        }
+        Ok(answers)
     })
 }
 
@@ -315,7 +333,7 @@ async fn report_agent(
         if tracked.stopped() && let Some(agent) = &tracked.agent {
             crate::budgets_context::finish(&state, agent, &tracked.session)?;
         }
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        view(&state, &tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)
 }
@@ -348,7 +366,7 @@ async fn report_found(
         {
             crate::budgets_context::finish(&state, agent, &tracked.session)?;
         }
-        view(&state, &tracked).ok_or(ServerError::RuntimeSessionUnknown)
+        view(&state, &tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
     })
     .map(Json)
 }
@@ -373,12 +391,13 @@ async fn agent_sessions(
         }
         with_runtime(&state, |store| {
             Ok(SessionsView {
-                sessions: store
-                    .sessions()
-                    .iter()
-                    .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str()))
-                    .filter_map(|tracked| view(&state, tracked))
-                    .collect(),
+                sessions: views(
+                    &state,
+                    store
+                        .sessions()
+                        .iter()
+                        .filter(|tracked| tracked.agent.as_deref() == Some(agent.as_str())),
+                )?,
             })
         })
     })
@@ -465,7 +484,7 @@ pub(crate) fn live_page(
                     if projection.record(IdentityId::Agent(id)).is_none() {
                         return Err(ServerError::AgentNotVisible);
                     }
-                    view(state, tracked).ok_or(ServerError::RuntimeSessionUnknown)
+                    view(state, tracked)?.ok_or(ServerError::RuntimeSessionUnknown)
                 },
             )
         })
@@ -476,10 +495,7 @@ async fn sessions(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
-    let sessions = visible_sessions(&state, &headers)?
-        .iter()
-        .filter_map(|tracked| view(&state, tracked))
-        .collect();
+    let sessions = views(&state, visible_sessions(&state, &headers)?.iter())?;
     Ok(Json(SessionsView { sessions }))
 }
 
@@ -491,12 +507,13 @@ async fn found(
     crate::routes::administrator(&state, &actor)?;
     with_runtime(&state, |store| {
         Ok(SessionsView {
-            sessions: store
-                .sessions()
-                .iter()
-                .filter(|tracked| tracked.agent.is_none())
-                .filter_map(|tracked| view(&state, tracked))
-                .collect(),
+            sessions: views(
+                &state,
+                store
+                    .sessions()
+                    .iter()
+                    .filter(|tracked| tracked.agent.is_none()),
+            )?,
         })
     })
     .map(Json)

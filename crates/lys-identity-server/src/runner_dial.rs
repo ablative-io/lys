@@ -106,7 +106,7 @@ fn admitted(
             "the dial is not signed by machine `{machine}`'s key"
         ))
     })?;
-    if !state.runners.hub().fresh(machine, nonce) {
+    if !state.runners.hub().fresh(machine, nonce)? {
         return Err(refused(format!("nonce `{nonce}` was already used")));
     }
     Ok(())
@@ -125,7 +125,7 @@ async fn next(
     if let Ok(Ok(greeting)) = &greeting {
         pinned(&state, &machine, &greeting.runner)?;
     }
-    let (ticket, act) = state.runners.hub().next(&machine).await;
+    let (ticket, act) = state.runners.hub().next(&machine).await?;
     let signed = match greeting {
         Ok(greeting) => greeting.and_then(|greeting| state.runners.sign(&greeting, &act)),
         Err(refusal) => {

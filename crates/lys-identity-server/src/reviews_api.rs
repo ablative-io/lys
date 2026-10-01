@@ -23,7 +23,7 @@
 //! nothing more.
 
 use std::str::FromStr;
-use std::sync::{Arc, MutexGuard, PoisonError};
+use std::sync::{Arc, MutexGuard};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -185,7 +185,11 @@ fn decisions(state: &AppState) -> Result<Option<MutexGuard<'_, ReviewStore>>, Se
     let Some(store) = state.reviews.as_ref() else {
         return Ok(None);
     };
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::ReviewsUnavailable {
+            reason: format!("the reviews lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     Ok(Some(store))
 }

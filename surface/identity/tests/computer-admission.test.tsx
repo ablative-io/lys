@@ -24,7 +24,7 @@ type Body = { operation: string; agent: string; allow: boolean };
 const receipt = (body: Body, current = body.allow) => ({ machine: { ...machine, may_run: current ? [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] : [] }, recorded: { ...body, machine: id, by: ADA, at: 1 } });
 
 function service(extra: Record<string, Route> = {}): Record<string, Route> {
-  return { ...SERVICE, '/openapi.json': ok(capability), '/network': ok({ machines: [machine], reports_served: true }), '/harnesses': ok({ programs: [] }), '/skills': ok({ skills: [] }), '/secrets': ok({ secrets: [] }),
+  return { ...SERVICE, '/surface-contract': ok(capability), '/network': ok({ machines: [machine], reports_served: true }), '/harnesses': ok({ programs: [] }), '/skills': ok({ skills: [] }), '/secrets': ok({ secrets: [] }),
     [prefix + '/provisioning']: ok({ agent: SCRIBE, profile: null, versions: [], enforced: false }), ['POST ' + path]: (body) => ok(receipt(body as Body)), ...extra };
 }
 
@@ -83,7 +83,7 @@ describe('Choosing where an agent can run', () => {
     expect(tick('op-' + '3'.repeat(32)).disabled).toBe(true);
     expect($('[aria-label="Where can Scribe run?"]')?.textContent).not.toContain('Retired computer');
     expect(requests.filter((request) => request === '/network')).toHaveLength(1);
-    expect(requests.filter((request) => request === '/openapi.json')).toHaveLength(1);
+    expect(requests.filter((request) => request === '/surface-contract')).toHaveLength(1);
     expect(posted).toEqual([]);
   });
 
@@ -92,7 +92,7 @@ describe('Choosing where an agent can run', () => {
     { name: 'malformed', schema: ok({ paths: { '/network/machines/{id}/agents': { post: {} } } }) },
     { name: 'unavailable', schema: refused(503, 'SchemaUnavailable', 'The served schema could not be read') },
   ])('shows coming and sends no tick when the served route is $name', async ({ schema }) => {
-    const { posted } = await open(service({ '/openapi.json': schema }));
+    const { posted } = await open(service({ '/surface-contract': schema }));
     expect($('[aria-label="Where can Scribe run?"]')?.textContent).toContain('coming');
     expect(tick().disabled).toBe(true);
     await change();
@@ -128,7 +128,7 @@ describe('Choosing where an agent can run', () => {
     expect((posted[1].body as Body).operation).not.toBe((posted[0].body as Body).operation);
     expect(tick().checked).toBe(false);
     expect(sessionStorage.getItem(key)).toBeNull();
-    expect(requests.filter((request) => request === '/openapi.json')).toHaveLength(1);
+    expect(requests.filter((request) => request === '/surface-contract')).toHaveLength(1);
   });
 
   it('replays the exact uncertain tick after remount and does not restore an allowance removed later', async () => {
@@ -184,7 +184,7 @@ describe('Choosing where an agent can run', () => {
   });
 
   it('adds this computer in place under one retained operation, admits only this agent and returns to its selected computer', async () => {
-    const routes = service({ '/network': ok({ machines: [], reports_served: true }), '/openapi.json': ok({ openapi: '3.1.0', paths: {} }) });
+    const routes = service({ '/network': ok({ machines: [], reports_served: true }), '/surface-contract': ok({ openapi: '3.1.0', paths: {} }) });
     routes['POST /network/machines'] = (body) => {
       const draft = body as NameMachine;
       const named: Machine = { ...machine, ...draft, id: draft.operation, may_run: draft.may_run.map((agent) => ({ id: agent, display_name: 'Scribe', state: 'active' })) };

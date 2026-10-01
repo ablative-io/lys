@@ -11,7 +11,7 @@
 //! not kept, `ServiceAccountUnknown`, so no refusal says whether it exists.
 
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -80,7 +80,11 @@ fn with_service_accounts<T>(
             .ok_or_else(|| ServerError::ServiceAccountsUnavailable {
                 reason: "the configuration names no service_accounts_dir".to_owned(),
             })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::ServiceAccountsUnavailable {
+            reason: format!("the service accounts lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }

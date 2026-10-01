@@ -21,7 +21,7 @@
 //! records no roles or role versions yet, so `role` and `version` answer
 //! null until it does. Each route answers its type from `read_views`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::ops::Bound;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -111,6 +111,8 @@ pub(crate) fn agent_summary(
     id: IdentityId,
     record: &Record,
 ) -> Result<AgentSummary, ServerError> {
+    #[cfg(test)]
+    VIEW_BUILDS.with(|count| count.set(count.get() + 1));
     let reporting = crate::reporting_read::read(projection, record)?;
     Ok(AgentSummary {
         id: id.to_string(),
@@ -142,7 +144,14 @@ fn agents_of_observing(
         .collect()
 }
 
+#[cfg(test)]
+thread_local! {
+    static VIEW_BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn person_view(id: PersonId, record: &Record, agents: Vec<AgentSummary>) -> PersonView {
+    #[cfg(test)]
+    VIEW_BUILDS.with(|count| count.set(count.get() + 1));
     let PersonSummary {
         id: text,
         display_name,
@@ -208,15 +217,18 @@ async fn own_people(
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
-        let record = person_record(projection, person)?;
-        let agents = agents_of(projection, person)?;
-        people_page(
-            &state,
-            "personal",
-            vec![person_view(person, record, agents)],
-            query,
-            "/people",
-        )
+        let page = crate::list_page::Page::read(query, "/people")?;
+        let members = page
+            .as_ref()
+            .map(|page| page.members(&state))
+            .transpose()?
+            .flatten();
+        Ok(Json(personal_people(
+            projection,
+            person,
+            page.as_ref(),
+            members.as_ref(),
+        )?))
     })
 }
 
@@ -308,46 +320,63 @@ async fn every_person(
     })
 }
 
-fn people_page(
-    state: &AppState,
-    scope: &str,
-    mut people: Vec<PersonView>,
-    query: crate::list_page::Input,
-    route: &'static str,
-) -> Result<Json<PeopleView>, ServerError> {
-    let page = crate::list_page::Page::read(query, route)?;
-    let (totals, agents_total) = if let Some(page) = page {
-        let members = page.members(state)?;
-        people.retain(|person| {
-            let in_team = crate::list_page::member(members.as_ref(), &person.id, None)
-                || person
-                    .agents
-                    .iter()
-                    .any(|agent| crate::list_page::member(members.as_ref(), &agent.id, None));
-            in_team
-                && page.matches(
-                    std::iter::once(person.display_name.as_str()).chain(
-                        person
-                            .agents
-                            .iter()
-                            .map(|agent| agent.display_name.as_str()),
-                    ),
-                )
+fn personal_people(
+    projection: &Projection,
+    person: PersonId,
+    page: Option<&crate::list_page::Page>,
+    members: Option<&BTreeSet<String>>,
+) -> Result<PeopleView, ServerError> {
+    let record = person_record(projection, person)?;
+    let Some(page) = page else {
+        return Ok(PeopleView {
+            scope: "personal".to_owned(),
+            people: vec![person_view(person, record, agents_of(projection, person)?)],
+            page: None,
+            agents_total: None,
         });
-        let agents_total = people.iter().map(|person| person.agents.len()).sum();
-        (
-            Some(page.finish(&mut people, |person| &person.id)?),
-            Some(agents_total),
-        )
-    } else {
-        (None, None)
     };
-    Ok(Json(PeopleView {
-        scope: scope.to_owned(),
+    let id = person.to_string();
+    let filtered = page.filtered();
+    let mut agents_total = 0;
+    let (people, totals) = page.select(
+        std::iter::once(id.as_str()),
+        (!filtered).then_some(1),
+        |_| {
+            if !filtered {
+                return Ok(true);
+            }
+            let agents = projection
+                .agents_of(person)
+                .collect::<Result<Vec<_>, _>>()?;
+            let in_team = crate::list_page::member(members, &id, None)
+                || agents
+                    .iter()
+                    .any(|(agent, _)| crate::list_page::member(members, &agent.to_string(), None));
+            let matched = in_team
+                && page.matches(
+                    std::iter::once(record.profile().display_name()).chain(
+                        agents
+                            .iter()
+                            .map(|(_, record)| record.profile().display_name()),
+                    ),
+                );
+            if matched {
+                agents_total = projection.person_agents_count(person);
+            }
+            Ok(matched)
+        },
+        |id| id,
+        |_| Ok(person_view(person, record, agents_of(projection, person)?)),
+    )?;
+    if !filtered {
+        agents_total = projection.person_agents_count(person);
+    }
+    Ok(PeopleView {
+        scope: "personal".to_owned(),
         people,
-        page: totals,
-        agents_total,
-    }))
+        page: Some(totals),
+        agents_total: Some(agents_total),
+    })
 }
 
 async fn own_agent(

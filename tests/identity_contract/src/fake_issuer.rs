@@ -32,7 +32,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -120,19 +120,32 @@ struct PendingUpstream {
     session: String,
 }
 
-fn held<T>(slot: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    slot.lock().unwrap_or_else(PoisonError::into_inner)
+fn held<T>(slot: &Mutex<T>) -> std::io::Result<std::sync::MutexGuard<'_, T>> {
+    slot.lock()
+        .map_err(|error| std::io::Error::other(format!("fixture_lock_poisoned: {error}")))
+}
+
+macro_rules! fixture {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(error) => return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "error": "fixture_lock_poisoned", "message": error.to_string() })),
+            ).into_response(),
+        }
+    };
 }
 
 impl Inner {
     /// Record the forwarded address a sign-in step carried, answering it.
-    fn record(&self, headers: &HeaderMap) -> String {
+    fn record(&self, headers: &HeaderMap) -> std::io::Result<String> {
         let forwarded = headers
             .get("x-forwarded-for")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        held(&self.forwarded).push(forwarded.clone());
-        forwarded.unwrap_or_default()
+        held(&self.forwarded)?.push(forwarded.clone());
+        Ok(forwarded.unwrap_or_default())
     }
 
     fn next_serial(&self) -> u64 {
@@ -140,9 +153,15 @@ impl Inner {
     }
 
     /// Issue a code for `login`, answering it.
-    fn issue(&self, login: Login, state: &str, nonce: String, challenge: String) -> String {
+    fn issue(
+        &self,
+        login: Login,
+        state: &str,
+        nonce: String,
+        challenge: String,
+    ) -> std::io::Result<String> {
         let code = URL_SAFE_NO_PAD.encode(Sha256::digest(state.as_bytes()));
-        held(&self.codes).insert(
+        held(&self.codes)?.insert(
             code.clone(),
             Issued {
                 login,
@@ -150,12 +169,12 @@ impl Inner {
                 challenge,
             },
         );
-        code
+        Ok(code)
     }
 
     /// The login the test chose for the next sign-in, or the standing one.
-    fn chosen(&self) -> Option<Login> {
-        held(&self.next).take().or_else(|| self.standing.clone())
+    fn chosen(&self) -> std::io::Result<Option<Login>> {
+        Ok(held(&self.next)?.take().or_else(|| self.standing.clone()))
     }
 }
 
@@ -270,21 +289,38 @@ impl FakeIssuer {
     }
 
     /// Sign the next sign-in as `login`.
-    pub fn sign_in_as(&self, login: Login) {
-        *held(&self.inner.next) = Some(login);
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn sign_in_as(&self, login: Login) -> std::io::Result<()> {
+        *held(&self.inner.next)? = Some(login);
+        Ok(())
     }
 
     /// Hold `account` under its login's email, replacing any held there.
-    pub fn hold(&self, account: Account) {
-        held(&self.inner.accounts).insert(account.login.email.clone(), account);
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn hold(&self, account: Account) -> std::io::Result<()> {
+        held(&self.inner.accounts)?.insert(account.login.email.clone(), account);
+        Ok(())
     }
 
     /// Follow a change the administration API made to account `subject`:
     /// its email, a new password when one was set, and whether it may sign
     /// in. An account never given a password is not held.
-    pub fn follow(&self, subject: &str, email: &str, password: Option<String>, enabled: bool) {
-        let mut accounts = held(&self.inner.accounts);
-        let mut disabled = held(&self.inner.disabled);
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn follow(
+        &self,
+        subject: &str,
+        email: &str,
+        password: Option<String>,
+        enabled: bool,
+    ) -> std::io::Result<()> {
+        let mut accounts = held(&self.inner.accounts)?;
+        let mut disabled = held(&self.inner.disabled)?;
         let before = accounts
             .iter()
             .find(|(_, account)| account.login.subject == subject)
@@ -298,7 +334,7 @@ impl FakeIssuer {
         };
         let earlier = before.as_ref().map(|account| account.password.clone());
         let Some(password) = password.or(earlier) else {
-            return;
+            return Ok(());
         };
         let account = Account {
             login: Login {
@@ -313,11 +349,15 @@ impl FakeIssuer {
         } else {
             disabled.insert(subject.to_owned(), account);
         }
+        Ok(())
     }
 
     /// The account held under `email`, if one is.
-    pub fn account(&self, email: &str) -> Option<Account> {
-        held(&self.inner.accounts).get(email).cloned()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn account(&self, email: &str) -> std::io::Result<Option<Account>> {
+        Ok(held(&self.inner.accounts)?.get(email).cloned())
     }
 
     /// The stand-in provider's origin.
@@ -327,19 +367,29 @@ impl FakeIssuer {
 
     /// Send people back from the provider to `callback`, the issuer's
     /// public provider callback address.
-    pub fn set_public_callback(&self, callback: &str) {
-        callback.clone_into(&mut held(&self.inner.public_callback));
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn set_public_callback(&self, callback: &str) -> std::io::Result<()> {
+        callback.clone_into(&mut *held(&self.inner.public_callback)?);
+        Ok(())
     }
 
     /// Every redirect address the stand-in provider was asked with, in order.
-    pub fn provider_redirects(&self) -> Vec<String> {
-        held(&self.inner.provider_redirects).clone()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn provider_redirects(&self) -> std::io::Result<Vec<String>> {
+        Ok(held(&self.inner.provider_redirects)?.clone())
     }
 
     /// Every `X-Forwarded-For` value a sign-in step carried, in order, none
     /// where a step carried none.
-    pub fn forwarded(&self) -> Vec<Option<String>> {
-        held(&self.inner.forwarded).clone()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn forwarded(&self) -> std::io::Result<Vec<Option<String>>> {
+        Ok(held(&self.inner.forwarded)?.clone())
     }
 }
 
@@ -390,10 +440,10 @@ async fn authorize(
     if request.code_challenge_method != "S256" {
         return refused("only S256 is accepted");
     }
-    let Some(login) = inner.chosen() else {
+    let Some(login) = fixture!(inner.chosen()) else {
         return refused("the test chose no login");
     };
-    let code = inner.issue(login, &request.state, request.nonce, request.code_challenge);
+    let code = fixture!(inner.issue(login, &request.state, request.nonce, request.code_challenge));
     let location = format!(
         "{}?code={code}&state={}",
         request.redirect_uri, request.state
@@ -426,12 +476,7 @@ async fn token(
     if !client_admitted(&headers) {
         return refused("the client credentials are wrong");
     }
-    let Some(issued) = inner
-        .codes
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .remove(&request.code)
-    else {
+    let Some(issued) = fixture!(held(&inner.codes)).remove(&request.code) else {
         return refused("the code is unknown or used");
     };
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(request.code_verifier.as_bytes()));
@@ -482,14 +527,14 @@ async fn login_page(
     headers: HeaderMap,
     Query(request): Query<PageRequest>,
 ) -> Response {
-    inner.record(&headers);
+    fixture!(inner.record(&headers));
     if request.client_id != CLIENT_ID || request.code_challenge_method != "S256" {
         return refused("the authorization request is not one this issuer takes");
     }
     let serial = inner.next_serial();
     let session = format!("session{serial}");
     let token = format!("token{serial}");
-    held(&inner.sessions).insert(session.clone(), token.clone());
+    fixture!(held(&inner.sessions)).insert(session.clone(), token.clone());
     let page = format!(
         "<html><body><div hidden><template id=\"tpl_csrf_token\">{token}</template></div></body></html>"
     );
@@ -508,23 +553,23 @@ async fn login_page(
 }
 
 /// A proof-of-work challenge, remembered until it is answered once.
-async fn pow(State(inner): State<Shared>, headers: HeaderMap) -> String {
-    inner.record(&headers);
+async fn pow(State(inner): State<Shared>, headers: HeaderMap) -> Response {
+    fixture!(inner.record(&headers));
     let serial = inner.next_serial();
     let challenge = format!("1:{DIFFICULTY}:4102444800:{serial:0>16}:{serial:0>43}:");
-    held(&inner.challenges).insert(challenge.clone());
-    challenge
+    fixture!(held(&inner.challenges)).insert(challenge.clone());
+    challenge.into_response()
 }
 
 /// Whether `answer` answers a challenge this issuer gave and has not taken,
 /// taking it.
-fn answered(inner: &Inner, answer: &str) -> bool {
+fn answered(inner: &Inner, answer: &str) -> std::io::Result<bool> {
     let Some((challenge, counter)) = answer.rsplit_once(':') else {
-        return false;
+        return Ok(false);
     };
     let hash = Sha256::digest(answer.as_bytes());
     let zeros = hash[0] == 0 && hash[1] >> (16 - DIFFICULTY) == 0;
-    !counter.is_empty() && zeros && held(&inner.challenges).remove(&format!("{challenge}:"))
+    Ok(!counter.is_empty() && zeros && held(&inner.challenges)?.remove(&format!("{challenge}:")))
 }
 
 #[derive(Deserialize)]
@@ -573,22 +618,29 @@ async fn credentials(
     if agent.is_none_or(str::is_empty) {
         return status(StatusCode::BAD_REQUEST, "Empty User-Agent not allowed");
     }
-    let address = inner.record(&headers);
+    let address = fixture!(inner.record(&headers));
     let token = headers
         .get("x-csrf-token")
         .and_then(|value| value.to_str().ok());
-    let session = session_of(&headers).and_then(|id| held(&inner.sessions).get(&id).cloned());
+    let sessions = fixture!(held(&inner.sessions));
+    let session = session_of(&headers).and_then(|id| sessions.get(&id).cloned());
+    drop(sessions);
     if session.is_none() || session.as_deref() != token {
         return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
     }
-    if !answered(&inner, &request.pow) {
+    if !fixture!(answered(&inner, &request.pow)) {
         return status(StatusCode::BAD_REQUEST, "Invalid PoW");
     }
-    if held(&inner.failures).get(&address).copied().unwrap_or(0) >= FAILURES_BARRED {
+    if fixture!(held(&inner.failures))
+        .get(&address)
+        .copied()
+        .unwrap_or(0)
+        >= FAILURES_BARRED
+    {
         return status(StatusCode::TOO_MANY_REQUESTS, "Too many failed logins");
     }
     let password = request.password.unwrap_or_default();
-    let account = held(&inner.accounts).get(&request.email).cloned();
+    let account = fixture!(held(&inner.accounts)).get(&request.email).cloned();
     let login = match account {
         Some(account) if account.password == password => {
             if account.second_factor {
@@ -598,10 +650,10 @@ async fn credentials(
         }
         Some(_) => None,
         None if password.is_empty() => None,
-        None => inner.chosen(),
+        None => fixture!(inner.chosen()),
     };
     let Some(login) = login else {
-        *held(&inner.failures).entry(address).or_insert(0) += 1;
+        *fixture!(held(&inner.failures)).entry(address).or_insert(0) += 1;
         return status(StatusCode::UNAUTHORIZED, "Invalid user credentials");
     };
     if request.client_id != CLIENT_ID || request.code_challenge_method.as_deref() != Some("S256") {
@@ -611,12 +663,12 @@ async fn credentials(
         );
     }
     let state = request.state.unwrap_or_default();
-    let code = inner.issue(
+    let code = fixture!(inner.issue(
         login,
         &state,
         request.nonce.unwrap_or_default(),
         request.code_challenge.unwrap_or_default(),
-    );
+    ));
     let location = format!("{}?code={code}&state={state}", request.redirect_uri);
     (StatusCode::ACCEPTED, [(header::LOCATION, location)]).into_response()
 }
@@ -633,7 +685,7 @@ async fn provider_authorize(
     State(inner): State<Shared>,
     Query(ask): Query<ProviderAsk>,
 ) -> Response {
-    held(&inner.provider_redirects).push(ask.redirect_uri.clone());
+    fixture!(held(&inner.provider_redirects)).push(ask.redirect_uri.clone());
     if ask.client_id.starts_with("rejected") {
         return (
             StatusCode::UNAUTHORIZED,
@@ -647,11 +699,11 @@ async fn provider_authorize(
     let Some(state) = ask.state else {
         return (StatusCode::OK, "<html><title>Sign in</title></html>").into_response();
     };
-    let Some(login) = inner.chosen() else {
+    let Some(login) = fixture!(inner.chosen()) else {
         return refused("the test chose no login at the provider");
     };
     let code = format!("upstream{}", inner.next_serial());
-    held(&inner.upstream_codes).insert(code.clone(), login);
+    fixture!(held(&inner.upstream_codes)).insert(code.clone(), login);
     let location = format!("{}?code={code}&state={state}", ask.redirect_uri);
     (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
 }
@@ -670,12 +722,20 @@ struct ProviderLogin {
 }
 
 /// The session a request carries, when its request token is the session's.
-fn session_with_token(inner: &Inner, headers: &HeaderMap) -> Option<String> {
-    let token = headers
+fn session_with_token(inner: &Inner, headers: &HeaderMap) -> std::io::Result<Option<String>> {
+    let Some(token) = headers
         .get("x-csrf-token")
-        .and_then(|value| value.to_str().ok())?;
-    let session = session_of(headers)?;
-    (held(&inner.sessions).get(&session).map(String::as_str) == Some(token)).then_some(session)
+        .and_then(|value| value.to_str().ok())
+    else {
+        return Ok(None);
+    };
+    let Some(session) = session_of(headers) else {
+        return Ok(None);
+    };
+    Ok(
+        (held(&inner.sessions)?.get(&session).map(String::as_str) == Some(token))
+            .then_some(session),
+    )
 }
 
 /// The issuer's start of a provider sign-in.
@@ -684,11 +744,11 @@ async fn provider_login(
     headers: HeaderMap,
     Json(request): Json<ProviderLogin>,
 ) -> Response {
-    inner.record(&headers);
-    let Some(session) = session_with_token(&inner, &headers) else {
+    fixture!(inner.record(&headers));
+    let Some(session) = fixture!(session_with_token(&inner, &headers)) else {
         return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
     };
-    if !answered(&inner, &request.pow) {
+    if !fixture!(answered(&inner, &request.pow)) {
         return status(StatusCode::BAD_REQUEST, "Invalid PoW");
     }
     if request.provider_id.is_empty() || request.provider_id.starts_with("unknown") {
@@ -703,7 +763,7 @@ async fn provider_login(
     let serial = inner.next_serial();
     let callback_id = format!("callback{serial}");
     let xsrf = format!("xsrf{serial}");
-    held(&inner.upstream).insert(
+    fixture!(held(&inner.upstream)).insert(
         callback_id.clone(),
         PendingUpstream {
             redirect_uri: request.redirect_uri,
@@ -715,7 +775,7 @@ async fn provider_login(
             session,
         },
     );
-    let callback = held(&inner.public_callback).clone();
+    let callback = fixture!(held(&inner.public_callback)).clone();
     let Ok(mut location) = reqwest::Url::parse(&format!("{}/authorize", inner.provider_base))
     else {
         return status(
@@ -757,11 +817,11 @@ async fn provider_callback(
     headers: HeaderMap,
     Json(back): Json<ProviderBack>,
 ) -> Response {
-    inner.record(&headers);
-    let Some(session) = session_with_token(&inner, &headers) else {
+    fixture!(inner.record(&headers));
+    let Some(session) = fixture!(session_with_token(&inner, &headers)) else {
         return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
     };
-    let Some(pending) = held(&inner.upstream).remove(&back.state) else {
+    let Some(pending) = fixture!(held(&inner.upstream)).remove(&back.state) else {
         return status(
             StatusCode::BAD_REQUEST,
             "no provider sign-in has that state",
@@ -782,16 +842,36 @@ async fn provider_callback(
             "the provider sign-in does not match its start",
         );
     }
-    let Some(login) = held(&inner.upstream_codes).remove(&back.code) else {
+    let Some(login) = fixture!(held(&inner.upstream_codes)).remove(&back.code) else {
         return status(
             StatusCode::BAD_REQUEST,
             "the provider's code is unknown or used",
         );
     };
-    let code = inner.issue(login, &pending.state, pending.nonce, pending.code_challenge);
+    let code = fixture!(inner.issue(login, &pending.state, pending.nonce, pending.code_challenge));
     let location = format!(
         "{}?code={code}&state={}",
         pending.redirect_uri, pending.state
     );
     (StatusCode::ACCEPTED, [(header::LOCATION, location)]).into_response()
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::held;
+
+    #[test]
+    fn poisoned_fixture_state_fails_instead_of_returning_a_partial_value() {
+        let slot = std::sync::Mutex::new(1);
+        let poison = std::panic::catch_unwind(|| {
+            let mut state = held(&slot).expect("fixture is initially healthy");
+            *state = 2;
+            panic!("injected partial fixture update");
+        });
+        assert!(poison.is_err());
+        match held(&slot) {
+            Err(error) => assert!(error.to_string().contains("fixture_lock_poisoned")),
+            Ok(value) => panic!("poisoned fixture value was returned: {value}"),
+        }
+    }
 }

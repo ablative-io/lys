@@ -299,10 +299,9 @@ fn failed_writes_rebuild_only_durable_records_and_retry_updates_reads() -> TestR
     store.set("agent-0", 8, version(0, 9, true)?)?;
     assert!(store.named("record-0-9").is_some());
     assert!(store.declared_server("server-0-9").is_some());
-    assert_eq!(
-        std::fs::read(&path)?,
-        serde_json::to_vec_pretty(&store.kept)?
-    );
+    let reopened = ProvisioningStore::open(&path)?;
+    assert_eq!(reopened.profiles(), store.profiles());
+    assert_eq!(reopened.skills(), store.skills());
     Ok(())
 }
 

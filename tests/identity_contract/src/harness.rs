@@ -11,7 +11,7 @@
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_core::Ed25519Identity;
 use lys_identity::Directory;
@@ -44,12 +44,22 @@ pub enum Fault {
 /// The fault plan every store opened by one harness shares.
 pub type Plan = Arc<Mutex<Fault>>;
 
-fn fault(plan: &Plan) -> Fault {
-    *plan.lock().unwrap_or_else(PoisonError::into_inner)
+fn fault(plan: &Plan) -> StoreResult<Fault> {
+    plan.lock()
+        .map(|held| *held)
+        .map_err(|error| StoreError::Io {
+            context: "fixture_lock_poisoned".to_owned(),
+            source: std::io::Error::other(error.to_string()),
+        })
 }
 
-fn set(plan: &Plan, next: Fault) {
-    *plan.lock().unwrap_or_else(PoisonError::into_inner) = next;
+fn set(plan: &Plan, next: Fault) -> StoreResult<()> {
+    let mut held = plan.lock().map_err(|error| StoreError::Io {
+        context: "fixture_lock_poisoned".to_owned(),
+        source: std::io::Error::other(error.to_string()),
+    })?;
+    *held = next;
+    Ok(())
 }
 
 fn injected(context: &str) -> StoreError {
@@ -76,13 +86,13 @@ impl LeafStore for FaultStore {
         self.inner.leaf(index)
     }
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
-        match fault(&self.plan) {
+        match fault(&self.plan)? {
             Fault::BeforeLeaf => {
-                set(&self.plan, Fault::None);
+                set(&self.plan, Fault::None)?;
                 Err(injected("leaf write"))
             }
             Fault::LeafStoredWriteFailed => {
-                set(&self.plan, Fault::None);
+                set(&self.plan, Fault::None)?;
                 self.inner.put_leaf(index, bytes)?;
                 Err(injected("leaf durability"))
             }
@@ -95,9 +105,9 @@ impl LeafStore for FaultStore {
         self.inner.pinned()
     }
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
-        match fault(&self.plan) {
+        match fault(&self.plan)? {
             Fault::AfterLeaf => {
-                set(&self.plan, Fault::None);
+                set(&self.plan, Fault::None)?;
                 Err(injected("pin write"))
             }
             Fault::AfterLeafUnreadable => Err(injected("pin write")),
@@ -143,8 +153,11 @@ impl Harness {
     }
 
     /// Fail the next append as `next` says.
-    pub fn fail(&self, next: Fault) {
-        set(&self.plan, next);
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn fail(&self, next: Fault) -> StoreResult<()> {
+        set(&self.plan, next)
     }
 
     /// A way to open the log's leaf store that fails where the plan says.
@@ -152,7 +165,7 @@ impl Harness {
         let path = self.log_path();
         let plan = Arc::clone(&self.plan);
         Box::new(move || {
-            if fault(&plan) == Fault::AfterLeafUnreadable {
+            if fault(&plan)? == Fault::AfterLeafUnreadable {
                 return Err(injected("reopen"));
             }
             Ok(FaultStore {
@@ -167,7 +180,7 @@ impl Harness {
         let path = self.log_path();
         let plan = Arc::clone(&self.plan);
         let reopen = Box::new(move || {
-            if fault(&plan) == Fault::AfterLeafUnreadable {
+            if fault(&plan)? == Fault::AfterLeafUnreadable {
                 return Err(injected("reopen"));
             }
             Ok(FaultStore {
@@ -347,7 +360,7 @@ impl Service {
         let listen = listener.local_addr()?;
         let base = format!("http://{listen}");
         let issuer = FakeIssuer::start_behind(&base, &dir.path().join("issuer.key")).await?;
-        issuer.set_public_callback(&format!("{base}/auth/v1/providers/callback"));
+        issuer.set_public_callback(&format!("{base}/auth/v1/providers/callback"))?;
         let configured = |subject: &str| ConfiguredLogin {
             issuer: issuer.issuer().to_owned(),
             subject: subject.to_owned(),
@@ -455,7 +468,7 @@ impl Service {
     /// `login`, answering the callback path and the initiating browser's
     /// binding cookie. The browser must return that cookie on the callback.
     pub async fn issuer_answer(&self, login: Login) -> Result<(String, String), Box<dyn Error>> {
-        self.issuer.sign_in_as(login);
+        self.issuer.sign_in_as(login)?;
         let to_issuer = self
             .client
             .get(format!("{}/sign-in/providers/harness", self.base))
@@ -484,7 +497,7 @@ impl Service {
     /// signs whatever password is typed, answering the session cookie.
     pub async fn sign_in(&self, login: Login) -> Result<String, Box<dyn Error>> {
         let email = login.email.clone();
-        self.issuer.sign_in_as(login);
+        self.issuer.sign_in_as(login)?;
         self.sign_in_with(&email, HARNESS_PASSWORD).await
     }
 

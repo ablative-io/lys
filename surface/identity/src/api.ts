@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { subscribeChanges } from './live';
 import type { AgentView, DirectoryRecord, MeView, PeopleView, ReceiptAnswer, Refusal, SignedIn } from './generated';
 import type { ActionBody, DelegateBody, Grant, GrantList, GrantModel, Permit, ReachAnswer, ReachBody, Recorded, RevokeBody, WhoAnswer, WhoBody } from './generated/grants';
 
@@ -35,14 +36,14 @@ async function refusalOf(response: Response): Promise<Refused> {
 }
 
 /** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
-export async function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
+export async function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal): Promise<T> {
   let response: Response;
   const init: RequestInit =
     body === undefined
       ? { credentials: 'same-origin', headers: { accept: 'application/json' } }
       : { method, credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify(body) };
   try {
-    response = await fetch(API + path, init);
+    response = await fetch(API + path, { ...init, signal });
   } catch (error) {
     throw new Refused(0, { refusal: 'ServiceUnreachable', reason: `the identity service could not be reached: ${String(error)}` });
   }
@@ -104,23 +105,35 @@ export type Load<T> = { status: 'loading' } | { status: 'ok'; data: T } | { stat
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
 
-/** Read from the service when `key` changes; never a sample value in the meantime. */
-/** A read kept current: the first answer as useLoad gives it, then read again every `every` ms in place, never back to loading. */
-export function useLive<T>(read: () => Promise<T>, key: string, every = 10000): Load<T> {
+/** Live reads are driven by a bounded change signal, never a polling clock. */
+export function useLive<T>(read: () => Promise<T>, key: string): Load<T> {
   const [state, setState] = useState<Load<T>>({ status: 'loading' });
   useEffect(() => {
     let live = true;
+    let reading = false;
+    let again = false;
+    let feedFailure: Refused | null = null;
     setState({ status: 'loading' });
-    const once = () => read().then(
-      (data) => live && setState({ status: 'ok', data }),
-      (error: unknown) => live && setState({ status: 'refused', refused: asRefused(error) }),
-    );
-    void once();
-    const timer = setInterval(() => void once(), every);
-    return () => {
-      live = false;
-      clearInterval(timer);
+    const once = async () => {
+      if (reading) { again = true; return; }
+      reading = true;
+      try {
+        do {
+          again = false;
+          try {
+            const data = await read();
+            if (live && !feedFailure) setState({ status: 'ok', data });
+          } catch (error) {
+            if (live) setState({ status: 'refused', refused: asRefused(error) });
+          }
+        } while (live && again && document.visibilityState !== 'hidden');
+      } finally { reading = false; }
     };
+    const unsubscribe = subscribeChanges(() => { feedFailure = null; void once(); }, (error) => {
+      feedFailure = asRefused(error);
+      if (live) setState({ status: 'refused', refused: feedFailure });
+    });
+    return () => { live = false; unsubscribe(); };
   }, [key]);
   return state;
 }

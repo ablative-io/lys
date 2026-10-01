@@ -17,7 +17,7 @@ mod stub_program;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use axum::Router;
 use axum::extract::Request;
@@ -48,18 +48,16 @@ fn heard() -> &'static Heard {
         let kept = Arc::clone(&lines);
         lys_runner::error::also_to(Box::new(move |line| {
             kept.lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .expect("fixture lock poisoned")
                 .push(line.to_owned());
-        }));
+        }))
+        .expect("fixture logging sink unavailable");
         lines
     })
 }
 
 fn said_lines() -> Vec<String> {
-    heard()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone()
+    heard().lock().expect("fixture lock poisoned").clone()
 }
 
 const BEA: &str = "bea-subject";
@@ -127,7 +125,7 @@ impl Table {
             Some(Arc::new(move |line: &str| {
                 lines
                     .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
+                    .expect("fixture lock poisoned")
                     .push(format!("service {line}"));
             })),
             move |config| {

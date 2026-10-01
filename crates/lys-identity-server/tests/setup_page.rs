@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! First-run setup on Lys's own setup page (DIRECTORY-047 R1): with no
 //! administrator configured, the page takes the person's name, email and
 //! password against a one-time code, makes exactly one account at the
@@ -72,7 +74,7 @@ async fn table() -> Result<Table, Box<dyn Error>> {
         },
     )
     .await?;
-    rauthy.link(service.issuer.clone());
+    rauthy.link(service.issuer.clone())?;
     Ok(Table {
         service,
         rauthy,
@@ -139,7 +141,7 @@ async fn the_setup_route_answers_the_setup_screen_for_the_pending_code_only() ->
         .await?;
     refused(&wrong, 401, "SetupCodeRefused");
     assert_eq!(
-        table.rauthy.user_count(),
+        table.rauthy.user_count()?,
         0,
         "opening the page makes nothing"
     );
@@ -188,11 +190,11 @@ async fn a_setup_retried_after_its_account_was_made_signs_in_with_the_password_i
     assert_eq!(status, 200, "{text}");
     assert!(cookie.is_some(), "the retried setup signs the person in");
     assert_eq!(
-        table.rauthy.user_count(),
+        table.rauthy.user_count()?,
         1,
         "the account is found, not made again"
     );
-    assert_eq!(table.rauthy.users()[0]["id"], id);
+    assert_eq!(table.rauthy.users()?[0]["id"], id);
     Ok(())
 }
 
@@ -212,7 +214,7 @@ async fn completing_setup_makes_one_administrator_and_signs_them_in() -> TestRes
     assert_eq!(answer["receipt"]["change_kind"], 7);
     let cookie = cookie.ok_or("setup signs the person in")?;
 
-    let users = table.rauthy.users();
+    let users = table.rauthy.users()?;
     assert_eq!(users.len(), 1, "exactly one account is made: {users:?}");
     assert_eq!(users[0]["email"], EMAIL);
     assert!(
@@ -252,7 +254,11 @@ async fn completing_setup_makes_one_administrator_and_signs_them_in() -> TestRes
         .post("/setup/open", None, &json!({ "code": CODE }))
         .await?;
     refused(&reopened, 409, "SetupClosed");
-    assert_eq!(table.rauthy.user_count(), 1, "a closed setup makes nothing");
+    assert_eq!(
+        table.rauthy.user_count()?,
+        1,
+        "a closed setup makes nothing"
+    );
     let signed_in = service.sign_in_with(EMAIL, PASSWORD).await?;
     assert_eq!(service.get("/me", Some(&signed_in)).await?.0, 200);
     Ok(())
@@ -281,7 +287,7 @@ async fn a_wrong_code_makes_nothing_and_a_weak_password_is_refused_before_anythi
         .post("/setup/administrator", None, &unshaped)
         .await?;
     refused(&unshaped, 400, "AccountRefused");
-    assert_eq!(table.rauthy.user_count(), 0, "nothing was made");
+    assert_eq!(table.rauthy.user_count()?, 0, "nothing was made");
     assert!(table.code_file.exists(), "an unused code stays");
     Ok(())
 }
@@ -330,7 +336,7 @@ async fn a_password_code_sets_the_administrator_a_new_password() -> TestResult {
     let old = service.sign_in_with(EMAIL, PASSWORD).await;
     assert!(old.is_err(), "the old password no longer signs in");
     service.sign_in_with(EMAIL, renewed).await?;
-    assert_eq!(table.rauthy.user_count(), 1, "no second account is made");
+    assert_eq!(table.rauthy.user_count()?, 1, "no second account is made");
     Ok(())
 }
 
@@ -354,7 +360,7 @@ async fn every_setup_code_entry_point_shares_the_attempt_limit() -> TestResult {
         refused(&answer, 429, "SignInThrottled");
     }
     assert_eq!(std::fs::read(&table.code_file)?, initial);
-    assert_eq!(table.rauthy.user_count(), 0);
+    assert_eq!(table.rauthy.user_count()?, 0);
     assert!(!table.administrator_file.exists());
     Ok(())
 }

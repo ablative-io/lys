@@ -216,41 +216,6 @@ impl Page {
             })?),
         )
     }
-
-    pub(crate) fn finish<T>(
-        &self,
-        rows: &mut Vec<T>,
-        id: impl Fn(&T) -> &str,
-    ) -> Result<Totals, ServerError> {
-        rows.sort_by(|left, right| id(left).cmp(id(right)));
-        let total = rows.len();
-        if let Some(last) = &self.last {
-            rows.retain(|row| id(row) > last.as_str());
-        }
-        let limit = self.query.limit.unwrap_or(50).min(200);
-        let more = rows.len() > limit;
-        rows.truncate(limit);
-        let next = if more {
-            let row = rows
-                .last()
-                .ok_or_else(|| malformed("the page has no final row"))?;
-            let cursor = Cursor {
-                version: 1,
-                route: self.route.to_owned(),
-                q: self.query.q.clone(),
-                team: self.query.team.clone(),
-                last: id(row).to_owned(),
-            };
-            Some(
-                URL_SAFE_NO_PAD.encode(serde_json::to_vec(&cursor).map_err(|error| {
-                    malformed(format!("the paging cursor could not be encoded: {error}"))
-                })?),
-            )
-        } else {
-            None
-        };
-        Ok(Totals { total, next })
-    }
 }
 
 pub(crate) fn member(

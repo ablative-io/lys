@@ -162,9 +162,11 @@ fn team(state: &AppState, id: &str) -> Result<crate::teams_state::Team, ServerEr
             reason: "the configuration names no teams_dir".to_owned(),
         })
     })?;
-    let mut store = store
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut store = store.lock().map_err(|error| {
+        ServerError::Team(TeamError::Unavailable {
+            reason: format!("the teams lock is poisoned: {error}"),
+        })
+    })?;
     store.settle()?;
     store
         .team(id)

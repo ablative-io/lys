@@ -25,7 +25,7 @@
 //! is named in the answer, and its session stays unconfirmed.
 
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
@@ -296,7 +296,11 @@ fn with_stops<T>(
         .ok_or_else(|| ServerError::StopsUnavailable {
             reason: "the configuration names no stops_dir".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::StopsUnavailable {
+            reason: format!("the stops lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
@@ -429,7 +433,11 @@ fn withdraw_certificates(
     let Some(store) = state.certificates.as_ref() else {
         return Ok(Vec::new());
     };
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::CertificatesUnavailable {
+            reason: format!("the certificates lock is poisoned: {error}"),
+        })?;
     let reason = format!("emergency stop: {reason}");
     let mut serials: Vec<String> = store
         .certificates()

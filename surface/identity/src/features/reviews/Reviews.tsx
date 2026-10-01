@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** The server identifies grants for review; this view never invents a recorded keep decision. */
 import { useState } from 'react';
 import { Link } from 'react-router';
@@ -31,9 +32,9 @@ type Due = ReviewsView['due'][number];
 export function Reviews() {
   const [confirmed, setConfirmed] = useState<Record<string, Kept>>({});
   const [notice, setNotice] = useState('');
-  const load = useLoad(async () => ({
-    view: await request<ReviewsView>('/reviews'), me: await api.me(), people: await api.people(),
-    teams: await readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
+  const load = useLoad(() => readTogether({
+    view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(),
+    teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'reviews');
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
   return <div className="page fill">
