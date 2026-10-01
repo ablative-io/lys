@@ -367,3 +367,92 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
     assert_eq!(leaf_bytes(&service)?, old_leaves);
     Ok(())
 }
+
+#[tokio::test]
+async fn one_leaf_moves_accountability_for_an_agent_and_two_descendant_levels()
+-> Result<(), Box<dyn Error>> {
+    let table = Table::new().await?;
+    let root = table.seeded.people[0].agents[0].id.to_string();
+    let child = active_reporting_agent(&table, &root, "Child").await?;
+    let grandchild = active_reporting_agent(&table, &child, "Grandchild").await?;
+    let responsible = table.seeded.people[1].id.to_string();
+    let before = leaf_bytes(&table.service)?;
+    let request = edge(&responsible)?;
+    let (status, answer) = table
+        .service
+        .post(
+            &format!("/agents/{root}/reports-to"),
+            Some(&table.administrator),
+            &request,
+        )
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let receipt = &answer["responsibility"]["receipt"];
+    let index = receipt["log"]["index"]
+        .as_u64()
+        .ok_or("transition has no receipt")?;
+    let after = leaf_bytes(&table.service)?;
+    assert_eq!(
+        after.len(),
+        before.len() + 1,
+        "a reporting change is one signed leaf"
+    );
+    for (name, bytes) in before {
+        assert_eq!(after.get(&name), Some(&bytes));
+    }
+    for (agent, target) in [
+        (&root, &responsible),
+        (&child, &root),
+        (&grandchild, &child),
+    ] {
+        let seen = table.read(agent).await?;
+        assert_eq!(seen["reports_to"]["id"], *target);
+        assert_eq!(seen["accountable"]["id"], responsible);
+        assert_eq!(seen["gap"], Value::Null);
+        let events = seen["provenance"]["events"]
+            .as_array()
+            .ok_or("events missing")?;
+        assert!(
+            events.contains(&json!(index)),
+            "the descendant does not name the event that moved it"
+        );
+    }
+    let (status, recorded) = table
+        .service
+        .get(&format!("/receipts/{index}"), None)
+        .await?;
+    assert_eq!(status, 200, "{recorded}");
+    assert_eq!(&recorded["receipt"], receipt);
+    Ok(())
+}
+
+async fn active_reporting_agent(
+    table: &Table,
+    target: &str,
+    name: &str,
+) -> Result<String, Box<dyn Error>> {
+    let body = json!({
+        "operation": OperationId::generate()?.to_string(),
+        "display_name": name, "answers_to": target,
+    });
+    let (status, answer) = table
+        .service
+        .post("/agents", Some(&table.administrator), &body)
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let agent = answer["agent"]
+        .as_str()
+        .ok_or("registration has no agent")?
+        .to_owned();
+    let body = json!({"operation": OperationId::generate()?.to_string(), "transition": "activate"});
+    let (status, activated) = table
+        .service
+        .post(
+            &format!("/identities/{agent}/transitions"),
+            Some(&table.administrator),
+            &body,
+        )
+        .await?;
+    assert_eq!(status, 200, "{activated}");
+    Ok(agent)
+}
