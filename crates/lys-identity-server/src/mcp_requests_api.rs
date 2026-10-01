@@ -251,29 +251,24 @@ fn declaration(
     asked: &McpRequest,
 ) -> Result<McpServer, ServerError> {
     let server = match by {
-        IdentityId::Agent(agent) => profiles
-            .profile(&agent.to_string())
-            .and_then(latest_reviewed)
-            .and_then(|version| {
-                version
-                    .settings
-                    .mcp_servers
-                    .iter()
-                    .find(|server| server.name == asked.server)
-            }),
+        IdentityId::Agent(agent) => {
+            profiles
+                .latest_reviewed(&agent.to_string())
+                .and_then(|version| {
+                    version
+                        .settings
+                        .mcp_servers
+                        .iter()
+                        .find(|server| server.name == asked.server)
+                })
+        }
         IdentityId::Person(_)
             if state
                 .admission
                 .administrator(&signed_in(state, headers)?)
                 .is_ok() =>
         {
-            profiles
-                .profiles()
-                .iter()
-                .flat_map(|profile| &profile.versions)
-                .filter(|version| version.reviewed.is_some())
-                .flat_map(|version| &version.settings.mcp_servers)
-                .find(|server| server.name == asked.server)
+            profiles.declared_server(&asked.server)
         }
         IdentityId::Person(_) | IdentityId::ServiceAccount(_) => None,
     };
@@ -340,7 +335,7 @@ async fn approve(
             let server = declaration(&state, &headers, profiles, by, &asked)?;
             let profile = profiles.profile(&agent);
             let from_version = profile.map_or(0, Profile::latest);
-            let mut version = profile.and_then(latest_reviewed).cloned().ok_or(
+            let mut version = profiles.latest_reviewed(&agent).cloned().ok_or(
                 ServerError::ProfileNotReviewed {
                     version: from_version,
                 },

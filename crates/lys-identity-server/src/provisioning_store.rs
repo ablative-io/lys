@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use lys_home::harness::launch_fields::{Channel, DeclaredHarness, InstructionsMode, Literal};
 use serde::{Deserialize, Serialize};
@@ -26,9 +27,27 @@ use crate::launch_permissions::Permissions;
 #[path = "provisioning_builds.rs"]
 mod builds;
 
+#[path = "provisioning_edits.rs"]
+mod edits;
+
+#[path = "provisioning_index.rs"]
+mod index;
+
 #[cfg(test)]
 std::thread_local! {
     static HISTORY_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static PROFILE_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static SKILL_COPIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static HISTORY_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn index_work() -> (usize, usize, usize) {
+    (
+        PROFILE_COPIES.with(std::cell::Cell::get),
+        SKILL_COPIES.with(std::cell::Cell::get),
+        HISTORY_VISITS.with(std::cell::Cell::get),
+    )
 }
 
 #[cfg(test)]
@@ -90,7 +109,7 @@ pub enum Setting {
 }
 
 /// A skill Lys keeps: its text under its name, by the hash of its bytes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SkillText {
     /// Its name, one visible path component.
@@ -101,6 +120,19 @@ pub struct SkillText {
     pub len: u64,
     /// The SHA-256 of the text's bytes, as lowercase hex.
     pub sha256: String,
+}
+
+impl Clone for SkillText {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        SKILL_COPIES.with(|copies| copies.set(copies.get() + 1));
+        Self {
+            name: self.name.clone(),
+            text: self.text.clone(),
+            len: self.len,
+            sha256: self.sha256.clone(),
+        }
+    }
 }
 
 /// The skill a profile version names, pinned to the text it was recorded with.
@@ -209,13 +241,24 @@ pub struct Review {
 }
 
 /// An agent's profile: every version, in order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
     /// The agent.
     pub agent: String,
     /// Its versions, in order from 1.
     pub versions: Vec<Version>,
+}
+
+impl Clone for Profile {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        PROFILE_COPIES.with(|copies| copies.set(copies.get() + 1));
+        Self {
+            agent: self.agent.clone(),
+            versions: self.versions.clone(),
+        }
+    }
 }
 
 impl Profile {
@@ -237,7 +280,7 @@ struct Kept {
 pub struct ProvisioningStore {
     path: PathBuf,
     kept: Kept,
-    reviewed_builds: builds::ReviewedBuilds,
+    indexes: Arc<index::Indexes>,
     uncertain: bool,
 }
 
@@ -278,11 +321,11 @@ impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let kept = read(path)?;
-        let reviewed_builds = builds::index(&kept.profiles);
+        let indexes = Arc::new(index::Indexes::rebuild(&kept));
         Ok(Self {
             path: path.to_owned(),
             kept,
-            reviewed_builds,
+            indexes,
             uncertain: false,
         })
     }
@@ -291,17 +334,16 @@ impl ProvisioningStore {
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let kept = read(&self.path)?;
-            let reviewed_builds = builds::index(&kept.profiles);
+            let indexes = Arc::new(index::Indexes::rebuild(&kept));
             self.kept = kept;
-            self.reviewed_builds = reviewed_builds;
+            self.indexes = indexes;
             self.uncertain = false;
         }
         Ok(())
     }
 
-    fn write(&mut self, next: Kept) -> Result<(), ServerError> {
-        let bytes = serde_json::to_vec_pretty(&next).map_err(unavailable)?;
-        if let Err(failure) = replace(&self.path, &bytes) {
+    fn publish(&mut self, bytes: &[u8]) -> Result<(), ServerError> {
+        if let Err(failure) = replace(&self.path, bytes) {
             self.uncertain = true;
             self.settle()?;
             return Err(unavailable(format!(
@@ -309,6 +351,27 @@ impl ProvisioningStore {
                 self.path.display()
             )));
         }
+        Ok(())
+    }
+
+    fn commit(&mut self, edit: edits::Edit) -> Result<(), ServerError> {
+        let bytes = edits::encode(&self.kept, &edit)?;
+        self.publish(&bytes)?;
+        let changed = edits::apply(&mut self.kept, edit)
+            .and_then(|change| Arc::make_mut(&mut self.indexes).update(&self.kept, change));
+        if let Err(error) = changed {
+            self.uncertain = true;
+            self.settle()?;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn write(&mut self, next: Kept) -> Result<(), ServerError> {
+        let bytes = serde_json::to_vec_pretty(&next).map_err(unavailable)?;
+        self.publish(&bytes)?;
+        self.indexes = Arc::new(index::Indexes::rebuild(&next));
         self.kept = next;
         Ok(())
     }
@@ -325,7 +388,8 @@ impl ProvisioningStore {
         &self,
         contract: &str,
     ) -> impl Iterator<Item = &crate::harness_catalogue::BuildView> {
-        self.reviewed_builds
+        self.indexes
+            .reviewed_builds
             .get(contract)
             .into_iter()
             .flat_map(std::collections::BTreeSet::iter)
@@ -333,21 +397,34 @@ impl ProvisioningStore {
 
     /// The profile of `agent`, none while nothing was set for it.
     pub fn profile(&self, agent: &str) -> Option<&Profile> {
-        self.kept
-            .profiles
-            .iter()
-            .find(|profile| profile.agent == agent)
+        self.kept.profiles.get(*self.indexes.profiles.get(agent)?)
     }
 
     /// The agent and the version `operation` names, if it names one.
     pub(crate) fn named(&self, operation: &str) -> Option<(&str, &Version)> {
-        self.kept.profiles.iter().find_map(|profile| {
-            profile
-                .versions
-                .iter()
-                .find(|version| version.operation == operation)
-                .map(|version| (profile.agent.as_str(), version))
-        })
+        let &(profile, version) = self.indexes.operations.get(operation)?;
+        let profile = self.kept.profiles.get(profile)?;
+        Some((profile.agent.as_str(), profile.versions.get(version)?))
+    }
+
+    /// The first reviewed declaration in profile and version order.
+    pub(crate) fn declared_server(&self, name: &str) -> Option<&McpServer> {
+        let &(profile, version, server) = self.indexes.servers.get(name)?;
+        self.kept
+            .profiles
+            .get(profile)?
+            .versions
+            .get(version)?
+            .settings
+            .mcp_servers
+            .get(server)
+    }
+
+    /// The last reviewed version in the agent's recorded version order.
+    pub(crate) fn latest_reviewed(&self, agent: &str) -> Option<&Version> {
+        let profile = *self.indexes.profiles.get(agent)?;
+        let version = *self.indexes.latest_reviewed.get(&profile)?;
+        self.kept.profiles.get(profile)?.versions.get(version)
     }
 
     /// Keep `settings` as the version of `agent` after `from`, under
@@ -373,18 +450,16 @@ impl ProvisioningStore {
         }
         let number = latest.saturating_add(1);
         let version = Version { number, ..version };
-        let affected = builds::entry(&version);
-        let mut profiles = self.kept.profiles.clone();
-        match profiles.iter_mut().find(|profile| profile.agent == agent) {
-            Some(profile) => profile.versions.push(version),
-            None => profiles.push(Profile {
-                agent: agent.to_owned(),
-                versions: vec![version],
-            }),
-        }
-        let skills = self.kept.skills.clone();
-        self.write(Kept { profiles, skills })?;
-        builds::insert(&mut self.reviewed_builds, affected);
+        let profile = self
+            .indexes
+            .profiles
+            .get(agent)
+            .map_or(self.kept.profiles.len(), |position| *position);
+        self.commit(edits::Edit::Set {
+            profile,
+            agent: agent.to_owned(),
+            version: Box::new(version),
+        })?;
         Ok(number)
     }
 
@@ -393,41 +468,32 @@ impl ProvisioningStore {
     /// refused, and a version reviewed already answers its review unchanged.
     pub fn review(&mut self, agent: &str, number: u32, review: Review) -> Result<(), ServerError> {
         self.settle()?;
-        let reused = self.kept.profiles.iter().any(|profile| {
-            profile.versions.iter().any(|version| {
-                let reviewed_here = profile.agent == agent && version.number == number;
-                version.operation == review.operation
-                    || version.reviewed.as_ref().is_some_and(|kept| {
-                        kept.operation == review.operation
-                            && !(reviewed_here && kept.by == review.by)
-                    })
-            })
-        });
+        let reused = self
+            .indexes
+            .review_reused(&self.kept, agent, number, &review)?;
         if reused {
             return Err(ServerError::ProvisioningReused {
                 operation: review.operation,
             });
         }
-        let mut profiles = self.kept.profiles.clone();
-        let version = profiles
-            .iter_mut()
-            .find(|profile| profile.agent == agent)
-            .and_then(|profile| {
-                profile
-                    .versions
-                    .iter_mut()
-                    .find(|version| version.number == number)
-            })
+        let (profile, version) = self
+            .indexes
+            .location(agent, number)
             .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
-        if version.reviewed.is_some() {
+        let kept = self
+            .kept
+            .profiles
+            .get(profile)
+            .and_then(|profile| profile.versions.get(version))
+            .ok_or_else(|| unavailable("review index is outside the retained profile"))?;
+        if kept.reviewed.is_some() {
             return Ok(());
         }
-        version.reviewed = Some(review);
-        let affected = builds::entry(version);
-        let skills = self.kept.skills.clone();
-        self.write(Kept { profiles, skills })?;
-        builds::insert(&mut self.reviewed_builds, affected);
-        Ok(())
+        self.commit(edits::Edit::Review {
+            profile,
+            version,
+            review,
+        })
     }
 
     /// Keep `skill`; kept already with the same text, it is kept once.
@@ -436,10 +502,7 @@ impl ProvisioningStore {
         if self.skill(&skill.name, &skill.sha256).is_some() {
             return Ok(());
         }
-        let mut skills = self.kept.skills.clone();
-        skills.push(skill);
-        let profiles = self.kept.profiles.clone();
-        self.write(Kept { profiles, skills })
+        self.commit(edits::Edit::Skill(skill))
     }
 
     /// Every kept skill text, in the order kept.
@@ -449,10 +512,8 @@ impl ProvisioningStore {
 
     /// The text of `name` whose hash is `sha256`.
     pub fn skill(&self, name: &str, sha256: &str) -> Option<&SkillText> {
-        self.kept
-            .skills
-            .iter()
-            .find(|kept| kept.name == name && kept.sha256 == sha256)
+        let position = *self.indexes.skills.get(name)?.get(sha256)?;
+        self.kept.skills.get(position)
     }
 
     /// The skill pins the version set under `operation` was recorded with,
@@ -468,11 +529,10 @@ impl ProvisioningStore {
         names
             .iter()
             .map(|name| {
-                self.kept
-                    .skills
-                    .iter()
-                    .rev()
-                    .find(|kept| &kept.name == name)
+                self.indexes
+                    .latest_skills
+                    .get(name)
+                    .and_then(|position| self.kept.skills.get(*position))
                     .map(|kept| SkillPin {
                         name: name.clone(),
                         len: kept.len,
@@ -491,3 +551,7 @@ mod compatibility_tests;
 #[cfg(test)]
 #[path = "provisioning_builds_tests.rs"]
 mod build_tests;
+
+#[cfg(test)]
+#[path = "provisioning_index_tests.rs"]
+mod index_tests;
