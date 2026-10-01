@@ -344,10 +344,8 @@ enum Target {
 fn target_of(asked: &Asked<'_>) -> Target {
     if let Some(field) = path_field(asked.tool) {
         let given = match asked.input.get(field) {
-            None | Some(Value::Null) if field == "path" => {
-                return Target::Path(asked.cwd.to_owned());
-            }
-            Some(Value::String(given)) => given,
+            None | Some(Value::Null) if field == "path" => ".",
+            Some(Value::String(given)) => given.as_str(),
             _ => return Target::Unresolved(format!("{} carries no {field}", asked.tool)),
         };
         return match resolve(asked.cwd, given) {
