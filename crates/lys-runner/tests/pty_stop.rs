@@ -62,9 +62,9 @@ fn ordinary_end_preserves_the_final_usage_line() -> TestResult {
     let mut harness = Harness::start()?;
     let leader = harness.leader()?;
     pty::end(&leader)?;
-    let status = harness.0.child.wait()?;
     let mut output = String::new();
     harness.0.reader.read_to_string(&mut output)?;
+    let status = harness.0.child.wait()?;
     assert!(status.success(), "ordinary stop must let the trap finish");
     assert_eq!(
         output
