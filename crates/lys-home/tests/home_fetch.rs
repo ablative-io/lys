@@ -36,6 +36,8 @@ type Gate = Result<(), Box<dyn Error>>;
 
 #[path = "home_fetch/arrival.rs"]
 mod arrival;
+#[path = "home_fetch/fixture.rs"]
+mod fixture;
 #[path = "home_fetch/refusals.rs"]
 mod refusals;
 
@@ -96,49 +98,16 @@ fn git_text(args: &[&str]) -> Result<String, Box<dyn Error>> {
 /// A fixture home under `dir/name`: the launch session as `fixture`, then
 /// one render-launch of the launch template.
 fn fixture_home(dir: &Path, name: &str) -> Result<PathBuf, Box<dyn Error>> {
-    let root = dir.join(name);
-    let home = Home::open(&root)?;
-    std::fs::copy(SESSION, home.session_path("fixture")?)?;
-    let out = dir.join(format!("{name}-out"));
-    std::fs::create_dir(&out)?;
-    let rendered = lys_home(
-        dir,
-        &[
-            "render-launch",
-            "--home",
-            text(&root)?,
-            "--session",
-            "fixture",
-            "--template",
-            TEMPLATE,
-            "--uuid",
-            UUID,
-            "--cwd",
-            "/fixture",
-            "--model",
-            "claude-fixture",
-            "--version",
-            "2.1.283",
-            "--out",
-            text(&out)?,
-        ],
-    )?;
-    assert_eq!(rendered.status.code(), Some(0));
+    let (root, rendered) = fixture::home(dir, name)?;
+    assert_eq!(rendered, Some(0));
     Ok(root)
 }
 
 /// Ship `home` to `remote` and return the commit.
 fn ship(dir: &Path, home: &Path, remote: &Path) -> Result<String, Box<dyn Error>> {
-    let output = lys_home(
-        dir,
-        &["ship", "--home", text(home)?, "--remote", text(remote)?],
-    )?;
-    assert_eq!(output.status.code(), Some(0));
-    let value: Value = serde_json::from_slice(&output.stdout)?;
-    Ok(value["report"]["commit"]
-        .as_str()
-        .ok_or("a commit")?
-        .to_owned())
+    let (commit, status) = fixture::ship(dir, home, remote)?;
+    assert_eq!(status, Some(0));
+    Ok(commit)
 }
 
 fn fetch(dir: &Path, remote: &str, target: &Path) -> Result<Output, Box<dyn Error>> {
@@ -226,17 +195,7 @@ fn last_line(bytes: &[u8]) -> Result<Value, Box<dyn Error>> {
 
 /// Copy a home's stores and sessions, never its repository, into `to`.
 fn copy_home(from: &Path, to: &Path) -> Gate {
-    for (relative, _) in files_under(from)? {
-        if relative.starts_with(".git") {
-            continue;
-        }
-        let dest = to.join(&relative);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::copy(from.join(&relative), dest)?;
-    }
-    Ok(())
+    Ok(fixture::copy_tree(from, to, false)?)
 }
 
 /// Whether `dir` is a directory that holds nothing.
