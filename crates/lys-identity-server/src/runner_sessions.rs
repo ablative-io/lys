@@ -317,6 +317,7 @@ pub async fn run_on_runner(
         machine,
         runner.clone(),
         Act::Start {
+            lys_mcp: None,
             launch: Box::new(launch),
         },
     )
