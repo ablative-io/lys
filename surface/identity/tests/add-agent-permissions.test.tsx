@@ -105,7 +105,9 @@ describe('Add-agent reporting and permissions', () => {
     expect(sessionStorage.getItem(key)).toBe(saved);
     expect(location.hash).toBe('#/agents/new');
     expect(second.form.textContent).toContain('StorageUncertain');
-    expect(second.form.querySelector('details')).toBeNull();
+    const details = second.form.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
   });
   it('refuses a mismatched grant receipt before claiming completion', async () => {
     const { form, posted } = await open({ 'POST /grants': ok({ operation: 'op-' + '0'.repeat(32), grant: grantId, receipt: { caller: ADA } }) });
@@ -154,7 +156,7 @@ describe('Add-agent reporting and permissions', () => {
     expect(posted).toHaveLength(1);
     expect(form.textContent).toContain('UnconfirmedReceipt');
     expect(sessionStorage.getItem(key)).not.toBeNull();
-    expect(location.hash).toBe('#/agents/new');
+    expect(location.hash).toBe('#/agents/new?answers_to=' + SCRIBE);
   });
   it('keeps adding available when grants cannot be read and grants nothing', async () => {
     const { form, posted } = await open({ '/grants': refused(503, 'GrantStoreUnavailable', 'Access could not be read') });
