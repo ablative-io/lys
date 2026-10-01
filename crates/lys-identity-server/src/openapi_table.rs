@@ -169,8 +169,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/service-key" "The service's public key" P [];
     GET "/reviews" "The grants due for review" S [SIGNED, &["NoPerson"]] scope("review", "read", []);
     POST "/reviews/{grant}/keep" "Keep a grant under review" S [SIGNED_BODY, &["GrantNotDue", "GrantNotVisible", "ReviewReused"], &["NoPerson", "ReviewerOnly"]] scope("review", "review.keep", ["grant"]);
-    GET "/roles" "Every role" S [SIGNED];
-    POST "/roles" "Make a role" S [ADMIN_BODY, &["RelationUnknown", "RoleReused"]];
+    GET "/roles" "Every role" S [SIGNED] scope("role", "read", []);
+    POST "/roles" "Make a role" S [ADMIN_BODY, &["RelationUnknown", "RoleReused"]] scope("role", "role.create", []);
     GET "/roles/{id}" "One role" S [SIGNED] scope("role", "read", ["id"]);
     POST "/roles/{id}/versions" "Revise a role" S [ADMIN_BODY, &["RoleReused"]] scope("role", "role.revise", ["id"]);
     POST "/roles/{id}/holders" "Assign a role" S [ADMIN_BODY, &["HolderUnknown"], &["RoleHeld", "RoleUnknown"]] scope("role", "role.holder.assign", ["id"]);

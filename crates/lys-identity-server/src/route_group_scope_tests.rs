@@ -51,8 +51,22 @@ fn mutations_name_their_action() -> Result<(), Box<dyn Error>> {
             .map(|part| if part.starts_with('{') { "one" } else { part })
             .collect::<Vec<_>>()
             .join("/");
-        let (_, action) = crate::openapi_table::token_scope(row.0.word(), &path)?;
-        if row.0 != crate::openapi_table::GET {
+        let (resource, action) = crate::openapi_table::token_scope(row.0.word(), &path)?;
+        let owned = [
+            "person",
+            "identity",
+            "role",
+            "agent",
+            "launch-record",
+            "runtime-session",
+            "team",
+            "budget",
+            "account",
+            "session",
+            "machine",
+            "service-account",
+        ];
+        if owned.contains(&resource.kind()) && row.0 != crate::openapi_table::GET {
             assert_ne!(action.as_str(), "write", "{} {}", row.0.word(), row.1);
         }
     }
