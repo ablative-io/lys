@@ -1,7 +1,7 @@
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
@@ -38,10 +38,8 @@ function PeopleHead() {
             </button>
           ))}
         </div>
-        <a className="btn" href="#/directory/manage">Manage directory</a>
-        <button className="btn primary" data-act="commission" onClick={() => { location.hash = '/directory/manage?action=agent'; }}>
-          Register an agent
-        </button>
+        <a className="btn primary" href="#/agents/new">Add agent</a>
+        <a className="btn" href="#/people/new">Add person</a>
       </div>
     </div>
   );
@@ -98,12 +96,33 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
   const selectedHref = shown[Math.min(shell.cursor, Math.max(0, shown.length - 1))] ?? null;
   const selected = all.find((x) => '#/file/' + x.id === selectedHref) ?? null;
   const active = (kind: string) => all.filter((x) => x.kind === kind && x.state === 'active').length;
+  const memberTeams = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+    for (const team of teams) {
+      if (team.state !== 'active') continue;
+      for (const member of team.members) {
+        const ids = grouped.get(member);
+        if (ids) ids.push(team.id); else grouped.set(member, [team.id]);
+      }
+    }
+    return grouped;
+  }, [teams]);
+  const addUnder = (entry: Entry) => {
+    const person = entry.kind === 'person' ? entry.id : entry.person?.id;
+    if (!person) return null;
+    const memberships = memberTeams.get(entry.id) ?? memberTeams.get(person) ?? [];
+    const team = whose.kind === 'team' && memberships.includes(whose.team) ? whose.team : memberships.length === 1 ? memberships[0] : '';
+    const query = new URLSearchParams({ answers_to: person });
+    if (team) query.set('team', team);
+    return <a href={'#/agents/new?' + query.toString()} onClick={(event) => event.stopPropagation()}>Add agent under them</a>;
+  };
   const columns: Column<Row>[] = [
     { head: 'Name', cell: (x) => x.display_name },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <><span className={'dot s-' + x.state} />{x.state}</> },
     { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
+    { head: 'Add agent', cell: addUnder },
   ];
   return (
     <>
