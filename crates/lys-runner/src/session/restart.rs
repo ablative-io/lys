@@ -7,7 +7,6 @@ use super::{Sessions, lifecycle, now_ms, unknown, valid_id};
 use crate::error::RunnerError;
 use crate::operations::{OperationOutcome, begin_restart, finish_restart};
 use crate::peer::Leader;
-use crate::protocol::Ended;
 use crate::rotation::RotationState;
 
 impl Sessions {

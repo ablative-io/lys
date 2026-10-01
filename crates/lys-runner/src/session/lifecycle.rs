@@ -121,6 +121,7 @@ impl Pending {
 impl Sessions {
     /// Prepare a verified child without owning the session table.
     pub(super) fn run(&self, plan: &SpawnPlan) -> Result<Prepared, RunnerError> {
+        self.writer.barrier()?;
         #[cfg(test)]
         if let Some(probe) = self
             .spawn_probe
