@@ -180,6 +180,24 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
     state.sessions.actor(cookie_header(headers))
 }
 
+/// Require an active administrator using the current directory projection.
+pub(crate) fn administrator(state: &AppState, actor: &Actor) -> Result<(), ServerError> {
+    with_directory(state, |directory| {
+        state
+            .admission
+            .administrator(directory.projection()?, actor)
+    })
+}
+
+/// Whether the caller is an administrator, retaining operational refusals.
+pub(crate) fn is_administrator(state: &AppState, actor: &Actor) -> Result<bool, ServerError> {
+    with_directory(state, |directory| {
+        state
+            .admission
+            .is_administrator(directory.projection()?, actor)
+    })
+}
+
 /// Run `act` on the directory, one caller at a time.
 pub(crate) fn with_directory<T>(
     state: &AppState,
@@ -262,7 +280,7 @@ pub(crate) async fn register_person(
     Json(body): Json<Named>,
 ) -> Result<Json<PersonRegistered>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let (op, profile) = (
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
@@ -283,7 +301,7 @@ pub(crate) async fn register_agent(
 ) -> Result<Json<AgentRegistered>, ServerError> {
     if !headers.contains_key(axum::http::header::AUTHORIZATION) {
         let actor = signed_in(&state, &headers)?;
-        state.admission.administrator(&actor)?;
+        crate::routes::administrator(&state, &actor)?;
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
@@ -322,7 +340,7 @@ pub(crate) async fn list(
     headers: HeaderMap,
 ) -> Result<Json<IdentitiesView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let identities = directory
             .projection()?
@@ -339,7 +357,7 @@ pub(crate) async fn read(
     Path(id): Path<String>,
 ) -> Result<Json<IdentityRecordView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let id = identity_id(&id)?;
     with_directory(&state, |directory| {
         let record =
@@ -359,7 +377,7 @@ pub(crate) async fn change_profile(
     Json(body): Json<Named>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let (id, op, profile) = (
         identity_id(&id)?,
         operation(&body.operation)?,
@@ -390,7 +408,7 @@ pub(crate) async fn transition(
     Json(body): Json<Moved>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let moved = match body.transition.as_str() {
         "activate" => Transition::Activate,
         "suspend" => Transition::Suspend,
@@ -434,7 +452,7 @@ pub(crate) async fn bind_login(
     Json(body): Json<Bound>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let person = PersonId::from_str(&id)?;
     let (op, binding) = (
         operation(&body.operation)?,

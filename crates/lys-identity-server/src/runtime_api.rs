@@ -295,8 +295,7 @@ async fn report_agent(
                 IdentityId::ServiceAccount(_) => false,
             IdentityId::Person(person) => {
                 record.responsible() == Some(person)
-                    || signed_in(&state, &headers)
-                        .is_ok_and(|actor| state.admission.administrator(&actor).is_ok())
+                    || state.admission.is_administrator(directory, &signed_in(&state, &headers)?)?
             }
         };
         if !answers {
@@ -356,7 +355,7 @@ async fn agent_sessions(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(&state, &headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         if directory.record(IdentityId::Agent(agent)).is_none() {
             return Err(ServerError::AgentNotVisible);
         }
@@ -388,7 +387,7 @@ pub(crate) fn visible_sessions(
     with_directory(state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(state, headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         with_runtime(state, |store| {
             Ok(store
                 .sessions()
@@ -481,7 +480,7 @@ async fn found(
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_runtime(&state, |store| {
         Ok(SessionsView {
             sessions: store

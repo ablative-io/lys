@@ -129,7 +129,7 @@ pub fn operator(
 ) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     let id = AgentId::from_str(agent).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, &actor)?;
     let (asker, answers) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let asker = caller(state, headers, projection)?;

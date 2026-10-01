@@ -561,6 +561,12 @@ pub enum ServerError {
         /// Why.
         reason: String,
     },
+    /// A launch requires an explicitly recorded policy.
+    #[error("AgentHasNoPolicy: agent {agent} has no policy; record its policy before starting it")]
+    AgentHasNoPolicy {
+        /// The agent whose launch was refused.
+        agent: String,
+    },
     /// Another change to the policy came between the caller's read and its
     /// change.
     #[error(

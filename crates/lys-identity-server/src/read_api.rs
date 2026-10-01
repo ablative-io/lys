@@ -180,8 +180,12 @@ async fn me(
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = match crate::caller_admission::own_account_person(projection, &actor) {
-            Err(ServerError::NoPerson) if state.admission.administrator(&actor).is_ok() => {
-                return Err(ServerError::SetupRequired);
+            Err(ServerError::NoPerson) => {
+                return Err(match state.admission.configured_administrator(&actor) {
+                    Ok(()) => ServerError::SetupRequired,
+                    Err(ServerError::NotAdmitted { .. }) => ServerError::NoPerson,
+                    Err(error) => error,
+                });
             }
             answer => answer?,
         };
@@ -222,7 +226,7 @@ async fn every_person(
     query: crate::list_page::Input,
 ) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let page = crate::list_page::Page::read(query, "/directory/people")?;
@@ -366,7 +370,7 @@ async fn any_agent(
     Path(id): Path<String>,
 ) -> Result<Json<AgentView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let agent = AgentId::from_str(&id)?;
     with_directory(&state, |directory| {
         agent_json(directory, agent, |_| Ok(Scope::Directory))

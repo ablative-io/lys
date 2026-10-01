@@ -184,10 +184,15 @@ fn bearer(headers: &HeaderMap) -> Result<Option<(String, String, String)>, AppEr
 /// request carries, or else the signed-in person. A credential that is
 /// carried and does not verify is refused by name, never passed over for
 /// the session.
-pub fn acting(state: &AppState, held: &Held, headers: &HeaderMap) -> Result<Acting, ServerError> {
+pub fn acting(
+    state: &AppState,
+    held: &Held,
+    headers: &HeaderMap,
+    projection: &lys_identity::projection::Projection,
+) -> Result<Acting, ServerError> {
     let Some((scheme, holder, secret)) = bearer(headers)? else {
         let actor = crate::routes::signed_in(state, headers)?;
-        return Ok(if state.admission.administrator(&actor).is_ok() {
+        return Ok(if state.admission.is_administrator(projection, &actor)? {
             Acting::Administrator(actor)
         } else {
             Acting::Person(actor)

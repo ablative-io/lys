@@ -128,6 +128,8 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
+    "AgentHasNoPolicy",
+    "PolicyUnavailable",
     "MachineWithoutRunner",
     "runner_request_unsigned",
     "runner_request_malformed",
@@ -153,6 +155,8 @@ pub(crate) const START_RUNNER: &[&str] = &[
 
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
+    "AgentHasNoPolicy",
+    "PolicyUnavailable",
     "AgentNotVisible",
     "AgentNotActive",
     "NotAdmitted",

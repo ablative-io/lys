@@ -274,7 +274,7 @@ pub(crate) fn start_caller(
         let record = directory
             .record(IdentityId::Agent(parsed))
             .ok_or(ServerError::AgentNotVisible)?;
-        let answers = state.admission.administrator(actor).is_ok()
+        let answers = state.admission.is_administrator(directory, actor)?
             || directory
                 .person_for(actor.binding())
                 .is_some_and(|person| record.responsible() == Some(person));

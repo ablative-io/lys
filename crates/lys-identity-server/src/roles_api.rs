@@ -163,7 +163,7 @@ fn with_roles<T>(
 /// The administrator's session, or the refusal of any other caller.
 fn administrator(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
     let actor = signed_in(state, headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(state, &actor)?;
     Ok(actor)
 }
 

@@ -21,7 +21,7 @@ pub(crate) struct EstatePlanAnswer {
 
 fn loader(state: &AppState, headers: &HeaderMap) -> Result<(HeaderMap, String), ServerError> {
     let actor = signed_in(state, headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(state, &actor)?;
     let owner = with_directory(state, |directory| {
         Ok(crate::read_api::own_person(directory.projection()?, &actor)?.to_string())
     })?;

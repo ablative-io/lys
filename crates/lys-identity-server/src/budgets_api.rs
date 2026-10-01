@@ -138,7 +138,7 @@ pub(crate) fn authorised(
     actor: &Actor,
     holder: &Holder,
 ) -> Result<String, ServerError> {
-    let administrator = state.admission.administrator(actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, actor)?;
     let (person, responsible) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, actor)?.to_string();
@@ -218,7 +218,7 @@ async fn set(
         id,
     };
     let by = authorised(&state, &actor, &holder)?;
-    if holder.kind == HolderKind::Person && state.admission.administrator(&actor).is_err() {
+    if holder.kind == HolderKind::Person && !crate::routes::is_administrator(&state, &actor)? {
         return Err(ServerError::NotPermitted {
             reason: format!(
                 "a person's budget limits that person, so only an administrator sets the budget on person {}",
@@ -475,7 +475,7 @@ async fn confirm(
     body: Result<Json<ConfirmBody>, JsonRejection>,
 ) -> Result<Json<Budget>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     crate::budgets_migration::require_committed(&state)?;
     let Json(body) = body.map_err(|error| ServerError::RequestMalformed {
         reason: error.body_text(),

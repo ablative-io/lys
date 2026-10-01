@@ -39,7 +39,7 @@ pub(crate) async fn change(
     Json(body): Json<ReportsToBody>,
 ) -> Result<Json<ReportsToChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let agent = AgentId::from_str(&id)?;
     let operation = OperationId::from_str(&body.operation)?;
     let target = identity_id(&body.reports_to)?;

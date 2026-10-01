@@ -530,7 +530,7 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<ProvidersView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let listed = api(&state)?.listed().await?;
     Ok(Json(answer(listed, state.sign_in.callback())))
 }
@@ -541,7 +541,7 @@ async fn set(
     body: Result<Json<SetBody>, JsonRejection>,
 ) -> Result<Json<ProvidersView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     credential("client_id", &body.client_id, SECRET_MAX)?;
     credential("client_secret", &body.client_secret, SECRET_MAX)?;
