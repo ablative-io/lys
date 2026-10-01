@@ -10,7 +10,7 @@ use portable_pty::Child;
 use serde_json::Value;
 
 use super::super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
-use super::{Wake, accounts, append, stop_follower};
+use super::{Wake, accounts, append, plan, stop_follower, transcript_parent, window_limit};
 use crate::error::RunnerError;
 use crate::peer::Leader;
 use crate::protocol::{Ended, EndedHow, Launch};
@@ -24,7 +24,7 @@ impl Sessions {
         &self,
         id: &str,
         generation: u64,
-        output: &super::output::OutputHandle,
+        output: &super::super::output::OutputHandle,
         mut reader: Box<dyn Read + Send>,
     ) {
         let mut buffer = [0_u8; 8192];
@@ -82,7 +82,7 @@ impl Sessions {
         self: &Arc<Self>,
         id: &str,
         generation: u64,
-        output: &super::output::OutputHandle,
+        output: &super::super::output::OutputHandle,
         mut child: Box<dyn Child + Send + Sync>,
         pump: std::thread::JoinHandle<()>,
     ) {
