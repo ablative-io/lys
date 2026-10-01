@@ -89,22 +89,40 @@ pub(crate) fn person_summary(id: PersonId, record: &Record) -> PersonSummary {
 }
 
 /// Every agent in the directory, grouped by the person it answers to, in one pass.
-fn agents_by_person(projection: &Projection) -> HashMap<PersonId, Vec<AgentSummary>> {
+fn agents_by_person(
+    projection: &Projection,
+) -> Result<HashMap<PersonId, Vec<AgentSummary>>, ServerError> {
     let mut grouped: HashMap<PersonId, Vec<AgentSummary>> = HashMap::new();
     for (id, record) in projection.records() {
         if let (IdentityId::Agent(agent), Some(person)) = (id, record.responsible()) {
-            grouped.entry(person).or_default().push(AgentSummary {
-                id: agent.to_string(),
-                display_name: record.profile().display_name().to_owned(),
-                state: record.state().to_string(),
-            });
+            grouped.entry(person).or_default().push(agent_summary(
+                projection,
+                IdentityId::Agent(*agent),
+                record,
+            )?);
         }
     }
-    grouped
+    Ok(grouped)
 }
 
-/// The agents answering to one person, read from the records alone.
-fn agents_of(projection: &Projection, person: PersonId) -> Vec<AgentSummary> {
+pub(crate) fn agent_summary(
+    projection: &Projection,
+    id: IdentityId,
+    record: &Record,
+) -> Result<AgentSummary, ServerError> {
+    let reporting = crate::reporting_read::read(projection, record)?;
+    Ok(AgentSummary {
+        id: id.to_string(),
+        display_name: record.profile().display_name().to_owned(),
+        state: record.state().to_string(),
+        reports_to: reporting.target,
+        accountable: reporting.accountable,
+        gap: reporting.gap,
+    })
+}
+
+/// The agents answering to one person, selected by the maintained index.
+fn agents_of(projection: &Projection, person: PersonId) -> Result<Vec<AgentSummary>, ServerError> {
     agents_of_observing(projection, person, |_| {})
 }
 
@@ -112,19 +130,13 @@ fn agents_of_observing(
     projection: &Projection,
     person: PersonId,
     mut visited: impl FnMut(IdentityId),
-) -> Vec<AgentSummary> {
+) -> Result<Vec<AgentSummary>, ServerError> {
     projection
-        .records()
-        .filter_map(|(id, record)| {
+        .agents_of(person)
+        .map(|entry| {
+            let (id, record) = entry?;
             visited(*id);
-            match (id, record.responsible()) {
-                (IdentityId::Agent(agent), Some(owner)) if owner == person => Some(AgentSummary {
-                    id: agent.to_string(),
-                    display_name: record.profile().display_name().to_owned(),
-                    state: record.state().to_string(),
-                }),
-                _ => None,
-            }
+            agent_summary(projection, *id, record)
         })
         .collect()
 }
@@ -192,7 +204,7 @@ async fn own_people(
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
         let record = person_record(projection, person)?;
-        let agents = agents_of(projection, person);
+        let agents = agents_of(projection, person)?;
         people_page(
             &state,
             "personal",
@@ -212,7 +224,7 @@ async fn every_person(
     state.admission.administrator(&actor)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
-        let mut grouped = agents_by_person(projection);
+        let mut grouped = agents_by_person(projection)?;
         let people = projection
             .records()
             .filter_map(|(id, record)| match id {
@@ -332,11 +344,15 @@ fn agent_view(
         return Err(ServerError::AgentNotVisible);
     }
     let person_record = person_record(projection, person)?;
+    let reporting = crate::reporting_read::read(projection, record)?;
     Ok(AgentView {
         id: agent.to_string(),
         display_name: record.profile().display_name().to_owned(),
         person: person_summary(person, person_record),
-        needs_new_person: person_record.state() == LifecycleState::Retired,
+        needs_new_person: reporting.gap.is_some(),
+        reports_to: reporting.target,
+        accountable: reporting.accountable,
+        gap: reporting.gap,
         role: None,
         version: None,
         state: record.state().to_string(),

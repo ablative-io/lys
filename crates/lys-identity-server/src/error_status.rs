@@ -10,7 +10,10 @@ use crate::error::ServerError;
 
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
-        IdentityError::IdentityUnknown { .. } => StatusCode::NOT_FOUND,
+        IdentityError::IdentityUnknown { .. } | IdentityError::AnswersToUnknown { .. } => {
+            StatusCode::NOT_FOUND
+        }
+        IdentityError::AnswersToInactive { .. } => StatusCode::FORBIDDEN,
         IdentityError::AppendUncertain { .. }
         | IdentityError::LogUnavailable { .. }
         | IdentityError::AppendRefused { .. }
@@ -79,11 +82,27 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "refusal": self.name(),
             "reason": self.to_string(),
             "fields": self.fields(),
         });
+        if let Self::Identity(error) = &self {
+            match error {
+                IdentityError::AnswersToCycle { chain }
+                | IdentityError::NoAccountablePerson { chain } => {
+                    body["chain"] = serde_json::json!(chain);
+                }
+                IdentityError::AnswersToInactive { identity, state } => {
+                    body["identity"] = serde_json::json!(identity);
+                    body["state"] = serde_json::json!(state.to_string());
+                }
+                IdentityError::AnswersToUnknown { identity } => {
+                    body["identity"] = serde_json::json!(identity)
+                }
+                _ => {}
+            }
+        }
         (self.status(), Json(body)).into_response()
     }
 }

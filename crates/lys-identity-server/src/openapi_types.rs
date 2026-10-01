@@ -129,6 +129,12 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         (POST, "/setup", Some(setup), Some(made.clone())),
         (POST, "/people", Some(named.clone()), Some(made)),
         (POST, "/agents", Some(agent_registration), Some(agent_made)),
+        (
+            POST,
+            "/agents/{id}/reports-to",
+            Some(api.schema::<crate::reporting_api::ReportsToBody>()),
+            Some(api.schema::<crate::reporting_views::ReportsToChanged>()),
+        ),
         (GET, "/identities", None, Some(identities)),
         (GET, "/identities/{id}", None, Some(identity)),
         (

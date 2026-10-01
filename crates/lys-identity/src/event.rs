@@ -122,12 +122,32 @@ pub enum Change {
         /// How the person is shown.
         profile: Profile,
     },
-    /// An agent is registered under the person responsible for it, for life.
+    /// An agent is registered with a direct edge to its accountable person.
     RegisterAgent {
         /// The signed-in person who registered the agent.
         responsible: PersonId,
         /// How the agent is shown.
         profile: Profile,
+    },
+    /// Register an agent with its reporting edge in the same signed change.
+    ReportingRegistration {
+        /// The person reached by the reporting chain.
+        responsible: PersonId,
+        /// How the agent is shown.
+        profile: Profile,
+        /// The immediate person or agent the new agent reports to.
+        reports_to: IdentityId,
+    },
+    /// Move one reporting edge and its subtree's responsibility atomically.
+    ReportsToChanged {
+        /// The previous reporting target.
+        from: IdentityId,
+        /// The chosen reporting target.
+        to: IdentityId,
+        /// The previous accountable person.
+        responsible_from: PersonId,
+        /// The new accountable person.
+        responsible_to: PersonId,
     },
     /// An identity's display profile is replaced.
     ChangeProfile {
@@ -166,6 +186,21 @@ pub struct IdentityEvent {
 
 /// Refuse `change` if it does not fit `identity`.
 fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError> {
+    let invalid_target = match change {
+        Change::ReportingRegistration { reports_to, .. } => {
+            matches!(reports_to, IdentityId::ServiceAccount(_))
+        }
+        Change::ReportsToChanged { from, to, .. } => {
+            matches!(from, IdentityId::ServiceAccount(_))
+                || matches!(to, IdentityId::ServiceAccount(_))
+        }
+        _ => false,
+    };
+    if invalid_target {
+        return Err(IdentityError::ChangeMismatch {
+            reason: "a reporting target must be a person or agent",
+        });
+    }
     if matches!(identity, IdentityId::ServiceAccount(_)) {
         return Err(IdentityError::ChangeMismatch {
             reason: "service account lifecycle belongs to the service-account log",
@@ -177,11 +212,14 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
                 reason: "a person registration names a person",
             })
         }
-        (Change::RegisterAgent { .. }, IdentityId::Person(_)) => {
-            Err(IdentityError::ChangeMismatch {
-                reason: "an agent registration names an agent",
-            })
-        }
+        (
+            Change::RegisterAgent { .. }
+            | Change::ReportingRegistration { .. }
+            | Change::ReportsToChanged { .. },
+            IdentityId::Person(_),
+        ) => Err(IdentityError::ChangeMismatch {
+            reason: "an agent registration names an agent",
+        }),
         (Change::BindLogin { .. }, IdentityId::Agent(_)) => Err(IdentityError::ChangeMismatch {
             reason: "a login is bound to a person, never to an agent",
         }),
@@ -299,12 +337,18 @@ pub(crate) mod wire {
     pub(crate) const LINK_AUDIT: u64 = 6;
     /// An active person bound to the authenticated actor, in one leaf.
     pub(crate) const SETUP_PERSON: u64 = 7;
+    /// Registration with an explicit reporting edge.
+    pub(crate) const REPORTING_REGISTRATION: u64 = 8;
+    /// A reporting edge and accountable subtree change.
+    pub(crate) const REPORTS_TO_CHANGED: u64 = 9;
 
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
             Change::SetupPerson { .. } => SETUP_PERSON,
             Change::RegisterPerson { .. } => REGISTER_PERSON,
             Change::RegisterAgent { .. } => REGISTER_AGENT,
+            Change::ReportingRegistration { .. } => REPORTING_REGISTRATION,
+            Change::ReportsToChanged { .. } => REPORTS_TO_CHANGED,
             Change::ChangeProfile { .. } => CHANGE_PROFILE,
             Change::BindLogin { .. } => BIND_LOGIN,
             Change::Transition { .. } => TRANSITION,

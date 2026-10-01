@@ -27,6 +27,7 @@ fn record(id: IdentityId, record: &Record) -> Value {
         array(record.bindings.iter().map(binding).collect()),
         binding(&record.registered_by),
         array(record.events.iter().map(|index| uint(*index)).collect()),
+        nullable(record.reports_to.map(identity)),
     ])
 }
 
@@ -39,7 +40,8 @@ fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
         bindings,
         registered_by,
         events,
-    ] = tuple::<7>(value, "a directory record")?;
+        reports_to,
+    ] = tuple::<8>(value, "a directory record")?;
     let state = read_uint(&state, "a lifecycle state")?;
     let record = Record {
         profile: Profile::new(&read_text(name, "a display name")?)
@@ -50,6 +52,8 @@ fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
             .map(|person| read_fixed::<ID_LEN>(person, "a responsible person"))
             .transpose()?
             .map(PersonId::from_bytes),
+        reports_to: read_nullable(reports_to).map(read_identity).transpose()?,
+        reporting_gap: None,
         bindings: list(bindings, "a record's bindings")?
             .into_iter()
             .map(read_binding)
@@ -127,5 +131,32 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
     })?
     .into_iter()
     .collect();
+    projection
+        .rebuild_reporting_indexes()
+        .map_err(|error| error.to_string())?;
     Ok(projection)
+}
+
+/// Materialise the direct reporting edges of a version-two projection.
+pub(crate) fn migrate_v2(value: Value) -> Result<Projection, Unreadable> {
+    let [records, operations, link_sources] = tuple::<3>(value, "a directory projection")?;
+    let mut migrated = Vec::new();
+    for held in list(records, "the directory records")? {
+        let fields = tuple::<7>(held, "a version-two directory record")?;
+        let id = read_identity(fields[0].clone())?;
+        let target = match id {
+            IdentityId::Agent(_) => {
+                let person = read_fixed::<ID_LEN>(fields[3].clone(), "a responsible person")?;
+                identity(IdentityId::Person(PersonId::from_bytes(person)))
+            }
+            IdentityId::Person(_) => Value::Null,
+            IdentityId::ServiceAccount(_) => {
+                return Err("a service account is not a stored directory identity".to_owned());
+            }
+        };
+        let mut fields = Vec::from(fields);
+        fields.push(target);
+        migrated.push(array(fields));
+    }
+    decode(array(vec![array(migrated), operations, link_sources]))
 }

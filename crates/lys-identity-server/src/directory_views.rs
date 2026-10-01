@@ -132,6 +132,8 @@ pub struct AgentRegistered {
     pub agent: String,
     /// The person responsible for it.
     pub responsible: String,
+    /// The person or agent the registration reports to directly.
+    pub reports_to: crate::reporting_views::ReportingEdge,
     /// The receipt the registration was recorded under.
     pub receipt: DirectoryReceiptView,
 }

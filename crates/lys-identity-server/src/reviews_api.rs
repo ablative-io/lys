@@ -130,6 +130,7 @@ pub struct ReviewView {
 
 /// An agent in the directory with the person it answers to.
 struct Answering<'a> {
+    directory: &'a Projection,
     agent: AgentId,
     record: &'a Record,
     person: PersonId,
@@ -137,12 +138,8 @@ struct Answering<'a> {
 }
 
 impl Answering<'_> {
-    fn agent_summary(&self) -> AgentSummary {
-        AgentSummary {
-            id: self.agent.to_string(),
-            display_name: self.record.profile().display_name().to_owned(),
-            state: self.record.state().to_string(),
-        }
+    fn agent_summary(&self) -> Result<AgentSummary, ServerError> {
+        crate::read_api::agent_summary(self.directory, IdentityId::Agent(self.agent), self.record)
     }
 
     fn person_summary(&self) -> PersonSummary {
@@ -166,6 +163,7 @@ fn answering(
     let person_record = directory.record(IdentityId::Person(person))?;
     let shown = viewer.is_none_or(|viewer| viewer == person);
     (shown && record.state() != LifecycleState::Retired).then_some(Answering {
+        directory,
         agent,
         record,
         person,
@@ -208,29 +206,32 @@ async fn reviews(
             .records()
             .filter(|record| stands(book, record, judged_at))
             .filter_map(|record| {
-                let held = answering(judged.directory, record.grant().holder(), viewer)?;
-                Some(DueView {
-                    grant: grant_view(&judged, IdentityId::Person(person), record, judged_at),
-                    agent: held.agent_summary(),
-                    reviewer: held.person_summary(),
-                    last_kept: kept.as_ref().and_then(|store| {
-                        store
-                            .last_for(&record.grant().id().to_string())
-                            .map(KeptView::from)
-                    }),
+                answering(judged.directory, record.grant().holder(), viewer).map(|held| {
+                    Ok(DueView {
+                        grant: grant_view(&judged, IdentityId::Person(person), record, judged_at),
+                        agent: held.agent_summary()?,
+                        reviewer: held.person_summary(),
+                        last_kept: kept.as_ref().and_then(|store| {
+                            store
+                                .last_for(&record.grant().id().to_string())
+                                .map(KeptView::from)
+                        }),
+                    })
                 })
             })
-            .collect();
+            .collect::<Result<_, ServerError>>()?;
         let unanswered = judged
             .directory
             .records()
             .filter_map(|(identity, _)| answering(judged.directory, *identity, viewer))
             .filter(|held| held.person_record.state() != LifecycleState::Active)
-            .map(|held| UnansweredView {
-                agent: held.agent_summary(),
-                person: held.person_summary(),
+            .map(|held| {
+                Ok(UnansweredView {
+                    agent: held.agent_summary()?,
+                    person: held.person_summary(),
+                })
             })
-            .collect();
+            .collect::<Result<_, ServerError>>()?;
         Ok(Json(ReviewView {
             scope: if whole { "directory" } else { "personal" }.to_owned(),
             due,
