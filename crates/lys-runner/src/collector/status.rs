@@ -7,6 +7,11 @@ use crate::error::RunnerError;
 use crate::tracking::{Figures, Reading, UsageRecord};
 use crate::tracking_store::{Body, SourceState};
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static BEFORE_END: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
 pub(crate) struct PendingStatus {
     record: UsageRecord,
     path: String,
@@ -205,6 +210,12 @@ impl Sessions {
         };
         drop(table);
         if let Some(leader) = result.1 {
+            #[cfg(test)]
+            BEFORE_END.with(|probe| {
+                if let Some(probe) = probe.borrow_mut().take() {
+                    probe();
+                }
+            });
             crate::pty::end(&leader)?;
         }
         if flushed {
