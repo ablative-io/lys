@@ -5,6 +5,7 @@
 //! the people they were; a token from the earlier issuer resolves to nobody.
 
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 
 use identity_contract::apps::login;
 use identity_contract::fake_issuer::FakeIssuer;
@@ -113,6 +114,46 @@ async fn after_the_move_a_token_from_the_earlier_issuer_signs_nobody_in() -> Tes
     assert!(
         service.sign_in(login(ADMINISTRATOR)).await.is_err(),
         "a token the earlier issuer signed is refused"
+    );
+    Ok(())
+}
+
+/// An install from 29 September holds the directory loader's service
+/// account, created at start under the administrator's login at the earlier
+/// issuer. After the move the service starts, the administrator is still
+/// the administrator, and the account is still held, once.
+#[tokio::test]
+async fn an_install_holding_the_loaders_service_account_starts_after_the_move() -> TestResult {
+    const MODEL: &str = r#"{"version":1,"relations":{"owner":["view","edit","grant"],"editor":["view","edit"],"viewer":["view"]}}"#;
+    const ACCOUNT: &str = "op-91919191919191919191919191919191";
+    let (mut service, ()) = Service::start_judging(MODEL, None, |config| {
+        lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, "second-person"])?;
+        Ok(())
+    })
+    .await?;
+    let credential = service.dir.path().join("loader.credential");
+    std::fs::write(
+        &credential,
+        format!("lys-registrar.{ACCOUNT}.{}", "ab".repeat(32)),
+    )?;
+    std::fs::set_permissions(&credential, std::fs::Permissions::from_mode(0o600))?;
+    service
+        .restart_adjusted(|config| config.import_credential_file = Some(credential))
+        .await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let (status, before) = service.get("/service-accounts", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{before}");
+    assert!(before.to_string().contains(ACCOUNT), "{before}");
+    move_issuer(&mut service).await?;
+    service.restart().await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let (status, people) = service.get("/directory/people", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{people}");
+    let (status, after) = service.get("/service-accounts", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{after}");
+    assert_eq!(
+        after.to_string().matches(ACCOUNT).count(),
+        before.to_string().matches(ACCOUNT).count()
     );
     Ok(())
 }

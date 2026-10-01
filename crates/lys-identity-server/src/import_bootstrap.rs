@@ -90,42 +90,47 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
     if secret.len() != 64 || !secret.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(unavailable());
     }
-    let owner = with_directory(state, |directory| {
-        let Some(owner) = directory.projection()?.person_for(&administrator) else {
-            return Ok(None);
-        };
-        let accounts = state.service_accounts.as_ref().ok_or_else(unavailable)?;
-        let mut accounts =
-            accounts
-                .lock()
-                .map_err(|error| ServerError::ServiceAccountsUnavailable {
-                    reason: format!("the service accounts lock is poisoned: {error}"),
+    let owner =
+        with_directory(state, |directory| {
+            let Some(owner) = directory.projection()?.person_for(&administrator) else {
+                return Ok(None);
+            };
+            let accounts = state.service_accounts.as_ref().ok_or_else(unavailable)?;
+            let mut accounts =
+                accounts
+                    .lock()
+                    .map_err(|error| ServerError::ServiceAccountsUnavailable {
+                        reason: format!("the service accounts lock is poisoned: {error}"),
+                    })?;
+            // The loader's account is created once. Its words name the login
+            // that created it, which an issuer move rebinds, so a later start
+            // never sends the creation again under the same operation.
+            if accounts.account(account).is_none() {
+                accounts.create(Created {
+                    id: account.to_owned(),
+                    owner: owner.to_string(),
+                    name: "Lys directory loader".to_owned(),
+                    description: "Imports directory entries through explicitly delegated grants"
+                        .to_owned(),
+                    by: crate::read_api::login(&administrator),
+                    at: now(),
                 })?;
-        accounts.create(Created {
-            id: account.to_owned(),
-            owner: owner.to_string(),
-            name: "Lys directory loader".to_owned(),
-            description: "Imports directory entries through explicitly delegated grants".to_owned(),
-            by: crate::read_api::login(&administrator),
-            at: now(),
-        })?;
-        drop(accounts);
-        let mut apps =
-            state
-                .apps
-                .lock()
-                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+            }
+            drop(accounts);
+            let mut apps = state.apps.lock().map_err(|error| {
+                crate::apps_error::AppError::AppsUnavailable {
                     reason: format!("the apps lock is poisoned: {error}"),
-                })?;
-        apps.keep(Line::Registrar(Registrar {
-            operation: operation(account, "credential").to_string(),
-            service_account: account.to_owned(),
-            secret_sha256: sha256_hex(secret),
-            by: By::Start,
-            at: now(),
-        }))?;
-        Ok(Some(owner))
-    })?;
+                }
+            })?;
+            apps.keep(Line::Registrar(Registrar {
+                operation: operation(account, "credential").to_string(),
+                service_account: account.to_owned(),
+                secret_sha256: sha256_hex(secret),
+                by: By::Start,
+                at: now(),
+            }))?;
+            Ok(Some(owner))
+        })?;
     let Some(owner) = owner else { return Ok(()) };
     crate::grants::with_grants(state, |judged| {
         for collection in ["apps", "agents"] {
