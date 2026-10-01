@@ -11,6 +11,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+#[path = "runtime_operation_tests.rs"]
+mod operation_tests;
+
 /// The snapshot domain the reports' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/runtime-reports-state/v1";
 
@@ -213,6 +217,10 @@ impl Held {
         self.sessions
             .iter()
             .flat_map(|tracked| tracked.reports.iter())
+            .inspect(|_| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::RuntimeOperation);
+            })
             .find(|report| report.operation == operation)
     }
 
