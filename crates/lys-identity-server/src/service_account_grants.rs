@@ -80,13 +80,24 @@ pub(crate) fn projection(
     state: &AppState,
     directory: &Projection,
 ) -> Result<Projection, ServerError> {
-    let mut projection = directory.clone();
     let Some(accounts) = &state.service_accounts else {
-        return Ok(projection);
+        return expanded(directory, &crate::service_accounts_state::Held::default());
     };
     let mut accounts = accounts.lock().unwrap_or_else(PoisonError::into_inner);
     accounts.settle()?;
-    for account in accounts.accounts() {
+    expanded(directory, accounts.held())
+}
+
+fn expanded(
+    directory: &Projection,
+    accounts: &crate::service_accounts_state::Held,
+) -> Result<Projection, ServerError> {
+    let mut projection = directory.clone();
+    #[cfg(test)]
+    tests::copied(directory, &projection);
+    for account in &accounts.accounts {
+        #[cfg(test)]
+        tests::visited();
         let created = &account.created;
         projection.service_account(
             ServiceAccountId::from_str(&created.id)?,
@@ -98,6 +109,10 @@ pub(crate) fn projection(
     }
     Ok(projection)
 }
+
+#[cfg(test)]
+#[path = "service_account_grants_tests.rs"]
+mod tests;
 
 /// Authenticate a grant caller. Bearer authentication never falls back to a
 /// cookie; it names the account itself and confers no grant or root powers.
