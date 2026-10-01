@@ -202,6 +202,7 @@ impl Session {
 pub(crate) struct Table {
     pub(crate) owner: Weak<Sessions>,
     pub(crate) sessions: BTreeMap<String, Session>,
+    pub(crate) responsible: BTreeMap<String, String>,
     starting: BTreeSet<String>,
     stopping: bool,
     pub(crate) feed: Feed,
@@ -296,6 +297,7 @@ impl Sessions {
         let mut table = Table {
             owner: Weak::new(),
             sessions: BTreeMap::new(),
+            responsible: BTreeMap::new(),
             starting: BTreeSet::new(),
             stopping: false,
             feed: Feed::open(state_dir)?,
@@ -303,7 +305,9 @@ impl Sessions {
             gaps: BTreeMap::new(),
             operations: Operations::open(state_dir)?,
         };
-        for kept in state.read()?.sessions {
+        let kept = state.read()?;
+        table.responsible = kept.responsible;
+        for kept in kept.sessions {
             let ended = if let Some(ended) = kept.ended {
                 ended
             } else {
@@ -426,7 +430,8 @@ impl Sessions {
                 ended: session.ended.clone(),
             })
             .collect();
-        self.state.write(&Kept::new(sessions))
+        self.state
+            .write_responsible(&Kept::new(sessions), &table.responsible)
     }
 
     /// Record the table, naming any failure where the runner's log shows it:
@@ -443,15 +448,61 @@ impl Sessions {
         self.begin(launch, None, None)
     }
 
+    /// Start with a verified responsible person supplied by the admitting caller.
+    ///
+    /// # Errors
+    /// Returns invalid responsibility, launch or persistence errors by name.
+    pub fn start_for(
+        self: &Arc<Self>,
+        launch: Launch,
+        responsible: &str,
+    ) -> Result<(u32, u64), RunnerError> {
+        self.begin_for(launch, None, None, responsible)
+    }
+
+    /// Begin an owned session without deriving a person from a server key.
+    ///
+    /// # Errors
+    /// Returns invalid responsibility, tracking, launch or persistence errors by name.
+    pub fn begin_for(
+        self: &Arc<Self>,
+        launch: Launch,
+        policy: Option<Policy>,
+        tracking: Option<Tracking>,
+        responsible: &str,
+    ) -> Result<(u32, u64), RunnerError> {
+        if responsible.is_empty()
+            || responsible.trim() != responsible
+            || responsible.chars().any(char::is_control)
+            || responsible == "lys"
+        {
+            return Err(RunnerError::refused(
+                "SessionResponsibleInvalid",
+                "a verified responsible person is required",
+            ));
+        }
+        self.begin_owned(launch, policy, tracking, Some(responsible.to_owned()))
+    }
+
     /// Start `launch` as [`Sessions::start`] does, holding `policy` for its
     /// judge and tracking its harness as `tracking` says. A tracking the
     /// runner was not measured against is refused before anything runs, and
     /// so is an executable that reports another version.
     pub fn begin(
         self: &Arc<Self>,
+        launch: Launch,
+        policy: Option<Policy>,
+        tracking: Option<Tracking>,
+    ) -> Result<(u32, u64), RunnerError> {
+        self.begin_owned(launch, policy, tracking, None)
+    }
+
+    fn begin_owned(
+        self: &Arc<Self>,
         mut launch: Launch,
         policy: Option<Policy>,
         tracking: Option<Tracking>,
+        responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
         if let Some(tracking) = &tracking {
             tracking.checked()?;
@@ -544,6 +595,9 @@ impl Sessions {
             ));
         }
         table.sessions.insert(id.clone(), session);
+        if let Some(person) = responsible {
+            table.responsible.insert(id.clone(), person);
+        }
         let mut recorded = self.persist(&table);
         if let Some((executable, version)) = launched {
             recorded = recorded

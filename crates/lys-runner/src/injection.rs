@@ -116,12 +116,23 @@ pub fn lys_notice(sessions: &Sessions, session: &str, bytes: &[u8]) -> Result<u6
     deliver(sessions, session, "lys", bytes, None)
 }
 
-fn deliver(
+pub(crate) fn deliver(
     sessions: &Sessions,
     id: &str,
     sender: &str,
     bytes: &[u8],
     judge: Option<&dyn InputJudge>,
+) -> Result<u64, RunnerError> {
+    record(sessions, id, sender, bytes, judge, true)
+}
+
+pub(crate) fn record(
+    sessions: &Sessions,
+    id: &str,
+    sender: &str,
+    bytes: &[u8],
+    judge: Option<&dyn InputJudge>,
+    send: bool,
 ) -> Result<u64, RunnerError> {
     let (writer, generation) = {
         let mut table = sessions.lock()?;
@@ -161,7 +172,9 @@ fn deliver(
         )?
     };
     sessions.writer.barrier()?;
-    writer.write(bytes.to_vec())?;
+    if send {
+        writer.write(bytes.to_vec())?;
+    }
     drop(input_guard);
     Ok(index)
 }

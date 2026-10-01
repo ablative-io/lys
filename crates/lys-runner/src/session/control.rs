@@ -40,6 +40,12 @@ impl Sessions {
     pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
         let writer = {
             let mut table = self.lock()?;
+            if table.responsible.contains_key(id) {
+                return Err(RunnerError::refused(
+                    "SessionInputContextMissing",
+                    "owned session input requires a verified caller and live grant judge",
+                ));
+            }
             let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
             session.live(id)?.writer.clone()
         };

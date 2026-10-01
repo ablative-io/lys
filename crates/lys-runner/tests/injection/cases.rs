@@ -46,8 +46,14 @@ impl Fixture {
         Self::at(tempfile::tempdir()?)
     }
     fn at(dir: tempfile::TempDir) -> TestResult<Self> {
+        Self::started(dir, false)
+    }
+    fn owned() -> TestResult<Self> {
+        Self::started(tempfile::tempdir()?, true)
+    }
+    fn started(dir: tempfile::TempDir, owned: bool) -> TestResult<Self> {
         let sessions = Sessions::open(dir.path(), 4096)?;
-        sessions.start(Launch {
+        let launch = Launch {
             session: "session".to_owned(),
             program: "/bin/cat".to_owned(),
             arguments: Vec::new(),
@@ -58,7 +64,12 @@ impl Fixture {
             rows: 24,
             rotation: None,
             policy: None,
-        })?;
+        };
+        if owned {
+            sessions.start_for(launch, "person.owner")?;
+        } else {
+            sessions.start(launch)?;
+        }
         let bytes = Arc::new(Mutex::new(Vec::new()));
         let terminal = {
             let mut table = sessions.lock()?;
@@ -102,6 +113,242 @@ impl Fixture {
         drop(self.terminal);
         Ok(())
     }
+}
+
+#[test]
+fn owned_legacy_input_needs_context_and_start_records_the_person() -> TestResult {
+    let fixture = Fixture::owned()?;
+    let kept = crate::state::StateFile::open(&tempfile::tempdir()?.path().join("empty"))?.read()?;
+    assert!(kept.responsible.is_empty());
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fixture.dir.path().join("sessions.json"))?)?;
+    assert_eq!(record["responsible"]["session"], "person.owner");
+    for result in [
+        fixture.sessions.write("session", b"input"),
+        fixture.sessions.input("session", "input", true),
+        fixture
+            .sessions
+            .keys("session", &[crate::protocol::Key::Enter]),
+    ] {
+        assert_eq!(
+            result.expect_err("owned needs context").name(),
+            "SessionInputContextMissing"
+        );
+    }
+    let operation = crate::operations::Operation {
+        operation: "compact-owned".to_owned(),
+        session: "session".to_owned(),
+        request: crate::operations::OperationRequest::Compact {
+            text: "/compact".to_owned(),
+        },
+    };
+    assert_eq!(
+        fixture
+            .sessions
+            .operate(operation)
+            .expect_err("compact needs context")
+            .name(),
+        "SessionInputContextMissing"
+    );
+    assert!(
+        fixture
+            .bytes
+            .lock()
+            .map_err(|error| error.to_string())?
+            .is_empty()
+    );
+    fixture.end()
+}
+
+#[test]
+fn old_session_record_migrates_with_explicitly_absent_responsibility() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let old = br#"{"format":"lys-runner-sessions/v2","sessions":[{"session":"old","pid":null,"leader_start":null,"started_at":7,"columns":80,"rows":24,"ended":{"how":"exited","at":8,"status":0,"signal":null,"reason":null}}]}"#;
+    std::fs::write(dir.path().join("sessions.json"), old)?;
+    let state = crate::state::StateFile::open(dir.path())?;
+    let kept = state.read()?;
+    assert_eq!(kept.format, crate::state::FORMAT);
+    assert_eq!(kept.sessions.len(), 1);
+    assert_eq!(kept.sessions[0].session, "old");
+    assert_eq!(kept.sessions[0].started_at, 7);
+    assert!(kept.responsible.is_empty());
+    state.write(&kept)?;
+    assert_eq!(state.read()?, kept);
+    Ok(())
+}
+
+#[test]
+fn every_owned_legacy_act_uses_the_live_input_grant() -> TestResult {
+    use crate::legacy_input::InputContext;
+    use crate::protocol::{Act, Answer, Greeting, Key, sign_request};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    let fixture = Fixture::owned()?;
+    let server = lys_core::Ed25519Identity::ephemeral();
+    let acts = [
+        Act::InputBytes {
+            session: "session".to_owned(),
+            data: b"raw".to_vec(),
+        },
+        Act::Input {
+            session: "session".to_owned(),
+            text: "text".to_owned(),
+            enter: true,
+        },
+        Act::Keys {
+            session: "session".to_owned(),
+            keys: vec![Key::Enter],
+        },
+        Act::Operate {
+            operation: crate::operations::Operation {
+                operation: "compact-explicit".to_owned(),
+                session: "session".to_owned(),
+                request: crate::operations::OperationRequest::Compact {
+                    text: "/compact".to_owned(),
+                },
+            },
+        },
+    ];
+    let denied = |grant: &InputGrant<'_>| {
+        assert_eq!(
+            (grant.kind, grant.id, grant.action, grant.sender),
+            ("session", "session", "input", "agent.caller")
+        );
+        assert!(fixture.sessions.table.try_lock().is_ok());
+        Err(crate::error::RunnerError::refused(
+            "SessionInputNotGranted",
+            "revoked",
+        ))
+    };
+    let before = fixture.entries()?;
+    for act in &acts {
+        for (context, expected) in [
+            (None, "SessionInputContextMissing"),
+            (
+                Some(InputContext {
+                    sender: "agent.caller",
+                    signed: true,
+                    cookie: None,
+                    judge: &denied,
+                }),
+                "SessionInputNotGranted",
+            ),
+            (
+                Some(InputContext {
+                    sender: "agent.caller",
+                    signed: true,
+                    cookie: Some("administrator=borrowed"),
+                    judge: &denied,
+                }),
+                "AgentCookieRefused",
+            ),
+        ] {
+            let greeting = Greeting::fresh(fixture.sessions.runner());
+            let line = sign_request(&server, &greeting, act)?;
+            let answer = crate::socket::dispatch_for(
+                &fixture.sessions,
+                &server.public_key_bytes(),
+                &greeting,
+                &line,
+                &AtomicBool::new(false),
+                context.as_ref(),
+            );
+            assert!(matches!(answer, Answer::Refused {refusal, ..} if refusal == expected));
+        }
+    }
+    assert_eq!(fixture.entries()?, before);
+    assert!(
+        fixture
+            .bytes
+            .lock()
+            .map_err(|error| error.to_string())?
+            .is_empty()
+    );
+    let calls = AtomicUsize::new(0);
+    let allowed = |grant: &InputGrant<'_>| {
+        assert_eq!(grant.sender, "agent.caller");
+        calls.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    };
+    let context = InputContext {
+        sender: "agent.caller",
+        signed: true,
+        cookie: None,
+        judge: &allowed,
+    };
+    for act in &acts {
+        let greeting = Greeting::fresh(fixture.sessions.runner());
+        let line = sign_request(&server, &greeting, act)?;
+        let answer = crate::socket::dispatch_for(
+            &fixture.sessions,
+            &server.public_key_bytes(),
+            &greeting,
+            &line,
+            &AtomicBool::new(false),
+            Some(&context),
+        );
+        assert!(!matches!(answer, Answer::Refused { .. }), "{answer:?}");
+    }
+    assert_eq!(calls.load(Ordering::Relaxed), 4);
+    let entries = fixture.entries()?;
+    let injections: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry["body"]["kind"] == "injection")
+        .collect();
+    assert_eq!(injections.len(), 4);
+    assert!(
+        injections
+            .iter()
+            .all(|entry| entry["body"]["entry"]["sender"] == "agent.caller")
+    );
+    assert!(
+        !fixture
+            .bytes
+            .lock()
+            .map_err(|error| error.to_string())?
+            .is_empty()
+    );
+    fixture.end()
+}
+
+#[test]
+fn unowned_legacy_input_records_the_verified_server_key() -> TestResult {
+    let fixture = Fixture::new()?;
+    let server = lys_core::Ed25519Identity::ephemeral();
+    let greeting = crate::protocol::Greeting::fresh(fixture.sessions.runner());
+    let line = crate::protocol::sign_request(
+        &server,
+        &greeting,
+        &crate::protocol::Act::InputBytes {
+            session: "session".to_owned(),
+            data: b"operator".to_vec(),
+        },
+    )?;
+    let answer = crate::socket::dispatch(
+        &fixture.sessions,
+        &server.public_key_bytes(),
+        &greeting,
+        &line,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert!(matches!(answer, crate::protocol::Answer::Delivered { .. }));
+    let entries = fixture.entries()?;
+    let injections: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry["body"]["kind"] == "injection")
+        .collect();
+    assert_eq!(injections.len(), 1);
+    assert_eq!(
+        injections[0]["body"]["entry"]["sender"],
+        format!(
+            "server:{}",
+            crate::protocol::hex(&server.public_key_bytes())
+        )
+    );
+    assert_eq!(
+        *fixture.bytes.lock().map_err(|error| error.to_string())?,
+        b"operator"
+    );
+    fixture.end()
 }
 #[test]
 fn denied_injection_writes_neither_leaf_nor_terminal_bytes() -> TestResult {

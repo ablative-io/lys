@@ -23,8 +23,8 @@ use crate::protocol::{Answer, Greeting, reply_line};
 use crate::session::Sessions;
 
 mod acts;
-pub use acts::dispatch;
 use acts::perform;
+pub use acts::{dispatch, dispatch_for};
 
 mod connection;
 use connection::{DispatchSlots, connection};
