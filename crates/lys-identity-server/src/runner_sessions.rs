@@ -314,25 +314,27 @@ pub async fn run_on_runner(
         runner: runner.clone(),
     };
     let session = launch.session.clone();
-    let already_issued = crate::agent_pass::store(state)?.has_session(&session)?;
-    let act = if already_issued {
-        Act::Status {
+    let agent_id = AgentId::from_str(agent)?;
+    let record = launch
+        .environment
+        .get("LYS_LAUNCH_RECORD")
+        .map_or(session.as_str(), String::as_str)
+        .to_owned();
+    // The check that no pass is held and the issue take one lock, so two
+    // starts of the same session cannot both issue.
+    let issued =
+        crate::agent_pass::store(state)?.issue_unless_present(agent_id, &record, &session)?;
+    let act = match issued {
+        None => Act::Status {
             session: Some(session.clone()),
-        }
-    } else {
-        let agent_id = AgentId::from_str(agent)?;
-        let record = launch
-            .environment
-            .get("LYS_LAUNCH_RECORD")
-            .map_or(session.as_str(), String::as_str);
-        let pass = crate::agent_pass::store(state)?.issue(agent_id, record, &session)?;
-        Act::Start {
+        },
+        Some(pass) => Act::Start {
             launch: Box::new(launch),
             lys_mcp: Some(lys_runner::protocol::LysMcp {
                 url: format!("{}/api/mcp", state.oidc.public_origin()),
                 pass: pass.to_string(),
             }),
-        }
+        },
     };
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {

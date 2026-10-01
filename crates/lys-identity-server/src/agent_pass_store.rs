@@ -242,6 +242,21 @@ impl Passes {
         Ok(pass)
     }
 
+    /// Issue a fresh run pass for `session` under the same lock as the check
+    /// that no pass for it is held; `None` when one already is, and the held
+    /// pass is left admitted.
+    pub fn issue_unless_present(
+        &mut self,
+        agent: AgentId,
+        launch: &str,
+        session: &str,
+    ) -> Result<Option<Zeroizing<String>>, ServerError> {
+        if self.has_session(session)? {
+            return Ok(None);
+        }
+        self.issue(agent, launch, session).map(Some)
+    }
+
     pub(crate) fn end_agent(&mut self, agent: AgentId) -> Result<(), ServerError> {
         let agent = agent.to_string();
         self.end(|entry| entry.agent == agent)

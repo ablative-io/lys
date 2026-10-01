@@ -36,6 +36,7 @@ struct Held {
     ada: String,
     dir: tempfile::TempDir,
     serving: Option<Serving>,
+    passes: PathBuf,
     machine: String,
     broker: tokio::task::JoinHandle<std::io::Result<()>>,
 }
@@ -63,7 +64,7 @@ impl Held {
         let socket = dir.path().join("runner.sock");
         let adjusted = socket.clone();
         let state = dir.path().join("state");
-        let (service, (seeded, serving)) = Service::start_adjusted(
+        let (service, (seeded, serving, passes)) = Service::start_adjusted(
             &lys_identity::grants::shipped_model(),
             None,
             Some(settings),
@@ -80,7 +81,8 @@ impl Held {
                     server_key: key.public_key_bytes(),
                     scrollback: 4096,
                 })?;
-                Ok((seeded, runner.spawn()))
+                let passes = config.log_dir.with_file_name("agent-passes.json");
+                Ok((seeded, runner.spawn(), passes))
             },
         )
         .await?;
@@ -96,6 +98,7 @@ impl Held {
             ada,
             dir,
             serving: Some(serving),
+            passes,
             machine: operation()?,
             broker,
         };
@@ -276,6 +279,45 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     eprintln!(
         "proof: after stop, the pass is refused {status} {}",
         after["refusal"]
+    );
+    Ok(())
+}
+
+/// A stop whose pass end fails still withdraws, keeps the stop whole and
+/// tells the runners, and reports the failed end.
+#[tokio::test(flavor = "multi_thread")]
+async fn stop_api_a_failed_pass_end_still_keeps_the_stop_and_reports_the_failure() -> TestResult {
+    let held = Held::open().await?;
+    let started = held
+        .ok(
+            &format!("/agents/{}/start-command", held.agent()),
+            &json!({ "operation": operation()?, "machine": held.machine }),
+        )
+        .await?;
+    assert!(started["session"].as_str().is_some(), "{started}");
+    // The pass table can no longer be written, so ending the pass fails.
+    std::fs::remove_file(&held.passes)?;
+    std::fs::create_dir(&held.passes)?;
+    let (status, answer) = held
+        .service
+        .post(
+            &format!("/agents/{}/stop", held.agent()),
+            Some(&held.ada),
+            &json!({ "operation": operation()?, "reason": "proof" }),
+        )
+        .await?;
+    assert_ne!(status, 200, "a failed pass end was not reported: {answer}");
+    let (status, kept) = held
+        .service
+        .get(&format!("/agents/{}/stops", held.agent()), Some(&held.ada))
+        .await?;
+    assert_eq!(status, 200, "{kept}");
+    assert_eq!(kept["stops"].as_array().map(Vec::len), Some(1), "{kept}");
+    assert_eq!(kept["stops"][0]["done"], true, "{kept}");
+    assert_eq!(
+        kept["stops"][0]["sessions_asked"].as_array().map(Vec::len),
+        Some(1),
+        "{kept}"
     );
     Ok(())
 }
