@@ -32,6 +32,12 @@ identity_leg() {
   fi
   cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail
 }
+# The interpreter is named first, so a run here that differs from a run
+# elsewhere says which python3 each one used.
+identity_scripts_leg() {
+  echo "python3: $(command -v python3) $(python3 --version 2>&1)"
+  python3 -B -m unittest discover -s scripts/identity-gates -p "*test*.py"
+}
 # The compiled surface and dependencies are shared with the install fixtures.
 # Its type checks and every surface test still run on each gate.
 surface_leg() {
@@ -81,7 +87,7 @@ parallel sh scripts/design/gate.sh
 parallel cargo doc --no-deps --all-features
 parallel ast-grep scan --config sgconfig.yml
 parallel sh scripts/file-length.sh
-parallel python3 -B -m unittest discover -s scripts/identity-gates -p "*test*.py"
+parallel identity_scripts_leg
 parallel surface_leg
 leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
 leg cargo test --doc --workspace --all-features

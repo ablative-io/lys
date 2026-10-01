@@ -182,6 +182,11 @@ class SnapshotBytes:
         return values
 
 
+def ones(number):
+    """Set bits, as int.bit_count counts them; the gate's python3 is 3.9."""
+    return bin(number).count("1")
+
+
 def snapshot_value(data):
     reader = SnapshotBytes(data)
     value = reader.cbor()
@@ -212,7 +217,7 @@ def old_directory_snapshot(root, config, leaves, administrator):
     reader.finish()
     if size == 0 or size > len(leaves):
         raise RuntimeError("old snapshot must fold nonempty fixture leaves")
-    if len(frontier) != size.bit_count() * 32:
+    if len(frontier) != ones(size) * 32:
         raise RuntimeError("wrong directory snapshot frontier")
     nodes = []
     for index, content in enumerate(islice(leaves.values(), size)):
@@ -235,7 +240,7 @@ def old_directory_snapshot(root, config, leaves, administrator):
         not isinstance(checkpoints, list)
         or len(checkpoints) != size // 1024 + 1
         or any(
-            not isinstance(nodes, bytes) or len(nodes) != (slot * 1024).bit_count() * 32
+            not isinstance(nodes, bytes) or len(nodes) != ones(slot * 1024) * 32
             for slot, nodes in enumerate(checkpoints)
         )
     ):
