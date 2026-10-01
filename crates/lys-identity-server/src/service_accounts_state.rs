@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::read_views::Login;
 
+#[path = "service_accounts_grant_index.rs"]
+mod grant_index;
+
 /// The snapshot domain the service accounts' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/service-accounts-state/v1";
 
@@ -112,6 +115,7 @@ struct Index {
     accounts: HashMap<String, usize>,
     operations: HashMap<String, (usize, bool)>,
     refusals: HashMap<String, HashMap<String, HashMap<String, usize>>>,
+    grants: grant_index::GrantIndex,
 }
 
 #[derive(Deserialize)]
@@ -124,6 +128,7 @@ impl From<Records> for Held {
     fn from(records: Records) -> Self {
         let mut index = Index::default();
         for (position, account) in records.accounts.iter().enumerate() {
+            index.grants.hold(&account.created, account.is_retired());
             index
                 .accounts
                 .entry(account.created.id.clone())
@@ -170,6 +175,13 @@ struct Sealed {
 }
 
 impl Held {
+    pub(crate) fn grant_accounts(
+        &self,
+    ) -> Result<Arc<lys_identity::projection::accounts::Accounts>, lys_identity::IdentityError>
+    {
+        self.index.grants.accounts()
+    }
+
     /// The service account named `id`.
     pub fn account(&self, id: &str) -> Option<&Account> {
         self.index.accounts.get(id).and_then(|position| {
@@ -248,6 +260,7 @@ impl Held {
             Line::ImportRefused(_) => Err("unexpected import refusal".to_owned()),
             Line::Created(created) => {
                 let index = Arc::make_mut(&mut self.index);
+                index.grants.hold(&created, false);
                 index
                     .accounts
                     .insert(created.id.clone(), self.accounts.len());
@@ -279,6 +292,9 @@ impl Held {
                     .operations
                     .insert(retired.operation.clone(), (position, true));
                 account.retired = Some(retired);
+                Arc::make_mut(&mut self.index)
+                    .grants
+                    .hold(&account.created, true);
                 Ok(())
             }
         }

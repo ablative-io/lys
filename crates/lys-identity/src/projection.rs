@@ -21,6 +21,9 @@ use crate::profile::Profile;
 #[path = "projection_reporting.rs"]
 mod reporting;
 
+#[path = "projection_accounts.rs"]
+pub mod accounts;
+
 /// The inactive identity that interrupts a reporting chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReportingGap {
@@ -88,15 +91,16 @@ impl Record {
 /// Every identity the directory holds, and the indexes a change is judged against.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Projection {
-    records: BTreeMap<IdentityId, Record>,
+    records: Arc<BTreeMap<IdentityId, Record>>,
     people: Arc<BTreeMap<String, PersonId>>,
-    agents_by_person: BTreeMap<PersonId, BTreeSet<IdentityId>>,
-    reporting_children: BTreeMap<IdentityId, BTreeSet<IdentityId>>,
+    agents_by_person: Arc<BTreeMap<PersonId, BTreeSet<IdentityId>>>,
+    reporting_children: Arc<BTreeMap<IdentityId, BTreeSet<IdentityId>>>,
     agent_count: usize,
-    bindings: HashMap<LoginBinding, PersonId>,
-    agent_bindings: HashMap<LoginBinding, AgentId>,
-    operations: HashMap<OperationId, u64>,
-    link_sources: HashMap<String, u64>,
+    bindings: Arc<HashMap<LoginBinding, PersonId>>,
+    agent_bindings: Arc<HashMap<LoginBinding, AgentId>>,
+    operations: Arc<HashMap<OperationId, u64>>,
+    link_sources: Arc<HashMap<String, u64>>,
+    accounts: Arc<accounts::Accounts>,
 }
 
 fn unknown(identity: IdentityId) -> IdentityError {
@@ -106,6 +110,29 @@ fn unknown(identity: IdentityId) -> IdentityError {
 }
 
 impl Projection {
+    /// A request snapshot sharing every directory index without copying its records.
+    #[must_use]
+    pub fn shared(&self) -> Self {
+        self.with_accounts(Arc::clone(&self.accounts))
+    }
+
+    /// A shared directory snapshot with separately indexed service accounts.
+    #[must_use]
+    pub fn with_accounts(&self, accounts: Arc<accounts::Accounts>) -> Self {
+        Self {
+            records: Arc::clone(&self.records),
+            people: Arc::clone(&self.people),
+            agents_by_person: Arc::clone(&self.agents_by_person),
+            reporting_children: Arc::clone(&self.reporting_children),
+            agent_count: self.agent_count,
+            bindings: Arc::clone(&self.bindings),
+            agent_bindings: Arc::clone(&self.agent_bindings),
+            operations: Arc::clone(&self.operations),
+            link_sources: Arc::clone(&self.link_sources),
+            accounts,
+        }
+    }
+
     /// Add an account from the separately signed service-account log to a
     /// request's projection. Call only on a clone after settling that log.
     /// This never creates a login binding or changes the directory's log.
@@ -133,7 +160,7 @@ impl Projection {
                 identity: identity.to_string(),
             });
         }
-        self.records.insert(
+        Arc::make_mut(&mut self.records).insert(
             identity,
             Record {
                 profile,
@@ -156,12 +183,14 @@ impl Projection {
 
     /// The identity `id`, if the directory holds it.
     pub fn record(&self, id: IdentityId) -> Option<&Record> {
-        self.records.get(&id)
+        self.records
+            .get(&id)
+            .or_else(|| self.accounts.record(id, self))
     }
 
     /// Every identity, in identifier order.
     pub fn records(&self) -> impl Iterator<Item = (&IdentityId, &Record)> {
-        self.records.iter()
+        self.records.iter().chain(self.accounts.records(self))
     }
 
     /// People in wire identifier order, starting after the supplied identifier.
@@ -333,7 +362,7 @@ impl Projection {
     pub fn apply(&mut self, event: &IdentityEvent, index: u64) -> Result<(), IdentityError> {
         self.check(event)?;
         let identity = event.identity();
-        self.operations.insert(event.operation(), index);
+        Arc::make_mut(&mut self.operations).insert(event.operation(), index);
         let registered_by = event.actor().binding().clone();
         match event.change() {
             Change::SetupPerson { profile } => {
@@ -345,11 +374,11 @@ impl Projection {
                 let mut record = fresh(profile, None, registered_by.clone(), index);
                 record.state = LifecycleState::Active;
                 record.bindings.push(registered_by.clone());
-                self.records.insert(identity, record);
-                self.bindings.insert(registered_by, person);
+                Arc::make_mut(&mut self.records).insert(identity, record);
+                Arc::make_mut(&mut self.bindings).insert(registered_by, person);
             }
             Change::RegisterPerson { profile } => {
-                self.records
+                Arc::make_mut(&mut self.records)
                     .insert(identity, fresh(profile, None, registered_by, index));
             }
             Change::RegisterAgent {
@@ -381,10 +410,10 @@ impl Projection {
                 record.events.push(index);
                 match identity {
                     IdentityId::Person(person) => {
-                        self.bindings.insert(binding.clone(), person);
+                        Arc::make_mut(&mut self.bindings).insert(binding.clone(), person);
                     }
                     IdentityId::Agent(agent) => {
-                        self.agent_bindings.insert(binding.clone(), agent);
+                        Arc::make_mut(&mut self.agent_bindings).insert(binding.clone(), agent);
                     }
                     IdentityId::ServiceAccount(_) => {
                         return Err(IdentityError::ChangeMismatch {
@@ -401,7 +430,7 @@ impl Projection {
             }
             Change::LinkAudit(seen) => {
                 self.held(identity)?.events.push(index);
-                self.link_sources
+                Arc::make_mut(&mut self.link_sources)
                     .insert(seen.source_operation_id().to_owned(), index);
             }
         }
@@ -412,7 +441,7 @@ impl Projection {
     }
 
     fn held(&mut self, identity: IdentityId) -> Result<&mut Record, IdentityError> {
-        self.records
+        Arc::make_mut(&mut self.records)
             .get_mut(&identity)
             .ok_or_else(|| unknown(identity))
     }
@@ -442,3 +471,7 @@ pub(crate) mod state;
 #[cfg(test)]
 #[path = "projection_reporting_tests.rs"]
 mod reporting_tests;
+
+#[cfg(test)]
+#[path = "projection_shared_tests.rs"]
+mod shared_tests;
