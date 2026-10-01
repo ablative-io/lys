@@ -82,9 +82,9 @@ impl Admission {
     /// Admit `actor` as the administrator, or refuse by name.
     pub fn administrator(&self, directory: &Projection, actor: &Actor) -> Result<(), ServerError> {
         self.configured_administrator(actor)?;
-        let person = directory
-            .person_for(actor.binding())
-            .ok_or(ServerError::NoPerson)?;
+        let Some(person) = directory.person_for(actor.binding()) else {
+            return Ok(());
+        };
         let record = directory
             .record(IdentityId::Person(person))
             .ok_or(ServerError::NoPerson)?;
