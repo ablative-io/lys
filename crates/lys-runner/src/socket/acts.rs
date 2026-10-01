@@ -17,17 +17,31 @@ pub fn dispatch(
     line: &str,
     left: &AtomicBool,
 ) -> Answer {
+    dispatch_for(sessions, server, greeting, line, left, None)
+}
+
+/// Dispatch a signed server request with an optional verified input caller.
+pub fn dispatch_for(
+    sessions: &Arc<Sessions>,
+    server: &[u8; 32],
+    greeting: &Greeting,
+    line: &str,
+    left: &AtomicBool,
+    context: Option<&crate::legacy_input::InputContext<'_>>,
+) -> Answer {
     let act = match verify_request(line.trim_end(), server, greeting) {
         Ok(act) => act,
         Err(error) => return Answer::refusal(&error),
     };
-    perform(sessions, act, left).unwrap_or_else(|error| Answer::refusal(&error))
+    perform(sessions, server, act, left, context).unwrap_or_else(|error| Answer::refusal(&error))
 }
 
 pub(super) fn perform(
     sessions: &Arc<Sessions>,
+    server: &[u8; 32],
     act: Act,
     left: &AtomicBool,
+    context: Option<&crate::legacy_input::InputContext<'_>>,
 ) -> Result<Answer, RunnerError> {
     match act {
         Act::ReadBytes {
@@ -35,9 +49,10 @@ pub(super) fn perform(
             cursor,
             follow,
         } => crate::terminal_bytes::read(sessions, &session, cursor, follow, left),
-        Act::InputBytes { session, data } => sessions
-            .write(&session, &data)
-            .map(|()| Answer::Delivered { session }),
+        Act::InputBytes { session, data } => {
+            crate::legacy_input::write(sessions, server, &session, &data, context)
+                .map(|()| Answer::Delivered { session })
+        }
         Act::Start { launch } => {
             let session = launch.session.clone();
             let policy = launch
@@ -56,12 +71,22 @@ pub(super) fn perform(
             session,
             text,
             enter,
-        } => sessions
-            .input(&session, &text, enter)
-            .map(|()| Answer::Delivered { session }),
-        Act::Keys { session, keys } => sessions
-            .keys(&session, &keys)
-            .map(|()| Answer::Delivered { session }),
+        } => {
+            let mut bytes = text.into_bytes();
+            if enter {
+                bytes.extend_from_slice(crate::protocol::Key::Enter.bytes());
+            }
+            crate::legacy_input::write(sessions, server, &session, &bytes, context)
+                .map(|()| Answer::Delivered { session })
+        }
+        Act::Keys { session, keys } => {
+            let bytes: Vec<u8> = keys
+                .iter()
+                .flat_map(|key| key.bytes().iter().copied())
+                .collect();
+            crate::legacy_input::write(sessions, server, &session, &bytes, context)
+                .map(|()| Answer::Delivered { session })
+        }
         Act::Read {
             session,
             cursor,
@@ -89,9 +114,17 @@ pub(super) fn perform(
         Act::Status { session } => Ok(Answer::Status {
             status: sessions.status(session.as_deref())?,
         }),
-        Act::Operate { operation } => sessions
-            .operate(operation)
-            .map(|outcome| Answer::Operation { outcome }),
+        Act::Operate { operation } => {
+            let outcome = if matches!(
+                operation.request,
+                crate::operations::OperationRequest::Compact { .. }
+            ) {
+                crate::legacy_input::compact(sessions, server, operation, context)?
+            } else {
+                sessions.operate(operation)?
+            };
+            Ok(Answer::Operation { outcome })
+        }
         Act::Feed { cursor, follow } => {
             if follow {
                 sessions.until_any(left, |table| {

@@ -55,6 +55,7 @@ pub mod injection;
 mod input;
 pub mod judge;
 pub mod launch_config;
+pub mod legacy_input;
 pub mod operations;
 pub mod peer;
 pub mod protocol;

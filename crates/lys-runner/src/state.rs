@@ -17,6 +17,7 @@
 //! answered is kept: each is bound to a challenge made for its connection
 //! alone (see [`crate::protocol`]).
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -30,7 +31,7 @@ use crate::protocol::Ended;
 mod legacy;
 
 /// The record's format.
-pub const FORMAT: &str = "lys-runner-sessions/v2";
+pub const FORMAT: &str = "lys-runner-sessions/v3";
 
 /// One session as the record keeps it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +61,8 @@ pub struct Kept {
     pub format: String,
     /// Every session held.
     pub sessions: Vec<KeptSession>,
+    /// Verified responsible people for explicitly owned sessions.
+    pub responsible: BTreeMap<String, String>,
 }
 
 impl Kept {
@@ -68,6 +71,7 @@ impl Kept {
         Self {
             format: FORMAT.to_owned(),
             sessions,
+            responsible: BTreeMap::new(),
         }
     }
 }
@@ -139,6 +143,7 @@ impl StateFile {
             .ok_or_else(|| unavailable("the runner record names no format"))?;
         let kept: Kept = match found {
             FORMAT => serde_json::from_value(value),
+            "lys-runner-sessions/v2" => legacy::migrate_v2(value),
             legacy::FORMAT => legacy::migrate(value),
             other => {
                 return Err(unavailable(format!(
@@ -158,11 +163,47 @@ impl StateFile {
                 )));
             }
         }
+        let ids: BTreeSet<_> = kept
+            .sessions
+            .iter()
+            .map(|session| session.session.as_str())
+            .collect();
+        for (id, person) in &kept.responsible {
+            if !ids.contains(id.as_str())
+                || person.is_empty()
+                || person.trim() != person
+                || person.chars().any(char::is_control)
+            {
+                return Err(unavailable("the session responsibility record is invalid"));
+            }
+        }
         Ok(kept)
     }
 
     /// Replace the record with `kept`, durably.
     pub fn write(&self, kept: &Kept) -> Result<(), RunnerError> {
+        self.save(kept)
+    }
+
+    pub(crate) fn write_responsible(
+        &self,
+        kept: &Kept,
+        responsible: &BTreeMap<String, String>,
+    ) -> Result<(), RunnerError> {
+        #[derive(Serialize)]
+        struct Record<'a> {
+            format: &'a str,
+            sessions: &'a [KeptSession],
+            responsible: &'a BTreeMap<String, String>,
+        }
+        self.save(&Record {
+            format: &kept.format,
+            sessions: &kept.sessions,
+            responsible,
+        })
+    }
+
+    fn save(&self, kept: &impl Serialize) -> Result<(), RunnerError> {
         let bytes = serde_json::to_vec_pretty(kept).map_err(unavailable)?;
         if let Some(writer) = &self.writer {
             return writer.replace(&self.path, bytes);

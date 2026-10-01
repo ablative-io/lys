@@ -63,3 +63,19 @@ pub(super) fn migrate(value: Value) -> Result<Kept, serde_json::Error> {
         .collect();
     Ok(Kept::new(sessions))
 }
+
+pub(super) fn migrate_v2(value: Value) -> Result<Kept, serde_json::Error> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Previous {
+        format: String,
+        sessions: Vec<KeptSession>,
+    }
+    let previous: Previous = serde_json::from_value(value)?;
+    if previous.format != "lys-runner-sessions/v2" {
+        return Err(serde::de::Error::custom(
+            "the previous session format is invalid",
+        ));
+    }
+    Ok(Kept::new(previous.sessions))
+}

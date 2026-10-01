@@ -411,6 +411,21 @@ impl Operations {
 impl Sessions {
     /// Accept `operation` under its stable id, answering how it stands.
     pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
+        if matches!(operation.request, OperationRequest::Compact { .. })
+            && self.lock()?.responsible.contains_key(&operation.session)
+        {
+            return Err(RunnerError::refused(
+                "SessionInputContextMissing",
+                "owned compaction requires a verified caller and live grant judge",
+            ));
+        }
+        self.operate_admitted(operation)
+    }
+
+    pub(crate) fn operate_admitted(
+        &self,
+        operation: Operation,
+    ) -> Result<OperationOutcome, RunnerError> {
         let mut table = self.lock()?;
         let mut outcome = accept(&mut table, operation)?;
         drop(table);

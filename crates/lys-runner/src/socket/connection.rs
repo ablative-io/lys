@@ -95,7 +95,7 @@ pub(super) async fn departed(stream: &tokio::net::UnixStream) -> Result<(), Runn
 
 pub(super) enum Command {
     Peer(crate::peer::PeerRequest),
-    Server(Act),
+    Server(Act, [u8; 32]),
 }
 
 impl Command {
@@ -105,15 +105,16 @@ impl Command {
                 Act::Read { session, .. }
                 | Act::ReadBytes { session, .. }
                 | Act::Wait { session, .. },
+                _,
             ) => Some(session.clone()),
             _ => None,
         }
     }
 
     pub(super) fn control(&self) -> bool {
-        matches!(self, Self::Server(Act::Status { .. }))
+        matches!(self, Self::Server(Act::Status { .. }, _))
             || matches!(self,
-            Self::Server(Act::Operate { operation }) if operation.request == crate::operations::OperationRequest::Stop)
+            Self::Server(Act::Operate { operation }, _) if operation.request == crate::operations::OperationRequest::Stop)
     }
 }
 
@@ -164,7 +165,7 @@ pub(super) fn command(
     match crate::peer::parse(line.trim_end())? {
         crate::peer::ParsedRequest::Peer(request) => Ok(Command::Peer(request)),
         crate::peer::ParsedRequest::Server(request) => {
-            verify_parsed(&request, server, greeting).map(Command::Server)
+            verify_parsed(&request, server, greeting).map(|act| Command::Server(act, *server))
         }
         crate::peer::ParsedRequest::Versioned { .. } => Err(RunnerError::Malformed {
             reason: "the request shape was not decoded".to_owned(),
@@ -236,9 +237,8 @@ pub(super) async fn execute(
     let mut task = tokio::task::spawn_blocking(move || {
         let answer = match command {
             Command::Peer(request) => cached.answer(&held, &proved, request, &flag),
-            Command::Server(act) => {
-                perform(&held, act, &flag).unwrap_or_else(|error| Answer::refusal(&error))
-            }
+            Command::Server(act, server) => perform(&held, &server, act, &flag, None)
+                .unwrap_or_else(|error| Answer::refusal(&error)),
         };
         permit.finish();
         (answer, cached)
@@ -361,7 +361,7 @@ pub(super) async fn connection(
                 continue;
             }
         };
-        if matches!(command, Command::Server(Act::GrantChannel)) {
+        if matches!(command, Command::Server(Act::GrantChannel, _)) {
             if response(&stream, Answer::GrantChannel, &mut stop).await? {
                 grant_channel(sessions, &stream, &mut stop).await?;
             }
