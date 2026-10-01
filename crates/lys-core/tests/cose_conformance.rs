@@ -167,9 +167,8 @@ fn go_cose_conformance_round_trips() {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
     let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
+    build_go_tool(&go, &bin);
 
     let expected_verify_line = format!("{GOLDEN_HASH_HEX} {GOLDEN_TIMESTAMP}\n");
 

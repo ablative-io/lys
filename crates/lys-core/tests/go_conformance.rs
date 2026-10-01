@@ -7,7 +7,7 @@
 //! The Go scaffold in `tests/go-conformance/` is fully vendored
 //! (`go mod vendor`, pinned `golang.org/x/mod v0.22.0`); every invocation
 //! runs with `GOFLAGS=-mod=vendor GOPROXY=off GOTOOLCHAIN=local` and a
-//! throwaway `GOCACHE`, so the gate needs zero network. The toolchain is
+//! shared `GOCACHE`, so the gate needs zero network. The toolchain is
 //! located via `LYS_GO_BIN`, then `/usr/local/go/bin/go`, then `go` on
 //! `PATH`. If none is found, the Go round-trip tests print a skip notice
 //! and return — but a toolchain that is present and BROKEN is a hard test
@@ -16,6 +16,9 @@
 //! The pure-Rust golden assertions in this file run unconditionally, so a
 //! Go-less environment never reduces byte-exact coverage (the primary
 //! copies of these vectors live in the always-run unit tests as well).
+
+#[path = "harness/cache.rs"]
+mod cache;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -105,26 +108,39 @@ fn find_go() -> Option<PathBuf> {
     }
 }
 
-/// Runs the vendored Go tool hermetically with `input` on stdin; returns
-/// `(exit_success, stdout_bytes)`. Any spawn failure with a PRESENT
-/// toolchain is a hard panic — the environment contract is documented in
-/// the file header.
-fn run_go_tool(go: &Path, gocache: &Path, args: &[&str], input: &[u8]) -> (bool, Vec<u8>) {
+/// Builds the vendored reference once and copies it into the test directory.
+fn build_go_tool(go: &Path, out: &Path) {
     let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/go-conformance");
-    let mut child = Command::new(go)
-        .arg("run")
-        .arg(".")
+    cache::build(go, &scaffold_dir, out, |executable, gocache| {
+        let status = Command::new(go)
+            .arg("build")
+            .arg("-o")
+            .arg(executable)
+            .arg(".")
+            .current_dir(&scaffold_dir)
+            .env("GOFLAGS", "-mod=vendor")
+            .env("GOPROXY", "off")
+            .env("GOTOOLCHAIN", "local")
+            .env("GOWORK", "off")
+            .env("GOCACHE", gocache)
+            .status()
+            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+        assert!(
+            status.success(),
+            "go build of the note conformance tool failed"
+        );
+    });
+}
+
+/// Runs the built reference with the case's original arguments and input.
+fn run_go_tool(bin: &Path, args: &[&str], input: &[u8]) -> (bool, Vec<u8>) {
+    let mut child = Command::new(bin)
         .args(args)
-        .current_dir(&scaffold_dir)
-        .env("GOFLAGS", "-mod=vendor")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "local")
-        .env("GOCACHE", gocache)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+        .expect("failed to spawn the built Go conformance tool");
     child
         .stdin
         .take()
@@ -151,8 +167,9 @@ fn go_conformance_round_trips() {
         eprintln!("skipping Go conformance round-trip: no Go toolchain found");
         return;
     };
-    let gocache_dir = tempfile::tempdir().unwrap();
-    let gocache = gocache_dir.path().join("gocache");
+    let bin_dir = tempfile::tempdir().unwrap();
+    let bin = bin_dir.path().join("notetool");
+    build_go_tool(&go, &bin);
 
     let (_dir, identity) = golden_identity();
     let verifier = golden_verifier();
@@ -161,8 +178,7 @@ fn go_conformance_round_trips() {
     // Round-trip A (Rust -> Go): Go's reference verifier accepts the
     // Rust-built note under the Rust-built verifier-key string.
     let (ok, stdout) = run_go_tool(
-        &go,
-        &gocache,
+        &bin,
         &["verify", GOLDEN_VERIFIER_SPEC],
         rust_note.as_bytes(),
     );
@@ -176,8 +192,7 @@ fn go_conformance_round_trips() {
     // Round-trip B (Go -> Rust): the Go-built note verifies under the
     // Rust verifier, returning the same body.
     let (ok, go_note) = run_go_tool(
-        &go,
-        &gocache,
+        &bin,
         &["sign", GOLDEN_NAME, GOLDEN_SEED_HEX],
         GOLDEN_BODY.as_bytes(),
     );
@@ -194,12 +209,7 @@ fn go_conformance_round_trips() {
 
     // Negative parity: one flipped body byte, rejected by BOTH.
     let tampered = rust_note.replacen("\n3\n", "\n4\n", 1);
-    let (ok, _stdout) = run_go_tool(
-        &go,
-        &gocache,
-        &["verify", GOLDEN_VERIFIER_SPEC],
-        tampered.as_bytes(),
-    );
+    let (ok, _stdout) = run_go_tool(&bin, &["verify", GOLDEN_VERIFIER_SPEC], tampered.as_bytes());
     assert!(!ok, "Go accepted a tampered note");
     assert!(verify_note(tampered.as_bytes(), &verifier).is_err());
 
@@ -209,18 +219,12 @@ fn go_conformance_round_trips() {
     // intact.
     let blank_line_body = "A\n\nB\n";
     let (ok, blank_note) = run_go_tool(
-        &go,
-        &gocache,
+        &bin,
         &["sign", GOLDEN_NAME, GOLDEN_SEED_HEX],
         blank_line_body.as_bytes(),
     );
     assert!(ok, "Go note.Sign failed on a blank-line body");
-    let (ok, go_body) = run_go_tool(
-        &go,
-        &gocache,
-        &["verify", GOLDEN_VERIFIER_SPEC],
-        &blank_note,
-    );
+    let (ok, go_body) = run_go_tool(&bin, &["verify", GOLDEN_VERIFIER_SPEC], &blank_note);
     assert!(ok, "Go note.Open rejected its own blank-line-body note");
     assert_eq!(go_body, blank_line_body.as_bytes());
     let body = verify_note(&blank_note, &verifier).unwrap();
@@ -241,12 +245,7 @@ fn go_conformance_round_trips() {
     );
     let valid_sig_line = &GOLDEN_NOTE[GOLDEN_BODY.len() + 1..];
     let poisoned = format!("{GOLDEN_BODY}\n{garbage_line}{valid_sig_line}");
-    let (ok, _stdout) = run_go_tool(
-        &go,
-        &gocache,
-        &["verify", GOLDEN_VERIFIER_SPEC],
-        poisoned.as_bytes(),
-    );
+    let (ok, _stdout) = run_go_tool(&bin, &["verify", GOLDEN_VERIFIER_SPEC], poisoned.as_bytes());
     assert!(
         !ok,
         "Go accepted a note with a failed known-key signature line"

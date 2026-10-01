@@ -83,10 +83,9 @@ fn the_rfcs_recursive_subproof_derives_the_same_newer_root() {
     let Some(go) = go_or_skip("consistency conformance") else {
         return;
     };
-    let cache = tempfile::tempdir().unwrap();
     let out = tempfile::tempdir().unwrap();
     let bin = out.path().join("cosetool");
-    build_go_tool(&go, cache.path(), &bin);
+    build_go_tool(&go, &bin);
 
     let mut cases = 0;
     let mut prepended = 0;

@@ -88,9 +88,8 @@ fn go_cose_receipt_conformance_round_trips() {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
     let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
+    build_go_tool(&go, &bin);
 
     let (_dir, key) = receipt_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());
