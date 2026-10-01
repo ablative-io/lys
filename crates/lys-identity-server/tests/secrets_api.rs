@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The secrets screens' routes, against a stand-in broker that records what
 //! reaches it: only a signed-in person is served, the person the broker is
 //! told of is the session's and never the browser's, the request the broker
@@ -7,7 +9,7 @@
 //! passes through by name and status.
 
 use std::error::Error;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::body::Bytes;
@@ -57,23 +59,21 @@ async fn broker(State(log): State<Log>, request: Request) -> Response {
         || parts.uri.path().to_owned(),
         |whole| whole.as_str().to_owned(),
     );
-    log.lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .push(Received {
-            method: parts.method.as_str().to_owned(),
-            path: path.clone(),
-            headers: parts
-                .headers
-                .iter()
-                .filter_map(|(name, value)| {
-                    value
-                        .to_str()
-                        .ok()
-                        .map(|value| (name.as_str().to_owned(), value.to_owned()))
-                })
-                .collect(),
-            body: body.to_vec(),
-        });
+    log.lock().expect("fixture lock poisoned").push(Received {
+        method: parts.method.as_str().to_owned(),
+        path: path.clone(),
+        headers: parts
+            .headers
+            .iter()
+            .filter_map(|(name, value)| {
+                value
+                    .to_str()
+                    .ok()
+                    .map(|value| (name.as_str().to_owned(), value.to_owned()))
+            })
+            .collect(),
+        body: body.to_vec(),
+    });
     if path == "/_lys/apps/save" || path == "/_lys/apps/prepare" {
         let asked: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
         let owner = parts
@@ -172,7 +172,7 @@ fn login(subject: &str) -> Login {
 }
 
 fn received(log: &Log) -> Vec<Received> {
-    log.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    log.lock().expect("fixture lock poisoned").clone()
 }
 
 fn unhex(text: &str) -> Result<Vec<u8>, Box<dyn Error>> {

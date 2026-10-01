@@ -466,7 +466,7 @@ mod tests {
         profiles.set(&asked.agent, 0, base(&intended)?)?;
         requests.event(Event::Intended(intended.clone()))?;
         profiles.set(&asked.agent, 1, intended.version.clone())?;
-        harness.fail(Fault::BeforeLeaf);
+        harness.fail(Fault::BeforeLeaf)?;
         assert!(matches!(
             reconcile(&mut requests, &mut profiles, &asked.agent),
             Err(ServerError::McpRequestsUnavailable { .. })
@@ -509,12 +509,12 @@ mod tests {
         let intended = intent(&asked)?;
         let mut profiles = ProvisioningStore::open(&harness.dir.path().join("profiles.json"))?;
         profiles.set(&asked.agent, 0, base(&intended)?)?;
-        harness.fail(Fault::AfterLeafUnreadable);
+        harness.fail(Fault::AfterLeafUnreadable)?;
         assert!(matches!(
             requests.event(Event::Intended(intended.clone())),
             Err(ServerError::McpRequestsUnavailable { .. })
         ));
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         reconcile(&mut requests, &mut profiles, &asked.agent)?;
         assert!(requests.pending(&asked.agent)?.is_empty());
         assert!(requests.held().decision(&asked.id)?.is_none());

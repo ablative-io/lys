@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! R1: people and agents registered with enduring ids, each agent under its responsible person.
 
 use std::error::Error;
@@ -236,7 +238,7 @@ async fn registering_an_agent_creates_no_issuer_user_and_issues_no_credential() 
         "the counter fires on a call that reaches the issuer"
     );
 
-    let users = rauthy.user_count();
+    let users = rauthy.user_count()?;
     let requests = rauthy.request_count();
     let credentials = credential_count(&service, &cookie).await?;
     let (status, body) = service
@@ -251,7 +253,7 @@ async fn registering_an_agent_creates_no_issuer_user_and_issues_no_credential() 
     let agent = text(&body, "agent")?.to_owned();
 
     assert_eq!(rauthy.request_count(), requests, "issuer sent nothing");
-    assert_eq!(rauthy.user_count(), users, "no issuer user was created");
+    assert_eq!(rauthy.user_count()?, users, "no issuer user was created");
     assert_eq!(
         credential_count(&service, &cookie).await?,
         credentials,
@@ -348,6 +350,6 @@ async fn a_registration_needs_a_caller_and_the_responsible_person_never_moves() 
         applied += 1;
     }
     assert_eq!(applied, changes.len());
-    assert_eq!(rauthy.user_count(), 0, "no request made an issuer user");
+    assert_eq!(rauthy.user_count()?, 0, "no request made an issuer user");
     Ok(())
 }

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The access requests' store: what is kept is read back as it was kept, an
 //! append that fails is settled by what the leaves hold, and while the
 //! outcome cannot be read nothing is answered.
@@ -78,7 +80,7 @@ fn an_append_that_fails_is_settled_by_what_the_leaves_hold() -> TestResult {
         let harness = Harness::new(7)?;
         let mut store = RequestStore::over(harness.leaves(), harness_key(&harness)?)?;
         store.ask(asked("op-1"))?;
-        harness.fail(fault);
+        harness.fail(fault)?;
         let answer = store.ask(asked("op-2"));
         assert_eq!(answer.is_ok(), stored, "{fault:?}: {answer:?}");
         assert_eq!(store.request("op-2").is_some(), stored, "{fault:?}: memory");
@@ -126,7 +128,7 @@ fn a_store_that_cannot_be_read_back_answers_nothing_until_it_can() -> TestResult
         leaves()
     });
     let mut store = RequestStore::over(reopen, harness_key(&harness)?)?;
-    harness.fail(Fault::LeafStoredWriteFailed);
+    harness.fail(Fault::LeafStoredWriteFailed)?;
     blocked.store(true, Ordering::SeqCst);
     let failed = store
         .ask(asked("op-1"))

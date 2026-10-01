@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use lys_identity::start::credentials::{HandleAnswer, HandleRecords, HeldCredential, check};
@@ -71,11 +71,11 @@ impl Stub {
                 let head = String::from_utf8_lossy(&request);
                 let asked =
                     head.starts_with("GET /secrets/handles?holder=agent-fixture-1 HTTP/1.1\r\n");
-                let current = *set.lock().unwrap_or_else(PoisonError::into_inner);
+                let current = *set.lock().expect("fixture lock poisoned");
                 let (status, body) = if asked {
                     *count
                         .lock()
-                        .unwrap_or_else(PoisonError::into_inner)
+                        .expect("fixture lock poisoned")
                         .entry(current)
                         .or_insert(0) += 1;
                     answer_for(current)
@@ -99,13 +99,13 @@ impl Stub {
     }
 
     fn set(&self, case: &'static str) {
-        *self.case.lock().unwrap_or_else(PoisonError::into_inner) = case;
+        *self.case.lock().expect("fixture lock poisoned") = case;
     }
 
     fn served(&self, case: &str) -> usize {
         self.served
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .expect("fixture lock poisoned")
             .get(case)
             .copied()
             .unwrap_or(0)

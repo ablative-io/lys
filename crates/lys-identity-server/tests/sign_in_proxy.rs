@@ -24,7 +24,7 @@ async fn a_trusted_proxy_does_not_put_all_password_clients_in_one_bucket()
         },
         password: "Correct-Password-For-Test1".into(),
         second_factor: false,
-    });
+    })?;
     let client = reqwest::Client::new();
     let request = |forwarded: &str| {
         client

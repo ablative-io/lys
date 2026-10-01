@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Registered lifecycle regression coverage.
 use super::support::{TestResult, fixture_serving, inactive, stored};
 use identity_contract::harness::Service;
@@ -38,7 +40,7 @@ async fn issuer_account_fixture(
         api_key_file: rauthy.api_key_file(),
     };
     let (service, person, _) = fixture_serving(&subject, active, None, Some(settings)).await?;
-    rauthy.link(service.issuer.clone());
+    rauthy.link(service.issuer.clone())?;
     account["password"] = json!("Original-Password-12345");
     client
         .put(format!("{}/users/{subject}", rauthy.api()))
@@ -71,7 +73,7 @@ async fn account_mutation(active: bool, password: bool) -> TestResult {
     assert_eq!(own.0, 200, "{}", own.1);
     assert_eq!(own.1["email"], "registered@example.test");
     let requests = rauthy.request_count();
-    let users = rauthy.users();
+    let users = rauthy.users()?;
     let bytes = stored(&service)?;
     let answer = service.post(path, Some(&cookie), &body).await?;
     if active {
@@ -93,7 +95,7 @@ async fn account_mutation(active: bool, password: bool) -> TestResult {
             "Registered request reached issuer"
         );
         assert_eq!(
-            rauthy.users(),
+            rauthy.users()?,
             users,
             "Registered request changed issuer account"
         );

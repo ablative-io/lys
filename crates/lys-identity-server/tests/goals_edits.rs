@@ -1,7 +1,9 @@
+#![cfg(test)]
+
 //! Standing aims keep their words, optional deadlines and reversible reminder activity.
 
 use std::error::Error;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -531,10 +533,7 @@ impl Deliver for DeliveredText {
             let OperationRequest::Reminder { text } = operation.request else {
                 return Err(Undelivered::Refused("expected a reminder".to_owned()));
             };
-            self.0
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push(text);
+            self.0.lock().expect("fixture lock poisoned").push(text);
             Ok(OperationOutcome {
                 operation: operation.operation,
                 session: operation.session,
@@ -564,7 +563,7 @@ async fn deadline_free_reminders_use_the_current_words_without_deadline_phrases(
     let delivered = DeliveredText(Mutex::default());
     remind(&goals, &delivered, 1060).await?;
     assert_eq!(
-        *delivered.0.lock().unwrap_or_else(PoisonError::into_inner),
+        *delivered.0.lock().expect("fixture lock poisoned"),
         ["Reminder from Lys. Goal: keep the directory available."]
     );
     Ok(())

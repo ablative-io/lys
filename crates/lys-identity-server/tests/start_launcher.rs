@@ -9,7 +9,7 @@
 //! answer is keyed on what the test supplied.
 
 use std::error::Error;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::http::HeaderMap;
 use lys_core::Ed25519Identity;
@@ -178,21 +178,12 @@ struct Launches(Arc<Planned>);
 impl Launcher for Launches {
     fn launch<'a>(&'a self, given: &'a Given, caller: &'a str) -> LaunchFuture<'a> {
         Box::pin(async move {
-            self.0
-                .asked
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push((
-                    given.record.id.clone(),
-                    given.record.machine.clone(),
-                    caller.to_owned(),
-                ));
-            let plan = self
-                .0
-                .plan
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .clone();
+            self.0.asked.lock().expect("fixture lock poisoned").push((
+                given.record.id.clone(),
+                given.record.machine.clone(),
+                caller.to_owned(),
+            ));
+            let plan = self.0.plan.lock().expect("fixture lock poisoned").clone();
             match plan {
                 Plan::NoRunner => None,
                 Plan::Ran(member) => Some(Ok(member)),
@@ -253,11 +244,7 @@ impl Served {
 
     /// Start the agent under `plan`, answering the status and the answer.
     async fn start_under(&self, plan: Plan) -> Result<(u16, Value), Box<dyn Error>> {
-        *self
-            .planned
-            .plan
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = plan;
+        *self.planned.plan.lock().expect("fixture lock poisoned") = plan;
         let answer = self
             .client
             .post(format!("{}/agents/{AGENT}/start", self.base))
@@ -277,7 +264,7 @@ impl Served {
         self.planned
             .asked
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .expect("fixture lock poisoned")
             .clone()
     }
 }

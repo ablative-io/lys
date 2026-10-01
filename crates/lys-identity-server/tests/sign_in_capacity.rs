@@ -20,7 +20,7 @@ async fn abandoned_provider_flows_are_bounded_per_address_and_leave_other_client
         },
         password: "Correct-Person-Password1".to_owned(),
         second_factor: false,
-    });
+    })?;
     let oidc = Oidc::discover(&config).await?;
     let issuer = IssuerSignIn::configured(&config)?;
     let noisy: IpAddr = "192.0.2.10".parse()?;
@@ -59,7 +59,7 @@ async fn a_full_provider_pool_cannot_refuse_a_password_sign_in() -> Result<(), B
         },
         password: "Correct-Person-Password1".into(),
         second_factor: false,
-    });
+    })?;
     let oidc = Oidc::discover(&config).await?;
     let issuer = IssuerSignIn::configured(&config)?;
     for address in 0..64u8 {

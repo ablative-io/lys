@@ -437,7 +437,7 @@ mod tests {
             )?);
             let mut store = McpRequestStore::over(harness.leaves(), Arc::clone(&key))?;
             let asked = request()?;
-            harness.fail(fault);
+            harness.fail(fault)?;
             let answer = store.ask(asked.clone());
             match fault {
                 Fault::BeforeLeaf => {
@@ -456,7 +456,7 @@ mod tests {
                         store.listed(&asked.agent),
                         Err(ServerError::McpRequestsUnavailable { .. })
                     ));
-                    harness.fail(Fault::None);
+                    harness.fail(Fault::None)?;
                 }
                 Fault::LeafStoredWriteFailed | Fault::AfterLeaf => assert_eq!(answer?, asked),
                 Fault::None => return Err("the case must inject an append fault".into()),
