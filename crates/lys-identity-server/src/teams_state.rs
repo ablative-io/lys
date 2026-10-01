@@ -220,6 +220,14 @@ pub struct Held {
 struct Index {
     positions: HashMap<String, usize>,
     children: HashMap<String, BTreeSet<String>>,
+    operations: HashMap<String, Operation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Operation {
+    Created(usize),
+    Change(usize, usize),
+    Checked,
 }
 
 #[derive(Deserialize)]
@@ -238,6 +246,23 @@ impl From<Records> for Held {
                 .positions
                 .entry(team.created.id.clone())
                 .or_insert(position);
+            let created = team
+                .changes
+                .iter()
+                .position(|line| matches!(line, Line::CreatedV1(_)))
+                .map_or(Operation::Created(position), |change| {
+                    Operation::Change(position, change)
+                });
+            index
+                .operations
+                .entry(team.created.id.clone())
+                .or_insert(created);
+            for (change, line) in team.changes.iter().enumerate() {
+                index
+                    .operations
+                    .entry(line.operation().to_owned())
+                    .or_insert(Operation::Change(position, change));
+            }
             if let Some(parent) = &team.parent {
                 index
                     .children
@@ -245,6 +270,12 @@ impl From<Records> for Held {
                     .or_default()
                     .insert(team.created.id.clone());
             }
+        }
+        if let Some(checked) = &records.checked {
+            index
+                .operations
+                .entry(checked.operation.clone())
+                .or_insert(Operation::Checked);
         }
         Self {
             teams: records.teams,
@@ -328,36 +359,19 @@ impl Held {
 
     /// The line kept under `operation`, whichever kind it is.
     pub fn operation(&self, operation: &str) -> Option<Line> {
-        self.teams
-            .iter()
-            .find_map(|team| {
-                #[cfg(test)]
-                crate::folded_work::visit(crate::folded_work::Work::TeamOperation);
-                if team.created.id == operation {
-                    return Some(
-                        team.changes
-                            .iter()
-                            .find(|line| matches!(line, Line::CreatedV1(_)))
-                            .cloned()
-                            .unwrap_or_else(|| Line::Created(team.created.clone())),
-                    );
-                }
-                team.changes
-                    .iter()
-                    .find(|line| {
-                        #[cfg(test)]
-                        crate::folded_work::visit(crate::folded_work::Work::TeamOperation);
-                        line.operation() == operation
-                    })
-                    .cloned()
-            })
-            .or_else(|| {
-                self.checked
-                    .as_ref()
-                    .filter(|checked| checked.operation == operation)
-                    .cloned()
-                    .map(Line::Checked)
-            })
+        let operation = self.index.operations.get(operation)?;
+        #[cfg(test)]
+        crate::folded_work::visit(crate::folded_work::Work::TeamOperation);
+        match *operation {
+            Operation::Created(position) => self
+                .teams
+                .get(position)
+                .map(|team| Line::Created(team.created.clone())),
+            Operation::Change(position, change) => {
+                self.teams.get(position)?.changes.get(change).cloned()
+            }
+            Operation::Checked => self.checked.clone().map(Line::Checked),
+        }
     }
 
     /// Whether `line` may be kept on the teams as they stand, by reason.
@@ -409,7 +423,7 @@ impl Held {
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
-        if self.operation(line.operation()).is_some() {
+        if self.index.operations.contains_key(line.operation()) {
             return Err(format!(
                 "operation `{}` already names a line",
                 line.operation()
@@ -424,6 +438,9 @@ impl Held {
         })?;
         match line {
             Line::Created(created) => {
+                Arc::make_mut(&mut self.index)
+                    .operations
+                    .insert(created.id.clone(), Operation::Created(self.teams.len()));
                 Arc::make_mut(&mut self.index)
                     .positions
                     .insert(created.id.clone(), self.teams.len());
@@ -440,6 +457,10 @@ impl Held {
             }
             Line::CreatedV1(created) => {
                 let index = Arc::make_mut(&mut self.index);
+                index.operations.insert(
+                    created.created.id.clone(),
+                    Operation::Change(self.teams.len(), 0),
+                );
                 index
                     .positions
                     .insert(created.created.id.clone(), self.teams.len());
@@ -462,6 +483,9 @@ impl Held {
                 return Ok(());
             }
             Line::Checked(checked) => {
+                Arc::make_mut(&mut self.index)
+                    .operations
+                    .insert(checked.operation.clone(), Operation::Checked);
                 self.checked = Some(checked);
                 return Ok(());
             }
@@ -512,6 +536,10 @@ impl Held {
             }
             Line::Created(_) | Line::CreatedV1(_) | Line::Checked(_) => {}
         }
+        Arc::make_mut(&mut self.index).operations.insert(
+            line.operation().to_owned(),
+            Operation::Change(position, team.changes.len()),
+        );
         team.changes.push(line);
         Ok(())
     }
