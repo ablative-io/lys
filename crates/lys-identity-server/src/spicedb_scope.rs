@@ -16,12 +16,12 @@
 //! asks under the grants' lock), and never while the service writes its own.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use lys_identity::grants::GrantError;
 use serde_json::{Value, json};
 
-use super::{SpiceDb, SpiceDbSettings, unavailable};
+use super::{SpiceDb, SpiceDbConnection, unavailable};
 use crate::spicedb_http::post_json;
 
 /// The prefix every scratch name is held under.
@@ -263,16 +263,16 @@ impl SpiceDb {
         }
     }
 
-    /// Remove the scratch scope `scope` from the engine `settings` names:
+    /// Remove the scratch scope `scope` from the engine `connection` names:
     /// every relationship of every definition it holds, then its names.
     pub(crate) fn remove_scratch(
-        settings: &SpiceDbSettings,
+        connection: &SpiceDbConnection,
         scope: &str,
     ) -> Result<(), GrantError> {
         let engine = Self {
-            endpoint: settings.endpoint.clone(),
-            key: Self::key(settings)?,
-            mirror: settings.mirror.clone(),
+            endpoint: connection.endpoint.clone(),
+            key: Arc::clone(&connection.key),
+            mirror: connection.mirror.clone(),
             relations: BTreeMap::new(),
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: Some(scope.to_owned()),
@@ -304,13 +304,13 @@ impl SpiceDb {
         )))
     }
 
-    /// Remove every scratch scope the engine `settings` names holds,
+    /// Remove every scratch scope the engine `connection` names holds,
     /// answering how many were removed: none outlives the process that made it.
-    pub(crate) fn clear_scratch(settings: &SpiceDbSettings) -> Result<usize, GrantError> {
+    pub(crate) fn clear_scratch(connection: &SpiceDbConnection) -> Result<usize, GrantError> {
         let engine = Self {
-            endpoint: settings.endpoint.clone(),
-            key: Self::key(settings)?,
-            mirror: settings.mirror.clone(),
+            endpoint: connection.endpoint.clone(),
+            key: Arc::clone(&connection.key),
+            mirror: connection.mirror.clone(),
             relations: BTreeMap::new(),
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: None,
@@ -324,7 +324,7 @@ impl SpiceDb {
             })
             .collect();
         for scope in &scopes {
-            Self::remove_scratch(settings, scope)?;
+            Self::remove_scratch(connection, scope)?;
         }
         Ok(scopes.len())
     }

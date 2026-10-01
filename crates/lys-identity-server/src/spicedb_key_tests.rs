@@ -1,6 +1,6 @@
 //! Engine scopes share the credential loaded before serving requests.
 
-use super::{Model, SpiceDb, SpiceDbSettings};
+use super::{Model, SpiceDb, SpiceDbConnection, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
 use std::io::{Read, Write};
@@ -98,13 +98,14 @@ fn scratch_open_and_cleanup_reuse_the_key_after_its_file_disappears() -> Result<
             mirror: "fixture".to_owned(),
         };
         let model = model()?;
-        let engine = SpiceDb::open(&settings, &model)?;
+        let connection = SpiceDbConnection::load(&settings)?;
+        let engine = SpiceDb::open_connected(&connection, &model)?;
         std::fs::remove_file(&key_file)?;
-        let scratch = SpiceDb::open_scratch(&settings, &model, "lys/bench_one")?;
+        let scratch = SpiceDb::open_scratch(&connection, &model, "lys/bench_one")?;
         scratch.kinds()?;
-        SpiceDb::remove_scratch(&settings, "lys/bench_one")?;
-        SpiceDb::open_scratch(&settings, &model, "lys/bench_two")?;
-        if SpiceDb::clear_scratch(&settings)? != 1 {
+        SpiceDb::remove_scratch(&connection, "lys/bench_one")?;
+        SpiceDb::open_scratch(&connection, &model, "lys/bench_two")?;
+        if SpiceDb::clear_scratch(&connection)? != 1 {
             return Err("expected one scratch scope".into());
         }
         engine.kinds()?;
@@ -118,5 +119,42 @@ fn scratch_open_and_cleanup_reuse_the_key_after_its_file_disappears() -> Result<
     stopped?;
     result?;
     assert!(calls > 3);
+    Ok(())
+}
+
+#[test]
+fn explicit_reload_replaces_the_key_without_changing_existing_connections()
+-> Result<(), Box<dyn Error>> {
+    let temporary = tempfile::tempdir()?;
+    let settings = SpiceDbSettings {
+        endpoint: "127.0.0.1:1".to_owned(),
+        key_file: temporary.path().join("key"),
+        mirror: "fixture".to_owned(),
+    };
+    std::fs::write(
+        &settings.key_file,
+        "SPICEDB_GRPC_PRESHARED_KEY=first-fixture\n",
+    )?;
+    let original = SpiceDbConnection::load(&settings)?;
+    let shared = original.clone();
+    assert!(std::sync::Arc::ptr_eq(&original.key, &shared.key));
+    assert!(!format!("{original:?}").contains("first-fixture"));
+    std::fs::write(&settings.key_file, "second-fixture\n")?;
+    let reloaded = SpiceDbConnection::load(&settings)?;
+    assert_eq!(original.key.as_ref(), "first-fixture");
+    assert_eq!(reloaded.key.as_ref(), "second-fixture");
+    assert!(!format!("{reloaded:?}").contains("second-fixture"));
+    std::fs::write(&settings.key_file, " \n")?;
+    assert!(matches!(
+        SpiceDbConnection::load(&settings),
+        Err(lys_identity::grants::GrantError::PermissionEngineUnavailable { reason })
+            if reason.contains("key file is empty")
+    ));
+    std::fs::remove_file(&settings.key_file)?;
+    assert!(matches!(
+        SpiceDbConnection::load(&settings),
+        Err(lys_identity::grants::GrantError::PermissionEngineUnavailable { reason })
+            if reason.contains("key file") && reason.contains("could not be read")
+    ));
     Ok(())
 }

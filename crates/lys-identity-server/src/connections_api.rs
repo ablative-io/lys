@@ -68,7 +68,7 @@ async fn connections(
         .map(|settings| {
             // The gateway contract takes host:port, not a URL or a credential.
             origin(
-                &format!("http://{}", settings.endpoint),
+                &format!("http://{}", settings.endpoint()),
                 "permission engine",
             )
         })
