@@ -101,6 +101,7 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         return Err(ServerError::AgentNotVisible);
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
+    let sessions = crate::runtime_api::session_agents(state)?;
     let mut targets = BTreeMap::new();
     for standing in &standings {
         let live = if state.runtime.is_some() {
@@ -126,7 +127,14 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         if store.held().charged.contains(&usage.event) {
             return Ok(());
         }
-        let crossed = crossings(store.held(), &usage, &standings, &targets, &zone)?;
+        let crossed = crossings(
+            store.held(),
+            &usage,
+            &standings,
+            &targets,
+            &zone,
+            sessions.as_deref(),
+        )?;
         store.charge(Usage { crossed, ..usage })?;
         Ok(())
     })?;
@@ -139,6 +147,7 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
+    sessions: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<Vec<Crossing>, ServerError> {
     let mut crossed = Vec::new();
     for collection in &held.limit_sets {
@@ -152,7 +161,7 @@ fn crossings(
                 figure,
                 since,
                 account,
-            }) = levels(held, usage, limit, &agents, zone)?
+            }) = levels(held, usage, limit, &agents, zone, sessions)?
             else {
                 continue;
             };
@@ -231,6 +240,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
+    let sessions = crate::runtime_api::session_agents(state)?;
     with_budgets(state, |store| {
         for collection in &store.held().limit_sets {
             let agents = crate::budgets_members::covered(&collection.holder, &standings);
@@ -241,16 +251,30 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                 if limit.act != Act::Stop || limit.period.is_none() {
                     continue;
                 }
-                let used =
-                    crate::budgets_usage::figure(store.held(), &limit, &agents, &zone, at_ms, None)
-                        .map_err(unavailable)?;
-                let figure = used.figure.ok_or_else(|| {
-                    unavailable(
-                        used.unavailable
-                            .as_deref()
-                            .unwrap_or("a periodic Stop limit has no figure and no source reason"),
-                    )
-                })?;
+                let used = crate::budgets_usage::figure_with_sessions(
+                    store.held(),
+                    &limit,
+                    &agents,
+                    &zone,
+                    at_ms,
+                    None,
+                    sessions.as_deref(),
+                )
+                .map_err(unavailable)?;
+                let figure = match used.figure {
+                    Some(figure) => figure,
+                    // Running is needed to observe the next window after its recorded reset.
+                    None if limit.unit == Measure::PlanPercent
+                        && used.since_ms.is_some_and(|boundary| boundary <= at_ms) =>
+                    {
+                        0.into()
+                    }
+                    None => {
+                        return Err(unavailable(used.unavailable.as_deref().unwrap_or(
+                            "a periodic Stop limit has no figure and no source reason",
+                        )));
+                    }
+                };
                 if reached(limit.unit, &figure, &limit.amount).map_err(unavailable)? {
                     let reset = if limit.unit == Measure::PlanPercent {
                         used.since_ms.and_then(|start| {
@@ -327,6 +351,7 @@ fn levels(
     limit: &Limit,
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
+    sessions: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<Option<Levels>, ServerError> {
     if limit.unit == Measure::ContextPercent {
         let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
@@ -344,10 +369,26 @@ fn levels(
             account: None,
         }));
     }
-    let before = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, None)
-        .map_err(unavailable)?;
-    let after = crate::budgets_usage::figure(held, limit, agents, zone, usage.at_ms, Some(usage))
-        .map_err(unavailable)?;
+    let before = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        None,
+        sessions,
+    )
+    .map_err(unavailable)?;
+    let after = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        Some(usage),
+        sessions,
+    )
+    .map_err(unavailable)?;
     let Some(figure) = after.figure else {
         return Ok(None);
     };

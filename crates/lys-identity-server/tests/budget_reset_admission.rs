@@ -12,6 +12,8 @@ use lys_identity_server::budgets_state::{
 };
 use lys_identity_server::budgets_store::BudgetStore;
 use lys_identity_server::dev_seed::seed_configured;
+use lys_identity_server::runtime_state::{Report, Reported};
+use lys_identity_server::runtime_store::RuntimeStore;
 use lys_runner::tracking::{Figures, Unavailable};
 use lys_runner::tracking_budget::{PlanWindow, cost_delta};
 use lys_runner::tracking_store::SourceState;
@@ -31,10 +33,39 @@ impl Table {
     }
 
     async fn with_measure(measure: Measure, uses: Vec<Usage>) -> TestResult<Self> {
+        Self::with_history(measure, uses, false).await
+    }
+
+    async fn with_history(
+        measure: Measure,
+        uses: Vec<Usage>,
+        has_session: bool,
+    ) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
             let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
             let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+            if has_session {
+                let mut runtime = RuntimeStore::open(
+                    config
+                        .runtime_dir
+                        .as_deref()
+                        .ok_or("no runtime directory")?,
+                    Arc::clone(&key),
+                )?;
+                runtime.report(Report {
+                    operation: OperationId::generate()?.to_string(),
+                    session: OperationId::generate()?.to_string(),
+                    agent: Some(agent.clone()),
+                    machine: OperationId::generate()?.to_string(),
+                    state: Reported::Starting,
+                    what: "tracked session".to_owned(),
+                    confirmation: String::new(),
+                    reported_by: seed.people[0].id.to_string(),
+                    at: 1,
+                    launch: None,
+                })?;
+            }
             let mut store = BudgetStore::open(
                 config
                     .budgets_dir
@@ -311,16 +342,17 @@ async fn a_recorded_plan_reset_admits_both_starts_and_names_the_fresh_window() -
 
 #[tokio::test]
 async fn an_unreported_plan_stop_refuses_both_starts_with_the_source_reason() -> TestResult {
-    let table = Table::with_measure(Measure::PlanPercent, Vec::new()).await?;
+    let table = Table::with_history(Measure::PlanPercent, Vec::new(), true).await?;
     let used = table.figure_in("plan_percent").await?;
     let reason = format!("plan window unreported for agent {}", table.agent);
+    let refusal = format!("BudgetsUnavailable: {reason}");
     assert_eq!(used["figure"], Value::Null, "{used}");
     assert_eq!(used["unavailable"], reason, "{used}");
     for route in ["start-command", "start"] {
         let (status, answer) = table.start(route).await?;
         assert_eq!(status, 503, "{route}: {answer}");
         assert_eq!(answer["refusal"], "BudgetsUnavailable", "{route}: {answer}");
-        assert_eq!(answer["reason"], reason, "{route}: {answer}");
+        assert_eq!(answer["reason"], refusal, "{route}: {answer}");
     }
     Ok(())
 }

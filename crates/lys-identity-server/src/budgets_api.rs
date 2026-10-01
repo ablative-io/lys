@@ -317,6 +317,7 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
+    let sessions = crate::runtime_api::session_agents(state)?;
     let held = with_budgets(state, |store| Ok(store.held().clone()))?;
     let at_ms = jiff::Timestamp::now().as_millisecond();
     let collection = held.limit_set(holder);
@@ -325,8 +326,16 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
     let used = effective
         .iter()
         .map(|limit| {
-            crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
+            crate::budgets_usage::figure_with_sessions(
+                &held,
+                limit,
+                &agents,
+                &zone,
+                at_ms,
+                None,
+                sessions.as_deref(),
+            )
+            .map_err(|reason| ServerError::Budget(BudgetError::BudgetsUnavailable { reason }))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
@@ -362,10 +371,18 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                 let used = limits
                     .iter()
                     .map(|limit| {
-                        crate::budgets_usage::figure(&held, limit, &agents, &zone, at_ms, None)
-                            .map_err(|reason| {
-                                ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
-                            })
+                        crate::budgets_usage::figure_with_sessions(
+                            &held,
+                            limit,
+                            &agents,
+                            &zone,
+                            at_ms,
+                            None,
+                            sessions.as_deref(),
+                        )
+                        .map_err(|reason| {
+                            ServerError::Budget(BudgetError::BudgetsUnavailable { reason })
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {

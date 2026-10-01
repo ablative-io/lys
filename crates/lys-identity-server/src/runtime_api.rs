@@ -16,7 +16,7 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -138,6 +138,16 @@ pub(crate) fn with_runtime<T>(
     let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
     store.settle()?;
     act(&mut store)
+}
+
+/// Lifetime session knowledge; absent when no runtime history is configured.
+pub(crate) fn session_agents(
+    state: &AppState,
+) -> Result<Option<Arc<BTreeSet<String>>>, ServerError> {
+    if state.runtime.is_none() {
+        return Ok(None);
+    }
+    with_runtime(state, RuntimeStore::agents_with_sessions).map(Some)
 }
 
 /// When a runtime last reported a session on each machine, by machine id;

@@ -17,6 +17,7 @@
 //! snapshot and only the leaves after it. A snapshot refused, or a state that
 //! does not read back, sends the start to every leaf, by name, never silently.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -45,6 +46,7 @@ pub struct RuntimeStore<S: LeafStore = FileLeafStore> {
     key: Arc<Ed25519Identity>,
     log: FrontierLog<S>,
     held: Held,
+    agents_with_sessions: Arc<BTreeSet<String>>,
     start: Start,
     since_snapshot: u64,
     snapshot_failure: Option<String>,
@@ -93,11 +95,13 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
+        let agents_with_sessions = session_agents(&held);
         let mut store = Self {
             reopen,
             key,
             log,
             held,
+            agents_with_sessions,
             start: start.clone(),
             since_snapshot: 0,
             snapshot_failure: None,
@@ -152,6 +156,7 @@ impl<S: LeafStore> RuntimeStore<S> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
+            self.agents_with_sessions = session_agents(&held);
             self.held = held;
             self.start = start.clone();
             self.uncertain = false;
@@ -166,9 +171,17 @@ impl<S: LeafStore> RuntimeStore<S> {
         let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
+            let new_agent = report
+                .agent
+                .as_ref()
+                .filter(|agent| !self.agents_with_sessions.contains(*agent))
+                .cloned();
             if let Err(reason) = self.held.hold(report) {
                 self.uncertain = true;
                 return Err(unavailable(reason));
+            }
+            if let Some(agent) = new_agent {
+                Arc::make_mut(&mut self.agents_with_sessions).insert(agent);
             }
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
@@ -190,6 +203,12 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// Every session, in the order first reported.
     pub fn sessions(&self) -> &[Tracked] {
         &self.held.sessions
+    }
+
+    /// Agents with a durably recorded session, shared without copying their history.
+    pub fn agents_with_sessions(&mut self) -> Result<Arc<BTreeSet<String>>, ServerError> {
+        self.settle()?;
+        Ok(Arc::clone(&self.agents_with_sessions))
     }
 
     /// The session named `session`.
@@ -255,6 +274,15 @@ impl<S: LeafStore> RuntimeStore<S> {
             .cloned()
             .ok_or(ServerError::RuntimeSessionUnknown)
     }
+}
+
+fn session_agents(held: &Held) -> Arc<BTreeSet<String>> {
+    Arc::new(
+        held.sessions
+            .iter()
+            .filter_map(|tracked| tracked.agent.clone())
+            .collect(),
+    )
 }
 
 /// Open the log from its snapshot, or from every leaf when the snapshot or
