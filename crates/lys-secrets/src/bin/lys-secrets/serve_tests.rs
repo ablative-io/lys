@@ -266,3 +266,87 @@ async fn a_hundred_proxied_requests_read_routes_json_no_time_after_start() -> Te
     served.dir.close()?;
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn signing_rpc_returns_only_cose_and_names_a_revoked_lease() -> TestResult {
+    let gate = Arc::new(Gate::default());
+    gate.release();
+    let served = served(gate)?;
+    let issued = {
+        let mut broker = served.shared.broker.lock().expect("fixture broker");
+        broker.seal_once(
+            "signing",
+            lys_secrets::EntryClass::Key,
+            PERSON,
+            &Secret::from_slice(&[9; 32]),
+        )?;
+        FileGrants::new(served.shared.layout.grants()).set(
+            Relation::Use,
+            HOLDER,
+            "signing",
+            Some(PERSON),
+        )?;
+        broker.issue(
+            &Holder {
+                identity: HOLDER.to_owned(),
+                key: served.agent.public_key_bytes(),
+            },
+            "signing",
+            2,
+            now_ms() + 600_000,
+        )?
+    };
+    let payload = b"exact payload";
+    let request = || -> TestResult<Request> {
+        let presentation = Presentation::sign(
+            &issued.id,
+            &new_operation_id()?,
+            now_ms(),
+            request_digest("SIGN", "signing", payload)?,
+            &served.agent,
+        )?;
+        let [id, operation, time, signature] = presentation.to_wire();
+        Ok(axum::http::Request::builder()
+            .method("POST")
+            .uri("/_lys/sign/signing")
+            .header("lys-handle", to_hex(issued.token.expose()))
+            .header("lys-handle-id", id)
+            .header("lys-operation", operation)
+            .header("lys-signed-at", time)
+            .header("lys-presentation", signature)
+            .body(Body::from(payload.to_vec()))?)
+    };
+    let response = crate::signing::sign(
+        State(Arc::clone(&served.shared)),
+        axum::extract::Path("signing".to_owned()),
+        request()?,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 1024).await?;
+    let seed = zeroize::Zeroizing::new([9; 32]);
+    let key = Ed25519Identity::from_seed(&seed);
+    lys_core::attestation::verify_attestation_bytes_by_signer(
+        &bytes,
+        payload,
+        &key.public_key_bytes(),
+    )?;
+    assert!(!bytes.windows(32).any(|window| window == seed.as_slice()));
+    served
+        .shared
+        .broker
+        .lock()
+        .expect("fixture broker")
+        .drop_handle(&issued.id)?;
+    let response = crate::signing::sign(
+        State(Arc::clone(&served.shared)),
+        axum::extract::Path("signing".to_owned()),
+        request()?,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let bytes = axum::body::to_bytes(response.into_body(), 1024).await?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    assert_eq!(value["refusal"], "HandleDropped");
+    Ok(())
+}

@@ -26,6 +26,7 @@
 //! The bridge is a process of its own, so a server that cannot be reached
 //! ends the bridge, by name, and never the runner or a session it holds.
 
+pub mod agent;
 mod dispatch;
 mod transport;
 
