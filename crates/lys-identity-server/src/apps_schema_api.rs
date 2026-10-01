@@ -27,7 +27,9 @@ use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::OperationId;
-use lys_identity::grants::{AppSchema, Resource, Standing as Held, diff, owner_of, stranded};
+use lys_identity::grants::{
+    AppSchema, GrantBook, Resource, Standing as Held, diff, owner_of, stranded,
+};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -38,7 +40,7 @@ use crate::apps_state::{Applied, By, Decided, Line, Placed, Proposed, Standing};
 use crate::apps_store::AppStore;
 use crate::apps_views::{AppView, DiffView, SchemaChanged, SchemaCheck, SchemaVersionView};
 use crate::error::ServerError;
-use crate::grants::{Judged, with_grants};
+use crate::grants::with_grants;
 use crate::routes::AppState;
 use crate::session::now;
 use crate::spicedb::Relationships;
@@ -139,11 +141,9 @@ fn current(apps: &AppStore, id: &str) -> Result<(AppSchema, u64), ServerError> {
 
 /// Each relation changing `old` to `new` would strand, with its count of
 /// standing grants: not revoked and not ended at `at`.
-fn strands(judged: &Judged<'_>, old: &AppSchema, new: &AppSchema, at: u64) -> Vec<Strand> {
-    let standing = judged
-        .grants
-        .book()
-        .records()
+fn strands(book: &GrantBook, old: &AppSchema, new: &AppSchema, at: u64) -> Vec<Strand> {
+    let standing = book
+        .in_app(old.app())
         .filter(|record| record.revoked().is_none())
         .map(lys_identity::grants::GrantRecord::grant)
         .filter(|grant| grant.window().ends_at().is_none_or(|end| end > at))
@@ -174,7 +174,7 @@ async fn check(
         may_change(&who, &id)?;
         let (old, version) = current(judged.apps, &id)?;
         let new = AppSchema::parse(&id, &body.schema).map_err(AppError::from)?;
-        let stranded = strands(&judged, &old, &new, now());
+        let stranded = strands(judged.grants.book(), &old, &new, now());
         let moved = body.replaces.is_some_and(|replaces| replaces != version);
         Ok(Json(SchemaCheck {
             app: id.clone(),
@@ -210,7 +210,7 @@ async fn change(
             .into());
         }
         let new = AppSchema::parse(&id, &body.schema).map_err(AppError::from)?;
-        let stranded = strands(&judged, &old, &new, now());
+        let stranded = strands(judged.grants.book(), &old, &new, now());
         if !stranded.is_empty() {
             return Err(AppError::SchemaChangeStrandsGrants { stranded }.into());
         }
@@ -300,7 +300,7 @@ async fn approve(
             .and_then(|app| app.pending.clone())
             .ok_or_else(|| AppError::AppDecided { app: id.clone() })?;
         let new = AppSchema::parse(&id, &pending.schema).map_err(AppError::from)?;
-        let stranded = strands(&judged, &old, &new, now());
+        let stranded = strands(judged.grants.book(), &old, &new, now());
         if !stranded.is_empty() {
             return Err(AppError::SchemaChangeStrandsGrants { stranded }.into());
         }
@@ -451,3 +451,7 @@ async fn place(
     })
     .map(Json)
 }
+
+#[cfg(test)]
+#[path = "apps_schema_index_tests.rs"]
+mod index_tests;
