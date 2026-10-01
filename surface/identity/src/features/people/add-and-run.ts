@@ -2,8 +2,11 @@ import { operationId, Refused, request } from '../../api';
 import type { Login } from '../../generated';
 import { agentRequestOf, addAgent } from './add-agent-request';
 import type { PendingAgent } from './add-agent-request';
-import { isRecord, pendingMachineOf, readableMachine, strings } from '../network/contract';
-import type { NetworkView, PendingMachine } from '../network/contract';
+import { confirmRunner, isRecord, pendingMachineOf, readableMachine, strings } from '../network/contract';
+import type { Machine, NetworkView, PendingMachine } from '../network/contract';
+import { confirmAdmission } from '../network/machine-admission';
+import type { MachineAdmission } from '../network/machine-admission';
+import type { AddAndRunCapability } from './registration-capability';
 import { recordComputer, validComputerName } from '../network/AddMachine';
 import { pendingStartOf, profileRequest, startRequest } from '../runtime/StartAgent';
 import type { Pending } from '../runtime/StartAgent';
@@ -11,9 +14,14 @@ import { readChoices } from '../provisioning/choices';
 import type { Choices } from '../provisioning/choices';
 import type { HarnessDescription, ProvisioningProfile } from '../provisioning/Provisioning';
 
+type Placement = { kind: 'new'; machine: PendingMachine } | { kind: 'existing'; computer: Machine; admission: MachineAdmission | null };
 export interface AddAndRun {
-  version: 1; person: string; registration: PendingAgent; settings: Record<string, unknown>;
-  step: 'registration' | 'profile' | 'review' | 'computer' | 'start'; machine: PendingMachine; pending: Pending | null;
+  version: 2; person: string; registration: PendingAgent; settings: Record<string, unknown>;
+  step: 'registration' | 'profile' | 'review' | 'computer' | 'admission' | 'start'; placement: Placement; pending: Pending | null;
+}
+const operation = /^op-[0-9a-f]{32}$/;
+export function placementComputer(placement: Placement): { id: string; name: string } {
+  return placement.kind === 'new' ? { id: placement.machine.body.operation, name: placement.machine.body.name } : placement.computer;
 }
 const unreadable = (): never => { throw new Refused(0, { refusal: 'PendingAddAndRunUnreadable', reason: 'The retained add-and-run request cannot be read. Resolve its original outcome before starting another.' }); };
 function description(value: unknown): value is HarnessDescription {
@@ -37,42 +45,74 @@ export function profileFromSettings(value: Record<string, unknown>): Provisionin
     model_access: value.model_access, permissions: { default_mode: permissions.default_mode }, tools: [], skills: [], mcp_servers: [],
     instructions: value.instructions, instructions_mode: value.instructions_mode ?? (value.instructions ? 'append' : 'keep'), note: value.note, set_by: '', set_at: 0, session: null };
 }
+function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun['step']): Placement {
+  if (!isRecord(value)) return unreadable();
+  if (value.kind === 'new') {
+    if (!isRecord(value.machine) || 'computer' in value || 'admission' in value || step === 'admission') return unreadable();
+    const machine = pendingMachineOf({ ...value.machine, version: 1 });
+    if (!machine || machine.legacy || !validComputerName(machine.body.name) || machine.body.kind !== 'Computer' || machine.body.runtime !== 'lys-runner'
+      || machine.body.slots !== 0 || machine.body.may_reach.length || (machine.body.may_run_roles ?? []).length) return unreadable();
+    if (step === 'registration' ? machine.phase !== 'machine' || machine.body.may_run.length
+      : machine.body.may_run.length !== 1 || machine.body.may_run[0] !== registration.agent) return unreadable();
+    if (step === 'start' && (machine.phase !== 'runner' || !machine.machine)) return unreadable();
+    return { kind: 'new', machine };
+  }
+  if (value.kind !== 'existing' || 'machine' in value || step === 'computer' || !readableMachine(value.computer)
+    || !operation.test(value.computer.id) || value.computer.kind !== 'Computer' || value.computer.state !== 'in_use' || value.computer.runtime !== 'lys-runner') return unreadable();
+  const admission = value.admission;
+  if (step === 'admission' || step === 'start') {
+    if (!isRecord(admission) || typeof admission.operation !== 'string' || !operation.test(admission.operation)
+      || admission.agent !== registration.agent || admission.allow !== true || !registration.agent) return unreadable();
+    return { kind: 'existing', computer: value.computer, admission: { operation: admission.operation, agent: registration.agent, allow: true } };
+  }
+  if (admission !== null) return unreadable();
+  return { kind: 'existing', computer: value.computer, admission: null };
+}
+function addAndRunOf(value: unknown, person: string): AddAndRun {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2) || value.person !== person || !isRecord(value.settings)
+    || !['registration', 'profile', 'review', 'computer', 'admission', 'start'].includes(String(value.step))) return unreadable();
+  const registration = agentRequestOf(value.registration); profileFromSettings(value.settings);
+  const step = value.step as AddAndRun['step'];
+  if (value.version === 1 && (step === 'admission' || 'placement' in value)) return unreadable();
+  if (value.version === 2 && 'machine' in value) return unreadable();
+  const placement = placementOf(value.version === 1 ? { kind: 'new', machine: value.machine } : value.placement, registration, step);
+  if (step === 'registration') {
+    if (value.pending !== null) return unreadable();
+    return { version: 2, person, registration, settings: value.settings, step, placement, pending: null };
+  }
+  if (!registration.agent || !registration.activated) return unreadable();
+  const prefix = '/agents/' + encodeURIComponent(registration.agent);
+  const pending = pendingStartOf(value.pending, 'lys.pending.agent-start.' + person + '.' + registration.agent, prefix);
+  const expected = step === 'computer' || step === 'admission' ? 'start' : step;
+  if (pending.stage !== expected || pending.machine !== placementComputer(placement).id || pending.legacyKey !== undefined
+    || placement.kind === 'existing' && placement.admission?.operation === pending.body.operation) return unreadable();
+  return { version: 2, person, registration, settings: value.settings, step, placement, pending };
+}
 export function readAddAndRun(key: string, person: string): AddAndRun | null {
   const raw = sessionStorage.getItem(key);
   if (raw === null) return null;
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (!isRecord(value) || value.version !== 1 || value.person !== person || !isRecord(value.settings)
-      || !['registration', 'profile', 'review', 'computer', 'start'].includes(String(value.step))) return unreadable();
-    const registration = agentRequestOf(value.registration); profileFromSettings(value.settings);
-    if (!isRecord(value.machine)) return unreadable();
-    const machine = pendingMachineOf({ version: 1, ...value.machine });
-    if (!machine || machine.legacy || !validComputerName(machine.body.name) || machine.body.kind !== 'Computer' || machine.body.runtime !== 'lys-runner'
-      || machine.body.slots !== 0 || machine.body.may_reach.length || (machine.body.may_run_roles ?? []).length) return unreadable();
-    if (value.step === 'registration') {
-      if (value.pending !== null || machine.phase !== 'machine' || machine.body.may_run.length) return unreadable();
-      return { version: 1, person, registration, settings: value.settings, step: 'registration', machine, pending: null };
-    }
-    if (!registration.agent || !registration.activated || machine.body.may_run.length !== 1 || machine.body.may_run[0] !== registration.agent) return unreadable();
-    const prefix = '/agents/' + encodeURIComponent(registration.agent);
-    const pending = pendingStartOf(value.pending, 'lys.pending.agent-start.' + person + '.' + registration.agent, prefix);
-    if (value.step === 'start' && (machine.phase !== 'runner' || !machine.machine)) return unreadable();
-    const expected = value.step === 'computer' ? 'start' : value.step;
-    if (pending.stage !== expected || pending.machine !== machine.body.operation || pending.legacyKey !== undefined) return unreadable();
-    return { version: 1, person, registration, settings: value.settings, step: value.step as AddAndRun['step'], machine, pending };
-  } catch { return unreadable(); }
+  let value: unknown; let current: AddAndRun;
+  try { value = JSON.parse(raw); current = addAndRunOf(value, person); }
+  catch { return unreadable(); }
+  if (isRecord(value) && value.version === 1) {
+    try { sessionStorage.setItem(key, JSON.stringify(current)); }
+    catch { throw new Refused(0, { refusal: 'PendingAddAndRunMigrationFailed', reason: 'The earlier request could not be saved in the current format. No request has been sent; its original record is kept.' }); }
+  }
+  return current;
 }
-export function newAddAndRun(registration: PendingAgent, settings: Record<string, unknown>, name: string, person: string): AddAndRun {
+export function newAddAndRun(registration: PendingAgent, settings: Record<string, unknown>, name: string, person: string, computer?: Machine): AddAndRun {
   profileFromSettings(settings);
-  if (!validComputerName(name)) return unreadable();
-  return { version: 1, person, registration, settings, step: 'registration', pending: null,
-    machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null } };
+  const placement: Placement = computer ? placementOf({ kind: 'existing', computer, admission: null }, registration, 'registration')
+    : { kind: 'new', machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', legacy: false, machine: null } };
+  if (placement.kind === 'new' && !validComputerName(name)) return unreadable();
+  return { version: 2, person, registration, settings, step: 'registration', pending: null, placement };
 }
 export function addAndRunStep(current: AddAndRun): string {
   if (current.step === 'registration') return current.registration.activated ? 'joining the team' : current.registration.agent ? 'activating the agent' : 'registering the agent';
   if (current.step === 'profile') return 'saving the settings';
   if (current.step === 'review') return 'approving the settings';
-  if (current.step === 'computer') return current.machine.phase === 'machine' ? 'adding this computer' : 'recording this computer’s runner';
+  if (current.step === 'computer' && current.placement.kind === 'new') return current.placement.machine.phase === 'machine' ? 'adding this computer' : 'recording this computer’s runner';
+  if (current.step === 'admission') return 'allowing the agent on this computer';
   return 'starting the agent';
 }
 export class AddAndRunFailure extends Error {
@@ -88,8 +128,8 @@ export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: A
     save(current);
     if (current.step === 'registration') {
       const agent = await addAgent(current.registration, current.person, (registration) => save({ ...current, registration }), login);
-      const machine = { ...current.machine, body: { ...current.machine.body, may_run: [agent] } };
-      save({ ...current, machine, step: 'profile', pending: { stage: 'profile', path: '/agents/' + agent + '/provisioning', body: { ...current.settings, operation: operationId(), from_version: 0 }, machine: machine.body.operation, version: 0 } });
+      const placement: Placement = current.placement.kind === 'new' ? { kind: 'new', machine: { ...current.placement.machine, body: { ...current.placement.machine.body, may_run: [agent] } } } : current.placement;
+      save({ ...current, placement, step: 'profile', pending: { stage: 'profile', path: '/agents/' + agent + '/provisioning', body: { ...current.settings, operation: operationId(), from_version: 0 }, machine: placementComputer(placement).id, version: 0 } });
     }
     const agent = current.registration.agent;
     if (!agent) return unreadable();
@@ -97,16 +137,29 @@ export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: A
     if (current.step === 'profile') {
       if (!current.pending) return unreadable();
       const confirmed = await profileRequest(agent, current.pending);
-      save({ ...current, step: 'review', pending: { stage: 'review', path: prefix + '/provisioning/' + confirmed.version + '/review', body: { operation: operationId() }, machine: current.machine.body.operation, version: confirmed.version } });
+      save({ ...current, step: 'review', pending: { stage: 'review', path: prefix + '/provisioning/' + confirmed.version + '/review', body: { operation: operationId() }, machine: placementComputer(current.placement).id, version: confirmed.version } });
     }
     if (current.step === 'review') {
       if (!current.pending) return unreadable();
       const confirmed = await profileRequest(agent, current.pending);
-      save({ ...current, step: 'computer', pending: { stage: 'start', path: prefix + '/start-command', body: { operation: operationId(), machine: current.machine.body.operation }, machine: current.machine.body.operation, version: confirmed.version } });
+      const placement: Placement = current.placement.kind === 'existing' ? { ...current.placement, admission: { operation: operationId(), agent, allow: true } } : current.placement;
+      const machine = placementComputer(placement).id;
+      save({ ...current, placement, step: placement.kind === 'new' ? 'computer' : 'admission', pending: { stage: 'start', path: prefix + '/start-command', body: { operation: operationId(), machine }, machine, version: confirmed.version } });
     }
     if (current.step === 'computer') {
-      await recordComputer(current.machine, current.person, (machine) => save({ ...current, machine }));
+      if (current.placement.kind !== 'new') return unreadable();
+      await recordComputer(current.placement.machine, current.person, (machine) => save({ ...current, placement: { kind: 'new', machine } }));
       save({ ...current, step: 'start' });
+    }
+    if (current.step === 'admission') {
+      const placement = current.placement;
+      if (placement.kind !== 'existing' || !placement.admission) return unreadable();
+      const answer = await request<unknown>('/network/machines/' + encodeURIComponent(placement.computer.id) + '/agents', placement.admission);
+      const machine = confirmAdmission(answer, placement.computer.id, placement.admission, current.person);
+      if (machine.state !== 'in_use' || machine.kind !== 'Computer' || machine.runtime !== 'lys-runner' || !machine.may_run.some((entry) => entry.id === agent && entry.state === 'active')) {
+        throw new Refused(200, { refusal: 'MachineAdmissionReceiptMismatch', reason: 'The allowance did not confirm this active agent on the chosen computer. Its original request is kept; no start has been sent.' });
+      }
+      save({ ...current, placement: { ...placement, computer: machine }, step: 'start' });
     }
     if (!current.pending || current.step !== 'start') return unreadable();
     const answer = await startRequest(agent, current.pending);
@@ -115,14 +168,23 @@ export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: A
     return agent;
   } catch (problem) { throw new AddAndRunFailure(addAndRunStep(current), problem); }
 }
-export interface FirstRunOptions { choices: Choices | null; network: NetworkView | null; problem: unknown }
-export async function firstRunChoices(): Promise<FirstRunOptions> {
+export interface FirstRunOptions { choices: Choices | null; network: NetworkView | null; computers: Machine[]; problem: unknown }
+export async function firstRunChoices(capability: AddAndRunCapability): Promise<FirstRunOptions> {
   let network: NetworkView | null = null;
   try {
     const answer = await request<unknown>('/network');
     if (!isRecord(answer) || !Array.isArray(answer.machines) || !answer.machines.every(readableMachine) || typeof answer.reports_served !== 'boolean') throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name readable computers and their admission rules.' });
     network = { machines: answer.machines, reports_served: answer.reports_served };
-    if (network.machines.some((machine) => machine.state === 'in_use')) return { choices: null, network, problem: null };
-    return { choices: await readChoices(network), network, problem: null };
-  } catch (problem) { return { choices: null, network, problem }; }
+    const inUse = network.machines.filter((machine) => machine.state === 'in_use');
+    if (!inUse.length) return { choices: await readChoices(network), network, computers: [], problem: null };
+    if (capability.machineAdmission !== true) return { choices: null, network, computers: [], problem: capability.admissionProblem };
+    const eligible = inUse.filter((machine) => machine.kind === 'Computer' && machine.runtime === 'lys-runner' && operation.test(machine.id));
+    const runners = await Promise.all(eligible.map(async (machine) => {
+      try { confirmRunner(await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner'), machine.id, true); return { machine, problem: null }; }
+      catch (problem) { return { machine: null, problem }; }
+    }));
+    const computers = runners.flatMap((entry) => entry.machine ? [entry.machine] : []);
+    const problem = runners.find((entry) => entry.problem)?.problem ?? (computers.length ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed local Lys runner. Add the agent here, then confirm its computer and runner in Network.' }));
+    return { choices: computers.length ? await readChoices(network) : null, network, computers, problem };
+  } catch (problem) { return { choices: null, network, computers: [], problem }; }
 }
