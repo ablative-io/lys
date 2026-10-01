@@ -5,102 +5,39 @@
 //! Claude Code enables it by. What would carry a credential is refused when
 //! the profile is recorded, naming the server and where, never the value.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+#[path = "support/runner_start.rs"]
+pub mod support;
+use support::{PLANTED, Table, operation};
 
 use std::error::Error;
 
-use axum::Router;
-use axum::extract::Request;
-use axum::response::{IntoResponse, Response};
-use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
-use lys_core::Ed25519Identity;
 use lys_home::harness::claude_code::template::parse_template;
-use lys_identity::OperationId;
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::secrets_api::SecretsSettings;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// A value the stand-in broker plants beside a handle; it must never reach a render.
-const PLANTED: &str = "sk-planted-credential-value";
 /// A credential a profile tries to carry inline; it must never be repeated.
 const INLINE: &str = "abcdef0123456789";
 
-async fn broker(request: Request) -> Response {
-    if request.uri().path() != "/_lys/handles" {
-        return axum::Json(json!({})).into_response();
-    }
-    axum::Json(json!({ "holder": "any", "handles": [
-        { "id": "h-live", "secret": "git-host token", "max_uses": 10, "used": 1,
-          "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0,
-          "parent": null, "value": PLANTED },
-    ]}))
-    .into_response()
-}
-
-fn operation() -> Result<String, Box<dyn Error>> {
-    Ok(OperationId::generate()?.to_string())
-}
-
-struct Table {
-    service: Service,
-    seeded: Seeded,
-    ada: String,
-}
-
 impl Table {
-    async fn set() -> Result<Self, Box<dyn Error>> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let address = listener.local_addr()?;
-        tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
-        let keys = tempfile::TempDir::new()?;
-        let key_file = keys.path().join("secrets-service.key");
-        Ed25519Identity::load_or_generate(&key_file)?;
-        let settings = SecretsSettings {
-            broker: format!("http://{address}"),
-            service: "identity".to_owned(),
-            service_key_file: key_file,
-        };
-        let (service, seeded) =
-            Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-                Ok(seed_configured(config, [ADMINISTRATOR, "bea-subject"])?)
-            })
-            .await?;
-        drop(keys);
-        let ada = service
-            .sign_in(Login {
-                subject: ADMINISTRATOR.to_owned(),
-                email: "ada@example.test".to_owned(),
-            })
-            .await?;
-        Ok(Self {
-            service,
-            seeded,
-            ada,
-        })
-    }
-
-    fn agent(&self) -> String {
-        self.seeded.people[0].agents[0].id.to_string()
-    }
-
     /// Record `servers` as the agent's profile, from `from`.
     async fn record(&self, from: u32, servers: &Value) -> Result<(u16, Value), Box<dyn Error>> {
         let body = json!({
             "operation": operation()?, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
             "mcp_servers": servers, "instructions": "", "note": "",
-            "harness": harness_description::declared(),
+            "harness": self.harness(),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await
     }
 
     /// Record `servers`, review them, and ask for a start on a new machine.
-    async fn start(&self, from: u32, servers: &Value) -> Result<(u16, Value), Box<dyn Error>> {
+    async fn start_profile(
+        &self,
+        from: u32,
+        servers: &Value,
+    ) -> Result<(u16, Value), Box<dyn Error>> {
         let (status, set) = self.record(from, servers).await?;
         assert_eq!(status, 200, "{set}");
         let path = format!("/agents/{}/provisioning/{}/review", self.agent(), from + 1);
@@ -117,6 +54,11 @@ impl Table {
             .post("/network/machines", Some(&self.ada), &body)
             .await?;
         assert_eq!(status, 200, "{named}");
+        self.ok(
+            &format!("/network/machines/{machine}/runner"),
+            &json!({"runner": {"kind": "lys"}}),
+        )
+        .await?;
         let path = format!("/agents/{}/start-command", self.agent());
         let body = json!({ "machine": machine, "operation": operation()? });
         self.service.post(&path, Some(&self.ada), &body).await
@@ -145,8 +87,8 @@ fn seat() -> Value {
 #[tokio::test]
 async fn five_command_servers_render_exactly_with_typed_settings_handles_and_a_waking_channel()
 -> TestResult {
-    let table = Table::set().await?;
-    let (status, start) = table.start(0, &seat()).await?;
+    let table = Table::unprofiled().await?;
+    let (status, start) = table.start_profile(0, &seat()).await?;
     assert_eq!(status, 200, "{start}");
     assert!(
         !start.to_string().contains(PLANTED),
@@ -179,20 +121,20 @@ async fn five_command_servers_render_exactly_with_typed_settings_handles_and_a_w
     );
     assert_eq!(start["left_out"], json!([]));
 
-    let (status, again) = table.start(1, &seat()).await?;
+    let (status, again) = table.start_profile(1, &seat()).await?;
     assert_eq!(status, 200, "{again}");
     let again = parse_template(again["template"].as_str().ok_or("no template")?.as_bytes())?;
     assert_eq!(
         again.mcp, template.mcp,
         "the same profile renders the same servers"
     );
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_credential_or_an_unrepresentable_setting_is_refused_by_name_when_recorded() -> TestResult
 {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let command = |args: Value, env: Value| {
         json!([{ "name": "meridian", "command": { "program": "/opt/seat/bin/meridian",
             "args": args, "env": env } }])
@@ -252,16 +194,16 @@ async fn a_credential_or_an_unrepresentable_setting_is_refused_by_name_when_reco
         (status, answer["refusal"].clone()),
         (400, json!("RequestMalformed"))
     );
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_start_refuses_a_secret_without_a_handle_and_a_directory_claude_code_cannot_take()
 -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let unheld = json!([{ "name": "meridian", "command": { "program": "/opt/seat/bin/meridian",
         "env": { "MERIDIAN_AUTH": { "handle": "not held" } } } }]);
-    let (status, answer) = table.start(0, &unheld).await?;
+    let (status, answer) = table.start_profile(0, &unheld).await?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["refusal"], "McpHandleUnsupported", "{answer}");
     let placed = json!([{ "name": "meridian", "command": { "program": "/opt/seat/bin/meridian",
@@ -269,5 +211,5 @@ async fn a_start_refuses_a_secret_without_a_handle_and_a_directory_claude_code_c
     let (status, answer) = table.record(1, &placed).await?;
     assert_eq!(status, 400, "{answer}");
     assert_eq!(answer["refusal"], "McpSettingUnrepresentable", "{answer}");
-    Ok(())
+    table.close()
 }

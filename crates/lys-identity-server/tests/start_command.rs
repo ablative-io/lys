@@ -2,63 +2,22 @@
 
 //! The start-command route: an agent's start command is rendered from its
 //! kept profile for a chosen machine, names the agent and its handle ids and
-//! never a credential's value, is never run, and each refusal is by name.
+//! never a credential's value, runs on its runner, and each refusal is by name.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+#[path = "support/runner_start.rs"]
+pub mod support;
+use support::{PLANTED, Table, operation};
 
 use std::error::Error;
 
-use axum::Router;
-use axum::extract::Request;
-use axum::response::{IntoResponse, Response};
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
-use lys_core::Ed25519Identity;
 use lys_home::harness::claude_code::template::parse_template;
-use lys_identity::{AgentId, OperationId};
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::secrets_api::SecretsSettings;
+use lys_identity::AgentId;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BEA: &str = "bea-subject";
-/// A value the stand-in broker plants beside a handle; it must never reach a command.
-const PLANTED: &str = "sk-planted-credential-value";
-
-async fn broker(request: Request) -> Response {
-    if request.uri().path() != "/_lys/handles" {
-        return axum::Json(json!({})).into_response();
-    }
-    axum::Json(json!({ "holder": "any", "handles": [
-        { "id": "h-live", "secret": "git-host token", "max_uses": 10, "used": 1,
-          "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0,
-          "parent": null, "value": PLANTED, "token": PLANTED },
-        { "id": "h-gone", "secret": "old key", "max_uses": 1, "used": 1,
-          "not_after_ms": 0, "dropped": true, "spend_cap": null, "settled": 0,
-          "parent": null },
-    ]}))
-    .into_response()
-}
-
-struct Table {
-    service: Service,
-    seeded: Seeded,
-    ada: String,
-    bea: String,
-}
-
-fn login(subject: &str) -> Login {
-    Login {
-        subject: subject.to_owned(),
-        email: "shared@example.test".to_owned(),
-    }
-}
-
-fn operation() -> Result<String, Box<dyn Error>> {
-    Ok(OperationId::generate()?.to_string())
-}
 
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
     assert_eq!(answer.0, status, "{}", answer.1);
@@ -66,39 +25,7 @@ fn refused(answer: &(u16, Value), status: u16, name: &str) {
 }
 
 impl Table {
-    async fn set() -> Result<Self, Box<dyn Error>> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let address = listener.local_addr()?;
-        tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
-        let keys = tempfile::TempDir::new()?;
-        let key_file = keys.path().join("secrets-service.key");
-        Ed25519Identity::load_or_generate(&key_file)?;
-        let settings = SecretsSettings {
-            broker: format!("http://{address}"),
-            service: "identity".to_owned(),
-            service_key_file: key_file,
-        };
-        let (service, seeded) =
-            Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-                Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
-            })
-            .await?;
-        drop(keys);
-        let ada = service.sign_in(login(ADMINISTRATOR)).await?;
-        let bea = service.sign_in(login(BEA)).await?;
-        Ok(Self {
-            service,
-            seeded,
-            ada,
-            bea,
-        })
-    }
-
-    fn agent(&self) -> String {
-        self.seeded.people[0].agents[0].id.to_string()
-    }
-
-    async fn machine(
+    async fn placed_machine(
         &self,
         runtime: Option<&str>,
         may_run: &[String],
@@ -113,10 +40,17 @@ impl Table {
             .post("/network/machines", Some(&self.ada), &body)
             .await?;
         assert_eq!(status, 200, "{named}");
+        if runtime.is_some() {
+            self.ok(
+                &format!("/network/machines/{id}/runner"),
+                &json!({"runner": {"kind": "lys"}}),
+            )
+            .await?;
+        }
         Ok(id)
     }
 
-    async fn profile(&self) -> TestResult {
+    async fn launch_profile(&self) -> TestResult {
         let skill = json!({ "name": "review", "text": "Read the change against its brief.\n" });
         let (status, kept) = self
             .service
@@ -127,7 +61,7 @@ impl Table {
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": ["review"],
             "mcp_servers": [{ "name": "cambium", "url": "https://cambium.example.test/mcp" }],
-            "harness": harness_description::declared(),
+            "harness": self.harness(),
             "instructions": "Build what the brief says.", "note": "First setup.",
         });
         let path = format!("/agents/{}/provisioning", self.agent());
@@ -157,11 +91,18 @@ impl Table {
 
 #[tokio::test]
 async fn each_refusal_is_by_name() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
+    let bea = table
+        .service
+        .sign_in(Login {
+            subject: BEA.to_owned(),
+            email: "shared@example.test".to_owned(),
+        })
+        .await?;
     let agent = table.agent();
     let unheld = AgentId::generate()?.to_string();
     let open = table
-        .machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
         .await?;
 
     refused(
@@ -169,30 +110,26 @@ async fn each_refusal_is_by_name() -> TestResult {
         404,
         "AgentNotVisible",
     );
-    refused(
-        &table.ask(&agent, &open, &table.bea).await?,
-        403,
-        "NotAdmitted",
-    );
+    refused(&table.ask(&agent, &open, &bea).await?, 403, "NotAdmitted");
     refused(
         &table.ask(&agent, &open, &table.ada).await?,
         404,
         "LaunchRecordMissing",
     );
 
-    table.profile().await?;
+    table.launch_profile().await?;
     refused(
         &table.ask(&agent, &operation()?, &table.ada).await?,
         404,
         "MachineUnknown",
     );
-    let bare = table.machine(None, &[]).await?;
+    let bare = table.placed_machine(None, &[]).await?;
     refused(
         &table.ask(&agent, &bare, &table.ada).await?,
         409,
         "MachineWithoutRuntime",
     );
-    let elsewhere = table.machine(Some("manifold"), &[]).await?;
+    let elsewhere = table.placed_machine(Some("manifold"), &[]).await?;
     refused(
         &table.ask(&agent, &elsewhere, &table.ada).await?,
         403,
@@ -223,16 +160,16 @@ async fn each_refusal_is_by_name() -> TestResult {
         .await?;
     assert_eq!(status, 400, "{none}");
     assert_eq!(none["refusal"], "RequestMalformed");
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let agent = table.agent();
-    table.profile().await?;
+    table.launch_profile().await?;
     let machine = table
-        .machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
         .await?;
 
     let (status, start) = table.ask(&agent, &machine, &table.ada).await?;
@@ -254,7 +191,14 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
     let command = start["command"].as_str().ok_or("no command")?;
     let session = start["session"].as_str().ok_or("no session")?;
     assert!(command.starts_with("env "), "{command}");
-    assert!(command.contains("/opt/seat/bin/claude"), "{command}");
+    assert!(
+        command.contains(
+            table.harness()["program"]
+                .as_str()
+                .ok_or("no declared program")?
+        ),
+        "{command}"
+    );
     assert!(!command.contains("manifold"), "{command}");
     for named in [
         format!("LYS_AGENT={agent}"),
@@ -286,16 +230,16 @@ async fn the_command_names_the_agent_and_its_handles_and_never_a_value() -> Test
         again["session"], start["session"],
         "each start is its own session"
     );
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_start_is_kept_once_under_its_operation() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let agent = table.agent();
-    table.profile().await?;
+    table.launch_profile().await?;
     let machine = table
-        .machine(Some("manifold"), std::slice::from_ref(&agent))
+        .placed_machine(Some("manifold"), std::slice::from_ref(&agent))
         .await?;
     let path = format!("/agents/{agent}/start-command");
     let body = json!({ "machine": machine, "operation": operation()? });
@@ -318,15 +262,19 @@ async fn a_start_is_kept_once_under_its_operation() -> TestResult {
     let sessions = held["sessions"].as_array().ok_or("no sessions")?;
     assert_eq!(sessions.len(), 1, "{held}");
     assert_eq!(sessions[0]["session"], first["session"]);
-    assert_eq!(sessions[0]["shown"], "unconfirmed");
-    Ok(())
+    assert_eq!(sessions[0]["shown"], "running");
+    assert_eq!(first["runner"]["session"], first["session"]);
+    assert_eq!(again["runner"]["session"], first["session"]);
+    assert_eq!(first["runner"]["state"], "running");
+    assert_eq!(again["runner"]["state"], "running");
+    table.close()
 }
 
 #[tokio::test]
 async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let agent = table.agent();
-    table.profile().await?;
+    table.launch_profile().await?;
     let machine = operation()?;
     let body = json!({
         "operation": machine, "name": "closed", "kind": "laptop", "runtime": "manifold",
@@ -342,5 +290,5 @@ async fn a_machine_that_cannot_reach_the_profile_is_refused() -> TestResult {
         409,
         "MachineCannotReach",
     );
-    Ok(())
+    table.close()
 }

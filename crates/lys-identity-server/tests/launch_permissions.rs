@@ -5,79 +5,19 @@
 //! rule the settings file cannot express is refused by name: a profile's
 //! when it is recorded, a policy's by its id when the start is rendered.
 
-#[path = "support/harness_description.rs"]
-mod harness_description;
+#[path = "support/runner_start.rs"]
+pub mod support;
+use support::{Table, operation};
 
 use std::error::Error;
 
-use axum::Router;
-use axum::extract::Request;
-use axum::response::{IntoResponse, Response};
-use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
-use lys_core::Ed25519Identity;
 use lys_home::harness::claude_code::launch_env::env_settings;
 use lys_home::harness::claude_code::template::parse_template;
-use lys_identity::OperationId;
-use lys_identity_server::dev_seed::{Seeded, seed_configured};
-use lys_identity_server::secrets_api::SecretsSettings;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-async fn broker(request: Request) -> Response {
-    if request.uri().path() != "/_lys/handles" {
-        return axum::Json(json!({})).into_response();
-    }
-    axum::Json(json!({ "holder": "any", "handles": [] })).into_response()
-}
-
-fn operation() -> Result<String, Box<dyn Error>> {
-    Ok(OperationId::generate()?.to_string())
-}
-
-struct Table {
-    service: Service,
-    seeded: Seeded,
-    ada: String,
-}
-
 impl Table {
-    async fn set() -> Result<Self, Box<dyn Error>> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let address = listener.local_addr()?;
-        tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
-        let keys = tempfile::TempDir::new()?;
-        let key_file = keys.path().join("secrets-service.key");
-        Ed25519Identity::load_or_generate(&key_file)?;
-        let settings = SecretsSettings {
-            broker: format!("http://{address}"),
-            service: "identity".to_owned(),
-            service_key_file: key_file,
-        };
-        let (service, seeded) =
-            Service::start_asking(GRANT_MODEL, None, Some(settings), |config| {
-                Ok(seed_configured(config, [ADMINISTRATOR, "bea-subject"])?)
-            })
-            .await?;
-        drop(keys);
-        let ada = service
-            .sign_in(Login {
-                subject: ADMINISTRATOR.to_owned(),
-                email: "ada@example.test".to_owned(),
-            })
-            .await?;
-        Ok(Self {
-            service,
-            seeded,
-            ada,
-        })
-    }
-
-    fn agent(&self) -> String {
-        self.seeded.people[0].agents[0].id.to_string()
-    }
-
     /// Record a Claude Code profile of `tools` and `permissions`, from `from`.
     async fn record(
         &self,
@@ -89,7 +29,7 @@ impl Table {
             "operation": operation()?, "from_version": from,
             "model_access": ["claude-fable-5-1"], "tools": tools, "skills": [],
             "mcp_servers": [], "instructions": "", "note": "", "permissions": permissions,
-            "harness": harness_description::declared(),
+            "harness": self.harness(),
         });
         let path = format!("/agents/{}/provisioning", self.agent());
         self.service.post(&path, Some(&self.ada), &body).await
@@ -114,7 +54,7 @@ impl Table {
     }
 
     /// Ask for a start on a new machine named `name`.
-    async fn start(&self, name: &str) -> Result<(u16, Value), Box<dyn Error>> {
+    async fn start_profile(&self, name: &str) -> Result<(u16, Value), Box<dyn Error>> {
         let machine = operation()?;
         let body = json!({
             "operation": machine, "name": name, "kind": "server",
@@ -125,6 +65,11 @@ impl Table {
             .post("/network/machines", Some(&self.ada), &body)
             .await?;
         assert_eq!(status, 200, "{named}");
+        self.ok(
+            &format!("/network/machines/{machine}/runner"),
+            &json!({"runner": {"kind": "lys"}}),
+        )
+        .await?;
         let path = format!("/agents/{}/start-command", self.agent());
         let body = json!({ "machine": machine, "operation": operation()? });
         self.service.post(&path, Some(&self.ada), &body).await
@@ -149,7 +94,7 @@ fn permissions() -> Value {
 #[tokio::test]
 async fn the_settings_file_carries_the_union_of_the_profile_and_the_policy_twice_identical()
 -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     table
         .policy(&json!([hard(
             "no-keys",
@@ -171,7 +116,7 @@ async fn the_settings_file_carries_the_union_of_the_profile_and_the_policy_twice
     });
     let mut written = Vec::new();
     for name in ["Box one", "Box two"] {
-        let (status, started) = table.start(name).await?;
+        let (status, started) = table.start_profile(name).await?;
         assert_eq!(status, 200, "{started}");
         let text = started["template"].as_str().ok_or("no template")?;
         let template = parse_template(text.as_bytes())?;
@@ -185,12 +130,12 @@ async fn the_settings_file_carries_the_union_of_the_profile_and_the_policy_twice
         written.push(settings["permissions"].clone());
     }
     assert_eq!(written[0], written[1], "two renders write one permissions");
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_profile_rule_the_settings_file_cannot_express_is_refused_by_name() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let cases = [
         (json!({ "deny": ["Bash(rm"] }), "Bash(rm"),
         (json!({ "deny": ["Read("] }), "Read("),
@@ -214,13 +159,13 @@ async fn a_profile_rule_the_settings_file_cannot_express_is_refused_by_name() ->
             "{refused}"
         );
     }
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_by_its_id()
 -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     table
         .policy(&json!([hard(
             "no-denied-writes",
@@ -232,7 +177,7 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
     let (status, set) = table.record(0, &json!([]), &json!({})).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
-    let (status, refused) = table.start("Box one").await?;
+    let (status, refused) = table.start_profile("Box one").await?;
     assert_eq!(
         (status, &refused["refusal"]),
         (400, &json!("PolicyUnrepresentable")),
@@ -244,23 +189,23 @@ async fn a_hard_policy_rule_the_settings_file_cannot_express_refuses_the_start_b
             .is_some_and(|reason| reason.contains("no-denied-writes")),
         "{refused}"
     );
-    Ok(())
+    table.close()
 }
 
 #[tokio::test]
 async fn a_profile_with_no_permissions_writes_environment_only() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let (status, set) = table.record(0, &json!([]), &Value::Null).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
-    let (status, started) = table.start("Box one").await?;
+    let (status, started) = table.start_profile("Box one").await?;
     assert_eq!(status, 200, "{started}");
     let text = started["template"].as_str().ok_or("no template")?;
     let template = parse_template(text.as_bytes())?;
     let settings: Value = serde_json::from_slice(&env_settings(&template)?)?;
     let members: Vec<&String> = settings.as_object().ok_or("no object")?.keys().collect();
     assert_eq!(members, ["env"]);
-    Ok(())
+    table.close()
 }
 
 /// The template a start renders, without the per-start identity in its
@@ -277,18 +222,18 @@ fn rendered_without_identity(started: &Value) -> Result<Vec<u8>, Box<dyn Error>>
 
 #[tokio::test]
 async fn a_tool_and_the_same_allow_rule_render_byte_identical_starts() -> TestResult {
-    let table = Table::set().await?;
+    let table = Table::unprofiled().await?;
     let (status, set) = table.record(0, &json!(["Bash"]), &permissions()).await?;
     assert_eq!(status, 200, "{set}");
     table.review(1).await?;
-    let (status, as_tool) = table.start("Tool box").await?;
+    let (status, as_tool) = table.start_profile("Tool box").await?;
     assert_eq!(status, 200, "{as_tool}");
     let mut folded = permissions();
     folded["allow"] = json!(["Read", "Bash"]);
     let (status, set) = table.record(1, &json!([]), &folded).await?;
     assert_eq!(status, 200, "{set}");
     table.review(2).await?;
-    let (status, as_rule) = table.start("Rule box").await?;
+    let (status, as_rule) = table.start_profile("Rule box").await?;
     assert_eq!(status, 200, "{as_rule}");
     assert_eq!(as_tool["provisioning_version"], 1);
     assert_eq!(as_rule["provisioning_version"], 2);
@@ -297,5 +242,5 @@ async fn a_tool_and_the_same_allow_rule_render_byte_identical_starts() -> TestRe
         rendered_without_identity(&as_rule)?,
         "folding a tool into the allow rules changes nothing the start renders"
     );
-    Ok(())
+    table.close()
 }
