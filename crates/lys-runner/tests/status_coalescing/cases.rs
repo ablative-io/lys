@@ -180,7 +180,7 @@ fn a_full_window_stops_its_leader_even_when_flushing_fails() -> Result<(), Box<d
     let signalled = Arc::new(AtomicBool::new(false));
     let seen = Arc::clone(&signalled);
     super::status::BEFORE_END.with(|probe| {
-        *probe.borrow_mut() = Some(Box::new(move || seen.store(true, Ordering::SeqCst)))
+        *probe.borrow_mut() = Some(Box::new(move || seen.store(true, Ordering::SeqCst)));
     });
     let result = sessions.collect(
         "session",
