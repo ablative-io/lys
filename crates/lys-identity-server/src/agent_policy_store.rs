@@ -32,6 +32,10 @@ use crate::config::Config;
 use crate::error::ServerError;
 use crate::routes::Say;
 
+#[cfg(test)]
+#[path = "agent_policy_store_tests.rs"]
+mod tests;
+
 /// The origin the policies' leaf store is created with.
 pub const ORIGIN: &str = "lys/identity/agent-policies";
 
