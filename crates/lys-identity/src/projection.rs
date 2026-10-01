@@ -171,7 +171,7 @@ impl Projection {
             .get(&person)
             .into_iter()
             .flat_map(|agents| agents.iter())
-            .map(|identity| {
+            .map(move |identity| {
                 let held = self.records.get_key_value(identity).ok_or_else(|| {
                     IdentityError::LogUnavailable {
                         reason: format!(
