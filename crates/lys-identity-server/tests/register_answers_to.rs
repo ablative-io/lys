@@ -1,3 +1,5 @@
+//! Registration preserves the selected responsible person and the caller's authority.
+
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
