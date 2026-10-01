@@ -11,7 +11,8 @@
 //! (`product`). Container-backed: runs only on the identity leg.
 //!
 //! The directory service and the secrets broker answer on the install's
-//! independently selected ports, so parallel installs never share services. The binaries are the workspace test build's
+//! fixed ports, so the test refuses by name when another install holds them
+//! rather than sharing one. The binaries are the workspace test build's
 //! siblings, so the CLI and services come from the same build without
 //! compiling them again inside a running test.
 
@@ -41,6 +42,30 @@ use sha2::{Digest, Sha256};
 const TEMPLATE: &str = include_str!("../src/identity/install/deployment.template.toml");
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
+
+/// Reuse the workspace's compiled binaries, refusing an incomplete build.
+fn binaries() -> TestResult<PathBuf> {
+    let directory = Path::new(env!("CARGO_BIN_EXE_lys"))
+        .parent()
+        .ok_or("install_binary_directory_missing: the compiled CLI has no parent")?;
+    for name in ["lys", "lys-identity-server", "lys-secrets"] {
+        let path = directory.join(name);
+        let metadata = std::fs::metadata(&path)
+            .map_err(|error| format!("install_binary_missing: {}: {error}", path.display()))?;
+        if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 {
+            return Err(format!("install_binary_not_executable: {}", path.display()).into());
+        }
+    }
+}
+
+/// Refuses by name when anything listens on `port` already.
+fn port_free(port: u16, what: &str) -> TestResult {
+    TcpListener::bind(("127.0.0.1", port))
+        .map(drop)
+        .map_err(|error| {
+            format!("port_in_use: {what} port 127.0.0.1:{port} is taken ({error}); stop the install holding it").into()
+        })
+}
 
 /// Reuse the workspace's compiled binaries, refusing an incomplete build.
 fn binaries() -> TestResult<PathBuf> {

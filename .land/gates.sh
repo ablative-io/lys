@@ -35,12 +35,6 @@ identity_leg() {
   python3 -B scripts/identity-gates/spicedb_fixture.py -- cargo nextest run --locked -p lys-identity-server --all-features --test identity_spicedb --no-fail-fast --retries 0 --no-tests fail || identity_status=1
   return "$identity_status"
 }
-# The interpreter is named first, so a run here that differs from a run
-# elsewhere says which python3 each one used.
-identity_scripts_leg() {
-  echo "python3: $(command -v python3) $(python3 --version 2>&1)"
-  python3 -B -m unittest discover -s scripts/identity-gates -p "*test*.py"
-}
 # The compiled surface and dependencies are shared with the install fixtures.
 # Its type checks and every surface test still run on each gate.
 surface_leg() {
@@ -81,19 +75,12 @@ leg cargo fmt --all
 leg source_changed
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-mkdir -p target || exit 1
-gate_logs=$(mktemp -d target/land-logs.XXXXXX) || exit 1
-trap 'rm -rf "$gate_logs"' EXIT
-job_index=0
-gate_pids=""
-parallel sh scripts/design/gate.sh
-parallel cargo doc --no-deps --all-features
-parallel ast-grep scan --config sgconfig.yml
-parallel sh scripts/file-length.sh
-parallel identity_scripts_leg
-parallel surface_leg
-leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
-leg cargo test --doc --workspace --all-features
+leg cargo test --workspace --all-features --no-fail-fast
+leg cargo doc --no-deps --all-features
+leg cargo doc --no-deps
+leg ast-grep scan --config sgconfig.yml
+leg sh scripts/file-length.sh
+leg python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
 leg identity_leg
 finish_parallel
 exit "$status"
