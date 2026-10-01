@@ -237,6 +237,8 @@ pub async fn change(
     id: &str,
     change: impl FnOnce(&mut Value) + Send,
 ) -> Result<(), ServerError> {
+    #[cfg(test)]
+    changes_tests::started(false);
     let user = read(api, id).await?;
     let mut update = update_of(&user)?;
     change(&mut update);
@@ -510,3 +512,7 @@ async fn set_enabled(
 #[cfg(test)]
 #[path = "accounts_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "accounts_changes_tests.rs"]
+pub(crate) mod changes_tests;
