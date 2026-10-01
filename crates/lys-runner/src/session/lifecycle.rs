@@ -34,6 +34,18 @@ pub use crate::peer::Collected;
 #[path = "../../tests/lifecycle/cases.rs"]
 mod io_tests;
 
+pub(crate) fn transcript_parent(path: &Path) -> Result<PathBuf, RunnerError> {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            RunnerError::refused(
+                "transcript_parent_missing",
+                format!("{} has no containing directory", path.display()),
+            )
+        })
+}
+
 /// What wakes a session's stream follower.
 #[derive(Debug)]
 pub(crate) enum Wake {
@@ -454,7 +466,18 @@ impl Sessions {
                 crate::error::said(&format!("a stream follower had ended: {gone}"));
             }
         });
-        let dir = path.parent().unwrap_or_else(|| Path::new("/")).to_owned();
+        let dir = match transcript_parent(&path) {
+            Ok(dir) => dir,
+            Err(error) => {
+                crate::error::said(&format!("session {id}: {error}"));
+                let source = table.feed.source(id).cloned().unwrap_or_default();
+                let coverage = Coverage::of("source_refused", &source, None, error.to_string());
+                if let Err(error) = append(table, id, vec![Body::Coverage(coverage)], None) {
+                    crate::error::said(&format!("session {id}: coverage_record_failed: {error}"));
+                }
+                return;
+            }
+        };
         let watching = notifier.and_then(|mut each| {
             notify::Watcher::watch(&mut each, &dir, notify::RecursiveMode::NonRecursive)
                 .map(|()| each)

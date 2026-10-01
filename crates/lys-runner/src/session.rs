@@ -59,7 +59,7 @@ type SpawnProbe = Box<dyn FnOnce() + Send>;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
-pub(crate) use lifecycle::{Wake, accounts, append, window_limit};
+pub(crate) use lifecycle::{Wake, accounts, append, transcript_parent, window_limit};
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
