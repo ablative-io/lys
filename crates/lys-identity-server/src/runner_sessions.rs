@@ -327,6 +327,7 @@ pub async fn run_on_runner(
             .map_or(session.as_str(), String::as_str);
         let pass = crate::agent_pass::store(state)?.issue(agent_id, record, &session)?;
         Act::Start {
+            lys_mcp: None,
             launch: Box::new(launch),
             lys_mcp: Some(lys_runner::protocol::LysMcp {
                 url: format!("{}/api/mcp", state.oidc.public_origin()),

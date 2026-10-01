@@ -38,7 +38,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::admitted::{Admitted, JudgedUnder};
 use crate::error::RunnerError;
+pub use crate::protocol_request::Request;
 use crate::rotation::{Move, Rotation};
+pub use lys_home::harness::lys_mcp::LysMcp;
 
 /// The protocol version this crate speaks.
 pub const PROTOCOL_VERSION: u32 = 1;
@@ -173,6 +175,9 @@ pub enum Act {
     Start {
         /// What it is started with.
         launch: Box<Launch>,
+        /// Run-only MCP credentials, omitted by older servers.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lys_mcp: Option<LysMcp>,
     },
     /// Type text, then Enter when asked.
     Input {
@@ -508,23 +513,6 @@ impl Greeting {
     }
 }
 
-/// A request as it is sent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Request {
-    /// The protocol version.
-    pub version: u32,
-    /// The runner it is made for, as its greeting named it.
-    pub runner: String,
-    /// The challenge of the connection it is made on.
-    pub challenge: String,
-    /// The act's JSON, as signed.
-    pub act: String,
-    /// Lowercase hex of the signature.
-    #[serde(default)]
-    pub signature: String,
-}
-
 /// A reply as it is sent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -710,7 +698,11 @@ pub fn verify_parsed(
         }
     })?;
     serde_json::from_str(&request.act).map_err(|error| RunnerError::Malformed {
-        reason: format!("the act does not read: {error}"),
+        reason: format!(
+            "the act does not read at line {}, column {}",
+            error.line(),
+            error.column()
+        ),
     })
 }
 

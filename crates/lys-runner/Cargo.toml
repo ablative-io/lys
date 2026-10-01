@@ -12,6 +12,7 @@ publish = false
 [dependencies]
 jiff = { workspace = true, features = ["tz-system"] }
 lys-core.workspace = true
+lys-home.workspace = true
 # A session's stream file is followed by the platform's change notices,
 # never by polling on a clock.
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
