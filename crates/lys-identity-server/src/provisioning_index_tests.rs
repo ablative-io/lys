@@ -54,6 +54,13 @@ fn provisioning_writes_do_not_copy_retained_profiles_or_skill_texts() -> TestRes
     let before = index_work();
     store.set("agent-0", 8, version(0, 9, true)?)?;
     assert_eq!(
+        store
+            .latest_reviewed("agent-0")
+            .ok_or("reviewed version missing")?
+            .number,
+        9
+    );
+    assert_eq!(
         index_work().0 - before.0,
         0,
         "approval copied retained profiles"
@@ -64,6 +71,13 @@ fn provisioning_writes_do_not_copy_retained_profiles_or_skill_texts() -> TestRes
         "approval copied retained skill texts"
     );
     store.set("agent-0", 9, version(0, 10, false)?)?;
+    assert_eq!(
+        store
+            .latest_reviewed("agent-0")
+            .ok_or("reviewed version missing")?
+            .number,
+        9
+    );
     store.review(
         "agent-0",
         10,
@@ -73,6 +87,13 @@ fn provisioning_writes_do_not_copy_retained_profiles_or_skill_texts() -> TestRes
             at: 2,
         },
     )?;
+    assert_eq!(
+        store
+            .latest_reviewed("agent-0")
+            .ok_or("reviewed version missing")?
+            .number,
+        10
+    );
     store.keep_skill(SkillText {
         name: "new-skill".to_owned(),
         text: "new text".to_owned(),
@@ -89,11 +110,38 @@ fn provisioning_writes_do_not_copy_retained_profiles_or_skill_texts() -> TestRes
         0,
         "a write copied retained skill texts"
     );
+    assert_eq!(
+        index_work().2 - before.2,
+        0,
+        "a write rebuilt retained version history"
+    );
     let reopened = ProvisioningStore::open(&directory.path().join("profiles.json"))?;
     assert_eq!(reopened.profiles(), store.profiles());
     assert_eq!(reopened.skills(), store.skills());
     assert!(reopened.named("record-0-10").is_some());
     assert!(reopened.skill("new-skill", "new-digest").is_some());
+    Ok(())
+}
+
+#[test]
+fn shared_indexes_clone_without_copying_and_keep_their_recorded_view() -> TestResult {
+    let (directory, mut store) = fixture()?;
+    let before = index_work();
+    let shared = std::sync::Arc::clone(&store.indexes);
+    let another = std::sync::Arc::clone(&shared);
+    assert!(std::sync::Arc::ptr_eq(&store.indexes, &shared));
+    assert!(std::sync::Arc::ptr_eq(&shared, &another));
+    assert_eq!(index_work(), before);
+    store.set("agent-0", 8, version(0, 9, true)?)?;
+    assert!(store.named("record-0-9").is_some());
+    assert!(!shared.operations.contains_key("record-0-9"));
+    assert!(!std::sync::Arc::ptr_eq(&store.indexes, &shared));
+    assert_eq!(
+        index_work(),
+        before,
+        "a shared-index update copied retained records or rescanned history"
+    );
+    assert!(directory.path().join("profiles.json").exists());
     Ok(())
 }
 

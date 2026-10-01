@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::harness_catalogue::{BuildSource, BuildView};
 
-use super::{Profile, Version};
+use super::Version;
 
 pub(super) type ReviewedBuilds = BTreeMap<String, BTreeSet<BuildView>>;
 pub(super) type Entry = Option<(String, BuildView)>;
@@ -17,6 +17,11 @@ std::thread_local! {
 #[cfg(test)]
 pub(super) fn index_visits() -> usize {
     INDEX_VISITS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+pub(super) fn visit() {
+    INDEX_VISITS.with(|visits| visits.set(visits.get() + 1));
 }
 
 pub(super) fn entry(version: &Version) -> Entry {
@@ -37,14 +42,4 @@ pub(super) fn insert(builds: &mut ReviewedBuilds, entry: Entry) {
     if let Some((contract, build)) = entry {
         builds.entry(contract).or_default().insert(build);
     }
-}
-
-pub(super) fn index(profiles: &[Profile]) -> ReviewedBuilds {
-    let mut builds = BTreeMap::new();
-    for version in profiles.iter().flat_map(|profile| &profile.versions) {
-        #[cfg(test)]
-        INDEX_VISITS.with(|visits| visits.set(visits.get() + 1));
-        insert(&mut builds, entry(version));
-    }
-    builds
 }

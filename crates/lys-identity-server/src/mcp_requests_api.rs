@@ -23,7 +23,6 @@ use crate::provisioning_api::with_provisioning;
 use crate::provisioning_store::{McpServer, Profile, ProvisioningStore, Review};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-use crate::tree_views::latest_reviewed;
 
 /// An operation asking for an already declared server by name.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -156,21 +155,12 @@ async fn ask(
             return Ok(Json(view(requests, kept)?));
         }
         with_provisioning(&state, |profiles| {
-            let known = profiles.profiles().iter().any(|profile| {
-                profile.versions.iter().any(|version| {
-                    version.reviewed.is_some()
-                        && version
-                            .settings
-                            .mcp_servers
-                            .iter()
-                            .any(|held| held.name == server)
-                })
-            });
+            let known = profiles.declared_server(&server).is_some();
             if !known {
                 return Err(ServerError::McpServerUnknown { server });
             }
             let profile = profiles.profile(&agent_id);
-            let version = profile.and_then(latest_reviewed).ok_or_else(|| {
+            let version = profiles.latest_reviewed(&agent_id).ok_or_else(|| {
                 ServerError::ProfileNotReviewed {
                     version: profile.map_or(0, crate::provisioning_store::Profile::latest),
                 }
@@ -251,16 +241,17 @@ fn declaration(
     asked: &McpRequest,
 ) -> Result<McpServer, ServerError> {
     let server = match by {
-        IdentityId::Agent(agent) => profiles
-            .profile(&agent.to_string())
-            .and_then(latest_reviewed)
-            .and_then(|version| {
-                version
-                    .settings
-                    .mcp_servers
-                    .iter()
-                    .find(|server| server.name == asked.server)
-            }),
+        IdentityId::Agent(agent) => {
+            profiles
+                .latest_reviewed(&agent.to_string())
+                .and_then(|version| {
+                    version
+                        .settings
+                        .mcp_servers
+                        .iter()
+                        .find(|server| server.name == asked.server)
+                })
+        }
         IdentityId::Person(_)
             if state
                 .admission
@@ -334,7 +325,7 @@ async fn approve(
             let server = declaration(&state, &headers, profiles, by, &asked)?;
             let profile = profiles.profile(&agent);
             let from_version = profile.map_or(0, Profile::latest);
-            let mut version = profile.and_then(latest_reviewed).cloned().ok_or(
+            let mut version = profiles.latest_reviewed(&agent).cloned().ok_or(
                 ServerError::ProfileNotReviewed {
                     version: from_version,
                 },
