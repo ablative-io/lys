@@ -278,8 +278,8 @@ impl<S: LeafStore> PolicyStore<S> {
             .map(|(tool, _)| Rule {
                 id: format!("deny-{tool}"),
                 tool: tool.to_owned(),
-                kind: RuleKind::PathPrefix,
-                target: Some("/".to_owned()),
+                kind: RuleKind::Tool,
+                target: None,
                 authority: Authority::Hard,
             })
             .collect();
@@ -290,7 +290,14 @@ impl<S: LeafStore> PolicyStore<S> {
             target: None,
             authority: Authority::Hard,
         });
-        // Root path rules also refuse tools whose target cannot be inspected.
+        // A path rule also refuses tools whose target cannot be inspected.
+        rules.push(Rule {
+            id: "deny-uninspectable".to_owned(),
+            tool: "Read".to_owned(),
+            kind: RuleKind::PathPrefix,
+            target: Some("/".to_owned()),
+            authority: Authority::Hard,
+        });
         self.set(
             Policy {
                 version: 1,

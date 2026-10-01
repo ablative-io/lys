@@ -26,6 +26,13 @@ use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request}
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
 
+#[cfg(test)]
+#[path = "../tests/socket_bounds/cases.rs"]
+mod bounds_tests;
+
+#[cfg(test)]
+type ShutdownProbe = Box<dyn FnOnce() -> Result<(), RunnerError> + Send>;
+
 /// What a runner is started with.
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -53,6 +60,8 @@ pub struct Serving {
     socket: PathBuf,
     stop: Arc<AtomicBool>,
     thread: JoinHandle<()>,
+    #[cfg(test)]
+    shutdown_probe: Option<ShutdownProbe>,
 }
 
 fn socket_failed(what: impl std::fmt::Display) -> RunnerError {
@@ -154,6 +163,8 @@ impl Runner {
             socket,
             stop,
             thread,
+            #[cfg(test)]
+            shutdown_probe: None,
         }
     }
 
@@ -191,6 +202,10 @@ impl Serving {
         self.stop.store(true, Ordering::SeqCst);
         if let Err(error) = UnixStream::connect(&self.socket) {
             crate::error::said(&format!("the runner's socket was already closed: {error}"));
+        }
+        #[cfg(test)]
+        if let Some(probe) = self.shutdown_probe {
+            probe()?;
         }
         self.thread
             .join()
@@ -247,7 +262,7 @@ fn answer_one(
             crate::error::said(&format!("a caller wrote {read} bytes past its one request"));
         }
         flag.store(true, Ordering::SeqCst);
-        woken.wake();
+        woken.cancel_waiters();
     });
     let answer = if crate::peer::is_peer(&line) {
         crate::peer::answer(sessions, stream, line.trim_end(), &left)
