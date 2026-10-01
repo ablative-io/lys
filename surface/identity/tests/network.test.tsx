@@ -24,14 +24,20 @@ async function submit() {
 const recorded = (body: NameMachine): Machine => ({ ...machine, ...body, id: body.operation, may_run: body.may_run.map((id) => ({ id, display_name: 'Scribe', state: 'active' })) });
 
 async function adding(extra: Record<string, Route> = {}) {
-  const mounted = await mount('#/network', { ...routes, ...extra });
+  for (const [path, route] of Object.entries(routes)) if (!(path in extra)) extra[path] = route;
+  const mounted = await mount('#/network', extra);
   await click(button('+ Add a computer'));
   return mounted;
 }
-async function pick(name: string) {
-  const search = $('input[aria-label="Add an agent"]') as HTMLInputElement;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(search, name.slice(0, 3)); search.dispatchEvent(new Event('input', { bubbles: true })); });
-  await click(button(name));
+function naming(runner: (id: string) => Route = (id) => ok({ machine: id, runner: { kind: 'lys' } })): Record<string, Route> {
+  const answers: Record<string, Route> = {};
+  answers['POST /network/machines'] = (body) => {
+    const draft = body as NameMachine;
+    answers['POST /network/machines/' + draft.operation + '/runner'] = runner(draft.operation);
+    answers['/network/machines/' + draft.operation + '/runner'] = ok({ machine: draft.operation, runner: { kind: 'lys' } });
+    return ok(recorded(draft));
+  };
+  return answers;
 }
 
 describe('Network', () => {
@@ -43,31 +49,34 @@ describe('Network', () => {
     expect($('.detail h2')?.textContent).toBe('Workshop laptop');
     expect(button('Refresh network')).toBeNull();
   });
-  it('adds the computer Lys runs on, with its websites normalized', async () => {
-    const { posted } = await adding({ 'POST /network/machines': (body) => ok(recorded(body as NameMachine)), ['POST /network/machines/op-' + 'x'.repeat(32) + '/runner']: ok({}) });
+  it('adds this computer with a name and no website permissions', async () => {
+    const { posted } = await adding(naming());
     expect($('input[name="kind"]')).toBeNull(); expect($('input[type="radio"]')).toBeNull();
-    input('name', 'Lab'); input('hosts', 'API.EXAMPLE.TEST\napi.example.test'); await submit();
-    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: ['api.example.test'] } });
+    expect($('[name="hosts"]')).toBeNull();
+    input('name', 'Lab'); await submit();
+    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] } });
   });
-  it('adds the computer Lys runs on with its own runner and the agents that may start there, chosen by name', async () => {
-    const { posted } = await adding({ 'POST /network/machines': (body) => ok(recorded(body as NameMachine)), ['POST /network/machines/op-' + 'x'.repeat(32) + '/runner']: ok({}) });
-    input('name', 'Lab'); await pick('Scribe'); await submit();
-    expect(posted[0].body).toMatchObject({ runtime: 'lys-runner', slots: 0, may_run: [SCRIBE], may_run_roles: [] });
+  it('adds this computer with its own runner and grants no agent or role from the global page', async () => {
+    const { posted } = await adding(naming());
+    input('name', 'Lab'); await submit();
+    expect($('input[aria-label="Add an agent"]')).toBeNull();
+    expect(posted[0].body).toMatchObject({ runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [] });
     const id = (posted[0].body as NameMachine).operation;
     expect(posted[1]).toEqual({ path: '/network/machines/' + id + '/runner', body: { runner: { kind: 'lys' } } });
   });
-  it('refuses a runner key that is not 64 letters and digits', async () => {
-    const { posted } = await adding();
-    await click(button('Another computer'));
-    input('name', 'Lab'); input('runner-key', 'short'); await submit();
-    expect(posted).toEqual([]); expect(text()).toContain('64 letters and digits');
+  it('keeps the runner phase unresolved when its answer is refused', async () => {
+    const { posted } = await adding(naming(() => refused(503, 'RunnerUnavailable', 'The runner was not confirmed')));
+    input('name', 'Lab'); await submit();
+    expect(posted).toHaveLength(2); expect(text()).toContain('RunnerUnavailable');
+    expect(text()).not.toContain('Lab was added.'); expect(sessionStorage.length).toBe(1);
+    expect(button('Check whether it was added')).not.toBeNull();
   });
   it('keeps an unconfirmed addition across remount and sends only its original request', async () => {
     const first = await adding({ 'POST /network/machines': refused(503, 'NetworkUnavailable', 'write outcome unknown') });
     input('name', 'Lab'); await submit();
     const original = first.posted[0].body;
     unmountAll(); document.body.innerHTML = '';
-    const second = await adding({ 'POST /network/machines': (body) => ok(recorded(body as NameMachine)) });
+    const second = await adding(naming());
     await click(button('Check whether it was added'));
     expect(second.posted[0]).toEqual({ path: '/network/machines', body: original });
     expect(text()).toContain('Lab was added.');
@@ -86,11 +95,14 @@ describe('Network', () => {
     await mount('#/network', { ...routes, '/network': refused(503, 'NetworkUnavailable', 'not configured') });
     expect(text()).toContain('NetworkUnavailable'); expect(button('+ Add a computer')).toBeNull();
   });
-  it('records selected roles separately from individual agents, and keeps the entry when the answer omits one', async () => {
+  it('replays a legacy role declaration exactly and keeps the entry when the answer omits that role', async () => {
     const role = { id: 'op-' + 'c'.repeat(32), name: 'Builder', holders: [], versions: [] };
+    const legacy: NameMachine = { operation: 'op-' + 'd'.repeat(32), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [role.id], may_reach: [] };
+    sessionStorage.setItem('lys.pending.machine.' + ADA, JSON.stringify(legacy));
     const { posted } = await adding({ '/roles': ok({ roles: [role] }), 'POST /network/machines': (body) => ok({ ...recorded(body as NameMachine), may_run_roles: [] }) });
-    input('name', 'Lab'); await click($('input[name="role"]')); await submit();
+    await click(button('Check whether it was added'));
     expect(posted[0].body).toMatchObject({ may_run: [], may_run_roles: [role.id] });
+    expect(posted[0].body).toEqual(legacy);
     expect(text()).toContain('What you entered is kept'); expect(sessionStorage.length).toBe(1);
   });
 });
