@@ -18,6 +18,15 @@ use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 #[path = "../tests/collector_binding/cases.rs"]
 mod binding_tests;
 
+#[cfg(test)]
+#[path = "../tests/rollout_dates/cases.rs"]
+mod rollout_tests;
+
+#[cfg(test)]
+thread_local! {
+    static ROLLOUT_DIRECTORIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -348,6 +357,8 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
     let mut dirs = vec![home.join("sessions")];
     let mut found = None;
     while let Some(dir) = dirs.pop() {
+        #[cfg(test)]
+        ROLLOUT_DIRECTORIES.with(|count| count.set(count.get() + 1));
         let entries = std::fs::read_dir(&dir).map_err(|error| {
             RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
         })?;
