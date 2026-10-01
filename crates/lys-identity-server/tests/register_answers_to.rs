@@ -58,7 +58,7 @@ async fn registration_respects_the_chosen_person_and_the_callers_authority()
     for (id, status, code) in [
         (unknown.as_str(), 404, "AnswersToUnknown"),
         (unknown_agent.as_str(), 404, "AnswersToUnknown"),
-        ("malformed-identity", 409, "IdentifierMalformed"),
+        ("malformed-identity", 400, "IdentifierMalformed"),
     ] {
         let body = json!({"operation": OperationId::generate()?.to_string(), "display_name": "Invalid responsibility", "answers_to": id});
         refused(&service, &administrator, &body, status, code).await?;
@@ -316,6 +316,6 @@ async fn an_answers_to_that_is_no_identity_is_refused_by_name() -> Result<(), Bo
         "operation": OperationId::generate()?.to_string(),
         "display_name": "Malformed reporting target", "answers_to": "not-an-id",
     });
-    refused(&service, &administrator, &body, 409, "IdentifierMalformed").await?;
+    refused(&service, &administrator, &body, 400, "IdentifierMalformed").await?;
     Ok(())
 }
