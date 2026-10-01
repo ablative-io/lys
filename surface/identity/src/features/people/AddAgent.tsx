@@ -11,12 +11,11 @@ import type { PendingAgent } from './add-agent-request';
 import { registrationCapability } from './registration-capability';
 import type { RegistrationCapability } from './registration-capability';
 import { addAndRun, AddAndRunFailure, addAndRunStep, firstRunChoices, newAddAndRun, profileFromSettings, readAddAndRun } from './add-and-run';
-import type { AddAndRun } from './add-and-run';
+import type { AddAndRun, FirstRunOptions } from './add-and-run';
 import { ProfileFields } from '../provisioning/ProfileEditor';
-import type { Choices } from '../provisioning/choices';
 import { validComputerName } from '../network/AddMachine';
 
-function Form({ me, people, teams, search, capability, runOptions }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: RegistrationCapability; runOptions: { choices: Choices | null; problem: unknown } }) {
+function Form({ me, people, teams, search, capability, runOptions }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: RegistrationCapability; runOptions: FirstRunOptions }) {
   const navigate = useNavigate();
   const key = 'lys.add-agent.' + me.person.id;
   const runKey = 'lys.add-and-run.' + me.person.id;
@@ -38,7 +37,12 @@ function Form({ me, people, teams, search, capability, runOptions }: { me: MeVie
   const [pending, setPending] = useState(saved.pending);
   const [walk, setWalk] = useState(saved.walk);
   const [computerName, setComputerName] = useState(saved.walk?.machine.body.name ?? '');
-  const onePress = Boolean(walk) || !pending && runOptions.choices !== null;
+  const inUse = useMemo(() => runOptions.network?.machines.filter((machine) => machine.state === 'in_use') ?? [], [runOptions.network]);
+  const hold = walk && runOptions.network === null
+    ? new Refused(0, { refusal: 'RetainedNetworkUnconfirmed', reason: 'Lys could not confirm the computers for this saved request; it has not been sent.' })
+    : walk && inUse.length > 0 && !inUse.some((machine) => machine.id === walk.machine.body.operation)
+      ? new Refused(0, { refusal: 'RetainedComputerAdditionHeld', reason: 'This saved request would add a second computer; it has not been sent.' }) : null;
+  const onePress = Boolean(walk) && !hold || !pending && !walk && runOptions.choices !== null;
   const working = useRef(false);
   const peopleById = useMemo(() => new Map(people.people.map((entry) => [entry.id, entry])), [people]);
   const names = useMemo(() => new Map((peopleById.get(person)?.agents ?? []).map((agent) => [agent.display_name.trim().toLowerCase(), agent.display_name])), [peopleById, person]);
@@ -54,7 +58,7 @@ function Form({ me, people, teams, search, capability, runOptions }: { me: MeVie
   const keepWalk = (next: AddAndRun) => { sessionStorage.setItem(runKey, JSON.stringify(next)); setWalk(next); };
   const submit = async (event: FormEvent<HTMLFormElement>, settings?: Record<string, unknown>, profileProblem = '') => {
     event.preventDefault();
-    if (working.current || saved.error || unavailable || !name.trim() || (!pending && !walk && (invalidChoice || taken))) return;
+    if (working.current || saved.error || hold || unavailable || !name.trim() || (!pending && !walk && (invalidChoice || taken))) return;
     if (onePress && !walk && (!settings || profileProblem || !validComputerName(computerName.trim()))) return;
     working.current = true; setSending(true); setRefusal(null);
     try {
@@ -91,17 +95,22 @@ function Form({ me, people, teams, search, capability, runOptions }: { me: MeVie
   const renderForm = (fields: ReactNode, settings?: Record<string, unknown>, profileProblem = '') => <form className="add-agent" aria-label="Add an agent" onSubmit={(event) => { void submit(event, settings, profileProblem); }}>
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
       {registrationFields}{fields}
-      {onePress ? <label className="field">Computer name<input name="computer_name" value={computerName} required maxLength={100} autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
+      {onePress ? inUse.length ? <p>Computer: {walk?.machine.body.name}</p> : <label className="field">Computer name<input name="computer_name" value={computerName} required maxLength={100} autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
     </fieldset>
+    {!walk ? inUse.map((machine) => <p key={machine.id}>{machine.may_run_roles?.length
+      ? "Lys cannot confirm what " + machine.name + "'s roles grant, so it won't give one to " + (name.trim() || 'this agent') + '. Add the agent here, then start it from its page once it is admitted to ' + machine.name + '.'
+      : machine.name + ' runs only the agents named when it was added. To add and run from here, add this computer again in Network with a role, then retire ' + machine.name + '.'}</p>) : null}
+    {hold ? <><p className="why-not" role="alert">{hold.message}</p><details><summary>Details</summary><ErrorWords problem={hold} /></details></> : null}
+    {inUse.length && (!walk || hold) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
     {capability.problem ? <><p>The service’s registration choices could not be read. You can add an agent under You only.</p><details><summary>Registration details</summary><ErrorWords problem={capability.problem} /></details></> : !capability.answersTo ? <p>Adding an agent under another person is coming. You can add an agent under You.</p> : null}
     {unsupported ? <p role="alert" className="why-not">{unsupported}</p> : null}
     {invalidChoice ? <p role="alert" className="why-not">{invalidChoice}</p> : null}
     {runOptions.problem ? <><p>Lys could not read the choices for adding and running this agent.</p><details><summary>Details</summary><ErrorWords problem={runOptions.problem} /></details></> : null}
     {refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><details><summary>Details</summary><ErrorWords problem={refusal.problem} /></details></> : onePress ? <><p role="alert">Lys could not read the saved add-and-run request.</p><details><summary>Details</summary><ErrorWords problem={refusal} /></details></> : <ErrorWords problem={refusal} /> : null}
-    {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. Its original requests are saved; this button continues them.</p> : null}
+    {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. {hold ? 'Its original requests are kept.' : 'Its original requests are saved; this button continues them.'}</p> : null}
     {onePress && !walk && profileProblem ? <><p>Choose the settings before adding and running this agent.</p><details><summary>Details</summary><p>{profileProblem}</p></details></> : null}
     {pending ? <p role="status">{pending.activated ? 'Your agent was added. Its team membership still needs confirmation.' : pending.agent ? 'Your agent was registered. Activation still needs confirmation.' : 'The registration has no confirmed answer yet.'} The original request is saved. Try that same request again without adding another agent.</p> : null}
-    <p><button className="btn primary" type="submit" disabled={sending || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !validComputerName(computerName.trim())))}>{onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'}</button></p>
+    <p><button className="btn primary" type="submit" disabled={sending || Boolean(hold) || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !validComputerName(computerName.trim())))}>{hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'}</button></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} strict render={renderForm} /> : renderForm(null);
 }
