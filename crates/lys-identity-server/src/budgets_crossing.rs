@@ -108,7 +108,7 @@ pub enum Stands {
     Delivered,
     /// Seen done: a compaction begun, a stop's exit seen.
     Confirmed,
-    /// Whether it reached the session cannot be known; it is not asked again.
+    /// Whether it reached the session is unknown; ask again under the same id.
     Uncertain,
     /// Not done, by name.
     Refused,
@@ -185,7 +185,7 @@ impl Crossings {
             .filter(|crossing| match self.acted.get(&crossing.operation) {
                 None => true,
                 Some(acted) => {
-                    acted.stands == Stands::Accepted
+                    matches!(acted.stands, Stands::Accepted | Stands::Uncertain)
                         || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
                 }
             })
