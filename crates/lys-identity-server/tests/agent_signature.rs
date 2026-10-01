@@ -106,7 +106,7 @@ impl Table {
             move |config| {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let actor = Actor::new(
-                    LoginBinding::new(&config.issuer, BEA)?,
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
                     Provenance::new(AuthMethod::Oidc, 1),
                 );
                 let mut directory = open_directory(config)?;
@@ -114,6 +114,13 @@ impl Table {
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    1,
+                )?;
+                directory.bind_login(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    LoginBinding::new(&config.issuer, BEA)?,
                     1,
                 )?;
                 let (agent, _) = directory.register_agent(
@@ -131,14 +138,28 @@ impl Table {
                     "",
                     3,
                 )?;
+                drop(lys_identity_server::runtime_store::RuntimeStore::open(
+                    config
+                        .runtime_dir
+                        .as_deref()
+                        .ok_or("runtime directory missing")?,
+                    Arc::clone(&key),
+                )?);
+                drop(lys_identity_server::goals_store::GoalStore::open(
+                    config
+                        .goals_dir
+                        .as_deref()
+                        .ok_or("goals directory missing")?,
+                    Arc::clone(&key),
+                )?);
+                let mut certificates = CertificateStore::open(
+                    config
+                        .certificates_dir
+                        .as_deref()
+                        .ok_or("certificate directory missing")?,
+                    Arc::clone(&key),
+                )?;
                 if let Some(der) = der {
-                    let mut certificates = CertificateStore::open(
-                        config
-                            .certificates_dir
-                            .as_deref()
-                            .ok_or("certificate directory missing")?,
-                        Arc::clone(&key),
-                    )?;
                     certificates.issue(Issued {
                         serial: entered_serial,
                         agent: agent.to_string(),
