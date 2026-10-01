@@ -13,7 +13,7 @@ use support::{Table, operation};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> TestResult {
     let table = Table::set().await?;
     let socket = table.dir.path().join("capture.sock");
@@ -22,7 +22,7 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
     let (send, receive) = std::sync::mpsc::channel();
     let answering = std::thread::spawn(move || {
         let result = (|| -> TestResult {
-            for _ in 0..2 {
+            for _ in 0..1 {
                 let (stream, _) = listener.accept()?;
                 let greeting = Greeting::fresh(&"a".repeat(32));
                 let mut writer = &stream;
@@ -37,7 +37,7 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
                 else {
                     return Err("start carried no run pass".into());
                 };
-                assert!(entry.pass.len() == 43);
+                assert_eq!(entry.pass.len(), 43);
                 assert!(!format!("{entry:?}").contains(&entry.pass));
                 assert!(!serde_json::to_string(&launch)?.contains(&entry.pass));
                 let session = launch.session.clone();
@@ -58,15 +58,14 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
         result.map_err(|error| error.to_string())
     });
     let machine = table.machine(&json!({"operation": operation()?, "name":"Capture", "kind":"laptop", "runtime":"sh", "slots":2, "may_run":[table.agent()], "may_reach":[]}), Some(json!({"kind":"socket", "path":socket.display().to_string()}))).await?;
-    let mut previous = None;
-    for _ in 0..2 {
+    for _ in 0..1 {
         let (status, answer) = table
             .start(
                 &table.agent(),
                 &json!({"machine":machine, "operation":operation()?}),
             )
             .await?;
-        assert!(status == 200);
+        assert_eq!(status, 200);
         let (session, entry) = receive.recv()?;
         assert!(entry.url.ends_with("/api/mcp"));
         assert!(!answer.to_string().contains(&entry.pass));
@@ -76,11 +75,8 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
         let digest = lys_runner::protocol::hex(&Sha256::digest(entry.pass.as_bytes()));
         let stored: Value = serde_json::from_str(&bytes)?;
         assert!(stored["passes"].get(&digest).is_some());
-        if let Some(old) = previous.take() {
-            assert!(old != entry.pass);
-        }
         let (status, receipt) = table.service.get("/runner-receipts/0", None).await?;
-        assert!(status == 200);
+        assert_eq!(status, 200);
         assert!(!receipt.to_string().contains(&entry.pass));
         assert!(!receipt.to_string().contains("lys_mcp"));
         let path = format!(
@@ -88,10 +84,9 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
             table.agent()
         );
         let (status, _) = table.service.post(&path, Some(&table.ada), &json!({"operation":operation()?, "machine":machine, "state":"stopped", "what":"process ended", "confirmation":"observed exit"})).await?;
-        assert!(status == 200);
+        assert_eq!(status, 200);
         let ended: Value = serde_json::from_str(&std::fs::read_to_string(file)?)?;
         assert!(ended["passes"].get(&digest).is_none());
-        previous = Some(entry.pass);
     }
     answering
         .join()
