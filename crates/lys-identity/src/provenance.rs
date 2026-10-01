@@ -31,6 +31,8 @@ pub enum AuthMethod {
     /// This person's service account presented its independently verified
     /// bearer credential. This never asserts the person signed in.
     ServiceAccountBearer(ServiceAccountId),
+    /// A live pass bound to this agent's run authenticated the request.
+    AgentPass(AgentId),
 }
 
 /// How and when the service authenticated the actor.
@@ -65,7 +67,7 @@ impl Provenance {
     pub fn agent(&self) -> Option<AgentId> {
         match self.method {
             AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => None,
-            AuthMethod::AgentSignature(agent) => Some(agent),
+            AuthMethod::AgentSignature(agent) | AuthMethod::AgentPass(agent) => Some(agent),
         }
     }
 
@@ -73,7 +75,10 @@ impl Provenance {
     pub fn service_account(&self) -> Option<ServiceAccountId> {
         match self.method {
             AuthMethod::ServiceAccountBearer(account) => Some(account),
-            AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::AgentSignature(_) => None,
+            AuthMethod::Oidc
+            | AuthMethod::Operator
+            | AuthMethod::AgentSignature(_)
+            | AuthMethod::AgentPass(_) => None,
         }
     }
 
@@ -111,3 +116,7 @@ impl Actor {
         &self.provenance
     }
 }
+
+#[cfg(test)]
+#[path = "provenance_tests.rs"]
+mod tests;

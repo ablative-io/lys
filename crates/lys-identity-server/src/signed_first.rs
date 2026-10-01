@@ -57,6 +57,37 @@ async fn check(
     request: Request,
     next: Next,
 ) -> Response {
+    if request.headers().contains_key(crate::agent_pass::HEADER) {
+        if [
+            header::COOKIE,
+            header::AUTHORIZATION,
+            axum::http::HeaderName::from_static(crate::agent_signature::HEADER),
+        ]
+        .iter()
+        .any(|name| request.headers().contains_key(name))
+        {
+            return ServerError::AgentPassRefused {
+                reason: "a run pass cannot be combined with another credential".to_owned(),
+            }
+            .into_response();
+        }
+        let method = if request.method() == HttpMethod::HEAD {
+            "GET"
+        } else {
+            request.method().as_str()
+        };
+        let path = request
+            .uri()
+            .path()
+            .strip_prefix(NESTED)
+            .unwrap_or(request.uri().path());
+        if let Err(refusal) =
+            crate::route_actions::admit(&doors.state, method, path, request.headers())
+        {
+            return *refusal;
+        }
+        return next.run(request).await;
+    }
     if request
         .extensions()
         .get::<crate::agent_signature::TokenPrincipal>()

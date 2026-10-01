@@ -34,6 +34,7 @@ enum StoredMethod {
     Oidc,
     AgentSignature,
     ServiceAccountBearer,
+    AgentPass,
 }
 
 /// An actor, as stored.
@@ -85,6 +86,7 @@ impl StoredActor {
             AuthMethod::AgentSignature(agent) => {
                 (StoredMethod::AgentSignature, Some(agent.to_string()))
             }
+            AuthMethod::AgentPass(agent) => (StoredMethod::AgentPass, Some(agent.to_string())),
             AuthMethod::ServiceAccountBearer(account) => (
                 StoredMethod::ServiceAccountBearer,
                 Some(account.to_string()),
@@ -107,6 +109,11 @@ impl StoredActor {
             (StoredMethod::Oidc, None) => AuthMethod::Oidc,
             (StoredMethod::AgentSignature, Some(agent)) => {
                 AuthMethod::AgentSignature(agent.parse::<AgentId>().map_err(|error| {
+                    unavailable(path, &format!("a stored agent does not read: {error}"))
+                })?)
+            }
+            (StoredMethod::AgentPass, Some(agent)) => {
+                AuthMethod::AgentPass(agent.parse::<AgentId>().map_err(|error| {
                     unavailable(path, &format!("a stored agent does not read: {error}"))
                 })?)
             }
