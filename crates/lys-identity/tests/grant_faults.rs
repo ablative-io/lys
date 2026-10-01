@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! R3: grants and their audit as one replayable operation (`GRANT_DURABILITY`
 //! and `GRANT_IDEMPOTENCE`).
 
@@ -6,7 +8,7 @@ mod support;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::Path;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
@@ -20,6 +22,13 @@ use lys_log_store::{FileLeafStore, LeafStore, Log, PinnedRoot, StoreError, Store
 use support::{T0, World, actions, alpha, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn held<T>(slot: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    match slot.lock() {
+        Ok(held) => held,
+        Err(error) => panic!("fixture_lock_poisoned: {error}"),
+    }
+}
 
 const BOTH: [RecipientKind; 2] = [RecipientKind::Person, RecipientKind::Agent];
 
@@ -45,11 +54,11 @@ enum EngineFault {
 type Plan<T> = Arc<Mutex<T>>;
 
 fn get<T: Copy>(plan: &Plan<T>) -> T {
-    *plan.lock().unwrap_or_else(PoisonError::into_inner)
+    *held(plan)
 }
 
 fn set<T>(plan: &Plan<T>, next: T) {
-    *plan.lock().unwrap_or_else(PoisonError::into_inner) = next;
+    *held(plan) = next;
 }
 
 fn injected(context: &str) -> StoreError {

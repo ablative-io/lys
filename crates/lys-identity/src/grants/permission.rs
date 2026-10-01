@@ -10,7 +10,7 @@
 //! reflects, so a decision can require the revision a change made.
 
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use super::error::GrantError;
 use super::types::{Grant, GrantId, Resource, Source};
@@ -182,7 +182,13 @@ pub struct MemoryRelationships {
 
 impl RelationshipStore for MemoryRelationships {
     fn revision(&self) -> Result<u64, GrantError> {
-        Ok(self.state.lock().unwrap_or_else(PoisonError::into_inner).0)
+        Ok(self
+            .state
+            .lock()
+            .map_err(|error| GrantError::PermissionEngineUnavailable {
+                reason: format!("permission relationships lock poisoned: {error}"),
+            })?
+            .0)
     }
 
     fn write(
@@ -191,7 +197,12 @@ impl RelationshipStore for MemoryRelationships {
         touch: &[Relationship],
         delete: &[Relationship],
     ) -> Result<(), GrantError> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut state =
+            self.state
+                .lock()
+                .map_err(|error| GrantError::PermissionEngineUnavailable {
+                    reason: format!("permission relationships lock poisoned: {error}"),
+                })?;
         if revision != state.0 + 1 {
             return Err(GrantError::PermissionEngineUnavailable {
                 reason: format!("a write at revision {revision} does not follow {}", state.0),
@@ -209,7 +220,9 @@ impl RelationshipStore for MemoryRelationships {
         Ok(self
             .state
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| GrantError::PermissionEngineUnavailable {
+                reason: format!("permission relationships lock poisoned: {error}"),
+            })?
             .1
             .clone())
     }
@@ -249,4 +262,46 @@ pub fn confirm(held: &BTreeSet<Relationship>, path: &[GrantId], at: u64) -> Resu
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::{GrantError, MemoryRelationships, RelationshipStore};
+
+    #[test]
+    fn poisoned_permission_projection_refuses_reads_and_writes_until_rebuilt() {
+        let mut engine = MemoryRelationships::default();
+        assert!(engine.write(1, &[], &[]).is_ok());
+        let poisoned = engine.clone();
+        let panic = std::panic::catch_unwind(move || {
+            let mut state = match poisoned.state.lock() {
+                Ok(state) => state,
+                Err(error) => panic!("fixture_lock_poisoned: {error}"),
+            };
+            state.0 = 2;
+            panic!("injected partial permission update");
+        });
+        assert!(panic.is_err());
+        let unavailable = |error| {
+            assert!(
+                matches!(error, GrantError::PermissionEngineUnavailable { reason }
+                if reason.contains("lock poisoned"))
+            );
+        };
+        unavailable(match engine.revision() {
+            Err(error) => error,
+            Ok(revision) => panic!("poisoned revision was exposed: {revision}"),
+        });
+        unavailable(match engine.read() {
+            Err(error) => error,
+            Ok(held) => panic!("poisoned relationships were exposed: {held:?}"),
+        });
+        unavailable(match engine.write(3, &[], &[]) {
+            Err(error) => error,
+            Ok(()) => panic!("poisoned relationships accepted another write"),
+        });
+        let mut rebuilt = MemoryRelationships::default();
+        assert!(rebuilt.write(1, &[], &[]).is_ok());
+        assert_eq!(rebuilt.revision(), Ok(1));
+    }
 }

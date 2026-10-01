@@ -9,7 +9,7 @@
 
 use std::error::Error;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::http::HeaderMap;
 use lys_core::Ed25519Identity;
@@ -47,7 +47,7 @@ struct World {
 struct Seam(Arc<World>);
 
 fn lock<T>(held: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    held.lock().unwrap_or_else(PoisonError::into_inner)
+    held.lock().expect("fixture lock poisoned")
 }
 
 fn is_fixture_agent(agent: &str) -> bool {
@@ -191,6 +191,10 @@ fn marker(dir: &tempfile::TempDir) -> PathBuf {
 
 impl Served {
     async fn start() -> Result<Self, Box<dyn Error>> {
+        Self::start_with_callers(Box::new(HeaderCallers)).await
+    }
+
+    async fn start_with_callers(callers: Box<dyn Callers>) -> Result<Self, Box<dyn Error>> {
         let dir = tempfile::tempdir()?;
         let script = dir.path().join("fixture-exec");
         std::fs::write(&script, format!("touch '{}'\n", marker(&dir).display()))?;
@@ -219,12 +223,7 @@ impl Served {
         };
         let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
         let launches = LaunchRecords::open(&dir.path().join("launch-records"), key)?;
-        let service = Arc::new(StartService::new(
-            owners,
-            Box::new(HeaderCallers),
-            launches,
-            clock,
-        ));
+        let service = Arc::new(StartService::new(owners, callers, launches, clock));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let base = format!("http://{}", listener.local_addr()?);
         let app = routes(Arc::clone(&service));
@@ -371,7 +370,7 @@ async fn each_refusal_is_the_librarys_own_bytes() -> TestResult {
             ("machine".to_owned(), "machine-fixture-1".to_owned()),
             ("agent".to_owned(), agent.to_owned()),
         ];
-        let mut launches = served.service.launches();
+        let mut launches = served.service.launches()?;
         let error = give(
             &mut launches,
             &served.service.owners(),
@@ -438,4 +437,57 @@ fn the_route_holds_no_start_logic_and_reads_the_door_through_the_seam() {
     assert!(ROUTES.contains("let handles = door_handles::DoorHandles::unconfigured();"));
     assert!(ROUTES.contains("Box::new(handles),\n        door_handles::credential_id,"));
     assert!(ROUTES.contains("let starts = start::routes(start_service(config, &state)?);"));
+}
+
+#[tokio::test]
+async fn poisoned_launch_records_are_refused_without_a_command() -> TestResult {
+    let served = Served::start().await?;
+    let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let held = served
+            .service
+            .launches()
+            .expect("fixture launch store poisoned before injection");
+        assert_eq!(held.record_count(), 0);
+        panic!("launch records failure");
+    }));
+    assert!(poisoned.is_err());
+    let (status, body) = served.start_agent("admin-fixture").await?;
+    assert_eq!(status, 503, "{body}");
+    assert_eq!(parsed(&body)?["error"], "launch_records_unavailable");
+    assert!(body.contains("launch records unavailable"));
+    assert!(parsed(&body)?.get("command").is_none());
+    assert!(!served.ran());
+    Ok(())
+}
+
+struct UnavailableCallers(Arc<std::sync::atomic::AtomicBool>);
+
+impl Callers for UnavailableCallers {
+    fn check_admission(&self) -> Result<(), lys_identity_server::error::ServerError> {
+        Err(
+            lys_identity_server::error::ServerError::DirectoryUnavailable {
+                reason: "administrator store unavailable".to_owned(),
+            },
+        )
+    }
+
+    fn caller(&self, headers: &HeaderMap) -> Option<String> {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        HeaderCallers.caller(headers)
+    }
+}
+
+#[tokio::test]
+async fn unavailable_admission_is_named_before_the_legacy_authority_seam() -> TestResult {
+    let read = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let served =
+        Served::start_with_callers(Box::new(UnavailableCallers(Arc::clone(&read)))).await?;
+    let (status, body) = served.start_agent("admin-fixture").await?;
+    assert_eq!(status, 503, "{body}");
+    assert_eq!(parsed(&body)?["error"], "DirectoryUnavailable");
+    assert!(body.contains("administrator store unavailable"));
+    assert!(!read.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(parsed(&body)?.get("command").is_none());
+    assert!(!served.ran());
+    Ok(())
 }

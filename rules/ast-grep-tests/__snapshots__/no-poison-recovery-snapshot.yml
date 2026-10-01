@@ -1,0 +1,20 @@
+id: no-poison-recovery
+snapshots:
+  'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(PoisonError::into_inner); }':
+    labels:
+    - source: PoisonError::into_inner
+      style: primary
+      start: 52
+      end: 75
+  'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(std::sync::PoisonError::into_inner); }':
+    labels:
+    - source: std::sync::PoisonError::into_inner
+      style: primary
+      start: 52
+      end: 86
+  'fn lock(m: &Mutex<State>) { m.lock().unwrap_or_else(|error| error.into_inner()); }':
+    labels:
+    - source: m.lock().unwrap_or_else(|error| error.into_inner())
+      style: primary
+      start: 28
+      end: 79

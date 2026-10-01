@@ -8,8 +8,8 @@ use axum::extract::{MatchedPath, Request, State};
 use axum::http::Method;
 use axum::middleware::Next;
 use axum::response::Response;
-use lys_identity::Actor;
 use lys_identity::projection::Projection;
+use lys_identity::{Actor, IdentityId};
 
 use crate::caller_admission::{active_caller, authenticating_caller};
 use crate::error::ServerError;
@@ -52,7 +52,51 @@ pub async fn guard(
 
 /// Begin a session while its bound identity may authenticate, serialized
 /// with lifecycle transitions. Unbound first-run administrator login is kept.
-pub fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError> {
+pub async fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError> {
+    let account = with_directory(state, |directory| {
+        Ok(account_id(
+            directory.projection()?,
+            &actor,
+            state.oidc.issuer(),
+        ))
+    })?;
+    let (Some(api), Some(account)) = (&state.sign_in_providers, account) else {
+        return begin_lifecycle(state, actor);
+    };
+    let guard = api.lock_account(&account).await?;
+    let user = crate::accounts::read(api, &account).await?;
+    let enabled = user
+        .get("enabled")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| ServerError::SignInProvidersUnavailable {
+            reason: "the sign-in service's account answer has no boolean enabled field".to_owned(),
+        })?;
+    if !enabled {
+        return Err(ServerError::SignInRefused);
+    }
+    let answer = with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        if account_id(projection, &actor, state.oidc.issuer()).as_deref() != Some(&account) {
+            return Err(ServerError::SignInRefused);
+        }
+        bound_caller(projection, &actor, true)?;
+        state.sessions.begin(actor)
+    });
+    drop(guard);
+    answer
+}
+
+fn account_id(directory: &Projection, actor: &Actor, issuer: &str) -> Option<String> {
+    let person = directory.person_for(actor.binding())?;
+    directory
+        .record(IdentityId::Person(person))?
+        .bindings()
+        .iter()
+        .find(|binding| binding.issuer() == issuer)
+        .map(|binding| binding.subject().to_owned())
+}
+
+fn begin_lifecycle(state: &AppState, actor: Actor) -> Result<String, ServerError> {
     with_directory(state, |directory| {
         bound_caller(directory.projection()?, &actor, true)?;
         state.sessions.begin(actor)

@@ -15,7 +15,7 @@
 //! that version runs.
 
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -330,7 +330,11 @@ pub(crate) fn with_provisioning<T>(
             .ok_or_else(|| ServerError::ProvisioningUnavailable {
                 reason: "the configuration names no provisioning_file".to_owned(),
             })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::ProvisioningUnavailable {
+            reason: format!("the provisioning lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }

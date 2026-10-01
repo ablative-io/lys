@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, MutexGuard};
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -59,10 +59,9 @@ mod refusals;
 /// process and spawn the binary, run one at a time.
 static SERIAL: Mutex<()> = Mutex::new(());
 
-/// Take [`SERIAL`]; a test that failed while holding it has already reported
-/// its own failure, so the poison is not a second one.
+/// Take the fixture serialisation lock; interrupted fixture state refuses reuse.
 fn serially() -> MutexGuard<'static, ()> {
-    SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+    SERIAL.lock().expect("test state lock poisoned")
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

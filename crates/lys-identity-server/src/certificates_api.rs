@@ -10,7 +10,7 @@
 //! Issuing and withdrawing are in `certificates_issue`; their answers are
 //! this same view, with the serial the act was recorded under.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
@@ -97,7 +97,11 @@ fn with_certificates<T>(
             .ok_or_else(|| ServerError::CertificatesUnavailable {
                 reason: "the configuration names no certificates_dir".to_owned(),
             })?;
-    let store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let store = store
+        .lock()
+        .map_err(|error| ServerError::CertificatesUnavailable {
+            reason: format!("the certificates lock is poisoned: {error}"),
+        })?;
     act(&store)
 }
 

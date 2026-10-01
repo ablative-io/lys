@@ -166,6 +166,13 @@ fn encoded(text: &str) -> String {
 }
 
 impl OpenIdProvider {
+    /// Revoke the person's codes and durably remove their access tokens.
+    pub(crate) fn revoke_person(&self, subject: &str) -> Result<(), ServerError> {
+        let mut codes = held(&self.codes)?;
+        codes.retain(|_, grant| grant.subject != subject);
+        held(&self.tokens)?.revoke_subject(subject)
+    }
+
     /// The provider `settings` names, answering as `issuer`, Lys's origin.
     pub fn open(settings: &ProviderSettings, issuer: String) -> Result<Self, ServerError> {
         let key = Ed25519Identity::load(&settings.key_file).map_err(|error| {

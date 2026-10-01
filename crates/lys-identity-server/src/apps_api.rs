@@ -24,7 +24,7 @@
 
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path as UrlPath, State};
@@ -154,7 +154,13 @@ pub(crate) fn with_apps<T>(
     act: impl FnOnce(&mut AppStore, &lys_identity::projection::Projection) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
-        let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut apps =
+            state
+                .apps
+                .lock()
+                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                    reason: format!("the apps lock is poisoned: {error}"),
+                })?;
         apps.settle()?;
         act(&mut apps, directory.projection()?)
     })
@@ -212,7 +218,11 @@ fn service_account_held(state: &AppState, id: &str) -> Result<(), ServerError> {
             reason: "the configuration names no service_accounts_dir, so no service account can be bound to an app".to_owned(),
         });
     };
-    let store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let store = store
+        .lock()
+        .map_err(|error| ServerError::ServiceAccountsUnavailable {
+            reason: format!("the service accounts lock is poisoned: {error}"),
+        })?;
     match store.account(id) {
         Some(account) if !account.is_retired() => Ok(()),
         Some(_) => Err(ServerError::ServiceAccountRetired {

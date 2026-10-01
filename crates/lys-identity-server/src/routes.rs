@@ -7,7 +7,7 @@ pub use crate::routes_table::router;
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
@@ -204,10 +204,13 @@ pub(crate) fn with_directory<T>(
     state: &AppState,
     act: impl FnOnce(&mut Directory<FileLeafStore>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let mut directory = state
-        .directory
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut directory =
+        state
+            .directory
+            .lock()
+            .map_err(|error| ServerError::DirectoryUnavailable {
+                reason: format!("the directory lock is poisoned: {error}"),
+            })?;
     act(&mut directory)
 }
 

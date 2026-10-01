@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! A question that cannot be answered is named, never drawn as nobody: with
 //! `SpiceDB` answering the service but refusing every relationship read, with
 //! a grant recorded that it would not take, and with a revocation the grant
@@ -8,7 +10,7 @@ use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
@@ -55,7 +57,7 @@ fn engine(broken: Arc<AtomicBool>, refusing: Arc<AtomicBool>) -> Result<String, 
                 break;
             }
             let request: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
-            let mut text = schema.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut text = schema.lock().expect("fixture lock poisoned");
             let (status, answer) = match path.as_str() {
                 "/v1/schema/read" => (200, json!({ "schemaText": *text }).to_string()),
                 "/v1/schema/write" => {

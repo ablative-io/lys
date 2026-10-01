@@ -311,7 +311,7 @@ mod directory_events {
     fn an_append_whose_leaf_landed_is_found_committed_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        harness.fail(Fault::AfterLeaf);
+        harness.fail(Fault::AfterLeaf)?;
         let (person, receipt) =
             directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(receipt.coordinate().index, 0);
@@ -326,7 +326,7 @@ mod directory_events {
     fn an_append_whose_leaf_never_landed_is_refused_and_records_nothing() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        harness.fail(Fault::BeforeLeaf);
+        harness.fail(Fault::BeforeLeaf)?;
         let refused = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
         assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
         assert_eq!(directory.log()?.len()?, 0);
@@ -339,14 +339,14 @@ mod directory_events {
     fn an_uncertain_append_holds_every_read_until_it_is_resolved() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        harness.fail(Fault::AfterLeafUnreadable);
+        harness.fail(Fault::AfterLeafUnreadable)?;
         let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
         assert!(
             directory.projection().is_err(),
             "no read answers while the append is uncertain"
         );
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         assert_eq!(
             directory.projection()?.records().count(),
             1,
@@ -362,7 +362,7 @@ mod directory_events {
     fn a_leaf_stored_behind_a_failed_write_is_found_committed_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        harness.fail(Fault::LeafStoredWriteFailed);
+        harness.fail(Fault::LeafStoredWriteFailed)?;
         let (person, receipt) =
             directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(
@@ -444,7 +444,7 @@ mod directory_events {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
         let (ada, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        harness.fail(Fault::AfterLeafUnreadable);
+        harness.fail(Fault::AfterLeafUnreadable)?;
         let held = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
         assert!(
@@ -455,7 +455,7 @@ mod directory_events {
             directory.record(IdentityId::Person(ada)).is_err(),
             "no record is served while uncertain"
         );
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         assert_eq!(directory.log()?.len()?, 2);
         Ok(())
     }
@@ -464,10 +464,10 @@ mod directory_events {
     fn the_same_operation_retried_after_the_log_was_unavailable_records_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        harness.fail(Fault::AfterLeafUnreadable);
+        harness.fail(Fault::AfterLeafUnreadable)?;
         let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         let (person, receipt) =
             directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
         assert_eq!(
@@ -776,7 +776,7 @@ mod faults {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
         directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        harness.fail(fault);
+        harness.fail(fault)?;
         let first = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
         if matches!(first, Err(IdentityError::LogUnavailable { .. })) {
             assert!(
@@ -784,7 +784,7 @@ mod faults {
                 "{fault:?}: no projection is answered while the append is uncertain"
             );
         }
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         if matches!(recovery, Recovery::Restart) {
             drop(directory);
             directory = harness.open()?;

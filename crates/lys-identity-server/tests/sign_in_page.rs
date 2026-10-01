@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Password sign-in on Lys's own page (DIRECTORY-047 R2): the browser posts
 //! to Lys and is never sent to the issuer, a wrong password and an unknown
 //! email are one refusal that names neither the issuer nor which was wrong,
@@ -68,7 +70,9 @@ fn sign_in_body(email: &str, password: &str) -> String {
 #[tokio::test]
 async fn every_address_the_browser_is_sent_to_is_on_lys_origin() -> TestResult {
     let service = Service::start().await?;
-    service.issuer.hold(account("grace-subject", EMAIL, false));
+    service
+        .issuer
+        .hold(account("grace-subject", EMAIL, false))?;
     let browser = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -124,7 +128,7 @@ async fn every_address_the_browser_is_sent_to_is_on_lys_origin() -> TestResult {
         }
     }
     assert_eq!(read, 3, "two bodies and one redirect were read");
-    let forwarded = service.issuer.forwarded();
+    let forwarded = service.issuer.forwarded()?;
     assert_eq!(
         forwarded.len(),
         3,
@@ -142,7 +146,9 @@ async fn every_address_the_browser_is_sent_to_is_on_lys_origin() -> TestResult {
 #[tokio::test]
 async fn a_wrong_password_and_an_unknown_email_are_one_refusal() -> TestResult {
     let service = Service::start().await?;
-    service.issuer.hold(account("grace-subject", EMAIL, false));
+    service
+        .issuer
+        .hold(account("grace-subject", EMAIL, false))?;
     let client = reqwest::Client::new();
     let mut answers = Vec::new();
     for (email, password) in [
@@ -180,7 +186,9 @@ async fn a_wrong_password_and_an_unknown_email_are_one_refusal() -> TestResult {
 #[tokio::test]
 async fn an_account_asking_for_a_second_factor_is_refused_by_name() -> TestResult {
     let service = Service::start().await?;
-    service.issuer.hold(account("passkey-subject", EMAIL, true));
+    service
+        .issuer
+        .hold(account("passkey-subject", EMAIL, true))?;
     let answer = reqwest::Client::new()
         .post(format!("{}/sign-in", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -196,7 +204,9 @@ async fn an_account_asking_for_a_second_factor_is_refused_by_name() -> TestResul
 #[tokio::test]
 async fn failed_sign_ins_from_one_address_do_not_bar_another() -> TestResult {
     let (service, config) = Service::start_with(|config: &Config| Ok(config.clone())).await?;
-    service.issuer.hold(account("grace-subject", EMAIL, false));
+    service
+        .issuer
+        .hold(account("grace-subject", EMAIL, false))?;
     let oidc = Oidc::discover(&config).await?;
     let issuer = IssuerSignIn::configured(&config)?;
     let noisy = IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1));
@@ -229,7 +239,7 @@ async fn failed_sign_ins_from_one_address_do_not_bar_another() -> TestResult {
     assert_eq!(barred.as_deref(), Some("SignInThrottled"));
     let actor = issuer.password(&oidc, &attempt(PASSWORD, quiet)).await?;
     assert_eq!(actor.binding().subject(), "grace-subject");
-    let forwarded = service.issuer.forwarded();
+    let forwarded = service.issuer.forwarded()?;
     assert!(forwarded.contains(&Some("198.51.100.7".to_owned())));
     assert!(forwarded.contains(&Some("192.0.2.1".to_owned())));
     Ok(())
@@ -241,7 +251,7 @@ async fn a_provider_sign_in_passes_through_the_provider_and_lys_only() -> TestRe
     service.issuer.sign_in_as(Login {
         subject: "google-subject".to_owned(),
         email: "g@example.test".to_owned(),
-    });
+    })?;
     let browser = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -375,7 +385,7 @@ async fn the_served_sign_in_page_loads_nothing_from_the_issuer() -> TestResult {
 #[tokio::test]
 async fn lys_limits_attempts_even_when_the_issuer_accepts_every_password() -> TestResult {
     let service = Service::start().await?;
-    service.issuer.hold(account("person", EMAIL, false));
+    service.issuer.hold(account("person", EMAIL, false))?;
     let browser = reqwest::Client::new();
     for _ in 0..10 {
         let answer = browser

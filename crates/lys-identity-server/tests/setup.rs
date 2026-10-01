@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! First-run admission, a single durable setup event, replay and failure recovery.
 use std::error::Error;
 
@@ -96,14 +98,14 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
         let harness = Harness::new(7)?;
         let mut directory = harness.open()?;
         let op = OperationId::generate()?;
-        harness.fail(fault);
+        harness.fail(fault)?;
         let answer = directory.setup_person(actor(1)?, op, Profile::new("Tom")?, 2);
         if matches!(fault, Fault::BeforeLeaf | Fault::AfterLeafUnreadable) {
             assert!(answer.is_err());
         } else {
             assert!(answer.is_ok());
         }
-        harness.fail(Fault::None);
+        harness.fail(Fault::None)?;
         drop(directory);
         let mut directory = harness.open()?;
         let (person, receipt) = directory.setup_person(actor(3)?, op, Profile::new("Tom")?, 4)?;

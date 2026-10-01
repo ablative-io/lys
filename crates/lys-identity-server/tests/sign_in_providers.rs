@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The administrator sets Google, Microsoft and GitHub sign-in at the issuer
 //! from the service: each provider's endpoints come from the issuer's own
 //! lookup (GitHub's are fixed), setting one again replaces it under the same
@@ -68,7 +70,7 @@ async fn google_is_set_from_the_lookup_and_set_again_replaces_it() -> TestResult
         "the secret never comes back: {set}"
     );
 
-    let held = rauthy.providers();
+    let held = rauthy.providers()?;
     assert_eq!(held.len(), 1);
     assert_eq!(held[0]["typ"], "google");
     let provider = service.issuer.provider_base();
@@ -89,7 +91,7 @@ async fn google_is_set_from_the_lookup_and_set_again_replaces_it() -> TestResult
         .await?;
     assert_eq!(status, 200, "{set}");
     assert_eq!(set["providers"].as_array().map(Vec::len), Some(1), "{set}");
-    let held = rauthy.providers();
+    let held = rauthy.providers()?;
     assert_eq!(held.len(), 1, "set again replaces, never adds");
     assert_eq!(held[0]["client_secret"], "GOCSPX-rotated");
     Ok(())
@@ -104,7 +106,7 @@ async fn github_has_fixed_endpoints_and_microsoft_names_its_tenant() -> TestResu
         .post("/sign-in-providers", Some(&ada), &github)
         .await?;
     assert_eq!(status, 200, "{set}");
-    let held = rauthy.providers();
+    let held = rauthy.providers()?;
     assert_eq!(held[0]["typ"], "github");
     assert_eq!(
         held[0]["token_endpoint"],
@@ -142,7 +144,7 @@ async fn github_has_fixed_endpoints_and_microsoft_names_its_tenant() -> TestResu
         .await?;
     assert_eq!(status, 200, "{set}");
     assert_eq!(set["providers"].as_array().map(Vec::len), Some(2), "{set}");
-    let held = rauthy.providers();
+    let held = rauthy.providers()?;
     assert_eq!(held[1]["name"], "Microsoft");
     assert_eq!(held[1]["typ"], "oidc");
     assert_eq!(
@@ -168,7 +170,7 @@ async fn the_redirect_address_shown_is_the_one_the_provider_is_asked_with() -> T
         .await?;
     assert_eq!(status, 200, "{set}");
     assert_eq!(set["redirect_address"], expected.as_str());
-    let asked = service.issuer.provider_redirects();
+    let asked = service.issuer.provider_redirects()?;
     assert_eq!(
         asked,
         [expected],
@@ -193,7 +195,7 @@ async fn a_client_id_the_provider_rejects_is_refused_in_the_providers_words() ->
         );
     }
     assert!(
-        rauthy.providers().is_empty(),
+        rauthy.providers()?.is_empty(),
         "a refused provider is never saved"
     );
     let (status, offered) = service.get("/sign-in/providers", None).await?;

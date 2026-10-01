@@ -14,7 +14,7 @@
 //! A withdrawal is entered beside the issuance and changes nothing already
 //! entered.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Json;
@@ -85,7 +85,11 @@ fn with_store<T>(
         .certificates
         .as_ref()
         .ok_or_else(|| unavailable("the configuration names no certificates_dir"))?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::CertificatesUnavailable {
+            reason: format!("the certificates lock is poisoned: {error}"),
+        })?;
     act(&mut store)
 }
 
@@ -114,7 +118,11 @@ fn roles(state: &AppState, agent: &str, at: u64) -> Result<Value, ServerError> {
     let Some(store) = state.roles.as_ref() else {
         return Ok(Value::Null);
     };
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::RolesUnavailable {
+            reason: format!("the roles lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     Ok(store
         .roles()
@@ -132,7 +140,11 @@ fn profile_version(state: &AppState, agent: &str) -> Result<Value, ServerError> 
     let Some(store) = state.provisioning.as_ref() else {
         return Ok(Value::Null);
     };
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::ProvisioningUnavailable {
+            reason: format!("the provisioning lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     Ok(store
         .profile(agent)

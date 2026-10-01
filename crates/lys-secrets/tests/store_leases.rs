@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Leases: the bounds a handle is cut with and presented within. A lease
 //! ends no later than the grant it counts against, and a handle is admitted
 //! only for the secret its lease names.
@@ -28,17 +30,23 @@ fn sec3_store_refusals_lease_beyond_grant() -> TestResult {
     let noor = Signer::new(&world.keys(), "agent:noor")?;
     let kit = Signer::new(&world.keys(), "agent:kit")?;
     let grants = granted("agent:noor", &[]);
-    grants.grant_until(
-        Relation::Use,
-        relation("agent:noor", "token"),
-        Some(NOW_MS + 10_000),
-    );
-    grants.grant_until(
-        Relation::Use,
-        relation("agent:kit", "token"),
-        Some(NOW_MS + 2_000),
-    );
-    grants.grant_as(Relation::Lend, relation("agent:noor", "token"));
+    grants
+        .grant_until(
+            Relation::Use,
+            relation("agent:noor", "token"),
+            Some(NOW_MS + 10_000),
+        )
+        .expect("local grants lock must be healthy");
+    grants
+        .grant_until(
+            Relation::Use,
+            relation("agent:kit", "token"),
+            Some(NOW_MS + 2_000),
+        )
+        .expect("local grants lock must be healthy");
+    grants
+        .grant_as(Relation::Lend, relation("agent:noor", "token"))
+        .expect("local grants lock must be healthy");
     let mut broker = world.broker(grants)?;
     broker.seal("token", GRANTOR, &Secret::from_slice(b"value-one"))?;
 

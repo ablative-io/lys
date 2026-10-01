@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! R4: revocation and current permission decisions (`GRANT_REVOKE` and
 //! `GRANT_FRESHNESS`).
 
@@ -6,7 +8,7 @@ mod support;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::Path;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_identity::grants::admission::effective;
 use lys_identity::grants::test_support::FailingRelationships;
@@ -20,6 +22,13 @@ use lys_log_store::FileLeafStore;
 use support::{T0, World, actions, alpha, pass};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn held<T>(slot: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    match slot.lock() {
+        Ok(held) => held,
+        Err(error) => panic!("fixture_lock_poisoned: {error}"),
+    }
+}
 
 const BOTH: [RecipientKind; 2] = [RecipientKind::Person, RecipientKind::Agent];
 
@@ -141,7 +150,7 @@ struct Pausable {
 
 impl Pausable {
     fn pause(&self, paused: bool) {
-        *self.paused.lock().unwrap_or_else(PoisonError::into_inner) = paused;
+        *held(&self.paused) = paused;
     }
 }
 
@@ -155,7 +164,7 @@ impl RelationshipStore for Pausable {
         touch: &[Relationship],
         delete: &[Relationship],
     ) -> Result<(), GrantError> {
-        if *self.paused.lock().unwrap_or_else(PoisonError::into_inner) {
+        if *held(&self.paused) {
             return Err(GrantError::PermissionEngineUnavailable {
                 reason: "projection paused".to_owned(),
             });

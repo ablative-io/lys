@@ -13,7 +13,7 @@
 //! no new version changes it, and a holding that lapsed is never moved.
 
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -155,7 +155,11 @@ fn with_roles<T>(
         .ok_or_else(|| ServerError::RolesUnavailable {
             reason: "the configuration names no roles_file".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::RolesUnavailable {
+            reason: format!("the roles lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
@@ -210,7 +214,7 @@ fn said(state: &AppState, body: &VersionBody) -> Result<Words, ServerError> {
     for template in &body.grant_templates {
         let resource = Resource::new(&template.resource.kind, &template.resource.id)?;
         let relation = Relation::new(&template.relation)?;
-        state.grant_setup.model().actions(&relation)?;
+        state.grant_setup.model()?.actions(&relation)?;
         if template.days == Some(0) {
             return Err(malformed(
                 "a template's days is 1 or more, or null for no end of its own",

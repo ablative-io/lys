@@ -1,7 +1,7 @@
 //! The caller's tree is computed on the request from the service's held state.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::State;
@@ -186,7 +186,11 @@ fn roles(state: &AppState) -> Result<Vec<crate::roles_records::Role>, ServerErro
         .ok_or_else(|| ServerError::RolesUnavailable {
             reason: "the configuration names no roles_file".to_owned(),
         })?;
-    let mut roles = roles.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut roles = roles
+        .lock()
+        .map_err(|error| ServerError::RolesUnavailable {
+            reason: format!("the roles lock is poisoned: {error}"),
+        })?;
     roles.settle()?;
     Ok(roles.roles().to_vec())
 }

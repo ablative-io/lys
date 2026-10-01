@@ -19,7 +19,7 @@
 //! flow to it.
 
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, Query, State};
@@ -438,7 +438,11 @@ async fn place(
             by: who.by(),
             at: now(),
         }))?;
-        let slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
+        let slot = state.grants.lock().map_err(|error| {
+            lys_identity::grants::GrantError::LogUnavailable {
+                reason: format!("the grants lock is poisoned: {error}"),
+            }
+        })?;
         if let Some(grants) = &*slot
             && let Relationships::SpiceDb(engine) = grants.relationships()
         {

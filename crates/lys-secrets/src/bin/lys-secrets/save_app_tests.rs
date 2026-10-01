@@ -15,7 +15,7 @@ use lys_secrets::{
     request_digest, to_hex,
 };
 use serde_json::json;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 const PATH: &str = "/_lys/apps/save";
@@ -95,7 +95,7 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
         .0;
     assert_eq!(answer, again);
     {
-        let broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
+        let broker = shared.broker.lock().expect("test state lock poisoned");
         assert_eq!(broker.store().entries().count(), 2);
         for entry in broker.store().entries() {
             assert_eq!(entry.owner, "person-fixture");
@@ -138,7 +138,7 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
         shared
             .broker
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .expect("test state lock poisoned")
             .issue(&holder, reference, 2, now_ms() + 60_000)
             .is_err()
     );
@@ -151,7 +151,7 @@ async fn signed_save_is_private_repeatable_and_bound_to_body() -> Outcome {
     let issued = shared
         .broker
         .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("test state lock poisoned")
         .issue(&holder, reference, 2, now_ms() + 60_000)?;
     let path = format!("/{reference}/apps/me");
     let presentation = Presentation::sign(
@@ -233,7 +233,7 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
         shared
             .broker
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .expect("test state lock poisoned")
             .store()
             .entries()
             .count(),

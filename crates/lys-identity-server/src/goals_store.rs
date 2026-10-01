@@ -23,7 +23,7 @@
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
@@ -493,7 +493,9 @@ impl Goals {
         &self,
         act: impl FnOnce(&mut GoalStore) -> Result<T, ServerError>,
     ) -> Result<T, ServerError> {
-        let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut store = self.store.lock().map_err(|error| GoalError::Unavailable {
+            reason: format!("the goals lock is poisoned: {error}"),
+        })?;
         store.settle()?;
         act(&mut store)
     }
@@ -588,3 +590,7 @@ fn rebuilt<S: LeafStore>(reopen: &Reopen<S>, reason: String) -> Result<Opened<S>
     };
     Ok((log, held, start))
 }
+
+#[cfg(test)]
+#[path = "goals_store_poison_tests.rs"]
+mod poison_tests;

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -41,14 +43,14 @@ fn terminal_output_never_locks_or_wakes_the_global_table() -> Result<(), Box<dyn
         policy: None,
     })?;
     let generation = sessions
-        .lock()
+        .lock()?
         .sessions
         .get("output")
         .ok_or("session missing")?
         .generation;
     let output = std::sync::Arc::clone(
         &sessions
-            .lock()
+            .lock()?
             .sessions
             .get("output")
             .ok_or("session missing")?
@@ -68,7 +70,7 @@ fn terminal_output_never_locks_or_wakes_the_global_table() -> Result<(), Box<dyn
     let locks = LOCKS.get();
     let wakes = WAKES.get();
     let kept = sessions
-        .lock()
+        .lock()?
         .sessions
         .get("output")
         .ok_or("session missing")?
@@ -76,7 +78,7 @@ fn terminal_output_never_locks_or_wakes_the_global_table() -> Result<(), Box<dyn
         .lock()?
         .scrollback()
         .from(0)?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert_eq!(kept, bytes);
     assert_eq!(
         (locks, wakes),

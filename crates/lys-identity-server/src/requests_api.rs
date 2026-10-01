@@ -23,7 +23,7 @@
 
 use std::ops::Bound;
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -120,7 +120,11 @@ pub(crate) fn with_requests<T>(
         .ok_or_else(|| ServerError::RequestsUnavailable {
             reason: "the configuration names no requests_dir".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::RequestsUnavailable {
+            reason: format!("the requests lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }

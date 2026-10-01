@@ -91,7 +91,7 @@ fn opening_live_grants_during_a_question_invalidates_its_snapshot() -> Result<()
         Box::new(move || lys_log_store::FileLeafStore::open(&log)),
         lys_core::Ed25519Identity::load_or_generate(&temporary.path().join("key"))?,
         crate::spicedb::Relationships::Memory(lys_identity::grants::MemoryRelationships::default()),
-        setup.model(),
+        setup.model()?,
         lys_identity::PersonId::generate()?,
     )?;
     let grants: Mutex<Option<GrantState>> = Mutex::new(None);

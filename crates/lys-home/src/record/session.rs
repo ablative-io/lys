@@ -124,6 +124,9 @@ impl Session {
     /// failed part way. Runs before any other act when the session is stale;
     /// a session that cannot reconcile stays stale and refuses by name.
     pub(super) fn reconcile(&mut self) -> Result<(), HomeError> {
+        if self.calls.is_poisoned() {
+            self.stale = true;
+        }
         if !self.stale {
             return Ok(());
         }
@@ -276,7 +279,7 @@ impl Session {
             len: line.len() as u64,
             custom: custom_type_of(entry),
         })?;
-        self.note_call(entry);
+        self.note_call(entry)?;
         Ok(())
     }
 

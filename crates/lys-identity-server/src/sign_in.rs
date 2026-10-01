@@ -329,11 +329,11 @@ impl IssuerSignIn {
         match self.carry(&begun, attempt).await {
             Ok((code, answered)) if answered == state => oidc.finish(code, &state).await,
             Ok(_) => {
-                oidc.abandon(&state);
+                oidc.abandon(&state)?;
                 Err(ServerError::SignInStateUnknown)
             }
             Err(error) => {
-                oidc.abandon(&state);
+                oidc.abandon(&state)?;
                 Err(error)
             }
         }
@@ -461,7 +461,10 @@ async fn login() -> Response {
 
 /// Sign the person in with `actor` and answer the signed-in body with the
 /// session cookie.
-pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response, ServerError> {
+pub(crate) async fn begin_session(
+    state: &AppState,
+    actor: &Actor,
+) -> Result<Response, ServerError> {
     let body = SignedInView {
         signed_in: SessionLogin {
             issuer: actor.binding().issuer().to_owned(),
@@ -469,7 +472,7 @@ pub(crate) fn begin_session(state: &AppState, actor: &Actor) -> Result<Response,
         },
         authority: AUTHORITY.to_owned(),
     };
-    let cookie = crate::session_admission::begin(state, actor.clone())?;
+    let cookie = crate::session_admission::begin(state, actor.clone()).await?;
     Ok(([(header::SET_COOKIE, cookie)], Json(body)).into_response())
 }
 
@@ -492,7 +495,7 @@ async fn sign_in(
         address: state.sign_in.address(&extensions, &headers)?,
     };
     let actor = state.sign_in.password(&state.oidc, &attempt).await?;
-    begin_session(&state, &actor)
+    begin_session(&state, &actor).await
 }
 
 #[cfg(test)]

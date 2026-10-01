@@ -27,7 +27,7 @@ use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use axum::Router;
 use axum::body::Bytes;
@@ -56,6 +56,11 @@ use crate::routes::{AppState, signed_in, with_directory};
 
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
+    /// Refuse unavailable admission state before a start reads authority.
+    fn check_admission(&self) -> Result<(), ServerError> {
+        Ok(())
+    }
+
     /// The caller the request's headers authenticate, or `None`.
     fn caller(&self, headers: &HeaderMap) -> Option<String>;
 }
@@ -161,8 +166,12 @@ impl StartService {
     }
 
     /// The launch records, one caller at a time.
-    pub fn launches(&self) -> MutexGuard<'_, LaunchRecords> {
-        self.launches.lock().unwrap_or_else(PoisonError::into_inner)
+    pub fn launches(&self) -> Result<MutexGuard<'_, LaunchRecords>, StartError> {
+        self.launches
+            .lock()
+            .map_err(|error| StartError::Unavailable {
+                reason: format!("launch records unavailable: {error}"),
+            })
     }
 }
 
@@ -222,6 +231,10 @@ where
     F: FnOnce(&StartService, &mut LaunchRecords, &str) -> Result<T, StartError> + Send + 'static,
     T: Send + 'static,
 {
+    service
+        .callers
+        .check_admission()
+        .map_err(IntoResponse::into_response)?;
     let Some(caller) = service.callers.caller(headers) else {
         return Err(named(
             StatusCode::UNAUTHORIZED,
@@ -230,7 +243,7 @@ where
         ));
     };
     let task = tokio::task::spawn_blocking(move || {
-        let mut launches = service.launches();
+        let mut launches = service.launches()?;
         act(&service, &mut launches, &caller)
     });
     match task.await {
@@ -431,6 +444,10 @@ impl Directory {
 }
 
 impl Callers for Directory {
+    fn check_admission(&self) -> Result<(), ServerError> {
+        self.0.admission.administrator_available()
+    }
+
     fn caller(&self, headers: &HeaderMap) -> Option<String> {
         let actor = signed_in(&self.0, headers).ok()?;
         Some(self.caller_of(actor.binding()))
@@ -439,10 +456,13 @@ impl Callers for Directory {
 
 impl Admission for Directory {
     fn is_administrator(&self, caller: &str) -> bool {
-        self.0
-            .admission
-            .administrator_login()
-            .is_some_and(|login| caller == self.caller_of(&login))
+        match self.0.admission.administrator_login() {
+            Ok(login) => login.is_some_and(|login| caller == self.caller_of(&login)),
+            Err(error) => {
+                tracing::error!("start administrator admission refused: {error}");
+                false
+            }
+        }
     }
 
     /// Step 1 admits the configured administrator alone.

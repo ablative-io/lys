@@ -3,7 +3,6 @@
 //! retired account or inactive owner cannot exercise a grant.
 
 use std::str::FromStr;
-use std::sync::PoisonError;
 
 use axum::http::{HeaderMap, header};
 use lys_identity::projection::Projection;
@@ -83,7 +82,12 @@ pub(crate) fn projection(
     let Some(accounts) = &state.service_accounts else {
         return Ok(directory.shared());
     };
-    let mut accounts = accounts.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut accounts =
+        accounts
+            .lock()
+            .map_err(|error| ServerError::ServiceAccountsUnavailable {
+                reason: format!("the service accounts lock is poisoned: {error}"),
+            })?;
     accounts.settle()?;
     expanded(directory, accounts.held())
 }

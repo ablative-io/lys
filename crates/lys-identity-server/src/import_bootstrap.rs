@@ -5,7 +5,6 @@
 
 use std::fs;
 use std::str::FromStr;
-use std::sync::PoisonError;
 
 use lys_identity::grants::{
     Action, DelegateRequest, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
@@ -77,7 +76,7 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
     let Some(path) = &state.import_credential_file else {
         return Ok(());
     };
-    let Some(administrator) = state.admission.administrator_login() else {
+    let Some(administrator) = state.admission.administrator_login()? else {
         return Ok(());
     };
     let bytes = read(path)?;
@@ -96,7 +95,12 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
             return Ok(None);
         };
         let accounts = state.service_accounts.as_ref().ok_or_else(unavailable)?;
-        let mut accounts = accounts.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut accounts =
+            accounts
+                .lock()
+                .map_err(|error| ServerError::ServiceAccountsUnavailable {
+                    reason: format!("the service accounts lock is poisoned: {error}"),
+                })?;
         accounts.create(Created {
             id: account.to_owned(),
             owner: owner.to_string(),
@@ -106,7 +110,13 @@ pub(crate) fn ensure(state: &AppState) -> Result<(), ServerError> {
             at: now(),
         })?;
         drop(accounts);
-        let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut apps =
+            state
+                .apps
+                .lock()
+                .map_err(|error| crate::apps_error::AppError::AppsUnavailable {
+                    reason: format!("the apps lock is poisoned: {error}"),
+                })?;
         apps.keep(Line::Registrar(Registrar {
             operation: operation(account, "credential").to_string(),
             service_account: account.to_owned(),

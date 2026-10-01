@@ -85,7 +85,7 @@ fn apply(
             grants.set_kinds(model.kinds().clone());
         }
     }
-    setup.hold_model(model);
+    setup.hold_model(model)?;
     Ok(())
 }
 

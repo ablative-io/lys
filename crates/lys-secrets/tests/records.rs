@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Sealed records: a memory record is read by name, in the piece asked for,
 //! by an identity holding the read relation; a key is never read; an
 //! unknown name is `NotFound`; a removed relation is named `RelationRemoved`,
@@ -26,14 +28,16 @@ fn paths(root: &TempDir) -> Result<BrokerPaths, std::io::Error> {
 fn reader() -> LocalGrants {
     let grants = LocalGrants::new();
     for record in ["notes", "signing-key"] {
-        grants.grant_as(
-            Relation::Read,
-            SecretRelation {
-                identity: "agent:noor".to_owned(),
-                secret: record.to_owned(),
-                granted_by: Some("person:tom".to_owned()),
-            },
-        );
+        grants
+            .grant_as(
+                Relation::Read,
+                SecretRelation {
+                    identity: "agent:noor".to_owned(),
+                    secret: record.to_owned(),
+                    granted_by: Some("person:tom".to_owned()),
+                },
+            )
+            .expect("local grants lock must be healthy");
     }
     grants
 }
@@ -109,14 +113,17 @@ fn a_removed_relation_is_named_and_stays_named_after_a_restart() -> TestResult {
     broker.read_record("agent:noor", "notes", None)?;
     broker
         .permissions()
-        .revoke_as(Relation::Read, "agent:noor", "notes");
+        .revoke_as(Relation::Read, "agent:noor", "notes")
+        .expect("local grants lock must be healthy");
     assert_eq!(
         refusal(broker.read_record("agent:noor", "notes", None)),
         "RelationRemoved"
     );
     drop(broker);
     let grants = reader();
-    grants.revoke_as(Relation::Read, "agent:noor", "notes");
+    grants
+        .revoke_as(Relation::Read, "agent:noor", "notes")
+        .expect("local grants lock must be healthy");
     let mut reopened = Broker::open(&paths, grants, Box::new(|| 2))?;
     assert_eq!(
         refusal(reopened.read_record("agent:noor", "notes", None)),
@@ -131,11 +138,13 @@ fn a_key_is_used_through_a_handle_and_memory_is_never_handed_out() -> TestResult
     let paths = paths(&root)?;
     let grants = reader();
     for record in ["notes", "signing-key"] {
-        grants.grant(SecretRelation {
-            identity: "agent:noor".to_owned(),
-            secret: record.to_owned(),
-            granted_by: Some("person:tom".to_owned()),
-        });
+        grants
+            .grant(SecretRelation {
+                identity: "agent:noor".to_owned(),
+                secret: record.to_owned(),
+                granted_by: Some("person:tom".to_owned()),
+            })
+            .expect("local grants lock must be healthy");
     }
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1))?;
     broker.seal_record(

@@ -84,7 +84,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
         identity: "agent:noor".to_owned(),
         secret: "github-token".to_owned(),
         granted_by: Some("person:tom".to_owned()),
-    });
+    })?;
     let issued = broker.issue(&agent, "github-token", 2, now_ms() + 600_000)?;
     println!(
         "  handle id {} (the handle itself is shown to the agent once, never kept)",
@@ -130,7 +130,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
 
     step("9. A fresh handle, then Tom revokes the grant and drops it");
     let again = broker.issue(&agent, "github-token", 5, now_ms() + 600_000)?;
-    broker.permissions().revoke("agent:noor", "github-token");
+    broker.permissions().revoke("agent:noor", "github-token")?;
     let after_revoke =
         Presentation::sign(&again.id, &new_operation_id()?, now_ms(), call, &agent_key)?;
     refused(
@@ -156,7 +156,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
         identity: "agent:noor".to_owned(),
         secret: "github-token".to_owned(),
         granted_by: Some("person:tom".to_owned()),
-    });
+    })?;
     let after_rotation = broker.issue(&agent, "github-token", 1, now_ms() + 600_000)?;
     let rotated_use = Presentation::sign(
         &after_rotation.id,

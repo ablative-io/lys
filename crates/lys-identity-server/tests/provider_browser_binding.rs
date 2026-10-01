@@ -39,7 +39,7 @@ async fn a_callback_without_the_initiating_browser_cookie_never_creates_a_sessio
     service.issuer.sign_in_as(Login {
         subject: "victim".to_owned(),
         email: "victim@example.test".to_owned(),
-    });
+    })?;
     let browser = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -59,7 +59,7 @@ async fn a_callback_with_another_browsers_cookie_never_creates_a_session() -> Te
     service.issuer.sign_in_as(Login {
         subject: "victim".to_owned(),
         email: "victim@example.test".to_owned(),
-    });
+    })?;
     let browser = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -80,7 +80,7 @@ async fn the_bound_browser_can_finish_once_and_a_replay_cannot_sign_in() -> Test
     service.issuer.sign_in_as(Login {
         subject: "person".to_owned(),
         email: "person@example.test".to_owned(),
-    });
+    })?;
     let browser = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -127,7 +127,7 @@ async fn duplicate_browser_cookies_are_refused_even_with_one_correct_value() -> 
     service.issuer.sign_in_as(Login {
         subject: "person".to_owned(),
         email: "person@example.test".to_owned(),
-    });
+    })?;
     let browser = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;

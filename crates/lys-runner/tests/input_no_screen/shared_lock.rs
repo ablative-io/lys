@@ -64,7 +64,7 @@ fn a_full_unwatched_input_pipe_leaves_the_second_session_answering() -> Result<(
     sessions.start(launch("blocked"))?;
     sessions.start(launch("second"))?;
     let result = exercise(&sessions, None);
-    sessions.stop_all();
+    sessions.stop_all()?;
     result
 }
 
@@ -80,7 +80,7 @@ fn an_unwatched_operation_leaves_the_second_session_answering() -> Result<(), Bo
             text: "x".to_owned(),
         }),
     );
-    sessions.stop_all();
+    sessions.stop_all()?;
     result
 }
 
@@ -96,7 +96,7 @@ fn an_unwatched_compaction_keeps_an_early_harness_confirmation() -> Result<(), B
             text: "x".to_owned(),
         }),
     );
-    sessions.stop_all();
+    sessions.stop_all()?;
     result
 }
 
@@ -112,7 +112,7 @@ fn an_unwatched_reminder_leaves_the_second_session_answering() -> Result<(), Box
             text: "x".to_owned(),
         }),
     );
-    sessions.stop_all();
+    sessions.stop_all()?;
     result
 }
 
@@ -136,7 +136,7 @@ fn exercise(
     let (blocked, pipe_full) = mpsc::sync_channel(1);
     let (release, resume) = mpsc::sync_channel(1);
     let terminal_input = {
-        let mut table = sessions.lock();
+        let mut table = sessions.lock()?;
         let live = table
             .sessions
             .get_mut("blocked")
@@ -172,7 +172,7 @@ fn exercise(
     };
     let compact = matches!(operation, Some(OperationRequest::Compact { .. }));
     let writer = if let Some(request) = operation {
-        let mut table = sessions.lock();
+        let mut table = sessions.lock()?;
         let accepted = crate::operations::accept(
             &mut table,
             Operation {
@@ -199,7 +199,7 @@ fn exercise(
     };
     pipe_full.recv()?;
     if compact {
-        let mut table = sessions.lock();
+        let mut table = sessions.lock()?;
         crate::operations::compacting(&mut table, "blocked");
         assert_eq!(
             table

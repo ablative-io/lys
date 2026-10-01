@@ -27,7 +27,7 @@ fn an_unreadable_transcript_binding_is_refused_and_audited() -> Result<(), Box<d
         policy: None,
     })?;
     sessions
-        .lock()
+        .lock()?
         .sessions
         .get_mut("session")
         .ok_or("session missing")?
@@ -50,7 +50,7 @@ fn an_unreadable_transcript_binding_is_refused_and_audited() -> Result<(), Box<d
             input: serde_json::json!({"session_id":"native", "transcript_path":path}),
         },
     );
-    sessions.stop_all();
+    sessions.stop_all()?;
     let error = result
         .err()
         .ok_or("missing transcript was bound from zero")?;
@@ -58,7 +58,7 @@ fn an_unreadable_transcript_binding_is_refused_and_audited() -> Result<(), Box<d
         error.to_string().contains("transcript_unreadable"),
         "{error}"
     );
-    let table = sessions.lock();
+    let table = sessions.lock()?;
     assert!(table.feed.source("session").is_none());
     assert!(table.feed.page(None)?.entries.iter().any(|entry|
         matches!(&entry.body, Body::Coverage(coverage) if coverage.state == "source_refused")));

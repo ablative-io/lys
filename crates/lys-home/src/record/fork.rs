@@ -202,7 +202,7 @@ impl Session {
             len: line.len() as u64,
             custom: custom_type_of(entry),
         })?;
-        self.note_call(entry);
+        self.note_call(entry)?;
         if let Err(e) = self.persist_head(Some(entry.id())) {
             self.stale = true;
             self.reconcile()?;

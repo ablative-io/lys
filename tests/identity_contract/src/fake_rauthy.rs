@@ -17,7 +17,7 @@ use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, Request, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -50,6 +50,23 @@ pub struct FakeRauthy {
 }
 
 type Shared = Arc<Inner>;
+
+fn held<T>(slot: &Mutex<T>) -> std::io::Result<std::sync::MutexGuard<'_, T>> {
+    slot.lock()
+        .map_err(|error| std::io::Error::other(format!("fixture_lock_poisoned: {error}")))
+}
+
+macro_rules! fixture {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(error) => return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "error": "fixture_lock_poisoned", "message": error.to_string() })),
+            ).into_response(),
+        }
+    };
+}
 
 impl FakeRauthy {
     /// Start the stand-in on a local port.
@@ -94,39 +111,36 @@ impl FakeRauthy {
     }
 
     /// Every provider held, as the service sent it, with its id.
-    pub fn providers(&self) -> Vec<Value> {
-        self.inner
-            .providers
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn providers(&self) -> std::io::Result<Vec<Value>> {
+        Ok(held(&self.inner.providers)?.clone())
     }
 
     /// How many users the stand-in holds.
-    pub fn user_count(&self) -> usize {
-        self.inner
-            .users
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .len()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn user_count(&self) -> std::io::Result<usize> {
+        Ok(held(&self.inner.users)?.len())
     }
 
     /// Hand every password set on an account from now on to `issuer`.
-    pub fn link(&self, issuer: FakeIssuer) {
-        *self
-            .inner
-            .issuer
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(issuer);
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn link(&self, issuer: FakeIssuer) -> std::io::Result<()> {
+        *held(&self.inner.issuer)? = Some(issuer);
+        Ok(())
     }
 
     /// Every account held, as the service last wrote it, never with a password.
-    pub fn users(&self) -> Vec<Value> {
-        self.inner
-            .users
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn users(&self) -> std::io::Result<Vec<Value>> {
+        Ok(held(&self.inner.users)?.clone())
     }
 
     /// How many requests reached the stand-in, on any route, answered or refused.
@@ -192,11 +206,7 @@ async fn list(State(inner): State<Shared>, headers: HeaderMap) -> Response {
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    let held = inner
-        .providers
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone();
+    let held = fixture!(held(&inner.providers)).clone();
     Json(Value::Array(held)).into_response()
 }
 
@@ -208,10 +218,7 @@ async fn create(
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    let mut held = inner
-        .providers
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut held = fixture!(held(&inner.providers));
     let id = format!("provider-{}", held.len() + 1);
     if let Value::Object(fields) = &mut body {
         fields.insert("id".to_owned(), Value::String(id));
@@ -229,10 +236,7 @@ async fn replace(
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    let mut held = inner
-        .providers
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut held = fixture!(held(&inner.providers));
     let Some(slot) = held
         .iter_mut()
         .find(|provider| provider.get("id").and_then(Value::as_str) == Some(id.as_str()))
@@ -254,11 +258,7 @@ async fn users(State(inner): State<Shared>, headers: HeaderMap) -> Response {
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    let held = inner
-        .users
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone();
+    let held = fixture!(held(&inner.users)).clone();
     Json(Value::Array(held)).into_response()
 }
 
@@ -270,7 +270,7 @@ async fn create_user(
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    let mut held = inner.users.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut held = fixture!(held(&inner.users));
     let id = format!("user-{}", held.len() + 1);
     if let Value::Object(fields) = &mut body {
         fields.insert("id".to_owned(), Value::String(id));
@@ -294,14 +294,8 @@ fn no_user() -> Response {
         .into_response()
 }
 
-fn held_user(inner: &Inner, found: impl Fn(&Value) -> bool) -> Option<Value> {
-    inner
-        .users
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .iter()
-        .find(|user| found(user))
-        .cloned()
+fn held_user(inner: &Inner, found: impl Fn(&Value) -> bool) -> std::io::Result<Option<Value>> {
+    Ok(held(&inner.users)?.iter().find(|user| found(user)).cloned())
 }
 
 async fn read_user(
@@ -312,7 +306,7 @@ async fn read_user(
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    held_user(&inner, |user| user["id"] == id.as_str())
+    fixture!(held_user(&inner, |user| user["id"] == id.as_str()))
         .map_or_else(no_user, |user| Json(user).into_response())
 }
 
@@ -324,7 +318,7 @@ async fn user_by_email(
     if let Some(refusal) = refused(&headers) {
         return refusal;
     }
-    held_user(&inner, |user| user["email"] == email.as_str())
+    fixture!(held_user(&inner, |user| user["email"] == email.as_str()))
         .map_or_else(no_user, |user| Json(user).into_response())
 }
 
@@ -345,18 +339,16 @@ async fn update_user(
         _ => None,
     };
     let email = body["email"].as_str().unwrap_or_default().to_owned();
-    let linked = inner
-        .issuer
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone();
+    let linked = fixture!(held(&inner.issuer)).clone();
     // The issuer refuses a password set again while it is one of the last
     // used (Rauthy v0.36.2's password policy, not_recently_used).
-    let reused = linked.as_ref().is_some_and(|issuer| {
-        issuer.account(&email).is_some_and(|account| {
-            account.login.subject == id
-                && password.as_ref().and_then(Value::as_str) == Some(account.password.as_str())
-        })
+    let account = match linked.as_ref() {
+        Some(issuer) => fixture!(issuer.account(&email)),
+        None => None,
+    };
+    let reused = account.is_some_and(|account| {
+        account.login.subject == id
+            && password.as_ref().and_then(Value::as_str) == Some(account.password.as_str())
     });
     if reused {
         return (
@@ -369,7 +361,7 @@ async fn update_user(
             .into_response();
     }
     {
-        let mut held = inner.users.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = fixture!(held(&inner.users));
         let Some(slot) = held.iter_mut().find(|user| user["id"] == id.as_str()) else {
             return no_user();
         };
@@ -381,7 +373,7 @@ async fn update_user(
     };
     let enabled = body["enabled"].as_bool().unwrap_or(true);
     if let Some(issuer) = linked {
-        issuer.follow(&id, &email, password, enabled);
+        fixture!(issuer.follow(&id, &email, password, enabled));
     }
     Json(body).into_response()
 }

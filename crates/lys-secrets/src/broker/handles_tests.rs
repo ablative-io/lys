@@ -39,11 +39,13 @@ fn broker(dir: &Path) -> TestResult<Broker<LocalGrants>> {
         anchor: keys.join("audit.anchor"),
     };
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: SECRET.to_owned(),
-        granted_by: Some(PERSON.to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: SECRET.to_owned(),
+            granted_by: Some(PERSON.to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     let mut broker = Broker::create(&paths, grants, Box::new(|| NOW))?;
     broker.seal(SECRET, PERSON, &Secret::from_slice(b"value-one"))?;
     Ok(broker)

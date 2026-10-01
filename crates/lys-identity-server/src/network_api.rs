@@ -12,7 +12,7 @@
 
 use std::ops::Bound;
 use std::str::FromStr;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -198,7 +198,11 @@ pub(crate) fn with_network<T>(
         .ok_or_else(|| ServerError::NetworkUnavailable {
             reason: "the configuration names no network_file".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::NetworkUnavailable {
+            reason: format!("the network lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }

@@ -34,7 +34,7 @@ fn the_real_spawn_boundary_holds_no_session_table_lock() -> Result<(), Box<dyn E
         rotation: None,
         policy: None,
     })?;
-    sessions.stop_all();
+    sessions.stop_all()?;
     assert!(
         available.load(Ordering::SeqCst),
         "process spawn held the session table"

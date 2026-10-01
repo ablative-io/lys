@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Leases in the world of CONFORMANCE row 7.6. `agent_a` acts for `person_a`,
 //! stands in the organisation and may use `a_org` and `b_org`; `person_a` may use
 //! `a_org`. A use goes through the broker's proxy path to an upstream double
@@ -65,11 +67,21 @@ impl Leases {
         let grants = broker.permissions();
         let acted_for = Scope::Personal(PERSON_A.to_owned()).target();
         let organisation = Scope::Organisation(ORGANISATION.to_owned()).target();
-        grants.grant_as(Relation::Member, relation(AGENT_A, &acted_for, PERSON_A));
-        grants.grant_as(Relation::Member, relation(AGENT_A, &organisation, PERSON_A));
-        grants.grant(relation(AGENT_A, A_ORG, PERSON_A));
-        grants.grant(relation(AGENT_A, B_ORG, PERSON_B));
-        grants.grant(relation(PERSON_A, A_ORG, PERSON_A));
+        grants
+            .grant_as(Relation::Member, relation(AGENT_A, &acted_for, PERSON_A))
+            .expect("local grants lock must be healthy");
+        grants
+            .grant_as(Relation::Member, relation(AGENT_A, &organisation, PERSON_A))
+            .expect("local grants lock must be healthy");
+        grants
+            .grant(relation(AGENT_A, A_ORG, PERSON_A))
+            .expect("local grants lock must be healthy");
+        grants
+            .grant(relation(AGENT_A, B_ORG, PERSON_B))
+            .expect("local grants lock must be healthy");
+        grants
+            .grant(relation(PERSON_A, A_ORG, PERSON_A))
+            .expect("local grants lock must be healthy");
         Ok(Self {
             dir,
             clock,

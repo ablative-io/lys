@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! The broker end to end: issue, use, every named refusal, retries, drops,
 //! key rotation, accounts, and the audit log read back after a restart.
 
@@ -58,11 +60,13 @@ fn clock(world: &World) -> lys_secrets::Clock {
 
 fn granted() -> LocalGrants {
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "token".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "token".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     grants
 }
 
@@ -125,11 +129,14 @@ fn issue_needs_a_grant_that_traces_to_a_person() -> TestResult {
         refusal(broker.issue(&world.holder, "token", 1, START_MS + 1)),
         "PermissionDenied"
     );
-    broker.permissions().grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "token".to_owned(),
-        granted_by: None,
-    });
+    broker
+        .permissions()
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "token".to_owned(),
+            granted_by: None,
+        })
+        .expect("local grants lock must be healthy");
     assert_eq!(
         refusal(broker.issue(&world.holder, "token", 1, START_MS + 1)),
         "NoPersonRoot"
@@ -254,7 +261,10 @@ fn a_window_closes_and_a_drop_and_a_revocation_bite_at_the_next_use() -> TestRes
         "HandleDropped"
     );
     let revoked = broker.issue(&world.holder, "token", 5, START_MS + 60_000)?;
-    broker.permissions().revoke("agent:noor", "token");
+    broker
+        .permissions()
+        .revoke("agent:noor", "token")
+        .expect("local grants lock must be healthy");
     let after_revoke = present(&world, &revoked, &world.agent)?;
     assert_eq!(
         refusal(broker.use_handle(&revoked.token, &after_revoke, Secret::len)),

@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lys_identity::Actor;
@@ -133,13 +133,18 @@ impl Sessions {
     }
 
     /// The live sessions, with every expired one removed.
-    fn pruned(&self) -> MutexGuard<'_, Live> {
-        let mut live = self.live.lock().unwrap_or_else(PoisonError::into_inner);
+    fn pruned(&self) -> Result<MutexGuard<'_, Live>, ServerError> {
+        let mut live = self
+            .live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?;
         let at = now();
         live.entries.retain(|_, entry| entry.ends_at > at);
         let Live { entries, ids } = &mut *live;
         ids.retain(|_, key| entries.contains_key(key));
-        live
+        Ok(live)
     }
 
     /// The Set-Cookie header value carrying `value` for `max_age` seconds.
@@ -173,7 +178,7 @@ impl Sessions {
             ends_at: started_at.saturating_add(self.seconds),
         };
         let key = key_of(&secret);
-        let mut live = self.pruned();
+        let mut live = self.pruned()?;
         let id = entry.id.clone();
         live.entries.insert(key.clone(), entry);
         if let Err(error) = self.keep(&live.entries) {
@@ -230,19 +235,46 @@ impl Sessions {
     }
 
     /// Every live session whose actor `belongs` admits.
-    pub fn live(&self, belongs: impl Fn(&Actor) -> bool) -> Vec<SessionEntry> {
-        self.pruned()
+    pub fn live(&self, belongs: impl Fn(&Actor) -> bool) -> Result<Vec<SessionEntry>, ServerError> {
+        Ok(self
+            .pruned()?
             .entries
             .values()
             .filter(|entry| belongs(&entry.actor))
             .cloned()
-            .collect()
+            .collect())
+    }
+
+    /// Revoke matching sessions before saving, so a failed durable write never
+    /// restores a credential already refused by an account disable.
+    pub fn revoke_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
+        let mut live = self
+            .live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?;
+        let before = live.entries.len();
+        let Live { entries, ids } = &mut *live;
+        entries.retain(|_, entry| {
+            if belongs(&entry.actor) {
+                ids.remove(&entry.id);
+                false
+            } else {
+                true
+            }
+        });
+        let revoked = before - entries.len();
+        if revoked > 0 {
+            self.keep(entries)?;
+        }
+        Ok(revoked)
     }
 
     /// End every matching session in one durable write. A failed write leaves
     /// the previous in-memory set intact; lifecycle admission still refuses it.
     pub fn end_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
-        let mut live = self.pruned();
+        let mut live = self.pruned()?;
         let mut remaining = live.entries.clone();
         remaining.retain(|_, entry| !belongs(&entry.actor));
         let ended = live.entries.len() - remaining.len();
@@ -263,7 +295,7 @@ impl Sessions {
         id: &str,
         belongs: impl FnOnce(&Actor) -> bool,
     ) -> Result<SessionEntry, ServerError> {
-        let mut live = self.pruned();
+        let mut live = self.pruned()?;
         let key = live.ids.get(id).and_then(|key| {
             live.entries
                 .get(key)
@@ -284,3 +316,7 @@ impl Sessions {
         Ok(ended)
     }
 }
+
+#[cfg(test)]
+#[path = "session_poison_tests.rs"]
+mod poison_tests;

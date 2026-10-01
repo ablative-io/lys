@@ -15,7 +15,6 @@
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use std::sync::PoisonError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::http::HeaderMap;
@@ -106,14 +105,7 @@ pub fn signed_agent(
     let binding = person.bindings().first().ok_or(ServerError::NoPerson)?;
     let actor = Actor::new(binding.clone(), Provenance::by_agent(agent, now / 1000));
     crate::caller_admission::active_caller(directory, &actor)?;
-    let mut seen = state
-        .agent_nonces
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    seen.retain(|_nonce, at| now.abs_diff(*at) <= WINDOW_MS);
-    if seen.insert(nonce.to_ascii_lowercase(), signed_at).is_some() {
-        return Err(refused("the nonce was already used"));
-    }
+    remember_nonce(&state.agent_nonces, nonce, signed_at, now)?;
     Ok(Some(agent))
 }
 
@@ -164,3 +156,24 @@ fn unhex(text: &str) -> Option<Vec<u8>> {
         .map(|at| u8::from_str_radix(text.get(at..at + 2)?, 16).ok())
         .collect()
 }
+
+fn remember_nonce(
+    nonces: &Nonces,
+    nonce: &str,
+    signed_at: u64,
+    now: u64,
+) -> Result<(), ServerError> {
+    let mut seen = nonces.lock().map_err(|error| {
+        tracing::error!("signature nonce store unavailable: {error}");
+        refused("the signature nonce store is unavailable")
+    })?;
+    seen.retain(|_nonce, at| now.abs_diff(*at) <= WINDOW_MS);
+    if seen.insert(nonce.to_ascii_lowercase(), signed_at).is_some() {
+        return Err(refused("the nonce was already used"));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "agent_signature_poison_tests.rs"]
+mod poison_tests;

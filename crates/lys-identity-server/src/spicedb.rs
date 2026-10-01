@@ -23,7 +23,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
@@ -275,7 +275,7 @@ impl SpiceDb {
     }
 
     /// The schema for the resource kinds `kinds`.
-    pub fn schema(&self, kinds: &BTreeSet<String>) -> String {
+    pub fn schema(&self, kinds: &BTreeSet<String>) -> Result<String, GrantError> {
         let mut carried: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
         for (relation, actions) in &self.relations {
             for action in actions {
@@ -297,7 +297,7 @@ impl SpiceDb {
         let app_kinds = self
             .app_kinds
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))?
             .clone();
         let apps = app_kinds
             .iter()
@@ -305,7 +305,7 @@ impl SpiceDb {
         // A service account is also an existing resource kind. Keep one
         // definition with its ordinary resource relations, never emit a
         // second definition when a grant names an account as a resource.
-        [
+        Ok([
             SCHEMA.replace(
                 "definition service_account {}",
                 &format!("definition service_account {{\n{body}}}"),
@@ -315,7 +315,7 @@ impl SpiceDb {
         .into_iter()
         .chain(kinds)
         .chain(apps)
-        .collect()
+        .collect())
     }
 
     pub(crate) fn schema_writer(&self) -> Result<Self, GrantError> {
@@ -352,7 +352,8 @@ impl SpiceDb {
         *self
             .app_kinds
             .lock()
-            .unwrap_or_else(PoisonError::into_inner) = kinds.clone();
+            .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))? =
+            kinds.clone();
         self.write_schema(&self.kinds()?)
     }
 
@@ -413,12 +414,12 @@ impl SpiceDb {
         let known = self
             .app_kinds
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))?
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>();
         let text = self.schema_text()?.unwrap_or_default();
-        let mut schema = self.schema(kinds);
+        let mut schema = self.schema(kinds)?;
         for (kind, definition) in app_definitions(&text) {
             if !known.contains(&kind) {
                 schema.push('\n');
@@ -630,3 +631,7 @@ mod calls_tests;
 #[cfg(test)]
 #[path = "spicedb_key_tests.rs"]
 mod key_tests;
+
+#[cfg(test)]
+#[path = "spicedb_poison_tests.rs"]
+mod poison_tests;

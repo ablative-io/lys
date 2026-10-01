@@ -15,6 +15,14 @@ pub use translate::TranslateError;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HomeError {
+    /// A panic interrupted an in-process state owner.
+    #[error("StatePoisoned: {state} was interrupted by a panic: {reason}; reopen the owner")]
+    StatePoisoned {
+        /// The state that must be reopened.
+        state: &'static str,
+        /// The lock failure.
+        reason: String,
+    },
     /// An I/O operation failed at a named path.
     #[error("{context} at {}: {source}", path.display())]
     Io {

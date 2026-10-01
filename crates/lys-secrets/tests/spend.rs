@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Spend caps: a capped lease reserves before a call is forwarded, refuses a
 //! reservation past its cap, settles what the call spent, and settles a call
 //! the broker never saw finish as `outcome_unknown` at its full reservation.
@@ -56,11 +58,13 @@ impl World {
 
 fn grants() -> LocalGrants {
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "model-key".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "model-key".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     grants
 }
 
@@ -197,7 +201,10 @@ fn a_call_forwarded_before_a_revocation_finishes_as_completed_after_drop() -> Te
     let issued = broker.issue_capped(&world.holder, "model-key", 5, NOW_MS + 60_000, Some(100))?;
     let admitted = fresh(broker.admit_use(&issued.token, &world.present(&issued.id)?, 40)?)?;
     let forwarded = broker.at_forward_boundary(admitted)?;
-    broker.permissions().revoke("agent:noor", "model-key");
+    broker
+        .permissions()
+        .revoke("agent:noor", "model-key")
+        .expect("local grants lock must be healthy");
     broker.settle(forwarded, 25)?;
     let last = broker
         .audit()

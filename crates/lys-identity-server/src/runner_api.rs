@@ -470,11 +470,12 @@ async fn live(
         (sessions, Some(totals))
     } else {
         (
-            crate::runtime_api::visible_sessions(&state, &headers)?
-                .iter()
-                .filter(|tracked| !tracked.stopped())
-                .filter_map(|tracked| crate::runtime_api::view(&state, tracked))
-                .collect(),
+            crate::runtime_api::views(
+                &state,
+                crate::runtime_api::visible_sessions(&state, &headers)?
+                    .iter()
+                    .filter(|tracked| !tracked.stopped()),
+            )?,
             None,
         )
     };
