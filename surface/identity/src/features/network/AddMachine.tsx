@@ -18,7 +18,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const keep = (next: PendingMachine) => { sessionStorage.setItem(key, JSON.stringify({ version: 1, ...next })); setPending(next); };
-  const send = async (initial: PendingMachine) => {
+  const send = async (initial: PendingMachine, retry = false) => {
     if (working.current || restored.error) return;
     working.current = true; setBusy(true); setFailure('');
     let current = initial;
@@ -35,7 +35,12 @@ export function AddMachine({ person, agent, changed, cancel }: {
       if (!current.machine) throw new Refused(200, { refusal: 'MachineReceiptMismatch', reason: 'The recorded computer is missing from this pending addition.' });
       sessionStorage.removeItem(key); setPending(null);
       changed(current.body.name + ' was added. Its runner is recorded.', current.machine);
-    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    } catch (error) {
+      if (!retry && current.phase === 'machine' && error instanceof Refused && error.status >= 400 && error.status < 500 && error.refusal.refusal !== 'Unanswered') {
+        sessionStorage.removeItem(key); setPending(null);
+      }
+      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+    }
     finally { working.current = false; setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -52,7 +57,7 @@ export function AddMachine({ person, agent, changed, cancel }: {
       <p className="hint">Type a name for this computer.</p>
       <div className="chain"><button className="btn primary" type="submit">Add this computer</button><button className="btn" type="button" onClick={cancel}>Cancel</button></div>
     </fieldset>
-    {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending)}>Check whether it was added</button></div> : null}
+    {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><button className="btn" type="button" disabled={busy} onClick={() => void send(pending, true)}>Check whether it was added</button></div> : null}
     {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><details><summary>Details</summary><p>{failure}</p></details></> : null}
   </form>;
 }
