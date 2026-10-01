@@ -259,17 +259,16 @@ impl Sessions {
             operations: Operations::open(state_dir)?,
         };
         for kept in state.read()?.sessions {
-            let ended = match kept.ended {
-                Some(ended) => ended,
-                None => {
-                    let (signal, reason) = left_behind(&kept.session, kept.leader_start.as_ref());
-                    Ended {
-                        how: EndedHow::EndedByRunnerRestart,
-                        at: found_at,
-                        status: None,
-                        signal,
-                        reason,
-                    }
+            let ended = if let Some(ended) = kept.ended {
+                ended
+            } else {
+                let (signal, reason) = left_behind(&kept.session, kept.leader_start.as_ref());
+                Ended {
+                    how: EndedHow::EndedByRunnerRestart,
+                    at: found_at,
+                    status: None,
+                    signal,
+                    reason,
                 }
             };
             table.sessions.insert(
