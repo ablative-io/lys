@@ -173,6 +173,24 @@ impl Sessions {
         (path, bound): (&str, &str),
         from_start: bool,
     ) -> Result<String, RunnerError> {
+        if let Err(error) = crate::session::transcript_parent(Path::new(path)) {
+            let source = SourceState {
+                path: path.to_owned(),
+                ..SourceState::default()
+            };
+            append(
+                table,
+                id,
+                vec![Body::Coverage(Coverage::of(
+                    "source_refused",
+                    &source,
+                    None,
+                    error.to_string(),
+                ))],
+                None,
+            )?;
+            return Err(error);
+        }
         let held = table.feed.source(id).cloned();
         if held.as_ref().is_some_and(|held| held.path == path) {
             return Ok(format!("{path} is already bound"));
