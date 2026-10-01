@@ -2,16 +2,16 @@
 //!
 //! The runner listens on one Unix socket, made readable and writable by its
 //! owner alone (mode 0600), and on no network address. A connection carries
-//! one greeting, one request and one reply. Each request is verified
+//! a fresh greeting, one request and one reply at each request boundary. Each request is verified
 //! against the server's key, this runner's id and the challenge its
 //! connection was given before anything in it is acted on; a request that
 //! fails any of them is refused by name and does nothing.
 //!
 //! While an act waits (a read that follows, a wait for a pattern, an end),
-//! a second thread reads the connection: when the caller closes it, the act
+//! readiness watches the connection: when the caller closes it, the act
 //! stops waiting. Nothing ends a wait on a clock.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io;
 use std::net::Shutdown;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -58,7 +58,7 @@ pub struct Runner {
 pub struct Serving {
     sessions: Arc<Sessions>,
     socket: PathBuf,
-    stop: Arc<AtomicBool>,
+    stop: tokio::sync::watch::Sender<bool>,
     thread: JoinHandle<()>,
     #[cfg(test)]
     shutdown_probe: Option<ShutdownProbe>,
@@ -153,11 +153,25 @@ impl Runner {
 
     /// Serve on a thread of its own until [`Serving::stop`].
     pub fn spawn(self) -> Serving {
-        let stop = Arc::new(AtomicBool::new(false));
+        let (stop, stopped) = tokio::sync::watch::channel(false);
         let sessions = Arc::clone(&self.sessions);
         let socket = self.socket.clone();
-        let stopped = Arc::clone(&stop);
-        let thread = std::thread::spawn(move || self.serve_until(&stopped));
+        let thread = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(DISPATCH_MAX)
+                .build();
+            match runtime {
+                Ok(runtime) => {
+                    if let Err(error) = runtime.block_on(self.serve_until(stopped)) {
+                        crate::error::said(&format!("runner_socket_unavailable: {error}"));
+                    }
+                }
+                Err(error) => {
+                    crate::error::said(&format!("runner_socket_runtime_failed: {error}"));
+                }
+            }
+        });
         Serving {
             sessions,
             socket,
@@ -168,24 +182,66 @@ impl Runner {
         }
     }
 
-    fn serve_until(self, stop: &AtomicBool) {
-        for incoming in self.listener.incoming() {
-            if stop.load(Ordering::SeqCst) {
-                break;
-            }
-            match incoming {
-                Ok(stream) => {
-                    let sessions = Arc::clone(&self.sessions);
-                    let server = self.server;
-                    std::thread::spawn(move || connection(&sessions, &server, &stream));
+    async fn serve_until(
+        self,
+        mut stop: tokio::sync::watch::Receiver<bool>,
+    ) -> Result<(), RunnerError> {
+        self.listener.set_nonblocking(true).map_err(socket_failed)?;
+        let listener = tokio::net::UnixListener::from_std(self.listener).map_err(socket_failed)?;
+        let slots = Arc::new(DispatchSlots::new());
+        let open = Arc::new(tokio::sync::Semaphore::new(CONNECTION_MAX));
+        let mut connections = tokio::task::JoinSet::new();
+        while !*stop.borrow() {
+            tokio::select! {
+                changed = stop.changed() => {
+                    changed.map_err(socket_failed)?;
                 }
-                Err(error) => {
-                    crate::error::said(&format!(
-                        "runner_socket_unavailable: a connection was not accepted: {error}"
-                    ));
+                incoming = listener.accept() => {
+                    let (stream, _) = incoming.map_err(socket_failed)?;
+                    match Arc::clone(&open).try_acquire_owned() {
+                        Ok(permit) => {
+                            let sessions = Arc::clone(&self.sessions);
+                            let slots = Arc::clone(&slots);
+                            let stopped = stop.clone();
+                            let server = self.server;
+                            connections.spawn(async move {
+                                let result = connection(&sessions, server, stream, slots, stopped).await;
+                                drop(permit);
+                                result
+                            });
+                        }
+                        Err(error) => {
+                            let greeting = Greeting::fresh(self.sessions.runner());
+                            let refused = Answer::refusal(&RunnerError::refused("runner_connections_full", error.to_string()));
+                            let text = format!("{}\n{}\n", greeting.line(), reply_line(refused));
+                            if let Err(error) = stream.try_write(text.as_bytes()) {
+                                crate::error::said(&format!("runner_capacity_answer_failed: {error}"));
+                            }
+                        }
+                    }
+                }
+                completed = connections.join_next(), if !connections.is_empty() => {
+                    connection_result(completed);
                 }
             }
         }
+        drop(listener);
+        while let Some(completed) = connections.join_next().await {
+            connection_result(Some(completed));
+        }
+        Ok(())
+    }
+}
+
+const CONNECTION_MAX: usize = 64;
+const DISPATCH_MAX: usize = 32;
+const LINE_MAX: usize = 1_048_576;
+
+fn connection_result(result: Option<Result<Result<(), RunnerError>, tokio::task::JoinError>>) {
+    match result {
+        Some(Ok(Err(error))) => crate::error::said(&format!("runner_connection_closed: {error}")),
+        Some(Err(error)) => crate::error::said(&format!("runner_connection_failed: {error}")),
+        Some(Ok(Ok(()))) | None => {}
     }
 }
 
@@ -195,84 +251,374 @@ impl Serving {
         &self.sessions
     }
 
-    /// End every session, answering once each exit is seen, then stop
-    /// serving and remove the socket.
+    /// Stop uses its held signal channel even after the listener path disappears.
     pub fn stop(self) -> Result<(), RunnerError> {
         self.sessions.stop_all();
-        self.stop.store(true, Ordering::SeqCst);
-        if let Err(error) = UnixStream::connect(&self.socket) {
-            crate::error::said(&format!("the runner's socket was already closed: {error}"));
-        }
+        let sent = self.stop.send(true);
         #[cfg(test)]
         if let Some(probe) = self.shutdown_probe {
             probe()?;
         }
-        self.thread
-            .join()
-            .map_err(|_panicked| socket_failed("the serving thread ended abnormally"))?;
-        std::fs::remove_file(&self.socket)
-            .map_err(|error| socket_failed(format!("removing {}: {error}", self.socket.display())))
-    }
-}
-
-/// Answer the one request `stream` carries, naming in the runner's log a
-/// caller that left before its answer was written.
-fn connection(sessions: &Arc<Sessions>, server: &[u8; 32], stream: &UnixStream) {
-    if let Err(error) = answer_one(sessions, server, stream) {
-        crate::error::said(&format!(
-            "a request was not answered: the caller left: {error}"
-        ));
-    }
-}
-
-fn answer_one(
-    sessions: &Arc<Sessions>,
-    server: &[u8; 32],
-    stream: &UnixStream,
-) -> std::io::Result<()> {
-    let greeting = Greeting::fresh(sessions.runner());
-    let mut writer = stream;
-    writer.write_all(greeting.line().as_bytes())?;
-    writer.write_all(b"\n")?;
-    writer.flush()?;
-    let mut line = String::new();
-    BufReader::new(stream.try_clone()?).read_line(&mut line)?;
-    if line.is_empty() {
-        return Ok(());
-    }
-    if !crate::peer::is_peer(&line)
-        && matches!(
-            verify_request(line.trim_end(), server, &greeting),
-            Ok(Act::GrantChannel)
-        )
-    {
-        writer.write_all(reply_line(Answer::GrantChannel).as_bytes())?;
-        writer.write_all(b"\n")?;
-        writer.flush()?;
-        crate::refusals::serve(sessions, stream);
-        return stream.shutdown(Shutdown::Both);
-    }
-    let left = Arc::new(AtomicBool::new(false));
-    let mut watched = stream.try_clone()?;
-    let (flag, woken) = (Arc::clone(&left), Arc::clone(sessions));
-    std::thread::spawn(move || {
-        let mut byte = [0_u8; 1];
-        let seen = watched.read(&mut byte);
-        if let Ok(read @ 1..) = seen {
-            crate::error::said(&format!("a caller wrote {read} bytes past its one request"));
+        self.thread.join().map_err(|panic| {
+            socket_failed(format!("the serving thread ended abnormally: {panic:?}"))
+        })?;
+        sent.map_err(socket_failed)?;
+        self.sessions.writer.barrier()?;
+        match std::fs::remove_file(&self.socket) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(socket_failed(format!(
+                "removing {}: {error}",
+                self.socket.display()
+            ))),
         }
-        flag.store(true, Ordering::SeqCst);
-        woken.wake();
-    });
-    let answer = if crate::peer::is_peer(&line) {
-        crate::peer::answer(sessions, stream, line.trim_end(), &left)
+    }
+}
+
+async fn write_line(stream: &tokio::net::UnixStream, line: String) -> Result<(), RunnerError> {
+    let bytes = line.into_bytes();
+    let mut offset = 0;
+    while offset < bytes.len() {
+        stream.writable().await.map_err(socket_failed)?;
+        match stream.try_write(&bytes[offset..]) {
+            Ok(0) => return Err(socket_failed("the connection closed during its answer")),
+            Ok(written) => offset += written,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            Err(error) => return Err(socket_failed(error)),
+        }
+    }
+    Ok(())
+}
+
+async fn read_line(
+    stream: &tokio::net::UnixStream,
+    pending: &mut Vec<u8>,
+) -> Result<Option<String>, RunnerError> {
+    let mut scanned = 0;
+    loop {
+        if let Some(end) = pending[scanned..].iter().position(|byte| *byte == b'\n') {
+            let end = scanned + end;
+            if end >= LINE_MAX {
+                return Err(RunnerError::refused(
+                    "request_too_large",
+                    "the request exceeds 1048576 bytes",
+                ));
+            }
+            let remainder = pending.split_off(end + 1);
+            let line = std::mem::replace(pending, remainder);
+            return String::from_utf8(line)
+                .map(Some)
+                .map_err(|error| RunnerError::refused("request_malformed", error.to_string()));
+        }
+        if pending.len() > LINE_MAX {
+            return Err(RunnerError::refused(
+                "request_too_large",
+                "the request exceeds 1048576 bytes",
+            ));
+        }
+        scanned = pending.len();
+        stream.readable().await.map_err(socket_failed)?;
+        let mut bytes = [0; 8192];
+        let room = (LINE_MAX + 1 - pending.len()).min(bytes.len());
+        match stream.try_read(&mut bytes[..room]) {
+            Ok(0) if pending.is_empty() => return Ok(None),
+            Ok(0) => {
+                return Err(RunnerError::refused(
+                    "request_unterminated",
+                    "the connection ended before its request newline",
+                ));
+            }
+            Ok(read) => pending.extend_from_slice(&bytes[..read]),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            Err(error) => return Err(socket_failed(error)),
+        }
+    }
+}
+
+async fn departed(stream: &tokio::net::UnixStream) -> Result<(), RunnerError> {
+    let mut byte = [0];
+    loop {
+        stream.readable().await.map_err(socket_failed)?;
+        match stream.try_read(&mut byte) {
+            Ok(0) => return Ok(()),
+            Ok(_) => {
+                return Err(RunnerError::refused(
+                    "request_pipelined",
+                    "another request arrived before the answer",
+                ));
+            }
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            Err(error) => return Err(socket_failed(error)),
+        }
+    }
+}
+
+enum Command {
+    Peer(String),
+    Server(Act),
+}
+
+impl Command {
+    fn control(&self) -> bool {
+        matches!(self, Self::Server(Act::Status { .. }))
+            || matches!(self,
+            Self::Server(Act::Operate { operation }) if operation.request == crate::operations::OperationRequest::Stop)
+    }
+}
+
+struct DispatchSlots {
+    total: Arc<tokio::sync::Semaphore>,
+    ordinary: Arc<tokio::sync::Semaphore>,
+}
+
+struct DispatchPermit {
+    total: tokio::sync::OwnedSemaphorePermit,
+    ordinary: Option<tokio::sync::OwnedSemaphorePermit>,
+}
+
+impl DispatchSlots {
+    fn new() -> Self {
+        Self {
+            total: Arc::new(tokio::sync::Semaphore::new(DISPATCH_MAX)),
+            ordinary: Arc::new(tokio::sync::Semaphore::new(DISPATCH_MAX - 1)),
+        }
+    }
+
+    fn acquire(&self, control: bool) -> Result<DispatchPermit, tokio::sync::TryAcquireError> {
+        let ordinary = if control {
+            None
+        } else {
+            Some(Arc::clone(&self.ordinary).try_acquire_owned()?)
+        };
+        let total = Arc::clone(&self.total).try_acquire_owned()?;
+        Ok(DispatchPermit { total, ordinary })
+    }
+}
+
+impl DispatchPermit {
+    fn finish(self) {
+        drop(self.total);
+        drop(self.ordinary);
+    }
+}
+
+fn command(line: String, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
+    if crate::peer::is_peer(&line) {
+        Ok(Command::Peer(line))
     } else {
-        dispatch(sessions, server, &greeting, &line, &left)
+        verify_request(line.trim_end(), server, greeting).map(Command::Server)
+    }
+}
+
+struct Cancellation {
+    sessions: Arc<Sessions>,
+    left: Arc<AtomicBool>,
+    proof: Arc<UnixStream>,
+    armed: bool,
+}
+
+impl Cancellation {
+    fn cancel(&self) {
+        let table = self.sessions.lock();
+        self.left.store(true, Ordering::SeqCst);
+        self.sessions.wake();
+        drop(table);
+        if let Err(error) = self.proof.shutdown(Shutdown::Both) {
+            if error.kind() != io::ErrorKind::NotConnected {
+                crate::error::said(&format!("runner_cancellation_failed: {error}"));
+            }
+        }
+    }
+}
+
+impl Drop for Cancellation {
+    fn drop(&mut self) {
+        if self.armed {
+            self.cancel();
+        }
+    }
+}
+
+async fn execute(
+    sessions: &Arc<Sessions>,
+    proof: &Arc<UnixStream>,
+    stream: &tokio::net::UnixStream,
+    command: Command,
+    permit: DispatchPermit,
+    stop: &mut tokio::sync::watch::Receiver<bool>,
+) -> Result<Option<Answer>, RunnerError> {
+    let left = Arc::new(AtomicBool::new(false));
+    let mut cancellation = Cancellation {
+        sessions: Arc::clone(sessions),
+        left: Arc::clone(&left),
+        proof: Arc::clone(proof),
+        armed: true,
     };
-    writer.write_all(reply_line(answer).as_bytes())?;
-    writer.write_all(b"\n")?;
-    writer.flush()?;
-    stream.shutdown(Shutdown::Both)
+    let flag = Arc::clone(&left);
+    let held = Arc::clone(sessions);
+    let proved = Arc::clone(proof);
+    let mut task = tokio::task::spawn_blocking(move || {
+        let answer = match command {
+            Command::Peer(line) => crate::peer::answer(&held, &proved, line.trim_end(), &flag),
+            Command::Server(act) => {
+                perform(&held, act, &flag).unwrap_or_else(|error| Answer::refusal(&error))
+            }
+        };
+        permit.finish();
+        answer
+    });
+    tokio::select! {
+        result = &mut task => {
+            cancellation.armed = false;
+            Ok(Some(result.map_err(socket_failed)?))
+        }
+        result = departed(stream) => {
+            cancellation.cancel();
+            cancellation.armed = false;
+            task.await.map_err(socket_failed)?;
+            result?;
+            Ok(None)
+        }
+        changed = stop.changed() => {
+            cancellation.cancel();
+            cancellation.armed = false;
+            task.await.map_err(socket_failed)?;
+            changed.map_err(socket_failed)?;
+            Ok(None)
+        }
+    }
+}
+
+async fn grant_channel(
+    sessions: &Arc<Sessions>,
+    stream: &tokio::net::UnixStream,
+    stop: &mut tokio::sync::watch::Receiver<bool>,
+) -> Result<(), RunnerError> {
+    let channel = crate::refusals::Channel::new(sessions);
+    let ready = channel.ready();
+    let mut pending = Vec::new();
+    while !*stop.borrow() {
+        let notified = ready.notified();
+        let Some(question) = channel.next() else {
+            tokio::select! {
+                () = notified => continue,
+                incoming = read_line(stream, &mut pending) => match incoming? {
+                    None => break,
+                    Some(_) => return Err(RunnerError::refused("grant_answer_unasked", "the authority sent an answer before a question")),
+                },
+                changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
+            }
+        };
+        let line = serde_json::to_string(&question).map_err(socket_failed)?;
+        tokio::select! {
+            result = write_line(stream, format!("{line}\n")) => result?,
+            changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
+        }
+        tokio::select! {
+            incoming = read_line(stream, &mut pending) => match incoming? {
+                None => break,
+                Some(line) => channel.answer(&question, &line)?,
+            },
+            changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
+        }
+    }
+    Ok(())
+}
+
+async fn response(
+    stream: &tokio::net::UnixStream,
+    answer: Answer,
+    stop: &mut tokio::sync::watch::Receiver<bool>,
+) -> Result<bool, RunnerError> {
+    tokio::select! {
+        result = write_line(stream, format!("{}\n", reply_line(answer))) => { result?; Ok(true) },
+        changed = stop.changed() => { changed.map_err(socket_failed)?; Ok(false) }
+    }
+}
+
+async fn connection(
+    sessions: &Arc<Sessions>,
+    server: [u8; 32],
+    stream: tokio::net::UnixStream,
+    slots: Arc<DispatchSlots>,
+    mut stop: tokio::sync::watch::Receiver<bool>,
+) -> Result<(), RunnerError> {
+    let stream = stream.into_std().map_err(socket_failed)?;
+    let proof = Arc::new(stream.try_clone().map_err(socket_failed)?);
+    let stream = tokio::net::UnixStream::from_std(stream).map_err(socket_failed)?;
+    let mut pending = Vec::new();
+    while !*stop.borrow() {
+        let greeting = Greeting::fresh(sessions.runner());
+        tokio::select! {
+            result = write_line(&stream, format!("{}\n", greeting.line())) => result?,
+            changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
+        }
+        let line = tokio::select! {
+            result = read_line(&stream, &mut pending) => match result {
+                Ok(Some(line)) => line,
+                Ok(None) => break,
+                Err(error) => { response(&stream, Answer::refusal(&error), &mut stop).await?; break; }
+            },
+            changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
+        };
+        let command = match command(line, &server, &greeting) {
+            Ok(command) if pending.is_empty() => command,
+            Ok(_) => {
+                response(
+                    &stream,
+                    Answer::refusal(&RunnerError::refused(
+                        "request_pipelined",
+                        "send the next request after its greeting",
+                    )),
+                    &mut stop,
+                )
+                .await?;
+                break;
+            }
+            Err(error) => {
+                if !response(&stream, Answer::refusal(&error), &mut stop).await? {
+                    break;
+                }
+                continue;
+            }
+        };
+        if matches!(command, Command::Server(Act::GrantChannel)) {
+            if response(&stream, Answer::GrantChannel, &mut stop).await? {
+                grant_channel(sessions, &stream, &mut stop).await?;
+            }
+            break;
+        }
+        let permit = match slots.acquire(command.control()) {
+            Ok(permit) => permit,
+            Err(error) => {
+                if !response(
+                    &stream,
+                    Answer::refusal(&RunnerError::refused(
+                        "runner_dispatch_full",
+                        error.to_string(),
+                    )),
+                    &mut stop,
+                )
+                .await?
+                {
+                    break;
+                }
+                continue;
+            }
+        };
+        let Some(answer) = execute(sessions, &proof, &stream, command, permit, &mut stop).await?
+        else {
+            break;
+        };
+        if !response(&stream, answer, &mut stop).await? {
+            break;
+        }
+    }
+    match proof.shutdown(Shutdown::Both) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotConnected => Ok(()),
+        Err(error) => Err(socket_failed(error)),
+    }
 }
 
 /// The answer to request `line`, made on the connection given `greeting`.
