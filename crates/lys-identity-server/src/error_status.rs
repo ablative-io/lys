@@ -143,6 +143,7 @@ impl ServerError {
             | Self::ProfileNotReviewed { .. }
             | Self::MachineCannotReach { .. }
             | Self::MachineWithoutRuntime
+            | Self::MachineWithoutRunner
             | Self::LaunchUnrenderable { .. }
             | Self::HarnessUndeclared { .. }
             | Self::McpHandleUnsupported { .. }

@@ -392,6 +392,9 @@ pub enum ServerError {
     /// The machine has no runtime, so nothing is started on it.
     #[error("MachineWithoutRuntime: the machine has no runtime to start the agent with")]
     MachineWithoutRuntime,
+    /// The machine cannot execute a start without a recorded runner.
+    #[error("MachineWithoutRunner: the machine has no recorded runner to start the agent with")]
+    MachineWithoutRunner,
     /// A skill Lys keeps no text for.
     #[error("SkillUnknown: Lys keeps no skill named `{name}`; keep its text under /skills first")]
     SkillUnknown {

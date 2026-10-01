@@ -1,5 +1,5 @@
-//! The start-command route: the product starts an agent by giving the
-//! command that starts it on a chosen machine, never by running it.
+//! The start-command route asks the chosen machine's recorded runner to
+//! start the agent and returns the runner's answer with the rendered command.
 //!
 //! The command is rendered from the agent's kept provisioning profile, as a
 //! launch template the home keeps by hash, and names the agent's identity,
@@ -10,8 +10,8 @@
 //! A start is admitted once, under the caller's operation id, and kept in
 //! the runtime reports' log as the session's `starting` report before the
 //! command is answered; the session is that operation id. The same request
-//! sent again answers the start exactly as it was first answered, kept whole
-//! in that report, whatever has changed since; the same operation id naming
+//! sent again uses the start kept whole in that report, provided the machine
+//! still names a runner; the same operation id naming
 //! any other report is refused. Only an active agent is started, only on a
 //! machine that lists the agent or a role it holds and whose egress list
 //! names every host its profile's servers are reached at, and only from a
@@ -25,9 +25,9 @@
 //! On a machine whose record names a runner, the kept start is then run by
 //! that runner, using signed process inputs and config files, and the answer carries the
 //! runner's word beside the command: the session is kept running once the
-//! runner says its process is up. On a machine that names none, the command
-//! is answered as it always was, and nothing runs. The service itself
-//! never runs anything: it asks the runner over its socket.
+//! runner says its process is up. A machine without a recorded runner is
+//! refused before a new start is kept. Existing starts remain intact when
+//! their runner is removed. The service asks the runner over its socket.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -211,6 +211,8 @@ pub(crate) async fn start_profile(
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
     })?;
+    crate::runner_sessions::machine_runner(state, machine)?
+        .ok_or(ServerError::MachineWithoutRunner)?;
     let kept = with_runtime(state, |store| {
         store.report(Report {
             operation: session.clone(),
@@ -259,10 +261,7 @@ pub(crate) fn start_caller(
     })
 }
 
-/// Run the start `view` answers on its machine's runner, when the machine
-/// names one, and answer the view with the runner's word on it beside it;
-/// a machine that names none is answered the view as it is, and nothing
-/// runs. The service spawns nothing: it asks the runner.
+/// A replay requires the recorded runner even though its launch is already kept.
 async fn run(
     state: &Arc<AppState>,
     view: Value,
@@ -277,14 +276,14 @@ async fn run(
             })
     };
     let (agent, machine) = (member("agent")?, member("machine")?);
+    crate::runner_sessions::machine_runner(state, &machine)?
+        .ok_or(ServerError::MachineWithoutRunner)?;
     let mut launch = with_provisioning(state, |store| kept_launch(store, &view))?;
     launch.policy = crate::agent_policy_api::launch_policy(state, &agent)?;
     let ran = crate::runner_sessions::run_on_runner(state, (&agent, &machine, admitted_by), launch)
         .await?;
     let mut view = view;
-    if let Some(runner) = ran {
-        view["runner"] = runner;
-    }
+    view["runner"] = ran;
     Ok(Json(view))
 }
 

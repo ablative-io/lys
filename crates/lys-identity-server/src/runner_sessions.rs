@@ -295,16 +295,14 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
 }
 
 /// Start `launch` for `agent` on `machine`'s runner and keep it running;
-/// none when the machine names no runner, and then nothing is run. A start
-/// sent again finds the session the runner already holds.
+/// refuse when the machine names no runner. A start sent again finds the
+/// session the runner already holds.
 pub async fn run_on_runner(
     state: &Arc<AppState>,
     (agent, machine, caller): (&str, &str, &str),
     launch: Launch,
-) -> Result<Option<Value>, ServerError> {
-    let Some(runner) = machine_runner(state, machine)? else {
-        return Ok(None);
-    };
+) -> Result<Value, ServerError> {
+    let runner = machine_runner(state, machine)?.ok_or(ServerError::MachineWithoutRunner)?;
     let driven = Driven {
         session: launch.session.clone(),
         agent: agent.to_owned(),
@@ -381,13 +379,13 @@ pub async fn run_on_runner(
     if let Some(ended) = &ended {
         record_end(state, &driven, ended)?;
     }
-    Ok(Some(json!({
+    Ok(json!({
         "session": driven.session,
         "state": if ended.is_some() { "ended" } else { "running" },
         "pid": pid,
         "started_at": started_at,
         "ended": ended,
-    })))
+    }))
 }
 
 /// The directory service's launcher: a given start is run by the runner its
@@ -477,9 +475,7 @@ impl Launcher for DirectoryLauncher {
                 rotation,
                 policy,
             };
-            run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch)
-                .await
-                .transpose()
+            Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
         })
     }
 }

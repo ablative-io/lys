@@ -116,6 +116,7 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
 
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
+    "MachineWithoutRunner",
     "runner_request_unsigned",
     "runner_request_malformed",
     "runner_protocol_mismatch",
@@ -154,6 +155,7 @@ pub(crate) const RESTART: &[&str] = &[
     "MachineRetired",
     "MachineUnknown",
     "MachineWithoutRuntime",
+    "MachineWithoutRunner",
     "HarnessUndeclared",
     "LaunchUnrenderable",
     "McpHandleUnsupported",
