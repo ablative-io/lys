@@ -7,8 +7,6 @@
 //! with a higher [`SHIPPED_VERSION`] is applied over the one held, since it
 //! only adds.
 
-use std::fmt::Write as _;
-
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
 pub const SHIPPED_VERSION: u64 = 2;
 
@@ -119,8 +117,9 @@ pub fn shipped_model() -> String {
         "{{\n  \"version\": {SHIPPED_VERSION},\n  \"relations\": {{\n    \"owner\": [{owner}],\n    \"editor\": [{editor}],\n    \"viewer\": [\"view\", \"{READ}\"],\n    \"reader\": [\"{READ}\"]"
     );
     for action in ACTIONS {
-        // Writing to a String cannot fail.
-        let _ = write!(text, ",\n    \"{ONE}{action}\": [\"{action}\"]");
+        for part in [",\n    \"", ONE, action, "\": [\"", action, "\"]"] {
+            text.push_str(part);
+        }
     }
     text.push_str("\n  }\n}\n");
     text
