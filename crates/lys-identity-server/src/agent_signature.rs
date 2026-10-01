@@ -177,3 +177,50 @@ fn remember_nonce(
 #[cfg(test)]
 #[path = "agent_signature_poison_tests.rs"]
 mod poison_tests;
+
+/// An in-process principal inserted only after MCP validates the token's scope.
+#[derive(Clone, Copy)]
+pub struct TokenPrincipal {
+    pub(crate) holder: AgentId,
+    pub(crate) grant: lys_identity::grants::GrantId,
+}
+
+impl TokenPrincipal {
+    /// The grant whose declared scope admitted this in-process request.
+    pub fn grant(&self) -> lys_identity::grants::GrantId {
+        self.grant
+    }
+}
+
+/// A trusted token principal uses the route's current lifecycle judgement.
+pub(crate) fn signed_agent_with_token(
+    state: &AppState,
+    directory: &Projection,
+    headers: &HeaderMap,
+    request: (&str, &str, &[u8]),
+    principal: Option<&TokenPrincipal>,
+) -> Result<Option<AgentId>, ServerError> {
+    let Some(principal) = principal else {
+        return signed_agent(state, directory, headers, request);
+    };
+    if headers.contains_key(HEADER)
+        || headers.contains_key(axum::http::header::COOKIE)
+        || headers.contains_key(axum::http::header::AUTHORIZATION)
+    {
+        return Err(refused("a token principal cannot carry another credential"));
+    }
+    let record = directory
+        .record(IdentityId::Agent(principal.holder))
+        .ok_or_else(|| refused("the token holder is unknown"))?;
+    let binding = record
+        .responsible()
+        .and_then(|person| directory.record(IdentityId::Person(person)))
+        .and_then(|person| person.bindings().first())
+        .ok_or(ServerError::NoPerson)?;
+    let actor = Actor::new(
+        binding.clone(),
+        Provenance::by_agent(principal.holder, crate::session::now()),
+    );
+    crate::caller_admission::active_caller(directory, &actor)?;
+    Ok(Some(principal.holder))
+}

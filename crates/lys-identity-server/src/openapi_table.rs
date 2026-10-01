@@ -38,14 +38,78 @@ pub(crate) struct E(
     pub(crate) &'static str,
     pub(crate) &'static [Auth],
     pub(crate) &'static [&'static [&'static str]],
+    pub(crate) Option<Scope>,
 );
 
-/// The table's entries, one line each: method, path, words, authentication
-/// and refusal sets, written as the table macro reads them.
+/// A route's declared token scope, resolved only from named path parameters.
+#[derive(Clone, Copy)]
+pub(crate) struct Scope {
+    kind: &'static str,
+    action: &'static str,
+    parameters: &'static [&'static str],
+}
+
 macro_rules! entries {
-    ($($method:ident $path:literal $words:literal $auth:ident [$($set:expr),*];)*) => {
-        &[$(E($method, $path, $words, $auth, &[$($set),*]),)*]
+    ($($method:ident $path:literal $words:literal $auth:ident [$($set:expr),*] $(scope($kind:literal, $action:literal, [$($parameter:literal),+]))?;)*) => {
+        &[$(E($method, $path, $words, $auth, &[$($set),*], entries!(@scope $($kind, $action, [$($parameter),+])?)),)*]
     };
+    (@scope) => { None };
+    (@scope $kind:literal, $action:literal, [$($parameter:literal),+]) => {
+        Some(Scope { kind: $kind, action: $action, parameters: &[$($parameter),+] })
+    };
+}
+
+/// Resolve one declared scope; an absent declaration never implies authority.
+pub(crate) fn token_scope(
+    method: &str,
+    path: &str,
+) -> Result<
+    (lys_identity::grants::Resource, lys_identity::grants::Action),
+    crate::grant_tokens::TokenError,
+> {
+    use crate::grant_tokens::TokenError;
+    use lys_identity::grants::{Action, Resource};
+    static DECLARED: std::sync::OnceLock<Vec<&'static E>> = std::sync::OnceLock::new();
+    let rows = DECLARED.get_or_init(|| TABLE.iter().filter(|row| row.5.is_some()).collect());
+    for row in rows {
+        if !method.eq_ignore_ascii_case(row.0.word()) {
+            continue;
+        }
+        let mut values = std::collections::BTreeMap::new();
+        let mut concrete = path.split('/');
+        let matched = row.1.split('/').all(|part| {
+            let Some(value) = concrete.next() else {
+                return false;
+            };
+            if let Some(name) = part
+                .strip_prefix('{')
+                .and_then(|part| part.strip_suffix('}'))
+            {
+                if value.is_empty() {
+                    return false;
+                }
+                values.insert(name, value);
+                true
+            } else {
+                part == value
+            }
+        }) && concrete.next().is_none();
+        if !matched {
+            continue;
+        }
+        let scope = row.5.ok_or(TokenError::Undeclared)?;
+        let id = scope
+            .parameters
+            .iter()
+            .map(|name| values.get(name).copied().ok_or(TokenError::Undeclared))
+            .collect::<Result<Vec<_>, _>>()?
+            .join(".");
+        return Ok((
+            Resource::new(scope.kind, &id).map_err(crate::error::ServerError::from)?,
+            Action::new(scope.action).map_err(crate::error::ServerError::from)?,
+        ));
+    }
+    Err(TokenError::Undeclared)
 }
 
 /// Every route of the table; `openapi_types.rs` names the types each takes and answers.
@@ -63,7 +127,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
-    POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]];
+    POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "write", ["id"]);
     POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY];
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY];
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
@@ -132,7 +196,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
+    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]] scope("budget", "write", ["kind", "id"]);
     GET "/teams/{id}/budget" "A team's limits and measured usage" S [SIGNED, BUDGET_READ];
     PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
@@ -173,7 +237,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]];
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
-    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "ProviderUnavailable"]];
+    POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "ProviderUnavailable"]] scope("account", "write", ["id"]);
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]];
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];
@@ -189,7 +253,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/teams" "Every team" S [SIGNED];
     POST "/teams" "Create a team" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "NoPerson"]];
     GET "/teams/{id}" "One team" S [SIGNED];
-    POST "/teams/{id}/members" "Add a team member" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["AgentNotVisible", "NotAdmitted", "not_permitted", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "TeamsUnavailable", "NoPerson"]];
+    POST "/teams/{id}/members" "Add a team member" G [SIGNED_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["AgentNotVisible", "NotAdmitted", "not_permitted", "HoldingNotHeld", "NotHeld", "Revoked", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("team", "write", ["id"]);
     POST "/teams/{id}/members/{member}/remove" "Remove a member" S [SIGNED_BODY];
     POST "/teams/{id}/members/{member}/confirm" "Confirm a held membership" S [ADMIN_BODY, &["TeamsUnavailable"]];
     POST "/teams/{id}/nesting" "Replace a team parent and lead" S [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]];
@@ -220,7 +284,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]];
     GET "/mcp" "MCP server stream availability" G [SIGNED];
-    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT];
+    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent"]];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
 };

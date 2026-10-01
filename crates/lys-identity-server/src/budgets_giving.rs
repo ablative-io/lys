@@ -34,9 +34,16 @@ pub(crate) fn giver(
     headers: &HeaderMap,
     request: (&str, &str, &[u8]),
     holder: &Holder,
+    principal: Option<&crate::agent_signature::TokenPrincipal>,
 ) -> Result<Giver, ServerError> {
     if let Some(agent) = with_directory(state, |directory| {
-        crate::agent_signature::signed_agent(state, directory.projection()?, headers, request)
+        crate::agent_signature::signed_agent_with_token(
+            state,
+            directory.projection()?,
+            headers,
+            request,
+            principal,
+        )
     })? {
         return Ok(Giver::Agent(agent));
     }
