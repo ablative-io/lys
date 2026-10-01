@@ -3,7 +3,7 @@
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use lys_identity::IdentityId;
-use lys_identity::grants::{ExerciseRequest, Route};
+use lys_identity::grants::{ExerciseRequest, GrantError, Route};
 
 use crate::routes::AppState;
 
@@ -37,7 +37,7 @@ pub(crate) fn admit(
     }
     let (resource, action) = crate::openapi_table::token_scope(method, path)
         .map_err(|error| Box::new(error.into_response()))?;
-    crate::grants::with_grants(state, |mut judged| {
+    let refusal = crate::grants::with_grants(state, |mut judged| {
         let actor = crate::routes::signed_in(state, headers)?;
         crate::caller_admission::active_caller(judged.directory, &actor)?;
         judged.apps.admit_kind(None, resource.kind())?;
@@ -48,15 +48,32 @@ pub(crate) fn admit(
             resource,
             action,
         };
-        let (permit, _) = crate::grants::decide(
+        let at = crate::session::now();
+        let decision = crate::grants::decide(
             &mut judged,
             &request,
-            crate::session::now(),
+            at,
             None,
             crate::grants::Decision::Exercise,
-        )?;
+        );
+        let (permit, _) = match decision {
+            Ok(permit) => permit,
+            Err(error @ GrantError::NotHeld { .. }) => {
+                let holders = crate::who_can_grant::for_judged(
+                    &mut judged,
+                    agent,
+                    &request.resource,
+                    &request.action,
+                    at,
+                )?;
+                return Ok(Some(Box::new(crate::who_can_grant::refusal(
+                    error, &holders,
+                ))));
+            }
+            Err(error) => return Err(error.into()),
+        };
         match permit.use_event {
-            Some(Ok(_)) => Ok(()),
+            Some(Ok(_)) => Ok(None),
             Some(Err(error)) => Err(lys_identity::grants::GrantError::LogUnavailable {
                 reason: format!("the granted call's use was not recorded: {error}"),
             }
@@ -67,5 +84,9 @@ pub(crate) fn admit(
             .into()),
         }
     })
-    .map_err(|error| Box::new(error.into_response()))
+    .map_err(|error| Box::new(error.into_response()))?;
+    match refusal {
+        Some(refusal) => Err(refusal),
+        None => Ok(()),
+    }
 }
