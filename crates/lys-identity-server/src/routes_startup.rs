@@ -186,7 +186,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             .fallback(|| async { axum::http::StatusCode::NOT_FOUND }),
     );
     let served = match &config.surface_dir {
-        Some(dir) => crate::surface::serving(dir.clone(), api)?,
+        Some(dir) => crate::surface::serving(dir, api)?,
         None => api,
     };
     Ok(served

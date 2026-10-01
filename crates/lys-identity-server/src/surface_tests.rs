@@ -10,7 +10,7 @@ use super::{cache_control, content_type, serving};
 
 async fn started(dir: &Path) -> Result<String, Box<dyn Error>> {
     let api = Router::new().route("/authority", get(|| async { "the api" }));
-    let app = serving(dir.to_path_buf(), api)?;
+    let app = serving(dir, api)?;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let base = format!("http://{}", listener.local_addr()?);
     tokio::spawn(async move { axum::serve(listener, app).await });
