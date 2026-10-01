@@ -216,6 +216,7 @@ pub(crate) async fn start_profile(
         .network
         .as_ref()
         .ok_or(ServerError::MachineWithoutRunner)?;
+    // Session reads take runtime before network; admission must use the same order.
     let kept = with_runtime(state, |store| {
         keep_with_runner(network, machine, || {
             store.report(Report {
@@ -253,8 +254,10 @@ fn keep_with_runner(
     network
         .runner(machine)
         .ok_or(ServerError::MachineWithoutRunner)?;
+    // Removal is ordered after the append, including an uncertain append result.
+    let kept = keep();
     drop(network);
-    keep()
+    kept
 }
 
 /// Authenticate the caller and require the existing start authority.
