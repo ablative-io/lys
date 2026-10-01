@@ -208,6 +208,8 @@ impl Reading<'_> {
             .iter()
             .chain(incoming)
             .filter(|usage| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Usage);
                 if !agents.contains(&usage.agent) {
                     return false;
                 }

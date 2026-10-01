@@ -92,6 +92,8 @@ pub fn convert(
         let previous = prior
             .iter()
             .filter(|usage| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Running);
                 usage.agent == agent && usage.session.as_deref() == Some(record.session.as_str())
             })
             .filter(|usage| usage.at_ms <= at_ms && usage.reported_running_ms.is_some())

@@ -245,7 +245,7 @@ pub struct Standing {
 }
 
 /// The budgets as their log folds them.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Held {
     /// The old versions retained as migration and confirmation evidence.
@@ -269,6 +269,23 @@ pub struct Held {
     /// Current context availability, derived once on open and updated with each usage leaf.
     #[serde(skip)]
     pub context_availability: crate::budgets_context::Availability,
+}
+
+impl Clone for Held {
+    fn clone(&self) -> Self {
+        #[cfg(test)]
+        crate::budgets_work::visit(crate::budgets_work::Work::StateCopy);
+        Self {
+            budgets: self.budgets.clone(),
+            limit_sets: self.limit_sets.clone(),
+            unconfirmed: self.unconfirmed.clone(),
+            charged: self.charged.clone(),
+            uses: self.uses.clone(),
+            crossings: self.crossings.clone(),
+            refusals: self.refusals.clone(),
+            context_availability: self.context_availability.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
