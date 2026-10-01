@@ -14,6 +14,7 @@ import { You } from './features/me/You';
 import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { AddAgent } from './features/people/AddAgent';
+import { AddPerson } from './features/people/AddPerson';
 import { Manage } from './features/people/Manage';
 import { IssueRoot } from './features/grants/IssueRoot';
 import { Model } from './features/access/Model';
@@ -49,6 +50,7 @@ export function AppRoutes() {
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
       <Route path="/agents/new" element={<AddAgent />} />
+      <Route path="/people/new" element={<AddPerson />} />
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/start" element={<OneStart />} />
       <Route path="/file/:id/:tab?" element={<IdentityFile />} />

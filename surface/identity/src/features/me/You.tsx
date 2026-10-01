@@ -216,7 +216,6 @@ function Agents({ data }: { data: ActiveData }) {
     <div className="you-panel">
       <div className="section-h">
         <span>Your agents</span>
-        <button className="btn" data-act="commission" onClick={() => navigate('/directory/manage?action=agent')}>Register an agent</button>
       </div>
       <div className="you-scroll">
         <table className="you-tree">
