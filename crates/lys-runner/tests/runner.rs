@@ -25,6 +25,10 @@ use lys_runner::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "support/restart_child.rs"]
+mod restart_child;
+use restart_child::PtyChild;
+
 struct Held {
     dir: tempfile::TempDir,
     key: Arc<Ed25519Identity>,
@@ -231,17 +235,14 @@ fn a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status() -> Te
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
     // What a runner that was lost leaves: its record, naming one process
     // group that is gone and one whose process ignored the hang-up and
-    // still runs. Each leads its own group, as a session's process does.
+    // still runs. The live fixture uses a launch's session creation.
     let mut gone = Command::new("/bin/sh")
         .args(["-c", "exit 0"])
         .process_group(0)
         .spawn()?;
     let gone_pid = gone.id();
     gone.wait()?;
-    let mut left = Command::new("/bin/cat")
-        .stdin(Stdio::piped())
-        .process_group(0)
-        .spawn()?;
+    let mut left = PtyChild::start()?;
     let state = dir.path().join("state");
     std::fs::create_dir_all(&state)?;
     let record = Kept::new(vec![
