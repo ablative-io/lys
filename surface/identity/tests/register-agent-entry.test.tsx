@@ -87,7 +87,7 @@ describe('Registration entry points', () => {
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
   });
 
-  it('carries an agent’s responsible person and team from its row to registration', async () => {
+  it('carries an agent and its team from its row to registration', async () => {
     await directory();
     const row = document.querySelector('tr[data-href="#/file/' + COURIER + '"]');
     if (!row) throw new Error('Missing agent row');
@@ -95,7 +95,7 @@ describe('Registration entry points', () => {
     const query = new URLSearchParams(location.hash.split('?')[1]);
     expect(location.hash.split('?')[0]).toBe('#/agents/new');
     expect(query.get('team')).toBe('team-crew');
-    expect(query.get('answers_to')).toBe(ADA);
+    expect(query.get('answers_to')).toBe(COURIER);
     expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('Add an agent');
   });
 });

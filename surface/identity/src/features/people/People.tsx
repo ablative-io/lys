@@ -108,11 +108,10 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
     return grouped;
   }, [teams]);
   const addUnder = (entry: Entry) => {
-    const person = entry.kind === 'person' ? entry.id : entry.person?.id;
-    if (!person) return null;
+    const person = entry.person?.id ?? entry.id;
     const memberships = memberTeams.get(entry.id) ?? memberTeams.get(person) ?? [];
     const team = whose.kind === 'team' && memberships.includes(whose.team) ? whose.team : memberships.length === 1 ? memberships[0] : '';
-    const query = new URLSearchParams({ answers_to: person });
+    const query = new URLSearchParams({ answers_to: entry.id });
     if (team) query.set('team', team);
     return <a href={'#/agents/new?' + query.toString()} onClick={(event) => event.stopPropagation()}>Add agent under them</a>;
   };
