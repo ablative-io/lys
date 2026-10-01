@@ -53,13 +53,16 @@ impl Held {
         ] {
             std::fs::copy(source.join(name), surface.join(name))?;
         }
-        succeeded(
-            &Command::new("npm")
-                .arg("ci")
-                .current_dir(&surface)
-                .output()?,
-            "install the locked preview tool",
-        )?;
+        let prepared = Command::new("python3")
+            .arg(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../scripts/identity-gates/surface_fixture.py"),
+            )
+            .arg(env!("CARGO_TARGET_TMPDIR"))
+            .output()?;
+        succeeded(&prepared, "prepare the shared preview tool")?;
+        let shared = PathBuf::from(String::from_utf8(prepared.stdout)?.trim());
+        symlink(shared.join("node_modules"), surface.join("node_modules"))?;
         std::fs::create_dir(surface.join("dist"))?;
         std::fs::write(
             surface.join("dist/index.html"),
