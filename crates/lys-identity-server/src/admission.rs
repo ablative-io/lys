@@ -30,6 +30,10 @@ use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
 
 use crate::error::ServerError;
 
+#[cfg(test)]
+#[path = "admission_tests.rs"]
+mod tests;
+
 /// What step 1 lets the administrator do, shown to every caller before they act.
 pub const AUTHORITY: &str = "Step 1 of the directory has one administrator, configured by issuer and subject. The administrator may register people, register agents under themselves, change profiles, bind logins and record lifecycle states. Every other caller may read only their own person, sign-in identities and agents, and changes no directory record. Grants are the one other write. The person bound to the administrator's login issues root grants, a holder passes on only what their grant lets them pass on, a grant is revoked by its issuer, by a holder it derives from or by the root authority, and any signed-in person may ask why they may act and who can. A grant held by an identity that is not active permits nothing.";
 
