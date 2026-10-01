@@ -83,6 +83,24 @@ fn write_absent(path: &Path, text: &str) -> IdentityResult<bool> {
     Ok(true)
 }
 
+/// Writes the shipped permission model when the model file is absent or
+/// holds an earlier version of it, and leaves any other file as it is: the
+/// running service applies a later version over the one it holds.
+fn write_model(path: &Path) -> IdentityResult<bool> {
+    let shipped = lys_identity::grants::shipped_model();
+    let held = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|model| model.get("version").and_then(serde_json::Value::as_u64));
+    match held {
+        Some(version) if version < lys_identity::grants::SHIPPED_VERSION => {}
+        _ if path.exists() => return Ok(false),
+        _ => {}
+    }
+    write_plain(path, &shipped)?;
+    Ok(true)
+}
+
 /// The key Lys signs products' ID tokens with, kept in the state folder.
 fn provider_key(config: &DeploymentConfig) -> IdentityResult<()> {
     let path = config.state_dir().join(server_config::PROVIDER_KEY_FILE);
@@ -181,7 +199,7 @@ pub(super) fn start_runner(
 /// and upgrade both run it, so an install made by an earlier build gains
 /// what this build's service needs before it starts.
 pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
-    write_absent(&layout.grant_model(), layout::GRANT_MODEL)?;
+    write_model(&layout.grant_model())?;
     write_providers_key(config)?;
     provider_key(config)?;
     service_key(layout)?;

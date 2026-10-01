@@ -24,6 +24,7 @@ mod apps_refresh;
 pub mod apps_schema_api;
 pub mod apps_state;
 pub mod apps_store;
+mod apps_upgrade;
 pub mod apps_views;
 pub mod budgets_act;
 pub mod budgets_api;

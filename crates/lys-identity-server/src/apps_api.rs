@@ -115,10 +115,7 @@ pub fn opened(
         .and_then(|lys| lys.current())
         .map(|current| current.version);
     if let Some(version) = held {
-        say(&format!(
-            "grant_model_file_ignored: the app lys holds schema version {version} in the apps log, which is its only source; {} is not read",
-            config.grant_model_file.display()
-        ));
+        crate::apps_upgrade::upgrade(config, &mut store, version, say)?;
         return Ok(store);
     }
     let model = config.grant_model()?;
