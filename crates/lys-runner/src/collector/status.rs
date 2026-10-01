@@ -191,11 +191,15 @@ impl Sessions {
             };
             let pending =
                 PendingStatus::new(record.clone(), &source, session.pending_status.as_ref());
-            let leader = crate::session::window_limit(
-                &mut table,
-                id,
-                std::slice::from_ref(&Body::Usage(record)),
-            );
+            let leader = if pending.is_ok() {
+                crate::session::window_limit(
+                    &mut table,
+                    id,
+                    std::slice::from_ref(&Body::Usage(record)),
+                )
+            } else {
+                None
+            };
             let message = pending.and_then(|pending| {
                 table
                     .sessions
@@ -208,7 +212,15 @@ impl Sessions {
         } else {
             (Ok("the snapshot repeats the last one held"), None)
         };
+        let stopping = result.1.is_some();
+        if stopping {
+            flush_status(&mut table, id)?;
+        }
         drop(table);
+        if stopping || flushed {
+            self.writer.barrier()?;
+            self.wake();
+        }
         if let Some(leader) = result.1 {
             #[cfg(test)]
             BEFORE_END.with(|probe| {
@@ -217,10 +229,6 @@ impl Sessions {
                 }
             });
             crate::pty::end(&leader)?;
-        }
-        if flushed {
-            self.writer.barrier()?;
-            self.wake();
         }
         result.0.map(str::to_owned)
     }
