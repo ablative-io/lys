@@ -142,6 +142,16 @@ impl Tokens {
         Ok(())
     }
 
+    pub(super) fn revoke_subject(&mut self, subject: &str) -> Result<(), ServerError> {
+        self.ready()?;
+        let before = self.live.len();
+        self.live.retain(|_, access| access.subject != subject);
+        if self.live.len() != before {
+            self.change(None, None)?;
+        }
+        Ok(())
+    }
+
     fn change(
         &mut self,
         added: Option<(&str, &Access)>,

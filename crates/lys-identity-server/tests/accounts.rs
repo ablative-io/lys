@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! A person's own account and the administrator's administration of
 //! accounts, carried out by the service at the issuer (DIRECTORY-047 R5): a
 //! changed email signs in and the old one does not, a password reset by the
@@ -87,7 +89,7 @@ async fn account_update_refuses_each_missing_mandatory_member_before_put() -> Te
             &user,
         )
         .await?;
-        let before = issuer.users();
+        let before = issuer.users()?;
         let requests = issuer.request_count();
         let mut changed = false;
         let answer = accounts::change(&api, &id, |update| {
@@ -111,7 +113,7 @@ async fn account_update_refuses_each_missing_mandatory_member_before_put() -> Te
             "{field}: only GET reaches the issuer"
         );
         assert_eq!(
-            issuer.users(),
+            issuer.users()?,
             before,
             "{field}: held records survive without a PUT"
         );
@@ -138,7 +140,7 @@ async fn account_update_preserves_other_values_and_never_copies_a_held_password(
     fields.remove("created_at");
     fields.insert("enabled".to_owned(), json!(false));
     accounts::change(&api, &id, |update| update["enabled"] = json!(false)).await?;
-    assert_eq!(issuer.users(), vec![expected]);
+    assert_eq!(issuer.users()?, vec![expected]);
     Ok(())
 }
 
@@ -164,7 +166,7 @@ async fn account_update_keeps_absent_optionals_distinct_from_explicit_null() -> 
             .to_owned();
         expected["enabled"] = json!(false);
         accounts::change(&api, &id, |update| update["enabled"] = json!(false)).await?;
-        let held = issuer.users();
+        let held = issuer.users()?;
         let actual = held
             .iter()
             .find(|user| user["id"] == id)
@@ -250,7 +252,7 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         },
     )
     .await?;
-    rauthy.link(service.issuer.clone());
+    rauthy.link(service.issuer.clone())?;
     let made = reqwest::Client::new()
         .post(format!("{}/setup/administrator", service.base))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -570,6 +572,15 @@ async fn disabling_an_account_revokes_existing_sessions_codes_and_tokens_across_
         .await?;
     assert_eq!(disabled.0, 200, "{}", disabled.1);
     assert_eq!(disabled.1["enabled"], false);
+    let kept: Value = serde_json::from_slice(&std::fs::read(
+        service.dir.path().join("provider.tokens.json"),
+    )?)?;
+    assert!(
+        kept["tokens"]
+            .as_array()
+            .ok_or("no stored access table")?
+            .is_empty()
+    );
     let signed_out = service.get("/me", Some(&cookie)).await?;
     assert_eq!(signed_out.0, 401, "{}", signed_out.1);
     assert_eq!(signed_out.1["refusal"], "NotSignedIn");
@@ -597,7 +608,7 @@ async fn a_callback_prepared_before_disable_cannot_create_a_new_session() -> Tes
     let (service, rauthy, ada) = table().await?;
     let person = bea(&service, &rauthy, &ada).await?;
     let user = rauthy
-        .users()
+        .users()?
         .into_iter()
         .find(|user| user["email"] == "bea@example.test")
         .ok_or("account missing")?;
@@ -660,7 +671,7 @@ async fn a_failed_session_revoke_is_named_and_keeps_the_old_cookie_refused() -> 
     assert_eq!(signed_out.0, 401, "{}", signed_out.1);
     assert_eq!(signed_out.1["refusal"], "NotSignedIn");
     let user = rauthy
-        .users()
+        .users()?
         .into_iter()
         .find(|user| user["email"] == "bea@example.test")
         .ok_or("account missing")?;

@@ -419,7 +419,11 @@ async fn own_password(
     check_password(&body.password)?;
     confirm(&state, &extensions, &id, &body.current).await?;
     let api = api(&state)?;
-    set_password(api, &id, &body.password).await?;
+    change(api, &id, |update| {
+        update["password"] = Value::String(body.password);
+        update["email_verified"] = Value::Bool(true);
+    })
+    .await?;
     shown(api, &id).await
 }
 
@@ -504,7 +508,25 @@ async fn set_enabled(
     }
     let enabled = body_of(body)?.enabled;
     let api = api(&state)?;
-    change(api, &id, |update| update["enabled"] = Value::Bool(enabled)).await?;
+    let guard = api.lock_account(&id).await?;
+    let mut update = update_of(&read(api, &id).await?)?;
+    update["enabled"] = Value::Bool(enabled);
+    if !enabled {
+        let person = PersonId::from_str(&person)?;
+        with_directory(&state, |directory| {
+            let projection = directory.projection()?;
+            state
+                .sessions
+                .revoke_matching(|actor| projection.person_for(actor.binding()) == Some(person))
+        })?;
+        if let Some(provider) = &state.provider {
+            provider.revoke_person(&person.to_string())?;
+        }
+    }
+    api.call(reqwest::Method::PUT, &format!("/users/{id}"), Some(&update))
+        .await
+        .map_err(account_refusal)?;
+    drop(guard);
     shown(api, &id).await
 }
 
