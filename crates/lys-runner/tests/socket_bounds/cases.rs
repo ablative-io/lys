@@ -111,3 +111,22 @@ fn shutdown_does_not_need_the_listener_path_to_exist() -> TestResult {
     assert!(result.is_ok(), "{result:?}");
     Ok(())
 }
+
+#[test]
+fn an_accept_failure_leaves_the_listener_answering_the_next_connection() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut runner = runner(dir.path())?;
+    runner.accept_error = Some(std::io::Error::from(std::io::ErrorKind::ConnectionAborted));
+    let serving = runner.spawn();
+    let path = dir.path().join("runner.sock");
+    let mut first = BufReader::new(UnixStream::connect(&path)?);
+    let mut greeting = String::new();
+    assert_eq!(first.read_line(&mut greeting)?, 0);
+    drop(first);
+    let mut next = BufReader::new(UnixStream::connect(&path)?);
+    assert!(next.read_line(&mut greeting)? > 0);
+    assert!(greeting.contains("challenge"), "{greeting}");
+    drop(next);
+    serving.stop()?;
+    Ok(())
+}

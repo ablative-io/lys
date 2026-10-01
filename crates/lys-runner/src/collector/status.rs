@@ -7,6 +7,11 @@ use crate::error::RunnerError;
 use crate::tracking::{Figures, Reading, UsageRecord};
 use crate::tracking_store::{Body, SourceState};
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static BEFORE_END: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
 pub(crate) struct PendingStatus {
     record: UsageRecord,
     path: String,
@@ -203,14 +208,44 @@ impl Sessions {
         } else {
             (Ok("the snapshot repeats the last one held"), None)
         };
+        let stopping = result.1.is_some();
+        let appended = if stopping {
+            flush_status(&mut table, id).map(|_| ())
+        } else {
+            Ok(())
+        };
         drop(table);
-        if let Some(leader) = result.1 {
-            crate::pty::end(&leader)?;
-        }
-        if flushed {
-            self.writer.barrier()?;
+        let durable = if stopping || flushed {
+            let durable = self.writer.barrier();
             self.wake();
+            durable
+        } else {
+            Ok(())
+        };
+        let ended = if let Some(leader) = result.1 {
+            #[cfg(test)]
+            BEFORE_END.with(|probe| {
+                if let Some(probe) = probe.borrow_mut().take() {
+                    probe();
+                }
+            });
+            crate::pty::end(&leader)
+        } else {
+            Ok(())
+        };
+        for error in [
+            result.0.as_ref().err(),
+            appended.as_ref().err(),
+            durable.as_ref().err(),
+            ended.as_ref().err(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            crate::error::said(&format!("session {id}: status_boundary_failed: {error}"));
         }
-        result.0.map(str::to_owned)
+        let words = result.0?;
+        appended.and(durable).and(ended)?;
+        Ok(words.to_owned())
     }
 }

@@ -2,7 +2,8 @@
 //!
 //! Every grant is bounded by an acyclic ancestry ending at a root held by its
 //! responsible person. Each hop is judged again here, whoever wrote it: the
-//! grant was issued by its source's holder, is on the same resource, carries
+//! grant was issued by its source's holder or the person answering for both
+//! agents, is on the same resource, carries
 //! only actions its source let be passed on, to a kind of recipient its source
 //! names, and ends no later than its source. A grant that does not pass is
 //! refused by the boundary it broke, so a forged or hand-written grant carries
@@ -31,7 +32,11 @@ pub struct Lineage {
 /// Refuse `grant` unless it lies within what `source` let be passed on.
 pub fn check_hop(grant: &Grant, source: &Grant) -> Result<(), GrantError> {
     let parts = grant.parts();
-    if parts.issuer != source.holder() {
+    let responsible_pass = matches!(source.holder(), IdentityId::Agent(_))
+        && matches!(grant.holder(), IdentityId::Agent(_))
+        && parts.issuer == IdentityId::Person(source.responsible())
+        && grant.responsible() == source.responsible();
+    if parts.issuer != source.holder() && !responsible_pass {
         return Err(GrantError::IssuerNotHolder {
             grant: grant.id().to_string(),
             source_grant: source.id().to_string(),
