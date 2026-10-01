@@ -59,9 +59,12 @@ def populate(browser, root):
     })
     if browser.ask("GET", f"/identities/{person}")["state"] != "active":
         raise RuntimeError("old fixture grant holder was not activated by its transition")
-    agent = browser.ask("POST", "/agents", {
+    registered = browser.ask("POST", "/agents", {
         "operation": operation(), "display_name": "Preserved Agent",
-    })["agent"]
+    })
+    agent = registered["agent"]
+    if registered["responsible"] != owner:
+        raise RuntimeError("old fixture registration has the wrong responsible person")
     app = "upgrade_fixture"
     kind = app + ".document"
     browser.ask("POST", "/apps", {
@@ -132,11 +135,51 @@ def observe(browser, ids):
     return result
 
 
+def migrated_agent(before, after, person):
+    value = dict(after)
+    expected = {
+        "reports_to": {"id": person["id"], "kind": "person",
+                       "display_name": person["display_name"]},
+        "accountable": {"id": person["id"], "display_name": person["display_name"]},
+        "gap": None,
+    }
+    for field, wanted in expected.items():
+        if field not in before:
+            if field not in value or value[field] != wanted:
+                raise RuntimeError(f"upgrade did not materialise the agent's {field}")
+            del value[field]
+    return value
+
+
+def migrated_people(before, after):
+    value = dict(after)
+    old_people = {person["id"]: person for person in before["people"]}
+    people = []
+    for person in after["people"]:
+        old = old_people.get(person["id"])
+        if old is None:
+            raise RuntimeError("upgrade introduced a person into the directory")
+        old_agents = {agent["id"]: agent for agent in old["agents"]}
+        agents = []
+        for agent in person["agents"]:
+            previous = old_agents.get(agent["id"])
+            if previous is None:
+                raise RuntimeError("upgrade moved or introduced an agent")
+            agents.append(migrated_agent(previous, agent, old))
+        people.append(dict(person, agents=agents))
+    value["people"] = people
+    return value
+
+
 def same_records(before, after):
     if before.keys() != after.keys():
         raise RuntimeError("upgrade readback domains differ")
     for name in before:
         value = after[name]
+        if name == "agent":
+            value = migrated_agent(before[name], value, before[name]["person"])
+        if name == "people":
+            value = migrated_people(before[name], value)
         # This fixture's agent budget cannot need personal-budget confirmation.
         # Accept only the declared additive empty field, never erase its contents.
         if name == "budgets" and "unconfirmed" not in before[name] and "unconfirmed" in value:
