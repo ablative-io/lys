@@ -418,10 +418,16 @@ pub(crate) async fn change_profile(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(id): Path<String>,
+    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
     body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let bytes = body.map_err(|error| malformed(error.body_text()))?;
-    let actor = people_giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    let actor = people_giving::actor(
+        &state,
+        &headers,
+        ("POST", uri.path(), &bytes),
+        principal.as_ref().map(|value| &value.0),
+    )?;
     if actor.provenance().agent().is_none() {
         crate::routes::administrator(&state, &actor)?;
     }

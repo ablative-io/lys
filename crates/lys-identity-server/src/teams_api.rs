@@ -370,10 +370,16 @@ async fn add(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(id): Path<String>,
+    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
     body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
     let bytes = body.map_err(|refused| malformed(refused.body_text()))?;
-    let actor = giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    let actor = giving::actor(
+        &state,
+        &headers,
+        ("POST", uri.path(), &bytes),
+        principal.as_ref().map(|value| &value.0),
+    )?;
     let body: MemberBody = giving::json(headers.clone(), bytes).await?;
     let id = team_id(&id)?;
     let member = body.member.trim().to_owned();

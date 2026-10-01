@@ -20,8 +20,9 @@ pub(crate) fn actor(
     state: &AppState,
     headers: &HeaderMap,
     request: (&str, &str, &[u8]),
+    principal: Option<&crate::agent_signature::TokenPrincipal>,
 ) -> Result<Actor, ServerError> {
-    if !headers.contains_key(crate::agent_signature::HEADER) {
+    if !headers.contains_key(crate::agent_signature::HEADER) && principal.is_none() {
         return signed_in(state, headers);
     }
     if headers.contains_key(header::COOKIE) {
@@ -31,8 +32,10 @@ pub(crate) fn actor(
     }
     with_directory(state, |directory| {
         let projection = directory.projection()?;
-        let agent = crate::agent_signature::signed_agent(state, projection, headers, request)?
-            .ok_or(ServerError::NoPerson)?;
+        let agent = crate::agent_signature::signed_agent_with_token(
+            state, projection, headers, request, principal,
+        )?
+        .ok_or(ServerError::NoPerson)?;
         let binding = projection
             .record(IdentityId::Agent(agent))
             .and_then(lys_identity::projection::Record::responsible)

@@ -77,7 +77,7 @@ pub fn api() -> Api {
         "Sign-in, identities, grants and the apps that register with Lys. Every refusal answers {refusal, reason, fields}.",
     );
     let named = types(&mut api);
-    for E(method, path, summary, auth, refusals) in TABLE {
+    for E(method, path, summary, auth, refusals, ..) in TABLE {
         let (request, response) = named.get(&(*method, path)).cloned().unwrap_or_default();
         api.route(route(
             (*method, path, summary),

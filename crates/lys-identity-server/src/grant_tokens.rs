@@ -22,6 +22,12 @@ pub enum TokenError {
     /// The credential or administration id is unknown.
     #[error("GrantTokenUnknown")]
     Unknown,
+    /// A route declares no token resource/action scope.
+    #[error("TokenScopeUndeclared")]
+    Undeclared,
+    /// A token holder must be an agent.
+    #[error("TokenHolderNotAgent")]
+    HolderNotAgent,
     /// The credential's own expiry has passed.
     #[error("GrantTokenExpired")]
     Expired,
@@ -58,6 +64,8 @@ impl IntoResponse for TokenError {
         }
         let name = match &self {
             Self::Unknown => "GrantTokenUnknown",
+            Self::Undeclared => "TokenScopeUndeclared",
+            Self::HolderNotAgent => "TokenHolderNotAgent",
             Self::Expired => "GrantTokenExpired",
             Self::Revoked => "GrantTokenRevoked",
             Self::Scope => "GrantTokenScopeMismatch",
@@ -72,7 +80,9 @@ impl IntoResponse for TokenError {
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Full => StatusCode::CONFLICT,
             Self::Expiry | Self::CookieConflict(_) => StatusCode::BAD_REQUEST,
-            Self::Responsible | Self::Scope => StatusCode::FORBIDDEN,
+            Self::Responsible | Self::Scope | Self::Undeclared | Self::HolderNotAgent => {
+                StatusCode::FORBIDDEN
+            }
             _ => StatusCode::UNAUTHORIZED,
         };
         (
@@ -285,6 +295,50 @@ async fn revoke(
                 id: token_id,
                 revoked: true,
             }))
+        })())
+    })?
+}
+
+/// Admit a token for one declared scope and produce only an active agent principal.
+pub(crate) fn principal(
+    state: &AppState,
+    token: &str,
+    resource: &Resource,
+    action: &Action,
+) -> Result<crate::agent_signature::TokenPrincipal, TokenError> {
+    let at = crate::session::now();
+    crate::grants::with_grants(state, |judged| {
+        Ok((|| {
+            let tokens = state.grant_tokens.lock().map_err(|error| {
+                TokenError::Unavailable(format!("grant token lock poisoned: {error}"))
+            })?;
+            judged
+                .apps
+                .admit_kind(None, resource.kind())
+                .map_err(ServerError::from)?;
+            judged
+                .apps
+                .admit_action(resource.kind(), action.as_str())
+                .map_err(ServerError::from)?;
+            let grant = validate_with(
+                &tokens,
+                judged.grants.book(),
+                judged.directory,
+                token,
+                resource,
+                action,
+                at,
+            )?;
+            let holder = judged
+                .grants
+                .book()
+                .grant(grant)
+                .ok_or(TokenError::Unknown)?
+                .holder();
+            let IdentityId::Agent(holder) = holder else {
+                return Err(TokenError::HolderNotAgent);
+            };
+            Ok(crate::agent_signature::TokenPrincipal { holder, grant })
         })())
     })?
 }

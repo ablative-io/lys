@@ -210,6 +210,7 @@ async fn set(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path((kind, id)): Path<(String, String)>,
+    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
     body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<BudgetsView>, ServerError> {
     let bytes = body.map_err(|rejected| {
@@ -222,8 +223,13 @@ async fn set(
         kind: kind_of(&kind)?,
         id,
     };
-    let giver =
-        crate::budgets_giving::giver(&state, &headers, ("PUT", uri.path(), &bytes), &holder)?;
+    let giver = crate::budgets_giving::giver(
+        &state,
+        &headers,
+        ("PUT", uri.path(), &bytes),
+        &holder,
+        principal.as_ref().map(|value| &value.0),
+    )?;
     let mut request = Request::new(Body::from(bytes));
     *request.headers_mut() = headers;
     let Json(body) = Json::<BudgetBody>::from_request(request, &state)
@@ -286,6 +292,7 @@ async fn set_team_budget(
         headers,
         uri,
         Path(("team".to_owned(), id)),
+        None,
         body,
     )
     .await

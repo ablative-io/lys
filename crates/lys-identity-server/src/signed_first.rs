@@ -57,6 +57,16 @@ async fn check(
     request: Request,
     next: Next,
 ) -> Response {
+    if request
+        .extensions()
+        .get::<crate::agent_signature::TokenPrincipal>()
+        .is_some()
+        || (request.method() == HttpMethod::POST
+            && matches!(request.uri().path(), "/mcp" | "/api/mcp")
+            && request.headers().contains_key(crate::grant_tokens::HEADER))
+    {
+        return next.run(request).await;
+    }
     let named = matched.and_then(|matched| {
         let path = matched.as_str();
         let method = match request.method() {

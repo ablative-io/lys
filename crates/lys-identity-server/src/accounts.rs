@@ -502,13 +502,18 @@ async fn set_enabled(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(person): Path<String>,
+    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
     body: Result<Bytes, BytesRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let bytes = body.map_err(|error| ServerError::RequestMalformed {
         reason: error.body_text(),
     })?;
-    let actor =
-        crate::routes::people_giving::actor(&state, &headers, ("POST", uri.path(), &bytes))?;
+    let actor = crate::routes::people_giving::actor(
+        &state,
+        &headers,
+        ("POST", uri.path(), &bytes),
+        principal.as_ref().map(|value| &value.0),
+    )?;
     if actor.provenance().agent().is_none() {
         crate::routes::administrator(&state, &actor)?;
     }

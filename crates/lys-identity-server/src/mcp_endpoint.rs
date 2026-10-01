@@ -26,16 +26,35 @@ const LEGACY_TOOLS: [&str; 4] = ["what-can-I-do", "read", "change", "drafts"];
 
 struct Endpoint {
     router: Router,
+    state: Option<Arc<crate::routes::AppState>>,
     origin: String,
     tools: &'static crate::mcp_tools::Catalogue,
 }
 
+#[cfg(test)]
 pub(crate) fn routes(router: Router, origin: &str) -> Result<Router, ServerError> {
+    registered(router, origin, None)
+}
+
+pub(crate) fn admitted_routes(
+    router: Router,
+    origin: &str,
+    state: Arc<crate::routes::AppState>,
+) -> Result<Router, ServerError> {
+    registered(router, origin, Some(state))
+}
+
+fn registered(
+    router: Router,
+    origin: &str,
+    state: Option<Arc<crate::routes::AppState>>,
+) -> Result<Router, ServerError> {
     let origin = reqwest::Url::parse(origin).map_err(|error| ServerError::ConfigInvalid {
         reason: format!("the MCP origin is invalid: {error}"),
     })?;
     let endpoint = Arc::new(Endpoint {
         router,
+        state,
         origin: origin.origin().ascii_serialization(),
         tools: crate::mcp_tools::prepare()?,
     });
@@ -97,6 +116,21 @@ fn accepts(headers: &HeaderMap, media: &str) -> bool {
 }
 
 async fn message(State(endpoint): State<Arc<Endpoint>>, request: Request) -> Response {
+    if request.headers().contains_key(crate::grant_tokens::HEADER) {
+        if let Err(error) = crate::grant_tokens::header(request.headers()) {
+            return error.into_response();
+        }
+        if request
+            .headers()
+            .contains_key(crate::agent_signature::HEADER)
+            || request.headers().contains_key(header::AUTHORIZATION)
+        {
+            return ServerError::AgentSignatureRefused {
+                reason: "a grant token cannot carry another credential",
+            }
+            .into_response();
+        }
+    }
     if request
         .headers()
         .contains_key(crate::agent_signature::HEADER)
@@ -329,6 +363,25 @@ async fn call(
             .resolve(&call.name, &call.arguments.method, uri.path())
             .map_err(|reason| (-32602, reason))?;
     }
+    if parts.headers.contains_key(crate::grant_tokens::HEADER) {
+        let admitted = (|| {
+            let token = crate::grant_tokens::header(&parts.headers)?;
+            let (resource, action) =
+                crate::openapi_table::token_scope(&call.arguments.method, uri.path())?;
+            let state = endpoint.state.as_ref().ok_or_else(|| {
+                crate::grant_tokens::TokenError::Unavailable(
+                    "MCP has no token authority state".to_owned(),
+                )
+            })?;
+            crate::grant_tokens::principal(state, token, &resource, &action)
+        })();
+        match admitted {
+            Ok(principal) => {
+                parts.extensions.insert(principal);
+            }
+            Err(error) => return rendered(error.into_response()).await,
+        }
+    }
     parts.method = Method::from_bytes(call.arguments.method.as_bytes())
         .map_err(|error| (-32602, error.to_string()))?;
     parts.uri = uri;
@@ -359,6 +412,10 @@ async fn call(
         Ok(response) => response,
         Err(error) => match error {},
     };
+    rendered(response).await
+}
+
+async fn rendered(response: Response) -> ResultValue {
     let status = response.status();
     let bytes = to_bytes(response.into_body(), BODY_LIMIT)
         .await

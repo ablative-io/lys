@@ -218,9 +218,10 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         Arc::clone(&state),
         crate::operator::guard,
     ));
-    let api = api.merge(guarded(crate::mcp_endpoint::routes(
+    let api = api.merge(guarded(crate::mcp_endpoint::admitted_routes(
         dispatcher,
         &crate::sign_in::lys_origin(config)?,
+        Arc::clone(&state),
     )?));
     let served = match &config.surface_dir {
         Some(dir) => crate::surface::serving(dir, api)?,
