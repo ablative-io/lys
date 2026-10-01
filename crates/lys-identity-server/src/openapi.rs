@@ -54,9 +54,11 @@ pub(crate) fn route(
             named.push(refusal);
         }
     }
-    // The global admission guard refuses a bad operator header on every route.
-    if !named.contains(&"OperatorRefused") {
-        named.push("OperatorRefused");
+    // The ingress guard judges credentials before the route.
+    for refusal in ["OperatorRefused", "AgentSignatureRefused"] {
+        if !named.contains(&refusal) {
+            named.push(refusal);
+        }
     }
     Route {
         method,

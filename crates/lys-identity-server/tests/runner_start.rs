@@ -527,3 +527,46 @@ async fn a_bridge_carrying_another_runners_greeting_is_refused_by_name() -> Test
     assert!(asked.1.contains("pins runner"), "{asked:?}");
     table.close()
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_start_with_a_cookie_and_signature_is_refused_before_recording() -> TestResult {
+    let table = Table::set().await?;
+    let machine = table
+        .machine(&machine_body(&table)?, Some(json!({ "kind": "lys" })))
+        .await?;
+    let path = format!("/agents/{}/start-command", table.agent());
+    let body = start_body(&machine)?;
+    let before = runtime_bytes(&table.service.dir.path().join("runtime"))?;
+    let response = reqwest::Client::new()
+        .post(format!("{}{path}", table.service.base))
+        .header(reqwest::header::COOKIE, &table.ada)
+        .header(lys_identity_server::agent_signature::HEADER, "present")
+        .json(&body)
+        .send()
+        .await?;
+    assert_eq!(response.status(), 401);
+    let refusal: serde_json::Value = response.json().await?;
+    assert_eq!(refusal["refusal"], "AgentSignatureRefused");
+    assert_eq!(
+        runtime_bytes(&table.service.dir.path().join("runtime"))?,
+        before
+    );
+    table.close()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn another_cookie_route_refuses_the_same_mixed_credentials() -> TestResult {
+    let table = Table::unprofiled().await?;
+    let response = reqwest::Client::new()
+        .get(format!("{}/configuration", table.service.base))
+        .header(reqwest::header::COOKIE, &table.ada)
+        .header(lys_identity_server::agent_signature::HEADER, "present")
+        .send()
+        .await?;
+    let status = response.status();
+    let refusal: serde_json::Value = response.json().await?;
+    table.close()?;
+    assert_eq!(status, 401, "{refusal}");
+    assert_eq!(refusal["refusal"], "AgentSignatureRefused");
+    Ok(())
+}

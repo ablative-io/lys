@@ -92,6 +92,12 @@ async fn check(
 /// that brings a credential or a signature for the route to judge, or a
 /// live session; otherwise the session's own refusal.
 fn admitted(state: &AppState, auth: &[Auth], headers: &HeaderMap) -> Result<(), ServerError> {
+    if headers.contains_key(header::COOKIE) && headers.contains_key(crate::agent_signature::HEADER)
+    {
+        return Err(ServerError::AgentSignatureRefused {
+            reason: "an agent signature cannot carry a session cookie",
+        });
+    }
     let brings = headers.contains_key(header::AUTHORIZATION)
         || headers.contains_key(crate::agent_signature::HEADER);
     if brings || auth.contains(&Auth::Public) {
