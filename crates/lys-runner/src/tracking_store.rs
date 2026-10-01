@@ -31,7 +31,6 @@ use serde_json::Value;
 use crate::tracking::{Figures, Unavailable, UsageRecord, count, note};
 
 mod cursor;
-use cursor::*;
 
 /// The feed's format.
 pub const FEED_FORMAT: &str = "lys-runner-feed/v1";

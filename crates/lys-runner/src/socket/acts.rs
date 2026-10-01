@@ -1,20 +1,13 @@
 //! The acts a verified request asks for: run, read, write, wait, end and
 //! status, each answered on the sessions it names.
 
-use super::*;
 use crate::admitted::Admitted;
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed, verify_request};
+use crate::protocol::{Act, Answer, Greeting, Output, verify_request};
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
-use std::io;
-use std::net::Shutdown;
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::JoinHandle;
+use std::sync::atomic::AtomicBool;
 
 /// The answer to request `line`, made on the connection given `greeting`.
 pub fn dispatch(

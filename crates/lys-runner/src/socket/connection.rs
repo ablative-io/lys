@@ -2,21 +2,15 @@
 //! within the bounded slots with one held for control, and its acts cancelled
 //! when the caller leaves.
 
-use super::*;
-use crate::admitted::Admitted;
+use super::{DISPATCH_MAX, LINE_MAX, perform, socket_failed};
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed, verify_request};
-use crate::scrollback::whole_text;
+use crate::protocol::{Act, Answer, Greeting, reply_line, verify_parsed};
 use crate::session::Sessions;
-use acts::*;
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
+use std::os::unix::net::UnixStream;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::JoinHandle;
 
 pub(super) async fn write_line(
     stream: &tokio::net::UnixStream,

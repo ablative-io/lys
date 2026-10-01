@@ -27,7 +27,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -39,7 +38,7 @@ use crate::input::Input;
 use crate::judge::Policy;
 use crate::operations::Operations;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
+use crate::protocol::{Ended, EndedHow, Launch, SessionView};
 use crate::refusals::Desk;
 use crate::rotation::RotationState;
 use crate::state::{Kept, KeptSession, StateFile};
@@ -47,10 +46,8 @@ use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
 mod control;
-use control::*;
 
 mod peer_view;
-use peer_view::*;
 
 mod lifecycle;
 pub(crate) mod output;

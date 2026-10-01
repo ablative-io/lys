@@ -1,26 +1,9 @@
 //! What the peer proof reads of the sessions: the leader a process id names
 //! and whether a connection's proved leader still holds its session.
 
-use super::*;
-use crate::admitted::Admitted;
+use super::{Guard, Sessions};
 use crate::error::RunnerError;
-use crate::input::Input;
-use crate::judge::Policy;
-use crate::operations::Operations;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
-use crate::refusals::Desk;
-use crate::rotation::RotationState;
-use crate::state::{Kept, KeptSession, StateFile};
-use crate::tracking::Tracking;
-use crate::tracking_store::Feed;
-use control::*;
-use portable_pty::MasterPty;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak, mpsc};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 impl Sessions {
     pub(crate) fn peer_leader(

@@ -1,17 +1,8 @@
 //! Reading the feed by cursor: a page of whole entries after it, whether
 //! anything follows it, and the byte a cursor names.
 
-use super::*;
+use super::{Body, FEED_FORMAT, Feed, FeedPage, PAGE_MAX, failed};
 use crate::error::RunnerError;
-use crate::operations::OperationOutcome;
-use crate::refusals::RefusalRecord;
-use crate::tracking::{Figures, Unavailable, UsageRecord, count, note};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::BTreeMap;
-use std::fs;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
 
 impl Feed {
     /// The entries after `cursor`, the first when none is given, up to

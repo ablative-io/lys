@@ -1,25 +1,11 @@
 //! What callers do to running sessions: wait on them, type into them,
 //! resize and end them, read their status, and stop them all.
 
-use super::*;
-use crate::admitted::Admitted;
+use super::{RUNNER, Sessions, Table, output, unknown};
 use crate::error::RunnerError;
-use crate::input::Input;
-use crate::judge::Policy;
-use crate::operations::Operations;
-use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Key, Launch, SessionView, StatusView};
-use crate::refusals::Desk;
-use crate::rotation::RotationState;
-use crate::state::{Kept, KeptSession, StateFile};
-use crate::tracking::Tracking;
-use crate::tracking_store::Feed;
-use portable_pty::MasterPty;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use crate::protocol::{Ended, Key, StatusView};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak, mpsc};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 impl Sessions {
     /// Run `check` on the table each time it changes, until it answers, the

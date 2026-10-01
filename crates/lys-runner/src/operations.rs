@@ -21,19 +21,18 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Weak, atomic::AtomicBool};
+use std::sync::atomic::AtomicBool;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::RunnerError;
-use crate::protocol::{Ended, Key};
-use crate::session::{Sessions, Table, now_ms};
-use crate::tracking_store::{Body, Commit};
+use crate::protocol::Ended;
+use crate::session::{Sessions, now_ms};
 
 mod delivery;
-use delivery::*;
 pub(crate) use delivery::{accept, compacting, deliver, ended};
+use delivery::{feed, stop};
 
 #[cfg(test)]
 #[path = "../tests/operations_index/cases.rs"]

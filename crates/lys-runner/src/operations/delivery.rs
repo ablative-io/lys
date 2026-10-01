@@ -2,17 +2,15 @@
 //! confirmed by what the harness says or by the session's end, and said in
 //! the feed.
 
-use super::*;
+use super::{
+    Operation, OperationOutcome, OperationRequest, OperationState, TextDigest, unavailable,
+};
 use crate::error::RunnerError;
 use crate::protocol::{Ended, Key};
-use crate::session::{Sessions, Table, now_ms};
+use crate::session::{Table, now_ms};
 use crate::tracking_store::{Body, Commit};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
-use std::io::{BufRead, BufReader, Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::{Weak, atomic::AtomicBool};
+use std::collections::VecDeque;
+use std::sync::Weak;
 
 /// Say `outcome` in the feed, naming in the log a feed that cannot take it:
 /// the record of operations still answers it.

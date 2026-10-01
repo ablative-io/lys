@@ -12,25 +12,22 @@
 //! stops waiting. Nothing ends a wait on a clock.
 
 use std::io;
-use std::net::Shutdown;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 
-use crate::admitted::Admitted;
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed, verify_request};
-use crate::scrollback::whole_text;
+use crate::protocol::{Answer, Greeting, reply_line};
 use crate::session::Sessions;
 
 mod acts;
-use acts::*;
+pub use acts::dispatch;
+use acts::perform;
 
 mod connection;
-use connection::*;
+use connection::{DispatchSlots, connection};
 
 #[cfg(test)]
 #[path = "../tests/socket_bounds/cases.rs"]
