@@ -2,6 +2,7 @@
 use crate::error::ServerError;
 use crate::routes::{AppState, start::StartService, with_directory};
 use crate::runtime_api::with_runtime;
+use crate::runtime_state::{Reported, Tracked};
 use lys_identity::{AgentId, IdentityId, LifecycleState};
 use std::collections::HashSet;
 
@@ -58,11 +59,7 @@ pub(crate) fn at_start(state: &AppState, starts: &StartService) -> Result<(), Se
                     && !withdrawn.contains(launch)
                     && runtime
                         .and_then(|store| store.session(session))
-                        .is_some_and(|tracked| {
-                            tracked.agent.as_deref() == Some(agent)
-                                && !tracked.stopped()
-                                && tracked.stop_asked_at().is_none()
-                        })
+                        .is_some_and(|tracked| holds_pass(tracked, agent))
             })
         };
         if state.runtime.is_none() {
@@ -71,4 +68,17 @@ pub(crate) fn at_start(state: &AppState, starts: &StartService) -> Result<(), Se
             with_runtime(state, |runtime| reconcile(Some(runtime)))
         }
     })
+}
+
+/// Whether a restored pass for `agent` may survive on `tracked`, its runtime
+/// session: held under that agent, past `starting` (a start the runner
+/// refused after it was recorded never revives), neither stopped nor asked
+/// to stop.
+pub(crate) fn holds_pass(tracked: &Tracked, agent: &str) -> bool {
+    tracked.agent.as_deref() == Some(agent)
+        && tracked
+            .latest()
+            .is_some_and(|report| report.state != Reported::Starting)
+        && !tracked.stopped()
+        && tracked.stop_asked_at().is_none()
 }

@@ -29,7 +29,13 @@ pub(crate) fn act(
         .environment
         .get("LYS_LAUNCH_RECORD")
         .map_or(launch.session.as_str(), String::as_str);
-    let pass = passes.issue(agent, record, &launch.session)?;
+    // The check that no pass is held and the issue take one lock, so two
+    // starts of the same session cannot both issue.
+    let Some(pass) = passes.issue_unless_present(agent, record, &launch.session)? else {
+        return Ok(Act::Status {
+            session: Some(launch.session),
+        });
+    };
     Ok(Act::Start {
         launch: Box::new(launch),
         lys_mcp: Some(lys_runner::protocol::LysMcp {

@@ -140,6 +140,20 @@ async fn fixture() -> TestResult<(Service, String, String, String, String)> {
                 at: 1,
                 launch: None,
             })?;
+            // The runner answered the start: a pass on a session still only
+            // starting does not survive the restart.
+            runtime.report(crate::runtime_state::Report {
+                operation: operation()?,
+                session: "session-proof".to_owned(),
+                agent: Some(agent.to_string()),
+                machine: "fixture-machine".to_owned(),
+                state: crate::runtime_state::Reported::Running,
+                what: "running".to_owned(),
+                confirmation: String::new(),
+                reported_by: person.to_string(),
+                at: 2,
+                launch: None,
+            })?;
             if let Some(reason) = runtime.snapshot_failure() {
                 return Err(format!("fixture runtime snapshot failed: {reason}").into());
             }
