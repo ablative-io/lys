@@ -72,3 +72,24 @@ fn attempts_from_ipv6_privacy_addresses_share_the_prefix_allowance() -> Result<(
     attempts.at("2001:db8:1:3::1".parse()?, 5, now)?;
     Ok(())
 }
+
+#[test]
+fn poisoned_attempt_counters_refuse_credentials_before_the_issuer() -> Result<(), Box<dyn Error>> {
+    let attempts = Attempts::default();
+    let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let held = attempts
+            .0
+            .lock()
+            .expect("fixture lock poisoned before injection");
+        assert!(held.is_empty());
+        panic!("attempt counter failure");
+    }));
+    assert!(poisoned.is_err());
+    let refused = attempts
+        .admit("192.0.2.1".parse()?, 5)
+        .err()
+        .ok_or("poisoned counters admitted sign-in")?;
+    assert_eq!(refused.name(), "SignInFailed");
+    assert!(refused.to_string().contains("credential attempt counters"));
+    Ok(())
+}

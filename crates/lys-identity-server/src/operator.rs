@@ -165,7 +165,7 @@ pub fn actor(state: &AppState, headers: &HeaderMap) -> Result<Option<Actor>, Ser
     }
     let login = state
         .admission
-        .administrator_login()
+        .administrator_login()?
         .ok_or(ServerError::OperatorRefused {
             reason: "there is no administrator yet",
         })?;

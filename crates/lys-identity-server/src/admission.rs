@@ -23,7 +23,7 @@
 //! answers for nothing, so neither their session nor their agent's signature
 //! is admitted as the link-audit source.
 
-use std::sync::{PoisonError, RwLock};
+use std::sync::RwLock;
 
 use lys_identity::projection::{Projection, Record};
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
@@ -55,20 +55,36 @@ impl Admission {
     }
 
     /// The administrator's login, when there is an administrator yet.
-    pub fn administrator_login(&self) -> Option<LoginBinding> {
-        self.administrator
+    pub fn administrator_login(&self) -> Result<Option<LoginBinding>, ServerError> {
+        Ok(self
+            .administrator
             .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+            .map_err(|error| ServerError::DirectoryUnavailable {
+                reason: format!("administrator store unavailable: {error}"),
+            })?
+            .clone())
+    }
+
+    pub(crate) fn administrator_available(&self) -> Result<(), ServerError> {
+        let held =
+            self.administrator
+                .read()
+                .map_err(|error| ServerError::DirectoryUnavailable {
+                    reason: format!("administrator store unavailable: {error}"),
+                })?;
+        drop(held);
+        Ok(())
     }
 
     /// Record `login` as the administrator. Recording the login already
     /// recorded changes nothing; recording another is refused by name.
     pub fn set_administrator(&self, login: LoginBinding) -> Result<(), ServerError> {
-        let mut held = self
-            .administrator
-            .write()
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut held =
+            self.administrator
+                .write()
+                .map_err(|error| ServerError::DirectoryUnavailable {
+                    reason: format!("administrator store unavailable: {error}"),
+                })?;
         match &*held {
             Some(existing) if existing == &login => Ok(()),
             Some(_) => Err(ServerError::SetupClosed),

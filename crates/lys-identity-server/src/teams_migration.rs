@@ -113,7 +113,7 @@ pub fn at_start(state: &AppState) -> Result<(), ServerError> {
 /// Read historical attribution as evidence, never forge a new authenticated actor.
 fn permitted(state: &AppState, added: &Changed) -> Result<bool, ServerError> {
     let binding = LoginBinding::new(&added.by.provider, &added.by.subject)?;
-    if state.admission.administrator_login().as_ref() == Some(&binding) {
+    if state.admission.administrator_login()?.as_ref() == Some(&binding) {
         return Ok(true);
     }
     let caller = with_directory(state, |directory| {

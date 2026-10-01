@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use lys_core::Ed25519Identity;
 use lys_runner::protocol::{Greeting, read_reply, sign_request, unhex};
@@ -119,37 +119,52 @@ pub struct Leave {
 
 impl Leave {
     /// Hold `hook` to run when the caller leaves; run at once when it has.
-    pub fn hold(&self, hook: Hook) {
-        let mut held = self.hook.lock().unwrap_or_else(PoisonError::into_inner);
+    pub fn hold(&self, hook: Hook) -> Result<(), RunnerError> {
+        let mut held = match self.hook.lock() {
+            Ok(held) => held,
+            Err(error) => {
+                hook();
+                return Err(RunnerError::Unreachable {
+                    reason: format!("caller leave hook unavailable: {error}"),
+                });
+            }
+        };
         if self.left.load(Ordering::SeqCst) {
             drop(held);
             hook();
-            return;
+            return Ok(());
         }
         *held = Some(hook);
+        Ok(())
     }
 
     /// The caller left.
-    pub fn leave(&self) {
+    pub fn leave(&self) -> Result<(), RunnerError> {
         self.left.store(true, Ordering::SeqCst);
         let hook = self
             .hook
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| RunnerError::Unreachable {
+                reason: format!("caller leave hook unavailable: {error}"),
+            })?
             .take();
         if let Some(hook) = hook {
             hook();
         }
+        Ok(())
     }
 
     /// The request was answered: nothing is left to close.
-    pub fn done(&self) {
+    pub fn done(&self) -> Result<(), RunnerError> {
         drop(
             self.hook
                 .lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .map_err(|error| RunnerError::Unreachable {
+                    reason: format!("caller leave hook unavailable: {error}"),
+                })?
                 .take(),
         );
+        Ok(())
     }
 }
 
@@ -159,7 +174,9 @@ pub struct LeaveOnDrop(pub Arc<Leave>);
 
 impl Drop for LeaveOnDrop {
     fn drop(&mut self) {
-        self.0.leave();
+        if let Err(error) = self.0.leave() {
+            tracing::error!("runner caller leave refused: {error}");
+        }
     }
 }
 
@@ -172,6 +189,12 @@ struct Pending {
     ticket: String,
     act: Act,
     reply: mpsc::Sender<Replied>,
+}
+
+struct Queued {
+    ticket: String,
+    answer: mpsc::Receiver<Replied>,
+    cancellation: mpsc::Sender<Replied>,
 }
 
 /// One machine's side of the hub.
@@ -204,9 +227,18 @@ impl Default for DialHub {
 }
 
 impl DialHub {
-    fn with<T>(&self, machine: &str, act: impl FnOnce(&mut Machine) -> T) -> T {
-        let mut machines = self.machines.lock().unwrap_or_else(PoisonError::into_inner);
-        act(machines.entry(machine.to_owned()).or_default())
+    fn with<T>(
+        &self,
+        machine: &str,
+        act: impl FnOnce(&mut Machine) -> T,
+    ) -> Result<T, RunnerError> {
+        let mut machines = self
+            .machines
+            .lock()
+            .map_err(|error| RunnerError::Unreachable {
+                reason: format!("runner dial hub unavailable: {error}"),
+            })?;
+        Ok(act(machines.entry(machine.to_owned()).or_default()))
     }
 
     /// The epoch every dial to this server is signed under.
@@ -215,14 +247,15 @@ impl DialHub {
     }
 
     /// Whether `nonce` is new for `machine` in this epoch, holding it.
-    pub fn fresh(&self, machine: &str, nonce: &str) -> bool {
-        self.with(machine, |held| held.nonces.insert(nonce.to_owned()))
+    pub fn fresh(&self, machine: &str, nonce: &str) -> Result<bool, ServerError> {
+        Ok(self.with(machine, |held| held.nonces.insert(nonce.to_owned()))?)
     }
 
     /// Queue `act` for `machine`'s bridge, answering the ticket and what
     /// its reply arrives on.
-    fn queue(&self, machine: &str, act: Act) -> (String, mpsc::Receiver<Replied>) {
+    fn queue(&self, machine: &str, act: Act) -> Result<Queued, RunnerError> {
         let (reply, answer) = mpsc::channel();
+        let cancellation = reply.clone();
         let ticket = lys_runner::protocol::nonce();
         self.with(machine, |held| {
             held.queue.push_back(Pending {
@@ -231,21 +264,25 @@ impl DialHub {
                 reply,
             });
             held.notify.notify_one();
-        });
-        (ticket, answer)
+        })?;
+        Ok(Queued {
+            ticket,
+            answer,
+            cancellation,
+        })
     }
 
     /// Withdraw `ticket` for `machine`, whether still waiting or taken: its
     /// caller left, so its reply has no one to reach.
-    fn withdraw(&self, machine: &str, ticket: &str) {
+    fn withdraw(&self, machine: &str, ticket: &str) -> Result<(), RunnerError> {
         self.with(machine, |held| {
             held.queue.retain(|pending| pending.ticket != ticket);
             held.delivered.remove(ticket);
-        });
+        })
     }
 
     /// The next act for `machine` and its ticket, once there is one.
-    pub async fn next(&self, machine: &str) -> (String, Act) {
+    pub async fn next(&self, machine: &str) -> Result<(String, Act), ServerError> {
         loop {
             let (taken, notify) = self.with(machine, |held| {
                 let taken = held.queue.pop_front().map(|pending| {
@@ -253,9 +290,9 @@ impl DialHub {
                     (pending.ticket, pending.act)
                 });
                 (taken, Arc::clone(&held.notify))
-            });
+            })?;
             if let Some(taken) = taken {
-                return taken;
+                return Ok(taken);
             }
             notify.notified().await;
         }
@@ -263,7 +300,7 @@ impl DialHub {
 
     /// Hand `reply` to the caller waiting on `ticket`.
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
-        let waiting = self.with(machine, |held| held.delivered.remove(ticket));
+        let waiting = self.with(machine, |held| held.delivered.remove(ticket))?;
         let waiting = waiting.ok_or_else(|| ServerError::DialRefused {
             reason: format!("no request of machine `{machine}` waits on ticket `{ticket}`"),
         })?;
@@ -275,6 +312,24 @@ impl DialHub {
         }
         Ok(())
     }
+}
+
+fn withdraw_on_leave(
+    hub: Arc<DialHub>,
+    machine: String,
+    ticket: String,
+    cancellation: mpsc::Sender<Replied>,
+) -> Hook {
+    Box::new(move || {
+        if let Err(error) = hub.withdraw(&machine, &ticket) {
+            tracing::error!("runner request withdrawal refused: {error}");
+            if let Err(undelivered) = cancellation.send(Err(error)) {
+                tracing::error!(
+                    "runner withdrawal refusal could not reach its caller: {undelivered}"
+                );
+            }
+        }
+    })
 }
 
 /// How the server reaches runners.
@@ -328,14 +383,18 @@ impl Runners {
                 self.exchange_socket(&PathBuf::from(path), act, leave)?
             }
             RunnerRecord::Dialled { .. } => {
-                let (ticket, answer) = self.hub.queue(machine, act.clone());
+                let Queued {
+                    ticket,
+                    answer,
+                    cancellation,
+                } = self.hub.queue(machine, act.clone())?;
                 let (hub, machine) = (Arc::clone(&self.hub), machine.to_owned());
-                leave.hold(Box::new(move || hub.withdraw(&machine, &ticket)));
+                leave.hold(withdraw_on_leave(hub, machine, ticket, cancellation))?;
                 let reply = answer.recv().map_err(|_left| RunnerError::Unreachable {
                     reason: "the request was withdrawn before the machine's runner answered"
                         .to_owned(),
                 })?;
-                leave.done();
+                leave.done()?;
                 reply?
             }
         };
@@ -376,12 +435,12 @@ impl Runners {
     ) -> Result<String, RunnerError> {
         let mut connection = lys_runner::connect(socket)?;
         let closer = connection.closer()?;
-        leave.hold(Box::new(move || closer.close()));
+        leave.hold(Box::new(move || closer.close()))?;
         let reply = connection
             .greeting()
             .and_then(|greeting| self.sign(&greeting, act))
             .and_then(|line| connection.exchange(&line));
-        leave.done();
+        leave.done()?;
         reply
     }
 }
@@ -404,7 +463,11 @@ pub async fn ask(
                 refusal: "runner_unreachable".to_owned(),
                 words: format!("the request to the runner ended abnormally: {failed}"),
             })?;
-    guard.0.done();
+    guard.0.done()?;
     drop(guard);
     Ok(asked?)
 }
+
+#[cfg(test)]
+#[path = "runner_client_poison_tests.rs"]
+mod poison_tests;

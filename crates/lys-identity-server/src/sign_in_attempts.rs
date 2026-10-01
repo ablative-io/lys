@@ -3,7 +3,7 @@
 //! checks them; blocked attempts do not extend the fixed window. No timer.
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crate::error::ServerError;
@@ -26,7 +26,9 @@ impl Attempts {
 
     fn at(&self, address: IpAddr, limit: u8, now: Instant) -> Result<(), ServerError> {
         let address = crate::sign_in_flights::address_key(address);
-        let mut buckets = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut buckets = self.0.lock().map_err(|error| ServerError::SignInFailed {
+            reason: format!("credential attempt counters unavailable: {error}"),
+        })?;
         buckets.retain(|_, bucket| now.saturating_duration_since(bucket.start) < WINDOW);
         if let Some(bucket) = buckets.get_mut(&address) {
             if bucket.count >= limit {
