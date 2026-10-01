@@ -6,8 +6,9 @@
 use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
-    ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ, PERSON,
-    PROFILE_REVIEW, RECORDED, RESTART, SIGNED, SIGNED_BODY, START_BUDGET, START_RUNNER, UNANSWERED,
+    ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ,
+    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, RESTART, SIGNED, SIGNED_BODY, START_BUDGET,
+    START_RUNNER, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -100,6 +101,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]];
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]];
+    POST "/network/machines/{id}/agents" "Allow or remove one agent on a computer" S [ADMIN_BODY, MACHINE_AGENTS, &["NoPerson", "IdentifierMalformed", "AgentNotVisible", "MachineUnknown", "MachineRetired", "MachineWithoutRuntime", "NetworkUnavailable", "RuntimeUnavailable"]];
     GET "/agents/{id}/provisioning" "An agent's profile" S [SIGNED, &["AgentNotVisible"]];
     GET "/agents/{id}/mcp-requests" "An agent's pending MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable"]];
     POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]];
