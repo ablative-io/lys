@@ -26,6 +26,13 @@ use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request}
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
 
+#[cfg(test)]
+#[path = "../tests/socket_bounds/cases.rs"]
+mod bounds_tests;
+
+#[cfg(test)]
+type ShutdownProbe = Box<dyn FnOnce() -> Result<(), RunnerError> + Send>;
+
 /// What a runner is started with.
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -53,6 +60,8 @@ pub struct Serving {
     socket: PathBuf,
     stop: Arc<AtomicBool>,
     thread: JoinHandle<()>,
+    #[cfg(test)]
+    shutdown_probe: Option<ShutdownProbe>,
 }
 
 fn socket_failed(what: impl std::fmt::Display) -> RunnerError {
@@ -154,6 +163,8 @@ impl Runner {
             socket,
             stop,
             thread,
+            #[cfg(test)]
+            shutdown_probe: None,
         }
     }
 
@@ -191,6 +202,10 @@ impl Serving {
         self.stop.store(true, Ordering::SeqCst);
         if let Err(error) = UnixStream::connect(&self.socket) {
             crate::error::said(&format!("the runner's socket was already closed: {error}"));
+        }
+        #[cfg(test)]
+        if let Some(probe) = self.shutdown_probe {
+            probe()?;
         }
         self.thread
             .join()
