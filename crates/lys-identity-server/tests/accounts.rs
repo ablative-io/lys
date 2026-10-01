@@ -589,7 +589,8 @@ async fn disabling_an_account_revokes_existing_sessions_codes_and_tokens_across_
     assert_eq!(revoked.1["refusal"], "TokenUnknown");
     let code_refused = product_token(&service, &pending, verifier).await?;
     assert_eq!(code_refused.0, 400, "{}", code_refused.1);
-    assert_eq!(code_refused.1["error"], "CodeUnknown");
+    assert_eq!(code_refused.1["error"], "invalid_grant");
+    assert_eq!(code_refused.1["refusal"], "CodeUnknown");
     service.restart().await?;
     let reopened = service.get("/me", Some(&cookie)).await?;
     assert_eq!(reopened.0, 401, "{}", reopened.1);
