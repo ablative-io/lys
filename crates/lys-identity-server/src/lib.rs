@@ -145,6 +145,8 @@ pub mod roles_api;
 pub mod roles_records;
 pub mod roles_store;
 pub mod roles_views;
+#[cfg(test)]
+mod route_group_scope_tests;
 pub mod routes;
 mod routes_startup;
 pub mod routes_table;
