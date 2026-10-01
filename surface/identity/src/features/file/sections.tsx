@@ -29,9 +29,9 @@ function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
   return (
     <div className="grid2">
-      <div>
+      {!agent ? <div>
         <AssignedRoles id={x.id} />
-      </div>
+      </div> : null}
       <div>
         <div className="card">
           <dl className="facts">

@@ -15,6 +15,7 @@ import { day } from './time';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { AgentOverview } from './AgentOverview';
+import { AssignedRoles } from '../roles/AssignedRoles';
 
 /** Everything a file shows, all of it read from the service. */
 export interface FileData {
@@ -65,14 +66,14 @@ function FileTabs({ data, tab }: { data: FileData; tab: string }) {
   </a>)}</nav>;
 }
 
-function AgentDetails({ data, tab, reload, problems = [] }: { data: FileData; tab: string; reload: () => void; problems?: Refused[] }) {
+function AgentDetails({ data, tab, reload, stop, problems = [] }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; problems?: Refused[] }) {
   const [opened, setOpened] = useState(tab === 'record');
   const x = data.x;
   return <details className="agent-details" open={tab === 'record' || undefined} onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
     <summary>Details</summary>
     {problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null}
     <p className="identity-id">Identity: <code>{x.id}</code></p>
-    <p>Access status: <span className={'state ' + x.state} id="state">{STATUS[x.state]}</span>. This says whether its identity may be used; it does not say a process is running.</p>
+    <p>Access status: <span className={'state ' + x.state} id="state">{stop?.agent === x.id && stop.state === 'suspended' ? 'Suspended in this stop answer' : STATUS[x.state]}</span>. This says whether its identity may be used; it does not say a process is running.</p>
     {data.agent?.provenance.registration ? <p>Registered since {day(data.agent.provenance.registration.actor.authenticated_at)}.</p> : null}
     <div className="agent-detail-acts">
       <a className="btn" href={'#/directory/manage?action=profile&identity=' + encodeURIComponent(x.id)}>Edit name</a>
@@ -129,7 +130,7 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
         </div>
         {stop && stop.agent === x.id ? <StopReceipt answer={stop} /> : null}
         {agent ? <div className="pane">
-          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <AgentDetails data={{ ...data, x }} tab={tab} reload={reload} problems={problems} />} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p>{tab !== 'record' ? <div className="agent-settings"><TabBody tab={tab} data={{ ...data, x }} reload={reload} /></div> : null}<AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} /></>}
+          {tab === 'profile' ? <AgentOverview key={x.id} agent={agent} details={(problems) => <><AssignedRoles id={x.id} /><AgentDetails data={{ ...data, x }} tab={tab} reload={reload} stop={stop} problems={problems} /></>} /> : <><p><a href={'#/file/' + encodeURIComponent(x.id)}>← About {x.display_name}</a></p>{tab !== 'record' ? <div className="agent-settings"><TabBody tab={tab} data={{ ...data, x }} reload={reload} /></div> : null}<AgentDetails key={x.id + ':' + tab} data={{ ...data, x }} tab={tab} reload={reload} stop={stop} /></>}
         </div> : <><nav className="tabs">
           {TABS.map(([k, l]) => (
             <a key={k} href={`#/file/${x.id}/${k}`} className={tab === k ? 'on' : ''}>
