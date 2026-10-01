@@ -93,15 +93,9 @@ fn go_sumdb_note_reproduces_the_anchors_checkpoints_byte_for_byte() {
     let Some(go) = harness::go_or_skip("lys-anchor checkpoint note conformance") else {
         return;
     };
-    let gocache_dir = TempDir::new().unwrap();
     let bin_dir = TempDir::new().unwrap();
     let bin = bin_dir.path().join("notetool");
-    harness::build_go_tool(
-        &go,
-        harness::GoScaffold::Note,
-        &gocache_dir.path().join("gocache"),
-        &bin,
-    );
+    harness::build_go_tool(&go, harness::GoScaffold::Note, &bin);
 
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path();

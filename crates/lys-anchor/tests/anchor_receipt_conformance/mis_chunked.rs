@@ -8,7 +8,7 @@ fn go_refuses_the_mis_chunked_receipts_lys_accepts() {
     let Some(go) = go_or_skip("lys-anchor receipt negatives") else {
         return;
     };
-    let (_gocache_dir, _bin_dir, bin) = cose_tool(&go);
+    let (_bin_dir, bin) = cose_tool(&go);
 
     // Grown here rather than in a helper: a helper would have to name
     // `Anchor<..>`'s type parameters, and this file has no business pinning

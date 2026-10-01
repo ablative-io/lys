@@ -129,9 +129,8 @@ fn go_cose_consistency_receipt_conformance_round_trips() {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
     let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
+    build_go_tool(&go, &bin);
 
     let (_dir, key) = anchor_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());
@@ -220,9 +219,8 @@ fn go_cose_refuses_what_lys_refuses() {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
     let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
+    build_go_tool(&go, &bin);
 
     let (_dir, key) = anchor_identity();
     let pubkey_hex = to_hex(&key.public_key_bytes());

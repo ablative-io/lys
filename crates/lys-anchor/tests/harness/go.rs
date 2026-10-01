@@ -18,7 +18,7 @@
 //! # The duplication that remains, named rather than left to be noticed
 //!
 //! What *is* duplicated is the environment contract: `GOFLAGS=-mod=vendor`,
-//! `GOPROXY=off`, `GOTOOLCHAIN=local`, and a throwaway `GOCACHE`, so a gate
+//! `GOPROXY=off`, `GOTOOLCHAIN=local`, and a shared `GOCACHE`, so a gate
 //! needs no network and cannot silently resolve a different dependency than the
 //! vendored, pinned one. `lys-core`'s own harness says why that contract lives
 //! in one place: two copies is two chances for one of them to lose a flag.
@@ -42,6 +42,9 @@
 //! quietly report a pass for a cross-check that never ran. A toolchain that is
 //! present but *broken* is always a hard failure.
 
+#[path = "../../../lys-core/tests/harness/cache.rs"]
+mod cache;
+
 use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -49,7 +52,7 @@ use std::process::{Command, Stdio};
 
 /// The hermeticity contract, as the data every spawn actually uses.
 ///
-/// `GOCACHE` is not here because its value is a per-run temporary directory
+/// `GOCACHE` is not here because its value is the shared compiler-cache directory
 /// rather than a constant; it is set alongside these on every spawn.
 pub const GO_ENV: [(&str, &str); 3] = [
     ("GOFLAGS", "-mod=vendor"),
@@ -141,18 +144,22 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 /// that is present but broken is deliberately a hard failure, never a skip —
 /// and so is a scaffold that will not build offline, since `GOPROXY=off` means
 /// an unvendored dependency cannot resolve at all rather than being fetched.
-pub fn build_go_tool(go: &Path, scaffold: GoScaffold, gocache: &Path, out: &Path) {
-    let status = Command::new(go)
-        .arg("build")
-        .arg("-o")
-        .arg(out)
-        .arg(".")
-        .current_dir(scaffold.dir())
-        .envs(GO_ENV)
-        .env("GOCACHE", gocache)
-        .status()
-        .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-    assert!(status.success(), "go build of the {scaffold:?} tool failed");
+pub fn build_go_tool(go: &Path, scaffold: GoScaffold, out: &Path) {
+    let scaffold_dir = scaffold.dir();
+    cache::build(go, &scaffold_dir, out, |executable, gocache| {
+        let status = Command::new(go)
+            .arg("build")
+            .arg("-o")
+            .arg(executable)
+            .arg(".")
+            .current_dir(&scaffold_dir)
+            .envs(GO_ENV)
+            .env("GOWORK", "off")
+            .env("GOCACHE", gocache)
+            .status()
+            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+        assert!(status.success(), "go build of the {scaffold:?} tool failed");
+    });
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,
@@ -218,7 +225,7 @@ fn the_go_environment_contract_matches_the_one_lys_core_wrote_down() {
 
     assert!(
         theirs.contains(r#".env("GOCACHE", gocache)"#),
-        "lys-core's harness no longer uses a throwaway GOCACHE"
+        "lys-core's harness no longer uses the shared GOCACHE"
     );
 }
 

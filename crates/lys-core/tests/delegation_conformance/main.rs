@@ -296,7 +296,7 @@ fn expected_payload_report(claim: &DelegationClaim) -> Vec<(String, String)> {
 fn cose_tool(go: &Path) -> (tempfile::TempDir, std::path::PathBuf) {
     let workdir = tempfile::tempdir().unwrap();
     let bin = workdir.path().join("cosetool");
-    build_go_tool(go, &workdir.path().join("gocache"), &bin);
+    build_go_tool(go, &bin);
     (workdir, bin)
 }
 

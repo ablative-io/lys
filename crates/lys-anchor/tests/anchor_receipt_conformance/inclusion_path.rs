@@ -8,7 +8,7 @@ fn go_cose_derives_the_inclusion_path_the_anchor_emitted_node_for_node() {
     let Some(go) = go_or_skip("lys-anchor receipt conformance") else {
         return;
     };
-    let (_gocache_dir, _bin_dir, bin) = cose_tool(&go);
+    let (_bin_dir, bin) = cose_tool(&go);
 
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path();

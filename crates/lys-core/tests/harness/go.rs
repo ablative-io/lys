@@ -3,7 +3,7 @@
 //! Both `cose_conformance` and `bundle_conformance` shell out to the same
 //! vendored tool in `tests/cose-conformance`, and the part that must never
 //! drift between them is the **environment contract**: every invocation runs
-//! with `GOFLAGS=-mod=vendor GOPROXY=off GOTOOLCHAIN=local` and a throwaway
+//! with `GOFLAGS=-mod=vendor GOPROXY=off GOTOOLCHAIN=local` and a shared
 //! `GOCACHE`, so the gates need zero network and cannot silently pick up a
 //! different dependency than the vendored, pinned one. Two copies of that
 //! contract is two chances for one of them to lose a flag, which is why it
@@ -14,6 +14,9 @@
 //! hard failure, so a conformance gate can never quietly degrade to "passed" in
 //! CI. A toolchain that is present but *broken* is always a hard failure —
 //! [`build_go_tool`] panics rather than treating it as absent.
+
+#[path = "cache.rs"]
+mod cache;
 
 use std::ffi::OsStr;
 use std::io::Write;
@@ -76,21 +79,24 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 ///
 /// Panics if the toolchain cannot be spawned or the build fails. A toolchain
 /// that is present but broken is deliberately a hard failure, never a skip.
-pub fn build_go_tool(go: &Path, gocache: &Path, out: &Path) {
+pub fn build_go_tool(go: &Path, out: &Path) {
     let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cose-conformance");
-    let status = Command::new(go)
-        .arg("build")
-        .arg("-o")
-        .arg(out)
-        .arg(".")
-        .current_dir(&scaffold_dir)
-        .env("GOFLAGS", "-mod=vendor")
-        .env("GOPROXY", "off")
-        .env("GOTOOLCHAIN", "local")
-        .env("GOCACHE", gocache)
-        .status()
-        .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-    assert!(status.success(), "go build of the conformance tool failed");
+    cache::build(go, &scaffold_dir, out, |executable, gocache| {
+        let status = Command::new(go)
+            .arg("build")
+            .arg("-o")
+            .arg(executable)
+            .arg(".")
+            .current_dir(&scaffold_dir)
+            .env("GOFLAGS", "-mod=vendor")
+            .env("GOPROXY", "off")
+            .env("GOTOOLCHAIN", "local")
+            .env("GOWORK", "off")
+            .env("GOCACHE", gocache)
+            .status()
+            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+        assert!(status.success(), "go build of the conformance tool failed");
+    });
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,

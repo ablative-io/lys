@@ -234,15 +234,9 @@ fn sign_args(seed_hex: &str, leaf_index: u64, tree_size: u64) -> Vec<String> {
 
 /// Builds the vendored `cose-conformance` tool into a throwaway directory,
 /// returning it with the directories that must outlive it.
-fn cose_tool(go: &Path) -> (TempDir, TempDir, std::path::PathBuf) {
-    let gocache_dir = TempDir::new().unwrap();
+fn cose_tool(go: &Path) -> (TempDir, std::path::PathBuf) {
     let bin_dir = TempDir::new().unwrap();
     let bin = bin_dir.path().join("cosetool");
-    build_go_tool(
-        go,
-        GoScaffold::Cose,
-        &gocache_dir.path().join("gocache"),
-        &bin,
-    );
-    (gocache_dir, bin_dir, bin)
+    build_go_tool(go, GoScaffold::Cose, &bin);
+    (bin_dir, bin)
 }

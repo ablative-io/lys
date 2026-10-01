@@ -267,9 +267,8 @@ fn go_bundle_conformance_agrees_case_by_case() {
         return;
     };
     let workdir = tempfile::tempdir().unwrap();
-    let gocache = workdir.path().join("gocache");
     let bin = workdir.path().join("cosetool");
-    build_go_tool(&go, &gocache, &bin);
+    build_go_tool(&go, &bin);
 
     let cases = cases();
     let mut checked = 0usize;
