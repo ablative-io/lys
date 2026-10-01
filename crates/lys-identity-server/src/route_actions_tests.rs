@@ -15,9 +15,40 @@ fn operation() -> TestResult<String> {
 
 async fn fixture() -> TestResult<(Service, String, String, String, String)> {
     let (service, (pass, person, agent)) = Service::start_with(|config| {
-        let seeded = crate::dev_seed::seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
-        let person = seeded.people[0].id;
-        let agent = seeded.people[0].agents[0].id;
+        use lys_identity::{
+            Actor, AuthMethod, Directory, IdentityId, LoginBinding, Profile, Provenance, Transition,
+        };
+        use lys_log_store::FileLeafStore;
+        FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+        let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
+        lys_identity::directory_migration::migrate(FileLeafStore::open(&config.log_dir)?, &key)?;
+        let path = config.log_dir.clone();
+        let mut directory = Directory::open(Box::new(move || FileLeafStore::open(&path)), key)?;
+        let actor = Actor::new(
+            LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+            Provenance::new(AuthMethod::Oidc, 1),
+        );
+        let (person, _) = directory.setup_person(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Owner")?,
+            1,
+        )?;
+        let (agent, _) = directory.register_agent(
+            actor.clone(),
+            OperationId::generate()?,
+            person,
+            Profile::new("Reader")?,
+            2,
+        )?;
+        directory.transition(
+            actor,
+            OperationId::generate()?,
+            IdentityId::Agent(agent),
+            Transition::Activate,
+            "",
+            3,
+        )?;
         let mut passes = crate::agent_pass_store::Passes::open(
             config.log_dir.with_file_name("agent-passes.json"),
         )?;
