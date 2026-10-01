@@ -153,6 +153,8 @@ pub mod roles_views;
 mod route_actions;
 #[cfg(test)]
 mod route_actions_tests;
+#[cfg(test)]
+mod route_group_scope_tests;
 pub mod routes;
 mod routes_startup;
 pub mod routes_table;
