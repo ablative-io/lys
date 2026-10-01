@@ -46,8 +46,10 @@ pub(crate) fn route(
         }
     }
     // The common ingress check can refuse any inactive authenticated caller.
-    if !named.contains(&"inactive") {
-        named.push("inactive");
+    for refusal in ["inactive", "AnswersToInactive"] {
+        if !named.contains(&refusal) {
+            named.push(refusal);
+        }
     }
     // The global admission guard refuses a bad operator header on every route.
     if !named.contains(&"OperatorRefused") {
@@ -98,6 +100,16 @@ pub fn document() -> Result<Value, ServerError> {
         })?;
     crate::message_edges::document_query(&mut document)?;
     crate::list_page::document_query(&mut document)?;
+    let answers_to = document
+        .pointer_mut("/components/schemas/AgentRegistrationBody/properties/answers_to")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| ServerError::ConfigInvalid {
+            reason: "the registration schema has no answers_to field".to_owned(),
+        })?;
+    answers_to.insert(
+        "x-lys-answers-to".to_owned(),
+        serde_json::json!(["person", "agent"]),
+    );
     Ok(document)
 }
 

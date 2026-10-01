@@ -14,6 +14,10 @@ pub fn router(state: Shared) -> Router {
         .route("/callback", get(crate::sign_in_callback::callback))
         .route("/people", post(register_person))
         .route("/agents", post(register_agent))
+        .route(
+            "/agents/{id}/reports-to",
+            post(crate::reporting_api::change),
+        )
         .route("/identity/import", post(crate::import_api::import))
         .route("/identity/estate-plan", get(crate::estate_api::plan))
         .route("/identity/estate-apply", post(crate::estate_api::apply))

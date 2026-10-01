@@ -13,8 +13,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
 use axum::{Json, Router};
 use lys_identity::{
-    Actor, AgentId, Directory, IdentityError, IdentityId, LifecycleState, LoginBinding,
-    OperationId, PersonId, Profile, Transition,
+    Actor, AgentId, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile, Transition,
 };
 use lys_log_store::FileLeafStore;
 use serde::Deserialize;
@@ -152,11 +151,13 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
         })?;
     }
     let log_dir = config.log_dir.clone();
+    let key = load_service_key(&config.event_key_file)?;
+    let store = FileLeafStore::open(&log_dir).map_err(|error| ServerError::ConfigInvalid {
+        reason: format!("the directory migration could not open the log: {error}"),
+    })?;
+    lys_identity::directory_migration::migrate(store, &key)?;
     let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    Ok(Directory::open(
-        reopen,
-        load_service_key(&config.event_key_file)?,
-    )?)
+    Ok(Directory::open(reopen, key)?)
 }
 
 fn malformed(reason: String) -> ServerError {
@@ -237,37 +238,18 @@ pub(crate) struct AgentRegistration {
     answers_to: Option<String>,
 }
 
-fn registration_person(
-    projection: &lys_identity::projection::Projection,
-    operation: OperationId,
+fn registration_target(
     own: PersonId,
     requested: Option<&str>,
     may_choose: bool,
-) -> Result<PersonId, ServerError> {
-    let responsible = requested
-        .map(PersonId::from_str)
-        .transpose()?
-        .unwrap_or(own);
-    if responsible != own && !may_choose {
+) -> Result<IdentityId, ServerError> {
+    let target = requested.map_or(Ok(IdentityId::Person(own)), identity_id)?;
+    if target != IdentityId::Person(own) && !may_choose {
         return Err(ServerError::NotAdmitted {
             reason: "only an administrator may register an agent under another person",
         });
     }
-    if projection.operation(operation).is_some() {
-        return Ok(responsible);
-    }
-    let record = projection
-        .record(IdentityId::Person(responsible))
-        .ok_or_else(|| IdentityError::IdentityUnknown {
-            identity: responsible.to_string(),
-        })?;
-    if record.state() != LifecycleState::Active {
-        return Err(ServerError::Inactive {
-            identity: responsible.to_string(),
-            state: record.state(),
-        });
-    }
-    Ok(responsible)
+    Ok(target)
 }
 
 fn operation(text: &str) -> Result<OperationId, ServerError> {
@@ -316,14 +298,9 @@ pub(crate) async fn register_agent(
                     });
                 }
             };
-            let responsible =
-                registration_person(projection, op, own, body.answers_to.as_deref(), true)?;
-            let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
-            Ok(Json(AgentRegistered {
-                agent: id.to_string(),
-                responsible: responsible.to_string(),
-                receipt: receipt_view(&receipt),
-            }))
+            let target = registration_target(own, body.answers_to.as_deref(), true)?;
+            let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+            crate::reporting_api::registered(answer).map(Json)
         });
     }
     let (op, profile) = (
@@ -334,19 +311,9 @@ pub(crate) async fn register_agent(
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         crate::service_account_grants::admit(&mut judged, caller, "agents")?;
         let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
-        let responsible = registration_person(
-            directory.projection()?,
-            op,
-            responsible,
-            body.answers_to.as_deref(),
-            false,
-        )?;
-        let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
-        Ok(Json(AgentRegistered {
-            agent: id.to_string(),
-            responsible: responsible.to_string(),
-            receipt: receipt_view(&receipt),
-        }))
+        let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
+        let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
+        crate::reporting_api::registered(answer).map(Json)
     })
 }
 

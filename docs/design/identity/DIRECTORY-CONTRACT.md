@@ -23,9 +23,9 @@ Every change names its actor: a login of the person the service authenticated, t
 | Call | Answers | Records |
 | --- | --- | --- |
 | `Directory::register_person(actor, operation, profile, at)` | the new `PersonId` and the receipt | a person in state registered |
-| `Directory::register_agent(actor, operation, responsible, profile, at)` | the new `AgentId` and the receipt | an agent in state registered, with `responsible` as its responsible person for life |
+| `Directory::register_agent(actor, operation, responsible, profile, at)` | the new `AgentId` and the receipt | an agent in state registered, with a direct reporting edge to `responsible` |
 
-An agent's responsible person must be registered, or the call is refused `IdentityUnknown` and nothing is recorded. In step 1 the actor is always the configured administrator, and the responsible person is the administrator's person. Registering an agent starts nothing, and issues no login, credential, handle or certificate (P3). No call changes an agent's responsible person.
+An agent's responsible person must be registered, or the call is refused `IdentityUnknown` and nothing is recorded. In step 1 the actor is always the configured administrator, and the responsible person is the administrator's person. Registering an agent starts nothing, and issues no login, credential, handle or certificate (P3). `Directory::register_reporting_agent` accepts a person or agent target and resolves an active chain to its accountable person. `Directory::change_reports_to` changes that edge and the affected descendants' accountability in one signed event; earlier signed leaves remain unchanged. Inactive reporting links remain visible as a named gap and block acting authority until restored or reassigned. Snapshot version 3 materialises direct edges for existing agents through an explicit version-2 migration before startup opens the directory.
 
 ## Reading
 
@@ -33,7 +33,7 @@ An agent's responsible person must be registered, or the call is refused `Identi
 | --- | --- |
 | `Directory::record(id)` | the identity's record, or none |
 | `Directory::projection()` then `records()` | every identity, in id order |
-| `Record::profile()`, `state()`, `responsible()`, `bindings()`, `registered_by()`, `events()` | the record's parts, and the log indices of its events |
+| `Record::profile()`, `state()`, `responsible()`, `reports_to()`, `reporting_gap()`, `bindings()`, `registered_by()`, `events()` | the record's parts, and the log indices of its events |
 
 A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`. Resolving it applies every leaf the log holds from that index on, whoever wrote it, before anything is answered. A leaf past the pin that is not a whole event this directory signed is refused `LeafNotAnEvent` before it is pinned, so it can be removed without equivocating. An event larger than the directory reads back is refused `EventTooLarge` before it is signed.
 

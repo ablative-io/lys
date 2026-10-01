@@ -30,6 +30,9 @@ use crate::operation::OperationId;
 use crate::profile::Profile;
 use crate::provenance::{Actor, Provenance};
 
+#[path = "encoding_reporting.rs"]
+mod reporting;
+
 /// The hash a receipt's payload commitment is made with, over the body bytes.
 pub const PAYLOAD_COMMITMENT_HASH: &str = "sha-256";
 
@@ -105,6 +108,17 @@ fn change(out: &mut Vec<u8>, value: &Change) {
             uint(out, 2);
             profile(out, shown);
         }
+        Change::ReportingRegistration {
+            responsible,
+            profile: shown,
+            reports_to,
+        } => reporting::registration(out, *responsible, shown, *reports_to),
+        Change::ReportsToChanged {
+            from,
+            to,
+            responsible_from,
+            responsible_to,
+        } => reporting::changed(out, *from, *to, *responsible_from, *responsible_to),
         Change::BindLogin { binding } => {
             map(out, 2);
             uint(out, 1);
@@ -337,7 +351,8 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
                 as_uint(&observed_at, "an observation time is seconds")?,
             )?))
         }
-        _ => Err(malformed("a change kind is 1 to 7")),
+        wire::REPORTING_REGISTRATION | wire::REPORTS_TO_CHANGED => reporting::decode(kind, value),
+        _ => Err(malformed("a change kind is 1 to 9")),
     }
 }
 

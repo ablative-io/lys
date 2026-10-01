@@ -36,6 +36,12 @@ pub struct AgentSummary {
     pub display_name: String,
     /// Its lifecycle state: registered, active, suspended or retired.
     pub state: String,
+    /// The immediate reporting target.
+    pub reports_to: crate::reporting_views::ReportingTarget,
+    /// The active person reached by the reporting chain.
+    pub accountable: Option<crate::reporting_views::AccountablePerson>,
+    /// The inactive identity interrupting that chain.
+    pub gap: Option<crate::reporting_views::ReportingGap>,
 }
 
 /// The answer of `GET /me`.
@@ -141,6 +147,12 @@ pub struct AgentView {
     pub person: PersonSummary,
     /// Whether that person is retired, so the agent needs a new one.
     pub needs_new_person: bool,
+    /// The immediate reporting target.
+    pub reports_to: crate::reporting_views::ReportingTarget,
+    /// The active person reached by the reporting chain.
+    pub accountable: Option<crate::reporting_views::AccountablePerson>,
+    /// The inactive identity interrupting that chain.
+    pub gap: Option<crate::reporting_views::ReportingGap>,
     /// The agent's role, where recorded. The directory records none yet.
     pub role: Option<String>,
     /// The role's version, where recorded. The directory records none yet.

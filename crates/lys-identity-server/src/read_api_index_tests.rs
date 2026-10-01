@@ -55,7 +55,7 @@ fn a_persons_agent_view_does_not_visit_other_peoples_records() -> Result<(), Box
     own.sort();
     let mut visited = Vec::new();
     let started = Instant::now();
-    let agents = agents_of_observing(&projection, people[0], |id| visited.push(id));
+    let agents = agents_of_observing(&projection, people[0], |id| visited.push(id))?;
     eprintln!(
         "agents_of: elapsed_ms={} records_visited={}",
         started.elapsed().as_secs_f64() * 1000.0,

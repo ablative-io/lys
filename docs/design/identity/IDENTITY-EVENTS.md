@@ -50,6 +50,10 @@ Setup creates one new active person and binds exactly the event actor's issuer a
 
 A profile is the map `1` display name (text).
 
+Reporting registration uses kind `8`, naming an agent. Its map is `1` responsible person (16 bytes), `2` profile, `3` reporting target. A reporting target is the map `1` kind (`1` person, `2` agent), `2` id (16 bytes). Direct person registrations continue using kind `2` with unchanged bytes.
+
+Reporting reassignment uses kind `9`, naming the changed agent. Its map is `1` previous target, `2` new target, `3` previous accountable person (16 bytes), `4` new accountable person (16 bytes). One leaf changes the edge and the affected descendants' accountable person. Each affected record names that leaf in its event provenance. Snapshot version `3` stores each agent's direct edge; the explicit version-2 migration materialises existing person edges without rewriting signed leaves. Readers must support both new event kinds before they are written.
+
 Lifecycle states are `1` registered, `2` active, `3` suspended, `4` retired. Transitions are `1` activate, `2` suspend, `3` reinstate, `4` retire. A transition event is refused unless its `to` is the state the table gives from its `from`: activate is registered to active, suspend is active to suspended, reinstate is suspended to active, and retire is active or suspended to retired. Suspend and retire name a reason.
 
 A link-audit event records the issuer's observation as the receiver accepted it, under the source's own operation id. It is an observation, kept apart from any claim a person made. Its fields follow R4 as written. Row 01's typed link-audit contract must equal this payload: a wire format is kept for ever, so the contract follows the wire and never the other way round.

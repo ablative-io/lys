@@ -10,6 +10,42 @@ use crate::lifecycle::{LifecycleState, Transition};
 /// Errors returned by the directory's records and its event encoding.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum IdentityError {
+    /// The directory snapshot must be upgraded before ordinary opening.
+    #[error(
+        "DirectorySnapshotUnmigrated: snapshot version {found} requires migration to {expected}"
+    )]
+    DirectorySnapshotUnmigrated {
+        /// The stored version.
+        found: u64,
+        /// The version required by this reader.
+        expected: u64,
+    },
+    /// A reporting target is not held in the directory.
+    #[error("AnswersToUnknown: the directory holds no reporting target {identity}")]
+    AnswersToUnknown {
+        /// The unknown target.
+        identity: String,
+    },
+    /// The selected target cannot accept a new reporting edge.
+    #[error("AnswersToInactive: {identity} is {state}")]
+    AnswersToInactive {
+        /// The selected target.
+        identity: String,
+        /// Its recorded state.
+        state: LifecycleState,
+    },
+    /// A reporting edge would make a cycle.
+    #[error("AnswersToCycle: the reporting chain cycles through {chain:?}")]
+    AnswersToCycle {
+        /// The traversed identities including the repeated identity.
+        chain: Vec<String>,
+    },
+    /// A reporting chain cannot reach an active person.
+    #[error("NoAccountablePerson: the reporting chain has no active person: {chain:?}")]
+    NoAccountablePerson {
+        /// The traversed identities through the gap.
+        chain: Vec<String>,
+    },
     /// The login already belongs to a person; setup cannot replace that identity.
     #[error("AlreadyBootstrapped: this sign-in is already bound to person `{person}`")]
     AlreadyBootstrapped {

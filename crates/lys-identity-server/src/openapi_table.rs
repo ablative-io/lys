@@ -7,8 +7,9 @@ use lys_openapi::{Auth, Method};
 
 use crate::openapi_refusals::{
     ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ,
-    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, RESTART, SIGNED, SIGNED_BODY, START_BUDGET,
-    START_RUNNER, UNANSWERED,
+    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, REPORTING, RESTART, SIGNED, SIGNED_BODY,
+    START_BUDGET, START_RUNNER, UNANSWERED,
+
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -53,7 +54,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]];
-    POST "/agents" "Register an agent" A [ADMIN_BODY, &["credential_refused", "ServiceAccountUnknown", "NotHeld"]];
+    POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld"]];
+    POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING];
     GET "/identities" "Every identity the directory holds" S [ADMIN];
     GET "/identities/{id}" "One identity" S [ADMIN];
     POST "/identities/{id}/profile" "Change an identity's profile" S [ADMIN_BODY];

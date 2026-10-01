@@ -9,6 +9,7 @@
 pub mod binding;
 pub mod checkpoints;
 pub mod directory;
+pub mod directory_migration;
 mod directory_state;
 pub mod encoding;
 pub mod error;

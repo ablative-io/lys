@@ -55,10 +55,17 @@ fn resolve(
         own_account && matches!(identity, IdentityId::Person(_)),
     )?;
     if let IdentityId::Agent(_) = identity {
-        let person = directory
-            .record(identity)
-            .and_then(lys_identity::projection::Record::responsible)
-            .ok_or(ServerError::NoPerson)?;
+        let record = directory.record(identity).ok_or(ServerError::NoPerson)?;
+        if let Some(gap) = record.reporting_gap()
+            && matches!(gap.identity, IdentityId::Agent(_))
+        {
+            return Err(lys_identity::IdentityError::AnswersToInactive {
+                identity: gap.identity.to_string(),
+                state: gap.state,
+            }
+            .into());
+        }
+        let person = record.responsible().ok_or(ServerError::NoPerson)?;
         admit_identity(directory, IdentityId::Person(person), false)?;
     }
     Ok(identity)

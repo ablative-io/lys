@@ -7,7 +7,7 @@
 //! event would apply without applying it, so a change is refused by name
 //! before it is signed and never after it is in the log.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
@@ -17,12 +17,26 @@ use crate::lifecycle::LifecycleState;
 use crate::operation::OperationId;
 use crate::profile::Profile;
 
+#[path = "projection_reporting.rs"]
+mod reporting;
+
+/// The inactive identity that interrupts a reporting chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReportingGap {
+    /// The identity at the gap.
+    pub identity: IdentityId,
+    /// Its recorded lifecycle state.
+    pub state: LifecycleState,
+}
+
 /// One identity, as the directory holds it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     profile: Profile,
     state: LifecycleState,
     responsible: Option<PersonId>,
+    reports_to: Option<IdentityId>,
+    reporting_gap: Option<ReportingGap>,
     bindings: Vec<LoginBinding>,
     registered_by: LoginBinding,
     events: Vec<u64>,
@@ -39,9 +53,19 @@ impl Record {
         self.state
     }
 
-    /// An agent's responsible person, for life. `None` for a person.
+    /// An agent's current accountable person. `None` for a person.
     pub fn responsible(&self) -> Option<PersonId> {
         self.responsible
+    }
+
+    /// The immediate reporting target recorded for an agent.
+    pub fn reports_to(&self) -> Option<IdentityId> {
+        self.reports_to
+    }
+
+    /// The current gap in an agent's reporting chain, if one exists.
+    pub fn reporting_gap(&self) -> Option<ReportingGap> {
+        self.reporting_gap
     }
 
     /// The logins bound to a person, in the order they were bound.
@@ -64,6 +88,9 @@ impl Record {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Projection {
     records: BTreeMap<IdentityId, Record>,
+    agents_by_person: BTreeMap<PersonId, BTreeSet<IdentityId>>,
+    reporting_children: BTreeMap<IdentityId, BTreeSet<IdentityId>>,
+    agent_count: usize,
     bindings: HashMap<LoginBinding, PersonId>,
     agent_bindings: HashMap<LoginBinding, AgentId>,
     operations: HashMap<OperationId, u64>,
@@ -110,6 +137,8 @@ impl Projection {
                 profile,
                 state,
                 responsible: Some(owner),
+                reports_to: None,
+                reporting_gap: None,
                 bindings: Vec::new(),
                 registered_by: created_by,
                 events: Vec::new(),
@@ -131,6 +160,34 @@ impl Projection {
     /// Every identity, in identifier order.
     pub fn records(&self) -> impl Iterator<Item = (&IdentityId, &Record)> {
         self.records.iter()
+    }
+
+    /// The named person's agents, without visiting unrelated directory records.
+    pub fn agents_of(
+        &self,
+        person: PersonId,
+    ) -> impl Iterator<Item = Result<(&IdentityId, &Record), IdentityError>> {
+        self.agents_by_person
+            .get(&person)
+            .into_iter()
+            .flat_map(|agents| agents.iter())
+            .map(|identity| {
+                let held = self.records.get_key_value(identity).ok_or_else(|| {
+                    IdentityError::LogUnavailable {
+                        reason: format!(
+                            "person {person}'s agent index names missing identity {identity}"
+                        ),
+                    }
+                })?;
+                if !matches!(held.0, IdentityId::Agent(_)) || held.1.responsible != Some(person) {
+                    return Err(IdentityError::LogUnavailable {
+                        reason: format!(
+                            "person {person}'s agent index disagrees with identity {identity}"
+                        ),
+                    });
+                }
+                Ok(held)
+            })
     }
 
     /// The person a login is bound to.
@@ -166,6 +223,7 @@ impl Projection {
             Change::SetupPerson { .. }
             | Change::RegisterPerson { .. }
             | Change::RegisterAgent { .. }
+            | Change::ReportingRegistration { .. }
                 if held.is_some() =>
             {
                 Err(IdentityError::AlreadyRegistered {
@@ -186,6 +244,30 @@ impl Projection {
                     Err(unknown(IdentityId::Person(*responsible)))
                 }
             }
+            Change::ReportingRegistration {
+                responsible,
+                reports_to,
+                ..
+            } => {
+                if self.resolve_reporting(*reports_to, None)? != *responsible {
+                    return Err(IdentityError::ChangeMismatch {
+                        reason: "registration responsibility differs from its reporting chain",
+                    });
+                }
+                Ok(())
+            }
+            Change::ReportsToChanged {
+                from,
+                to,
+                responsible_from,
+                responsible_to,
+            } => self.check_reporting_change(
+                identity,
+                *from,
+                *to,
+                *responsible_from,
+                *responsible_to,
+            ),
             Change::ChangeProfile { .. } => held.map(|_| ()).ok_or_else(|| unknown(identity)),
             Change::BindLogin { binding } => {
                 held.ok_or_else(|| unknown(identity))?;
@@ -250,10 +332,19 @@ impl Projection {
                 responsible,
                 profile,
             } => {
-                self.records.insert(
-                    identity,
-                    fresh(profile, Some(*responsible), registered_by, index),
-                );
+                let record = fresh(profile, Some(*responsible), registered_by, index);
+                self.register_reporting(identity, record, IdentityId::Person(*responsible))?;
+            }
+            Change::ReportingRegistration {
+                responsible,
+                profile,
+                reports_to,
+            } => {
+                let record = fresh(profile, Some(*responsible), registered_by, index);
+                self.register_reporting(identity, record, *reports_to)?;
+            }
+            Change::ReportsToChanged { to, .. } => {
+                self.apply_reporting_change(identity, *to, index)?
             }
             Change::ChangeProfile { profile } => {
                 let record = self.held(identity)?;
@@ -282,6 +373,7 @@ impl Projection {
                 let record = self.held(identity)?;
                 record.state = *to;
                 record.events.push(index);
+                self.refresh_reporting_children(identity, None)?;
             }
             Change::LinkAudit(seen) => {
                 self.held(identity)?.events.push(index);
@@ -309,6 +401,8 @@ fn fresh(
         profile: profile.clone(),
         state: LifecycleState::Registered,
         responsible,
+        reports_to: None,
+        reporting_gap: None,
         bindings: Vec::new(),
         registered_by,
         events: vec![index],
@@ -317,3 +411,7 @@ fn fresh(
 
 #[path = "projection_state.rs"]
 pub(crate) mod state;
+
+#[cfg(test)]
+#[path = "projection_reporting_tests.rs"]
+mod reporting_tests;

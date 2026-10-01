@@ -15,6 +15,16 @@ pub(crate) const ADMIN: &[&str] = &["NotSignedIn", "NotAdmitted"];
 pub(crate) const ADMIN_BODY: &[&str] = &["NotSignedIn", "NotAdmitted", "RequestMalformed"];
 /// An allowance operation reused for different words.
 pub(crate) const MACHINE_AGENTS: &[&str] = &["MachineAgentsReused"];
+/// A reporting edge must resolve to an active accountable person.
+pub(crate) const REPORTING: &[&str] = &[
+    "IdentifierMalformed",
+    "AnswersToUnknown",
+    "AnswersToInactive",
+    "AnswersToCycle",
+    "NoAccountablePerson",
+    "OperationReused",
+    "IdentityUnknown",
+];
 /// A signed-in person bound to a person.
 pub(crate) const PERSON: &[&str] = &["NotSignedIn", "NoPerson"];
 /// A grant the caller may see.

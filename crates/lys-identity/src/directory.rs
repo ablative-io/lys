@@ -33,8 +33,18 @@ use crate::receipt::Receipt;
 use crate::restart::SNAPSHOT_EVERY;
 use crate::signer::{SignedEvent, sign_event};
 
+#[path = "directory_reporting.rs"]
+pub mod reporting;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
+
+fn same_actor(recorded: &Actor, actor: &Actor) -> bool {
+    recorded == actor
+        || (actor.provenance().service_account().is_some()
+            && recorded.binding() == actor.binding()
+            && recorded.provenance().method() == actor.provenance().method())
+}
 
 /// The directory of people and agents over its log.
 pub struct Directory<S: LeafStore> {
@@ -60,6 +70,16 @@ impl<S: LeafStore> Directory<S> {
         every: NonZeroU64,
     ) -> Result<Self, IdentityError> {
         let (mut log, opening) = EventLog::open(reopen, &key, every)?;
+        if opening
+            .state
+            .as_deref()
+            .is_some_and(|state| directory_state::version(state) == Ok(2))
+        {
+            return Err(IdentityError::DirectorySnapshotUnmigrated {
+                found: 2,
+                expected: directory_state::STATE_VERSION,
+            });
+        }
         let read = opening
             .state
             .as_deref()
@@ -193,11 +213,7 @@ impl<S: LeafStore> Directory<S> {
             return Ok(None);
         };
         let same_identity = identity.is_none_or(|identity| identity == event.identity());
-        let same_actor = event.actor() == actor
-            || (actor.provenance().service_account().is_some()
-                && event.actor().binding() == actor.binding()
-                && event.actor().provenance().method() == actor.provenance().method());
-        if same_actor && event.change() == change && same_identity {
+        if same_actor(event.actor(), actor) && event.change() == change && same_identity {
             Ok(Some((event.identity(), receipt)))
         } else {
             Err(IdentityError::OperationReused {
