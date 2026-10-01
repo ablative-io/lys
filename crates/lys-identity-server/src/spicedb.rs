@@ -159,6 +159,8 @@ fn relationship_of(value: &Value) -> Option<Relationship> {
     })
 }
 
+pub(super) static SCHEMA_WRITE: Mutex<()> = Mutex::new(());
+
 impl SpiceDb {
     /// Reach the engine `settings` names and write the schema `model` gives,
     /// keeping every resource kind the engine already holds.
@@ -366,6 +368,9 @@ impl SpiceDb {
     /// of every app kind the engine holds and this engine was not given, so
     /// a writer that knows only Lys's own model never removes an app's kinds.
     fn write_schema(&self, kinds: &BTreeSet<String>) -> Result<(), GrantError> {
+        let schema_guard = SCHEMA_WRITE
+            .lock()
+            .map_err(|error| unavailable(format!("schema writer unavailable: {error}")))?;
         for kind in kinds.iter().filter(|kind| !kind.contains('.')) {
             engine_name("resource kind", kind)?;
         }
@@ -387,6 +392,7 @@ impl SpiceDb {
         }
         let (status, body) = self.call("/v1/schema/write", &json!({"schema": schema}))?;
         if status == 200 {
+            drop(schema_guard);
             return Ok(());
         }
         Err(unavailable(format!("the schema was refused: {body}")))

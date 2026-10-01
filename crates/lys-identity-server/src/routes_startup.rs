@@ -107,6 +107,8 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             log_origin: config.grant_log_origin.clone(),
             key_file: config.event_key_file.clone(),
             model: std::sync::RwLock::new(model),
+            model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
+            refresh: Mutex::new(()),
             spicedb: config.spicedb.clone(),
         },
         secrets: config

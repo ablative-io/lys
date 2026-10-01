@@ -18,6 +18,15 @@ use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 #[path = "../tests/collector_binding/cases.rs"]
 mod binding_tests;
 
+#[cfg(test)]
+#[path = "../tests/rollout_dates/cases.rs"]
+mod rollout_tests;
+
+#[cfg(test)]
+thread_local! {
+    static ROLLOUT_DIRECTORIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -268,28 +277,74 @@ impl Sessions {
                 RunnerError::refused("notify_malformed", "the notification names no thread")
             })?;
         let turn = text(notification, "turn-id").map(str::to_owned);
-        let mut table = self.lock();
-        if table
-            .feed
-            .source(id)
-            .is_none_or(|source| source.bound != thread)
-        {
-            let home = table
+        let lookup = {
+            let table = self.lock();
+            let source = table
+                .feed
+                .source(id)
+                .map(|source| (source.generation, source.bound.clone()));
+            if source.as_ref().is_some_and(|(_, bound)| bound == thread) {
+                None
+            } else {
+                let session = table
+                    .sessions
+                    .get(id)
+                    .ok_or_else(|| crate::session::unknown(id))?;
+                let tracking = session
+                    .guard
+                    .tracking
+                    .as_ref()
+                    .filter(|tracking| tracking.harness == Harness::Codex)
+                    .ok_or_else(|| {
+                        RunnerError::refused(
+                            "transcript_unbound",
+                            format!("session {id} is not a tracked Codex session"),
+                        )
+                    })?;
+                Some((
+                    tracking.config_home.clone(),
+                    session.started_at,
+                    session.guard.leader.clone(),
+                    source,
+                ))
+            }
+        };
+        if let Some((home, launched, leader, before)) = lookup {
+            let path = rollout_since(Path::new(&home), thread, launched, now_ms())?
+                .display()
+                .to_string();
+            let mut table = self.lock();
+            let session = table
                 .sessions
                 .get(id)
-                .and_then(|session| session.guard.tracking.as_ref())
-                .filter(|tracking| tracking.harness == Harness::Codex)
-                .map(|tracking| tracking.config_home.clone())
-                .ok_or_else(|| {
-                    RunnerError::refused(
-                        "transcript_unbound",
-                        format!("session {id} is not a tracked Codex session"),
-                    )
-                })?;
-            let path = rollout(Path::new(&home), thread)?.display().to_string();
-            self.bind(&mut table, id, (&path, thread), true)?;
+                .ok_or_else(|| crate::session::unknown(id))?;
+            if session.started_at != launched
+                || session.guard.leader != leader
+                || session
+                    .guard
+                    .tracking
+                    .as_ref()
+                    .is_none_or(|tracking| tracking.config_home != home)
+            {
+                return Err(RunnerError::refused(
+                    "rollout_session_changed",
+                    "the launch changed while locating its rollout",
+                ));
+            }
+            let current = table
+                .feed
+                .source(id)
+                .map(|source| (source.generation, source.bound.clone()));
+            if current.as_ref().is_none_or(|(_, bound)| bound != thread) {
+                if current != before {
+                    return Err(RunnerError::refused(
+                        "source_changed",
+                        "the bound source changed while locating its rollout",
+                    ));
+                }
+                self.bind(&mut table, id, (&path, thread), true)?;
+            }
         }
-        drop(table);
         self.read_source(id, None);
         let mut table = self.lock();
         append(&mut table, id, vec![boundary("turn_end", turn)], None)?;
@@ -339,48 +394,133 @@ pub fn slug(cwd: &str) -> String {
         .collect()
 }
 
-/// The rollout Codex keeps for `thread` under `home`'s `sessions/`, once
-/// its first record, `session_meta`, names that thread; refused
-/// `rollout_thread_mismatch` when it names another, and
-/// `transcript_unbound` when there is none.
+/// Locate a rollout created on the current local date.
+/// Use [`rollout_since`] when the session may span several dates.
+///
+/// # Errors
+/// Refuses an unreadable rollout, mismatched metadata, or an absent thread.
 pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerError> {
+    let now = now_ms();
+    rollout_since(home, thread, now, now)
+}
+
+/// Locate a rollout within the session's launch-to-notification interval.
+/// Date folders use the machine's local calendar, as the harness does.
+///
+/// # Errors
+/// Refuses reversed instants, unreadable rollouts, or an absent thread.
+pub fn rollout_since(
+    home: &Path,
+    thread: &str,
+    launched: u64,
+    notified: u64,
+) -> Result<std::path::PathBuf, RunnerError> {
+    if !plain(thread) {
+        return Err(RunnerError::refused(
+            "notify_malformed",
+            "the thread id is invalid",
+        ));
+    }
+    if launched > notified {
+        return Err(RunnerError::refused(
+            "rollout_date_invalid",
+            "the launch follows the notification",
+        ));
+    }
+    let refused = |error: &dyn std::fmt::Display| {
+        RunnerError::refused("rollout_date_invalid", error.to_string())
+    };
+    let zone = jiff::tz::TimeZone::try_system().map_err(|error| refused(&error))?;
+    let date = |instant: u64| -> Result<jiff::civil::Date, RunnerError> {
+        let millis = i64::try_from(instant).map_err(|error| refused(&error))?;
+        Ok(jiff::Timestamp::from_millisecond(millis)
+            .map_err(|error| refused(&error))?
+            .to_zoned(zone.clone())
+            .date())
+    };
+    let mut first = date(launched)?;
+    let last = date(notified)?;
+    let root = home.join("sessions");
+    let metadata = std::fs::metadata(&root).map_err(|error| rollout_unreadable(&root, &error))?;
+    if !metadata.is_dir() {
+        return Err(rollout_unreadable(&root, &"not a directory"));
+    }
+    loop {
+        let dir = root.join(format!(
+            "{:04}/{:02}/{:02}",
+            first.year(),
+            first.month(),
+            first.day()
+        ));
+        if let Some(path) = rollout_on(&dir, thread)? {
+            return rollout_metadata(path, thread);
+        }
+        if first >= last {
+            break;
+        }
+        first = first.tomorrow().map_err(|error| refused(&error))?;
+    }
+    Err(RunnerError::refused(
+        "transcript_unbound",
+        format!(
+            "no rollout of thread {thread} is in the session's date interval under {}",
+            root.display()
+        ),
+    ))
+}
+
+fn rollout_unreadable(path: &Path, error: &dyn std::fmt::Display) -> RunnerError {
+    RunnerError::refused("rollout_unreadable", format!("{}: {error}", path.display()))
+}
+
+fn rollout_on(dir: &Path, thread: &str) -> Result<Option<std::path::PathBuf>, RunnerError> {
+    #[cfg(test)]
+    ROLLOUT_DIRECTORIES.with(|count| count.set(count.get() + 1));
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(rollout_unreadable(dir, &error)),
+    };
     let ending = format!("-{thread}.jsonl");
-    let mut dirs = vec![home.join("sessions")];
-    let mut found = None;
-    while let Some(dir) = dirs.pop() {
-        let entries = std::fs::read_dir(&dir).map_err(|error| {
-            RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
-        })?;
-        for entry in entries {
-            let entry = entry.map_err(|error| {
-                RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
-            })?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if path.is_dir() {
-                dirs.push(path);
-            } else if name.starts_with("rollout-") && name.ends_with(&ending) {
-                found = Some(path);
+    for entry in entries {
+        let entry = entry.map_err(|error| rollout_unreadable(dir, &error))?;
+        let name = entry.file_name();
+        let bytes = name.as_encoded_bytes();
+        if bytes.starts_with(b"rollout-") && bytes.ends_with(ending.as_bytes()) {
+            if !entry
+                .file_type()
+                .map_err(|error| rollout_unreadable(&entry.path(), &error))?
+                .is_file()
+            {
+                return Err(rollout_unreadable(
+                    &entry.path(),
+                    &"the rollout is not a regular file",
+                ));
             }
+            return Ok(Some(entry.path()));
         }
     }
-    let path = found.ok_or_else(|| {
-        RunnerError::refused(
-            "transcript_unbound",
-            format!("no rollout of thread {thread} is under {}", home.display()),
-        )
-    })?;
+    Ok(None)
+}
+
+fn rollout_metadata(
+    path: std::path::PathBuf,
+    thread: &str,
+) -> Result<std::path::PathBuf, RunnerError> {
+    use std::io::{BufRead, Read};
+    let file = std::fs::File::open(&path).map_err(|error| rollout_unreadable(&path, &error))?;
     let mut first = String::new();
-    std::fs::File::open(&path)
-        .and_then(|file| {
-            std::io::BufRead::read_line(&mut std::io::BufReader::new(file), &mut first)
-        })
-        .map_err(|error| RunnerError::refused("transcript_unbound", error.to_string()))?;
+    std::io::BufReader::new(file.take(1_048_577))
+        .read_line(&mut first)
+        .map_err(|error| rollout_unreadable(&path, &error))?;
+    if first.len() > 1_048_576 || !first.ends_with('\n') {
+        return Err(rollout_unreadable(
+            &path,
+            &"the first line exceeds its limit or is incomplete",
+        ));
+    }
     let meta: Value = serde_json::from_str(first.trim_end()).map_err(|error| {
-        RunnerError::refused(
-            "rollout_unreadable",
-            format!("the first line is not JSON: {error}"),
-        )
+        rollout_unreadable(&path, &format!("the first line is not JSON: {error}"))
     })?;
     let named = meta
         .get("payload")

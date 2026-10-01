@@ -80,9 +80,26 @@ pub struct GrantSetup {
     pub model: RwLock<Model>,
     /// The permission engine the grants are mirrored into, if one is named.
     pub spicedb: Option<SpiceDbSettings>,
+    pub(crate) model_revision: std::sync::atomic::AtomicU64,
+    pub(crate) refresh: std::sync::Mutex<()>,
 }
 
 impl GrantSetup {
+    pub(crate) fn require_model(&self, revision: u64) -> Result<(), ServerError> {
+        if self
+            .model_revision
+            .load(std::sync::atomic::Ordering::Acquire)
+            != revision
+        {
+            return Err(crate::apps_error::AppError::AppsUnavailable {
+                reason: "the app model awaits publication; retry the app approval or schema change"
+                    .to_owned(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     /// Lys's own model as the apps log last gave it.
     pub fn model(&self) -> Model {
         self.model
@@ -159,13 +176,29 @@ pub(crate) fn with_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants(state, |_, judged| act(judged))
+    with_directory_grants(state, act, |_, answer| Ok(answer))
 }
 
 /// Hold the directory and grants together for a directory mutation whose
 /// caller must first exercise an ordinary grant. No lock is reacquired.
-pub(crate) fn with_directory_grants<T>(
+pub(crate) fn with_directory_grants<A, T>(
     state: &AppState,
+    judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory_grants_model(state, true, act)
+}
+
+pub(crate) fn with_schema_grants<T>(
+    state: &AppState,
+    act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory_grants_model(state, false, |_, judged| act(judged))
+}
+
+fn with_directory_grants_model<T>(
+    state: &AppState,
+    require_model: bool,
     act: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
@@ -184,6 +217,9 @@ pub(crate) fn with_directory_grants<T>(
             })?;
         let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
         apps.settle()?;
+        if require_model {
+            state.grant_setup.require_model(apps.model_revision())?;
+        }
         let mut slot = state.grants.lock().unwrap_or_else(PoisonError::into_inner);
         let grants = if let Some(grants) = &mut *slot {
             grants
@@ -192,15 +228,14 @@ pub(crate) fn with_directory_grants<T>(
             (state.say)(&format!("grant log {}", opened.ledger().start()));
             slot.insert(opened)
         };
-        act(
-            directory,
-            Judged {
-                directory: &projection,
-                grants,
-                root,
-                apps: &mut apps,
-            },
-        )
+        let authorized = judge(Judged {
+            directory: &projection,
+            grants,
+            root,
+            apps: &mut apps,
+        })?;
+        drop(projection);
+        apply(directory, authorized)
     })
 }
 

@@ -7,7 +7,7 @@ use std::sync::PoisonError;
 
 use axum::http::{HeaderMap, header};
 use lys_identity::projection::Projection;
-use lys_identity::{IdentityId, LifecycleState, LoginBinding, PersonId, Profile, ServiceAccountId};
+use lys_identity::{IdentityId, LifecycleState, PersonId, ServiceAccountId};
 
 use crate::apps_binding::{Acting, acting};
 use crate::error::ServerError;
@@ -81,7 +81,7 @@ pub(crate) fn projection(
     directory: &Projection,
 ) -> Result<Projection, ServerError> {
     let Some(accounts) = &state.service_accounts else {
-        return expanded(directory, &crate::service_accounts_state::Held::default());
+        return Ok(directory.shared());
     };
     let mut accounts = accounts.lock().unwrap_or_else(PoisonError::into_inner);
     accounts.settle()?;
@@ -92,27 +92,15 @@ fn expanded(
     directory: &Projection,
     accounts: &crate::service_accounts_state::Held,
 ) -> Result<Projection, ServerError> {
-    let mut projection = directory.clone();
+    let projection = directory.with_accounts(accounts.grant_accounts()?);
     #[cfg(test)]
     tests::copied(directory, &projection);
-    for account in &accounts.accounts {
-        #[cfg(test)]
-        tests::visited();
-        let created = &account.created;
-        projection.service_account(
-            ServiceAccountId::from_str(&created.id)?,
-            PersonId::from_str(&created.owner)?,
-            Profile::new(&created.name)?,
-            account.is_retired(),
-            LoginBinding::new(&created.by.provider, &created.by.subject)?,
-        )?;
-    }
     Ok(projection)
 }
 
 #[cfg(test)]
 #[path = "service_account_grants_tests.rs"]
-mod tests;
+pub(crate) mod tests;
 
 /// Authenticate a grant caller. Bearer authentication never falls back to a
 /// cookie; it names the account itself and confers no grant or root powers.
