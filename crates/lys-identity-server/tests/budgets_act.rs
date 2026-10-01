@@ -63,7 +63,7 @@ impl Table {
         let socket = dir.path().join("runner.sock");
         let state = dir.path().join("runner-state");
         let (adjusted, opened) = (socket.clone(), (socket.clone(), state.clone()));
-        let (service, (seeded, serving, key)) = Service::start_saying(
+        let (service, (seeded, serving, key)) = Box::pin(Service::start_saying(
             GRANT_MODEL,
             None,
             Some(settings),
@@ -81,7 +81,7 @@ impl Table {
                 })?;
                 Ok((seeded, runner.spawn(), key))
             },
-        )
+        ))
         .await?;
         let login = Login {
             subject: ADMINISTRATOR.to_owned(),
