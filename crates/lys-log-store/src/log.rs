@@ -167,10 +167,10 @@ impl<S: LeafStore> Log<S> {
         if rebuilt_size > pinned.tree_size {
             let prefix = log.prefix_tree(pinned.tree_size)?;
             if prefix.root().to_parts().0 == pinned.root {
-                let count = usize::try_from(pinned.tree_size).map_err(|_| {
-                    StoreError::BatchSizeOverflow {
-                        index: pinned.tree_size,
-                        count: 0,
+                let count = usize::try_from(pinned.tree_size).map_err(|source| {
+                    StoreError::LeafCountUnrepresentable {
+                        count: pinned.tree_size,
+                        source,
                     }
                 })?;
                 log.leaves.truncate(count);

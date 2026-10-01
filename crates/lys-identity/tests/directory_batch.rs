@@ -19,7 +19,7 @@ fn open(
     let home = Arc::clone(home);
     let key = Ed25519Identity::load(&home.path().join("key"))?;
     Ok(Directory::open(
-        Box::new(move || FileLeafStore::open(home.path().join("log"))),
+        Box::new(move || FileLeafStore::open(&home.path().join("log"))),
         key,
     )?)
 }
@@ -140,7 +140,7 @@ fn invalid_later_event_refuses_the_whole_batch_without_state_or_log_changes() ->
     ));
     assert_eq!(directory.log()?.len()?, 0);
     assert!(directory.record(changes[0].identity())?.is_none());
-    assert_eq!(FileLeafStore::open(home.path().join("log"))?.extent(), 0);
+    assert_eq!(FileLeafStore::open(&home.path().join("log"))?.extent(), 0);
     Ok(())
 }
 
@@ -163,7 +163,7 @@ fn operation_reuse_inside_a_batch_refuses_before_writing_and_empty_batch_is_a_no
     ));
     assert!(directory.commit_batch(&[])?.is_empty());
     assert_eq!(directory.log()?.len()?, 0);
-    assert_eq!(FileLeafStore::open(home.path().join("log"))?.extent(), 0);
+    assert_eq!(FileLeafStore::open(&home.path().join("log"))?.extent(), 0);
     Ok(())
 }
 

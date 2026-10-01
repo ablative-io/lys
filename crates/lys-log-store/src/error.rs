@@ -38,6 +38,15 @@ use std::path::PathBuf;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StoreError {
+    /// A stored tree size cannot be represented by this process's leaf buffer.
+    #[error("tree size {count} cannot fit in a leaf buffer: {source}")]
+    LeafCountUnrepresentable {
+        /// The stored tree size.
+        count: u64,
+        /// The failed integer conversion.
+        #[source]
+        source: std::num::TryFromIntError,
+    },
     /// The requested batch would exceed the range of leaf indices.
     #[error("batch of {count} leaves at {index} exceeds the leaf index range")]
     BatchSizeOverflow {

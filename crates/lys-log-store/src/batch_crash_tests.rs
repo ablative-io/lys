@@ -79,7 +79,9 @@ fn batch_crash_child() -> Outcome {
     let Some(directory) = std::env::var_os(CHILD_DIR) else {
         return Ok(());
     };
-    let mut log = Log::open(BeforePin(FileLeafStore::open(directory)?))?;
+    let mut log = Log::open(BeforePin(FileLeafStore::open(std::path::Path::new(
+        &directory,
+    ))?))?;
     log.append_batch(&[b"first", b"second", b"third"])?;
     Err("writer unexpectedly advanced its pin".into())
 }
