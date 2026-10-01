@@ -42,6 +42,7 @@ struct ChainAdmission {
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = AgentGrantHolding)]
 enum Holding {
     #[serde(rename = "judged by the route")]
     JudgedByTheRoute,
@@ -73,6 +74,17 @@ async fn read(
     }) {
         return Err(ServerError::AgentSignatureRefused {
             reason: "an agent signature cannot carry a session cookie",
+        });
+    }
+    // The signature covers an empty body, so a read that carries one is
+    // refused rather than answered over bytes nobody signed.
+    if headers.contains_key(header::TRANSFER_ENCODING)
+        || headers
+            .get(header::CONTENT_LENGTH)
+            .is_some_and(|length| length.as_bytes() != b"0")
+    {
+        return Err(ServerError::AgentSignatureRefused {
+            reason: "a signed grant read carries no body",
         });
     }
     let path = uri

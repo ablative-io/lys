@@ -106,6 +106,15 @@ impl Fixture {
     }
 
     async fn signed(&self, cookie: bool) -> TestResult<(u16, Value)> {
+        self.signed_carrying(cookie, None).await
+    }
+
+    /// Signs a GET over no body, then sends `body` with it when given.
+    async fn signed_carrying(
+        &self,
+        cookie: bool,
+        body: Option<&'static [u8]>,
+    ) -> TestResult<(u16, Value)> {
         let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
         let nonce = crate::routes::hex(&Sha256::digest(
             OperationId::generate()?.to_string().as_bytes(),
@@ -122,6 +131,9 @@ impl Fixture {
             );
         if cookie {
             request = request.header("cookie", &self.cookie);
+        }
+        if let Some(body) = body {
+            request = request.body(body);
         }
         let response = request.send().await?;
         Ok((response.status().as_u16(), response.json().await?))
@@ -196,7 +208,7 @@ async fn an_agent_reads_only_its_own_live_grants_without_recording_a_use() -> Te
 async fn an_agent_grant_read_refuses_a_signature_with_an_administrator_cookie() -> TestResult {
     let fixture = Fixture::fresh().await?;
     let (status, body) = fixture.signed(true).await?;
-    assert_eq!(status, 403, "{body}");
+    assert_eq!(status, 401, "{body}");
     assert_eq!(body["refusal"], "AgentSignatureRefused");
     assert!(
         body["reason"]
@@ -208,7 +220,19 @@ async fn an_agent_grant_read_refuses_a_signature_with_an_administrator_cookie() 
         .service
         .get("/agent/grants", Some(&fixture.cookie))
         .await?;
-    assert_eq!(status, 403, "{body}");
+    assert_eq!(status, 401, "{body}");
     assert_eq!(body["refusal"], "AgentSignatureRefused");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_signed_grant_read_carrying_a_body_is_refused() -> TestResult {
+    let fixture = Fixture::fresh().await?;
+    let (status, body) = fixture.signed_carrying(false, Some(b"unsigned")).await?;
+    assert_eq!(status, 401, "{body}");
+    assert_eq!(body["refusal"], "AgentSignatureRefused");
+    assert!(body["reason"].as_str().ok_or("no reason")?.contains("body"));
+    let (status, body) = fixture.signed(false).await?;
+    assert_eq!(status, 200, "{body}");
     Ok(())
 }
