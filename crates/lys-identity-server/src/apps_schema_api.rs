@@ -31,7 +31,7 @@ use lys_identity::grants::{AppSchema, Resource, Standing as Held, diff, owner_of
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::apps_api::refresh_held;
+use crate::apps_api::refresh;
 use crate::apps_binding::{Acting, acting};
 use crate::apps_error::{AppError, Strand};
 use crate::apps_state::{Applied, By, Decided, Line, Placed, Proposed, Standing};
@@ -195,7 +195,7 @@ async fn change(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_grants(&state, |judged| {
+    let answer = with_grants(&state, |judged| {
         let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         may_change(&who, &id)?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
@@ -237,15 +237,16 @@ async fn change(
             })
         };
         judged.apps.keep(line)?;
-        if applied {
-            refresh_held(&state, judged.apps, judged.grants)?;
-        }
         Ok(Json(SchemaChanged {
             app: app_view(judged.apps, &id)?,
             applied,
             diff: DiffView::from(&change),
         }))
-    })
+    })?;
+    if answer.applied {
+        refresh(&state)?;
+    }
+    Ok(answer)
 }
 
 /// The answer to a change sent again under an operation already kept.
@@ -286,7 +287,7 @@ async fn approve(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_grants(&state, |judged| {
+    let answer = with_grants(&state, |judged| {
         let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         who.administrator()?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
@@ -313,13 +314,16 @@ async fn approve(
             by: who.by(),
             at: now(),
         }))?;
-        refresh_held(&state, judged.apps, judged.grants)?;
         Ok(Json(SchemaChanged {
             app: app_view(judged.apps, &id)?,
             applied: true,
             diff: DiffView::from(&change),
         }))
-    })
+    })?;
+    if answer.applied {
+        refresh(&state)?;
+    }
+    Ok(answer)
 }
 
 async fn decline(
