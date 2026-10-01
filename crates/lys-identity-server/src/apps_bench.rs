@@ -240,7 +240,6 @@ async fn ask(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let by = bencher(&state, &headers, None)?;
     let bench = bench(&state, &id, &by)?;
-    let (asking, _) = new_secret()?;
     let engine = state.grant_setup.spicedb.as_ref();
     let examples = Examples {
         holdings: &body.holdings,
@@ -255,7 +254,7 @@ async fn ask(
             lys: model,
             engine,
         };
-        answer_in(&bench.dir.join(&asking), &draft, &examples)
+        answer_in(&draft, &examples)
     };
     let Some(settings) = engine else {
         return answer(&state.grant_setup.model()).map(Json);

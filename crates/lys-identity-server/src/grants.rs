@@ -49,7 +49,7 @@ use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationsh
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
 use lys_identity::{IdentityError, IdentityId, PersonId};
-use lys_log_store::FileLeafStore;
+use lys_log_store::{FileLeafStore, LeafStore};
 
 use crate::apps_store::AppStore;
 use crate::error::ServerError;
@@ -158,15 +158,15 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 /// What one grant request is judged with.
-pub struct Judged<'a> {
+pub struct Judged<'a, S: LeafStore = FileLeafStore> {
     /// The directory's projection.
     pub directory: &'a Projection,
     /// The grants.
-    pub grants: &'a mut GrantState,
+    pub grants: &'a mut Grants<S, Relationships>,
     /// The root authority.
     pub root: PersonId,
     /// The apps, whose approved schemas say which kinds are judged at all.
-    pub apps: &'a mut AppStore,
+    pub apps: &'a mut AppStore<S>,
 }
 
 /// Run `act` with the directory's projection, the apps and the grants, in
@@ -243,8 +243,8 @@ fn with_directory_grants_model<A, T>(
 /// Refuse unless the permission engine, where one is named, gives the caller
 /// the action on the resource. The grants' own decision is made first and
 /// nothing is recorded, so a refusal the grants name is answered by its name.
-pub(crate) fn engine_permits(
-    grants: &mut GrantState,
+pub(crate) fn engine_permits<S: LeafStore>(
+    grants: &mut Grants<S, Relationships>,
     directory: &Projection,
     request: &ExerciseRequest,
     at: u64,
@@ -277,8 +277,8 @@ pub(crate) enum Decision {
 /// parent it is placed in that its schema lists, nearest first, answered
 /// with the permit and the resource whose grant permits it. The first
 /// resource's refusal is the one answered when none permits.
-pub(crate) fn decide(
-    judged: &mut Judged<'_>,
+pub(crate) fn decide<S: LeafStore>(
+    judged: &mut Judged<'_, S>,
     request: &ExerciseRequest,
     at: u64,
     at_least: Option<u64>,
