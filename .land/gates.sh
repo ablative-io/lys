@@ -30,7 +30,7 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  cargo nextest run -p lys --all-features --tests --no-fail-fast --retries 0 --no-tests fail -E 'binary(~identity_)'
+  cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail
 }
 # The surface leg installs dependencies, checks types and runs the identity tests:
 # npm ci, npm run typecheck and npm test,
