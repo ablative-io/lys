@@ -531,7 +531,6 @@ fn dispatch(
                 continue;
             }
             let text = match act {
-                Act::Compact => None,
                 Act::Notice => Some(
                     notice(
                         limit,
@@ -540,7 +539,7 @@ fn dispatch(
                     )
                     .map_err(unavailable)?,
                 ),
-                Act::Stop | Act::Tell => None,
+                Act::Compact | Act::Stop | Act::Tell => None,
             };
             crossed.push(Crossing {
                 operation,
