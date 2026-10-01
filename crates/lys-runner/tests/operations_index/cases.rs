@@ -36,7 +36,7 @@ fn old_install(dir: &std::path::Path, count: usize) -> Result<(), Box<dyn Error>
 fn old_install_outcomes_move_to_the_log_without_losing_identity() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     old_install(dir.path(), 2)?;
-    let operations = Operations::open(dir.path())?;
+    let operations = Operations::open_at(dir.path(), 1)?;
     assert_eq!(
         operations.get("notice-000000"),
         Some(&outcome("notice-000000".to_owned()))
@@ -45,7 +45,7 @@ fn old_install_outcomes_move_to_the_log_without_losing_identity() -> Result<(), 
     assert!(!dir.path().join("operations.json").exists());
     drop(operations);
     assert_eq!(
-        Operations::open(dir.path())?.get("notice-000001"),
+        Operations::open_at(dir.path(), 1)?.get("notice-000001"),
         Some(&outcome("notice-000001".to_owned()))
     );
     Ok(())
@@ -54,7 +54,7 @@ fn old_install_outcomes_move_to_the_log_without_losing_identity() -> Result<(), 
 fn changed_bytes(count: usize) -> Result<usize, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     old_install(dir.path(), count)?;
-    let mut operations = Operations::open(dir.path())?;
+    let mut operations = Operations::open_at(dir.path(), 1)?;
     let path = dir.path().join("operations.jsonl");
     let before = std::fs::read(&path)?;
     operations.set(
@@ -107,5 +107,17 @@ fn an_expired_operation_id_is_refused_after_a_restart() -> Result<(), Box<dyn Er
         .err()
         .ok_or("an expired id was accepted or replayed")?;
     assert!(error.to_string().contains("operation_repeated"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn terminal_retention_ends_at_twenty_four_hours() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    old_install(dir.path(), 1)?;
+    let mut operations = Operations::open_at(dir.path(), super::RETAIN_MS)?;
+    assert!(operations.get("notice-000000").is_some());
+    operations.prune(super::RETAIN_MS + 1);
+    assert!(operations.get("notice-000000").is_none());
+    assert!(operations.repeated("notice-000000").is_err());
     Ok(())
 }

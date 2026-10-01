@@ -334,7 +334,9 @@ impl Sessions {
     }
 
     pub(crate) fn lock(&self) -> MutexGuard<'_, Table> {
-        self.table.lock().unwrap_or_else(PoisonError::into_inner)
+        let mut table = self.table.lock().unwrap_or_else(PoisonError::into_inner);
+        table.operations.prune(now_ms());
+        table
     }
 
     fn wait<'a>(&self, table: MutexGuard<'a, Table>) -> MutexGuard<'a, Table> {
