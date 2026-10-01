@@ -122,7 +122,7 @@ describe('Add-agent retry safety', () => {
   });
 
   it.each([
-    { label: 'has no answers_to field', answer: schema(false), words: 'coming' },
+    { label: 'has no answers_to field', answer: schema(false), words: 'under You only' },
     { label: 'cannot be read', answer: ok({ broken: true }), words: 'could not be read' },
     { label: 'is unavailable', answer: refused(503, 'StorageUnavailable', 'Not available'), words: 'could not be read' },
   ])('still adds under You when the served schema $label', async ({ answer, words }) => {
@@ -134,7 +134,7 @@ describe('Add-agent retry safety', () => {
     });
     const other = entry.querySelector<HTMLOptionElement>('select[name="answers_to"] option[value="' + BEA + '"]');
     expect(other?.disabled).toBe(true);
-    expect(other?.textContent).toContain('(coming)');
+    expect(other?.textContent).toContain('not served');
     expect(entry.textContent).toContain(words);
     await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
     await submit(entry);

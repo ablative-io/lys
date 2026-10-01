@@ -1,13 +1,14 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { $, serve, type } from './harness';
 import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import type { Answer, Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 import { addAndRunCapability } from '../src/features/people/registration-capability';
+import { readAddAndRun } from '../src/features/people/add-and-run';
 
 const agent = 'agent-' + 'f'.repeat(32);
 const prefix = '/agents/' + agent;
@@ -15,8 +16,8 @@ const key = 'lys.add-and-run.' + ADA;
 const stages = ['register', 'activate', 'profile', 'review', 'machine', 'runner', 'start'] as const;
 type Stage = typeof stages[number] | 'admission';
 const words: Record<Stage, string> = { register: 'registering the agent', activate: 'activating the agent', profile: 'saving the settings', review: 'approving the settings', machine: 'adding this computer', runner: 'recording this computer’s runner', admission: 'allowing the agent on this computer', start: 'starting the agent' };
-const description = { models: { minimum: 1, maximum: 1, further_encoding: { kind: 'array' } }, permissions: { modes: ['default'], rule_forms: [] }, mcp: { transports: ['stdio'], working_directory: false, handle_variables: false, channel_policies: ['off'] }, rendering_contract: 'test' };
-const program = { name: 'Care program', line: 'Agent program', description, models: [{ id: 'care', label: 'Care model' }], modes: [{ id: 'default', meaning: 'Ask before changes' }], instructions_modes: ['keep'], builds: [{ name: 'Installed', program: '/opt/bin/care', package: 'care', from: 'runner' }] };
+const description = { models: { minimum: 1, maximum: 1, further_encoding: { kind: 'array' } }, permissions: { modes: ['default', 'workspace-write'], rule_forms: [] }, mcp: { transports: ['stdio'], working_directory: false, handle_variables: false, channel_policies: ['off'] }, rendering_contract: 'test' };
+const program = { name: 'Care program', line: 'Agent program', description, models: [{ id: 'care', label: 'Care model' }], modes: [{ id: 'default', meaning: 'Ask before changes' }, { id: 'workspace-write', meaning: 'Works in its own folder; no internet.' }], instructions_modes: ['keep'], builds: [{ name: 'Installed', program: '/opt/bin/care', package: 'care', from: 'runner' }] };
 let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; });
@@ -121,11 +122,11 @@ async function submit(twice = false) {
 }
 function plain(stage: Stage, code = 'StepUnavailable') {
   const details = [...document.querySelectorAll('details')].find((entry) => entry.textContent?.includes(code));
-  expect(details?.open).toBe(false);
-  expect(details?.textContent).toContain(code);
+  expect(details).toBeUndefined();
+  expect(document.body.textContent).toContain(code);
   const face = document.body.cloneNode(true) as HTMLElement;
   for (const detail of face.querySelectorAll('details')) detail.remove();
-  expect(face.textContent).not.toContain(code);
+  expect(face.textContent).toContain(code);
   expect(face.textContent).toContain(words[stage]);
 }
 
@@ -212,7 +213,7 @@ describe('Add and run on the first computer', () => {
     expect(posted).toHaveLength(7);
     const computer = (posted[4].body as NameMachine).operation;
     expect(posted.map((entry) => entry.path)).toEqual(['/agents', '/identities/' + agent + '/transitions', prefix + '/provisioning', prefix + '/provisioning/1/review', '/network/machines', '/network/machines/' + computer + '/runner', prefix + '/start-command']);
-    expect(posted[2].body).toMatchObject({ from_version: 0, model_access: ['care'], permissions: { default_mode: 'default' }, harness: { name: program.name, program: '/opt/bin/care' } });
+    expect(posted[2].body).toMatchObject({ from_version: 0, model_access: ['care'], permissions: { default_mode: 'workspace-write' }, harness: { name: program.name, program: '/opt/bin/care' } });
     expect(posted[4].body).toMatchObject({ name: 'Ward computer', runtime: 'lys-runner', slots: 0, may_run: [agent], may_run_roles: [], may_reach: [] });
     expect(posted[5].body).toEqual({ runner: { kind: 'lys' } });
     expect(posted[6].body).toMatchObject({ machine: computer });
@@ -267,16 +268,41 @@ describe('Add and run on the first computer', () => {
     await submit(); expect(posted).toEqual([]);
   });
 
-  it('does not invent choices when the service offers more than one', async () => {
+  it('preselects an offered workspace program when the service offers more than one', async () => {
     const server = service(); server.routes['/harnesses'] = ok({ programs: [program, { ...program, name: 'Other program' }] });
     const { posted } = await open(server.routes); await names();
-    expect(($('[name="program"]') as HTMLSelectElement).value).toBe('');
-    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(($('[name="program"]') as HTMLSelectElement).value).toBe(program.name);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect(posted).toEqual([]);
   });
 });
 
 describe('Add and run on an existing computer', () => {
+  it('is live with served defaults and a known computer, without a sandbox picker', async () => {
+    const computer = existingComputer();
+    const { posted } = await open(service(undefined, 'running', [computer]).routes);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
+    expect($('[name="computer_name"]')).toBeNull();
+    expect($('[name="mode"]')).toBeNull();
+    expect(document.body.textContent).toContain('Computer: Front desk');
+    expect(document.body.textContent).toContain('Works in its own folder; no internet.');
+    expect(document.body.textContent).not.toContain('Choose the settings before adding');
+    expect(posted).toEqual([]);
+  });
+
+  it('names an unavailable workspace setting instead of starting an unrestricted program', async () => {
+    const server = service(undefined, 'running', [existingComputer()]);
+    server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }] }] });
+    const { posted } = await open(server.routes);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.body.textContent).toContain('WorkspaceOnlyUnavailable');
+    expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
+    expect(document.querySelector('form details')).toBeNull();
+    await submit();
+    expect(posted).toEqual([]);
+  });
+
   it('keeps both capabilities unknown when their single schema read fails', async () => {
     const requests = serve({ '/openapi.json': refused(503, 'SchemaUnavailable', 'The served schema could not be read') });
     const capability = await addAndRunCapability();
@@ -295,7 +321,7 @@ describe('Add and run on an existing computer', () => {
     };
     sessionStorage.setItem(key, JSON.stringify(old));
     const server = service(); const { posted } = await open(server.routes);
-    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 2 });
+    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 3 });
     expect(posted).toEqual([]);
     await submit();
     expect(posted).toHaveLength(7);
@@ -318,12 +344,45 @@ describe('Add and run on an existing computer', () => {
     };
     sessionStorage.setItem(key, JSON.stringify(old));
     const { posted } = await open(service(undefined, 'running', [computer]).routes);
-    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 2, placement: { kind: 'new' }, pending: old.pending });
+    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 3, placement: { kind: 'new' }, pending: old.pending });
     expect(posted).toEqual([]);
     await submit();
     expect(posted).toEqual([{ path: prefix + '/start-command', body }]);
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(location.hash).toBe('#/file/' + agent);
+  });
+
+  it('migrates a version-two allowance and preserves its exact start and allowance requests', async () => {
+    const computer = existingComputer();
+    const body = { operation: 'op-' + '4'.repeat(32), machine: computer.id };
+    const allowance = { operation: 'op-' + '5'.repeat(32), agent, allow: true };
+    const old = { version: 2, person: ADA, step: 'admission',
+      registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent, answersTo: ADA, team: null, membership: null, activated: true },
+      settings: { harness: { name: program.name, program: '/opt/bin/care', package: 'care', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', instructions_mode: 'keep', note: '' },
+      placement: { kind: 'existing', computer, admission: allowance }, pending: { stage: 'start', path: prefix + '/start-command', body, machine: computer.id, version: 1 },
+    };
+    sessionStorage.setItem(key, JSON.stringify(old));
+    const { posted } = await open(service(undefined, 'running', [computer]).routes);
+    expect(JSON.parse(sessionStorage.getItem(key) ?? 'null')).toMatchObject({ version: 3, registration: { version: 1, responsible: ADA, grants: [] }, pending: old.pending });
+    expect(posted).toEqual([]);
+    await submit();
+    expect(posted).toEqual([{ path: '/network/machines/' + computer.id + '/agents', body: allowance }, { path: prefix + '/start-command', body }]);
+    expect(location.hash).toBe('#/file/' + agent);
+  });
+  it('keeps an older envelope intact when its migration cannot be saved', () => {
+    const old = { version: 2, person: ADA, step: 'registration', pending: null,
+      registration: { name: 'Clover', register: 'op-' + '1'.repeat(32), activate: 'op-' + '2'.repeat(32), agent: null, answersTo: ADA, team: null, membership: null, activated: false },
+      settings: { harness: { name: program.name, program: '/opt/bin/care', package: 'care', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', instructions_mode: 'keep', note: '' },
+      placement: { kind: 'existing', computer: existingComputer(), admission: null },
+    };
+    const raw = JSON.stringify(old); sessionStorage.setItem(key, raw);
+    const posted: { path: string; body: unknown }[] = []; serve(service().routes, posted);
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage is unavailable'); });
+    try {
+      expect(() => readAddAndRun(key, ADA)).toThrow('The earlier request could not be saved in the current format');
+      expect(sessionStorage.getItem(key)).toBe(raw);
+      expect(posted).toEqual([]);
+    } finally { write.mockRestore(); }
   });
 
   it.each(['missing', 'changed', 'different-placement'] as const)('refuses a version-two request with a %s computer binding', async (binding) => {
