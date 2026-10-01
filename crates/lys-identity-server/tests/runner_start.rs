@@ -132,7 +132,7 @@ async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -
     let kept = table
         .ok(
             &format!("/agents/{}/policy", table.agent()),
-            &json!({ "version": 0, "rules": [rule] }),
+            &json!({ "version": 1, "rules": [rule] }),
         )
         .await?;
     let machine = table
@@ -155,7 +155,7 @@ async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -
         .policy
         .as_ref()
         .ok_or("the session holds no policy")?;
-    assert_eq!(held.version, 1);
+    assert_eq!(held.version, 2);
     assert_eq!(
         Some(held.digest.as_str()),
         kept["digest"].as_str(),

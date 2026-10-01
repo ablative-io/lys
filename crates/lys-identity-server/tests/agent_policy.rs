@@ -9,11 +9,14 @@
 
 use std::error::Error;
 
-use identity_contract::apps::{Auth, BEA, login, seeded, send};
+use identity_contract::apps::{Auth, BEA, login, send};
 use identity_contract::harness::ADMINISTRATOR;
 use lys_identity_server::agent_policy_store::{PolicyStore, digest};
 use lys_runner::judge::{Authority, Policy, Rule, RuleKind};
 use serde_json::{Value, json};
+
+#[path = "support/agent_policy.rs"]
+mod support;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -24,9 +27,9 @@ fn deny_write_under(target: &str) -> Value {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> TestResult {
-    let (service, seeded) = seeded().await?;
+    let (service, seeded) = support::table(false).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
-    let agent = seeded.people[0].agents[0].id.to_string();
+    let agent = seeded[0].clone();
     let path = format!("/agents/{agent}/policy");
     let (status, empty) = send(
         &service,
@@ -36,8 +39,12 @@ async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> 
         None,
     )
     .await?;
-    assert_eq!((status, &empty["policy"]), (200, &Value::Null), "{empty}");
-    let body = json!({ "version": 0, "rules": [deny_write_under("/probe/denied")] });
+    assert_eq!(
+        (status, &empty["policy"]["version"]),
+        (200, &json!(1)),
+        "{empty}"
+    );
+    let body = json!({ "version": 1, "rules": [deny_write_under("/probe/denied")] });
     let (status, kept) = send(
         &service,
         reqwest::Method::POST,
@@ -47,7 +54,7 @@ async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> 
     )
     .await?;
     assert_eq!(status, 200, "{kept}");
-    assert_eq!(kept["policy"]["version"], 1);
+    assert_eq!(kept["policy"]["version"], 2);
     assert_eq!(kept["policy"]["agent"], agent.as_str());
     assert!(
         kept["applies"]
@@ -71,7 +78,7 @@ async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> 
         (409, Some("PolicyVersionConflict")),
         "{stale}"
     );
-    let next = json!({ "version": 1, "rules": [deny_write_under("/probe/other")] });
+    let next = json!({ "version": 2, "rules": [deny_write_under("/probe/other")] });
     let (status, second) = send(
         &service,
         reqwest::Method::POST,
@@ -82,7 +89,7 @@ async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> 
     .await?;
     assert_eq!(
         (status, &second["policy"]["version"]),
-        (200, &json!(2)),
+        (200, &json!(3)),
         "{second}"
     );
     let (_, read) = send(
@@ -99,9 +106,9 @@ async fn a_responsible_person_keeps_versions_that_apply_on_the_next_launch() -> 
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_policy_of_the_wrong_shape_is_refused_by_name() -> TestResult {
-    let (service, seeded) = seeded().await?;
+    let (service, seeded) = support::table(false).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
-    let path = format!("/agents/{}/policy", seeded.people[0].agents[0].id);
+    let path = format!("/agents/{}/policy", seeded[0]);
     let mut other = deny_write_under("/probe/else");
     other["id"] = json!("second");
     let cases = [
@@ -123,7 +130,7 @@ async fn a_policy_of_the_wrong_shape_is_refused_by_name() -> TestResult {
         ),
     ];
     for (rules, refusal) in cases {
-        let body = json!({ "version": 0, "rules": rules });
+        let body = json!({ "version": 1, "rules": rules });
         let (status, answer) = send(
             &service,
             reqwest::Method::POST,
@@ -138,7 +145,7 @@ async fn a_policy_of_the_wrong_shape_is_refused_by_name() -> TestResult {
             "{answer}"
         );
     }
-    let body = json!({ "version": 0, "rules": [deny_write_under("/a"), other] });
+    let body = json!({ "version": 1, "rules": [deny_write_under("/a"), other] });
     let (status, kept) = send(
         &service,
         reqwest::Method::POST,
@@ -148,17 +155,17 @@ async fn a_policy_of_the_wrong_shape_is_refused_by_name() -> TestResult {
     )
     .await?;
     assert_eq!(status, 200, "a refused change keeps no version: {kept}");
-    assert_eq!(kept["policy"]["version"], 1);
+    assert_eq!(kept["policy"]["version"], 2);
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn another_person_is_refused_and_shown_nothing() -> TestResult {
-    let (service, seeded) = seeded().await?;
+    let (service, seeded) = support::table(false).await?;
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea = service.sign_in(login(BEA)).await?;
-    let path = format!("/agents/{}/policy", seeded.people[0].agents[0].id);
-    let body = json!({ "version": 0, "rules": [deny_write_under("/probe/denied")] });
+    let path = format!("/agents/{}/policy", seeded[0]);
+    let body = json!({ "version": 1, "rules": [deny_write_under("/probe/denied")] });
     send(
         &service,
         reqwest::Method::POST,
@@ -194,7 +201,7 @@ async fn another_person_is_refused_and_shown_nothing() -> TestResult {
         (403, Some("not_permitted")),
         "{set}"
     );
-    let own = format!("/agents/{}/policy", seeded.people[1].agents[0].id);
+    let own = format!("/agents/{}/policy", seeded[1]);
     let (status, kept) = send(
         &service,
         reqwest::Method::POST,

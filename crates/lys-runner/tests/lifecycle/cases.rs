@@ -6,7 +6,7 @@ use std::error::Error;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use super::{Sessions, trip_on_words};
+use super::Sessions;
 use crate::Launch;
 use crate::peer::Collected;
 use crate::rotation::{Limit, Rotation, RotationState};
@@ -129,8 +129,14 @@ fn quoted_limit_words_with_a_forty_percent_status_do_not_rotate_claude() -> Test
     let tripped = {
         let mut table = sessions.lock();
         let session = table.sessions.get_mut("session").ok_or("session missing")?;
-        session.scrollback.push(b"review says: usage limit reached");
-        trip_on_words(session, 31);
+        session
+            .output
+            .begin(session.generation, session.rotation.as_ref(), true)?;
+        assert!(
+            !session
+                .output
+                .push(session.generation, b"review says: usage limit reached")?
+        );
         session
             .rotation
             .as_ref()

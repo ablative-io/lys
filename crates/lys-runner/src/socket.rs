@@ -214,8 +214,10 @@ impl Runner {
                             let greeting = Greeting::fresh(self.sessions.runner());
                             let refused = Answer::refusal(&RunnerError::refused("runner_connections_full", error.to_string()));
                             let text = format!("{}\n{}\n", greeting.line(), reply_line(refused));
-                            if let Err(error) = stream.try_write(text.as_bytes()) {
-                                crate::error::said(&format!("runner_capacity_answer_failed: {error}"));
+                            match stream.try_write(text.as_bytes()) {
+                                Ok(written) if written == text.len() => {},
+                                Ok(written) => crate::error::said(&format!("runner_capacity_answer_incomplete: wrote {written} of {} bytes", text.len())),
+                                Err(error) => crate::error::said(&format!("runner_capacity_answer_failed: {error}")),
                             }
                         }
                     }
@@ -359,6 +361,17 @@ enum Command {
 }
 
 impl Command {
+    fn output_session(&self) -> Option<String> {
+        match self {
+            Self::Server(
+                Act::Read { session, .. }
+                | Act::ReadBytes { session, .. }
+                | Act::Wait { session, .. },
+            ) => Some(session.clone()),
+            _ => None,
+        }
+    }
+
     fn control(&self) -> bool {
         matches!(self, Self::Server(Act::Status { .. }))
             || matches!(self,
@@ -412,6 +425,7 @@ fn command(line: String, server: &[u8; 32], greeting: &Greeting) -> Result<Comma
 
 struct Cancellation {
     sessions: Arc<Sessions>,
+    output_session: Option<String>,
     left: Arc<AtomicBool>,
     proof: Arc<UnixStream>,
     armed: bool,
@@ -423,6 +437,13 @@ impl Cancellation {
         self.left.store(true, Ordering::SeqCst);
         self.sessions.wake();
         drop(table);
+        if let Some(session) = &self.output_session {
+            if let Err(error) = self.sessions.wake_session(session) {
+                crate::error::said(&format!(
+                    "session {session}: cancellation_wake_failed: {error}"
+                ));
+            }
+        }
         if let Err(error) = self.proof.shutdown(Shutdown::Both) {
             if error.kind() != io::ErrorKind::NotConnected {
                 crate::error::said(&format!("runner_cancellation_failed: {error}"));
@@ -450,6 +471,7 @@ async fn execute(
     let left = Arc::new(AtomicBool::new(false));
     let mut cancellation = Cancellation {
         sessions: Arc::clone(sessions),
+        output_session: command.output_session(),
         left: Arc::clone(&left),
         proof: Arc::clone(proof),
         armed: true,
