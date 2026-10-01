@@ -136,12 +136,12 @@ pub(super) async fn authorize(
 /// A product's token request.
 #[derive(Deserialize)]
 pub(super) struct Exchange {
-    grant_type: String,
-    code: String,
-    redirect_uri: String,
-    code_verifier: String,
-    client_id: Option<String>,
-    client_secret: Option<String>,
+    pub(super) grant_type: String,
+    pub(super) code: String,
+    pub(super) redirect_uri: String,
+    pub(super) code_verifier: String,
+    pub(super) client_id: Option<String>,
+    pub(super) client_secret: Option<String>,
 }
 
 /// The client id and secret a token request presents, in its Basic
