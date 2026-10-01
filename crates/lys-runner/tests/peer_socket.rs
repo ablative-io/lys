@@ -31,31 +31,33 @@ fn an_unproved_judge_client_is_denied_on_the_runner_socket() -> Result<(), Box<d
     let serving = runner.spawn();
     let stream = UnixStream::connect(&socket)?;
     let mut reader = BufReader::new(stream.try_clone()?);
-    let mut greeting = String::new();
-    reader.read_line(&mut greeting)?;
-    let request = PeerRequest {
-        version: PROTOCOL_VERSION,
-        peer: PeerAct::Judge(JudgeAsk {
-            attempt: Some("toolu-1".to_owned()),
-            tool_name: "Read".to_owned(),
-            tool_input: json!({"file_path": "/etc/hosts"}),
-            claimed_session: Some("s1".to_owned()),
-            subagent: false,
-        }),
-    };
-    let mut writer = &stream;
-    writer.write_all(serde_json::to_string(&request)?.as_bytes())?;
-    writer.write_all(b"\n")?;
-    let mut line = String::new();
-    reader.read_line(&mut line)?;
-    let answer: Value = serde_json::from_str(&line)?;
-    let verdict = answer
-        .pointer("/verdict")
-        .or_else(|| answer.pointer("/answer/verdict"))
-        .ok_or_else(|| format!("the runner answered no verdict: {line}"))?;
-    assert_eq!(verdict["deny"], true, "{line}");
-    assert_eq!(verdict["refusal"], "peer_unproved", "{line}");
-    assert_eq!(verdict["audit"], "not_attributed", "{line}");
+    for attempt in ["toolu-1", "toolu-2"] {
+        let mut greeting = String::new();
+        reader.read_line(&mut greeting)?;
+        let request = PeerRequest {
+            version: PROTOCOL_VERSION,
+            peer: PeerAct::Judge(JudgeAsk {
+                attempt: Some(attempt.to_owned()),
+                tool_name: "Read".to_owned(),
+                tool_input: json!({"file_path": "/etc/hosts"}),
+                claimed_session: Some("s1".to_owned()),
+                subagent: false,
+            }),
+        };
+        let mut writer = &stream;
+        writer.write_all(serde_json::to_string(&request)?.as_bytes())?;
+        writer.write_all(b"\n")?;
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+        let answer: Value = serde_json::from_str(&line)?;
+        let verdict = answer
+            .pointer("/verdict")
+            .or_else(|| answer.pointer("/answer/verdict"))
+            .ok_or_else(|| format!("the runner answered no verdict: {line}"))?;
+        assert_eq!(verdict["deny"], true, "{line}");
+        assert_eq!(verdict["refusal"], "peer_unproved", "{line}");
+        assert_eq!(verdict["audit"], "not_attributed", "{line}");
+    }
     serving.stop()?;
     Ok(())
 }

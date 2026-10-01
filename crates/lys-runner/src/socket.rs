@@ -507,6 +507,7 @@ async fn execute(
     command: Command,
     permit: DispatchPermit,
     stop: &mut tokio::sync::watch::Receiver<bool>,
+    peer: &mut crate::peer::Connection,
 ) -> Result<Option<Answer>, RunnerError> {
     let left = Arc::new(AtomicBool::new(false));
     let mut cancellation = Cancellation {
@@ -519,20 +520,23 @@ async fn execute(
     let flag = Arc::clone(&left);
     let held = Arc::clone(sessions);
     let proved = Arc::clone(proof);
+    let mut cached = std::mem::take(peer);
     let mut task = tokio::task::spawn_blocking(move || {
         let answer = match command {
-            Command::Peer(request) => crate::peer::answer_parsed(&held, &proved, request, &flag),
+            Command::Peer(request) => cached.answer(&held, &proved, request, &flag),
             Command::Server(act) => {
                 perform(&held, act, &flag).unwrap_or_else(|error| Answer::refusal(&error))
             }
         };
         permit.finish();
-        answer
+        (answer, cached)
     });
     tokio::select! {
         result = &mut task => {
             cancellation.armed = false;
-            Ok(Some(result.map_err(socket_failed)?))
+            let (answer, cached) = result.map_err(socket_failed)?;
+            *peer = cached;
+            Ok(Some(answer))
         }
         result = departed(stream) => {
             cancellation.cancel();
@@ -609,6 +613,7 @@ async fn connection(
     let proof = Arc::new(stream.try_clone().map_err(socket_failed)?);
     let stream = tokio::net::UnixStream::from_std(stream).map_err(socket_failed)?;
     let mut pending = Vec::new();
+    let mut peer = crate::peer::Connection::default();
     while !*stop.borrow() {
         let greeting = Greeting::fresh(sessions.runner());
         tokio::select! {
@@ -668,7 +673,10 @@ async fn connection(
                 continue;
             }
         };
-        let Some(answer) = execute(sessions, &proof, &stream, command, permit, &mut stop).await?
+        let Some(answer) = execute(
+            sessions, &proof, &stream, command, permit, &mut stop, &mut peer,
+        )
+        .await?
         else {
             break;
         };
