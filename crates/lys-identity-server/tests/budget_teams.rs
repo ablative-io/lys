@@ -11,6 +11,8 @@ use lys_identity::OperationId;
 use lys_identity_server::dev_seed::seed_configured;
 use lys_identity_server::runtime_state::{Report, Reported};
 use lys_identity_server::runtime_store::RuntimeStore;
+use lys_runner::state::{Kept, KeptSession};
+use lys_runner::{Options, Runner, Serving};
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -20,6 +22,28 @@ struct Table {
     cookie: String,
     agents: Vec<String>,
     sessions: Vec<String>,
+    machines: Vec<String>,
+}
+
+struct RecoveredRunner(Option<Serving>);
+
+impl RecoveredRunner {
+    fn close(mut self) -> TestResult {
+        if let Some(serving) = self.0.take() {
+            serving.stop()?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for RecoveredRunner {
+    fn drop(&mut self) {
+        if let Some(serving) = self.0.take()
+            && let Err(error) = serving.stop()
+        {
+            eprintln!("runner_fixture_cleanup_failed: {error}");
+        }
+    }
 }
 
 impl Table {
@@ -32,9 +56,10 @@ impl Table {
     }
 
     async fn with_sessions(count: usize) -> TestResult<Self> {
-        let (service, (seeded, sessions)) = Service::start_with(move |config| {
+        let (service, (seeded, sessions, machines)) = Service::start_with(move |config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let mut sessions = Vec::with_capacity(count);
+            let mut machines = Vec::with_capacity(count);
             if count > 0 {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let mut runtime = RuntimeStore::open(
@@ -46,11 +71,12 @@ impl Table {
                 )?;
                 for _ in 0..count {
                     let session = OperationId::generate()?.to_string();
+                    let machine = OperationId::generate()?.to_string();
                     runtime.report(Report {
                         operation: OperationId::generate()?.to_string(),
                         session: session.clone(),
                         agent: Some(seeded.people[0].agents[2].id.to_string()),
-                        machine: OperationId::generate()?.to_string(),
+                        machine: machine.clone(),
                         state: Reported::Starting,
                         what: "tracked session".to_owned(),
                         confirmation: String::new(),
@@ -59,9 +85,10 @@ impl Table {
                         launch: None,
                     })?;
                     sessions.push(session);
+                    machines.push(machine);
                 }
             }
-            Ok((seeded, sessions))
+            Ok((seeded, sessions, machines))
         })
         .await?;
         let cookie = service
@@ -79,6 +106,7 @@ impl Table {
                 .map(|agent| agent.id.to_string())
                 .collect(),
             sessions,
+            machines,
         })
     }
     async fn post(&self, path: &str, body: &Value) -> TestResult<Value> {
@@ -147,6 +175,132 @@ impl Table {
             )
             .await
     }
+
+    async fn restarted_runner(&mut self) -> TestResult<(tempfile::TempDir, RecoveredRunner)> {
+        let member = &self.agents[2];
+        for machine in &self.machines {
+            self.post(
+                "/network/machines",
+                &json!({
+                    "operation": machine, "name": machine, "kind": "laptop", "runtime": "sh",
+                    "slots": 1, "may_run": [member], "may_reach": []
+                }),
+            )
+            .await?;
+            self.post(
+                &format!("/network/machines/{machine}/runner"),
+                &json!({"runner": {"kind": "lys"}}),
+            )
+            .await?;
+        }
+        let dir = tempfile::tempdir()?;
+        let state = dir.path().join("state");
+        std::fs::create_dir_all(&state)?;
+        let kept = Kept::new(
+            self.sessions
+                .iter()
+                .map(|session| KeptSession {
+                    session: session.clone(),
+                    pid: None,
+                    started_at: 1,
+                    columns: 120,
+                    rows: 40,
+                    ended: None,
+                })
+                .collect(),
+        );
+        std::fs::write(state.join("sessions.json"), serde_json::to_vec(&kept)?)?;
+        let key = Ed25519Identity::load(&self.service.dir.path().join("service.key"))?;
+        let socket = dir.path().join("runner.sock");
+        let runner = RecoveredRunner(Some(
+            Runner::open(&Options {
+                socket: socket.clone(),
+                state,
+                server_key: key.public_key_bytes(),
+                scrollback: 1 << 16,
+            })?
+            .spawn(),
+        ));
+        self.service
+            .restart_adjusted(move |config| config.runner_socket = Some(socket))
+            .await?;
+        Ok((dir, runner))
+    }
+}
+
+#[tokio::test]
+async fn a_runner_restart_reconciles_lost_sessions_and_restores_the_reported_budget() -> TestResult
+{
+    let mut table = Table::with_sessions(2).await?;
+    let (parent, child, limits) = table.charged_team().await?;
+    let path = format!("/teams/{parent}/budget");
+    let (status, answer) = send(
+        &table.service,
+        reqwest::Method::PUT,
+        &path,
+        Auth::Cookie(&table.cookie),
+        Some(&json!({"limits": limits, "warn_at": null, "version": 0})),
+    )
+    .await?;
+    assert_eq!(status, 200, "{answer}");
+    let member = table.agents[2].clone();
+    let reported = table.sessions.first().ok_or("no reported session")?;
+    let missing = table.sessions.get(1).ok_or("no lost session")?;
+    let at = jiff::Timestamp::now().as_millisecond();
+    table.post(&format!("/agents/{member}/usage"), &json!({
+        "event": "known-live-cost", "session": reported, "at_ms": at,
+        "dollars_micros": 25_000_000, "account": "shared-account",
+        "plan_windows": [{"duration_minutes": 10_080, "used_percent": 50, "resets_at_ms": at + 604_800_000}]
+    })).await?;
+    table.member(&child, &member).await?;
+    let unknown = table.get(&path).await?;
+    assert_eq!(unknown["used"][2]["figure"], Value::Null, "{unknown}");
+    assert!(
+        unknown["used"][2]["unavailable"]
+            .as_str()
+            .is_some_and(|reason| reason.contains(missing)),
+        "{unknown}"
+    );
+    let (dir, runner) = table.restarted_runner().await?;
+    let still_unknown = table.get(&path).await?;
+    assert_eq!(
+        still_unknown["used"][2]["figure"],
+        Value::Null,
+        "{still_unknown}"
+    );
+    let live = table.get("/runtime/live").await?;
+    assert_eq!(live["sessions"], json!([]), "{live}");
+    assert_eq!(live["unanswered"], json!([]), "{live}");
+    let tracked = table
+        .get(&format!("/agents/{member}/runtime/sessions"))
+        .await?;
+    let sessions = tracked["sessions"].as_array().ok_or("no sessions")?;
+    assert_eq!(sessions.len(), 2, "{tracked}");
+    for session in sessions {
+        assert_eq!(session["shown"], "stopped", "{session}");
+        assert!(
+            session["stopped"]["confirmation"]
+                .as_str()
+                .is_some_and(|words| words.contains("ended_by_runner_restart")),
+            "{session}"
+        );
+    }
+    for restarted in [false, true] {
+        if restarted {
+            table.service.restart().await?;
+        }
+        let recovered = table.get(&path).await?;
+        assert_eq!(recovered["used"][2]["figure"], 525, "{recovered}");
+        assert_eq!(
+            recovered["used"][2]["unavailable"],
+            Value::Null,
+            "{recovered}"
+        );
+        assert_eq!(recovered["used"][3]["figure"], 50, "{recovered}");
+    }
+    runner.close()?;
+    drop(dir);
+    Ok(())
 }
 
 #[tokio::test]
