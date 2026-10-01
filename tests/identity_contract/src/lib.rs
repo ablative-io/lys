@@ -7,3 +7,8 @@ pub mod fake_rauthy;
 pub mod fixtures;
 pub mod harness;
 pub mod refusals;
+
+mod harness_serve;
+mod service_template;
+mod template_files;
+mod template_stores;

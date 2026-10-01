@@ -55,6 +55,11 @@
 //! trail, appended like anything else. Keeping that line clean is what lets the
 //! backend be replaced without renegotiating what the log means.
 
+mod durability;
+
+#[cfg(feature = "flush-counts")]
+pub use durability::{flush_count, process_flush_count};
+
 pub mod error;
 pub mod file;
 pub mod frontier;

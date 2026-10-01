@@ -11,11 +11,13 @@ publish = false
 
 [dependencies]
 axum.workspace = true
+jiff.workspace = true
+rustix.workspace = true
 base64.workspace = true
 lys-core.workspace = true
 lys-identity.workspace = true
 lys-identity-server.workspace = true
-lys-log-store.workspace = true
+lys-log-store = { workspace = true, features = ["flush-counts"] }
 reqwest = { workspace = true, features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true
