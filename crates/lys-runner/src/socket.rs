@@ -210,7 +210,13 @@ impl Runner {
                     } else {
                         incoming
                     };
-                    let (stream, _) = incoming.map_err(socket_failed)?;
+                    let (stream, _) = match incoming {
+                        Ok(accepted) => accepted,
+                        Err(error) => {
+                            crate::error::said(&format!("runner_socket_accept_failed: {error}"));
+                            continue;
+                        }
+                    };
                     match Arc::clone(&open).try_acquire_owned() {
                         Ok(permit) => {
                             let sessions = Arc::clone(&self.sessions);
