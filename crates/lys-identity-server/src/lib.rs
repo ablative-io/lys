@@ -54,6 +54,9 @@ pub mod dev_seed;
 pub mod directory_views;
 pub mod error;
 pub mod error_budget;
+mod error_names;
+#[cfg(test)]
+mod error_names_tests;
 mod error_status;
 pub mod error_team;
 mod estate_api;

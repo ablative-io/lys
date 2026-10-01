@@ -79,7 +79,26 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         GrantError::OperationReused { .. }
         | GrantError::GrantExists { .. }
         | GrantError::AlreadyRevoked { .. } => StatusCode::CONFLICT,
-        _ => StatusCode::FORBIDDEN,
+        GrantError::RelationUnknown { .. }
+        | GrantError::ActionsOutside { .. }
+        | GrantError::LineageCycle { .. }
+        | GrantError::IssuerNotHolder { .. }
+        | GrantError::NotHolder { .. }
+        | GrantError::ResourceOutside { .. }
+        | GrantError::UseOnly { .. }
+        | GrantError::RecipientRefused { .. }
+        | GrantError::PassOnBeyondSource { .. }
+        | GrantError::ExpiryBeyondSource { .. }
+        | GrantError::ResponsibleMismatch { .. }
+        | GrantError::IdentityNotActive { .. }
+        | GrantError::Revoked { .. }
+        | GrantError::Expired { .. }
+        | GrantError::NotStarted { .. }
+        | GrantError::RootAuthorityRefused { .. }
+        | GrantError::RevokeRefused { .. }
+        | GrantError::NotHeld { .. }
+        | GrantError::EnvelopeMismatch { .. }
+        | GrantError::PermissionAbsent { .. } => StatusCode::FORBIDDEN,
     }
 }
 
@@ -111,15 +130,6 @@ impl IntoResponse for ServerError {
 }
 
 impl ServerError {
-    /// The stable refusal name, derived from the message unless its words stand alone.
-    pub fn name(&self) -> String {
-        if matches!(self, Self::ProfileVersionReplaced { .. }) {
-            return "ProfileVersionReplaced".to_owned();
-        }
-        let text = self.to_string();
-        text.split(':').next().unwrap_or_default().to_owned()
-    }
-
     /// The fields at fault, as JSON pointers into the request body; none
     /// when the refusal is not about a field.
     pub fn fields(&self) -> Vec<crate::apps_error::Field> {
