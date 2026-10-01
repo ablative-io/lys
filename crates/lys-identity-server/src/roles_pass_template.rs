@@ -82,7 +82,7 @@ fn build(
     )?;
     let mut runtime =
         crate::runtime_store::RuntimeStore::open(&root.join("runtime"), Arc::clone(key))?;
-    runtime.report(crate::runtime_state::Report {
+    let mut report = crate::runtime_state::Report {
         operation: "role-session".to_owned(),
         session: "role-session".to_owned(),
         agent: Some(agent.to_string()),
@@ -93,7 +93,12 @@ fn build(
         reported_by: person.to_string(),
         at: 3,
         launch: None,
-    })?;
+    };
+    runtime.report(report.clone())?;
+    report.operation = "role-session-running".to_owned();
+    report.state = crate::runtime_state::Reported::Running;
+    report.at = 4;
+    runtime.report(report)?;
     let mut apps = crate::apps_store::AppStore::open(&root.join("apps"), Arc::clone(key))?;
     let schema = AppSchema::lys(
         model
