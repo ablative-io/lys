@@ -12,10 +12,9 @@
 //!
 //! The directory service and the secrets broker answer on the install's
 //! fixed ports, so the test refuses by name when another install holds them
-//! rather than sharing one. The binaries are built into a target directory
-//! of their own, so the `lys` under test has its services beside it as an
-//! installed one does, and the build never waits on the lock of the build
-//! running this test.
+//! rather than sharing one. The binaries are the workspace test build's
+//! siblings, so the CLI and services come from the same build without
+//! compiling them again inside a running test.
 
 pub mod identity_support;
 #[path = "identity_install/product.rs"]
@@ -86,50 +85,42 @@ fn port_free(port: u16, what: &str) -> TestResult {
         })
 }
 
-/// `lys`, `lys-identity-server` and `lys-secrets`, built side by side into a
-/// target directory of their own, answering the directory they are in.
+/// Reuse the workspace's compiled binaries, refusing an incomplete build.
 fn binaries() -> TestResult<PathBuf> {
-    let root = repository_root();
-    let target = root.join("target").join("identity-install");
-    let built = Command::new(env!("CARGO"))
-        .current_dir(&root)
-        .args([
-            "build",
-            "--offline",
-            "-p",
-            "lys",
-            "-p",
-            "lys-identity-server",
-        ])
-        .args(["-p", "lys-secrets", "--target-dir"])
-        .arg(&target)
-        .output()?;
-    succeeded(&built, "cargo build of the installed binaries")?;
-    Ok(target.join("debug"))
+    let directory = Path::new(env!("CARGO_BIN_EXE_lys"))
+        .parent()
+        .ok_or("install_binary_directory_missing: the compiled CLI has no parent")?;
+    for name in ["lys", "lys-identity-server", "lys-secrets"] {
+        let path = directory.join(name);
+        let metadata = std::fs::metadata(&path)
+            .map_err(|error| format!("install_binary_missing: {}: {error}", path.display()))?;
+        if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 {
+            return Err(format!("install_binary_not_executable: {}", path.display()).into());
+        }
+    }
+    Ok(directory.to_path_buf())
 }
 
 /// The screens, built from this tree and packaged with the manifest the
 /// install verifies, written here from the manifest's documented format.
 fn screens(at: &Path) -> TestResult<PathBuf> {
-    let surface = repository_root().join("surface").join("identity");
-    if !surface.join("node_modules").is_dir() {
-        let installed = Command::new("npm")
-            .arg("--prefix")
-            .arg(&surface)
-            .arg("ci")
-            .output()?;
-        succeeded(&installed, "npm ci for the screens")?;
-    }
-    let package = at.join("screens");
-    let built = Command::new("npm")
-        .arg("--prefix")
-        .arg(&surface)
-        .args(["run", "build", "--", "--emptyOutDir", "--outDir"])
-        .arg(&package)
+    let prepared = Command::new("python3")
+        .arg(repository_root().join("scripts/identity-gates/surface_fixture.py"))
+        .arg(env!("CARGO_TARGET_TMPDIR"))
         .output()?;
-    succeeded(&built, "the screens' build")?;
+    succeeded(&prepared, "prepare the shared screens")?;
+    let surface = PathBuf::from(String::from_utf8(prepared.stdout)?.trim());
+    let package = at.join("screens");
     let mut files = Vec::new();
-    collect(&package, &package, &mut files)?;
+    let dist = surface.join("dist");
+    collect(&dist, &dist, &mut files)?;
+    std::fs::create_dir(&package)?;
+    for (relative, bytes) in &files {
+        let path = package.join(relative);
+        let parent = path.parent().ok_or("screen_asset_parent_missing")?;
+        std::fs::create_dir_all(parent)?;
+        std::fs::write(path, bytes)?;
+    }
     let entries: Vec<serde_json::Value> = files
         .iter()
         .map(|(path, bytes)| {
@@ -144,6 +135,7 @@ fn screens(at: &Path) -> TestResult<PathBuf> {
         .current_dir(repository_root())
         .args(["rev-parse", "HEAD"])
         .output()?;
+    succeeded(&commit, "read the screens' source commit")?;
     let manifest = serde_json::json!({
         "format": "lys-identity-surface/v1",
         "commit": String::from_utf8(commit.stdout)?.trim(),
