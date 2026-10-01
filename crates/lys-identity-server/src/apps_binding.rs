@@ -200,7 +200,7 @@ pub fn acting(
     };
     let digest = sha256_hex(&secret);
     match scheme.as_str() {
-        APP_CREDENTIAL => app_acting(held, &holder, &digest),
+        APP_CREDENTIAL => app_acting(state, held, &holder, &digest),
         REGISTRAR_CREDENTIAL => {
             let made = held
                 .registrars
@@ -209,9 +209,12 @@ pub fn acting(
                 .find(|registrar| registrar.service_account == holder)
                 .filter(|registrar| same(&registrar.secret_sha256, &digest));
             match made {
-                Some(_) => Ok(Acting::Registrar {
-                    service_account: holder,
-                }),
+                Some(_) => {
+                    active_account(state, &holder)?;
+                    Ok(Acting::Registrar {
+                        service_account: holder,
+                    })
+                }
                 None => Err(AppError::CredentialRefused {
                     reason: "no registrar holds that credential",
                 }
@@ -226,7 +229,12 @@ pub fn acting(
 }
 
 /// The app acting through the credential whose secret has `digest`.
-pub(crate) fn app_acting(held: &Held, app: &str, digest: &str) -> Result<Acting, ServerError> {
+pub(crate) fn app_acting(
+    state: &AppState,
+    held: &Held,
+    app: &str,
+    digest: &str,
+) -> Result<Acting, ServerError> {
     let refused = || AppError::CredentialRefused {
         reason: "no approved app holds that credential",
     };
@@ -241,6 +249,9 @@ pub(crate) fn app_acting(held: &Held, app: &str, digest: &str) -> Result<Acting,
         }
         .into());
     }
+    if let Some(binding) = &approved.binding {
+        active_account(state, &binding.service_account)?;
+    }
     Ok(Acting::App {
         app: app.to_owned(),
         service_account: approved
@@ -248,6 +259,25 @@ pub(crate) fn app_acting(held: &Held, app: &str, digest: &str) -> Result<Acting,
             .as_ref()
             .map(|binding| binding.service_account.clone()),
     })
+}
+
+fn active_account(state: &AppState, id: &str) -> Result<(), ServerError> {
+    let unavailable = |reason: String| ServerError::ServiceAccountsUnavailable { reason };
+    let store = state
+        .service_accounts
+        .as_ref()
+        .ok_or_else(|| unavailable("the service account store is not configured".to_owned()))?;
+    let mut store = store.lock().map_err(|error| {
+        unavailable(format!("the service account store is unavailable: {error}"))
+    })?;
+    store.settle()?;
+    match store.account(id) {
+        Some(account) if !account.is_retired() => Ok(()),
+        _ => Err(AppError::CredentialRefused {
+            reason: "the credential's service account is not active",
+        }
+        .into()),
+    }
 }
 
 /// The app whose sign-in client is `client_id`, when that client may complete

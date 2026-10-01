@@ -24,6 +24,7 @@ use lys_log_store::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::certificate_keys::SigningCertificate;
 use crate::error::ServerError;
 
 /// The origin the certificate log is created with.
@@ -189,6 +190,7 @@ pub struct CertificateStore<S: LeafStore = FileLeafStore> {
     since_snapshot: u64,
     snapshot_failure: Option<String>,
     uncertain: bool,
+    signing: BTreeMap<String, BTreeMap<String, Arc<SigningCertificate>>>,
 }
 
 impl CertificateStore<FileLeafStore> {
@@ -224,6 +226,7 @@ impl<S: LeafStore> CertificateStore<S> {
     /// signed by `key`.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
+        let signing = signing_index(&held);
         let mut store = Self {
             reopen,
             key,
@@ -233,6 +236,7 @@ impl<S: LeafStore> CertificateStore<S> {
             since_snapshot: 0,
             snapshot_failure: None,
             uncertain: false,
+            signing,
         };
         store.after_start(&start);
         Ok(store)
@@ -256,6 +260,21 @@ impl<S: LeafStore> CertificateStore<S> {
     /// The certificate named `serial`, as it stands.
     pub fn certificate(&self, serial: &str) -> Option<&Entered> {
         self.held.certificates.get(serial)
+    }
+
+    pub(crate) fn signing_certificates(
+        &self,
+        agent: &str,
+    ) -> Result<Vec<Arc<SigningCertificate>>, ServerError> {
+        if self.uncertain {
+            return Err(unavailable("the certificate log has an unsettled write"));
+        }
+        Ok(self
+            .signing
+            .get(agent)
+            .map_or_else(Vec::new, |certificates| {
+                certificates.values().cloned().collect()
+            }))
     }
 
     /// Enter `issued`. Entered again with the same bytes and claims it is
@@ -351,6 +370,7 @@ impl<S: LeafStore> CertificateStore<S> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
             self.log = log;
+            self.signing = signing_index(&held);
             self.held = held;
             self.start = start.clone();
             self.uncertain = false;
@@ -363,6 +383,24 @@ impl<S: LeafStore> CertificateStore<S> {
         let bytes = serde_json::to_vec(&line).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
+            match &line {
+                Line::Issued(issued) => {
+                    self.signing
+                        .entry(issued.agent.clone())
+                        .or_default()
+                        .insert(
+                            issued.serial.clone(),
+                            Arc::new(SigningCertificate::new(&issued.der)),
+                        );
+                }
+                Line::Withdrawn(withdrawn) => {
+                    if let Some(entered) = self.held.certificates.get(&withdrawn.serial)
+                        && let Some(certificates) = self.signing.get_mut(&entered.issued.agent)
+                    {
+                        certificates.remove(&withdrawn.serial);
+                    }
+                }
+            }
             self.held.hold(index, line);
             self.since_snapshot += 1;
             if self.since_snapshot >= SNAPSHOT_EVERY.get() {
@@ -415,4 +453,20 @@ fn rebuilt<S: LeafStore>(reopen: &Reopen<S>, reason: String) -> Result<Opened<S>
         replayed,
     };
     Ok((log, held, start))
+}
+
+fn signing_index(held: &Held) -> BTreeMap<String, BTreeMap<String, Arc<SigningCertificate>>> {
+    let mut index: BTreeMap<String, BTreeMap<String, Arc<SigningCertificate>>> = BTreeMap::new();
+    for entered in held
+        .certificates
+        .values()
+        .filter(|entered| entered.withdrawn.is_none())
+    {
+        let issued = &entered.issued;
+        index.entry(issued.agent.clone()).or_default().insert(
+            issued.serial.clone(),
+            Arc::new(SigningCertificate::new(&issued.der)),
+        );
+    }
+    index
 }

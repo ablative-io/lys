@@ -208,6 +208,26 @@ impl fmt::Debug for CertifiedKey {
 /// (RFC 8410 §3 requires their absence), or the key is not exactly 32 bytes in
 /// a BIT STRING with no unused bits.
 pub fn certificate_subject_public_key(cert_der: &[u8]) -> TrustResult<[u8; 32]> {
+    Ok(certificate_signing_key(cert_der)?.public_key)
+}
+
+/// The subject key and the validity interval carried by a certificate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CertificateSigningKey {
+    /// The Ed25519 subject public key.
+    pub public_key: [u8; 32],
+    /// First valid second since the Unix epoch.
+    pub not_before: i64,
+    /// Last valid second since the Unix epoch.
+    pub not_after: i64,
+}
+
+/// Decode an Ed25519 subject key and its validity interval once.
+///
+/// # Errors
+/// Returns [`TrustError::CertificateParsing`] for malformed DER or a subject
+/// key that is not a parameter-free, 32-byte Ed25519 key.
+pub fn certificate_signing_key(cert_der: &[u8]) -> TrustResult<CertificateSigningKey> {
     let (_, certificate) =
         X509Certificate::from_der(cert_der).map_err(|e| TrustError::CertificateParsing {
             reason: format!("failed to parse certificate DER: {e:?}"),
@@ -231,13 +251,19 @@ pub fn certificate_subject_public_key(cert_der: &[u8]) -> TrustResult<[u8; 32]> 
     }
 
     let data = spki.subject_public_key.data.as_ref();
-    data.try_into()
+    let public_key = data
+        .try_into()
         .map_err(|_err| TrustError::CertificateParsing {
             reason: format!(
                 "certificate subject key must be 32 bytes for Ed25519, got {}",
                 data.len()
             ),
-        })
+        })?;
+    Ok(CertificateSigningKey {
+        public_key,
+        not_before: certificate.validity().not_before.timestamp(),
+        not_after: certificate.validity().not_after.timestamp(),
+    })
 }
 
 /// Confirms that a freshly issued certificate's `subjectPublicKeyInfo` carries
