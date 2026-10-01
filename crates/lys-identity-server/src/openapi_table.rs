@@ -27,6 +27,8 @@ pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer, Auth::Operator];
 pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session, Auth::Operator];
 /// A provider-issued access token; a session or operator token cannot replace it.
 pub(crate) const B: &[Auth] = &[Auth::Bearer];
+/// An agent's signed request alone.
+pub(crate) const AGENT_ONLY: &[Auth] = &[Auth::AgentSignature];
 
 /// One untyped entry: method, path, words, authentication and the refusal
 /// sets it answers with.
@@ -66,6 +68,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/directory/people" "Every person, for the administrator" S [ADMIN, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/directory/agents/{id}" "Any agent, for the administrator" S [ADMIN, &["AgentNotVisible"]];
     GET "/grants" "The grants the caller may see" S [SIGNED, &["NotAdmitted"]];
+    GET "/agent/grants" "The signed agent's own live grants and their chain admission" AGENT_ONLY [AGENT, &["DirectoryUnavailable", "AppsUnavailable", "LogUnavailable", "ServiceAccountsUnavailable", "CertificatesUnavailable"]];
     POST "/grants" "Pass on part of a grant" S [GRANT_MADE, RECORDED, &["NoPerson"], &["ExpiryBeyondSource", "UseOnly", "NotAdmitted", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "DirectoryUnavailable", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused"]];
     GET "/grants/model" "Lys's own permission model" S [SIGNED];
     POST "/grants/roots" "Issue a root grant" S [GRANT_MADE, RECORDED, &["RelationUnknown"], &["RootAuthorityRefused"]];

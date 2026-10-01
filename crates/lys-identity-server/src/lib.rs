@@ -9,6 +9,7 @@
 
 pub mod accounts;
 pub mod admission;
+mod agent_grants_api;
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_sight;
