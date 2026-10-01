@@ -31,5 +31,8 @@ thiserror.workspace = true
 tokio.workspace = true
 zeroize.workspace = true
 
+[dev-dependencies]
+lys-log-store = { workspace = true, features = ["flush-counts"] }
+
 [lints]
 workspace = true
