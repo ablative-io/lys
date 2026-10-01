@@ -80,7 +80,7 @@ fn snapshot(
     operations: &mut [(OperationId, u64)],
     folded: u64,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    operations.sort_by(|left, right| left.0.cmp(&right.0));
+    operations.sort_by_key(|operation| operation.0);
     let projection = array(vec![
         array(
             projection
