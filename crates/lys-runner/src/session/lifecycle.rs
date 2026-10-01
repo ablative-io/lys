@@ -498,7 +498,11 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         )));
     }
     source.identity = Some(identity);
-    if let Err(error) = file.seek(SeekFrom::Start(source.offset)) {
+    if let Err(error) = if source.offset == 0 {
+        Ok(0)
+    } else {
+        file.seek(SeekFrom::Start(source.offset))
+    } {
         bodies.push(Body::Coverage(Coverage::of(
             "source_refused",
             source,
