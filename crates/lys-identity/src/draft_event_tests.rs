@@ -6,7 +6,7 @@ use lys_core::Ed25519Identity;
 use super::{cose_sign1, protected_header, sig_structure, verify_event};
 use crate::OperationId;
 
-fn actor() -> Value {
+pub(super) fn actor() -> Value {
     Value::Map(vec![
         (1.into(), Value::Text("https://issuer.example/".into())),
         (2.into(), Value::Text("subject".into())),
@@ -15,7 +15,7 @@ fn actor() -> Value {
     ])
 }
 
-fn created() -> Vec<u8> {
+pub(super) fn created() -> Vec<u8> {
     let value = Value::Array(vec![
         1.into(),
         0.into(),
@@ -94,7 +94,7 @@ fn an_approval_over_another_hash_is_refused() {
     assert_eq!(projection, before);
 }
 
-fn open(
+pub(super) fn open(
     home: &std::sync::Arc<tempfile::TempDir>,
 ) -> crate::Directory<lys_log_store::FileLeafStore> {
     let home = std::sync::Arc::clone(home);
@@ -107,7 +107,7 @@ fn open(
     .unwrap()
 }
 
-fn home() -> std::sync::Arc<tempfile::TempDir> {
+pub(super) fn home() -> std::sync::Arc<tempfile::TempDir> {
     let home = std::sync::Arc::new(tempfile::tempdir().unwrap());
     Ed25519Identity::load_or_generate(&home.path().join("key")).unwrap();
     lys_log_store::FileLeafStore::create(&home.path().join("log"), "example.com/lys/draft-test")
@@ -115,7 +115,7 @@ fn home() -> std::sync::Arc<tempfile::TempDir> {
     home
 }
 
-fn approval(hash: [u8; 32]) -> crate::draft_event::DraftEvent {
+pub(super) fn approval(hash: [u8; 32]) -> crate::draft_event::DraftEvent {
     let crate::draft_event::DraftEvent::Created(created) =
         crate::draft_event::decode(&created()).unwrap()
     else {
@@ -198,6 +198,15 @@ fn drafts_survive_snapshot_reopen_and_exact_retries() {
 
 #[test]
 fn a_version_three_install_snapshot_migrates_without_rewriting_leaves() {
+    old_install_migrates(3);
+}
+
+#[test]
+fn a_version_four_draft_snapshot_migrates_without_rewriting_leaves() {
+    old_install_migrates(4);
+}
+
+fn old_install_migrates(version: u8) {
     let home = home();
     let crate::draft_event::DraftEvent::Created(draft) =
         crate::draft_event::decode(&created()).unwrap()
@@ -220,16 +229,36 @@ fn a_version_three_install_snapshot_migrates_without_rewriting_leaves() {
         .0
         .bytes()
         .to_vec();
-    let state = crate::directory_state::encode(directory.projection().unwrap(), 1).unwrap();
+    if version == 4 {
+        directory
+            .record_draft(crate::draft_event::DraftEvent::Created(
+                std::sync::Arc::clone(&draft),
+            ))
+            .unwrap();
+    }
+    let fold = if version == 4 { 2 } else { 1 };
+    let state = crate::directory_state::encode(directory.projection().unwrap(), fold).unwrap();
     drop(directory);
     let Value::Array(mut fields) = crate::state_value::decode(&state).unwrap() else {
         panic!("snapshot must be an array");
     };
-    fields[0] = 3.into();
+    fields[0] = version.into();
     let Value::Array(projection) = &mut fields[2] else {
         panic!("projection must be an array");
     };
-    projection.pop();
+    if version == 3 {
+        projection.pop();
+    } else {
+        let Value::Array(drafts) = &mut projection[3] else {
+            panic!("drafts must be an array");
+        };
+        for draft in drafts {
+            let Value::Array(row) = draft else {
+                panic!("draft record must be an array");
+            };
+            row.pop();
+        }
+    }
     let state = crate::state_value::encode(&Value::Array(fields)).unwrap();
     let wrapped =
         crate::checkpoints::wrap(&crate::checkpoints::Checkpoints::default(), &state).unwrap();

@@ -1,6 +1,6 @@
 //! Definite canonical arrays preserve both action bytes and original request evidence.
 
-use super::{Approved, Created, DraftEvent, RequestEvidence, Target};
+use super::{Approved, Created, DraftEvent, RequestEvidence, RequestSignature, Target};
 use crate::encoding::{
     MAJOR_ARRAY, actor, as_bytes, as_text, as_uint, bytes, cbor, decode_actor, head, malformed,
     text, uint,
@@ -8,6 +8,9 @@ use crate::encoding::{
 use crate::{AgentId, IdentityError, IdentityId, OperationId, PersonId, ServiceAccountId};
 use ciborium::Value;
 use std::sync::Arc;
+
+#[path = "draft_decision_encoding.rs"]
+mod decisions;
 
 fn nullable_operation(out: &mut Vec<u8>, value: Option<OperationId>) {
     if let Some(value) = value {
@@ -37,8 +40,16 @@ pub fn encode(event: &DraftEvent) -> Vec<u8> {
     let mut out = Vec::new();
     match event {
         DraftEvent::Created(value) => {
-            head(&mut out, MAJOR_ARRAY, 13);
-            uint(&mut out, 1);
+            head(
+                &mut out,
+                MAJOR_ARRAY,
+                if value.request_signature.is_some() {
+                    14
+                } else {
+                    13
+                },
+            );
+            uint(&mut out, event.version());
             uint(&mut out, 0);
             text(&mut out, &value.operation.to_string());
             actor(&mut out, &value.actor);
@@ -54,6 +65,11 @@ pub fn encode(event: &DraftEvent) -> Vec<u8> {
             text(&mut out, &value.reviewer.to_string());
             nullable_operation(&mut out, value.corrects);
             evidence(&mut out, value.evidence.as_ref());
+            if let Some(signature) = &value.request_signature {
+                head(&mut out, MAJOR_ARRAY, 2);
+                bytes(&mut out, &signature.header);
+                bytes(&mut out, &signature.payload);
+            }
         }
         DraftEvent::Approved(value) => {
             head(&mut out, MAJOR_ARRAY, 9);
@@ -67,6 +83,8 @@ pub fn encode(event: &DraftEvent) -> Vec<u8> {
             text(&mut out, &value.application.to_string());
             evidence(&mut out, value.evidence.as_ref());
         }
+        DraftEvent::Refused(value) => decisions::write_refused(&mut out, value),
+        DraftEvent::Correction(value) => decisions::write_correction(&mut out, value),
     }
     out
 }
@@ -115,6 +133,21 @@ fn read_evidence(value: Value) -> Result<Option<RequestEvidence>, IdentityError>
 }
 
 fn created(value: Value) -> Result<DraftEvent, IdentityError> {
+    let Value::Array(mut parts) = value else {
+        return Err(malformed("a creation is a definite array"));
+    };
+    let request_signature = if parts.len() == 14 {
+        let value = parts
+            .pop()
+            .ok_or_else(|| malformed("a creation lacks signature bytes"))?;
+        let [header, payload] = tuple::<2>(value)?;
+        Some(RequestSignature {
+            header: as_bytes(header, "a signature header is bytes")?,
+            payload: as_bytes(payload, "a signed payload is bytes")?,
+        })
+    } else {
+        None
+    };
     let [
         version,
         kind,
@@ -129,8 +162,9 @@ fn created(value: Value) -> Result<DraftEvent, IdentityError> {
         reviewer,
         corrects,
         proof,
-    ] = tuple::<13>(value)?;
-    if as_uint(&version, "a draft version is unsigned")? != 1
+    ] = tuple::<13>(Value::Array(parts))?;
+    if as_uint(&version, "a draft version is unsigned")?
+        != if request_signature.is_some() { 2 } else { 1 }
         || as_uint(&kind, "a draft kind is unsigned")? != 0
     {
         return Err(malformed("a creation is draft version 1 kind 0"));
@@ -156,6 +190,7 @@ fn created(value: Value) -> Result<DraftEvent, IdentityError> {
             Some(operation(corrects)?)
         },
         evidence: read_evidence(proof)?,
+        request_signature,
     })))
 }
 
@@ -192,10 +227,18 @@ pub fn decode(body: &[u8]) -> Result<DraftEvent, IdentityError> {
     let Value::Array(items) = &value else {
         return Err(malformed("a draft payload is a definite array"));
     };
-    let event = match items.len() {
-        13 => created(value)?,
-        9 => approved(value)?,
-        _ => return Err(malformed("a draft payload has 13 or 9 fields")),
+    let [version, kind, ..] = items.as_slice() else {
+        return Err(malformed("a draft payload lacks its version and kind"));
+    };
+    let event = match (
+        as_uint(version, "a draft version is unsigned")?,
+        as_uint(kind, "a draft kind is unsigned")?,
+    ) {
+        (1 | 2, 0) => created(value)?,
+        (1, 1) => approved(value)?,
+        (2, 2) => decisions::refused(value)?,
+        (2, 3) => decisions::correction(value)?,
+        _ => return Err(malformed("the draft version and kind are not supported")),
     };
     event.validate()?;
     if encode(&event) != body {

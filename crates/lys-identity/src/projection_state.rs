@@ -9,9 +9,7 @@ use std::sync::Arc;
 
 use ciborium::Value;
 
-use super::draft::DraftRecord;
 use super::{Projection, Record};
-use crate::draft_event::DraftEvent;
 use crate::event::wire;
 use crate::id::IdentityId;
 use crate::id::{ID_LEN, PersonId};
@@ -97,28 +95,7 @@ pub(crate) fn encode(projection: &Projection) -> Value {
                 .collect(),
             |source| text(source),
         ),
-        array(
-            projection
-                .drafts
-                .values()
-                .map(|record| {
-                    array(vec![
-                        bytes(&crate::draft_event::encode(&DraftEvent::Created(
-                            Arc::clone(&record.created),
-                        ))),
-                        uint(record.created_index),
-                        nullable(record.approved.as_ref().map(|(approved, index)| {
-                            array(vec![
-                                bytes(&crate::draft_event::encode(&DraftEvent::Approved(
-                                    Arc::clone(approved),
-                                ))),
-                                uint(*index),
-                            ])
-                        })),
-                    ])
-                })
-                .collect(),
-        ),
+        super::draft::state::encode(projection),
     ])
 }
 
@@ -177,61 +154,7 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
     projection
         .rebuild_reporting_indexes()
         .map_err(|error| error.to_string())?;
-    for held in list(drafts, "the draft records")? {
-        let [created, index, approved] = tuple::<3>(held, "a draft record")?;
-        let Value::Bytes(body) = created else {
-            return Err("a draft creation is canonical bytes".to_owned());
-        };
-        let DraftEvent::Created(created) =
-            crate::draft_event::decode(&body).map_err(|error| error.to_string())?
-        else {
-            return Err("a draft record must begin with a creation".to_owned());
-        };
-        let created_index = read_uint(&index, "a draft creation index")?;
-        if projection.operation(created.operation) != Some(created_index) {
-            return Err("a draft creation disagrees with its operation index".to_owned());
-        }
-        let hash = crate::encoding::payload_commitment(&body);
-        let approved = read_nullable(approved)
-            .map(|value| {
-                let [body, index] = tuple::<2>(value, "a draft approval")?;
-                let Value::Bytes(body) = body else {
-                    return Err("a draft approval is canonical bytes".to_owned());
-                };
-                let DraftEvent::Approved(approval) =
-                    crate::draft_event::decode(&body).map_err(|error| error.to_string())?
-                else {
-                    return Err("a draft decision must be an approval".to_owned());
-                };
-                let index = read_uint(&index, "a draft approval index")?;
-                if approval.draft != created.operation
-                    || approval.draft_hash != hash
-                    || index <= created_index
-                {
-                    return Err("a draft approval disagrees with its creation".to_owned());
-                }
-                if projection.operation(approval.operation) != Some(index) {
-                    return Err("a draft approval disagrees with its operation index".to_owned());
-                }
-                Ok((approval, index))
-            })
-            .transpose()?;
-        let operation = created.operation;
-        if Arc::make_mut(&mut projection.drafts)
-            .insert(
-                operation,
-                Arc::new(DraftRecord {
-                    created,
-                    hash,
-                    created_index,
-                    approved,
-                }),
-            )
-            .is_some()
-        {
-            return Err("a draft is recorded twice".to_owned());
-        }
-    }
+    super::draft::state::decode(&mut projection, drafts)?;
     Ok(projection)
 }
 

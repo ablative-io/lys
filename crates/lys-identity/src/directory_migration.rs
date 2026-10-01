@@ -31,7 +31,7 @@ pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, Id
     if version == directory_state::STATE_VERSION {
         return Ok(false);
     }
-    if version != 2 && version != 3 {
+    if version != 2 && version != 3 && version != 4 {
         return Err(IdentityError::DirectorySnapshotUnmigrated {
             found: version,
             expected: directory_state::STATE_VERSION,

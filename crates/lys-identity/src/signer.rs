@@ -33,6 +33,8 @@ pub const SERVICE_ACCOUNT_CONTENT_TYPE: &str = "application/vnd.lys.identity-eve
 pub const INSTALL_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v3+cbor";
 /// The distinct envelope for immutable drafts and their decisions.
 pub const DRAFT_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v1+cbor";
+/// The envelope retaining original request bytes and terminal decisions.
+pub const DRAFT_V2_CONTENT_TYPE: &str = "application/vnd.lys.identity-draft.v2+cbor";
 
 fn content_type(event: &IdentityEvent) -> &'static str {
     if event.version() == 2 {
@@ -185,11 +187,16 @@ pub fn sign_draft_event(
     event: DraftEvent,
     service_key: &Ed25519Identity,
 ) -> Result<SignedEvent, IdentityError> {
-    event.validate()?;
+    event.validate_new()?;
     let body = draft_event::encode(&event);
+    let media_type = if event.version() == 2 {
+        DRAFT_V2_CONTENT_TYPE
+    } else {
+        DRAFT_CONTENT_TYPE
+    };
     seal(
         &body,
-        DRAFT_CONTENT_TYPE,
+        media_type,
         Entry::Draft(Box::new(event)),
         service_key,
     )
@@ -216,6 +223,7 @@ pub fn verify_event(
         && parts.protected != protected_header(&kid, SERVICE_ACCOUNT_CONTENT_TYPE)
         && parts.protected != protected_header(&kid, INSTALL_CONTENT_TYPE)
         && parts.protected != protected_header(&kid, DRAFT_CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, DRAFT_V2_CONTENT_TYPE)
     {
         return Err(IdentityError::EventMalformed {
             reason: "the protected header is not the identity-event header",
@@ -234,11 +242,16 @@ pub fn verify_event(
     {
         return Err(IdentityError::SignatureInvalid);
     }
-    let (entry, media_type) = if parts.protected == protected_header(&kid, DRAFT_CONTENT_TYPE) {
-        (
-            Entry::Draft(Box::new(draft_event::decode(&parts.payload)?)),
-            DRAFT_CONTENT_TYPE,
-        )
+    let (entry, media_type) = if parts.protected == protected_header(&kid, DRAFT_CONTENT_TYPE)
+        || parts.protected == protected_header(&kid, DRAFT_V2_CONTENT_TYPE)
+    {
+        let draft = draft_event::decode(&parts.payload)?;
+        let media_type = if draft.version() == 2 {
+            DRAFT_V2_CONTENT_TYPE
+        } else {
+            DRAFT_CONTENT_TYPE
+        };
+        (Entry::Draft(Box::new(draft)), media_type)
     } else if install_event::body_version(&parts.payload)? == Some(INSTALL_EVENT_VERSION) {
         let event = install_event::decode(&parts.payload)?;
         (Entry::Install(event), INSTALL_CONTENT_TYPE)
@@ -314,3 +327,7 @@ pub fn load_service_key(path: &std::path::Path) -> Result<Ed25519Identity, Ident
 #[cfg(test)]
 #[path = "draft_event_tests.rs"]
 mod draft_tests;
+
+#[cfg(test)]
+#[path = "draft_decision_tests.rs"]
+mod decision_tests;
