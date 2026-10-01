@@ -381,17 +381,6 @@ impl Sessions {
         output.wake()
     }
 
-    /// Wake caller-close requests whose session was not decoded.
-    pub(crate) fn cancel_waiters(&self) {
-        let table = self.lock();
-        for (id, session) in &table.sessions {
-            if let Err(error) = session.output.wake() {
-                crate::error::said(&format!("session {id}: cancellation_wake_failed: {error}"));
-            }
-        }
-        self.changed.notify_all();
-    }
-
     fn persist(&self, table: &Table) -> Result<(), RunnerError> {
         let sessions = table
             .sessions

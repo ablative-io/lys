@@ -202,6 +202,7 @@ impl GrantAnswer {
 /// Where the grant channel stands.
 #[derive(Debug, Default)]
 pub(crate) struct Desk {
+    ready: Arc<tokio::sync::Notify>,
     next: u64,
     live: BTreeSet<u64>,
     asked: VecDeque<GrantQuestion>,
@@ -247,7 +248,9 @@ pub fn ask(
         return Err("no grant authority is attached to this runner".to_owned());
     }
     table.desk.asked.push_back(question);
+    let ready = Arc::clone(&table.desk.ready);
     drop(table);
+    ready.notify_one();
     sessions.wake();
     let answered = sessions.until_any(left, |table| {
         if let Some(answer) = table.desk.answers.remove(&named) {
@@ -264,6 +267,69 @@ pub fn ask(
     table.desk.asked.retain(|waiting| key(waiting) != named);
     drop(table);
     answered.unwrap_or_else(|left| Err(format!("the question ended unanswered: {left}")))
+}
+
+pub(crate) struct Channel {
+    sessions: Arc<Sessions>,
+    id: u64,
+}
+
+impl Channel {
+    pub(crate) fn new(sessions: &Arc<Sessions>) -> Self {
+        let mut table = sessions.lock();
+        let id = table.desk.next;
+        table.desk.next += 1;
+        table.desk.live.insert(id);
+        Self {
+            sessions: Arc::clone(sessions),
+            id,
+        }
+    }
+
+    pub(crate) fn ready(&self) -> Arc<tokio::sync::Notify> {
+        Arc::clone(&self.sessions.lock().desk.ready)
+    }
+
+    pub(crate) fn next(&self) -> Option<GrantQuestion> {
+        let mut table = self.sessions.lock();
+        let question = table.desk.asked.pop_front()?;
+        table.desk.taken.insert(key(&question), self.id);
+        Some(question)
+    }
+
+    pub(crate) fn answer(
+        &self,
+        question: &GrantQuestion,
+        line: &str,
+    ) -> Result<(), crate::error::RunnerError> {
+        let answer = serde_json::from_str::<GrantAnswer>(line.trim_end())
+            .map_err(|error| format!("the authority's answer does not read: {error}"))
+            .and_then(|answer| {
+                if answer.answers(question) {
+                    Ok(answer)
+                } else {
+                    Err("the authority answered another attempt, rule or policy version".to_owned())
+                }
+            });
+        let result = answer.as_ref().map(|_| ()).map_err(|reason| {
+            crate::error::RunnerError::refused("grant_answer_invalid", reason.clone())
+        });
+        self.sessions
+            .lock()
+            .desk
+            .answers
+            .insert(key(question), answer);
+        self.sessions.wake();
+        result
+    }
+}
+
+impl Drop for Channel {
+    fn drop(&mut self) {
+        let mut table = self.sessions.lock();
+        table.desk.live.remove(&self.id);
+        self.sessions.wake();
+    }
 }
 
 /// Serve the grant channel on `stream`: write each question as one line,
