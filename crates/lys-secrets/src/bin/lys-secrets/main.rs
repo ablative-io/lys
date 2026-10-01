@@ -21,6 +21,7 @@ mod save_app_tests;
 mod serve;
 #[cfg(test)]
 mod serve_tests;
+mod signing;
 mod spice;
 mod view;
 #[cfg(test)]

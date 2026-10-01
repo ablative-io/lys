@@ -6,6 +6,7 @@ impl SecretsError {
     /// The refusal's name, the word audit lines record as the outcome.
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Signing(refusal) => refusal.name(),
             Self::StoreKeyMissing { .. } => "StoreKeyMissing",
             Self::KeyFileMisplaced { .. } => "KeyFileMisplaced",
             Self::KeyFilePermissions { .. } => "KeyFilePermissions",

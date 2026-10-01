@@ -294,7 +294,7 @@ impl Ed25519Identity {
     /// constructor accepting private key material is exposed to consumers.
     ///
     /// [`SigningKey`]: ed25519_dalek::SigningKey
-    fn from_seed(seed: &Zeroizing<[u8; 32]>) -> Self {
+    pub fn from_seed(seed: &Zeroizing<[u8; 32]>) -> Self {
         let signing_key = ed25519_dalek::SigningKey::from_bytes(seed);
         let verifying_key = signing_key.verifying_key();
         Self {

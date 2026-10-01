@@ -94,6 +94,10 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
             .route("/_lys/grants", axum::routing::get(crate::view::grants))
             .route("/_lys/handles", axum::routing::get(crate::view::handles))
             .route("/_lys/next-account", axum::routing::post(next_account))
+            .route(
+                "/_lys/sign/{secret}",
+                axum::routing::post(crate::signing::sign),
+            )
             .route("/_lys/scope", axum::routing::post(crate::manage::scope))
             .route(
                 "/_lys/recipients",
@@ -170,7 +174,7 @@ where
 
 /// The permission source's answers to `asks`, asked on the blocking pool
 /// with no lock held.
-async fn ask(shared: &Shared, asks: &[Ask]) -> Result<Checked, SecretsError> {
+pub(crate) async fn ask(shared: &Shared, asks: &[Ask]) -> Result<Checked, SecretsError> {
     let permissions = Arc::clone(&shared.permissions);
     let asks = asks.to_vec();
     let answered = blocking(move || Checked::answer(&asks, permissions.as_ref()));
@@ -210,6 +214,14 @@ pub(crate) fn signed(
         body,
     )
     .map_err(bad)?;
+    signed_for(parts, request)
+}
+
+pub(crate) fn signed_for(
+    parts: &axum::http::request::Parts,
+    request: [u8; 32],
+) -> Result<(HandleToken, Presentation), (StatusCode, SecretsError)> {
+    let bad = |error: SecretsError| (StatusCode::BAD_REQUEST, error);
     let malformed = || SecretsError::PresentationInvalid {
         handle: String::new(),
     };

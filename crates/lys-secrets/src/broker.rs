@@ -50,6 +50,10 @@ pub use revocation::{RevocationState, UpstreamRevocation};
 mod rotation;
 mod scope;
 pub use scope::{Discovery, ListScope, SecretSettings};
+mod sign;
+pub use sign::{Signature, SigningRefusal};
+#[cfg(test)]
+mod sign_tests;
 mod spawn;
 mod using;
 

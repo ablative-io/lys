@@ -44,6 +44,12 @@ webpki-roots = "=1.0.9"
 libproc = "0.14"
 
 [dev-dependencies]
+axum.workspace = true
+base64.workspace = true
+identity-contract = { path = "../../tests/identity_contract" }
+lys-identity.workspace = true
+lys-identity-server.workspace = true
+lys-secrets = { path = "../lys-secrets" }
 rcgen.workspace = true
 tempfile.workspace = true
 

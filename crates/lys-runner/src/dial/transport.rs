@@ -70,7 +70,7 @@ pub(super) struct Channel {
 
 /// A response: its status, its headers and its body.
 pub(super) struct Response {
-    status: u16,
+    pub(super) status: u16,
     headers: Vec<(String, String)>,
     pub(super) body: Vec<u8>,
 }
@@ -178,6 +178,13 @@ impl Channel {
 
     /// Send one request and read its whole response, refused by name when
     /// the server answers anything but 200.
+    pub(super) fn path(&self, route: &str) -> String {
+        if self.prefix.is_empty() {
+            route.to_owned()
+        } else {
+            format!("/{}{route}", self.prefix)
+        }
+    }
     pub(super) fn send(
         &self,
         method: &str,
@@ -185,17 +192,44 @@ impl Channel {
         headers: &[(&str, &str)],
         body: &[u8],
     ) -> Result<Response, RunnerError> {
-        let path = if self.prefix.is_empty() {
-            route.to_owned()
-        } else {
-            format!("/{}{route}", self.prefix)
-        };
+        let response = self.send_response(method, route, headers, body)?;
+        if response.status == 200 {
+            return Ok(response);
+        }
+        let words = String::from_utf8_lossy(&response.body).into_owned();
+        let refusal = serde_json::from_str::<serde_json::Value>(&words)
+            .ok()
+            .and_then(|value| value["refusal"].as_str().map(str::to_owned));
+        if refusal.as_deref() == Some(STALE) {
+            return Err(RunnerError::DialStale { reason: words });
+        }
+        Err(failed(format!(
+            "the server answered {}: {words}",
+            response.status
+        )))
+    }
+    pub(super) fn send_response(
+        &self,
+        method: &str,
+        route: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Result<Response, RunnerError> {
+        let path = self.path(route);
         validate_request(method, &path, headers)?;
         let mut head = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: keep-alive\r\n",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: keep-alive\r\n",
             self.authority,
             body.len()
         );
+        // The dial routes take text; a caller that names its own body type
+        // (a signed agent request sends JSON) is never sent a second one.
+        if !headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        {
+            head.push_str("Content-Type: text/plain\r\n");
+        }
         for (name, value) in headers {
             head.push_str(name);
             head.push_str(": ");
@@ -221,20 +255,7 @@ impl Channel {
             *connection_guard = Some(stream);
         }
         drop(connection_guard);
-        if response.status == 200 {
-            return Ok(response);
-        }
-        let words = String::from_utf8_lossy(&response.body).into_owned();
-        let refusal = serde_json::from_str::<serde_json::Value>(&words)
-            .ok()
-            .and_then(|value| value["refusal"].as_str().map(str::to_owned));
-        if refusal.as_deref() == Some(STALE) {
-            return Err(RunnerError::DialStale { reason: words });
-        }
-        Err(failed(format!(
-            "the server answered {}: {words}",
-            response.status
-        )))
+        Ok(response)
     }
 
     fn connect(&self) -> Result<BufReader<Stream>, RunnerError> {
@@ -268,7 +289,11 @@ fn token(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
 }
 
-fn validate_request(method: &str, path: &str, headers: &[(&str, &str)]) -> Result<(), RunnerError> {
+pub(super) fn validate_request(
+    method: &str,
+    path: &str,
+    headers: &[(&str, &str)],
+) -> Result<(), RunnerError> {
     if !token(method)
         || !path.starts_with('/')
         || path.bytes().any(|byte| byte <= b' ' || byte == 127)
