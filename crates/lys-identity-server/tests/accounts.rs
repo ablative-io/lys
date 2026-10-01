@@ -5,11 +5,20 @@
 //! person cannot sign in until enabled again.
 
 use std::error::Error;
+use std::sync::Arc;
+
+use base64::Engine;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 
 use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
 use lys_identity::OperationId;
+use lys_identity::signer::load_service_key;
 use lys_identity_server::accounts;
+use lys_identity_server::configuration_store::ConfigurationStore;
+use lys_identity_server::provider::{ProductClient, ProviderSettings};
+use lys_identity_server::routes::open_directory;
+use lys_identity_server::runner_acts::ActStore;
 use lys_identity_server::setup::SetupSettings;
 use lys_identity_server::sign_in_providers::{SignInProviders, SignInProvidersSettings};
 use serde_json::{Value, json};
@@ -20,6 +29,9 @@ type TestResult = Result<(), Box<dyn Error>>;
 const CODE: &str = "accounts-first-run-code";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
+const PRODUCT: &str = "accounts-fixture";
+const SECRET: &str = "accounts-fixture-secret";
+const CALLBACK: &str = "http://product.example.test/callback";
 
 fn held_account() -> Value {
     json!({
@@ -177,6 +189,32 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         None,
         Some(settings),
         |config| {
+            config.requests_dir = None;
+            config.certificates_dir = None;
+            config.network_file = None;
+            config.roles_file = None;
+            config.provisioning_file = None;
+            config.runtime_dir = None;
+            config.service_accounts_dir = None;
+            config.teams_dir = None;
+            config.stops_dir = None;
+            config.budgets_dir = None;
+            config.policies_dir = None;
+            config.goals_dir = None;
+            config.reviews_dir = None;
+            config.provider = Some(ProviderSettings {
+                key_file: config.log_dir.with_file_name("provider.key"),
+                clients: vec![ProductClient {
+                    client_id: PRODUCT.to_owned(),
+                    secret_sha256: Sha256::digest(SECRET.as_bytes())
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<Vec<_>>()
+                        .concat(),
+                    redirect_uris: vec![CALLBACK.to_owned()],
+                }],
+                code_seconds: 60,
+            });
             config.administrator = None;
             config.setup = Some(SetupSettings {
                 code_file: config.log_dir.with_file_name("setup-code"),
@@ -192,6 +230,22 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
                 .collect();
             let pending = json!({ "purpose": "first-run", "sha256": digest.concat() });
             std::fs::write(&setup.code_file, pending.to_string())?;
+            std::fs::write(config.log_dir.with_file_name("provider.key"), [5u8; 32])?;
+            let key = Arc::new(load_service_key(&config.event_key_file)?);
+            drop(open_directory(config)?);
+            drop(ConfigurationStore::open(
+                &config.log_dir.with_file_name("organisation"),
+                Arc::clone(&key),
+            )?);
+            drop(ActStore::open(
+                &config.log_dir.with_file_name("runner-acts"),
+                Arc::clone(&key),
+            )?);
+            drop(lys_identity::start::LaunchRecords::open(
+                &config.log_dir.with_file_name("launch-records"),
+                load_service_key(&config.event_key_file)?,
+            )?);
+            drop(lys_identity_server::apps_api::opened(config, key, &|_| {})?);
             Ok(())
         },
     )
@@ -418,6 +472,202 @@ async fn the_administrator_resets_a_password_and_disables_a_person() -> TestResu
     service
         .sign_in_with("bea@new.example.test", "Bea-New-Password-222")
         .await?;
+    Ok(())
+}
+
+async fn product_code(
+    service: &Service,
+    cookie: &str,
+    verifier: &str,
+) -> Result<String, Box<dyn Error>> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+    let answer = client
+        .get(format!("{}/oauth/authorize", service.base))
+        .query(&[
+            ("client_id", PRODUCT),
+            ("redirect_uri", CALLBACK),
+            ("response_type", "code"),
+            ("scope", "openid"),
+            ("state", "accounts-product"),
+            ("code_challenge", challenge.as_str()),
+            ("code_challenge_method", "S256"),
+        ])
+        .header(reqwest::header::COOKIE, cookie)
+        .send()
+        .await?;
+    assert_eq!(answer.status().as_u16(), 303);
+    let back = reqwest::Url::parse(
+        answer
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .ok_or("missing product redirect")?
+            .to_str()?,
+    )?;
+    back.query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, value)| value.into_owned())
+        .ok_or_else(|| "missing product code".into())
+}
+
+async fn product_token(
+    service: &Service,
+    code: &str,
+    verifier: &str,
+) -> Result<(u16, Value), Box<dyn Error>> {
+    let answer = reqwest::Client::new()
+        .post(format!("{}/oauth/token", service.base))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Basic {}", STANDARD.encode(format!("{PRODUCT}:{SECRET}"))),
+        )
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code),
+            ("redirect_uri", CALLBACK),
+            ("code_verifier", verifier),
+        ])
+        .send()
+        .await?;
+    Ok((answer.status().as_u16(), answer.json().await?))
+}
+
+async fn product_user(service: &Service, token: &str) -> Result<(u16, Value), Box<dyn Error>> {
+    let answer = reqwest::Client::new()
+        .get(format!("{}/oauth/userinfo", service.base))
+        .bearer_auth(token)
+        .send()
+        .await?;
+    Ok((answer.status().as_u16(), answer.json().await?))
+}
+
+#[tokio::test]
+async fn disabling_an_account_revokes_existing_sessions_codes_and_tokens_across_restart()
+-> TestResult {
+    let (mut service, rauthy, ada) = table().await?;
+    let person = bea(&service, &rauthy, &ada).await?;
+    let cookie = service
+        .sign_in_with("bea@example.test", "Bea-Password-000111")
+        .await?;
+    let verifier = "accounts-product-verifier-of-enough-length-0123456789";
+    let code = product_code(&service, &cookie, verifier).await?;
+    let issued = product_token(&service, &code, verifier).await?;
+    assert_eq!(issued.0, 200);
+    let token = issued.1["access_token"]
+        .as_str()
+        .ok_or("no access token")?
+        .to_owned();
+    assert_eq!(product_user(&service, &token).await?.0, 200);
+    let pending = product_code(&service, &cookie, verifier).await?;
+    let disabled = service
+        .post(
+            &format!("/directory/people/{person}/account/enabled"),
+            Some(&ada),
+            &json!({ "enabled": false }),
+        )
+        .await?;
+    assert_eq!(disabled.0, 200, "{}", disabled.1);
+    assert_eq!(disabled.1["enabled"], false);
+    let signed_out = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(signed_out.0, 401, "{}", signed_out.1);
+    assert_eq!(signed_out.1["refusal"], "NotSignedIn");
+    let revoked = product_user(&service, &token).await?;
+    assert_eq!(revoked.0, 401, "{}", revoked.1);
+    assert_eq!(revoked.1["refusal"], "TokenUnknown");
+    let code_refused = product_token(&service, &pending, verifier).await?;
+    assert_eq!(code_refused.0, 400, "{}", code_refused.1);
+    assert_eq!(code_refused.1["error"], "CodeUnknown");
+    service.restart().await?;
+    let reopened = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(reopened.0, 401, "{}", reopened.1);
+    assert_eq!(product_user(&service, &token).await?.0, 401);
+    assert!(
+        service
+            .sign_in_with("bea@example.test", "Bea-Password-000111")
+            .await
+            .is_err()
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_callback_prepared_before_disable_cannot_create_a_new_session() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let person = bea(&service, &rauthy, &ada).await?;
+    let user = rauthy
+        .users()
+        .into_iter()
+        .find(|user| user["email"] == "bea@example.test")
+        .ok_or("account missing")?;
+    let subject = user["id"].as_str().ok_or("account id missing")?.to_owned();
+    let (callback, binding) = service
+        .issuer_answer(identity_contract::fake_issuer::Login {
+            subject,
+            email: "bea@example.test".to_owned(),
+        })
+        .await?;
+    let disabled = service
+        .post(
+            &format!("/directory/people/{person}/account/enabled"),
+            Some(&ada),
+            &json!({ "enabled": false }),
+        )
+        .await?;
+    assert_eq!(disabled.0, 200, "{}", disabled.1);
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let answer = client
+        .get(format!("{}{callback}", service.base))
+        .header(reqwest::header::COOKIE, binding)
+        .send()
+        .await?;
+    let session = answer
+        .headers()
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|header| header.to_str().ok())
+        .find(|cookie| cookie.starts_with(&format!("{}=", lys_identity_server::session::COOKIE)));
+    assert!(
+        session.is_none(),
+        "a pre-disable callback recreated a signed-in session"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_failed_session_revoke_is_named_and_keeps_the_old_cookie_refused() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let person = bea(&service, &rauthy, &ada).await?;
+    let cookie = service
+        .sign_in_with("bea@example.test", "Bea-Password-000111")
+        .await?;
+    let sessions = service.dir.path().join("sessions.json");
+    std::fs::rename(&sessions, service.dir.path().join("saved-sessions.json"))?;
+    std::fs::create_dir(&sessions)?;
+    let refused = service
+        .post(
+            &format!("/directory/people/{person}/account/enabled"),
+            Some(&ada),
+            &json!({ "enabled": false }),
+        )
+        .await?;
+    assert_eq!(refused.0, 503, "{}", refused.1);
+    assert_eq!(refused.1["refusal"], "SessionsUnavailable");
+    let signed_out = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(signed_out.0, 401, "{}", signed_out.1);
+    assert_eq!(signed_out.1["refusal"], "NotSignedIn");
+    let user = rauthy
+        .users()
+        .into_iter()
+        .find(|user| user["email"] == "bea@example.test")
+        .ok_or("account missing")?;
+    assert_eq!(
+        user["enabled"], true,
+        "issuer changes only after durable session revocation"
+    );
     Ok(())
 }
 
