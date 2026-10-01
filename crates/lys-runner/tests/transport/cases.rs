@@ -46,7 +46,7 @@ fn oversized_headers_are_refused_by_name() -> TestResult {
 }
 
 #[test]
-fn ambiguous_or_truncated_framing_is_refused() -> TestResult {
+fn ambiguous_or_truncated_framing_is_refused() {
     for raw in [
         b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\nxx".as_slice(),
         b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
@@ -58,7 +58,6 @@ fn ambiguous_or_truncated_framing_is_refused() -> TestResult {
             "ambiguous or truncated framing accepted"
         );
     }
-    Ok(())
 }
 
 #[test]
@@ -116,7 +115,12 @@ fn sequential_control_requests_reuse_one_connection() -> TestResult {
     for route in ["/epoch", "/reply"] {
         assert_eq!(channel.send("GET", route, &[], b"")?.body, b"ok");
     }
-    assert_eq!(serving.join().map_err(|_| "server panicked")??, 1);
+    assert_eq!(
+        serving
+            .join()
+            .map_err(|panic| format!("server panicked: {panic:?}"))??,
+        1
+    );
     Ok(())
 }
 
@@ -177,7 +181,8 @@ fn blocked_long_poll_and_control_share_exactly_two_connections() -> TestResult {
                 .map_err(|error| error.to_string())?;
         }
         release.send(()).map_err(|error| error.to_string())?;
-        poll.join().map_err(|_| "poll server panicked")??;
+        poll.join()
+            .map_err(|panic| format!("poll server panicked: {panic:?}"))??;
         Ok(2)
     });
     let channel = Arc::new(Channel::for_server(&format!("http://{address}"), None)?);
@@ -194,8 +199,15 @@ fn blocked_long_poll_and_control_share_exactly_two_connections() -> TestResult {
     for _ in 0..2 {
         channel.send("GET", "/reply", &[], b"")?;
     }
-    client.join().map_err(|_| "poll client panicked")??;
-    assert_eq!(serving.join().map_err(|_| "server panicked")??, 2);
+    client
+        .join()
+        .map_err(|panic| format!("poll client panicked: {panic:?}"))??;
+    assert_eq!(
+        serving
+            .join()
+            .map_err(|panic| format!("server panicked: {panic:?}"))??,
+        2
+    );
     for lane in [&channel.poll, &channel.control] {
         assert!(lane.lock().map_err(|error| error.to_string())?.is_some());
     }

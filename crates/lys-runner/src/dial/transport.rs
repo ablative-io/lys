@@ -208,19 +208,19 @@ impl Channel {
         } else {
             &self.control
         };
-        let mut held = lane
+        let mut connection_guard = lane
             .lock()
             .map_err(|error| failed(format!("the connection lock is poisoned: {error}")))?;
-        let mut stream = match held.take() {
+        let mut stream = match connection_guard.take() {
             Some(stream) => stream,
             None => self.connect()?,
         };
         // A failed exchange is never replayed: a POST may already be applied.
         let (response, reusable) = exchange(&mut stream, head.as_bytes(), body)?;
         if reusable {
-            *held = Some(stream);
+            *connection_guard = Some(stream);
         }
-        drop(held);
+        drop(connection_guard);
         if response.status == 200 {
             return Ok(response);
         }
