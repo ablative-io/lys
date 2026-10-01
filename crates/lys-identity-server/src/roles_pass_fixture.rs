@@ -1,20 +1,63 @@
 use std::error::Error;
+use std::sync::Arc;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::{
-    Actor, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, Profile, Provenance,
-    Transition,
-};
+use lys_identity::{Directory, LoginBinding, OperationId};
 use lys_log_store::FileLeafStore;
 use serde_json::{Value, json};
 
 use crate::roles_records::{Holding, Role, Version, Words};
 
+#[path = "roles_pass_template.rs"]
+mod template;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const MODEL: &str = r#"{"version":1,"relations":{"reader":["read"],"creator":["role.create"],"reviser":["role.revise"],"assigner":["role.holder.assign"],"mover":["role.holder.move"],"ender":["role.holder.end"]}}"#;
+
+fn joined<T>(worker: std::thread::ScopedJoinHandle<'_, T>) -> T {
+    match worker.join() {
+        Ok(result) => result,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
+fn prepare_stores(
+    log: &std::path::Path,
+    key_file: &std::path::Path,
+    apps_dir: &std::path::Path,
+    runtime_dir: &std::path::Path,
+    key: &Arc<Ed25519Identity>,
+) -> TestResult {
+    std::thread::scope(|scope| -> TestResult {
+        let organisation = scope.spawn(|| {
+            crate::configuration_store::ConfigurationStore::open(
+                &log.with_file_name("organisation"),
+                Arc::clone(key),
+            )
+        });
+        let acts = scope.spawn(|| {
+            crate::runner_acts::ActStore::open(&log.with_file_name("runner-acts"), Arc::clone(key))
+        });
+        let launches = scope.spawn(|| -> Result<_, Box<dyn Error + Send + Sync>> {
+            Ok(lys_identity::start::LaunchRecords::open(
+                &log.with_file_name("launch-records"),
+                Ed25519Identity::load(key_file)?,
+            )?)
+        });
+        let apps = scope.spawn(|| crate::apps_store::AppStore::open(apps_dir, Arc::clone(key)));
+        let runtime =
+            scope.spawn(|| crate::runtime_store::RuntimeStore::open(runtime_dir, Arc::clone(key)));
+        joined(runtime)?;
+        joined(organisation)?;
+        joined(acts)?;
+        joined(launches).map_err(|error| error as Box<dyn Error>)?;
+        joined(apps)?;
+        Ok(())
+    })
+}
 
 pub(super) fn operation() -> TestResult<String> {
     Ok(OperationId::generate()?.to_string())
@@ -50,7 +93,6 @@ impl Table {
                 config.certificates_dir = None;
                 config.network_file = None;
                 config.provisioning_file = None;
-                config.runtime_dir = None;
                 config.service_accounts_dir = None;
                 config.teams_dir = None;
                 config.stops_dir = None;
@@ -61,36 +103,30 @@ impl Table {
                 config.homes_dir = None;
             },
             |config| {
-                FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+                let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+                let (agent, person) = template::restore(
+                    &config.log_dir,
+                    &config.event_key_file,
+                    &config.apps_dir(),
+                    config
+                        .runtime_dir
+                        .as_deref()
+                        .ok_or("runtime fixture is disabled")?,
+                    &config.log_origin,
+                    &key,
+                    &config.grant_model()?,
+                )?;
                 let path = config.log_dir.clone();
                 let mut directory = Directory::open(
                     Box::new(move || FileLeafStore::open(&path)),
                     Ed25519Identity::load(&config.event_key_file)?,
                 )?;
-                let actor = Actor::new(
-                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                    Provenance::new(AuthMethod::Oidc, 1),
-                );
-                let (person, _) = directory.setup_person(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    Profile::new("Owner")?,
-                    1,
-                )?;
-                let (agent, _) = directory.register_agent(
-                    actor.clone(),
+                directory.bind_login(
+                    template::actor()?,
                     OperationId::generate()?,
                     person,
-                    Profile::new("Recorder")?,
-                    2,
-                )?;
-                directory.transition(
-                    actor,
-                    OperationId::generate()?,
-                    IdentityId::Agent(agent),
-                    Transition::Activate,
-                    "",
-                    3,
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                    4,
                 )?;
                 let role = OperationId::from_bytes([8; 16]).to_string();
                 let assignment = OperationId::from_bytes([9; 16]).to_string();
