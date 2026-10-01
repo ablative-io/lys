@@ -33,6 +33,13 @@ use crate::error_team::TeamError;
 use crate::routes::Say;
 use crate::teams_state::{DOMAIN, Held, Line, Refused, Team};
 
+#[path = "teams_overlay.rs"]
+mod overlay;
+
+#[cfg(test)]
+#[path = "teams_overlay_tests.rs"]
+mod overlay_tests;
+
 /// How the leaf store is opened again after an append whose outcome is not known.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
 
@@ -51,7 +58,7 @@ pub struct TeamStore<S: LeafStore = FileLeafStore> {
     uncertain: bool,
     snapshots_enabled: bool,
     pending: Vec<Line>,
-    overlay: Option<Held>,
+    overlay: Option<overlay::Overlay>,
 }
 
 /// A log opened and folded: the log, what it folds to, and how it started.
@@ -216,24 +223,27 @@ impl<S: LeafStore> TeamStore<S> {
 
     /// Every team, in the order created.
     pub fn teams(&self) -> &[Team] {
-        &self.overlay.as_ref().unwrap_or(&self.held).teams
+        self.overlay
+            .as_ref()
+            .map_or(self.held.teams.as_slice(), |overlay| {
+                overlay.teams(&self.held)
+            })
     }
 
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
-        self.overlay.as_ref().unwrap_or(&self.held).team(id)
+        self.overlay
+            .as_ref()
+            .and_then(|overlay| overlay.team(id))
+            .or_else(|| self.held.team(id))
     }
 
     /// A team and each descendant under the current migration overlay.
     pub fn subtree(&self, root: &str) -> Result<BTreeSet<String>, ServerError> {
-        self.overlay
-            .as_ref()
-            .unwrap_or(&self.held)
-            .subtree(root)
-            .map_err(|reason| match reason {
-                Refused::Unknown => ServerError::Team(TeamError::Unknown),
-                other => unavailable(format!("team subtree refused: {other:?}")),
-            })
+        self.held.subtree(root).map_err(|reason| match reason {
+            Refused::Unknown => ServerError::Team(TeamError::Unknown),
+            other => unavailable(format!("team subtree refused: {other:?}")),
+        })
     }
 
     /// The line first kept under `operation`.
@@ -305,17 +315,19 @@ impl<S: LeafStore> TeamStore<S> {
     }
 
     fn refresh_overlay(&mut self) -> Result<(), ServerError> {
-        let mut held = self.held.clone();
+        if self.pending.is_empty() {
+            self.overlay = None;
+            return Ok(());
+        }
+        let mut overlay = overlay::Overlay::default();
         for line in &self.pending {
             if self.pending_line(line) {
-                held.hold(line.clone()).map_err(unavailable)?;
+                overlay
+                    .hold(&self.held, line.clone())
+                    .map_err(unavailable)?;
             }
         }
-        self.overlay = if self.pending.is_empty() {
-            None
-        } else {
-            Some(held)
-        };
+        self.overlay = Some(overlay);
         Ok(())
     }
 
