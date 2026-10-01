@@ -66,6 +66,15 @@ impl Sessions {
                 arguments = resume.to_vec();
             }
         }
+        #[cfg(test)]
+        if let Some(probe) = self
+            .spawn_probe
+            .lock()
+            .map_err(|error| RunnerError::refused("spawn_probe_failed", error.to_string()))?
+            .take()
+        {
+            probe();
+        }
         let spawned = crate::pty::spawn(&crate::pty::Spawn {
             program: &launch.program,
             arguments: &arguments,

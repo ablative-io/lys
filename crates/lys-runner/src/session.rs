@@ -50,6 +50,13 @@ use crate::tracking_store::Feed;
 mod lifecycle;
 mod restart;
 
+#[cfg(test)]
+#[path = "../tests/session_start/cases.rs"]
+mod start_tests;
+
+#[cfg(test)]
+type SpawnProbe = Box<dyn FnOnce() + Send>;
+
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
 pub(crate) use lifecycle::{Wake, accounts, append, window_limit};
@@ -207,6 +214,8 @@ pub struct Sessions {
     state_dir: PathBuf,
     scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
+    #[cfg(test)]
+    spawn_probe: Mutex<Option<SpawnProbe>>,
 }
 
 pub(crate) fn unknown(id: &str) -> RunnerError {
@@ -319,6 +328,8 @@ impl Sessions {
                 state_dir,
                 scrollback,
                 writer,
+                #[cfg(test)]
+                spawn_probe: Mutex::new(None),
             }
         });
         let table = sessions.lock();
