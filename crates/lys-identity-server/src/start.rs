@@ -234,7 +234,7 @@ where
     service
         .callers
         .check_admission()
-        .map_err(IntoResponse::into_response)?;
+        .map_err(|error| named(error.status(), &error.name(), &error.to_string()))?;
     let Some(caller) = service.callers.caller(headers) else {
         return Err(named(
             StatusCode::UNAUTHORIZED,

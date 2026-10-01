@@ -1,4 +1,6 @@
-//! Missing policy refuses a launch before an agent can run.
+//! Missing policy refuses a launch before an agent can run. Every registered
+//! agent is given a default-deny policy, so a launch finds none only on a
+//! service that keeps no policies.
 
 #[path = "support/runner_start.rs"]
 mod support;
@@ -12,7 +14,11 @@ use support::Table;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_agent_without_a_policy_cannot_start() -> Result<(), Box<dyn Error>> {
-    let table = Table::set().await?;
+    let mut table = Table::set().await?;
+    table
+        .service
+        .restart_adjusted(|config| config.policies_dir = None)
+        .await?;
     let agent = table.agent();
     let machine = table
         .machine(
