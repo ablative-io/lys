@@ -19,6 +19,7 @@ pub(super) enum Edit {
     Skill(SkillText),
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum Changed {
     Version((usize, usize)),
     Skill(usize),
@@ -48,7 +49,7 @@ struct Versions<'a> {
 }
 
 #[derive(serde::Serialize)]
-struct Reviewed<'a> {
+struct VersionView<'a> {
     number: u32,
     operation: &'a str,
     settings: &'a Settings,
@@ -108,7 +109,7 @@ impl Serialize for Versions<'_> {
                     version: target,
                     review,
                     ..
-                } if *target == position => sequence.serialize_element(&Reviewed {
+                } if *target == position => sequence.serialize_element(&VersionView {
                     number: version.number,
                     operation: &version.operation,
                     settings: &version.settings,
