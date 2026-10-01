@@ -41,6 +41,15 @@ impl Table {
         uses: Vec<Usage>,
         has_session: bool,
     ) -> TestResult<Self> {
+        Self::with_period(measure, uses, has_session, Length::Week).await
+    }
+
+    async fn with_period(
+        measure: Measure,
+        uses: Vec<Usage>,
+        has_session: bool,
+        length: Length,
+    ) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
             let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
@@ -82,7 +91,7 @@ impl Table {
                     measure,
                     limit: 50,
                     period: Some(Period {
-                        length: Length::Week,
+                        length,
                         zone: "UTC".to_owned(),
                     }),
                     act: Act::Stop,
@@ -258,6 +267,53 @@ async fn a_fresh_agent_has_explicit_zero_spend_and_passes_start_admission() -> T
     assert_eq!(status, 409, "{answer}");
     let checks = answer["checks"].as_array().ok_or("no start checks")?;
     assert_eq!(checks.len(), 5, "admitted past the budget check: {answer}");
+    assert_eq!(checks[0]["result"], "passed", "{answer}");
+    for check in &checks[1..] {
+        assert_eq!(check["result"], "check_record_missing", "{answer}");
+    }
+    let refused = answer["refused"].as_array().ok_or("no start refusals")?;
+    assert_eq!(refused.len(), 4, "{answer}");
+    assert!(
+        refused
+            .iter()
+            .all(|refusal| refusal["refusal"] == "check_record_missing"),
+        "{answer}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_prior_day_dollar_report_leaves_today_empty_and_admits_both_starts() -> TestResult {
+    let since = Period {
+        length: Length::Day,
+        zone: "UTC".to_owned(),
+    }
+    .start_of(jiff::Timestamp::now().as_millisecond())?;
+    let table = Table::with_period(
+        Measure::Dollars,
+        vec![Usage {
+            event: "yesterday-cost".to_owned(),
+            at_ms: since.checked_sub(1).ok_or("no prior day instant")?,
+            session: Some("provider-session".to_owned()),
+            dollars_micros: Some(50_000_000),
+            native_snapshot: true,
+            ..Usage::default()
+        }],
+        false,
+        Length::Day,
+    )
+    .await?;
+    let (command_status, command) = table.start("start-command").await?;
+    let (start_status, answer) = table.start("start").await?;
+    let used = table.figure().await?;
+    assert_eq!(used["figure"], 0, "{used}");
+    assert_eq!(used["unavailable"], Value::Null, "{used}");
+    assert_eq!(used["since_ms"], since, "{used}");
+    assert_eq!(command_status, 404, "{command}");
+    assert_eq!(command["refusal"], "LaunchRecordMissing", "{command}");
+    assert_eq!(start_status, 409, "{answer}");
+    let checks = answer["checks"].as_array().ok_or("no start checks")?;
+    assert_eq!(checks.len(), 5, "{answer}");
     assert_eq!(checks[0]["result"], "passed", "{answer}");
     for check in &checks[1..] {
         assert_eq!(check["result"], "check_record_missing", "{answer}");
