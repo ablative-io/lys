@@ -1977,6 +1977,24 @@
       ],
       "supersedes": [],
       "superseded_by": ""
+    },
+    {
+      "id": "ADR-134",
+      "title": "Leaves and the pin are appended together to checksummed segment files, with one flush per append",
+      "status": "decided",
+      "scope": "lys-log-store",
+      "date": "2026-10-01",
+      "decided_by": "Waffles in the Lys room at 13:27 Melbourne, under Tom's order to fix the slow tests; recorded by Archie.",
+      "context": "FileLeafStore writes every leaf as its own file (write_leaf_temp, sync_all, link_leaf, flush of leaves/; file.rs put_leaf_with) and then rewrites state.json for the pin (write_state: temp file, sync, rename, flush of the directory). One FrontierLog::append is about four full drive flushes and one new file. Every identity-server store, the lys-identity directory, the lys-secrets audit and lys log sit on it, and leaf() opens one file per record.",
+      "decision": "A log's leaves are appended as length-prefixed, checksummed records to segment files rolled at a fixed size. Each record carries the pin it makes, so the leaf and the pin are written by one append and made durable by one flush; state.json is no longer rewritten. Appends given together share one flush. A store in the per-file layout is migrated once, on its first writable open.",
+      "quote": "The fix is a format change, so it carries a migration",
+      "consequences": [
+        "An append costs one flush, and a batch of appends costs one flush.",
+        "A torn last record is the interrupted append; nothing under it is ever rewritten.",
+        "Crash behaviour is proven no weaker by a crash at every write, flush and rename boundary."
+      ],
+      "supersedes": [],
+      "superseded_by": ""
     }
   ]
 }

@@ -51,3 +51,12 @@
 - [ ] **C27** — The lys log and ca log commands and the revocation appends run on the frontier log (LYSLOGSTORE-007 R4).
 - [ ] **C28** — Only lys log audit reads every leaf, and the whole-tree Log is removed (LYSLOGSTORE-007 R5).
 - [ ] **C29** — A gate test fails when any open reads a leaf under the pin (LYSLOGSTORE-007 R6).
+
+## Segment log (LYSLOGSTORE-008)
+
+- [ ] **C32** — Leaves are appended as length-prefixed, checksummed records to segment files rolled at a fixed size, and leaf() reads one record by its offset (LYSLOGSTORE-008 R1).
+- [ ] **C33** — The pin is written inside the leaf's record, one flush makes both durable, and state.json is no longer rewritten (LYSLOGSTORE-008 R2).
+- [ ] **C34** — FrontierLog::append_batch writes many records with one flush, and the fixtures and bulk writers use it (LYSLOGSTORE-008 R3).
+- [ ] **C35** — A per-file store is migrated once on its first writable open, and a crash at any point leaves the old store whole or the new store complete (LYSLOGSTORE-008 R4).
+- [ ] **C36** — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
+- [ ] **C37** — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).

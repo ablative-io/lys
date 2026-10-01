@@ -1,0 +1,173 @@
+---
+type: brief
+id: LYSLOGSTORE-008
+cluster: lys-log-store
+title: An append costs one flush, so leaves and their pin go into segment files together
+---
+
+# LYSLOGSTORE-008: An append costs one flush, so leaves and their pin go into segment files together
+
+> **Cluster:** lys-log-store
+> **Design anchor:**
+> - ADR-134 — Leaves and the pin are appended together to checksummed segment files, with one flush per append — A log's leaves are appended as length-prefixed, checksummed records to segment files rolled at a fixed size. Each record carries the pin it makes, so the leaf and the pin are written by one append and made durable by one flush; state.json is no longer rewritten. Appends given together share one flush. A store in the per-file layout is migrated once, on its first writable open.
+> **Checklist:**
+> - C32 — Leaves are appended as length-prefixed, checksummed records to segment files rolled at a fixed size, and leaf() reads one record by its offset (LYSLOGSTORE-008 R1).
+> - C33 — The pin is written inside the leaf's record, one flush makes both durable, and state.json is no longer rewritten (LYSLOGSTORE-008 R2).
+> - C34 — FrontierLog::append_batch writes many records with one flush, and the fixtures and bulk writers use it (LYSLOGSTORE-008 R3).
+> - C35 — A per-file store is migrated once on its first writable open, and a crash at any point leaves the old store whole or the new store complete (LYSLOGSTORE-008 R4).
+> - C36 — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
+> - C37 — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
+> **Stories:**
+> - S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+## Purpose
+
+Waffles read the store on 1 October and found the cost behind most of Lys's slow tests and slow requests. FileLeafStore stores every leaf as its own file, and one FrontierLog::append (frontier_log.rs, append) writes a temporary leaf, flushes it, links it, flushes leaves/ (file.rs, put_leaf_with), then rewrites state.json through a temporary file, a flush, a rename and a flush of the directory (file.rs, write_state). That is about four full drive flushes and one new file per record, and leaf() opens one file per record. Every identity-server store (agent_policy, apps, budgets, certificates, configuration, goals, grants, mcp_requests, requests, reviews, runtime, service_accounts, stops, teams, runner_acts), the lys-identity directory, the lys-secrets audit and lys log sit on it, and log_window, list_paging and lys_home pay it in the gate.
+
+## Task
+
+Append leaves and their pin together to checksummed segment files with one flush. Add a batch append that shares one flush. Migrate every per-file store once on its first writable open. Prove with a crash at every boundary that nothing is weaker, and count the flushes in the gate. Out of scope: the tiles of LYSLOGSTORE-006 and the open from tiles of LYSLOGSTORE-007, which write beside the segments and join the same flush when they land; the budgets state shape, which is its own card.
+
+## Requirements
+
+### R1: Leaves are appended to segment files
+
+Behavioural. FileLeafStore keeps its leaves in leaves/segments/, as files named by the index of their first leaf. A record is the leaf's length as a little-endian u32, the leaf bytes, the pin record of R2, and a CRC-32C of everything before it. A segment is rolled to a new file when it passes 64 MiB; the roll writes the new file's first record before the old one is closed, so no index falls between segments. Beside each segment an offsets file holds one u64 offset per record. It is written without its own flush, and on open only its tail is checked against the segment: offsets past the last whole record are cut, and records past the last offset are found by reading forward from that offset, never from the start. leaf(index) finds the segment by its name, reads the offset and reads one record, checking its CRC; a record that fails its check is refused corrupt_record, naming the segment and offset. Every existing LeafStore behaviour and error keeps its meaning: LeafAlreadyWritten, LeafWouldLeaveGap, ReadOnly, RepairPending, ReopenRequired and LeafDurabilityUncertain.
+
+**Acceptance:**
+- Every existing lys-log-store test passes unchanged in what it asserts.
+- For 1, 2, 1,000 and 100,000 leaves, with segments rolled at a test size of 4 KiB, every leaf reads back byte-for-byte.
+- A record with one flipped byte is refused corrupt_record, naming its segment and offset.
+- An offsets file cut short, or holding entries past the segment's end, is repaired on open by reading only from its last good entry.
+
+**Files:**
+- create: crates/lys-log-store/src/file/segment.rs
+- create: crates/lys-log-store/src/file/segment_tests.rs
+- modify: crates/lys-log-store/src/file.rs
+- modify: crates/lys-log-store/src/file/leaves.rs
+- modify: crates/lys-log-store/src/error.rs
+- modify: crates/lys-log-store/Cargo.toml
+
+**Checklist:**
+- C32 — Leaves are appended as length-prefixed, checksummed records to segment files rolled at a fixed size, and leaf() reads one record by its offset (LYSLOGSTORE-008 R1).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R2: The pin is written inside the append
+
+Behavioural. Each record carries the tree size and root that appending its leaf makes. FrontierLog::append computes the new frontier first and hands the store the leaf and its pin together; one write and one flush of the segment make both durable, and put_leaf and pin become that one act. On open the pin is the one in the last whole record. A torn last record, short or failing its CRC, is the interrupted append: a writable open cuts it, and a read-only open answers at the last whole record and names the cut still owed, as RepairPending does today. Nothing under the last whole record is ever rewritten. state.json is no longer written. The snapshot slot (file/snapshot_slot.rs) keeps its own file and its own flush, because a snapshot is not an append. The one-leaf-ahead state, where a leaf is durable and its pin is not, can no longer happen, and the poisoned handle after a failed pin goes with it: a failed flush still marks the handle durability_uncertain and asks for a reopen.
+
+**Acceptance:**
+- A store opened after appends answers the same size and root as the frontier that wrote them.
+- A segment with its last record cut short by any number of bytes opens writable at the record before it, and read-only names the cut.
+- A store directory after appends holds no state.json and no file per leaf.
+- The pin a snapshot is written at still matches the record at that size.
+
+**Files:**
+- modify: crates/lys-log-store/src/frontier_log.rs
+- modify: crates/lys-log-store/src/store.rs
+- modify: crates/lys-log-store/src/file.rs
+- modify: crates/lys-log-store/src/test_store.rs
+- modify: crates/lys-log-store/src/frontier_log_tests.rs
+- modify: crates/lys-log-store/src/file_tests.rs
+
+**Checklist:**
+- C33 — The pin is written inside the leaf's record, one flush makes both durable, and state.json is no longer rewritten (LYSLOGSTORE-008 R2).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R3: Appends given together share one flush
+
+Behavioural. FrontierLog gains append_batch(leaves), which appends each leaf in order, with each record carrying its own pin, and makes them durable with one flush. It answers every index and leaf hash, or an error after which nothing in the batch is acknowledged. LeafStore gains the matching put_leaves. The test fixtures that build long logs (the log_window fixture in crates/lys-secrets/tests, the list_paging seeds and the lys_home fixtures) and the identity server's stores, where one request makes several appends under the store's lock, use it. No caller is acknowledged before the flush that covers its leaf.
+
+**Acceptance:**
+- A batch of 1,000 leaves costs one flush, counted by R6's counting layer.
+- A batch that fails its flush acknowledges none of its leaves, and the handle asks for a reopen.
+- Building the 10,000-line log_window fixture through append_batch gives byte-for-byte the store that one append at a time gives.
+
+**Files:**
+- modify: crates/lys-log-store/src/frontier_log.rs
+- modify: crates/lys-log-store/src/store.rs
+- modify: crates/lys-log-store/src/file.rs
+
+**Checklist:**
+- C34 — FrontierLog::append_batch writes many records with one flush, and the fixtures and bulk writers use it (LYSLOGSTORE-008 R3).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R4: A per-file store is migrated once
+
+Behavioural. The first writable open of a store with leaves/<index> files and state.json migrates it. It streams the leaves in order into segments in a private folder beside the store, checks that they rebuild the pinned root, flushes them, then renames the folder into place and flushes the directory. That rename is the commit point. Only then are state.json and the leaf files removed, and a removal that fails is kept by name, as left_behind keeps a temporary name today, and finished on the next open. A leaf past the pin, the interrupted append of the old layout, is reconciled before the migration as today. A read-only open of a store not yet migrated reads the old layout and names the migration still owed. The migration reads every leaf once, which is the one full read Tom's rule allows, as LYSLOGSTORE-006 R3's one adoption is. lys install and the upgrade path open every store writable once, so no store is left in the old layout after an upgrade.
+
+**Acceptance:**
+- A store written by the per-file layout at 0, 1, 600 and 100,000 leaves migrates, and opens after at the same size and root.
+- Every leaf reads back byte-for-byte after migration.
+- A read-only open before migration answers as before and names the migration owed.
+- After an install over a home with per-file stores, every store under it is in the segment layout.
+
+**Files:**
+- create: crates/lys-log-store/src/file/migrate.rs
+- create: crates/lys-log-store/src/file/migrate_tests.rs
+- modify: crates/lys-log-store/src/file.rs
+- modify: crates/lys-log-store/src/lib.rs
+- modify: crates/lys/src/identity/install.rs
+
+**Checklist:**
+- C35 — A per-file store is migrated once on its first writable open, and a crash at any point leaves the old store whole or the new store complete (LYSLOGSTORE-008 R4).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R5: A crash at every boundary loses nothing
+
+Behavioural. A fault layer under the store names every write, flush, rename and removal it is asked for, and can stop the process at any one of them, leaving the files as a crash would. A test runs an append, a batch of 50 and a migration of 600 leaves, stops at each boundary in turn, reopens writable and read-only, and checks: every leaf acknowledged before the stop is there, in order, byte-for-byte; no leaf that was not acknowledged is answered under the pin; the root answered is the root of the leaves answered; and the migration leaves either the old store whole or the new store complete. The same test run against main's per-file layout passes, so the segment layout is proven no weaker.
+
+**Acceptance:**
+- Every boundary of an append, a batch and the migration is stopped at once, and each check above holds at each.
+- The count of boundaries stopped at is printed, and is above zero for each of the three acts.
+
+**Files:**
+- create: crates/lys-log-store/tests/crash_boundaries.rs
+- create: crates/lys-log-store/src/file/fault.rs
+- modify: crates/lys-log-store/src/file.rs
+
+**Checklist:**
+- C36 — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R6: The flushes and the open are counted in the gate
+
+Behavioural. A gate test counts the flushes the store asks for through the fault layer of R5. An append is one flush. A batch of 1,000 is one flush. A segment roll is at most two. An open of a store of 10,000 records reads no more than the last record and the tail of the offsets file, counted by bytes read. The test fails on main before this card, which flushes four times per append.
+
+**Acceptance:**
+- Run against main before this card, the flush count for one append is 4 and the test fails.
+- At the card's head the counts are 1, 1 and at most 2, and the open reads under 64 KiB.
+
+**Files:**
+- create: crates/lys-log-store/tests/flush_count.rs
+
+**Checklist:**
+- C37 — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+## Boundaries
+
+- SHALL NOT acknowledge a leaf before the flush that covers it.
+- SHALL NOT rewrite any record under the last whole record.
+- SHALL NOT read the whole history on any open, apart from the one migration.
+- SHALL NOT change what any store, the anchor or any lys command answers.
+- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore], unsafe code or any bypass.
+- SHALL NOT add a silent fallback: a record that fails its check is a named refusal.
+
+## Verification
+
+- The full Lys gate, the ast-grep scan and the file-length check exit 0 at the card's head.
+- The log_window, list_paging and lys_home programs' times in the gate leg are posted before and after.
+- The flush count test fails on main and passes at the head.

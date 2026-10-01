@@ -34,7 +34,8 @@
     "ADR-004",
     "ADR-106",
     "ADR-108",
-    "ADR-112"
+    "ADR-112",
+    "ADR-134"
   ],
   "goals": [
     "After a put_leaf that fails before its link, no file exists under that leaf's 20-digit name, no temporary file of this writer's remains in leaves/, and a reopen reports the same extent as before the write.",
@@ -659,6 +660,56 @@
       "path": "crates/lys-log-store/src/frontier_log_tests.rs",
       "note": "Its documentation links to Log name FrontierLog or lys log audit.",
       "brief": "LYSLOGSTORE-007"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/segment.rs",
+      "note": "Segment files: checksummed records carrying their pin, rolled at a size, with an offsets file",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/segment_tests.rs",
+      "note": "Segment record, roll and offsets repair tests",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/leaves.rs",
+      "note": "Leaf reads and extent, through segments",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/Cargo.toml",
+      "note": "The crate's dependencies, including the CRC-32C used by segment records",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/migrate.rs",
+      "note": "The one migration of a per-file store into segments",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/migrate_tests.rs",
+      "note": "Migration tests",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/src/file/fault.rs",
+      "note": "The fault layer that names and stops at every write, flush, rename and removal",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/tests/crash_boundaries.rs",
+      "note": "A crash at every boundary of an append, a batch and the migration",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-log-store/tests/flush_count.rs",
+      "note": "The gate test counting flushes per append and bytes read by an open",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys/src/identity/install.rs",
+      "note": "lys install, which opens every store writable once so each is migrated",
+      "brief": "LYSLOGSTORE-008"
     }
   ],
   "inventory": [
