@@ -110,7 +110,7 @@ pub struct AppState {
     /// Cached durable grant-bound credentials.
     pub grant_tokens: Mutex<crate::grant_token_store::Tokens>,
     /// Cached digests for the agent runs this install starts.
-    pub agent_passes: Mutex<crate::agent_pass_store::Passes>,
+    pub agent_passes: Arc<Mutex<crate::agent_pass_store::Passes>>,
     /// Responsibilities loaded from the deployment data before serving.
     pub(crate) kept_responsibilities: crate::kept_responsibilities::Kept,
     /// The schema builder's test benches, each a throwaway draft.

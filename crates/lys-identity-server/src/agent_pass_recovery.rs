@@ -6,17 +6,23 @@ use lys_identity::{AgentId, IdentityId, LifecycleState};
 use std::collections::HashSet;
 
 pub(crate) fn withdraw(
-    state: Option<&AppState>,
+    passes: Option<&std::sync::Mutex<crate::agent_pass_store::Passes>>,
     launch: &str,
 ) -> Result<(), lys_identity::start::StartError> {
-    let state = state.ok_or_else(|| lys_identity::start::StartError::Unavailable {
+    let passes = passes.ok_or_else(|| lys_identity::start::StartError::Unavailable {
         reason: "agent pass store is not attached to launch withdrawal".to_owned(),
     })?;
-    crate::agent_pass::end_launch(state, launch).map_err(|error| {
-        lys_identity::start::StartError::Unavailable {
+    let mut passes =
+        passes
+            .lock()
+            .map_err(|error| lys_identity::start::StartError::Unavailable {
+                reason: format!("the agent pass store lock is poisoned: {error}"),
+            })?;
+    passes
+        .end_launch(launch)
+        .map_err(|error| lys_identity::start::StartError::Unavailable {
             reason: error.to_string(),
-        }
-    })
+        })
 }
 
 pub(crate) fn at_start(state: &AppState, starts: &StartService) -> Result<(), ServerError> {
