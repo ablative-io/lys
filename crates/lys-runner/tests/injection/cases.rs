@@ -68,7 +68,22 @@ impl Fixture {
         if owned {
             sessions.start_for(launch, "person.owner")?;
         } else {
-            sessions.start(launch)?;
+            let act =
+                serde_json::from_value(serde_json::json!({"act": "start", "launch": launch}))?;
+            let server = lys_core::Ed25519Identity::ephemeral();
+            let greeting =
+                crate::protocol::Greeting::fresh(&crate::protocol::hex(&server.public_key_bytes()));
+            let signed = crate::protocol::sign_request(&server, &greeting, &act)?;
+            let answer = crate::socket::dispatch(
+                &sessions,
+                &server.public_key_bytes(),
+                &greeting,
+                &signed,
+                &std::sync::atomic::AtomicBool::new(false),
+            );
+            if !matches!(answer, crate::protocol::Answer::Started { .. }) {
+                return Err(format!("real start refused: {answer:?}").into());
+            }
         }
         let bytes = Arc::new(Mutex::new(Vec::new()));
         let terminal = {
@@ -157,6 +172,15 @@ fn owned_legacy_input_needs_context_and_start_records_the_person() -> TestResult
             .map_err(|error| error.to_string())?
             .is_empty()
     );
+    fixture.end()
+}
+
+#[test]
+fn old_start_line_without_responsible_remains_unowned() -> TestResult {
+    let fixture = Fixture::new()?;
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fixture.dir.path().join("sessions.json"))?)?;
+    assert_eq!(record["responsible"], serde_json::json!({}));
     fixture.end()
 }
 
