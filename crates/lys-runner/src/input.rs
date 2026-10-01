@@ -11,6 +11,7 @@ type Completion = Box<dyn FnOnce(Result<(), RunnerError>) + Send>;
 struct Span {
     bytes: Vec<u8>,
     complete: Completion,
+    durable: Option<crate::durable::Writer>,
 }
 
 struct State {
@@ -41,6 +42,24 @@ impl Input {
         bytes: Vec<u8>,
         complete: impl FnOnce(Result<(), RunnerError>) + Send + 'static,
     ) -> Result<(), RunnerError> {
+        self.enqueue(bytes, None, complete)
+    }
+
+    pub(crate) fn submit_after(
+        &self,
+        bytes: Vec<u8>,
+        durable: crate::durable::Writer,
+        complete: impl FnOnce(Result<(), RunnerError>) + Send + 'static,
+    ) -> Result<(), RunnerError> {
+        self.enqueue(bytes, Some(durable), complete)
+    }
+
+    fn enqueue(
+        &self,
+        bytes: Vec<u8>,
+        durable: Option<crate::durable::Writer>,
+        complete: impl FnOnce(Result<(), RunnerError>) + Send + 'static,
+    ) -> Result<(), RunnerError> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if state.sender.is_none() {
             let writer = state.writer.take().ok_or_else(|| {
@@ -60,6 +79,7 @@ impl Input {
             .send(Span {
                 bytes,
                 complete: Box::new(complete),
+                durable,
             })
             .map_err(|error| RunnerError::refused("input_worker_ended", error.to_string()))
     }
@@ -80,10 +100,13 @@ impl Input {
 
 fn run(mut writer: Box<dyn Write + Send>, receiver: mpsc::Receiver<Span>) {
     for span in receiver {
-        let result = writer
-            .write_all(&span.bytes)
-            .and_then(|()| writer.flush())
-            .map_err(|error| RunnerError::refused("write_failed", error.to_string()));
+        let durable = span.durable.map_or(Ok(()), |durable| durable.barrier());
+        let result = durable.and_then(|()| {
+            writer
+                .write_all(&span.bytes)
+                .and_then(|()| writer.flush())
+                .map_err(|error| RunnerError::refused("write_failed", error.to_string()))
+        });
         (span.complete)(result);
     }
 }

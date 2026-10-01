@@ -52,7 +52,7 @@ mod restart;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
-pub(crate) use lifecycle::{Wake, accounts, append};
+pub(crate) use lifecycle::{Wake, accounts, append, window_limit};
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
@@ -71,6 +71,7 @@ pub(crate) struct Live {
     pub(crate) writer: Input,
     master: Box<dyn MasterPty + Send>,
     pid: u32,
+    leader: Option<Leader>,
 }
 
 #[cfg(test)]
@@ -82,14 +83,20 @@ mod input_no_screen;
 mod durable_tests;
 
 impl Live {
-    /// End the process and everything it started, naming a failure in the
-    /// runner's log: the exit, when it comes, is what answers.
-    pub(crate) fn end(&self, id: &str) {
-        if let Err(error) = crate::pty::end_group(self.pid) {
-            crate::error::said(&format!(
-                "session {id}: the process was already ending: {error}"
-            ));
-        }
+    /// Ask the verified leader to exit so its final usage can be flushed.
+    pub(crate) fn end(&self) -> Result<(), RunnerError> {
+        let leader = self.leader.as_ref().ok_or_else(|| {
+            RunnerError::refused(
+                "leader_unproved",
+                "the process's start identity was not recorded",
+            )
+        })?;
+        crate::pty::end(leader)
+    }
+
+    /// Emergency stop retains immediate process-group termination.
+    pub(crate) fn kill(&self) -> Result<(), RunnerError> {
+        crate::pty::end_group(self.pid)
     }
 }
 
@@ -199,6 +206,7 @@ pub struct Sessions {
     state: StateFile,
     state_dir: PathBuf,
     scrollback: usize,
+    pub(crate) writer: crate::durable::Writer,
 }
 
 pub(crate) fn unknown(id: &str) -> RunnerError {
@@ -251,7 +259,7 @@ impl Sessions {
                 "a session's scrollback keeps at least one byte",
             ));
         }
-        let state = StateFile::open(state_dir)?;
+        let mut state = StateFile::open(state_dir)?;
         let found_at = now_ms();
         let mut table = Table {
             owner: Weak::new(),
@@ -298,6 +306,10 @@ impl Sessions {
         let state_dir = state_dir
             .canonicalize()
             .map_err(|error| RunnerError::refused("launch_config_refused", error.to_string()))?;
+        let writer = crate::durable::Writer::new()?;
+        state.writer(writer.clone());
+        table.feed.writer(writer.clone());
+        table.operations.writer(writer.clone());
         let sessions = Arc::new_cyclic(|owner| {
             table.owner = Weak::clone(owner);
             Self {
@@ -306,11 +318,13 @@ impl Sessions {
                 state,
                 state_dir,
                 scrollback,
+                writer,
             }
         });
         let table = sessions.lock();
         sessions.persist(&table)?;
         drop(table);
+        sessions.writer.barrier()?;
         Ok(sessions)
     }
 
@@ -436,9 +450,10 @@ impl Sessions {
         table.sessions.insert(id.clone(), session);
         self.persist(&table)?;
         if let Some((executable, version)) = launched {
-            lifecycle::tracking_started(&mut table, &id, &executable, &version);
+            lifecycle::tracking_started(&mut table, &id, &executable, &version)?;
         }
         drop(table);
+        self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
     }
@@ -548,11 +563,13 @@ impl Sessions {
             if session.ended.is_none() {
                 session.ending = true;
                 if let Some(live) = &session.live {
-                    live.end(id);
+                    live.end()?;
                 }
             }
         }
-        self.until(id, left, |session, _| session.ended.clone().map(Ok))
+        let ended = self.until(id, left, |session, _| session.ended.clone().map(Ok))?;
+        self.writer.barrier()?;
+        Ok(ended)
     }
 
     /// What the runner holds: every session, or the one named.
@@ -582,7 +599,11 @@ impl Sessions {
             if session.ended.is_none() {
                 session.ending = true;
                 if let Some(live) = &session.live {
-                    live.end(id);
+                    if let Err(error) = live.end() {
+                        crate::error::said(&format!(
+                            "session {id}: shutdown_signal_failed: {error}"
+                        ));
+                    }
                 }
             }
         }
@@ -595,6 +616,9 @@ impl Sessions {
         }
         self.persist_logged(&table);
         drop(table);
+        if let Err(error) = self.writer.barrier() {
+            crate::error::said(&format!("runner_shutdown_record_failed: {error}"));
+        }
         self.wake();
     }
 }

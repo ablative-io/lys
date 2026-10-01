@@ -64,6 +64,7 @@ impl Sessions {
         let mut table = self.lock();
         let outcome = finish_restart(&mut table, operation, result);
         drop(table);
+        self.writer.barrier()?;
         self.wake();
         outcome
     }
@@ -101,6 +102,7 @@ impl Sessions {
         self.follow(&mut table, id);
         self.persist(&table)?;
         drop(table);
+        self.writer.barrier()?;
         self.wake();
         Ok(())
     }

@@ -170,6 +170,7 @@ pub(crate) struct Operations {
     active: BTreeMap<String, BTreeSet<String>>,
     texts: BTreeMap<String, String>,
     compacting: BTreeSet<String>,
+    writer: Option<crate::durable::Writer>,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> RunnerError {
@@ -210,6 +211,7 @@ impl Operations {
             active: BTreeMap::new(),
             texts: BTreeMap::new(),
             compacting: BTreeSet::new(),
+            writer: None,
         };
         let file = std::fs::File::open(&operations.path).map_err(unavailable)?;
         let length = file.metadata().map_err(unavailable)?.len();
@@ -285,9 +287,16 @@ impl Operations {
         Ok(operations)
     }
 
+    pub(crate) fn writer(&mut self, writer: crate::durable::Writer) {
+        self.writer = Some(writer);
+    }
+
     fn fold(&mut self, outcome: OperationOutcome) {
         let id = outcome.operation.clone();
-        if outcome.state == OperationState::Accepted && !self.held.contains_key(&id) {
+        if outcome.state == OperationState::Accepted
+            && outcome.request != "stop"
+            && !self.held.contains_key(&id)
+        {
             self.accepted
                 .entry(outcome.session.clone())
                 .or_default()
@@ -310,13 +319,17 @@ impl Operations {
     fn record(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
         let mut bytes = serde_json::to_vec(&outcome).map_err(unavailable)?;
         bytes.push(b'\n');
-        let mut file = std::fs::OpenOptions::new()
-            .append(true)
-            .open(&self.path)
-            .map_err(unavailable)?;
-        file.write_all(&bytes)
-            .and_then(|()| file.sync_data())
-            .map_err(unavailable)?;
+        if let Some(writer) = &self.writer {
+            writer.append(&self.path, bytes)?;
+        } else {
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&self.path)
+                .map_err(unavailable)?;
+            file.write_all(&bytes)
+                .and_then(|()| file.sync_data())
+                .map_err(unavailable)?;
+        }
         self.fold(outcome);
         Ok(())
     }
@@ -354,6 +367,10 @@ fn feed(table: &mut Table, outcome: &OperationOutcome) {
         Commit::default(),
     );
     if let Err(error) = appended {
+        let gap = table.gaps.entry(outcome.session.clone()).or_default();
+        gap.lost += 1;
+        gap.since.get_or_insert(outcome.at);
+        gap.words = format!("an operation's outcome was not fed: {error}");
         crate::error::said(&format!(
             "operation {}: its outcome was not fed: {error}",
             outcome.operation
@@ -418,7 +435,7 @@ pub(crate) fn accept(
     }
     let id = operation.session;
     if operation.request == OperationRequest::Stop {
-        return stop(table, &id, &operation.operation);
+        return Ok(outcome);
     }
     let waits = table
         .sessions
@@ -443,7 +460,7 @@ fn stop(table: &mut Table, id: &str, operation: &str) -> Result<OperationOutcome
     };
     session.ending = true;
     if let Some(live) = &session.live {
-        live.end(id);
+        live.kill()?;
     }
     let outcome = table.operations.set(
         operation,
@@ -499,8 +516,13 @@ fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<(), RunnerErr
     let mut bytes = text.into_bytes();
     bytes.extend_from_slice(Key::Enter.bytes());
     let owner = Weak::clone(&table.owner);
+    let durable = owner
+        .upgrade()
+        .ok_or_else(|| RunnerError::refused("runner_stopping", "the runner ended before delivery"))?
+        .writer
+        .clone();
     let operation = operation.to_owned();
-    writer.submit(bytes, move |result| {
+    writer.submit_after(bytes, durable, move |result| {
         let Some(sessions) = owner.upgrade() else {
             crate::error::said(&format!(
                 "operation {operation}: input completed after the runner ended"
@@ -510,6 +532,11 @@ fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<(), RunnerErr
         let mut table = sessions.lock();
         finish(&mut table, &operation, result);
         drop(table);
+        if let Err(error) = sessions.writer.barrier() {
+            crate::error::said(&format!(
+                "operation {operation}: delivery_record_uncertain: {error}"
+            ));
+        }
         sessions.wake();
     })
 }
@@ -615,18 +642,21 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
         table.operations.compacting.remove(&operation);
         let changed = table
             .operations
-            .set(&operation, next, words)
-            .map(|mut outcome| {
+            .get(&operation)
+            .cloned()
+            .ok_or_else(|| unavailable(format!("no operation {operation} is held")))
+            .and_then(|mut outcome| {
+                outcome.state = next;
+                outcome.at = now_ms();
+                outcome.words = words;
                 if next == OperationState::Confirmed {
                     outcome.ended = Some(ended.clone());
                 }
-                outcome
+                table.operations.record(outcome.clone())?;
+                Ok(outcome)
             });
         match changed {
             Ok(outcome) => {
-                if let Err(error) = table.operations.record(outcome.clone()) {
-                    crate::error::said(&format!("operation {operation}: {error}"));
-                }
                 feed(table, &outcome);
             }
             Err(error) => crate::error::said(&format!("operation {operation}: {error}")),
@@ -638,24 +668,32 @@ impl Sessions {
     /// Accept `operation` under its stable id, answering how it stands.
     pub fn operate(&self, operation: Operation) -> Result<OperationOutcome, RunnerError> {
         let mut table = self.lock();
-        let outcome = accept(&mut table, operation)?;
+        let mut outcome = accept(&mut table, operation)?;
         drop(table);
+        self.writer.barrier()?;
+        if outcome.request == "stop" && outcome.state == OperationState::Accepted {
+            outcome = stop(&mut self.lock(), &outcome.session, &outcome.operation)?;
+            self.writer.barrier()?;
+        }
         self.wake();
         if outcome.state != OperationState::Delivering {
             return Ok(outcome);
         }
-        self.until_any(&AtomicBool::new(false), |table| {
+        let outcome = self.until_any(&AtomicBool::new(false), |table| {
             table
                 .operations
                 .get(&outcome.operation)
                 .filter(|held| held.state != OperationState::Delivering)
                 .cloned()
-        })
+        })?;
+        self.writer.barrier()?;
+        Ok(outcome)
     }
 
     /// How operation `operation` stands, as the record keeps it.
     pub fn outcome(&self, operation: &str) -> Result<OperationOutcome, RunnerError> {
-        self.lock()
+        let outcome = self
+            .lock()
             .operations
             .get(operation)
             .cloned()
@@ -664,6 +702,8 @@ impl Sessions {
                     "operation_unknown",
                     format!("no operation {operation} is held"),
                 )
-            })
+            })?;
+        self.writer.barrier()?;
+        Ok(outcome)
     }
 }

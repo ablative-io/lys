@@ -67,7 +67,7 @@ fn tracked(
         session
             .scrollback()
             .from(0)
-            .is_ok_and(|bytes| bytes.windows(5).any(|word| word == b"ready"))
+            .is_ok_and(|bytes| bytes.windows(7).any(|word| word == b"ready\r\n"))
             .then_some(Ok(()))
     })?;
     Ok(sessions)
@@ -168,6 +168,51 @@ fn an_ordinary_stop_counts_the_usage_written_on_term() -> TestResult {
             .any(|entry| matches!(&entry.body, Body::Usage(usage)
         if usage.figures.output_tokens == Some(20))),
         "{entries:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_full_live_status_window_trips_the_declared_rotation() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("stream.jsonl");
+    std::fs::write(&path, b"")?;
+    let sessions = tracked(dir.path(), "printf 'ready\\n'; exec cat", &path)?;
+    sessions
+        .lock()
+        .sessions
+        .get_mut("session")
+        .ok_or("session missing")?
+        .rotation = Some(RotationState::new(Rotation {
+        accounts: vec!["one".to_owned(), "two".to_owned()],
+        variable: "ACCOUNT".to_owned(),
+        limit: Limit::PlanWindow,
+        resume_arguments: Vec::new(),
+    })?);
+    sessions.collect(
+        "session",
+        &Collected::StatusLine {
+            input: serde_json::json!({
+                "session_id": "native", "rate_limits": {"five_hour": {
+                    "used_percentage": 100, "resets_at": crate::session::now_ms() / 1000 + 3600
+                }}
+            }),
+        },
+    )?;
+    let rotation = sessions
+        .lock()
+        .sessions
+        .get("session")
+        .ok_or("session missing")?
+        .rotation
+        .as_ref()
+        .ok_or("rotation missing")?
+        .clone();
+    let tripped = rotation.tripped() || !rotation.moves().is_empty();
+    sessions.stop_all();
+    assert!(
+        tripped,
+        "the collector did not apply the declared account-window limit"
     );
     Ok(())
 }
