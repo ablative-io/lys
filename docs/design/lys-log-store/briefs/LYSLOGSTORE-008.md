@@ -17,6 +17,7 @@ title: An append costs one flush, so leaves and their pin go into segment files 
 > - C35 — A per-file store is migrated once on its first writable open, and a crash at any point leaves the old store whole or the new store complete (LYSLOGSTORE-008 R4).
 > - C36 — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
 > - C37 — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
+> - C38 — Every store on the log counts one flush per acknowledged act in the gate (LYSLOGSTORE-008 R7).
 > **Stories:**
 > - S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
 
@@ -153,6 +154,24 @@ Behavioural. A gate test counts the flushes the store asks for through the fault
 
 **Checklist:**
 - C37 — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
+
+**Stories:**
+- S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.
+
+### R7: Every store on the log is counted too
+
+Behavioural. The flush count of R6 runs against every store that sits on the log, through the same fault layer: each identity-server store (agent_policy, apps, budgets, certificates, configuration, goals, grants, mcp_requests, requests, reviews, runtime, service_accounts, stops, teams and runner_acts), the lys-identity directory, the lys-secrets audit and lys log append. For each, one acknowledged act costs one flush, and an act that makes several appends under one lock costs one flush through append_batch. A store that writes outside the log is named by the test and fails it. The test fails on main before this card.
+
+**Acceptance:**
+- Run against main before this card, every store's count is above one and the test fails naming each store.
+- At the card's head every store's count for one act is 1.
+
+**Files:**
+- create: crates/lys-identity-server/tests/store_flush_count.rs
+- create: crates/lys-secrets/tests/audit_flush_count.rs
+
+**Checklist:**
+- C38 — Every store on the log counts one flush per acknowledged act in the gate (LYSLOGSTORE-008 R7).
 
 **Stories:**
 - S11 (Estate operator, Runs Lys behind every agent and session) — As the operator of an estate where Lys runs behind every agent, I want an append to cost one write to an open file and one flush, so that busy stores and test fixtures stop paying four flushes and a new file for every record.

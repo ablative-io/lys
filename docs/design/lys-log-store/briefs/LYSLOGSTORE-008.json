@@ -10,7 +10,8 @@
     "C34",
     "C35",
     "C36",
-    "C37"
+    "C37",
+    "C38"
   ],
   "stories": [
     "S11"
@@ -176,6 +177,29 @@
       },
       "checklist": [
         "C37"
+      ],
+      "stories": [
+        "S11"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Every store on the log is counted too",
+      "spec": "Behavioural. The flush count of R6 runs against every store that sits on the log, through the same fault layer: each identity-server store (agent_policy, apps, budgets, certificates, configuration, goals, grants, mcp_requests, requests, reviews, runtime, service_accounts, stops, teams and runner_acts), the lys-identity directory, the lys-secrets audit and lys log append. For each, one acknowledged act costs one flush, and an act that makes several appends under one lock costs one flush through append_batch. A store that writes outside the log is named by the test and fails it. The test fails on main before this card.",
+      "acceptance": [
+        "Run against main before this card, every store's count is above one and the test fails naming each store.",
+        "At the card's head every store's count for one act is 1."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/store_flush_count.rs",
+          "crates/lys-secrets/tests/audit_flush_count.rs"
+        ],
+        "modify": [],
+        "delete": []
+      },
+      "checklist": [
+        "C38"
       ],
       "stories": [
         "S11"

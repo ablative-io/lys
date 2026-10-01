@@ -210,6 +210,8 @@ The witness keeps its per-origin memory in memory, as ADR-100 records. WitnessPr
 | `crates/lys-log-store/tests/crash_boundaries.rs` | A crash at every boundary of an append, a batch and the migration | LYSLOGSTORE-008 |
 | `crates/lys-log-store/tests/flush_count.rs` | The gate test counting flushes per append and bytes read by an open | LYSLOGSTORE-008 |
 | `crates/lys/src/identity/install.rs` | lys install, which opens every store writable once so each is migrated | LYSLOGSTORE-008 |
+| `crates/lys-identity-server/tests/store_flush_count.rs` | One flush per acknowledged act in every identity-server store | LYSLOGSTORE-008 |
+| `crates/lys-secrets/tests/audit_flush_count.rs` | One flush per audit append in the secrets broker | LYSLOGSTORE-008 |
 
 ## Inventory
 

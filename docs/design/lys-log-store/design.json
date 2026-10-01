@@ -710,6 +710,16 @@
       "path": "crates/lys/src/identity/install.rs",
       "note": "lys install, which opens every store writable once so each is migrated",
       "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/store_flush_count.rs",
+      "note": "One flush per acknowledged act in every identity-server store",
+      "brief": "LYSLOGSTORE-008"
+    },
+    {
+      "path": "crates/lys-secrets/tests/audit_flush_count.rs",
+      "note": "One flush per audit append in the secrets broker",
+      "brief": "LYSLOGSTORE-008"
     }
   ],
   "inventory": [

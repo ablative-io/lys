@@ -60,3 +60,4 @@
 - [ ] **C35** — A per-file store is migrated once on its first writable open, and a crash at any point leaves the old store whole or the new store complete (LYSLOGSTORE-008 R4).
 - [ ] **C36** — A crash at every write, flush and rename boundary of an append, a batch and the migration loses no acknowledged leaf and shows no unacknowledged one (LYSLOGSTORE-008 R5).
 - [ ] **C37** — Gate tests count one flush per append and per batch, and an open of 10,000 records reads only the tail (LYSLOGSTORE-008 R6).
+- [ ] **C38** — Every store on the log counts one flush per acknowledged act in the gate (LYSLOGSTORE-008 R7).
