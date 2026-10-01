@@ -145,10 +145,7 @@ pub async fn find_by_email(
     api: &SignInProviders,
     email: &str,
 ) -> Result<Option<Value>, ServerError> {
-    match api
-        .call(reqwest::Method::GET, &format!("/users/email/{email}"), None)
-        .await
-    {
+    match api.account_by_email(email).await {
         Ok(user) => Ok(Some(user)),
         Err(ServerError::SignInProvidersRefused { status: 404, .. }) => Ok(None),
         Err(error) => Err(error),
@@ -237,13 +234,17 @@ pub async fn change(
     id: &str,
     change: impl FnOnce(&mut Value) + Send,
 ) -> Result<(), ServerError> {
+    let guard = api.lock_account(id).await?;
     let user = read(api, id).await?;
     let mut update = update_of(&user)?;
     change(&mut update);
-    api.call(reqwest::Method::PUT, &format!("/users/{id}"), Some(&update))
+    let answer = api
+        .call(reqwest::Method::PUT, &format!("/users/{id}"), Some(&update))
         .await
-        .map_err(account_refusal)?;
-    Ok(())
+        .map_err(account_refusal)
+        .map(|_| ());
+    drop(guard);
+    answer
 }
 
 /// Set account `id`'s password, enabled and its email taken as verified,
@@ -510,3 +511,7 @@ async fn set_enabled(
 #[cfg(test)]
 #[path = "accounts_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "accounts_changes_tests.rs"]
+pub(crate) mod changes_tests;
