@@ -18,13 +18,13 @@ fn actor() -> Result<Actor, Box<dyn Error>> {
 }
 
 #[test]
-fn a_configured_login_without_a_person_has_no_administrator_authority() -> TestResult {
+fn an_unbound_configured_login_keeps_administrator_authority() -> TestResult {
     let actor = actor()?;
     let admission = Admission::new(Some(actor.binding().clone()), actor.binding().clone());
     assert!(
         admission
             .administrator(&lys_identity::projection::Projection::default(), &actor)
-            .is_err()
+            .is_ok()
     );
     Ok(())
 }
@@ -113,5 +113,21 @@ fn a_suspended_link_audit_agent_cannot_borrow_its_active_persons_authority() -> 
             .link_audit_agent(directory.projection()?, agent)
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn an_active_bound_administrator_is_admitted() -> TestResult {
+    let harness = Harness::new(32)?;
+    let mut directory = harness.open()?;
+    let actor = actor()?;
+    let admission = Admission::new(Some(actor.binding().clone()), actor.binding().clone());
+    directory.setup_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Authority")?,
+        1,
+    )?;
+    assert!(admission.is_administrator(directory.projection()?, &actor)?);
     Ok(())
 }

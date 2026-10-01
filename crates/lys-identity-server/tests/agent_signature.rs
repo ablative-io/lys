@@ -11,13 +11,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
 use lys_core::attestation::sign_attestation;
 use lys_core::ca::create_certificate_request;
-use lys_identity::OperationId;
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+};
 use lys_identity_server::agent_signature::{HEADER, payload};
-use lys_identity_server::dev_seed::seed_configured;
+use lys_identity_server::certificates_store::{CertificateStore, Issued};
+use lys_identity_server::routes::open_directory;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -78,12 +81,119 @@ struct Table {
 
 impl Table {
     async fn set() -> Result<Self, Box<dyn Error>> {
-        let (service, seeded) =
-            Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?))
-                .await?;
+        Self::set_certificate(None).await
+    }
+
+    async fn set_certificate(der: Option<&'static [u8]>) -> Result<Self, Box<dyn Error>> {
+        let serial = operation()?;
+        let entered_serial = serial.clone();
+        let (service, (agent, key)) = Service::start_adjusted(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            |config| {
+                config.requests_dir = None;
+                config.roles_file = None;
+                config.provisioning_file = None;
+                config.service_accounts_dir = None;
+                config.teams_dir = None;
+                config.stops_dir = None;
+                config.budgets_dir = None;
+                config.policies_dir = None;
+                config.reviews_dir = None;
+            },
+            move |config| {
+                let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+                let actor = Actor::new(
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                    Provenance::new(AuthMethod::Oidc, 1),
+                );
+                let mut directory = open_directory(config)?;
+                let (person, _) = directory.setup_person(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    Profile::new("Owner")?,
+                    1,
+                )?;
+                directory.bind_login(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    LoginBinding::new(&config.issuer, BEA)?,
+                    1,
+                )?;
+                let (agent, _) = directory.register_agent(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    Profile::new("Agent")?,
+                    2,
+                )?;
+                directory.transition(
+                    actor,
+                    OperationId::generate()?,
+                    IdentityId::Agent(agent),
+                    Transition::Activate,
+                    "",
+                    3,
+                )?;
+                drop(lys_identity_server::runtime_store::RuntimeStore::open(
+                    config
+                        .runtime_dir
+                        .as_deref()
+                        .ok_or("runtime directory missing")?,
+                    Arc::clone(&key),
+                )?);
+                drop(lys_identity_server::goals_store::GoalStore::open(
+                    config
+                        .goals_dir
+                        .as_deref()
+                        .ok_or("goals directory missing")?,
+                    Arc::clone(&key),
+                )?);
+                let mut certificates = CertificateStore::open(
+                    config
+                        .certificates_dir
+                        .as_deref()
+                        .ok_or("certificate directory missing")?,
+                    Arc::clone(&key),
+                )?;
+                if let Some(der) = der {
+                    certificates.issue(Issued {
+                        serial: entered_serial,
+                        agent: agent.to_string(),
+                        person: person.to_string(),
+                        claims: json!({}),
+                        der: STANDARD.encode(der),
+                        issued_at: 0,
+                    })?;
+                }
+                drop(
+                    lys_identity_server::configuration_store::ConfigurationStore::open(
+                        &config.log_dir.with_file_name("organisation"),
+                        Arc::clone(&key),
+                    )?,
+                );
+                drop(lys_identity_server::runner_acts::ActStore::open(
+                    &config.log_dir.with_file_name("runner-acts"),
+                    Arc::clone(&key),
+                )?);
+                drop(lys_identity::start::LaunchRecords::open(
+                    &config.log_dir.with_file_name("launch-records"),
+                    Ed25519Identity::load(&config.event_key_file)?,
+                )?);
+                drop(lys_identity_server::apps_api::opened(
+                    config,
+                    Arc::clone(&key),
+                    &|_| {},
+                )?);
+                Ok((agent.to_string(), key))
+            },
+        )
+        .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
-        let agent = seeded.people[1].agents[0].id.to_string();
         let machine = operation()?;
         let body = json!({
             "operation": machine, "name": "Laptop 2", "kind": "laptop", "runtime": "local launcher",
@@ -91,18 +201,16 @@ impl Table {
         });
         let (status, named) = service.post("/network/machines", Some(&ada), &body).await?;
         assert_eq!(status, 200, "{named}");
-        let key = Arc::new(Ed25519Identity::load_or_generate(
-            &service.dir.path().join("agent.key"),
-        )?);
-        let serial = operation()?;
-        let body = json!({
-            "operation": serial,
-            "request": STANDARD.encode(create_certificate_request(&key, &agent)?),
-        });
-        let (status, issued) = service
-            .post(&format!("/agents/{agent}/certificates"), Some(&bea), &body)
-            .await?;
-        assert_eq!(status, 200, "{issued}");
+        if der.is_none() {
+            let body = json!({
+                "operation": serial,
+                "request": STANDARD.encode(create_certificate_request(&key, &agent)?),
+            });
+            let (status, issued) = service
+                .post(&format!("/agents/{agent}/certificates"), Some(&bea), &body)
+                .await?;
+            assert_eq!(status, 200, "{issued}");
+        }
         Ok(Self {
             service,
             agent,
@@ -306,5 +414,18 @@ async fn a_goal_signature_covers_the_query_as_well_as_the_path() -> TestResult {
     let header = table.header(&target, &body, now_ms()?, &nonce(47));
     let answer = table.send(&target, &header, body).await?;
     assert_eq!(answer.1["refusal"], "goal_unknown", "{}", answer.1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_expired_certificate_cannot_sign_a_fresh_request() -> TestResult {
+    let table = Table::set_certificate(Some(include_bytes!("fixtures/expired-agent.der"))).await?;
+    let path = format!("/goals/{}/mark", operation()?);
+    let body = json!({"operation": operation()?, "standing": "met", "words": "completed"})
+        .to_string()
+        .into_bytes();
+    let header = table.header(&path, &body, now_ms()?, &nonce(48));
+    let answer = table.send(&path, &header, body).await?;
+    refused(&answer, "does not verify");
     Ok(())
 }

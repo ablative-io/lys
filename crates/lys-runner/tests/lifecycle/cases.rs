@@ -91,6 +91,7 @@ fn a_stream_wait_holds_no_session_table_lock() -> TestResult {
     joined
         .join()
         .map_err(|panic| format!("stream reader panicked: {panic:?}"))?;
+    std::fs::remove_file(&path)?;
     sessions.stop_all();
     assert!(available, "transcript I/O held the global session table");
     Ok(())

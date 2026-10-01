@@ -297,7 +297,7 @@ impl Sessions {
 
 /// Keep boundary `name` for session `id`, with the response its stream
 /// held pending, now shown whole.
-fn flushed(table: &mut Table, runner: &str, id: &str, name: &str) {
+pub(crate) fn flushed(table: &mut Table, runner: &str, id: &str, name: &str) {
     let source = table.feed.source(id).cloned();
     let pending = table.sessions.get(id).and_then(|session| {
         let tracking = session.guard.tracking.as_ref()?;
