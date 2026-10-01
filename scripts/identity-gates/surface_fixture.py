@@ -34,13 +34,13 @@ def prepared(root, scratch):
         "preparer": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }
     def build(stage):
-        archive = stage.parent / "source.tar"
-        subprocess.run([
-            "git", "archive", "--format=tar", "--output", str(archive),
-            commit, "surface/identity", "docs",
-        ], cwd=root, check=True)
-        with tarfile.open(archive) as source:
-            source.extractall(stage, filter="data")
+        archive = subprocess.Popen([
+            "git", "archive", "--format=tar", commit, "surface/identity", "docs",
+        ], cwd=root, stdout=subprocess.PIPE)
+        subprocess.run(["tar", "-x", "-f", "-", "-C", str(stage)], stdin=archive.stdout, check=True)
+        archive.stdout.close()
+        if archive.wait() != 0:
+            raise RuntimeError(f"surface_fixture_archive_failed: git archive exited {archive.returncode}")
         surface = stage / "surface/identity"
         for argv in [["npm", "ci", "--include=dev"], ["npm", "run", "build"]]:
             subprocess.run(argv, cwd=surface, stdout=sys.stderr, check=True)
