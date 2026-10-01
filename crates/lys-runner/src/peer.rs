@@ -290,17 +290,6 @@ pub fn prove_with(
             "the peer runs as user {uid}, and the runner as user {own}"
         )));
     }
-    let before: BTreeMap<u32, Result<StartIdentity, String>> = leaders
-        .values()
-        .map(|leader| {
-            (
-                leader.pid,
-                processes
-                    .start(leader.pid)
-                    .map_err(|error| error.to_string()),
-            )
-        })
-        .collect();
     let mut walked = BTreeSet::new();
     let mut at = pid;
     let (session, leader) = loop {
@@ -314,16 +303,15 @@ pub fn prove_with(
         }
         at = processes.parent(at)?;
     };
+    let before = processes.start(leader.pid)?;
     let after = processes.start(leader.pid)?;
-    match before.get(&leader.pid) {
-        Some(Ok(seen)) if *seen == leader.start && after == leader.start => Ok(session.clone()),
-        Some(Err(reason)) => Err(unproved(format!(
-            "session {session}'s leader could not be read: {reason}"
-        ))),
-        _ => Err(unproved(format!(
+    if before == leader.start && after == leader.start {
+        Ok(session.clone())
+    } else {
+        Err(unproved(format!(
             "process {} is not the leader session {session} was started with: its start identity differs",
             leader.pid
-        ))),
+        )))
     }
 }
 
