@@ -21,7 +21,7 @@ use std::sync::{Arc, mpsc};
 use portable_pty::Child;
 use serde_json::Value;
 
-use super::{Live, Session, Sessions, Table, now_ms, unknown};
+use super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
 use crate::error::RunnerError;
 use crate::peer::Leader;
 use crate::protocol::{Ended, EndedHow, Launch};
@@ -45,27 +45,83 @@ pub(crate) enum Wake {
     Stop,
 }
 
-impl Sessions {
-    /// Run the session's process, on its rotation's account when it has one,
-    /// and start the threads that read its output and see its exit.
-    pub(super) fn run(
-        self: &Arc<Self>,
-        id: &str,
-        session: &mut Session,
-        resumed: bool,
-    ) -> Result<u32, RunnerError> {
-        let launch = session.launch.as_ref().ok_or_else(|| unknown(id))?;
-        let mut environment = launch.environment.clone();
-        let mut arguments = launch.arguments.clone();
-        if let Some(rotation) = &session.rotation {
-            environment.insert(
-                rotation.variable().to_owned(),
-                rotation.account().to_owned(),
-            );
-            if let (true, Some(resume)) = (resumed, rotation.resume_arguments()) {
-                arguments = resume.to_vec();
+pub(super) struct SpawnPlan {
+    program: String,
+    arguments: Vec<String>,
+    directory: String,
+    environment: std::collections::BTreeMap<String, String>,
+    columns: u16,
+    rows: u16,
+}
+
+pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, RunnerError> {
+    let launch = session.launch.as_ref().ok_or_else(|| {
+        RunnerError::refused("session_launch_missing", "the session has no held launch")
+    })?;
+    let mut environment = launch.environment.clone();
+    let mut arguments = launch.arguments.clone();
+    if let Some(rotation) = &session.rotation {
+        environment.insert(
+            rotation.variable().to_owned(),
+            rotation.account().to_owned(),
+        );
+        if let (true, Some(resume)) = (resumed, rotation.resume_arguments()) {
+            arguments = resume.to_vec();
+        }
+    }
+    Ok(SpawnPlan {
+        program: launch.program.clone(),
+        arguments,
+        directory: launch.directory.clone(),
+        environment,
+        columns: session.columns,
+        rows: session.rows,
+    })
+}
+
+pub(super) struct Prepared {
+    spawned: Option<crate::pty::Spawned>,
+    leader: Leader,
+}
+
+impl Drop for Prepared {
+    fn drop(&mut self) {
+        if let Some(mut spawned) = self.spawned.take() {
+            match crate::pty::end_group(spawned.pid) {
+                Ok(()) => {
+                    if let Err(error) = spawned.child.wait() {
+                        crate::error::said(&format!("cancelled_spawn_exit_unconfirmed: {error}"));
+                    }
+                }
+                Err(error) => {
+                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {error}"));
+                }
             }
         }
+    }
+}
+
+pub(super) struct Pending {
+    pid: u32,
+    generation: u64,
+    reader: Box<dyn Read + Send>,
+    child: Box<dyn Child + Send + Sync>,
+}
+
+impl Pending {
+    pub(super) fn cancel(mut self) -> Result<(), RunnerError> {
+        crate::pty::end_group(self.pid)?;
+        self.child.wait().map_err(|error| {
+            RunnerError::refused("cancelled_spawn_exit_unconfirmed", error.to_string())
+        })?;
+        Ok(())
+    }
+}
+
+impl Sessions {
+    /// Prepare a verified child without owning the session table.
+    pub(super) fn run(&self, plan: &SpawnPlan) -> Result<Prepared, RunnerError> {
+        self.writer.barrier()?;
         #[cfg(test)]
         if let Some(probe) = self
             .spawn_probe
@@ -75,44 +131,129 @@ impl Sessions {
         {
             probe();
         }
-        let spawned = crate::pty::spawn(&crate::pty::Spawn {
-            program: &launch.program,
-            arguments: &arguments,
-            directory: &launch.directory,
-            environment: &environment,
-            columns: session.columns,
-            rows: session.rows,
+        let mut spawned = crate::pty::spawn(&crate::pty::Spawn {
+            program: &plan.program,
+            arguments: &plan.arguments,
+            directory: &plan.directory,
+            environment: &plan.environment,
+            columns: plan.columns,
+            rows: plan.rows,
+        })?;
+        let start = match crate::peer::start_identity(spawned.pid) {
+            Ok(start) => start,
+            Err(error) => {
+                crate::pty::end_group(spawned.pid)?;
+                spawned.child.wait().map_err(|waited| {
+                    RunnerError::refused("cancelled_spawn_exit_unconfirmed", waited.to_string())
+                })?;
+                return Err(error);
+            }
+        };
+        let leader = Leader {
+            pid: spawned.pid,
+            start,
+        };
+        Ok(Prepared {
+            spawned: Some(spawned),
+            leader,
+        })
+    }
+
+    pub(super) fn install(
+        session: &mut Session,
+        mut prepared: Prepared,
+    ) -> Result<Pending, RunnerError> {
+        let spawned = prepared.spawned.take().ok_or_else(|| {
+            RunnerError::refused(
+                "spawn_install_failed",
+                "the prepared child was already installed",
+            )
         })?;
         session.generation += 1;
         session.pid = Some(spawned.pid);
-        session.guard.leader = match crate::peer::start_identity(spawned.pid) {
-            Ok(start) => Some(Leader {
-                pid: spawned.pid,
-                start,
-            }),
-            Err(error) => {
-                crate::error::said(&format!(
-                    "session {id}: its leader's start identity was not read, so no peer of it is proved: {error}"
-                ));
-                None
-            }
-        };
-        session.leader_start = session.guard.leader.clone();
+        session.guard.leader = Some(prepared.leader.clone());
+        session.leader_start = Some(prepared.leader.clone());
         session.live = Some(Live {
             writer: crate::input::Input::new(spawned.writer),
             master: spawned.master,
             pid: spawned.pid,
-            leader: session.guard.leader.clone(),
+            leader: Some(prepared.leader.clone()),
         });
-        let generation = session.generation;
-        let (reader, child) = (spawned.reader, spawned.child);
+        Ok(Pending {
+            pid: spawned.pid,
+            generation: session.generation,
+            reader: spawned.reader,
+            child: spawned.child,
+        })
+    }
+
+    /// Activate only after the generation is visible in the table.
+    pub(super) fn activate(self: &Arc<Self>, id: &str, pending: Pending) {
+        let Pending {
+            generation,
+            reader,
+            child,
+            ..
+        } = pending;
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
         let pump = std::thread::spawn(move || pumped.pump(&owned, generation, reader));
         let watched = Arc::clone(self);
         let owned = id.to_owned();
         std::thread::spawn(move || watched.watch(&owned, generation, child, pump));
-        Ok(spawned.pid)
+    }
+
+    pub(super) fn replace_generation(
+        self: &Arc<Self>,
+        id: &str,
+        generation: u64,
+        plan: &SpawnPlan,
+        started_at: Option<u64>,
+        follow: bool,
+    ) -> Result<bool, RunnerError> {
+        let mut table = self.lock();
+        let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
+        if table.stopping || session.generation != generation {
+            return Ok(false);
+        }
+        if !table.starting.insert(id.to_owned()) {
+            return Err(RunnerError::refused(
+                "session_starting",
+                "the session already has a launch in progress",
+            ));
+        }
+        drop(table);
+        let reservation = Starting {
+            sessions: Arc::clone(self),
+            id: id.to_owned(),
+        };
+        let prepared = self.run(plan)?;
+        let mut table = self.lock();
+        let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
+        if table.stopping || session.generation != generation {
+            drop(table);
+            drop(prepared);
+            return Ok(false);
+        }
+        let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
+        let pending = Self::install(session, prepared)?;
+        session.ended = None;
+        session.ending = false;
+        session.guard.idle = true;
+        if let Some(started_at) = started_at {
+            session.started_at = started_at;
+        }
+        if follow {
+            self.follow(&mut table, id);
+        }
+        let recorded = self.persist(&table);
+        drop(table);
+        self.activate(id, pending);
+        drop(reservation);
+        recorded?;
+        self.writer.barrier()?;
+        self.wake();
+        Ok(true)
     }
 
     /// Keep the output of generation `generation` of session `id` until its
@@ -224,22 +365,20 @@ impl Sessions {
                 crate::error::said(&format!(
                     "session {id} reached its usage limit and moves to account {moved}"
                 ));
-                match self.run(id, session, true) {
-                    Ok(_) => {
-                        self.persist_logged(&table);
-                        drop(table);
-                        if let Err(error) = self.writer.barrier() {
-                            crate::error::said(&format!(
-                                "session {id}: rotation_record_failed: {error}"
-                            ));
-                        }
-                        self.wake();
-                        return;
+                let next_plan = plan(session, true);
+                drop(table);
+                match next_plan
+                    .and_then(|plan| self.replace_generation(id, generation, &plan, None, false))
+                {
+                    Ok(true) => return,
+                    Ok(false) => {}
+                    Err(error) => {
+                        crate::error::said(&format!(
+                            "session {id}: rotation_spawn_failed: {error}"
+                        ));
                     }
-                    Err(error) => crate::error::said(&format!(
-                        "session {id} could not move to its next account: {error}"
-                    )),
                 }
+                table = self.lock();
             } else {
                 crate::error::said(&format!(
                     "session {id} reached its usage limit on the last of its accounts"
@@ -253,6 +392,13 @@ impl Sessions {
             status,
             signal,
             reason: None,
+        };
+        let Some(session) = table
+            .sessions
+            .get_mut(id)
+            .filter(|session| session.generation == generation)
+        else {
+            return;
         };
         session.ended = Some(ended.clone());
         if let Some(follower) = session.follower.take() {
