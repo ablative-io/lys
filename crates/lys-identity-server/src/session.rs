@@ -51,10 +51,26 @@ pub struct SessionEntry {
 
 /// The live sessions.
 pub struct Sessions {
-    live: Mutex<HashMap<String, SessionEntry>>,
+    live: Mutex<Live>,
     file: Option<PathBuf>,
     seconds: u64,
     secure: bool,
+}
+
+#[derive(Default)]
+struct Live {
+    entries: HashMap<String, SessionEntry>,
+    ids: HashMap<String, String>,
+}
+
+impl Live {
+    fn from_entries(entries: HashMap<String, SessionEntry>) -> Self {
+        let ids = entries
+            .iter()
+            .map(|(key, entry)| (entry.id.clone(), key.clone()))
+            .collect();
+        Self { entries, ids }
+    }
 }
 
 /// The key a session is kept and looked up under: the SHA-256 of its
@@ -89,7 +105,7 @@ impl Sessions {
     /// No sessions, each to live `seconds`, kept in memory alone.
     pub fn new(seconds: u64, secure: bool) -> Self {
         Self {
-            live: Mutex::new(HashMap::new()),
+            live: Mutex::new(Live::default()),
             file: None,
             seconds,
             secure,
@@ -101,7 +117,7 @@ impl Sessions {
     pub fn open(file: PathBuf, seconds: u64, secure: bool) -> Result<Self, ServerError> {
         let live = crate::session_store::load(&file, now())?;
         Ok(Self {
-            live: Mutex::new(live),
+            live: Mutex::new(Live::from_entries(live)),
             file: Some(file),
             seconds,
             secure,
@@ -117,10 +133,12 @@ impl Sessions {
     }
 
     /// The live sessions, with every expired one removed.
-    fn pruned(&self) -> MutexGuard<'_, HashMap<String, SessionEntry>> {
+    fn pruned(&self) -> MutexGuard<'_, Live> {
         let mut live = self.live.lock().unwrap_or_else(PoisonError::into_inner);
         let at = now();
-        live.retain(|_, entry| entry.ends_at > at);
+        live.entries.retain(|_, entry| entry.ends_at > at);
+        let Live { entries, ids } = &mut *live;
+        ids.retain(|_, key| entries.contains_key(key));
         live
     }
 
@@ -156,19 +174,27 @@ impl Sessions {
         };
         let key = key_of(&secret);
         let mut live = self.pruned();
-        live.insert(key.clone(), entry);
-        if let Err(error) = self.keep(&live) {
-            live.remove(&key);
+        let id = entry.id.clone();
+        live.entries.insert(key.clone(), entry);
+        if let Err(error) = self.keep(&live.entries) {
+            live.entries.remove(&key);
             return Err(error);
         }
+        live.ids.insert(id, key);
         Ok(self.cookie(&secret, self.seconds))
     }
 
     /// The live session named by a Cookie header.
     fn entry(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
         let secret = cookie_secret(cookie_header)?;
-        self.pruned()
+        self.live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?
+            .entries
             .get(&key_of(secret))
+            .filter(|entry| entry.ends_at > now())
             .cloned()
             .ok_or(ServerError::NotSignedIn)
     }
@@ -188,9 +214,25 @@ impl Sessions {
         self.entry(cookie_header).map(|entry| entry.id)
     }
 
+    /// Whether the session named by its public id is still live.
+    pub fn is_live(&self, id: &str) -> Result<bool, ServerError> {
+        let live = self
+            .live
+            .lock()
+            .map_err(|error| ServerError::SessionsUnavailable {
+                reason: format!("the sessions lock is poisoned: {error}"),
+            })?;
+        Ok(live
+            .ids
+            .get(id)
+            .and_then(|key| live.entries.get(key))
+            .is_some_and(|entry| entry.ends_at > now()))
+    }
+
     /// Every live session whose actor `belongs` admits.
     pub fn live(&self, belongs: impl Fn(&Actor) -> bool) -> Vec<SessionEntry> {
         self.pruned()
+            .entries
             .values()
             .filter(|entry| belongs(&entry.actor))
             .cloned()
@@ -201,12 +243,13 @@ impl Sessions {
     /// the previous in-memory set intact; lifecycle admission still refuses it.
     pub fn end_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
         let mut live = self.pruned();
-        let mut remaining = live.clone();
+        let mut remaining = live.entries.clone();
         remaining.retain(|_, entry| !belongs(&entry.actor));
-        let ended = live.len() - remaining.len();
+        let ended = live.entries.len() - remaining.len();
         if ended > 0 {
             self.keep(&remaining)?;
-            *live = remaining;
+            live.ids.retain(|_, key| remaining.contains_key(key));
+            live.entries = remaining;
         }
         Ok(ended)
     }
@@ -221,18 +264,23 @@ impl Sessions {
         belongs: impl FnOnce(&Actor) -> bool,
     ) -> Result<SessionEntry, ServerError> {
         let mut live = self.pruned();
-        let key = live
-            .iter()
-            .find(|(_, entry)| entry.id == id)
-            .map(|(key, entry)| (key.clone(), belongs(&entry.actor)));
+        let key = live.ids.get(id).and_then(|key| {
+            live.entries
+                .get(key)
+                .map(|entry| (key.clone(), belongs(&entry.actor)))
+        });
         let Some((key, true)) = key else {
             return Err(ServerError::SessionUnknown);
         };
-        let ended = live.remove(&key).ok_or(ServerError::SessionUnknown)?;
-        if let Err(error) = self.keep(&live) {
-            live.insert(key, ended);
+        let ended = live
+            .entries
+            .remove(&key)
+            .ok_or(ServerError::SessionUnknown)?;
+        if let Err(error) = self.keep(&live.entries) {
+            live.entries.insert(key, ended);
             return Err(error);
         }
+        live.ids.remove(id);
         Ok(ended)
     }
 }
