@@ -251,3 +251,44 @@ fn identical_snapshot_skips_only_a_write_this_handle_completed() {
     assert_eq!(crate::durability::flush_count() - before, 2);
     assert_eq!(reopened.snapshot().unwrap().unwrap(), b"second");
 }
+
+#[test]
+fn failed_snapshot_replacement_invalidates_the_known_durable_value() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = create(&dir);
+    store.put_snapshot(b"first").unwrap();
+    let slot = dir.join("snapshot.bin");
+    std::fs::remove_file(&slot).unwrap();
+    std::fs::create_dir(&slot).unwrap();
+    assert!(store.put_snapshot(b"second").is_err());
+    std::fs::remove_dir(&slot).unwrap();
+    let before = crate::durability::flush_count();
+    store.put_snapshot(b"first").unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+    assert_eq!(store.snapshot().unwrap().unwrap(), b"first");
+}
+
+#[test]
+fn failed_pin_replacement_requires_writing_the_prior_pin_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("log");
+    let mut store = store_pinned_at_one(&dir);
+    let prior = store.pinned();
+    let state = dir.join("state.json");
+    std::fs::remove_file(&state).unwrap();
+    std::fs::create_dir(&state).unwrap();
+    assert!(
+        store
+            .pin(PinnedRoot {
+                tree_size: 2,
+                root: [8; 32]
+            })
+            .is_err()
+    );
+    std::fs::remove_dir(&state).unwrap();
+    let before = crate::durability::flush_count();
+    store.pin(prior).unwrap();
+    assert_eq!(crate::durability::flush_count() - before, 2);
+    assert!(state.is_file());
+}

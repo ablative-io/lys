@@ -120,6 +120,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::{StoreError, StoreResult};
 use crate::store::{LeafStore, PinnedRoot};
@@ -186,6 +187,10 @@ pub struct FileLeafStore {
     /// `put_leaf`, `pin` and `put_snapshot` refuse with
     /// [`StoreError::ReadOnly`].
     read_only: bool,
+    /// Digest of the last snapshot this handle flushed, including its name.
+    durable_snapshot: Option<[u8; 32]>,
+    /// An opened or failed pin must be flushed before this handle can skip it.
+    pin_uncertain: bool,
 }
 
 /// The two steps after a leaf is linked, kept as functions so that a test can
@@ -254,6 +259,8 @@ impl FileLeafStore {
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: false,
+            durable_snapshot: None,
+            pin_uncertain: false,
         })
     }
 
@@ -283,6 +290,8 @@ impl FileLeafStore {
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: false,
+            durable_snapshot: None,
+            pin_uncertain: true,
         })
     }
 
@@ -322,6 +331,8 @@ impl FileLeafStore {
             durability_uncertain: None,
             left_behind: Vec::new(),
             read_only: true,
+            durable_snapshot: None,
+            pin_uncertain: false,
         })
     }
 
@@ -506,7 +517,12 @@ impl LeafStore for FileLeafStore {
                 offered: STANDARD.encode(pin.root),
             });
         }
+        if pin == self.pinned && !self.pin_uncertain {
+            return Ok(());
+        }
+        self.pin_uncertain = true;
         write_state(&self.dir, pin)?;
+        self.pin_uncertain = false;
         self.pinned = pin;
         Ok(())
     }
@@ -517,7 +533,16 @@ impl LeafStore for FileLeafStore {
 
     fn put_snapshot(&mut self, bytes: &[u8]) -> StoreResult<()> {
         self.refuse_if_read_only("write a snapshot")?;
-        snapshot_slot::write(&self.dir, bytes)
+        let digest: [u8; 32] = Sha256::digest(bytes).into();
+        if self.durable_snapshot == Some(digest) {
+            return Ok(());
+        }
+        // A failed replacement may have changed the name before its directory
+        // flush failed. It invalidates even the previous successful value.
+        self.durable_snapshot = None;
+        snapshot_slot::write(&self.dir, bytes)?;
+        self.durable_snapshot = Some(digest);
+        Ok(())
     }
 }
 

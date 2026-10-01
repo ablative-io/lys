@@ -19,10 +19,11 @@ use lys_identity_server::config::ConfiguredLogin;
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_identity_server::sign_in_providers::{ProviderOrigins, SignInProvidersSettings};
 use lys_identity_server::spicedb::SpiceDbSettings;
-use lys_identity_server::{Config, Say, service, service_saying};
+use lys_identity_server::{Config, Say};
 use lys_log_store::{FileLeafStore, LeafStore, PinnedRoot, StoreError, StoreResult};
 
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer, Login};
+use crate::harness_serve::serve;
 
 /// Where the next append fails, if anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,7 +197,7 @@ pub const LINK_AUDIT_SOURCE: &str = "link-audit-source-subject";
 pub struct Service {
     /// The service's base URL.
     pub base: String,
-    /// Real log-store flush attempts during synchronous startup, before serving requests.
+    /// Process-wide log-store flush attempts during startup; exact in an isolated test.
     pub startup_flushes: u64,
     /// The issuer people sign in through.
     pub issuer: FakeIssuer,
@@ -240,40 +241,6 @@ fn location(answer: &reqwest::Response) -> Result<String, Box<dyn Error>> {
         .ok_or_else(|| format!("{} answered no redirect", answer.url()))?
         .to_str()?
         .to_owned())
-}
-
-/// The service `config` describes, answering on `listener`, and a client
-/// that follows no redirect.
-async fn serve(
-    listener: tokio::net::TcpListener,
-    config: &Config,
-    say: Option<Say>,
-) -> Result<
-    (
-        tokio::task::JoinHandle<std::io::Result<()>>,
-        reqwest::Client,
-    ),
-    Box<dyn Error>,
-> {
-    let documented = crate::refusals::listed();
-    let app = match say {
-        Some(say) => service_saying(config, say).await?,
-        None => service(config).await?,
-    };
-    let app = app.layer(axum::middleware::from_fn(move |request, next| {
-        crate::refusals::listed_only(Arc::clone(&documented), request, next)
-    }));
-    let server = tokio::spawn(async move {
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-        )
-        .await
-    });
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
-    Ok((server, client))
 }
 
 /// A status and a JSON body.
@@ -439,9 +406,10 @@ impl Service {
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         let prepared = prepare(&config)?;
-        let before = lys_log_store::flush_count();
+        crate::service_template::restore(&config)?;
+        let before = lys_log_store::process_flush_count();
         let (server, client) = serve(listener, &config, say).await?;
-        let startup_flushes = lys_log_store::flush_count() - before;
+        let startup_flushes = lys_log_store::process_flush_count() - before;
         Ok((
             Self {
                 base,
