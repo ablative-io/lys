@@ -36,7 +36,7 @@ pub(super) fn visited() {
 fn directory() -> Result<(Projection, PersonId), Box<dyn Error>> {
     let mut projection = Projection::new();
     let actor = Actor::new(
-        LoginBinding::new("issuer", "owner")?,
+        LoginBinding::new("https://issuer.test", "owner")?,
         Provenance::new(AuthMethod::Oidc, 1),
     );
     for index in 0..256u128 {
@@ -77,7 +77,7 @@ fn a_grant_request_shares_directory_records_and_does_not_walk_unrelated_accounts
             name: "service".to_owned(),
             description: String::new(),
             by: Login {
-                provider: "issuer".to_owned(),
+                provider: "https://issuer.test".to_owned(),
                 subject: "owner".to_owned(),
             },
             at: 1,
