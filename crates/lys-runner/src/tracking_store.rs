@@ -42,8 +42,9 @@ pub const PAGE_MAX: usize = 256;
 pub struct Pending {
     /// Its message and request id.
     pub key: String,
-    /// Its latest usage object, as text.
-    pub usage: String,
+    /// Its latest usage object. Old text records are decoded on read.
+    #[serde(deserialize_with = "pending_usage")]
+    pub usage: Value,
     /// The model it names.
     pub model: Option<String>,
     /// When it was observed, in milliseconds.
@@ -52,6 +53,19 @@ pub struct Pending {
     pub offset: u64,
     /// The turn it belongs to.
     pub turn: Option<String>,
+}
+
+fn pending_usage<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Value, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    if let Value::String(text) = &value {
+        match serde_json::from_str(text) {
+            Ok(decoded) => Ok(decoded),
+            // Retain unreadable evidence so the adapter records the gap at its offset.
+            Err(_) => Ok(value),
+        }
+    } else {
+        Ok(value)
+    }
 }
 
 /// A Codex usage object's counts, as kept between `token_count` events.

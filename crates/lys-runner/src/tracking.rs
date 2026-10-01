@@ -321,7 +321,10 @@ impl Reading<'_> {
             });
             self.now
         });
-        let (account, account_unknown) = self.accounts.at(observed_at);
+        let (account, account_unknown) = match origin.observed_at {
+            Some(instant) => self.accounts.at(instant),
+            None => (None, Some("usage_instant_missing".to_owned())),
+        };
         Body::Usage(UsageRecord {
             version: RECORD_VERSION,
             id: origin.id,
@@ -347,7 +350,14 @@ impl Reading<'_> {
     /// record; none when none is pending.
     pub fn flush(&self, source: &mut SourceState) -> Option<Body> {
         let pending = source.pending.take()?;
-        let usage: Value = serde_json::from_str(&pending.usage).unwrap_or(Value::Null);
+        if !pending.usage.is_object() {
+            return Some(Body::Coverage(Coverage::of(
+                "usage_unreadable",
+                source,
+                Some(pending.offset),
+                "the pending response's usage is not a readable object".to_owned(),
+            )));
+        }
         let origin = Origin {
             id: format!("{CLAUDE_ADAPTER}:{}:{}", source.bound, pending.key),
             offset: Some(pending.offset),
@@ -358,7 +368,7 @@ impl Reading<'_> {
             source,
             origin,
             Measure::Spend,
-            claude_figures(&usage),
+            claude_figures(&pending.usage),
             pending.model,
         ))
     }
@@ -396,15 +406,34 @@ impl Reading<'_> {
             .get("requestId")
             .and_then(Value::as_str)
             .unwrap_or("");
+        if id.is_empty() && request.is_empty() {
+            bodies.extend(self.flush(source));
+            bodies.push(Body::Coverage(Coverage::of(
+                "usage_unattributed",
+                source,
+                Some(offset),
+                "the response names neither a message id nor a request id".to_owned(),
+            )));
+            return bodies;
+        }
         let key = format!("{id}|{request}");
         if let Some(pending) = source.pending.as_mut().filter(|held| held.key == key) {
-            pending.usage = usage.to_string();
+            pending.usage.clone_from(usage);
             return bodies;
         }
         bodies.extend(self.flush(source));
+        if instant(record).is_none() {
+            bodies.push(Body::Coverage(Coverage::of(
+                "usage_instant_missing",
+                source,
+                Some(offset),
+                "the response names no readable instant; no paying account is attributed"
+                    .to_owned(),
+            )));
+        }
         source.pending = Some(Pending {
             key,
-            usage: usage.to_string(),
+            usage: usage.clone(),
             model: model.map(str::to_owned),
             observed_at: instant(record),
             offset,
@@ -432,13 +461,22 @@ impl Reading<'_> {
             return Vec::new();
         }
         let mut bodies = Vec::new();
+        if event == Some("token_count") && instant(record).is_none() {
+            bodies.push(Body::Coverage(Coverage::of(
+                "usage_instant_missing",
+                source,
+                Some(offset),
+                "the token report names no readable instant; no paying account is attributed"
+                    .to_owned(),
+            )));
+        }
         if event == Some("token_count")
             && let Some(payload) = payload
         {
             let mut unavailable = Vec::new();
             let mut plan_windows = crate::tracking_budget::codex_windows(payload, &mut unavailable);
             crate::tracking_budget::live(&mut plan_windows, self.now, &mut unavailable);
-            let (account, _) = self.accounts.at(instant(record).unwrap_or(self.now));
+            let account = instant(record).and_then(|instant| self.accounts.at(instant).0);
             if plan_windows != source.plan_windows || account != source.plan_account {
                 source.plan_windows.clone_from(&plan_windows);
                 source.plan_account = account;

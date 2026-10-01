@@ -310,17 +310,13 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
     let mut dirs = vec![home.join("sessions")];
     let mut found = None;
     while let Some(dir) = dirs.pop() {
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(error) => {
-                crate::error::said(&format!(
-                    "{} is not searched for rollouts: {error}",
-                    dir.display()
-                ));
-                continue;
-            }
-        };
-        for entry in entries.flatten() {
+        let entries = std::fs::read_dir(&dir).map_err(|error| {
+            RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|error| {
+                RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
+            })?;
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().into_owned();
             if path.is_dir() {
@@ -342,7 +338,12 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
             std::io::BufRead::read_line(&mut std::io::BufReader::new(file), &mut first)
         })
         .map_err(|error| RunnerError::refused("transcript_unbound", error.to_string()))?;
-    let meta: Value = serde_json::from_str(first.trim_end()).unwrap_or(Value::Null);
+    let meta: Value = serde_json::from_str(first.trim_end()).map_err(|error| {
+        RunnerError::refused(
+            "rollout_unreadable",
+            format!("the first line is not JSON: {error}"),
+        )
+    })?;
     let named = meta
         .get("payload")
         .and_then(|payload| payload.get("id"))
