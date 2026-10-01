@@ -244,6 +244,8 @@ pub struct Boundary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "entry", rename_all = "snake_case")]
 pub enum Body {
+    /// One admitted injection, durable before its terminal delivery.
+    Injection(crate::injection::InjectionRecord),
     /// A record of figures.
     Usage(UsageRecord),
     /// Where coverage stands.

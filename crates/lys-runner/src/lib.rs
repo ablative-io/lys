@@ -51,6 +51,7 @@ pub mod containment_stdio;
 pub mod dial;
 mod durable;
 pub mod error;
+pub mod injection;
 mod input;
 pub mod judge;
 pub mod launch_config;

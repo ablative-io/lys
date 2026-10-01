@@ -47,6 +47,10 @@ use crate::tracking_store::Feed;
 
 mod control;
 
+#[cfg(test)]
+#[path = "../tests/injection/cases.rs"]
+mod injection_tests;
+
 mod peer_view;
 
 mod lifecycle;
@@ -140,7 +144,7 @@ pub(crate) struct Session {
     pub(crate) output: Arc<output::OutputHandle>,
     pub(crate) ended: Option<Ended>,
     pub(crate) live: Option<Live>,
-    generation: u64,
+    pub(crate) generation: u64,
     pub(crate) launch: Option<Launch>,
     pub(crate) rotation: Option<RotationState>,
     pub(crate) ending: bool,

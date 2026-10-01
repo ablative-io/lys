@@ -23,16 +23,24 @@ struct State {
 #[derive(Clone)]
 pub(crate) struct Input {
     state: Arc<Mutex<State>>,
+    injection: Arc<Mutex<()>>,
 }
 
 impl Input {
     pub(crate) fn new(writer: Box<dyn Write + Send>) -> Self {
         Self {
+            injection: Arc::new(Mutex::new(())),
             state: Arc::new(Mutex::new(State {
                 writer: Some(writer),
                 sender: None,
             })),
         }
+    }
+
+    pub(crate) fn injection(&self) -> Result<std::sync::MutexGuard<'_, ()>, RunnerError> {
+        self.injection
+            .lock()
+            .map_err(|error| RunnerError::refused("injection_state_poisoned", error.to_string()))
     }
 
     /// Enqueue without waiting for the terminal. Completion must not wait
