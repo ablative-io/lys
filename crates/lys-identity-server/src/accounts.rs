@@ -5,7 +5,8 @@
 //! issuer and nowhere else: it is never kept here, logged, or part of an
 //! error. A change reads the account first and writes it back whole with
 //! the one field changed, because the issuer's update replaces every field
-//! it is given.
+//! it is given. An incomplete account answer is refused before a write,
+//! so an unknown saved value is never replaced by a guessed default.
 //!
 //! A person changes their own email, confirmed by their password, and their
 //! own password, confirmed by the current one; the confirmation is a
@@ -189,21 +190,45 @@ pub async fn make(
 
 /// The account `user` as the issuer's update takes it, with nothing changed
 /// and no password.
-fn update_of(user: &Value) -> Value {
-    let field = |name: &str| user.get(name).cloned().unwrap_or(Value::Null);
-    json!({
-        "email": field("email"),
-        "given_name": field("given_name"),
-        "family_name": field("family_name"),
-        "language": field("language"),
-        "password": null,
-        "roles": user.get("roles").cloned().unwrap_or_else(|| json!([])),
-        "groups": field("groups"),
-        "enabled": user.get("enabled").cloned().unwrap_or(Value::Bool(true)),
-        "email_verified": field("email_verified"),
-        "user_expires": field("user_expires"),
-        "user_values": field("user_values"),
-    })
+fn update_of(user: &Value) -> Result<Value, ServerError> {
+    let fields = user
+        .as_object()
+        .ok_or_else(|| ServerError::SignInProvidersUnavailable {
+            reason: "the sign-in service's account answer is not an object".to_owned(),
+        })?;
+    for name in [
+        "email",
+        "language",
+        "roles",
+        "enabled",
+        "email_verified",
+        "user_values",
+    ] {
+        if !fields.contains_key(name) {
+            return Err(ServerError::SignInProvidersUnavailable {
+                reason: format!("the sign-in service's account answer names no {name}"),
+            });
+        }
+    }
+    let mut update = serde_json::Map::new();
+    for name in [
+        "email",
+        "given_name",
+        "family_name",
+        "language",
+        "roles",
+        "groups",
+        "enabled",
+        "email_verified",
+        "user_expires",
+        "user_values",
+    ] {
+        if let Some(value) = fields.get(name) {
+            update.insert(name.to_owned(), value.clone());
+        }
+    }
+    update.insert("password".to_owned(), Value::Null);
+    Ok(Value::Object(update))
 }
 
 /// Read account `id`, let `change` change its update, and write it back.
@@ -213,7 +238,7 @@ pub async fn change(
     change: impl FnOnce(&mut Value) + Send,
 ) -> Result<(), ServerError> {
     let user = read(api, id).await?;
-    let mut update = update_of(&user);
+    let mut update = update_of(&user)?;
     change(&mut update);
     api.call(reqwest::Method::PUT, &format!("/users/{id}"), Some(&update))
         .await

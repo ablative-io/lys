@@ -274,6 +274,13 @@ async fn create_user(
     let id = format!("user-{}", held.len() + 1);
     if let Value::Object(fields) = &mut body {
         fields.insert("id".to_owned(), Value::String(id));
+        fields.entry("language").or_insert_with(|| json!("en"));
+        fields.entry("roles").or_insert_with(|| json!([]));
+        fields.entry("enabled").or_insert_with(|| json!(true));
+        fields
+            .entry("email_verified")
+            .or_insert_with(|| json!(false));
+        fields.entry("user_values").or_insert_with(|| json!({}));
     }
     held.push(body.clone());
     Json(body).into_response()
