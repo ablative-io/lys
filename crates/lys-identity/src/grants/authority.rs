@@ -302,7 +302,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     fn is_one_time(&self, grant: GrantId) -> bool {
-        self.book.grant(grant).is_some_and(super::types::Grant::is_once)
+        self.book
+            .grant(grant)
+            .is_some_and(super::types::Grant::is_once)
     }
 
     fn delegate_as(
