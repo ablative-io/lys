@@ -115,6 +115,7 @@ async fn restart(
             words: "the restart's end answered without the session's exit".to_owned(),
         });
     }
+    crate::agent_pass::end_session(&state, &given.session)?;
     start_profile(
         &state,
         &headers,

@@ -147,6 +147,7 @@ impl ServerError {
     pub(crate) fn status(&self) -> StatusCode {
         match self {
             Self::NotSignedIn
+            | Self::AgentPassRefused { .. }
             | Self::AgentSignatureRefused { .. }
             | Self::OperatorRefused { .. }
             | Self::SignInRefused

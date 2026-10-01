@@ -86,6 +86,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::HoldingChanged => "HoldingChanged",
         ServerError::LaunchRecordMissing => "LaunchRecordMissing",
         ServerError::OperatorRefused { .. } => "OperatorRefused",
+        ServerError::AgentPassRefused { .. } => "AgentPassRefused",
         ServerError::AgentSignatureRefused { .. } => "AgentSignatureRefused",
         ServerError::AgentNotActive { .. } => "AgentNotActive",
         ServerError::MachineCannotReach { .. } => "MachineCannotReach",

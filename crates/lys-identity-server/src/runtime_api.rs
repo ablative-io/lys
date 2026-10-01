@@ -330,6 +330,7 @@ async fn report_agent(
             })?;
         }
         let tracked = with_runtime(&state, |store| store.report(report))?;
+        if tracked.stopped() { crate::agent_pass::end_session(&state, &tracked.session)?; }
         if tracked.stopped() && let Some(agent) = &tracked.agent {
             crate::budgets_context::finish(&state, agent, &tracked.session)?;
         }
