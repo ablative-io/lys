@@ -81,6 +81,67 @@ mod tests {
     use crate::{BrokerPaths, LocalGrants};
 
     #[test]
+    fn app_name_collisions_are_refused_before_any_store_or_audit_write()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let paths = BrokerPaths {
+            store_dir: dir.path().join("store"),
+            log_dir: dir.path().join("log"),
+            store_key: dir.path().join("keys/store"),
+            audit_key: dir.path().join("keys/audit"),
+            anchor: dir.path().join("keys/anchor"),
+        };
+        std::fs::create_dir_all(dir.path().join("keys"))?;
+        let mut broker = Broker::create(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        let digest = broker.prepare_app("notes", "person-a-b")?;
+        let entries: Vec<_> = broker.store().entries().cloned().collect();
+        let audit_size = broker.audit().len();
+        let flushes = lys_log_store::process_flush_count();
+        for app in [
+            "b-notes",
+            "",
+            "ab",
+            "Notes",
+            "notes.app",
+            "notes/app",
+            "notes\n",
+            &"a".repeat(41),
+        ] {
+            let result = broker.prepare_app(app, "person-a");
+            assert!(
+                matches!(result, Err(SecretsError::InvalidName { what: "app", .. })),
+                "invalid app was not refused by name"
+            );
+            assert_eq!(
+                broker.store().entries().cloned().collect::<Vec<_>>(),
+                entries
+            );
+            assert_eq!(broker.audit().len(), audit_size);
+            assert_eq!(lys_log_store::process_flush_count(), flushes);
+        }
+        drop(broker);
+        let mut broker = Broker::open(&paths, LocalGrants::new(), Box::new(|| 1000))?;
+        assert_eq!(broker.prepare_app("notes", "person-a-b")?, digest);
+        assert_eq!(
+            broker.store().entries().cloned().collect::<Vec<_>>(),
+            entries
+        );
+        assert!(
+            broker
+                .store()
+                .entry("lys-app-person-a-b-notes-client")
+                .is_some()
+        );
+        assert!(
+            broker
+                .store()
+                .entry("lys-app-person-a-b-notes-api")
+                .is_some()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn same_save_after_restart_preserves_entry_and_conflicts_never_replace_it()
     -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
