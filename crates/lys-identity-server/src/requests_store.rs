@@ -99,6 +99,46 @@ pub struct Intended {
     pub note: String,
     /// When it was intended, in seconds since the Unix epoch.
     pub intended_at: u64,
+    /// How long the access is given for; absent in an intent kept before
+    /// answers were offered, which gave the window the request asked for.
+    #[serde(default, skip_serializing_if = "Answer::as_asked")]
+    pub answer: Answer,
+}
+
+/// How long an approval gives the access for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+pub enum Answer {
+    /// The window the request asked for.
+    #[default]
+    AsAsked,
+    /// Once: the grant is spent by its first exercise.
+    Once,
+    /// For a while: until the given time, in seconds since the Unix epoch.
+    Until {
+        /// When the access ends.
+        ends_at: u64,
+    },
+    /// Ongoing: until it is revoked.
+    Ongoing,
+}
+
+impl Answer {
+    /// Whether this is the window the request asked for.
+    #[must_use]
+    pub fn as_asked(&self) -> bool {
+        *self == Self::AsAsked
+    }
+
+    /// When the access given ends, for a request asked at `asked_at` until `asked_end`.
+    #[must_use]
+    pub fn ends_at(self, asked_end: Option<u64>) -> Option<u64> {
+        match self {
+            Self::AsAsked | Self::Once => asked_end,
+            Self::Until { ends_at } => Some(ends_at),
+            Self::Ongoing => None,
+        }
+    }
 }
 
 /// An intent given up, because the grants hold nothing for its operation.
