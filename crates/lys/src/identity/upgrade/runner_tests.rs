@@ -243,6 +243,7 @@ fn an_upgrade_refuses_live_sessions_and_later_restarts_without_losing_keys() -> 
         };
         assert!(matches!(
             running.client().ask(&Act::Start {
+                lys_mcp: None,
                 launch: Box::new(launch)
             })?,
             Answer::Started { .. }
@@ -455,6 +456,7 @@ fn recovery_after_lys_is_placed_restores_the_runner_or_refuses_unsafe_status() -
             };
             assert!(matches!(
                 running.client().ask(&Act::Start {
+                    lys_mcp: None,
                     launch: Box::new(launch)
                 })?,
                 Answer::Started { .. }

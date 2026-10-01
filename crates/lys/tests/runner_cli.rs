@@ -65,6 +65,7 @@ fn started(client: &Client, id: &str, script: &str) -> TestResult {
     };
     assert!(matches!(
         client.ask(&Act::Start {
+            lys_mcp: None,
             launch: Box::new(launch)
         })?,
         Answer::Started { .. }
