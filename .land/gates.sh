@@ -32,17 +32,15 @@ identity_leg() {
   fi
   cargo nextest run -p lys --all-features --test 'identity_*' --no-fail-fast --retries 0 --no-tests fail
 }
-# The surface leg installs dependencies, checks types and runs the identity tests:
-# npm ci, npm run typecheck and npm test,
-# with surface/identity as the package directory, so the shell's tests and the
-# mock-up's run on every lys landing. It is never scoped away by a changed-path
-# filter. Without npm it fails by name; it never skips.
+# The compiled surface and dependencies are shared with the install fixtures.
+# Its type checks and every surface test still run on each gate.
 surface_leg() {
   if ! command -v npm >/dev/null 2>&1; then
     echo "surface_npm_missing: the surface leg needs npm on the PATH to run npm ci and npm test in surface/identity"
     return 1
   fi
-  (cd surface/identity && npm ci && npm run typecheck && npm test)
+  prepared_surface=$(python3 scripts/identity-gates/surface_fixture.py) || return 1
+  (cd "$prepared_surface" && npm run typecheck && npm test)
 }
 parallel() {
   job_index=$((job_index + 1))
@@ -83,6 +81,7 @@ parallel sh scripts/design/gate.sh
 parallel cargo doc --no-deps --all-features
 parallel ast-grep scan --config sgconfig.yml
 parallel sh scripts/file-length.sh
+parallel python3 -B -m unittest discover -s scripts/identity-gates -p surface_fixture_tests.py
 parallel surface_leg
 leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
 leg cargo test --doc --workspace --all-features
