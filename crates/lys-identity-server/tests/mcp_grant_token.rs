@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Grant header admission preserves the ordinary route holding checks.
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::OperationId;
 use serde_json::{Value, json};
 use std::error::Error;
@@ -20,44 +20,64 @@ fn operation() -> TestResult<String> {
 }
 impl Fixture {
     async fn new() -> TestResult<Self> {
-        let (service, (person, agent)) = Service::start_with(|config| {
-            use lys_identity::{
-                Actor, AuthMethod, Directory, IdentityId, LoginBinding, Profile, Provenance,
-                Transition,
-            };
-            lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
-            let path = config.log_dir.clone();
-            let mut directory = Directory::open(
-                Box::new(move || lys_log_store::FileLeafStore::open(&path)),
-                lys_core::Ed25519Identity::load(&config.event_key_file)?,
-            )?;
-            let actor = Actor::new(
-                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                Provenance::new(AuthMethod::Oidc, 1),
-            );
-            let (person, _) = directory.setup_person(
-                actor.clone(),
-                OperationId::generate()?,
-                Profile::new("Owner")?,
-                1,
-            )?;
-            let (agent, _) = directory.register_agent(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                Profile::new("Agent")?,
-                2,
-            )?;
-            directory.transition(
-                actor,
-                OperationId::generate()?,
-                IdentityId::Agent(agent),
-                Transition::Activate,
-                "",
-                3,
-            )?;
-            Ok((person.to_string(), agent.to_string()))
-        })
+        // Only the stores token admission and the profile route touch are opened.
+        let (service, (person, agent)) = Service::start_adjusted(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            |config| {
+                config.requests_dir = None;
+                config.roles_file = None;
+                config.provisioning_file = None;
+                config.network_file = None;
+                config.runtime_dir = None;
+                config.service_accounts_dir = None;
+                config.stops_dir = None;
+                config.budgets_dir = None;
+                config.policies_dir = None;
+                config.goals_dir = None;
+                config.reviews_dir = None;
+            },
+            |config| {
+                use lys_identity::{
+                    Actor, AuthMethod, Directory, IdentityId, LoginBinding, Profile, Provenance,
+                    Transition,
+                };
+                lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+                let path = config.log_dir.clone();
+                let mut directory = Directory::open(
+                    Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+                    lys_core::Ed25519Identity::load(&config.event_key_file)?,
+                )?;
+                let actor = Actor::new(
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                    Provenance::new(AuthMethod::Oidc, 1),
+                );
+                let (person, _) = directory.setup_person(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    Profile::new("Owner")?,
+                    1,
+                )?;
+                let (agent, _) = directory.register_agent(
+                    actor.clone(),
+                    OperationId::generate()?,
+                    person,
+                    Profile::new("Agent")?,
+                    2,
+                )?;
+                directory.transition(
+                    actor,
+                    OperationId::generate()?,
+                    IdentityId::Agent(agent),
+                    Transition::Activate,
+                    "",
+                    3,
+                )?;
+                Ok((person.to_string(), agent.to_string()))
+            },
+        )
         .await?;
         let cookie = service
             .sign_in(Login {
