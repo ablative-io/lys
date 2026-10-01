@@ -9,7 +9,7 @@
 //! at `/runner-receipts/{index}`: the act as its log keeps it, naming the
 //! caller and the act and never the text typed, with the leaf's hash.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::routing::get;
@@ -75,7 +75,12 @@ async fn act_receipt(
     State(state): State<Arc<AppState>>,
     Path(index): Path<u64>,
 ) -> Result<Json<ActReceipt>, ServerError> {
-    let acts = state.acts.lock().unwrap_or_else(PoisonError::into_inner);
+    let acts = state
+        .acts
+        .lock()
+        .map_err(|error| ServerError::RuntimeUnavailable {
+            reason: format!("the runner acts lock is poisoned: {error}"),
+        })?;
     acts.receipt(index)?
         .map(Json)
         .ok_or_else(|| ServerError::RequestMalformed {

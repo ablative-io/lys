@@ -13,7 +13,7 @@
 //! kept version applies from the agent's next launch, never to a session
 //! already running.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -71,7 +71,11 @@ pub(crate) fn with_policies<T>(
         .ok_or_else(|| ServerError::PolicyUnavailable {
             reason: "the configuration names no policies_dir".to_owned(),
         })?;
-    let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut store = store
+        .lock()
+        .map_err(|error| ServerError::PolicyUnavailable {
+            reason: format!("the policies lock is poisoned: {error}"),
+        })?;
     store.settle()?;
     act(&mut store)
 }
