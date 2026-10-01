@@ -14,6 +14,9 @@
 //! confirms or removes it. The check is recorded once, so it never runs
 //! again.
 
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::read_views::Login;
@@ -202,13 +205,59 @@ pub struct Team {
 
 /// The teams as their log folds them, in the order created.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The teams.
     pub teams: Vec<Team>,
     /// The one check of the memberships kept before the rule, once made.
     #[serde(default)]
     pub checked: Option<Checked>,
+    #[serde(skip)]
+    index: Arc<Index>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Index {
+    positions: HashMap<String, usize>,
+    children: HashMap<String, BTreeSet<String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    teams: Vec<Team>,
+    #[serde(default)]
+    checked: Option<Checked>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut index = Index::default();
+        for (position, team) in records.teams.iter().enumerate() {
+            index
+                .positions
+                .entry(team.created.id.clone())
+                .or_insert(position);
+            if let Some(parent) = &team.parent {
+                index
+                    .children
+                    .entry(parent.clone())
+                    .or_default()
+                    .insert(team.created.id.clone());
+            }
+        }
+        Self {
+            teams: records.teams,
+            checked: records.checked,
+            index: Arc::new(index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -252,7 +301,29 @@ pub enum Refused {
 impl Held {
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
-        self.teams.iter().find(|team| team.created.id == id)
+        self.index
+            .positions
+            .get(id)
+            .and_then(|position| self.teams.get(*position))
+    }
+
+    /// A team and each descendant, without visiting unrelated teams.
+    pub fn subtree(&self, root: &str) -> Result<BTreeSet<String>, Refused> {
+        if !self.index.positions.contains_key(root) {
+            return Err(Refused::Unknown);
+        }
+        let mut ids = BTreeSet::new();
+        let mut pending = vec![root.to_owned()];
+        while let Some(id) = pending.pop() {
+            if ids.insert(id.clone()) {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::Team);
+                if let Some(children) = self.index.children.get(&id) {
+                    pending.extend(children.iter().cloned());
+                }
+            }
+        }
+        Ok(ids)
     }
 
     /// The line kept under `operation`, whichever kind it is.
@@ -347,6 +418,9 @@ impl Held {
         })?;
         match line {
             Line::Created(created) => {
+                Arc::make_mut(&mut self.index)
+                    .positions
+                    .insert(created.id.clone(), self.teams.len());
                 self.teams.push(Team {
                     created,
                     parent: None,
@@ -359,6 +433,17 @@ impl Held {
                 return Ok(());
             }
             Line::CreatedV1(created) => {
+                let index = Arc::make_mut(&mut self.index);
+                index
+                    .positions
+                    .insert(created.created.id.clone(), self.teams.len());
+                if let Some(parent) = &created.parent {
+                    index
+                        .children
+                        .entry(parent.clone())
+                        .or_default()
+                        .insert(created.created.id.clone());
+                }
                 self.teams.push(Team {
                     created: created.created.clone(),
                     parent: created.parent.clone(),
@@ -376,11 +461,12 @@ impl Held {
             }
             _ => {}
         }
-        let team = self
-            .teams
-            .iter_mut()
-            .find(|team| team.created.id == line.team())
+        let position = *self
+            .index
+            .positions
+            .get(line.team())
             .ok_or_else(|| format!("team `{}` was never created", line.team()))?;
+        let team = &mut self.teams[position];
         match &line {
             Line::Added(changed) => team.members.push(changed.member.clone()),
             Line::Removed(changed) => {
@@ -399,6 +485,22 @@ impl Held {
             }
             Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
             Line::NestedV1(nested) => {
+                let index = Arc::make_mut(&mut self.index);
+                if let Some(parent) = &team.parent {
+                    if let Some(children) = index.children.get_mut(parent) {
+                        children.remove(&team.created.id);
+                        if children.is_empty() {
+                            index.children.remove(parent);
+                        }
+                    }
+                }
+                if let Some(parent) = &nested.parent {
+                    index
+                        .children
+                        .entry(parent.clone())
+                        .or_default()
+                        .insert(team.created.id.clone());
+                }
                 team.parent.clone_from(&nested.parent);
                 team.lead.clone_from(&nested.lead);
             }
@@ -421,9 +523,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("teams state: {error}"))
     }

@@ -7,6 +7,9 @@
 //! the same operation in other words is refused, even for a stop cut off
 //! between its parts.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 /// The snapshot domain the stops' folded state is sealed under.
@@ -59,10 +62,51 @@ impl Stop {
 
 /// The stops as their log folds them, in the order kept.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The stops.
     pub stops: Vec<Stop>,
+    #[serde(skip)]
+    index: Arc<Index>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Index {
+    operations: HashMap<String, usize>,
+    agents: HashMap<String, Vec<usize>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    stops: Vec<Stop>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut index = Index::default();
+        for (position, stop) in records.stops.iter().enumerate() {
+            index
+                .operations
+                .entry(stop.operation.clone())
+                .or_insert(position);
+            index
+                .agents
+                .entry(stop.agent.clone())
+                .or_default()
+                .push(position);
+        }
+        Self {
+            stops: records.stops,
+            index: Arc::new(index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -75,40 +119,50 @@ struct Sealed {
 impl Held {
     /// The stop kept under `operation`.
     pub fn operation(&self, operation: &str) -> Option<&Stop> {
-        self.stops.iter().find(|stop| {
+        self.index.operations.get(operation).and_then(|position| {
             #[cfg(test)]
             crate::folded_work::visit(crate::folded_work::Work::Stop);
-            stop.operation == operation
+            self.stops.get(*position)
         })
     }
 
     /// Every stop kept on `agent`, in the order kept.
     pub fn of_agent<'a>(&'a self, agent: &'a str) -> impl Iterator<Item = &'a Stop> + 'a {
-        self.stops.iter().filter(move |stop| {
-            #[cfg(test)]
-            crate::folded_work::visit(crate::folded_work::Work::Stop);
-            stop.agent == agent
-        })
+        self.index
+            .agents
+            .get(agent)
+            .into_iter()
+            .flatten()
+            .filter_map(|position| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::Stop);
+                self.stops.get(*position)
+            })
     }
 
-    /// Fold one stop. A second stop under an operation already kept is
-    /// refused, since every kept stop was checked against what came before.
+    /// Fold one stop. Only an unfinished stop in the same words can be completed.
     pub fn hold(&mut self, stop: Stop) -> Result<(), String> {
-        let held = self.stops.iter_mut().find(|held| {
-            #[cfg(test)]
-            crate::folded_work::visit(crate::folded_work::Work::Stop);
-            held.operation == stop.operation
-        });
-        match held {
-            None => self.stops.push(stop),
-            Some(asked) if !asked.done && stop.done && asked.same_words(&stop) => *asked = stop,
-            Some(_) => {
-                return Err(format!(
-                    "operation `{}` already names a stop",
-                    stop.operation
-                ));
+        if let Some(position) = self.index.operations.get(&stop.operation) {
+            let asked = &mut self.stops[*position];
+            if !asked.done && stop.done && asked.same_words(&stop) {
+                *asked = stop;
+                return Ok(());
             }
+            return Err(format!(
+                "operation `{}` already names a stop",
+                stop.operation
+            ));
         }
+        let index = Arc::make_mut(&mut self.index);
+        index
+            .operations
+            .insert(stop.operation.clone(), self.stops.len());
+        index
+            .agents
+            .entry(stop.agent.clone())
+            .or_default()
+            .push(self.stops.len());
+        self.stops.push(stop);
         Ok(())
     }
 
@@ -125,9 +179,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("stops state: {error}"))
     }

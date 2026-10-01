@@ -7,7 +7,7 @@ use std::ops::Bound;
 
 use axum::extract::Query;
 
-use super::{ListQuery, Page, subtree};
+use super::{ListQuery, Page};
 use crate::folded_work::{Work, count, reset};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -40,10 +40,10 @@ fn unfiltered_page_reads_only_limit_plus_one_index_rows() -> TestResult {
                 .inspect(|_| touched.set(touched.get() + 1)),
             Some(rows.len()),
             |_| Ok(true),
-            String::as_str,
+            |row| row.as_str(),
             |row| {
                 built.set(built.get() + 1);
-                Ok(row.clone())
+                Ok((*row).clone())
             },
         )?;
         assert_eq!(totals.total, 512);
@@ -68,10 +68,10 @@ fn filtered_page_counts_exactly_and_builds_only_limit_plus_one_views() -> TestRe
         rows.values(),
         None,
         |row| Ok(query.matches([row.as_str()])),
-        String::as_str,
+        |row| row.as_str(),
         |row| {
             built.set(built.get() + 1);
-            Ok(row.clone())
+            Ok((*row).clone())
         },
     )?;
     assert_eq!(totals.total, 512);
@@ -82,8 +82,8 @@ fn filtered_page_counts_exactly_and_builds_only_limit_plus_one_views() -> TestRe
         rows.values(),
         None,
         |row| Ok(query.matches([row.as_str()])),
-        String::as_str,
-        |row| Ok(row.clone()),
+        |row| row.as_str(),
+        |row| Ok((*row).clone()),
     )?;
     assert_eq!(totals.total, 512);
     Ok(())
@@ -91,7 +91,7 @@ fn filtered_page_counts_exactly_and_builds_only_limit_plus_one_views() -> TestRe
 
 #[test]
 fn subtree_visits_each_descendant_once_without_unrelated_teams() -> TestResult {
-    let mut teams = Vec::new();
+    let mut teams: Vec<crate::teams_state::Team> = Vec::new();
     for n in (0..64).rev() {
         teams.push(serde_json::from_value(serde_json::json!({
             "created": {"id": format!("team-{n}"), "owner":"person", "name":"team", "description":"", "by":{"provider":"issuer","subject":"person"},"at":1},
@@ -99,7 +99,15 @@ fn subtree_visits_each_descendant_once_without_unrelated_teams() -> TestResult {
         }))?);
     }
     reset();
-    assert_eq!(subtree(&teams, "team-0")?.len(), 64);
+    let held: crate::teams_state::Held =
+        serde_json::from_value(serde_json::json!({"teams":teams}))?;
+    reset();
+    assert_eq!(
+        held.subtree("team-0")
+            .map_err(|reason| format!("{reason:?}"))?
+            .len(),
+        64
+    );
     assert!(count(Work::Team) <= 64);
     Ok(())
 }

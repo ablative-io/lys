@@ -16,10 +16,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
-use crate::error_team::TeamError;
 use crate::routes::AppState;
 use crate::teams_api::with_teams;
-use crate::teams_state::Team;
 
 /// Optional search and paging inputs shared by the list routes.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
@@ -65,30 +63,6 @@ pub(crate) struct Page {
 fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
-    }
-}
-
-fn subtree(teams: &[Team], root: &str) -> Result<BTreeSet<String>, ServerError> {
-    if !teams.iter().any(|team| team.created.id == root) {
-        return Err(ServerError::Team(TeamError::Unknown));
-    }
-    let mut ids = BTreeSet::from([root.to_owned()]);
-    loop {
-        let before = ids.len();
-        for team in teams {
-            #[cfg(test)]
-            crate::folded_work::visit(crate::folded_work::Work::Team);
-            if team
-                .parent
-                .as_ref()
-                .is_some_and(|parent| ids.contains(parent))
-            {
-                ids.insert(team.created.id.clone());
-            }
-        }
-        if ids.len() == before {
-            return Ok(ids);
-        }
     }
 }
 
@@ -157,12 +131,11 @@ impl Page {
             return Ok(None);
         };
         with_teams(state, |store| {
-            let subtree = subtree(store.teams(), root)?;
+            let subtree = store.subtree(root)?;
             Ok(Some(
-                store
-                    .teams()
+                subtree
                     .iter()
-                    .filter(|team| subtree.contains(&team.created.id))
+                    .filter_map(|id| store.team(id))
                     .flat_map(|team| team.members.iter().cloned())
                     .collect(),
             ))
@@ -173,7 +146,7 @@ impl Page {
         self.query
             .team
             .as_deref()
-            .map(|root| with_teams(state, |store| subtree(store.teams(), root)))
+            .map(|root| with_teams(state, |store| store.subtree(root)))
             .transpose()
     }
 
@@ -187,25 +160,61 @@ impl Page {
         self.query.q.is_some() || self.query.team.is_some()
     }
 
-    pub(crate) fn select<'a, T: 'a, V>(
+    pub(crate) fn select<T, V>(
         &self,
-        rows: impl Iterator<Item = &'a T>,
+        rows: impl Iterator<Item = T>,
         total: Option<usize>,
-        matches: impl Fn(&T) -> Result<bool, ServerError>,
+        mut matches: impl FnMut(&T) -> Result<bool, ServerError>,
         id: impl Fn(&T) -> &str,
         view: impl Fn(&T) -> Result<V, ServerError>,
     ) -> Result<(Vec<V>, Totals), ServerError> {
-        let mut selected = Vec::new();
+        let limit = self.query.limit.unwrap_or(50).min(200);
+        let mut selected = Vec::with_capacity(limit + 1);
+        let mut counted = 0;
         for row in rows {
-            if matches(row)? {
-                selected.push((id(row).to_owned(), view(row)?));
+            if !matches(&row)? {
+                continue;
+            }
+            counted += 1;
+            if self.last.as_deref().is_none_or(|last| id(&row) > last) && selected.len() <= limit {
+                selected.push((id(&row).to_owned(), view(&row)?));
+                if total.is_some() && selected.len() > limit {
+                    break;
+                }
             }
         }
-        let mut totals = self.finish(&mut selected, |row| &row.0)?;
-        if let Some(total) = total {
-            totals.total = total;
-        }
-        Ok((selected.into_iter().map(|(_, view)| view).collect(), totals))
+        let more = selected.len() > limit;
+        selected.truncate(limit);
+        let next = if more {
+            let last = selected
+                .last()
+                .ok_or_else(|| malformed("the page has no final row"))?;
+            Some(self.cursor(&last.0)?)
+        } else {
+            None
+        };
+        Ok((
+            selected.into_iter().map(|(_, view)| view).collect(),
+            Totals {
+                total: total.unwrap_or(counted),
+                next,
+            },
+        ))
+    }
+
+    fn cursor(&self, last: &str) -> Result<String, ServerError> {
+        let cursor = Cursor {
+            version: 1,
+            route: self.route.to_owned(),
+            q: self.query.q.clone(),
+            team: self.query.team.clone(),
+            last: last.to_owned(),
+        };
+        Ok(
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&cursor).map_err(|error| {
+                malformed(format!("the paging cursor could not be encoded: {error}"))
+            })?),
+        )
     }
 
     pub(crate) fn finish<T>(
@@ -216,7 +225,7 @@ impl Page {
         rows.sort_by(|left, right| id(left).cmp(id(right)));
         let total = rows.len();
         if let Some(last) = &self.last {
-            rows.retain(|row| id(row) > last.as_str());
+            rows.retain(|row| id(&row) > last.as_str());
         }
         let limit = self.query.limit.unwrap_or(50).min(200);
         let more = rows.len() > limit;

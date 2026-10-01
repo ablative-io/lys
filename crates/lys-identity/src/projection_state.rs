@@ -119,6 +119,9 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
                 return Err(format!("a login is bound twice, the second time to {id}"));
             }
         }
+        if let IdentityId::Person(person) = id {
+            std::sync::Arc::make_mut(&mut projection.people).insert(id.to_string(), person);
+        }
         if projection.records.insert(id, record).is_some() {
             return Err(format!("{id} is recorded twice"));
         }

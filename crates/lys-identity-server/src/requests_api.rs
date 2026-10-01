@@ -21,6 +21,7 @@
 //!
 //! The two decisions are in `requests_decide`.
 
+use std::ops::Bound;
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -303,30 +304,59 @@ async fn list(
             .flatten();
         let at = now();
         with_requests(&state, |store| {
-            let mut requests = Vec::new();
-            for (asked, decided) in store.requests() {
-                let weighed = Weighed::of(&judged, asked, at)?;
-                if weighed.shows(caller) || is_root(caller, judged.root) {
-                    let held_by = store.intent(&asked.id).map(|intent| intent.by.as_str());
-                    requests.push(weighed.view(&judged, caller, asked, decided, held_by)?);
-                }
-            }
-            let totals = if let Some(page) = &page {
-                requests.retain(|request| {
-                    crate::list_page::member(
-                        members.as_ref(),
-                        &request.asked_by,
-                        Some(&request.responsible.id),
-                    ) && page.matches([
-                        request.asked_by_name.as_deref().unwrap_or_default(),
-                        request.relation.as_str(),
-                        request.resource.id.as_str(),
-                        request.why.as_str(),
-                    ])
-                });
-                Some(page.finish(&mut requests, |request| &request.id)?)
+            let (requests, totals) = if let Some(page) = &page {
+                let filtered = page.filtered() || !is_root(caller, judged.root);
+                let after = if filtered {
+                    Bound::Unbounded
+                } else {
+                    page.after()
+                };
+                let (requests, totals) = page.select(
+                    store.requests_ordered(after),
+                    (!filtered).then_some(store.request_count()),
+                    |asked| {
+                        if !filtered {
+                            return Ok(true);
+                        }
+                        let weighed = Weighed::of(&judged, asked, at)?;
+                        let name = judged
+                            .directory
+                            .record(weighed.seeker)
+                            .map_or("", |record| record.profile().display_name());
+                        Ok((weighed.shows(caller) || is_root(caller, judged.root))
+                            && crate::list_page::member(
+                                members.as_ref(),
+                                &asked.asked_by,
+                                Some(&asked.responsible),
+                            )
+                            && page.matches([
+                                name,
+                                asked.relation.as_str(),
+                                asked.resource_id.as_str(),
+                                asked.why.as_str(),
+                            ]))
+                    },
+                    |asked| &asked.id,
+                    |asked| {
+                        let weighed = Weighed::of(&judged, asked, at)?;
+                        let (_, decided) = store
+                            .request(&asked.id)
+                            .ok_or(ServerError::RequestUnknown)?;
+                        let held_by = store.intent(&asked.id).map(|intent| intent.by.as_str());
+                        weighed.view(&judged, caller, asked, decided, held_by)
+                    },
+                )?;
+                (requests, Some(totals))
             } else {
-                None
+                let mut requests = Vec::new();
+                for (asked, decided) in store.requests() {
+                    let weighed = Weighed::of(&judged, asked, at)?;
+                    if weighed.shows(caller) || is_root(caller, judged.root) {
+                        let held_by = store.intent(&asked.id).map(|intent| intent.by.as_str());
+                        requests.push(weighed.view(&judged, caller, asked, decided, held_by)?);
+                    }
+                }
+                (requests, None)
             };
             Ok(Json(RequestList {
                 requests,
