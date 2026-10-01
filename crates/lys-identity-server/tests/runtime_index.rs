@@ -1,9 +1,7 @@
-#![cfg(test)]
 //! A held budget view cannot make report appends copy the estate's session index.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::error::Error;
-use std::ops::Deref;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
@@ -12,7 +10,7 @@ use base64::engine::general_purpose::STANDARD;
 use lys_core::Ed25519Identity;
 use lys_core::merkle::{AppendOnlyTree, RawLeaf};
 use lys_identity_server::runtime_state::{Report, Reported};
-use lys_identity_server::runtime_store::{ORIGIN, RuntimeStore, SessionActivity};
+use lys_identity_server::runtime_store::{ORIGIN, RuntimeStore};
 use lys_log_store::{LeafStore, PinnedRoot, StoreError, StoreResult};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -27,24 +25,42 @@ struct Kept {
     snapshot: Option<Vec<u8>>,
 }
 
-#[derive(Clone)]
-struct MemoryStore(Arc<Mutex<Kept>>);
+struct MemoryStore {
+    kept: Arc<Mutex<Kept>>,
+    extent: u64,
+    pin: PinnedRoot,
+}
 
 impl MemoryStore {
-    fn new() -> Self {
+    fn empty() -> Arc<Mutex<Kept>> {
         let (root, tree_size) = AppendOnlyTree::<RawLeaf>::new().root().to_parts();
-        Self(Arc::new(Mutex::new(Kept {
+        Arc::new(Mutex::new(Kept {
             leaves: Vec::new(),
             pin: PinnedRoot { root, tree_size },
             snapshot: None,
-        })))
+        }))
+    }
+
+    fn open(kept: Arc<Mutex<Kept>>) -> StoreResult<Self> {
+        let held = kept.lock().map_err(poisoned)?;
+        let extent = u64::try_from(held.leaves.len()).map_err(|error| StoreError::Io {
+            context: "memory_store_extent_overflow".to_owned(),
+            source: std::io::Error::other(error),
+        })?;
+        let pin = held.pin;
+        drop(held);
+        Ok(Self { kept, extent, pin })
     }
 
     fn lock(&self) -> StoreResult<MutexGuard<'_, Kept>> {
-        self.0.lock().map_err(|error| StoreError::Io {
-            context: "memory_store_poisoned".to_owned(),
-            source: std::io::Error::other(error.to_string()),
-        })
+        self.kept.lock().map_err(poisoned)
+    }
+}
+
+fn poisoned(error: impl std::fmt::Display) -> StoreError {
+    StoreError::Io {
+        context: "memory_store_poisoned".to_owned(),
+        source: std::io::Error::other(error.to_string()),
     }
 }
 
@@ -54,8 +70,7 @@ impl LeafStore for MemoryStore {
     }
 
     fn extent(&self) -> u64 {
-        u64::try_from(self.lock().expect("memory store lock").leaves.len())
-            .expect("memory store extent fits u64")
+        self.extent
     }
 
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>> {
@@ -67,19 +82,28 @@ impl LeafStore for MemoryStore {
 
     fn put_leaf(&mut self, index: u64, bytes: &[u8]) -> StoreResult<()> {
         let mut held = self.lock()?;
-        let next = u64::try_from(held.leaves.len()).expect("memory store extent fits u64");
+        let next = u64::try_from(held.leaves.len()).map_err(|error| StoreError::Io {
+            context: "memory_store_extent_overflow".to_owned(),
+            source: std::io::Error::other(error),
+        })?;
         if index < next {
             return Err(StoreError::LeafAlreadyWritten { index });
         }
         if index > next {
             return Err(StoreError::LeafWouldLeaveGap { index, next });
         }
+        let following = next.checked_add(1).ok_or_else(|| StoreError::Io {
+            context: "memory_store_extent_overflow".to_owned(),
+            source: std::io::Error::other("one more leaf exceeds the store extent"),
+        })?;
         held.leaves.push(bytes.to_vec());
+        drop(held);
+        self.extent = following;
         Ok(())
     }
 
     fn pinned(&self) -> PinnedRoot {
-        self.lock().expect("memory store lock").pin
+        self.pin
     }
 
     fn pin(&mut self, pin: PinnedRoot) -> StoreResult<()> {
@@ -98,6 +122,8 @@ impl LeafStore for MemoryStore {
             });
         }
         held.pin = pin;
+        drop(held);
+        self.pin = pin;
         Ok(())
     }
 
@@ -130,21 +156,17 @@ fn report(agent: &str, session: &str, state: Reported) -> Report {
     }
 }
 
-fn allocation(
-    view: impl Deref<Target = BTreeMap<String, SessionActivity>>,
-) -> *const BTreeMap<String, SessionActivity> {
-    std::ptr::from_ref(&*view)
-}
-
 #[test]
-fn a_budget_view_keeps_the_map_allocation_across_reports_and_reads_only_selected_agents()
--> TestResult {
+fn a_budget_view_retains_a_selected_snapshot_without_whole_map_copies() -> TestResult {
     let dir = tempfile::tempdir()?;
     let key = Arc::new(Ed25519Identity::load_or_generate(
         &dir.path().join("runtime.key"),
     )?);
-    let memory = MemoryStore::new();
-    let mut store = RuntimeStore::over(Box::new(move || Ok(memory.clone())), key)?;
+    let memory = MemoryStore::empty();
+    let mut store = RuntimeStore::over(
+        Box::new(move || MemoryStore::open(Arc::clone(&memory))),
+        key,
+    )?;
     for agent in 0..AGENTS {
         for session in 0..SESSIONS_PER_AGENT {
             store.report(report(
@@ -156,34 +178,59 @@ fn a_budget_view_keeps_the_map_allocation_across_reports_and_reads_only_selected
     }
     let selected = BTreeSet::from(["agent-0".to_owned()]);
     let view = store.agents_with_sessions()?;
-    let initial = allocation(store.agents_with_sessions()?);
+    let initial: BTreeSet<_> = (0..SESSIONS_PER_AGENT)
+        .map(|index| format!("session-0-{index}"))
+        .collect();
     let reports: Vec<_> = (0..REPORTS / 2)
         .flat_map(|index| {
             let session = format!("reported-{index}");
             [
                 report("agent-0", &session, Reported::Starting),
-                report("agent-0", &session, Reported::Stopped),
+                report(
+                    &format!("agent-{}", AGENTS / 2 + index / SESSIONS_PER_AGENT),
+                    &format!(
+                        "session-{}-{}",
+                        AGENTS / 2 + index / SESSIONS_PER_AGENT,
+                        index % SESSIONS_PER_AGENT
+                    ),
+                    Reported::Stopped,
+                ),
             ]
         })
         .collect();
     let started = Instant::now();
-    let mut mismatches = 0;
+    let mut copies = 0;
     for report in reports {
-        store.report(report)?;
-        if !std::ptr::eq(initial, allocation(store.agents_with_sessions()?)) {
-            mismatches += 1;
-        }
+        store.report_observing(report, |count| copies += count)?;
     }
     let elapsed = started.elapsed().as_secs_f64() * 1_000.0;
     let seen: BTreeSet<_> = view.keys().cloned().collect();
     println!(
-        "agents={AGENTS} initial_sessions={} reports={REPORTS} total_ms={elapsed:.3} per_report_ms={:.6} map_mismatches={mismatches} selected_agents={} read_agents={}",
+        "agents={AGENTS} initial_sessions={} reports={REPORTS} total_ms={elapsed:.3} per_report_ms={:.6} whole_map_copies={copies} selected_agents={} read_agents={}",
         AGENTS * SESSIONS_PER_AGENT,
         elapsed / f64::from(REPORTS),
         selected.len(),
         seen.len()
     );
-    assert_eq!(mismatches, 0, "a held budget view moved the session map");
+    assert_eq!(
+        view.get("agent-0")
+            .ok_or("agent missing from held view")?
+            .live_sessions(),
+        &initial,
+        "the held view changed after reports"
+    );
+    let fresh = store.agents_with_sessions()?;
+    let mut expected = initial;
+    expected.extend((0..REPORTS / 2).map(|index| format!("reported-{index}")));
+    assert_eq!(
+        fresh
+            .get("agent-0")
+            .ok_or("agent missing from fresh view")?
+            .live_sessions(),
+        &expected,
+        "a fresh read must include all 500 new sessions"
+    );
+    assert_eq!(copies, 0, "a held budget view copied the whole session map");
     assert_eq!(seen, selected, "the budget read copied unrelated agents");
     assert_eq!(
         store.sessions().len(),

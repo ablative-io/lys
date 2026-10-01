@@ -65,6 +65,11 @@ pub struct SessionActivity {
 }
 
 impl SessionActivity {
+    /// The live session ids, without their report history.
+    pub fn live_sessions(&self) -> &BTreeSet<String> {
+        &self.sessions
+    }
+
     pub(crate) fn unreported_session(&self, reported: impl Fn(&str) -> bool) -> Option<&str> {
         self.sessions
             .iter()
@@ -192,7 +197,7 @@ impl<S: LeafStore> RuntimeStore<S> {
 
     /// Append one report as one leaf. A failed append is settled by reading
     /// back: the report is kept only if the leaf store holds exactly it.
-    fn append(&mut self, report: Report) -> Result<(), ServerError> {
+    fn append(&mut self, report: Report, copies: &mut usize) -> Result<(), ServerError> {
         let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
@@ -213,7 +218,7 @@ impl<S: LeafStore> RuntimeStore<S> {
                 return Err(unavailable(reason));
             }
             if let Some((agent, session, state, at)) = transition
-                && let Err(error) = self.session_transition(agent, session, state, at)
+                && let Err(error) = self.session_transition(agent, session, state, at, copies)
             {
                 self.uncertain = true;
                 return Err(error);
@@ -254,7 +259,13 @@ impl<S: LeafStore> RuntimeStore<S> {
         session: String,
         state: Reported,
         at: u64,
+        copies: &mut usize,
     ) -> Result<(), ServerError> {
+        if Arc::strong_count(&self.agents_with_sessions) > 1 {
+            *copies = copies
+                .checked_add(1)
+                .ok_or_else(|| unavailable("session index copy count overflows"))?;
+        }
         let activity = Arc::make_mut(&mut self.agents_with_sessions)
             .entry(agent)
             .or_default();
@@ -295,6 +306,26 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// the same words it is kept once; the same operation in other words is
     /// refused, and so is a report the session as it stands does not take.
     pub fn report(&mut self, report: Report) -> Result<Tracked, ServerError> {
+        self.report_observing(report, |_| {})
+    }
+
+    /// Keep one report and observe the full index copies caused by it.
+    pub fn report_observing(
+        &mut self,
+        report: Report,
+        copied: impl FnOnce(usize),
+    ) -> Result<Tracked, ServerError> {
+        let mut copies = 0;
+        let result = self.report_counting(report, &mut copies);
+        copied(copies);
+        result
+    }
+
+    fn report_counting(
+        &mut self,
+        report: Report,
+        copies: &mut usize,
+    ) -> Result<Tracked, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&report.operation) {
             if !same_words(kept, &report) {
@@ -339,7 +370,7 @@ impl<S: LeafStore> RuntimeStore<S> {
             }
         }
         let session = report.session.clone();
-        self.append(report)?;
+        self.append(report, copies)?;
         self.standing(&session)
     }
 
