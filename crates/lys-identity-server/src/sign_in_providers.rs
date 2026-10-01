@@ -243,7 +243,7 @@ impl SignInProviders {
 
     pub(crate) async fn account_by_email(&self, email: &str) -> Result<Value, ServerError> {
         let mut url =
-            reqwest::Url::parse(&format!("{}/users/email/", self.api)).map_err(|error| {
+            reqwest::Url::parse(&format!("{}/users/email", self.api)).map_err(|error| {
                 ServerError::SignInProvidersUnavailable {
                     reason: format!("the issuer's account lookup URL is invalid: {error}"),
                 }
