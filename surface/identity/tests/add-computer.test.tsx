@@ -135,6 +135,29 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('Ward computer was added.');
   });
 
+  it('retains an unknown original when a later manual machine retry is rejected', async () => {
+    const routes = service(); routes['POST /network/machines'] = refused(503, 'NetworkUnavailable', 'The original outcome is unknown');
+    const { posted } = await open(routes); await submit();
+    expect(posted).toHaveLength(1);
+    const original = posted[0]; const pending = sessionStorage.getItem(pendingKey);
+    routes['POST /network/machines'] = refused(403, 'NotAdmitted', 'The retry is not admitted');
+    await retry();
+    expect(posted).toEqual([original, original]);
+    expect(sessionStorage.getItem(pendingKey)).toBe(pending);
+    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(document.body.textContent).not.toContain('Ward computer was added.');
+    plain('NotAdmitted');
+  });
+
+  it('retains a machine request when a 4xx answer names no definite refusal', async () => {
+    const routes = service(); routes['POST /network/machines'] = { status: 403, body: 'Unreadable refusal' };
+    const { posted } = await open(routes); await submit();
+    expect(posted).toHaveLength(1);
+    expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
+    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    plain('Unanswered');
+  });
+
   it('keeps an unconfirmed local-runner phase across remount and does not name the machine twice', async () => {
     const routes = service(refused(503, 'RunnerUnavailable', 'The runner recording outcome is unknown'));
     const first = await open(routes); await submit();
