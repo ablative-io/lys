@@ -315,7 +315,7 @@ impl Service {
         adjust: impl FnOnce(&mut Config) + Send,
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
-        Self::start_saying(
+        Box::pin(Self::start_saying(
             model,
             spicedb,
             secrets,
@@ -323,7 +323,7 @@ impl Service {
             adjust,
             None,
             prepare,
-        )
+        ))
         .await
     }
 
