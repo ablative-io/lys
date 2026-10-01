@@ -304,3 +304,11 @@ pub fn end_group(pid: u32) -> Result<(), RunnerError> {
         RunnerError::refused("end_failed", format!("process group {pid}: {error}"))
     })
 }
+
+/// Request an ordinary end of the recorded leader.
+///
+/// # Errors
+/// Returns a named refusal if the process cannot be signalled.
+pub fn end(leader: &crate::peer::Leader) -> Result<(), RunnerError> {
+    end_group(leader.pid)
+}
