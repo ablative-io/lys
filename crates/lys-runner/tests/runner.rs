@@ -213,10 +213,11 @@ fn a_clean_restart_reports_each_session_ended_with_its_instant() -> TestResult {
 }
 
 /// One session as a lost runner's record keeps it: started, never ended.
-fn unended(session: &str, pid: u32) -> KeptSession {
+fn unended(session: &str, pid: u32, leader_start: Option<lys_runner::peer::Leader>) -> KeptSession {
     KeptSession {
         session: session.to_owned(),
         pid: Some(pid),
+        leader_start,
         started_at: 1,
         columns: 80,
         rows: 24,
@@ -243,7 +244,17 @@ fn a_session_lost_with_its_runner_is_ended_by_the_restart_with_no_status() -> Te
         .spawn()?;
     let state = dir.path().join("state");
     std::fs::create_dir_all(&state)?;
-    let record = Kept::new(vec![unended("gone", gone_pid), unended("left", left.id())]);
+    let record = Kept::new(vec![
+        unended("gone", gone_pid, None),
+        unended(
+            "left",
+            left.id(),
+            Some(lys_runner::peer::Leader {
+                pid: left.id(),
+                start: lys_runner::peer::start_identity(left.id())?,
+            }),
+        ),
+    ]);
     std::fs::write(state.join("sessions.json"), serde_json::to_vec(&record)?)?;
 
     let restarted = Runner::open(&Options {
