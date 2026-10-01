@@ -227,3 +227,85 @@ fn incoming_totals_do_not_mutate_the_cache_or_charge_twice() -> TestResult {
     assert_eq!(tokens(&held, NOW, None)?, 10);
     Ok(())
 }
+
+fn crossing(operation: String, agent: &str) -> crate::budgets_crossing::Crossing {
+    crate::budgets_crossing::Crossing {
+        operation,
+        holder: crate::budgets_state::Holder {
+            kind: crate::budgets_state::HolderKind::Agent,
+            id: agent.to_owned(),
+        },
+        measure: Measure::Tokens,
+        version: 1,
+        limit: 10.into(),
+        figure: Some(10.into()),
+        unavailable: None,
+        limit_index: 0,
+        warning: false,
+        account: None,
+        act: Act::Stop,
+        agent: agent.to_owned(),
+        session: Some("session".to_owned()),
+        text: None,
+        at_ms: NOW,
+    }
+}
+
+fn crossing_history() -> TestResult<Held> {
+    let mut held = Held::default();
+    for index in 0..512 {
+        let operation = format!("old-{index}");
+        held.hold(Leaf::Used(Usage {
+            event: operation.clone(),
+            agent: "unrelated".to_owned(),
+            crossed: vec![crossing(operation.clone(), "unrelated")],
+            ..Usage::default()
+        }))?;
+        held.hold(Leaf::Acted(crate::budgets_crossing::Acted {
+            operation,
+            stands: crate::budgets_crossing::Stands::Confirmed,
+            words: "confirmed exit".to_owned(),
+            at_ms: NOW,
+            ended: None,
+        }))?;
+    }
+    held.hold(Leaf::Used(Usage {
+        event: "current".to_owned(),
+        agent: "covered".to_owned(),
+        crossed: vec![crossing("current".to_owned(), "covered")],
+        ..Usage::default()
+    }))?;
+    Ok(held)
+}
+
+#[test]
+fn unrelated_crossings_do_not_multiply_receipt_work_after_reopen() -> TestResult {
+    let held = crossing_history()?;
+    let restored = Held::decode(&held.encode()?)?;
+    reset();
+    let receipts = restored.crossings.of_agent("covered");
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].crossing.operation, "current");
+    assert!(
+        count(Work::Crossing) <= 1,
+        "{} unrelated crossing visits",
+        count(Work::Crossing)
+    );
+    Ok(())
+}
+
+#[test]
+fn settled_crossings_do_not_multiply_pending_work_after_reopen() -> TestResult {
+    let held = crossing_history()?;
+    let restored = Held::decode(&held.encode()?)?;
+    reset();
+    let pending = restored.crossings.unsettled();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].operation, "current");
+    assert!(
+        count(Work::Crossing) <= 1,
+        "{} settled crossing visits",
+        count(Work::Crossing)
+    );
+    Ok(())
+}

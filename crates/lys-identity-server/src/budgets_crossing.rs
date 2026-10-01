@@ -182,11 +182,15 @@ impl Crossings {
     pub fn unsettled(&self) -> Vec<Crossing> {
         self.crossed
             .iter()
-            .filter(|crossing| match self.acted.get(&crossing.operation) {
-                None => true,
-                Some(acted) => {
-                    matches!(acted.stands, Stands::Accepted | Stands::Uncertain)
-                        || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+            .filter(|crossing| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Crossing);
+                match self.acted.get(&crossing.operation) {
+                    None => true,
+                    Some(acted) => {
+                        matches!(acted.stands, Stands::Accepted | Stands::Uncertain)
+                            || (acted.stands == Stands::Delivered && crossing.act == Act::Stop)
+                    }
                 }
             })
             .cloned()
@@ -197,7 +201,11 @@ impl Crossings {
     pub fn of_agent(&self, agent: &str) -> Vec<Receipt> {
         self.crossed
             .iter()
-            .filter(|crossing| crossing.agent == agent)
+            .filter(|crossing| {
+                #[cfg(test)]
+                crate::budgets_work::visit(crate::budgets_work::Work::Crossing);
+                crossing.agent == agent
+            })
             .map(|crossing| Receipt {
                 crossing: crossing.clone(),
                 acted: self.acted.get(&crossing.operation).cloned(),
