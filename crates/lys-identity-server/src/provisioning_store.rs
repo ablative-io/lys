@@ -402,14 +402,8 @@ impl ProvisioningStore {
 
     /// The numbered version of the named agent's profile.
     pub fn version(&self, agent: &str, number: u32) -> Option<&Version> {
-        self.profile(agent)?
-            .versions
-            .iter()
-            .inspect(|_| {
-                #[cfg(test)]
-                HISTORY_VISITS.with(|visits| visits.set(visits.get() + 1));
-            })
-            .find(|version| version.number == number)
+        let (profile, version) = self.indexes.location(agent, number)?;
+        self.kept.profiles.get(profile)?.versions.get(version)
     }
 
     /// The agent and the version `operation` names, if it names one.
