@@ -182,14 +182,11 @@ fn reading_a_short_path_of_a_large_file_reads_only_that_path() {
     let mut s = home.create_session("s5", "/work", None).unwrap();
     let filler = "f".repeat(4096);
     // 50 entries on the main path, then 2,000 entries on a side branch.
-    let mut main = Vec::new();
-    for _ in 0..50 {
-        main.push(s.append(message("user", "m")).unwrap());
-    }
+    let main_bodies: Vec<_> = (0..50).map(|_| message("user", "m")).collect();
+    let main = s.append_all(&main_bodies).unwrap();
     s.move_head(Some(&main[0])).unwrap();
-    for _ in 0..2000 {
-        s.append(message("assistant", &filler)).unwrap();
-    }
+    let side_bodies: Vec<_> = (0..2000).map(|_| message("assistant", &filler)).collect();
+    s.append_all(&side_bodies).unwrap();
     let size = std::fs::metadata(s.file()).unwrap().len();
     assert!(size > 8_000_000, "file is {size} bytes");
     s.move_head(Some(&main[49])).unwrap();
