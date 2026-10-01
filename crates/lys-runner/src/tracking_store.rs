@@ -302,6 +302,7 @@ pub struct Feed {
     path: PathBuf,
     index_path: PathBuf,
     index: Index,
+    writer: Option<crate::durable::Writer>,
 }
 
 fn failed(what: impl std::fmt::Display) -> RunnerError {
@@ -338,9 +339,41 @@ impl Feed {
             path,
             index_path,
             index,
+            writer: None,
         };
         feed.recover()?;
+        if !feed.path.exists() {
+            crate::state::replace(&feed.path, b"").map_err(failed)?;
+        }
+        feed.write_index()?;
         Ok(feed)
+    }
+
+    pub(crate) fn writer(&mut self, writer: crate::durable::Writer) {
+        self.writer = Some(writer);
+    }
+
+    /// A read snapshot copies only the file boundary, never the source or attempt tables.
+    pub(crate) fn reader(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            index_path: self.index_path.clone(),
+            index: Index {
+                format: self.index.format.clone(),
+                feed: self.index.feed.clone(),
+                committed: self.index.committed,
+                next_seq: self.index.next_seq,
+                ..Index::default()
+            },
+            writer: self.writer.clone(),
+        }
+    }
+
+    pub(crate) fn attempt_reader(&self, key: &str) -> Option<Self> {
+        let offset = *self.index.attempts.get(key)?;
+        let mut reader = self.reader();
+        reader.index.attempts.insert(key.to_owned(), offset);
+        Some(reader)
     }
 
     /// Fold the units after the committed length, and cut off the bytes
@@ -360,9 +393,28 @@ impl Feed {
         if length == self.index.committed {
             return Ok(());
         }
-        let (entries, _, _) = self.lines(self.index.committed, length)?;
+        let mut file = fs::File::open(&self.path).map_err(failed)?;
+        file.seek(SeekFrom::Start(self.index.committed))
+            .map_err(failed)?;
+        let mut reader = BufReader::new(file.take(length - self.index.committed));
         let (mut kept, mut unit) = (self.index.committed, self.index.committed);
-        for (entry, after) in entries {
+        let mut after = self.index.committed;
+        loop {
+            let mut line = Vec::new();
+            let read = reader
+                .by_ref()
+                .take(1_048_577)
+                .read_until(b'\n', &mut line)
+                .map_err(failed)?;
+            if line.len() > 1_048_576 {
+                return Err(failed("feed_record_too_large"));
+            }
+            if read == 0 || line.last() != Some(&b'\n') {
+                break;
+            }
+            let entry: FeedEntry = serde_json::from_slice(&line)
+                .map_err(|error| failed(format!("feed_record_unreadable at {after}: {error}")))?;
+            after += read as u64;
             if let Body::Commit(commit) = entry.body {
                 self.index.next_seq = entry.seq + 1;
                 fold(&mut self.index, &entry.session, commit, unit);
@@ -385,10 +437,7 @@ impl Feed {
         self.write_index()
     }
 
-    /// The whole lines between `from` and `to`, each with the offset after
-    /// it; where the last whole line that reads ends; and, when a whole line
-    /// does not read, why.
-    fn lines(&self, from: u64, to: u64) -> Result<Lines, RunnerError> {
+    fn limited_lines(&self, from: u64, to: u64, limit: usize) -> Result<Lines, RunnerError> {
         if from >= to {
             return Ok((Vec::new(), from, None));
         }
@@ -398,7 +447,17 @@ impl Feed {
         let (mut entries, mut at) = (Vec::new(), from);
         loop {
             let mut line = Vec::new();
-            let read = reader.read_until(b'\n', &mut line).map_err(failed)?;
+            if entries.len() == limit {
+                return Ok((entries, at, None));
+            }
+            let read = reader
+                .by_ref()
+                .take(1_048_577)
+                .read_until(b'\n', &mut line)
+                .map_err(failed)?;
+            if line.len() > 1_048_576 {
+                return Err(failed("feed_record_too_large"));
+            }
             if read == 0 || line.last() != Some(&b'\n') {
                 return Ok((entries, at, None));
             }
@@ -441,10 +500,13 @@ impl Feed {
     /// The refusal kept for `key`, when one was: the first entry of the
     /// unit its attempt was committed in.
     pub fn attempt(&self, key: &str) -> Result<Option<RefusalRecord>, RunnerError> {
+        if let Some(writer) = &self.writer {
+            writer.barrier()?;
+        }
         let Some(offset) = self.index.attempts.get(key).copied() else {
             return Ok(None);
         };
-        let (entries, _, unread) = self.lines(offset, self.index.committed)?;
+        let (entries, _, unread) = self.limited_lines(offset, self.index.committed, 1)?;
         match entries.into_iter().next() {
             Some((
                 FeedEntry {
@@ -460,7 +522,8 @@ impl Feed {
     }
 
     /// Append `bodies` for `session` as one unit ending in `commit`, made
-    /// durable before this answers; answers the first entry's number.
+    /// queued in sequence; a shared writer is fenced outside the table
+    /// before answering a caller. Answers the first entry's number.
     pub fn append(
         &mut self,
         session: &str,
@@ -478,26 +541,30 @@ impl Feed {
                 session: session.to_owned(),
                 body,
             };
-            text.push_str(&serde_json::to_string(&entry).map_err(failed)?);
+            let line = serde_json::to_string(&entry).map_err(failed)?;
+            if line.len() >= 1_048_576 {
+                return Err(failed("feed_record_too_large"));
+            }
+            text.push_str(&line);
             text.push('\n');
             seq += 1;
         }
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(failed)?;
-        file.write_all(text.as_bytes())
-            .and_then(|()| file.sync_data())
-            .map_err(failed)?;
-        self.index.committed += text.len() as u64;
+        let written = text.len();
+        if let Some(writer) = &self.writer {
+            writer.append(&self.path, text.into_bytes())?;
+        } else {
+            let mut file = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.path)
+                .map_err(failed)?;
+            file.write_all(text.as_bytes())
+                .and_then(|()| file.sync_data())
+                .map_err(failed)?;
+        }
+        self.index.committed += written as u64;
         self.index.next_seq = seq;
         fold(&mut self.index, session, commit, unit);
-        if let Err(error) = self.write_index() {
-            crate::error::said(&format!(
-                "the feed's index was not written, and the next start folds the unit again: {error}"
-            ));
-        }
         Ok(first)
     }
 
@@ -505,8 +572,11 @@ impl Feed {
     /// [`PAGE_MAX`]; refused `cursor_expired` for another feed's cursor and
     /// `cursor_ahead` for one past its end.
     pub fn page(&self, cursor: Option<&str>) -> Result<FeedPage, RunnerError> {
+        if let Some(writer) = &self.writer {
+            writer.barrier()?;
+        }
         let from = self.offset(cursor)?;
-        let (entries, _, unread) = self.lines(from, self.index.committed)?;
+        let (entries, _, unread) = self.limited_lines(from, self.index.committed, PAGE_MAX * 2)?;
         if let (Some(reason), true) = (unread, entries.is_empty()) {
             return Err(failed(reason));
         }

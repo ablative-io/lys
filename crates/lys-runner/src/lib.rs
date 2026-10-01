@@ -49,6 +49,7 @@ pub mod containment_paths;
 pub mod containment_policy;
 pub mod containment_stdio;
 pub mod dial;
+mod durable;
 pub mod error;
 mod input;
 pub mod judge;
