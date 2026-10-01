@@ -40,6 +40,10 @@ use crate::read_views::{
 };
 use crate::routes::{AppState, signed_in, with_directory};
 
+#[cfg(test)]
+#[path = "read_api_index_tests.rs"]
+mod index_tests;
+
 /// The commit this service was built from, as `build.rs` stamped it.
 pub const BUILD: &str = env!("LYS_BUILD");
 
@@ -101,15 +105,26 @@ fn agents_by_person(projection: &Projection) -> HashMap<PersonId, Vec<AgentSumma
 
 /// The agents answering to one person, read from the records alone.
 fn agents_of(projection: &Projection, person: PersonId) -> Vec<AgentSummary> {
+    agents_of_observing(projection, person, |_| {})
+}
+
+fn agents_of_observing(
+    projection: &Projection,
+    person: PersonId,
+    mut visited: impl FnMut(IdentityId),
+) -> Vec<AgentSummary> {
     projection
         .records()
-        .filter_map(|(id, record)| match (id, record.responsible()) {
-            (IdentityId::Agent(agent), Some(owner)) if owner == person => Some(AgentSummary {
-                id: agent.to_string(),
-                display_name: record.profile().display_name().to_owned(),
-                state: record.state().to_string(),
-            }),
-            _ => None,
+        .filter_map(|(id, record)| {
+            visited(*id);
+            match (id, record.responsible()) {
+                (IdentityId::Agent(agent), Some(owner)) if owner == person => Some(AgentSummary {
+                    id: agent.to_string(),
+                    display_name: record.profile().display_name().to_owned(),
+                    state: record.state().to_string(),
+                }),
+                _ => None,
+            }
         })
         .collect()
 }
