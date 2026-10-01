@@ -5,11 +5,11 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::Path;
 
-use sha2::{Digest, Sha256};
+use ring::digest::{Context, SHA256};
 
 pub(crate) fn hash_file(path: &Path) -> io::Result<String> {
     let mut file = File::open(path)?;
-    let mut hash = Sha256::new();
+    let mut hash = Context::new(&SHA256);
     let mut buffer = [0; 8192];
     loop {
         let count = file.read(&mut buffer)?;
@@ -18,7 +18,13 @@ pub(crate) fn hash_file(path: &Path) -> io::Result<String> {
         }
         hash.update(&buffer[..count]);
     }
-    Ok(format!("{:x}", hash.finalize()))
+    let digest = hash.finish();
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.as_ref() {
+        std::fmt::Write::write_fmt(&mut encoded, format_args!("{byte:02x}"))
+            .map_err(io::Error::other)?;
+    }
+    Ok(encoded)
 }
 
 pub(crate) fn inventory(root: &Path) -> io::Result<BTreeMap<String, String>> {
@@ -99,6 +105,34 @@ fn copy_file(from: &Path, to: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_hash_keeps_exact_sha256_across_read_boundaries() -> io::Result<()> {
+        use sha2::{Digest, Sha256};
+
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("bytes");
+        for (bytes, expected) in [
+            (
+                &b""[..],
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                &b"abc"[..],
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ),
+        ] {
+            fs::write(&path, bytes)?;
+            assert_eq!(hash_file(&path)?, expected);
+        }
+        let mut bytes = vec![13; 8192 * 2 + 1];
+        fs::write(&path, &bytes)?;
+        assert_eq!(hash_file(&path)?, format!("{:x}", Sha256::digest(&bytes)));
+        bytes[8192 * 2] = 17;
+        fs::write(&path, &bytes)?;
+        assert_eq!(hash_file(&path)?, format!("{:x}", Sha256::digest(&bytes)));
+        Ok(())
+    }
 
     #[test]
     fn private_copies_do_not_mutate_the_template_or_each_other() -> io::Result<()> {

@@ -1339,6 +1339,7 @@ dependencies = [
  "lys-identity-server",
  "lys-log-store",
  "reqwest",
+ "ring",
  "rustix",
  "serde",
  "serde_json",
