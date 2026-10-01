@@ -118,7 +118,7 @@ impl Table {
         let state = dir.path().join("runner-state");
         let adjusted = socket.clone();
         let lines = Arc::clone(heard());
-        let (service, (seeded, serving)) = Service::start_saying(
+        let (service, (seeded, serving)) = Box::pin(Service::start_saying(
             GRANT_MODEL,
             None,
             Some(settings),
@@ -141,7 +141,7 @@ impl Table {
                 })?;
                 Ok((seeded, runner.spawn()))
             },
-        )
+        ))
         .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
