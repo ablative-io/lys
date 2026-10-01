@@ -25,7 +25,7 @@ use lys_identity::SNAPSHOT_EVERY;
 use lys_log_store::{
     FileLeafStore, FrontierLog, LeafStore, SnapshotRefusal, Start, StoreResult, open_with_snapshot,
 };
-use lys_runner::judge::Policy;
+use lys_runner::judge::{Authority, HOST_TOOL, PATH_TOOLS, Policy, Rule, RuleKind};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
@@ -264,6 +264,41 @@ impl<S: LeafStore> PolicyStore<S> {
             self.uncertain = false;
             self.after_start(&start);
         }
+        Ok(())
+    }
+
+    /// Persist the first restrictive policy only when no explicit version exists.
+    pub fn ensure_default(&mut self, agent: &str) -> Result<(), ServerError> {
+        self.settle()?;
+        if self.held.latest(agent).is_some() {
+            return Ok(());
+        }
+        let mut rules: Vec<_> = PATH_TOOLS
+            .into_iter()
+            .map(|(tool, _)| Rule {
+                id: format!("deny-{tool}"),
+                tool: tool.to_owned(),
+                kind: RuleKind::PathPrefix,
+                target: Some("/".to_owned()),
+                authority: Authority::Hard,
+            })
+            .collect();
+        rules.push(Rule {
+            id: format!("deny-{HOST_TOOL}"),
+            tool: HOST_TOOL.to_owned(),
+            kind: RuleKind::Tool,
+            target: None,
+            authority: Authority::Hard,
+        });
+        // Root path rules also refuse tools whose target cannot be inspected.
+        self.set(
+            Policy {
+                version: 1,
+                agent: agent.to_owned(),
+                rules,
+            },
+            0,
+        )?;
         Ok(())
     }
 
