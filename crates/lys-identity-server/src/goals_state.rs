@@ -16,6 +16,10 @@
 use lys_runner::operations::{OperationOutcome, OperationState};
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+#[path = "goals_operation_tests.rs"]
+mod operation_tests;
+
 /// The snapshot domain the goals' folded state is sealed under.
 pub const DOMAIN: &str = "lys/identity/goals-state/v1";
 
@@ -347,7 +351,13 @@ struct Sealed {
 impl Held {
     /// The item `id`.
     pub fn item(&self, id: &str) -> Option<&Item> {
-        self.items.iter().find(|item| item.goal.id == id)
+        self.items
+            .iter()
+            .inspect(|_| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
+            })
+            .find(|item| item.goal.id == id)
     }
 
     fn item_mut(&mut self, id: &str) -> Result<&mut Item, String> {
@@ -362,6 +372,10 @@ impl Held {
         self.items
             .iter()
             .filter_map(|item| item.marked.as_ref())
+            .inspect(|_| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
+            })
             .find(|marked| marked.operation == operation)
     }
 
@@ -370,6 +384,10 @@ impl Held {
         self.items
             .iter()
             .flat_map(|item| &item.changes)
+            .inspect(|_| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
+            })
             .find(|changed| changed.operation == operation)
     }
 
@@ -537,6 +555,10 @@ impl Held {
             .iter()
             .flat_map(|item| &item.fired)
             .flat_map(|fired| &fired.sent)
+            .inspect(|_| {
+                #[cfg(test)]
+                crate::folded_work::visit(crate::folded_work::Work::GoalOperation);
+            })
             .find(|sent| sent.operation == operation)
     }
 
