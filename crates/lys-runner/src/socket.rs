@@ -52,6 +52,8 @@ pub struct Runner {
     listener: UnixListener,
     socket: PathBuf,
     server: [u8; 32],
+    #[cfg(test)]
+    accept_error: Option<io::Error>,
 }
 
 /// A runner serving on its own thread.
@@ -107,6 +109,8 @@ impl Runner {
             listener,
             socket: options.socket.clone(),
             server: options.server_key,
+            #[cfg(test)]
+            accept_error: None,
         })
     }
 
@@ -188,6 +192,8 @@ impl Runner {
     ) -> Result<(), RunnerError> {
         self.listener.set_nonblocking(true).map_err(socket_failed)?;
         let listener = tokio::net::UnixListener::from_std(self.listener).map_err(socket_failed)?;
+        #[cfg(test)]
+        let mut accept_error = self.accept_error;
         let slots = Arc::new(DispatchSlots::new());
         let open = Arc::new(tokio::sync::Semaphore::new(CONNECTION_MAX));
         let mut connections = tokio::task::JoinSet::new();
@@ -197,6 +203,13 @@ impl Runner {
                     changed.map_err(socket_failed)?;
                 }
                 incoming = listener.accept() => {
+                    #[cfg(test)]
+                    let incoming = if let Some(error) = accept_error.take() {
+                        drop(incoming);
+                        Err(error)
+                    } else {
+                        incoming
+                    };
                     let (stream, _) = incoming.map_err(socket_failed)?;
                     match Arc::clone(&open).try_acquire_owned() {
                         Ok(permit) => {
