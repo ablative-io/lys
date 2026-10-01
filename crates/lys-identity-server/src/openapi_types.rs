@@ -194,6 +194,12 @@ fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
     let revoke = api.schema::<RevokeBody>();
     let keep = api.schema::<KeepBody>();
     vec![
+        (
+            GET,
+            "/agent/grants",
+            None,
+            Some(api.schema::<crate::agent_grants_api::AgentGrants>()),
+        ),
         (GET, "/grants", None, Some(list)),
         (POST, "/grants", Some(delegate), Some(recorded.clone())),
         (GET, "/grants/model", None, Some(api.schema::<ModelView>())),
