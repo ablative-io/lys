@@ -111,6 +111,12 @@ pub enum IdentityError {
         "EventNotCanonical: the event's bytes are not the canonical encoding of what they decode to"
     )]
     EventNotCanonical,
+    /// A leaf records a change to the install as a whole where a change to
+    /// one identity was asked for.
+    #[error(
+        "InstallEntry: the leaf records a change to the install as a whole, not a change to an identity"
+    )]
+    InstallEntry,
     /// An event is larger than any event this directory writes.
     #[error("EventTooLarge: {len} bytes, over the limit of {limit}")]
     EventTooLarge {

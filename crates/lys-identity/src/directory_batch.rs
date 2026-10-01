@@ -47,9 +47,9 @@ impl<S: LeafStore> Directory<S> {
             }
             if let Some(&position) = planned.get(&event.operation()) {
                 let original: &SignedEvent = &signed[position];
-                if !super::same_actor(original.event().actor(), event.actor())
-                    || original.event().identity() != event.identity()
-                    || original.event().change() != event.change()
+                if !super::same_actor(original.event()?.actor(), event.actor())
+                    || original.event()?.identity() != event.identity()
+                    || original.event()?.change() != event.change()
                 {
                     return Err(IdentityError::OperationReused {
                         operation: event.operation().to_string(),
@@ -78,11 +78,11 @@ impl<S: LeafStore> Directory<S> {
                 return Err(failure);
             }
         };
-        let receipts: Vec<_> = signed
+        let receipts: Vec<Receipt> = signed
             .iter()
             .zip(coordinates)
             .map(|(event, coordinate)| Receipt::of(event, coordinate))
-            .collect();
+            .collect::<Result<_, _>>()?;
         self.projection = projection;
         self.folded = next;
         self.snapshot();

@@ -22,11 +22,14 @@ use crate::encoding::{
 };
 use crate::error::IdentityError;
 use crate::event::IdentityEvent;
+use crate::install_event::{self, INSTALL_EVENT_VERSION, InstallEvent};
 
 /// The content type the protected header names.
 pub const CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v1+cbor";
 /// New envelope for events authenticated by a service account's bearer.
 pub const SERVICE_ACCOUNT_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v2+cbor";
+/// The envelope of an install event, recorded by the directory service itself.
+pub const INSTALL_CONTENT_TYPE: &str = "application/vnd.lys.identity-event.v3+cbor";
 
 fn content_type(event: &IdentityEvent) -> &'static str {
     if event.version() == 2 {
@@ -79,11 +82,20 @@ fn cose_sign1(protected: &[u8], payload: &[u8], signature: &[u8]) -> Vec<u8> {
     out
 }
 
+/// What one leaf of the directory's log records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Entry {
+    /// A change to one identity, made by a person the service authenticated.
+    Identity(IdentityEvent),
+    /// A change to the install as a whole, recorded by the service itself.
+    Install(InstallEvent),
+}
+
 /// An event with the exact bytes that were signed, ready to append or just verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignedEvent {
     bytes: Vec<u8>,
-    event: IdentityEvent,
+    entry: Entry,
     commitment: [u8; 32],
 }
 
@@ -93,9 +105,18 @@ impl SignedEvent {
         &self.bytes
     }
 
-    /// The event the message carries.
-    pub fn event(&self) -> &IdentityEvent {
-        &self.event
+    /// What the message records.
+    pub fn entry(&self) -> &Entry {
+        &self.entry
+    }
+
+    /// The identity event the message carries, refused by name when it
+    /// records an install event instead.
+    pub fn event(&self) -> Result<&IdentityEvent, IdentityError> {
+        match &self.entry {
+            Entry::Identity(event) => Ok(event),
+            Entry::Install(_) => Err(IdentityError::InstallEntry),
+        }
     }
 
     /// SHA-256 over the body bytes, named by [`crate::encoding::PAYLOAD_COMMITMENT_HASH`].
@@ -112,9 +133,34 @@ pub fn sign_event(
     service_key: &Ed25519Identity,
 ) -> Result<SignedEvent, IdentityError> {
     let body = encode_body(&event);
-    let protected = protected_header(&service_key.public_key_bytes(), content_type(&event));
-    let signature = service_key.sign(&sig_structure(&protected, &body));
-    let bytes = cose_sign1(&protected, &body, &signature);
+    let media_type = content_type(&event);
+    seal(&body, media_type, Entry::Identity(event), service_key)
+}
+
+/// Sign the install event `event` with the directory service's key, as
+/// [`sign_event`] signs an identity event.
+pub fn sign_install_event(
+    event: InstallEvent,
+    service_key: &Ed25519Identity,
+) -> Result<SignedEvent, IdentityError> {
+    let body = install_event::encode(&event);
+    seal(
+        &body,
+        INSTALL_CONTENT_TYPE,
+        Entry::Install(event),
+        service_key,
+    )
+}
+
+fn seal(
+    body: &[u8],
+    media_type: &str,
+    entry: Entry,
+    service_key: &Ed25519Identity,
+) -> Result<SignedEvent, IdentityError> {
+    let protected = protected_header(&service_key.public_key_bytes(), media_type);
+    let signature = service_key.sign(&sig_structure(&protected, body));
+    let bytes = cose_sign1(&protected, body, &signature);
     if bytes.len() > MAX_EVENT_BYTES {
         return Err(IdentityError::EventTooLarge {
             len: bytes.len(),
@@ -123,8 +169,8 @@ pub fn sign_event(
     }
     Ok(SignedEvent {
         bytes,
-        commitment: payload_commitment(&body),
-        event,
+        commitment: payload_commitment(body),
+        entry,
     })
 }
 
@@ -147,6 +193,7 @@ pub fn verify_event(
     };
     if parts.protected != protected_header(&kid, CONTENT_TYPE)
         && parts.protected != protected_header(&kid, SERVICE_ACCOUNT_CONTENT_TYPE)
+        && parts.protected != protected_header(&kid, INSTALL_CONTENT_TYPE)
     {
         return Err(IdentityError::EventMalformed {
             reason: "the protected header is not the identity-event header",
@@ -165,8 +212,16 @@ pub fn verify_event(
     {
         return Err(IdentityError::SignatureInvalid);
     }
-    let event = decode_body(&parts.payload)?;
-    if parts.protected != protected_header(&kid, content_type(&event)) {
+    let (entry, media_type) =
+        if install_event::body_version(&parts.payload)? == Some(INSTALL_EVENT_VERSION) {
+            let event = install_event::decode(&parts.payload)?;
+            (Entry::Install(event), INSTALL_CONTENT_TYPE)
+        } else {
+            let event = decode_body(&parts.payload)?;
+            let media_type = content_type(&event);
+            (Entry::Identity(event), media_type)
+        };
+    if parts.protected != protected_header(&kid, media_type) {
         return Err(malformed(
             "the identity event body version differs from its envelope",
         ));
@@ -177,7 +232,7 @@ pub fn verify_event(
     Ok(SignedEvent {
         bytes: message.to_vec(),
         commitment: payload_commitment(&parts.payload),
-        event,
+        entry,
     })
 }
 

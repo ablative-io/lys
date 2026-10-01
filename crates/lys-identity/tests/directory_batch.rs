@@ -254,7 +254,7 @@ fn failed_batch_adopts_only_its_prefix_and_retry_records_only_the_missing_event(
                     .ok_or(IdentityError::LogUnavailable {
                         reason: "prefix event missing".to_owned(),
                     })?;
-            Ok(lys_identity::receipt::Receipt::of(&signed, coordinate))
+            lys_identity::receipt::Receipt::of(&signed, coordinate)
         })
         .collect::<Result<_, IdentityError>>()?;
     let receipts = directory.commit_batch(&changes)?;

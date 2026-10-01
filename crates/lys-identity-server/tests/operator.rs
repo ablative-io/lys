@@ -81,12 +81,12 @@ async fn matching_token_records_operator_provenance_and_exact_retry_keeps_one_le
     let bytes = store.leaf(0)?.ok_or("setup leaf missing")?;
     let key = Ed25519Identity::load(&service.dir.path().join("service.key"))?;
     let signed = verify_event(&bytes, &key.public_key_bytes())?;
-    assert_eq!(signed.event().actor().binding().subject(), ADMINISTRATOR);
+    assert_eq!(signed.event()?.actor().binding().subject(), ADMINISTRATOR);
     assert_eq!(
-        signed.event().actor().provenance().method(),
+        signed.event()?.actor().provenance().method(),
         AuthMethod::Operator
     );
-    assert_eq!(signed.event().actor().provenance().agent(), None);
+    assert_eq!(signed.event()?.actor().provenance().agent(), None);
     Ok(())
 }
 
@@ -124,7 +124,7 @@ async fn absent_header_keeps_the_existing_cookie_admission() -> TestResult {
     let key = Ed25519Identity::load(&service.dir.path().join("service.key"))?;
     assert_eq!(
         verify_event(&bytes, &key.public_key_bytes())?
-            .event()
+            .event()?
             .actor()
             .provenance()
             .method(),

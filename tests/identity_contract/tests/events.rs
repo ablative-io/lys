@@ -121,7 +121,7 @@ fn every_change_signs_and_verifies_to_the_same_event_and_bytes() -> TestResult {
     for original in events {
         let signed = sign_event(original.clone(), &key)?;
         let read = verify_event(signed.bytes(), &key.public_key_bytes())?;
-        assert_eq!(read.event(), &original);
+        assert_eq!(read.event()?, &original);
         assert_eq!(read.bytes(), signed.bytes());
         assert_eq!(read.payload_commitment(), signed.payload_commitment());
         assert_eq!(
@@ -600,7 +600,7 @@ mod receipts {
         );
 
         let original = verify_event(&leaf, &key)?;
-        let event = original.event();
+        let event = original.event()?;
         let remade = |actor: Actor, change: Change| {
             IdentityEvent::new(
                 event.operation(),
@@ -618,7 +618,7 @@ mod receipts {
         let changed_actor = Receipt::of(
             &remade(other_actor, event.change().clone())?,
             receipt.coordinate(),
-        );
+        )?;
         let changed_payload = Receipt::of(
             &remade(
                 event.actor().clone(),
@@ -627,14 +627,14 @@ mod receipts {
                 },
             )?,
             receipt.coordinate(),
-        );
+        )?;
         let changed_sequence = Receipt::of(
             &original,
             Coordinate {
                 index: index + 1,
                 ..receipt.coordinate()
             },
-        );
+        )?;
         let mut signature_changed = leaf.clone();
         let last = signature_changed.len() - 1;
         signature_changed[last] ^= 1;

@@ -17,6 +17,7 @@ use crate::id::{AgentId, IdentityId, PersonId};
 use crate::lifecycle::LifecycleState;
 use crate::operation::OperationId;
 use crate::profile::Profile;
+use crate::signer::Entry;
 
 #[path = "projection_reporting.rs"]
 mod reporting;
@@ -358,6 +359,14 @@ impl Projection {
         }
     }
 
+    /// Advance the directory by the leaf `entry`, committed at log index `index`.
+    pub fn apply_entry(&mut self, entry: &Entry, index: u64) -> Result<(), IdentityError> {
+        match entry {
+            Entry::Identity(event) => self.apply(event, index),
+            Entry::Install(event) => self.apply_install(event, index),
+        }
+    }
+
     /// Advance the directory by `event`, committed at log index `index`.
     pub fn apply(&mut self, event: &IdentityEvent, index: u64) -> Result<(), IdentityError> {
         self.check(event)?;
@@ -467,6 +476,9 @@ fn fresh(
 
 #[path = "projection_state.rs"]
 pub(crate) mod state;
+
+#[path = "projection_install.rs"]
+mod install;
 
 #[cfg(test)]
 #[path = "projection_reporting_tests.rs"]

@@ -39,6 +39,9 @@ pub mod reporting;
 #[path = "directory_batch.rs"]
 mod batch;
 
+#[path = "directory_install.rs"]
+mod install;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 
@@ -178,7 +181,7 @@ impl<S: LeafStore> Directory<S> {
                 reason: format!("leaf {index} arrived where leaf {expected} was expected"),
             });
         }
-        self.projection.apply(signed.event(), index)?;
+        self.projection.apply_entry(signed.entry(), index)?;
         self.folded += 1;
         Ok(())
     }
@@ -199,8 +202,8 @@ impl<S: LeafStore> Directory<S> {
                     reason: format!("operation {operation} names leaf {index}, which is not held"),
                 })?;
         Ok(Some((
-            signed.event().clone(),
-            Receipt::of(&signed, coordinate),
+            signed.event()?.clone(),
+            Receipt::of(&signed, coordinate)?,
         )))
     }
 
@@ -233,7 +236,7 @@ impl<S: LeafStore> Directory<S> {
             Ok(coordinate) => {
                 self.record_committed(&signed, coordinate)?;
                 self.snapshot();
-                return Ok(Receipt::of(&signed, coordinate));
+                return Receipt::of(&signed, coordinate);
             }
             Err(failure) => failure,
         };
@@ -243,8 +246,8 @@ impl<S: LeafStore> Directory<S> {
         // A settle that cannot read the log back keeps the hold, and the
         // caller's retry of the same operation finds the answer once it can.
         self.settle()?;
-        match self.answered(signed.event().operation())? {
-            Some((event, receipt)) if &event == signed.event() => Ok(receipt),
+        match self.answered(signed.event()?.operation())? {
+            Some((event, receipt)) if &event == signed.event()? => Ok(receipt),
             _ => Err(IdentityError::AppendRefused {
                 reason: failure.to_string(),
             }),
@@ -466,10 +469,10 @@ impl<S: LeafStore> Directory<S> {
         if index >= self.folded {
             return Ok(None);
         }
-        Ok(self
-            .log
+        self.log
             .entry(index)?
-            .map(|(signed, coordinate)| Receipt::of(&signed, coordinate)))
+            .map(|(signed, coordinate)| Receipt::of(&signed, coordinate))
+            .transpose()
     }
 
     /// The committed event at `index` with its log position, or `None` past

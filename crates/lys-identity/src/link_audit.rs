@@ -40,7 +40,7 @@ impl<S: LeafStore> Directory<S> {
                     .ok_or(IdentityError::ReceiptInvalid {
                         reason: "an accepted source operation has no receipt",
                     })?;
-            let accepted = first.event();
+            let accepted = first.event()?;
             if accepted.identity() != IdentityId::Person(person)
                 || accepted.change() != &Change::LinkAudit(observation.clone())
             {
@@ -48,7 +48,7 @@ impl<S: LeafStore> Directory<S> {
                     source_operation_id: observation.source_operation_id().to_owned(),
                 });
             }
-            return Ok(Receipt::of(&first, coordinate));
+            return Receipt::of(&first, coordinate);
         }
         self.commit_change(
             source,

@@ -157,6 +157,7 @@ fn identity(error: &IdentityError) -> &str {
         IdentityError::ChangeMismatch { .. } => "ChangeMismatch",
         IdentityError::EventMalformed { .. } => "EventMalformed",
         IdentityError::EventNotCanonical => "EventNotCanonical",
+        IdentityError::InstallEntry => "InstallEntry",
         IdentityError::EventTooLarge { .. } => "EventTooLarge",
         IdentityError::VersionUnsupported { .. } => "VersionUnsupported",
         IdentityError::SignerMismatch => "SignerMismatch",

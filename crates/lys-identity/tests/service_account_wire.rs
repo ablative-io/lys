@@ -47,7 +47,7 @@ fn provenance_is_service_account_and_cannot_be_downgraded_to_v1() -> Result<(), 
     let key = load_service_key(&key_path)?;
     let signed = sign_event(event.clone(), &key)?;
     assert_eq!(
-        verify_event(signed.bytes(), &key.public_key_bytes())?.event(),
+        verify_event(signed.bytes(), &key.public_key_bytes())?.event()?,
         &event
     );
     let mut altered = signed.bytes().to_vec();

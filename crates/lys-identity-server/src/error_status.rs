@@ -31,6 +31,7 @@ pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
         | IdentityError::ChangeMismatch { .. }
         | IdentityError::EventMalformed { .. }
         | IdentityError::EventNotCanonical
+        | IdentityError::InstallEntry
         | IdentityError::EventTooLarge { .. }
         | IdentityError::VersionUnsupported { .. }
         | IdentityError::SignerMismatch

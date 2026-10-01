@@ -216,7 +216,7 @@ impl Table {
         let key = unhex(key["ed25519"].as_str().ok_or("no service key")?)?;
         let key = <[u8; 32]>::try_from(key).map_err(|_short| "the service key is not 32 bytes")?;
         let message = unhex(kept["message"].as_str().ok_or("no signed message")?)?;
-        Ok(verify_event(&message, &key)?.event().clone())
+        Ok(verify_event(&message, &key)?.event()?.clone())
     }
 
     fn source_login(&self) -> Result<LoginBinding, Box<dyn Error>> {

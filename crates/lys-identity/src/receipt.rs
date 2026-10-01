@@ -31,9 +31,9 @@ pub struct Receipt {
 
 impl Receipt {
     /// The receipt of `signed`, committed at `coordinate`.
-    pub fn of(signed: &SignedEvent, coordinate: Coordinate) -> Self {
-        let event = signed.event();
-        Self {
+    pub fn of(signed: &SignedEvent, coordinate: Coordinate) -> Result<Self, IdentityError> {
+        let event = signed.event()?;
+        Ok(Self {
             version: event.version(),
             operation: event.operation(),
             actor: event.actor().clone(),
@@ -41,7 +41,7 @@ impl Receipt {
             change_kind: wire::change(event.change()),
             payload_commitment: signed.payload_commitment(),
             coordinate,
-        }
+        })
     }
 
     /// The envelope version the event was signed under.
@@ -98,12 +98,12 @@ pub fn verify_receipt(
     proof: &InclusionProof,
 ) -> Result<(), IdentityError> {
     let signed = verify_event(message, service_key)?;
-    if receipt.version != signed.event().version() {
+    if receipt.version != signed.event()?.version() {
         return Err(IdentityError::ReceiptInvalid {
             reason: "the receipt names another envelope version",
         });
     }
-    if !receipt.matches(signed.event()) {
+    if !receipt.matches(signed.event()?) {
         return Err(IdentityError::ReceiptInvalid {
             reason: "the receipt's operation, actor, identity or change kind is not the event's",
         });

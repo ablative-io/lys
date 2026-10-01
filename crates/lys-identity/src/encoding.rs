@@ -223,7 +223,10 @@ pub(crate) fn malformed(reason: &'static str) -> IdentityError {
 }
 
 /// The values of a map whose keys are exactly 1 to `N`, in order.
-fn fields<const N: usize>(value: Value, reason: &'static str) -> Result<[Value; N], IdentityError> {
+pub(crate) fn fields<const N: usize>(
+    value: Value,
+    reason: &'static str,
+) -> Result<[Value; N], IdentityError> {
     let Value::Map(pairs) = value else {
         return Err(malformed(reason));
     };
@@ -251,7 +254,7 @@ pub(crate) fn as_uint(value: &Value, reason: &'static str) -> Result<u64, Identi
     }
 }
 
-fn as_text(value: Value, reason: &'static str) -> Result<String, IdentityError> {
+pub(crate) fn as_text(value: Value, reason: &'static str) -> Result<String, IdentityError> {
     match value {
         Value::Text(text) => Ok(text),
         _ => Err(malformed(reason)),

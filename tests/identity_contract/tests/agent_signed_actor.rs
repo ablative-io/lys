@@ -109,7 +109,7 @@ fn an_event_written_before_the_agent_signature_method_reads_unchanged() -> TestR
     let (key, _dir) = service_key(11)?;
     let message = unhex(MESSAGE_BEFORE)?;
     let read = verify_event(&message, &key.public_key_bytes())?;
-    assert_eq!(read.event(), &event);
+    assert_eq!(read.event()?, &event);
     assert_eq!(read.bytes(), message.as_slice());
     assert_eq!(
         sign_event(event, &key)?.bytes(),
@@ -125,7 +125,7 @@ fn an_agent_signed_event_round_trips_and_keeps_the_agent() -> TestResult {
     let (key, _dir) = service_key(11)?;
     let signed = sign_event(original.clone(), &key)?;
     let read = verify_event(signed.bytes(), &key.public_key_bytes())?;
-    assert_eq!(read.event(), &original);
+    assert_eq!(read.event()?, &original);
     assert_eq!(read.bytes(), signed.bytes());
 
     let body = encode_body(&original);
@@ -179,7 +179,7 @@ fn operator_provenance_is_distinct_and_preserves_the_signed_event() -> TestResul
     let (key, _dir) = service_key(11)?;
     let signed = sign_event(original.clone(), &key)?;
     assert_eq!(
-        verify_event(signed.bytes(), &key.public_key_bytes())?.event(),
+        verify_event(signed.bytes(), &key.public_key_bytes())?.event()?,
         &original
     );
     let with_agent = with_method(encode_body(&by_agent()?), 3)?;

@@ -86,9 +86,9 @@ fn an_agents_record_and_its_signed_registration_name_its_responsible_person() ->
         .leaf(receipt.coordinate().index)?
         .ok_or("leaf missing")?;
     let signed = verify_event(&leaf, &directory.service_key())?;
-    assert_eq!(signed.event().identity(), IdentityId::Agent(agent));
-    assert_eq!(signed.event().actor(), &administrator()?);
-    let Change::RegisterAgent { responsible, .. } = signed.event().change() else {
+    assert_eq!(signed.event()?.identity(), IdentityId::Agent(agent));
+    assert_eq!(signed.event()?.actor(), &administrator()?);
+    let Change::RegisterAgent { responsible, .. } = signed.event()?.change() else {
         return Err("the agent's first event is not its registration".into());
     };
     assert_eq!(*responsible, person, "the signed event names them");

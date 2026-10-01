@@ -67,7 +67,7 @@ pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, Id
     let (mut log, tail) = FrontierLog::resume(store, frontier.clone()).map_err(unavailable)?;
     for leaf in tail.leaves {
         let signed = verify_event(&leaf, &key.public_key_bytes())?;
-        projection.apply(signed.event(), frontier.size())?;
+        projection.apply_entry(signed.entry(), frontier.size())?;
         frontier.push(&leaf);
         checkpoints.record(&frontier);
     }

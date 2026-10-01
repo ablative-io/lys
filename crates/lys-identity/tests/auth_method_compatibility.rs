@@ -129,9 +129,9 @@ fn verify_historical(encoded: &str, source: &str, version: u64, method: AuthMeth
         })?;
     let verified = lys_identity::signer::verify_event(&message, &key)?;
     assert_eq!(verified.bytes(), message);
-    assert_eq!(verified.event().version(), version);
-    assert_eq!(verified.event().actor().provenance().method(), method);
-    assert_eq!(verified.event().actor().provenance().agent(), None);
+    assert_eq!(verified.event()?.version(), version);
+    assert_eq!(verified.event()?.actor().provenance().method(), method);
+    assert_eq!(verified.event()?.actor().provenance().agent(), None);
     let mut changed = message;
     let signature_byte = changed.last_mut().ok_or("empty signed fixture")?;
     *signature_byte ^= 1;

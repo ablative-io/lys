@@ -39,7 +39,7 @@ fn register_activate_suspend_reinstate_retire_is_five_signed_events() -> TestRes
     for index in 0..directory.log()?.len()? {
         let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
         let signed = verify_event(&leaf, &key)?;
-        let event = signed.event();
+        let event = signed.event()?;
         if event.identity() != agent {
             continue;
         }
