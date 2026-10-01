@@ -30,6 +30,10 @@ use crate::tracking_store::{Body, Commit, Coverage, SourceState};
 
 pub use crate::peer::Collected;
 
+#[cfg(test)]
+#[path = "../../tests/lifecycle/cases.rs"]
+mod io_tests;
+
 /// What wakes a session's stream follower.
 #[derive(Debug)]
 pub(crate) enum Wake {
