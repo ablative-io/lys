@@ -47,6 +47,10 @@ use crate::routes::{AppState, hex, signed_in, with_directory};
 use crate::session::now;
 use crate::sign_in::{Attempt, begin_session};
 
+#[cfg(test)]
+#[path = "setup_durability_tests.rs"]
+mod durability_tests;
+
 /// Where first-run setup reads its code and records its administrator.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -83,8 +83,11 @@ impl Held {
     /// Fold one kept version; one that does not follow the version held is
     /// refused, since every version was checked before it was kept.
     fn hold(&mut self, policy: Policy) -> Result<(), String> {
+        let policy = policy
+            .checked()
+            .map_err(|error| format!("{}: {}", error.refusal, error.words))?;
         let held = self.latest(&policy.agent).map_or(0, |held| held.version);
-        if policy.version != held + 1 {
+        if held.checked_add(1) != Some(policy.version) {
             return Err(format!(
                 "policy version {} of {} does not follow version {held}",
                 policy.version, policy.agent
@@ -124,7 +127,19 @@ impl Held {
                 sealed.format
             ));
         }
-        Ok(sealed.held)
+        let mut checked = Self::default();
+        for (agent, versions) in sealed.held.policies {
+            if versions.is_empty() {
+                return Err(format!("agent {agent} has no stored policy versions"));
+            }
+            for policy in versions {
+                if policy.agent != agent {
+                    return Err(format!("agent {agent} holds another agent's policy"));
+                }
+                checked.hold(policy)?;
+            }
+        }
+        Ok(checked)
     }
 }
 

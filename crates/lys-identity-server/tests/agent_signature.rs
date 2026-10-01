@@ -287,3 +287,24 @@ async fn a_runtime_signature_covers_the_query_as_well_as_the_path() -> TestResul
     assert_eq!(accepted.0, 200, "{}", accepted.1);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_goal_signature_covers_the_query_as_well_as_the_path() -> TestResult {
+    let table = Table::set().await?;
+    let path = format!("/goals/{}/mark", operation()?);
+    let body = json!({"operation": operation()?, "standing": "met", "words": "completed"})
+        .to_string()
+        .into_bytes();
+    let header = table.header(&path, &body, now_ms()?, &nonce(46));
+    refused(
+        &table
+            .send(&format!("{path}?scope=changed"), &header, body.clone())
+            .await?,
+        "does not verify",
+    );
+    let target = format!("{path}?scope=original");
+    let header = table.header(&target, &body, now_ms()?, &nonce(47));
+    let answer = table.send(&target, &header, body).await?;
+    assert_eq!(answer.1["refusal"], "goal_unknown", "{}", answer.1);
+    Ok(())
+}

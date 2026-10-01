@@ -281,7 +281,8 @@ async fn report_agent(
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let signed = signed_agent(&state, directory, &headers, ("POST", uri.path(), &bytes))?;
+        let target = uri.path_and_query().map_or(uri.path(), |target| target.as_str());
+        let signed = signed_agent(&state, directory, &headers, ("POST", target, &bytes))?;
         let asker = match signed {
             Some(own) => IdentityId::Agent(own),
             None => caller(&state, &headers, directory)?,
