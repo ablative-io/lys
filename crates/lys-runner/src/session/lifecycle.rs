@@ -76,11 +76,6 @@ impl Sessions {
         })?;
         session.generation += 1;
         session.pid = Some(spawned.pid);
-        session.live = Some(Live {
-            writer: crate::input::Input::new(spawned.writer),
-            master: spawned.master,
-            pid: spawned.pid,
-        });
         session.guard.leader = match crate::peer::start_identity(spawned.pid) {
             Ok(start) => Some(Leader {
                 pid: spawned.pid,
@@ -94,6 +89,12 @@ impl Sessions {
             }
         };
         session.leader_start = session.guard.leader.clone();
+        session.live = Some(Live {
+            writer: crate::input::Input::new(spawned.writer),
+            master: spawned.master,
+            pid: spawned.pid,
+            leader: session.guard.leader.clone(),
+        });
         let generation = session.generation;
         let (reader, child) = (spawned.reader, spawned.child);
         let pumped = Arc::clone(self);
@@ -377,6 +378,7 @@ impl Sessions {
                 source: Some(source),
                 attempt: None,
             };
+            let leader = window_limit(&mut table, id, &bodies);
             let appended = table.feed.append(id, now_ms(), bodies, commit);
             drop(table);
             if let Err(error) = appended.and_then(|_| self.writer.barrier()) {
@@ -384,6 +386,11 @@ impl Sessions {
                     "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
                 ));
                 return;
+            }
+            if let Some(leader) = leader {
+                if let Err(error) = crate::pty::end(&leader) {
+                    crate::error::said(&format!("session {id}: rotation_signal_failed: {error}"));
+                }
             }
             self.wake();
             if !more {
@@ -647,7 +654,35 @@ fn trip_on_words(session: &mut Session, read: usize) {
     if rotation.words_in(&String::from_utf8_lossy(&bytes)) {
         rotation.trip();
         if let Some(live) = &session.live {
-            live.end("at its usage limit");
+            if let Err(error) = live.end() {
+                crate::error::said(&format!("rotation_signal_failed: {error}"));
+            }
         }
     }
+}
+
+pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Option<Leader> {
+    let session = table.sessions.get_mut(id)?;
+    if session.ending {
+        return None;
+    }
+    let rotation = session.rotation.as_mut()?;
+    if rotation.tripped() {
+        return None;
+    }
+    let reached = bodies.iter().any(|body| match body {
+        Body::Usage(record) => {
+            record.account.as_deref() == Some(rotation.account())
+                && rotation.windows_in(&record.figures.plan_windows, now_ms())
+        }
+        _ => false,
+    });
+    if reached {
+        rotation.trip();
+        if session.guard.leader.is_none() {
+            crate::error::said("rotation_signal_failed: the process's leader is unproved");
+        }
+        return session.guard.leader.clone();
+    }
+    None
 }

@@ -244,8 +244,14 @@ impl Sessions {
         let Some(body) = reading.status(&mut source, input, record) else {
             return Ok("the snapshot repeats the last one kept".to_owned());
         };
-        append(table, id, vec![body], Some(source));
+        let bodies = vec![body];
+        let leader = crate::session::window_limit(table, id, &bodies);
+        append(table, id, bodies, Some(source));
         drop(guard);
+        self.writer.barrier()?;
+        if let Some(leader) = leader {
+            crate::pty::end(&leader)?;
+        }
         self.wake();
         Ok("a context snapshot kept; it adds no spend".to_owned())
     }

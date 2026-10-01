@@ -52,7 +52,7 @@ mod restart;
 
 pub use crate::refusal_log::AuditGap;
 pub use lifecycle::Collected;
-pub(crate) use lifecycle::{Wake, accounts, append};
+pub(crate) use lifecycle::{Wake, accounts, append, window_limit};
 
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
@@ -71,6 +71,7 @@ pub(crate) struct Live {
     pub(crate) writer: Input,
     master: Box<dyn MasterPty + Send>,
     pid: u32,
+    leader: Option<Leader>,
 }
 
 #[cfg(test)]
@@ -82,14 +83,20 @@ mod input_no_screen;
 mod durable_tests;
 
 impl Live {
-    /// End the process and everything it started, naming a failure in the
-    /// runner's log: the exit, when it comes, is what answers.
-    pub(crate) fn end(&self, id: &str) {
-        if let Err(error) = crate::pty::end_group(self.pid) {
-            crate::error::said(&format!(
-                "session {id}: the process was already ending: {error}"
-            ));
-        }
+    /// Ask the verified leader to exit so its final usage can be flushed.
+    pub(crate) fn end(&self) -> Result<(), RunnerError> {
+        let leader = self.leader.as_ref().ok_or_else(|| {
+            RunnerError::refused(
+                "leader_unproved",
+                "the process's start identity was not recorded",
+            )
+        })?;
+        crate::pty::end(leader)
+    }
+
+    /// Emergency stop retains immediate process-group termination.
+    pub(crate) fn kill(&self) -> Result<(), RunnerError> {
+        crate::pty::end_group(self.pid)
     }
 }
 
@@ -556,7 +563,7 @@ impl Sessions {
             if session.ended.is_none() {
                 session.ending = true;
                 if let Some(live) = &session.live {
-                    live.end(id);
+                    live.end()?;
                 }
             }
         }
@@ -592,7 +599,11 @@ impl Sessions {
             if session.ended.is_none() {
                 session.ending = true;
                 if let Some(live) = &session.live {
-                    live.end(id);
+                    if let Err(error) = live.end() {
+                        crate::error::said(&format!(
+                            "session {id}: shutdown_signal_failed: {error}"
+                        ));
+                    }
                 }
             }
         }
