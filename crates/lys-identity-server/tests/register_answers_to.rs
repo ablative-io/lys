@@ -288,3 +288,34 @@ fn reporting_contract_advertises_identity_kinds_and_resolution() -> Result<(), B
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn an_answers_to_that_is_no_identity_is_refused_by_name() -> Result<(), Box<dyn Error>> {
+    let (service, ()) = Service::start_with(|config| {
+        let mut directory = lys_identity_server::routes::open_directory(config)?;
+        let actor = lys_identity::Actor::new(
+            lys_identity::LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+            lys_identity::Provenance::new(lys_identity::AuthMethod::Oidc, 1),
+        );
+        directory.setup_person(
+            actor,
+            OperationId::generate()?,
+            lys_identity::Profile::new("Administrator")?,
+            1,
+        )?;
+        Ok(())
+    })
+    .await?;
+    let administrator = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "administrator@example.test".to_owned(),
+        })
+        .await?;
+    let body = json!({
+        "operation": OperationId::generate()?.to_string(),
+        "display_name": "Malformed reporting target", "answers_to": "not-an-id",
+    });
+    refused(&service, &administrator, &body, 409, "IdentifierMalformed").await?;
+    Ok(())
+}
