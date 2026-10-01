@@ -332,7 +332,7 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
             &json!({"operation": operation()?, "machine": table.machine.id}),
         )
         .await?;
-    refused(&admitted, 503, "SecretsUnavailable");
+    refused(&admitted, 502, "SecretsUnavailable");
     assert_ne!(
         admitted.1["refusal"], "MachineNotForAgent",
         "grant did not admit past placement"
