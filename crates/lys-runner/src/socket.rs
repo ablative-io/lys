@@ -262,7 +262,7 @@ fn answer_one(
             crate::error::said(&format!("a caller wrote {read} bytes past its one request"));
         }
         flag.store(true, Ordering::SeqCst);
-        woken.wake();
+        woken.cancel_waiters();
     });
     let answer = if crate::peer::is_peer(&line) {
         crate::peer::answer(sessions, stream, line.trim_end(), &left)

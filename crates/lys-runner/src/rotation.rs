@@ -96,6 +96,12 @@ fn variable_name(name: &str) -> bool {
 }
 
 impl RotationState {
+    pub(crate) fn words(&self) -> Option<&[String]> {
+        match &self.rotation.limit {
+            Limit::Words { words } => Some(words),
+            Limit::ExitStatus { .. } | Limit::PlanWindow => None,
+        }
+    }
     /// The rotation `rotation` at its first account, refused by name when it
     /// names no account, a variable no environment can hold, or no words.
     pub fn new(rotation: Rotation) -> Result<Self, RunnerError> {
