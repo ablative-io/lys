@@ -69,6 +69,11 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     ));
     let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model = apps.model()?;
+    let spicedb = config
+        .spicedb
+        .as_ref()
+        .map(crate::spicedb::SpiceDbConnection::load)
+        .transpose()?;
     let state = Arc::new(AppState {
         import_credential_file: config.import_credential_file.clone(),
         estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
@@ -116,7 +121,7 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
             model: std::sync::RwLock::new(model),
             model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
             refresh: Mutex::new(()),
-            spicedb: config.spicedb.clone(),
+            spicedb,
         },
         secrets: config
             .secrets

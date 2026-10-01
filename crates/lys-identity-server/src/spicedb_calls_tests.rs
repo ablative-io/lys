@@ -67,7 +67,7 @@ fn engine() -> Result<(String, Heard), Box<dyn Error>> {
 fn at(endpoint: String, scope: Option<&str>) -> SpiceDb {
     SpiceDb {
         endpoint,
-        key: "fixture-only".to_owned(),
+        key: Arc::from("fixture-only"),
         mirror: "calls_fixture".to_owned(),
         relations: BTreeMap::new(),
         app_kinds: Mutex::new(BTreeMap::new()),
