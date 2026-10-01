@@ -5,7 +5,7 @@ use lys_identity::{Actor, IdentityId, PersonId};
 
 use crate::error::ServerError;
 use crate::error_team::TeamError;
-use crate::grants::{Decision, decide, with_grants};
+use crate::grants::{Decision, decide_as, with_grants};
 use crate::routes::AppState;
 use crate::session::now;
 
@@ -29,7 +29,7 @@ fn admitted(
             action: Action::new("write")?,
         };
         let at = now();
-        decide(&mut judged, &request, at, None, Decision::Explain)?;
+        decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
         let target = judged
             .directory
             .record(IdentityId::Person(person))
@@ -73,7 +73,7 @@ fn admitted(
         teams.settle()?;
         crate::routes::people_giving::holds(teams.teams_iter(), agent, person)?;
         if decision == Decision::Exercise {
-            decide(&mut judged, &request, at, None, decision)?;
+            decide_as(actor, &mut judged, &request, at, None, decision)?;
             if !enabled {
                 state.sessions.revoke_matching(|actor| {
                     judged.directory.person_for(actor.binding()) == Some(person)
