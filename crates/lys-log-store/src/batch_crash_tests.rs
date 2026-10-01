@@ -60,16 +60,18 @@ struct Writer(Child);
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        match self.0.try_wait() {
-            Ok(Some(_)) => {}
-            Ok(None) | Err(_) => {
-                if let Err(error) = self.0.kill() {
-                    eprintln!("kill batch writer: {error}");
-                }
-                if let Err(error) = self.0.wait() {
-                    eprintln!("reap batch writer: {error}");
-                }
-            }
+        let status = self.0.try_wait();
+        if let Ok(Some(_)) = status {
+            return;
+        }
+        if let Err(error) = status {
+            eprintln!("check batch writer exit: {error}");
+        }
+        if let Err(error) = self.0.kill() {
+            eprintln!("kill batch writer: {error}");
+        }
+        if let Err(error) = self.0.wait() {
+            eprintln!("reap batch writer: {error}");
         }
     }
 }

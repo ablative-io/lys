@@ -154,14 +154,13 @@ fn failed_final_pin_holds_a_complete_batch_until_reopen() -> Outcome {
 }
 
 #[test]
-fn batch_overflow_is_refused_before_any_leaf_is_written() -> Outcome {
+fn batch_overflow_is_refused_before_any_leaf_is_written() {
     let mut store = CountingStore::new();
     assert!(matches!(
         store.put_leaves(u64::MAX, &LEAVES),
         Err(StoreError::BatchSizeOverflow { .. })
     ));
     assert_eq!(store.extent(), 0);
-    Ok(())
 }
 
 #[test]
