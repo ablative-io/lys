@@ -187,15 +187,15 @@ pub enum Left {
     Gone,
     /// Processes were still in it, and were ended with it.
     Ended,
+    /// The live leader has another start identity, so the group was not signalled.
+    Reused,
 }
 
-/// End what is left of process group `pid`, which a runner started and a
-/// restart found recorded without an end. A process that ignored the
-/// hang-up its terminal closing sent is still in the group, and is ended
-/// with it by a signal no process can ignore. A group that answers but may
-/// not be signalled is not this user's, so not the runner's: it is refused
-/// `end_failed` by name, and the caller reports the runner's own as gone.
-pub fn end_left_group(pid: u32) -> Result<Left, RunnerError> {
+/// End a recorded leader's group only while its start identity still matches.
+/// A reused group is reported without a signal; an unreadable identity or
+/// a refused signal is returned by name so a restart cannot claim it ended.
+pub fn end_left_group(leader: &crate::peer::Leader) -> Result<Left, RunnerError> {
+    let pid = leader.pid;
     let group = group(pid)?;
     match test_kill_process_group(group) {
         Err(rustix::io::Errno::SRCH) => Ok(Left::Gone),
@@ -203,7 +203,18 @@ pub fn end_left_group(pid: u32) -> Result<Left, RunnerError> {
             "end_failed",
             format!("process group {pid} answers but is not this runner's to end: {error}"),
         )),
-        Ok(()) => end_group(pid).map(|()| Left::Ended),
+        Ok(()) => {
+            let current = crate::peer::start_identity(pid).map_err(|error| {
+                RunnerError::refused(
+                    "process_start_unreadable",
+                    format!("process group {pid} was not ended: {error}"),
+                )
+            })?;
+            if current != leader.start {
+                return Ok(Left::Reused);
+            }
+            end_group(pid).map(|()| Left::Ended)
+        }
     }
 }
 

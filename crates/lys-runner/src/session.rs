@@ -21,8 +21,9 @@
 //! holds with no end was lost with the runner that held it: it is reported
 //! `ended_by_runner_restart`, at the instant the restart found it gone and
 //! with no exit status, since none was seen. Before it is reported gone its
-//! recorded process group is made gone: anything left in it, a process that
-//! ignored the hang-up, is ended then, and the end names that signal.
+//! recorded process group is ended only when its leader's recorded start
+//! identity still matches. A group whose ownership cannot be proved is
+//! never signalled, and the reported end says why.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -108,6 +109,7 @@ pub struct Guard {
 pub(crate) struct Session {
     pub(crate) started_at: u64,
     pid: Option<u32>,
+    pub(crate) leader_start: Option<Leader>,
     columns: u16,
     rows: u16,
     scrollback: Scrollback,
@@ -199,21 +201,28 @@ pub(crate) fn unknown(id: &str) -> RunnerError {
     RunnerError::refused("session_unknown", format!("no session {id} is held"))
 }
 
-/// End what is left of session `id`'s process group `pid`, which the last
-/// run recorded and never saw end, answering the signal that ended it when
-/// anything was left; a group that cannot be ended is named in the log.
-fn left_behind(id: &str, pid: u32) -> Option<String> {
-    match crate::pty::end_left_group(pid) {
-        Ok(crate::pty::Left::Gone) => None,
+/// Report a lost session's cleanup without treating a group number as ownership.
+/// A missing or changed leader identity is reported without signalling it.
+fn left_behind(id: &str, leader: Option<&Leader>) -> (Option<String>, Option<String>) {
+    let Some(leader) = leader else {
+        return (
+            None,
+            Some("start identity not recorded; process group not ended".to_owned()),
+        );
+    };
+    let pid = leader.pid;
+    match crate::pty::end_left_group(leader) {
+        Ok(crate::pty::Left::Gone) => (None, None),
         Ok(crate::pty::Left::Ended) => {
             crate::error::said(&format!(
                 "session {id}: process group {pid} outlived the last runner and was ended"
             ));
-            Some("SIGKILL".to_owned())
+            (Some("SIGKILL".to_owned()), None)
         }
+        Ok(crate::pty::Left::Reused) => (None, Some("process group reused, not ended".to_owned())),
         Err(error) => {
             crate::error::said(&format!("session {id}: {error}"));
-            None
+            (None, Some(error.to_string()))
         }
     }
 }
@@ -251,18 +260,23 @@ impl Sessions {
         for kept in state.read()?.sessions {
             let ended = match kept.ended {
                 Some(ended) => ended,
-                None => Ended {
-                    how: EndedHow::EndedByRunnerRestart,
-                    at: found_at,
-                    status: None,
-                    signal: kept.pid.and_then(|pid| left_behind(&kept.session, pid)),
-                },
+                None => {
+                    let (signal, reason) = left_behind(&kept.session, kept.leader_start.as_ref());
+                    Ended {
+                        how: EndedHow::EndedByRunnerRestart,
+                        at: found_at,
+                        status: None,
+                        signal,
+                        reason,
+                    }
+                }
             };
             table.sessions.insert(
                 kept.session,
                 Session {
                     started_at: kept.started_at,
                     pid: kept.pid,
+                    leader_start: kept.leader_start,
                     columns: kept.columns,
                     rows: kept.rows,
                     scrollback: Scrollback::new(scrollback),
@@ -323,6 +337,7 @@ impl Sessions {
             .map(|(id, session)| KeptSession {
                 session: id.clone(),
                 pid: session.pid,
+                leader_start: session.leader_start.clone(),
                 started_at: session.started_at,
                 columns: session.columns,
                 rows: session.rows,
@@ -393,6 +408,7 @@ impl Sessions {
         let mut session = Session {
             started_at: now_ms(),
             pid: None,
+            leader_start: None,
             columns: launch.columns,
             rows: launch.rows,
             scrollback: Scrollback::new(self.scrollback),

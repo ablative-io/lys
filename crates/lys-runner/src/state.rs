@@ -24,10 +24,13 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::error::RunnerError;
+use crate::peer::Leader;
 use crate::protocol::Ended;
 
+mod legacy;
+
 /// The record's format.
-pub const FORMAT: &str = "lys-runner-sessions/v1";
+pub const FORMAT: &str = "lys-runner-sessions/v2";
 
 /// One session as the record keeps it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,6 +40,8 @@ pub struct KeptSession {
     pub session: String,
     /// Its process id, while one was known.
     pub pid: Option<u32>,
+    /// The leader's identity recorded at spawn, absent when it was not proved.
+    pub leader_start: Option<Leader>,
     /// When it started, in milliseconds since the Unix epoch.
     pub started_at: u64,
     /// Width in columns.
@@ -119,15 +124,33 @@ impl StateFile {
                 )));
             }
         };
-        let kept: Kept = serde_json::from_slice(&bytes).map_err(|error| {
+        let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
             unavailable(format!("{} does not read: {error}", self.path.display()))
         })?;
-        if kept.format != FORMAT {
-            return Err(unavailable(format!(
-                "{} is in format {}, not {FORMAT}",
-                self.path.display(),
-                kept.format
-            )));
+        let found = value
+            .get("format")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| unavailable("the runner record names no format"))?;
+        let kept: Kept = match found {
+            FORMAT => serde_json::from_value(value),
+            legacy::FORMAT => legacy::migrate(value),
+            other => {
+                return Err(unavailable(format!(
+                    "{} is in format {other}, not {FORMAT}",
+                    self.path.display()
+                )));
+            }
+        }
+        .map_err(|error| unavailable(format!("{} does not read: {error}", self.path.display())))?;
+        for session in &kept.sessions {
+            if session.leader_start.as_ref().is_some_and(|leader| {
+                session.pid != Some(leader.pid) || leader.pid <= 1 || leader.start.0.is_empty()
+            }) {
+                return Err(unavailable(format!(
+                    "session {} has an invalid leader start identity",
+                    session.session
+                )));
+            }
         }
         Ok(kept)
     }

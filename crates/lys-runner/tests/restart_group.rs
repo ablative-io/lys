@@ -1,12 +1,17 @@
 #![cfg(test)]
 //! A recorded group number is not proof that the group still belongs to a session.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
+use std::os::unix::process::ExitStatusExt;
 use std::process::{Child, ChildStdout, Command, Stdio};
+use std::sync::atomic::AtomicBool;
 
-use lys_runner::{EndedHow, Sessions};
+use lys_runner::peer::{Leader, start_identity};
+use lys_runner::state::{Kept, KeptSession};
+use lys_runner::{EndedHow, Launch, Sessions};
 use serde_json::json;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -110,5 +115,164 @@ fn a_legacy_restart_never_signals_an_unproved_live_process_group() -> TestResult
     );
     assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
     assert_eq!(ended.signal, None, "an unproved group is never signalled");
+    assert_eq!(
+        ended.reason.as_deref(),
+        Some("start identity not recorded; process group not ended")
+    );
+    drop(restarted);
+    let migrated: Kept = serde_json::from_slice(&std::fs::read(dir.path().join("sessions.json"))?)?;
+    assert_eq!(migrated.format, "lys-runner-sessions/v2");
+    assert_eq!(migrated.sessions[0].leader_start, None);
+    let reopened = Sessions::open(dir.path(), 4096)?;
+    assert_eq!(
+        reopened.status(None)?.sessions[0].ended.as_ref(),
+        Some(ended)
+    );
+    Ok(())
+}
+
+fn record_group(dir: &std::path::Path, pid: u32, leader: Leader) -> TestResult {
+    let record = Kept::new(vec![KeptSession {
+        session: "recorded".to_owned(),
+        pid: Some(pid),
+        leader_start: Some(leader),
+        started_at: 1,
+        columns: 80,
+        rows: 24,
+        ended: None,
+    }]);
+    std::fs::write(dir.join("sessions.json"), serde_json::to_vec(&record)?)?;
+    Ok(())
+}
+
+#[test]
+fn a_restart_never_signals_a_group_whose_start_identity_changed() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut child = BlockedChild::start()?;
+    let pid = child.child.id();
+    let mut start = start_identity(pid)?;
+    start.0.push_str(":different");
+    record_group(dir.path(), pid, Leader { pid, start })?;
+    let restarted = Sessions::open(dir.path(), 4096)?;
+    let status = restarted.status(None)?;
+    let ended = status.sessions[0]
+        .ended
+        .as_ref()
+        .ok_or("RestartEndMissing")?;
+    let survived = child.answers()?;
+    child.close()?;
+    assert!(survived, "a different start identity is never signalled");
+    assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
+    assert_eq!(ended.status, None);
+    assert_eq!(ended.signal, None);
+    assert_eq!(
+        ended.reason.as_deref(),
+        Some("process group reused, not ended")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_restart_ends_only_a_group_with_its_recorded_start_identity() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut child = BlockedChild::start()?;
+    let pid = child.child.id();
+    record_group(
+        dir.path(),
+        pid,
+        Leader {
+            pid,
+            start: start_identity(pid)?,
+        },
+    )?;
+    let restarted = Sessions::open(dir.path(), 4096)?;
+    let status = restarted.status(None)?;
+    let ended = status.sessions[0]
+        .ended
+        .as_ref()
+        .ok_or("RestartEndMissing")?;
+    let exit = child.child.wait()?;
+    child.close()?;
+    assert_eq!(exit.signal(), Some(9), "the owned group really ended");
+    assert_eq!(ended.how, EndedHow::EndedByRunnerRestart);
+    assert_eq!(ended.status, None);
+    assert_eq!(ended.signal.as_deref(), Some("SIGKILL"));
+    assert_eq!(ended.reason, None);
+    Ok(())
+}
+
+#[test]
+fn a_spawn_records_the_actual_leader_identity_before_it_is_answered() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let sessions = Sessions::open(dir.path(), 4096)?;
+    let started = sessions.start(Launch {
+        session: "spawned".to_owned(),
+        program: "/bin/cat".to_owned(),
+        arguments: Vec::new(),
+        directory: "/".to_owned(),
+        environment: BTreeMap::new(),
+        config: None,
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    });
+    let observed = (|| -> Result<_, Box<dyn Error>> {
+        let (pid, _) = started?;
+        let actual = start_identity(pid)?;
+        let kept: Kept = serde_json::from_slice(&std::fs::read(dir.path().join("sessions.json"))?)?;
+        let session = kept
+            .sessions
+            .into_iter()
+            .find(|session| session.session == "spawned")
+            .ok_or("SpawnRecordMissing")?;
+        Ok((pid, actual, session))
+    })();
+    let cleanup = sessions.end("spawned", &AtomicBool::new(false));
+    let (pid, actual, kept) = match (observed, cleanup) {
+        (Ok(observed), Ok(_)) => observed,
+        (Err(error), Ok(_)) => return Err(error),
+        (Ok(_), Err(error)) => return Err(format!("SpawnCleanupFailed: {error}").into()),
+        (Err(error), Err(cleanup)) => {
+            return Err(format!("{error}; SpawnCleanupFailed: {cleanup}").into());
+        }
+    };
+    assert_eq!(kept.pid, Some(pid));
+    assert_eq!(kept.leader_start, Some(Leader { pid, start: actual }));
+    Ok(())
+}
+
+#[test]
+fn a_legacy_completed_session_migrates_without_changing_its_observed_end() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let record = json!({
+        "format": "lys-runner-sessions/v1",
+        "sessions": [{
+            "session": "completed",
+            "pid": null,
+            "started_at": 1,
+            "columns": 80,
+            "rows": 24,
+            "ended": { "how": "exited", "at": 2, "status": 3, "signal": null }
+        }]
+    });
+    std::fs::write(
+        dir.path().join("sessions.json"),
+        serde_json::to_vec(&record)?,
+    )?;
+    let restarted = Sessions::open(dir.path(), 4096)?;
+    let status = restarted.status(None)?;
+    let ended = status.sessions[0]
+        .ended
+        .as_ref()
+        .ok_or("MigratedEndMissing")?;
+    assert_eq!(ended.how, EndedHow::Exited);
+    assert_eq!(ended.at, 2);
+    assert_eq!(ended.status, Some(3));
+    assert_eq!(ended.signal, None);
+    assert_eq!(ended.reason, None);
+    let kept: Kept = serde_json::from_slice(&std::fs::read(dir.path().join("sessions.json"))?)?;
+    assert_eq!(kept.format, "lys-runner-sessions/v2");
+    assert_eq!(kept.sessions[0].leader_start, None);
     Ok(())
 }
