@@ -24,10 +24,10 @@ pub(crate) fn visit(work: Work) {
     });
 }
 
-fn reset() {
+pub(crate) fn reset() {
     COUNTS.set([0; 4]);
 }
 
-fn count(work: Work) -> usize {
+pub(crate) fn count(work: Work) -> usize {
     COUNTS.get()[work as usize]
 }
