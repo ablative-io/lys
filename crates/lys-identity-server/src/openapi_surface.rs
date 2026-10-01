@@ -10,7 +10,9 @@ use std::sync::OnceLock;
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub(crate) struct SurfaceContract {
+    #[schema(value_type = Object)]
     paths: BTreeMap<String, Value>,
+    #[schema(value_type = Object)]
     components: Value,
 }
 
