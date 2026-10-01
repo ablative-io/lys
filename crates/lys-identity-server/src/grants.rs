@@ -186,20 +186,21 @@ pub(crate) fn with_directory_grants<A, T>(
     judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
     apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, true, act)
+    with_directory_grants_model(state, true, judge, apply)
 }
 
 pub(crate) fn with_schema_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, false, |_, judged| act(judged))
+    with_directory_grants_model(state, false, act, |_, answer| Ok(answer))
 }
 
-fn with_directory_grants_model<T>(
+fn with_directory_grants_model<A, T>(
     state: &AppState,
     require_model: bool,
-    act: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, Judged<'_>) -> Result<T, ServerError>,
+    judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = crate::service_account_grants::projection(state, directory.projection()?)?;
