@@ -590,3 +590,7 @@ mod upgrade_tests;
 #[cfg(test)]
 #[path = "spicedb_calls_tests.rs"]
 mod calls_tests;
+
+#[cfg(test)]
+#[path = "spicedb_key_tests.rs"]
+mod key_tests;
