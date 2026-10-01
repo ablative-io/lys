@@ -25,9 +25,9 @@ use lys_identity::projection::Projection;
 use lys_identity::{Actor, OperationId};
 use serde::Deserialize;
 
+use crate::caller_admission::active_caller;
 use crate::error::ServerError;
 use crate::grants::caller;
-use crate::read_api::own_person;
 use crate::roles_records::{Ending, Holding, Move, Role, Template, Version, Words};
 use crate::roles_store::RolesStore;
 use crate::roles_views::{
@@ -296,7 +296,7 @@ async fn make(
             number: 1,
             operation: OperationId::from_str(&body.operation)?.to_string(),
             words: said(&state, &body)?,
-            made_by: own_person(directory, &actor)?.to_string(),
+            made_by: active_caller(directory, &actor)?.to_string(),
             made_at: at,
         };
         with_roles(&state, |store| {
@@ -318,7 +318,7 @@ async fn revise(
     let body = taken(body)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let by = own_person(directory, &actor)?.to_string();
+        let by = active_caller(directory, &actor)?.to_string();
         let operation = OperationId::from_str(&body.operation)?.to_string();
         let said = said(&state, &body)?;
         let at = now();
@@ -340,7 +340,7 @@ async fn assign(
     let body = taken(body)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let by = own_person(directory, &actor)?.to_string();
+        let by = active_caller(directory, &actor)?.to_string();
         let operation = OperationId::from_str(&body.operation)?.to_string();
         let holder = identity_id(&body.holder)
             .ok()
@@ -386,7 +386,7 @@ async fn move_holder(
     let body = taken(body)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let by = own_person(directory, &actor)?.to_string();
+        let by = active_caller(directory, &actor)?.to_string();
         let at = now();
         with_roles(&state, |store| {
             let moved = Move {
@@ -427,7 +427,7 @@ async fn end(
     let body = taken(body)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let by = own_person(directory, &actor)?.to_string();
+        let by = active_caller(directory, &actor)?.to_string();
         let at = now();
         with_roles(&state, |store| {
             store.end(&id, &holder, &body.assignment, Ending { by, at })?;
