@@ -78,9 +78,8 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
     let model = apps.model()?;
     let spicedb = config
         .spicedb
-        .as_ref()
-        .map(crate::spicedb::SpiceDbConnection::load)
-        .transpose()?;
+        .clone()
+        .map(crate::spicedb::SpiceDbEngine::new);
     let state = Arc::new(AppState {
         changes: crate::changes::Changes::new()?,
         import_credential_file: config.import_credential_file.clone(),

@@ -13,10 +13,20 @@ struct Harness(Spawned);
 
 impl Harness {
     fn start() -> Result<Self, Box<dyn Error>> {
-        let arguments = vec![
-            "-c".to_owned(),
-            "import signal, sys\ndef ended(signum, frame):\n print('final-usage:7', flush=True)\n sys.exit(0)\nsignal.signal(signal.SIGTERM, ended)\nprint('ready', flush=True)\nsignal.pause()".to_owned(),
-        ];
+        Self::running(
+            "import signal, sys\ndef ended(signum, frame):\n print('final-usage:7', flush=True)\n sys.exit(0)\nsignal.signal(signal.SIGTERM, ended)\nprint('ready', flush=True)\nsignal.pause()",
+        )
+    }
+
+    /// A leader that ignores the polite signal, as an interactive shell does.
+    fn deaf() -> Result<Self, Box<dyn Error>> {
+        Self::running(
+            "import signal\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nprint('ready', flush=True)\nwhile True:\n signal.pause()",
+        )
+    }
+
+    fn running(script: &str) -> Result<Self, Box<dyn Error>> {
+        let arguments = vec!["-c".to_owned(), script.to_owned()];
         let mut harness = Self(pty::spawn(&Spawn {
             program: "/usr/bin/python3",
             arguments: &arguments,
@@ -99,5 +109,24 @@ fn emergency_end_does_not_wait_for_final_usage() -> TestResult {
     let mut output = String::new();
     harness.0.reader.read_to_string(&mut output)?;
     assert!(!output.contains("final-usage"));
+    Ok(())
+}
+
+#[test]
+fn ordinary_end_ends_a_leader_that_ignores_the_polite_signal_after_its_grace() -> TestResult {
+    let mut harness = Harness::deaf()?;
+    let leader = harness.leader()?;
+    let asked = std::time::Instant::now();
+    pty::end(&leader)?;
+    let status = harness.0.child.wait()?;
+    assert!(
+        !status.success(),
+        "the group is ended by a signal it cannot ignore"
+    );
+    assert!(
+        asked.elapsed() >= pty::END_GRACE,
+        "the leader had its grace first"
+    );
+    assert_eq!(pty::end_left_group(&leader)?, pty::Left::Gone);
     Ok(())
 }

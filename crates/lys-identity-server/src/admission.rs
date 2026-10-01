@@ -196,7 +196,11 @@ impl Admission {
         Ok(&self.link_audit_source)
     }
 
-    /// Only an active person may hold the link-audit source's authority.
+    /// Only an active person may hold the link-audit source's authority. The
+    /// configured source login itself, held by no person, is the install's
+    /// link-audit service login and keeps its authority, as an unbound
+    /// configured administrator login does; a person who holds it must be
+    /// active.
     pub fn link_audit_holder(&self, directory: &Projection) -> Result<(), ServerError> {
         let state = directory
             .person_for(&self.link_audit_source)
@@ -209,9 +213,9 @@ impl Admission {
             Some(LifecycleState::Retired) => Err(ServerError::NotAdmitted {
                 reason: "the person who holds the link-audit source login is retired and answers for no link-audit request (act: bind that login to a person who may act)",
             }),
-            Some(LifecycleState::Active) => Ok(()),
-            Some(LifecycleState::Registered) | None => Err(ServerError::NotAdmitted {
-                reason: "the link-audit source login is not held by an active person",
+            Some(LifecycleState::Active) | None => Ok(()),
+            Some(LifecycleState::Registered) => Err(ServerError::NotAdmitted {
+                reason: "the person who holds the link-audit source login is not active yet and answers for no link-audit request (act: activate that person)",
             }),
         }
     }

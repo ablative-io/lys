@@ -1,6 +1,8 @@
 //! The reviewed-build index follows confirmed changes and durable recovery.
 
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 use serde_json::{Value, json};
 
@@ -8,6 +10,12 @@ use super::{ProvisioningStore, Review, Version, builds};
 
 type TestResult = Result<(), Box<dyn Error>>;
 const CONTRACT: &str = "codex/template-v1";
+
+/// Make the journal refuse the next append (read-only) or take it again.
+fn refuse_appends(path: &Path, refused: bool) -> std::io::Result<()> {
+    let mode = if refused { 0o444 } else { 0o644 };
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+}
 
 fn version(operation: &str, program: &str, reviewed: bool) -> Result<Version, Box<dyn Error>> {
     let source: Value =
@@ -72,15 +80,14 @@ fn an_unconfirmed_write_never_publishes_the_proposed_build() -> TestResult {
     let path = directory.path().join("profiles.json");
     let mut store = ProvisioningStore::open(&path)?;
     store.set("agent", 0, version("first", "/opt/first", true)?)?;
-    let blocked = path.with_extension("writing");
-    std::fs::create_dir(&blocked)?;
+    refuse_appends(&path, true)?;
     let proposed = version("second", "/opt/second", true)?;
     assert!(matches!(
         store.set("agent", 1, proposed.clone()),
         Err(crate::error::ServerError::ProvisioningUnavailable { .. })
     ));
     assert_eq!(programs(&store), ["/opt/first"]);
-    std::fs::remove_dir(blocked)?;
+    refuse_appends(&path, false)?;
     store.set("agent", 1, proposed)?;
     assert_eq!(programs(&store), ["/opt/first", "/opt/second"]);
     Ok(())
@@ -110,8 +117,7 @@ fn a_failed_review_does_not_publish_an_unconfirmed_build() -> TestResult {
     let path = directory.path().join("profiles.json");
     let mut store = ProvisioningStore::open(&path)?;
     store.set("agent", 0, version("first", "/opt/first", false)?)?;
-    let blocked = path.with_extension("writing");
-    std::fs::create_dir(&blocked)?;
+    refuse_appends(&path, true)?;
     let review = Review {
         operation: "review".to_owned(),
         by: "reviewer".to_owned(),
@@ -122,7 +128,7 @@ fn a_failed_review_does_not_publish_an_unconfirmed_build() -> TestResult {
         Err(crate::error::ServerError::ProvisioningUnavailable { .. })
     ));
     assert!(programs(&store).is_empty());
-    std::fs::remove_dir(blocked)?;
+    refuse_appends(&path, false)?;
     store.review("agent", 1, review)?;
     assert_eq!(programs(&store), ["/opt/first"]);
     Ok(())

@@ -1,6 +1,6 @@
 //! Engine scopes share the credential loaded before serving requests.
 
-use super::{Model, SpiceDb, SpiceDbConnection, SpiceDbSettings};
+use super::{Model, SpiceDb, SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 use serde_json::{Value, json};
 use std::error::Error;
 use std::io::{Read, Write};
@@ -156,5 +156,29 @@ fn explicit_reload_replaces_the_key_without_changing_existing_connections()
         Err(lys_identity::grants::GrantError::PermissionEngineUnavailable { reason })
             if reason.contains("key file") && reason.contains("could not be read")
     ));
+    Ok(())
+}
+
+#[test]
+fn the_engine_reads_its_key_once_on_first_use() -> Result<(), Box<dyn Error>> {
+    let temporary = tempfile::tempdir()?;
+    let settings = SpiceDbSettings {
+        endpoint: "127.0.0.1:1".to_owned(),
+        key_file: temporary.path().join("key"),
+        mirror: "fixture".to_owned(),
+    };
+    let unread = SpiceDbEngine::new(settings.clone());
+    assert_eq!(unread.endpoint(), "127.0.0.1:1");
+    assert!(matches!(
+        unread.connection(),
+        Err(lys_identity::grants::GrantError::PermissionEngineUnavailable { .. })
+    ));
+    std::fs::write(&settings.key_file, "first-fixture\n")?;
+    let engine = SpiceDbEngine::new(settings.clone());
+    let first = engine.connection()?;
+    std::fs::remove_file(&settings.key_file)?;
+    let again = engine.connection()?;
+    assert!(std::sync::Arc::ptr_eq(&first.key, &again.key));
+    assert_eq!(again.key.as_ref(), "first-fixture");
     Ok(())
 }

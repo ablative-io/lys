@@ -176,6 +176,51 @@ async fn every_refused_grant_request_is_named_and_writes_nothing() -> TestResult
 }
 
 #[tokio::test]
+async fn a_pass_on_by_a_non_holder_for_another_person_or_beyond_its_source_is_named() -> TestResult
+{
+    let (service, seeded) = seeded().await?;
+    let (ada, bea) = (&seeded.people[0], &seeded.people[1]);
+    let bea_agent = bea.agents[0].id.to_string();
+    let ada_cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let bea_cookie = service.sign_in(login(BEA)).await?;
+    let (status, issued) = service
+        .post(
+            "/grants/roots",
+            Some(&ada_cookie),
+            &root_body(&bea.id.to_string(), "1", &pass_on_read_to_agents())?,
+        )
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let lending = issued["grant"].as_str().ok_or("no grant")?.to_owned();
+    let before = revision(&service, &ada_cookie).await?;
+    let mut beyond = delegate_body(&lending, &bea_agent, &bea.id.to_string(), "1", "api")?;
+    beyond["pass_on"] =
+        json!({ "kind": "to", "actions": ["read", "write"], "recipients": ["agent"] });
+    for (cookie, body, name) in [
+        (
+            &ada_cookie,
+            delegate_body(&lending, &bea_agent, &bea.id.to_string(), "1", "api")?,
+            "NotHolder",
+        ),
+        (
+            &bea_cookie,
+            delegate_body(&lending, &bea_agent, &ada.id.to_string(), "1", "api")?,
+            "ResponsibleMismatch",
+        ),
+        (&bea_cookie, beyond, "PassOnBeyondSource"),
+    ] {
+        let answer = service.post("/grants", Some(cookie), &body).await?;
+        refused(&answer, 403, name);
+        assert_eq!(
+            revision(&service, &ada_cookie).await?,
+            before,
+            "{name} wrote"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_same_request_is_permitted_through_the_api_the_tool_and_the_browser() -> TestResult {
     let (service, seeded) = seeded().await?;
     let bea = &seeded.people[1];

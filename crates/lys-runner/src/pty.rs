@@ -305,11 +305,18 @@ pub fn end_group(pid: u32) -> Result<(), RunnerError> {
     })
 }
 
-/// Ask the recorded leader to flush and exit. Its owner waits on the child's
-/// exit, then ends verified remnants with [`end_left_group`].
+/// How long an ordinary end leaves the leader to flush and exit before its
+/// whole group is ended by a signal no process can ignore. A shell or any
+/// program that ignores the polite signal still ends.
+pub const END_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Ask the recorded leader to flush and exit, and end its group at once if
+/// the same leader is still there [`END_GRACE`] later. Its owner waits on the
+/// child's exit, then ends verified remnants with [`end_left_group`].
 ///
 /// # Errors
-/// Refuses a reused leader or a failure to read or signal it.
+/// Refuses a reused leader or a failure to read or signal it, or to start
+/// the grace that ends it.
 pub fn end(leader: &crate::peer::Leader) -> Result<(), RunnerError> {
     let pid = group(leader.pid)?;
     match crate::peer::present_start(leader.pid)? {
@@ -323,7 +330,34 @@ pub fn end(leader: &crate::peer::Leader) -> Result<(), RunnerError> {
         }
     }
     match kill_process(pid, Signal::TERM) {
-        Ok(()) | Err(rustix::io::Errno::SRCH) => Ok(()),
-        Err(error) => Err(RunnerError::refused("end_failed", error.to_string())),
+        Ok(()) => {}
+        Err(rustix::io::Errno::SRCH) => return Ok(()),
+        Err(error) => return Err(RunnerError::refused("end_failed", error.to_string())),
     }
+    let (leader_pid, start) = (leader.pid, leader.start.clone());
+    std::thread::Builder::new()
+        .name("runner-end-grace".to_owned())
+        .spawn(move || {
+            std::thread::sleep(END_GRACE);
+            match crate::peer::present_start(leader_pid) {
+                Ok(Some(current)) if current == start => {
+                    if let Err(error) = end_group(leader_pid) {
+                        crate::error::said(&format!(
+                            "leader {leader_pid}: end_after_grace_failed: {error}"
+                        ));
+                    }
+                }
+                Ok(_) => {}
+                Err(error) => crate::error::said(&format!(
+                    "leader {leader_pid}: end_grace_unreadable: {error}"
+                )),
+            }
+        })
+        .map(drop)
+        .map_err(|error| {
+            RunnerError::refused(
+                "end_failed",
+                format!("the grace that ends leader {leader_pid} could not start: {error}"),
+            )
+        })
 }

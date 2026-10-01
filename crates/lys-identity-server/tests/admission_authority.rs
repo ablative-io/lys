@@ -59,16 +59,36 @@ fn a_suspended_administrator_has_no_administrator_authority() -> TestResult {
 }
 
 #[test]
-fn an_unbound_link_audit_source_is_refused() -> TestResult {
+fn an_unbound_configured_link_audit_login_keeps_its_authority() -> TestResult {
     let harness = Harness::new(30)?;
-    let mut directory = harness.open()?;
+    let directory = harness.open()?;
     let actor = actor()?;
     let admission = Admission::new(None, actor.binding().clone());
-    assert!(
-        admission
-            .link_audit_holder(directory.projection()?)
-            .is_err()
+    admission.link_audit_source(&actor)?;
+    admission.link_audit_holder(directory.projection()?)?;
+    Ok(())
+}
+
+#[test]
+fn a_person_less_human_login_is_not_the_link_audit_source() -> TestResult {
+    let harness = Harness::new(33)?;
+    let directory = harness.open()?;
+    let admission = Admission::new(None, actor()?.binding().clone());
+    let human = Actor::new(
+        LoginBinding::new("https://issuer.example.test", "someone-without-a-person")?,
+        Provenance::new(AuthMethod::Oidc, 1),
     );
+    assert!(
+        directory
+            .projection()?
+            .person_for(human.binding())
+            .is_none()
+    );
+    let error = admission
+        .link_audit_source(&human)
+        .err()
+        .ok_or("a person-less human was admitted as the link-audit source")?;
+    assert_eq!(error.name(), "NotAdmitted");
     Ok(())
 }
 

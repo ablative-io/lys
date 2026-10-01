@@ -120,6 +120,45 @@ impl SpiceDbConnection {
     }
 }
 
+/// The configured engine. Its credential is read once, on the first call that
+/// needs it, so an install whose key cannot be read still starts and reports
+/// its configured connection; every later engine shares that one read.
+#[derive(Debug)]
+pub struct SpiceDbEngine {
+    settings: SpiceDbSettings,
+    loaded: Mutex<Option<SpiceDbConnection>>,
+}
+
+impl SpiceDbEngine {
+    /// The engine `settings` names, its credential not read yet.
+    pub fn new(settings: SpiceDbSettings) -> Self {
+        Self {
+            settings,
+            loaded: Mutex::new(None),
+        }
+    }
+
+    pub(crate) fn endpoint(&self) -> &str {
+        &self.settings.endpoint
+    }
+
+    /// The connection, reading the credential the first time it is asked for.
+    pub fn connection(&self) -> Result<SpiceDbConnection, GrantError> {
+        let mut loaded = self.loaded.lock().map_err(|error| {
+            unavailable(format!(
+                "the permission engine credential is unavailable: {error}"
+            ))
+        })?;
+        if let Some(connection) = loaded.as_ref() {
+            return Ok(connection.clone());
+        }
+        let connection = SpiceDbConnection::load(&self.settings)?;
+        *loaded = Some(connection.clone());
+        drop(loaded);
+        Ok(connection)
+    }
+}
+
 /// The permission engine, reached over its gateway.
 pub struct SpiceDb {
     endpoint: String,

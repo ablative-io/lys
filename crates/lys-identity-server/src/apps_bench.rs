@@ -246,7 +246,13 @@ async fn ask(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let by = bencher(&state, &headers, None)?;
     let bench = bench(&state, &id, &by)?;
-    let engine = state.grant_setup.spicedb.as_ref();
+    let connection = state
+        .grant_setup
+        .spicedb
+        .as_ref()
+        .map(crate::spicedb::SpiceDbEngine::connection)
+        .transpose()?;
+    let engine = connection.as_ref();
     let examples = Examples {
         holdings: &body.holdings,
         placements: &body.placements,

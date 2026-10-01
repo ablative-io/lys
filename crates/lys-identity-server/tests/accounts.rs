@@ -684,6 +684,59 @@ async fn a_failed_session_revoke_is_named_and_keeps_the_old_cookie_refused() -> 
 }
 
 #[tokio::test]
+async fn a_failed_token_revoke_is_named_and_leaves_the_issuer_account_enabled() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let person = bea(&service, &rauthy, &ada).await?;
+    let cookie = service
+        .sign_in_with("bea@example.test", "Bea-Password-000111")
+        .await?;
+    let verifier = "accounts-product-verifier-of-enough-length-0123456789";
+    let code = product_code(&service, &cookie, verifier).await?;
+    let issued = product_token(&service, &code, verifier).await?;
+    assert_eq!(issued.0, 200, "{}", issued.1);
+    let tokens = service.dir.path().join("provider.tokens.json");
+    std::fs::rename(&tokens, service.dir.path().join("saved-tokens.json"))?;
+    std::fs::create_dir(&tokens)?;
+    let refused = service
+        .post(
+            &format!("/directory/people/{person}/account/enabled"),
+            Some(&ada),
+            &json!({ "enabled": false }),
+        )
+        .await?;
+    assert_eq!(refused.0, 503, "{}", refused.1);
+    assert_eq!(refused.1["refusal"], "ProviderUnavailable");
+    let user = rauthy
+        .users()?
+        .into_iter()
+        .find(|user| user["email"] == "bea@example.test")
+        .ok_or("account missing")?;
+    assert_eq!(
+        user["enabled"], true,
+        "issuer changes only after the provider's tokens are revoked"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_sign_in_the_issuer_api_refuses_is_named_and_begins_no_session() -> TestResult {
+    let (mut service, rauthy, ada) = table().await?;
+    bea(&service, &rauthy, &ada).await?;
+    std::fs::write(rauthy.api_key_file(), "lys$not-the-issuer-key")?;
+    service.restart().await?;
+    let refused = service
+        .post(
+            "/sign-in",
+            None,
+            &json!({ "email": "bea@example.test", "password": "Bea-Password-000111" }),
+        )
+        .await?;
+    assert_eq!(refused.0, 502, "{}", refused.1);
+    assert_eq!(refused.1["refusal"], "SignInProvidersRefused");
+    Ok(())
+}
+
+#[tokio::test]
 async fn the_administrator_is_refused_an_email_or_password_the_policy_refuses() -> TestResult {
     let (service, rauthy, ada) = table().await?;
     let bea = bea(&service, &rauthy, &ada).await?;

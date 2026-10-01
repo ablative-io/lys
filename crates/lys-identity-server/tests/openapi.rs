@@ -62,7 +62,8 @@ fn declared_in(text: &str) -> Declared {
     found
 }
 
-/// Every route the service's source declares, outside the screens' own router.
+/// Every route the service's source declares, outside the screens' own router
+/// and the test modules, whose fake issuers and engines are not the service.
 fn declared() -> Result<Declared, Box<dyn Error>> {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut found = Declared::new();
@@ -74,7 +75,7 @@ fn declared() -> Result<Declared, Box<dyn Error>> {
             .and_then(|name| name.to_str())
             .unwrap_or_default();
         let rust = path.extension().is_some_and(|extension| extension == "rs");
-        if !rust || name.starts_with("surface") {
+        if !rust || name.starts_with("surface") || name.ends_with("_tests.rs") {
             continue;
         }
         found.extend(declared_in(&std::fs::read_to_string(&path)?));

@@ -15,14 +15,15 @@ use std::sync::Arc;
 mod bench;
 
 use identity_contract::apps::{
-    Auth, NOTES, TestResult, get, login, ok, op, post, put, refused, registered, root, seeded,
-    workspace_schema,
+    Auth, NOTES, TestResult, get, login, ok, op, post, put, refused, registered, registration,
+    root, seeded, workspace_schema,
 };
-use identity_contract::harness::ADMINISTRATOR;
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
 use lys_identity_server::Config;
 use lys_identity_server::apps_state::{By, Line, Placed, Registered};
 use lys_identity_server::apps_store::AppStore;
+use lys_identity_server::dev_seed::seed_configured;
 use lys_log_store::Start;
 use serde_json::{Value, json};
 
@@ -32,6 +33,26 @@ fn without_member() -> Value {
     schema["kinds"][format!("{NOTES}.workspace")]["relations"] =
         json!({"owner": ["read", "write"]});
     schema
+}
+
+#[tokio::test]
+async fn a_registration_naming_a_service_account_without_their_store_is_refused_by_name()
+-> TestResult {
+    let (service, _) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| config.service_accounts_dir = None,
+        |config| Ok(seed_configured(config, [ADMINISTRATOR])?),
+    )
+    .await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let mut body = registration(NOTES, &workspace_schema(NOTES))?;
+    body["service_account"] = json!("account-without-a-store");
+    let answer = post(&service, "/apps", Auth::Cookie(&admin), &body).await?;
+    refused(&answer, 503, "ServiceAccountsUnavailable")?;
+    Ok(())
 }
 
 #[tokio::test]

@@ -62,7 +62,7 @@ pub(crate) use crate::grant_sight::grant_view;
 use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
-use crate::spicedb::{Relationships, SpiceDb, SpiceDbConnection};
+use crate::spicedb::{Relationships, SpiceDb, SpiceDbEngine};
 
 /// The grants as the service holds them.
 pub type GrantState = Grants<FileLeafStore, Relationships>;
@@ -79,7 +79,7 @@ pub struct GrantSetup {
     /// last gave it. The log is its only source once the app `lys` exists.
     pub model: RwLock<Model>,
     /// The permission engine the grants are mirrored into, if one is named.
-    pub spicedb: Option<SpiceDbConnection>,
+    pub spicedb: Option<SpiceDbEngine>,
     pub(crate) model_revision: std::sync::atomic::AtomicU64,
     pub(crate) refresh: std::sync::Mutex<()>,
 }
@@ -132,7 +132,9 @@ impl GrantSetup {
         }
         let log_dir = self.log_dir.clone();
         let relationships = match &self.spicedb {
-            Some(settings) => Relationships::SpiceDb(SpiceDb::open_connected(settings, &model)?),
+            Some(engine) => {
+                Relationships::SpiceDb(SpiceDb::open_connected(&engine.connection()?, &model)?)
+            }
             None => Relationships::Memory(MemoryRelationships::default()),
         };
         let mut grants = Grants::open(

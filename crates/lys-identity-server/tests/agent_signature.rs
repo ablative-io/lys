@@ -429,3 +429,21 @@ async fn an_expired_certificate_cannot_sign_a_fresh_request() -> TestResult {
     refused(&answer, "does not verify");
     Ok(())
 }
+
+#[tokio::test]
+async fn a_recorded_certificate_that_cannot_be_decoded_is_named_and_admits_nothing() -> TestResult {
+    let table = Table::set_certificate(Some(b"not a certificate")).await?;
+    let path = format!("/goals/{}/mark", operation()?);
+    let body = json!({"operation": operation()?, "standing": "met", "words": "completed"})
+        .to_string()
+        .into_bytes();
+    let header = table.header(&path, &body, now_ms()?, &nonce(49));
+    let answer = table.send(&path, &header, body).await?;
+    assert_eq!(answer.0, 503, "{}", answer.1);
+    assert_eq!(
+        answer.1["refusal"], "CertificatesUnavailable",
+        "{}",
+        answer.1
+    );
+    Ok(())
+}
