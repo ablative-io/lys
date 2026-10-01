@@ -27,6 +27,10 @@ mod rollout_tests;
 mod parent_tests;
 
 #[cfg(test)]
+#[path = "../tests/status_coalescing/cases.rs"]
+mod status_tests;
+
+#[cfg(test)]
 thread_local! {
     static ROLLOUT_DIRECTORIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
