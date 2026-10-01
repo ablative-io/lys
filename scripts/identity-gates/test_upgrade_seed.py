@@ -8,8 +8,9 @@ from upgrade_fixture import populate
 
 
 class OldApi:
-    def __init__(self, state="active"):
+    def __init__(self, state="active", responsible="owner"):
         self.state = state
+        self.responsible = responsible
         self.calls = []
         self.active = False
 
@@ -26,7 +27,7 @@ class OldApi:
         if path == "/identities/member":
             return {"id": "member", "state": "active" if self.active else "registered"}
         if path == "/agents":
-            return {"agent": "agent"}
+            return {"agent": "agent", "responsible": self.responsible}
         if path == "/grants/roots":
             if not self.active:
                 raise RuntimeError("grant holder is not active")
@@ -50,6 +51,10 @@ class SeedTests(unittest.TestCase):
     def test_registered_setup_is_not_misreported_as_a_valid_fixture(self):
         with self.assertRaisesRegex(RuntimeError, "Active administrator"):
             self.exercise(OldApi("registered"))
+
+    def test_an_agent_registered_under_another_person_is_refused(self):
+        with self.assertRaisesRegex(RuntimeError, "wrong responsible person"):
+            self.exercise(OldApi(responsible="member"))
 
 
 if __name__ == "__main__":

@@ -152,6 +152,8 @@ def migrated_agent(before, after, person):
 
 
 def migrated_people(before, after):
+    if not isinstance(after.get("people"), list):
+        raise RuntimeError("upgrade changed the people readback shape")
     value = dict(after)
     old_people = {person["id"]: person for person in before["people"]}
     people = []

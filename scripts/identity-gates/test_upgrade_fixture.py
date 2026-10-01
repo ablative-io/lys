@@ -66,6 +66,8 @@ class UpgradeProofTests(unittest.TestCase):
     def test_every_domain_difference_is_refused(self):
         before = {name: {"value": name} for name in (
             "people", "grant", "app", "configuration", "budgets", "goals", "policy")}
+        before["people"] = {"people": [
+            {"id": "owner", "display_name": "Owner", "agents": []}]}
         before["sessions"] = {"sessions": [{"id": "preserved"}]}
         after = copy.deepcopy(before)
         after["budgets"]["unconfirmed"] = []
