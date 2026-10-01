@@ -22,7 +22,7 @@
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
 use crate::error::HomeError;
 use crate::record::index::Index;
@@ -45,22 +45,32 @@ struct Claim(PathBuf);
 impl Claim {
     /// Enter `path` in the registry, or `None` when an owner in this process
     /// already holds it.
-    fn enter(path: PathBuf) -> Option<Self> {
+    fn enter(path: PathBuf) -> Result<Option<Self>, HomeError> {
         // The guard is released at the end of this statement, before any
         // claim exists whose drop would take it again.
         let entered = HELD
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| HomeError::StatePoisoned {
+                state: "session lock registry",
+                reason: error.to_string(),
+            })?
             .insert(path.clone());
-        entered.then(|| Self(path))
+        Ok(entered.then(|| Self(path)))
     }
 }
 
 impl Drop for Claim {
     fn drop(&mut self) {
-        HELD.lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .remove(&self.0);
+        match HELD.lock() {
+            Ok(mut held) => {
+                held.remove(&self.0);
+            }
+            Err(error) => {
+                eprintln!(
+                    "lys-home: StatePoisoned: session lock registry: {error}; restart the process"
+                );
+            }
+        }
     }
 }
 
@@ -84,7 +94,7 @@ impl SessionLock {
     /// `held`; a refusal names `held` and, when the lock does, the holding
     /// process. The lock file is created when absent and never removed.
     pub(crate) fn take_at(path: &Path, held: &Path) -> Result<Self, HomeError> {
-        let claim = Claim::enter(resolved(path)?).ok_or_else(|| HomeError::SessionHeld {
+        let claim = Claim::enter(resolved(path)?)?.ok_or_else(|| HomeError::SessionHeld {
             path: held.to_path_buf(),
             holder: Some(std::process::id()),
         })?;

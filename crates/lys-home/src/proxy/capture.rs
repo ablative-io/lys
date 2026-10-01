@@ -23,7 +23,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -149,6 +149,8 @@ pub struct Call {
     journal: Journal,
     sink: Sink,
     state: Mutex<CallState>,
+    poisoned: AtomicBool,
+    ended: AtomicBool,
 }
 
 impl Call {
@@ -175,6 +177,8 @@ impl Call {
             journal,
             sink,
             state: Mutex::new(state),
+            poisoned: AtomicBool::new(false),
+            ended: AtomicBool::new(false),
         })
     }
 
@@ -185,7 +189,18 @@ impl Call {
     }
 
     fn with<R>(&self, f: impl FnOnce(&mut CallState) -> R) -> Option<R> {
-        self.state.lock().ok().map(|mut state| f(&mut state))
+        match self.state.lock() {
+            Ok(mut state) => Some(f(&mut state)),
+            Err(error) => {
+                if !self.poisoned.swap(true, Ordering::AcqRel) {
+                    eprintln!(
+                        "lys-proxy: StatePoisoned: call {}: {error}",
+                        self.open.call_id
+                    );
+                }
+                None
+            }
+        }
     }
 
     /// The observer of the request body on its way upstream.
@@ -233,6 +248,9 @@ impl Call {
 
     /// End the call and hand it to the sink; a second end does nothing.
     pub fn finish(&self, end: End) {
+        if self.ended.swap(true, Ordering::AcqRel) {
+            return;
+        }
         let duration_ms = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let job = self.with(|s| {
             if s.finished {
@@ -278,6 +296,8 @@ impl Call {
                 slot: s.slot.take(),
             })
         });
+        // An interrupted capture keeps its durable open journal entry;
+        // recovery records the lost call without trusting its partial state.
         if let Some(job) = job.flatten()
             && let Err(error) = self.sink.send(job)
         {
@@ -333,5 +353,51 @@ impl Observer for ResponseSide {
 
     fn ended(&mut self, end: End) {
         self.0.finish(end);
+    }
+}
+
+#[cfg(test)]
+mod poison_tests {
+    use super::*;
+    use crate::record::Home;
+    use crate::record::call::Api;
+    use std::sync::mpsc;
+
+    #[test]
+    fn an_interrupted_capture_names_the_fault_and_retains_its_durable_journal()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let home = Home::open(dir.path().join("home"))?;
+        let journal = Journal::open(dir.path().join("journal"))?;
+        let open = OpenCall {
+            call_id: "interrupted".to_owned(),
+            provider: "provider".to_owned(),
+            api: Api::Messages,
+            started_at: "2000-01-01T00:00:00Z".to_owned(),
+            session: None,
+        };
+        journal.write(&open)?;
+        let (reports, received) = mpsc::channel();
+        let sink = Sink::start(home, journal.clone(), reports);
+        let call = Call::admit(open.clone(), None, dir.path(), journal.clone(), sink);
+        let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            call.with(|state| {
+                state.capture_failed = true;
+                panic!("interrupted capture mutation");
+            });
+        }));
+        assert!(interrupted.is_err());
+        assert!(
+            call.with(|_| panic!("poisoned state must not be entered"))
+                .is_none()
+        );
+        assert!(call.poisoned.load(Ordering::Acquire));
+        call.finish(End::Complete);
+        call.finish(End::Complete);
+        assert!(call.ended.load(Ordering::Acquire));
+        assert_eq!(journal.open_calls()?, vec![open]);
+        drop(call);
+        assert!(received.recv().is_err());
+        Ok(())
     }
 }
