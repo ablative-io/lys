@@ -57,7 +57,7 @@ pub(crate) const UNANSWERED: &[&str] = &[
     "StaleDecision",
 ];
 /// An agent's signed request.
-pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused"];
+pub(crate) const AGENT: &[&str] = &["AgentSignatureRefused", "CertificatesUnavailable"];
 /// A registration.
 pub(crate) const REGISTER: &[&str] = &[
     "NotHeld",
@@ -69,12 +69,17 @@ pub(crate) const REGISTER: &[&str] = &[
     "app_exists",
     "redirect_invalid",
     "credential_refused",
+    "ServiceAccountsUnavailable",
     "app_operation_reused",
 ];
 /// An app the caller may see.
 pub(crate) const APP_READ: &[&str] = &["NotSignedIn", "app_unknown", "credential_refused"];
 /// An app's own sign-in.
-pub(crate) const APP_SELF: &[&str] = &["credential_refused", "app_retired"];
+pub(crate) const APP_SELF: &[&str] = &[
+    "credential_refused",
+    "ServiceAccountsUnavailable",
+    "app_retired",
+];
 /// A decision on a registration.
 pub(crate) const DECIDE: &[&str] = &[
     "NotAdmitted",
@@ -114,6 +119,7 @@ pub(crate) const BATCH: &[&str] = &[
     "RequestMalformed",
     "batch_too_large",
     "credential_refused",
+    "ServiceAccountsUnavailable",
 ];
 /// The ids a subject may act on.
 pub(crate) const WHICH: &[&str] = &[

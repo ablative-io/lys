@@ -4,15 +4,8 @@ use super::*;
 
 #[tokio::test]
 async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not() -> TestResult {
-    let (service, seeded) = identity_contract::harness::Service::start_judging(
+    let (service, owner) = authority_table(
         r#"{"version":1,"relations":{"editor":["view","edit"],"viewer":["view"]}}"#,
-        None,
-        |config| {
-            Ok(lys_identity_server::dev_seed::seed_configured(
-                config,
-                [ADMINISTRATOR, BEA],
-            )?)
-        },
     )
     .await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -35,7 +28,6 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
     let probe = registration(NOTES, &workspace_schema(NOTES))?;
     let missing = post(&service, "/apps", Auth::Bearer(&credential), &probe).await?;
     assert_eq!(missing.1["refusal"], "NotHeld", "{}", missing.1);
-    let owner = seeded.people[0].id.to_string();
     let root = ok(post(&service, "/grants/roots", Auth::Cookie(&admin), &json!({
         "operation":op()?,"route":"api","holder":owner,"resource":{"kind":"directory","id":"apps"},"relation":"editor",
         "pass_on":{"kind":"to","actions":["view","edit"],"recipients":["service_account"]},"window":{"starts_at":0,"ends_at":null}
@@ -102,7 +94,7 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
 
 #[tokio::test]
 async fn approval_binds_the_service_account_the_registration_names() -> TestResult {
-    let (service, _) = seeded().await?;
+    let (service, _) = authority_table(identity_contract::harness::GRANT_MODEL).await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let account = op()?;
     let made = json!({"operation": account, "name": "app fixture"});
@@ -139,4 +131,106 @@ async fn approval_binds_the_service_account_the_registration_names() -> TestResu
         "credential_refused",
     )?;
     Ok(())
+}
+
+async fn authority_table(
+    model: &str,
+) -> Result<(identity_contract::harness::Service, String), Box<dyn Error>> {
+    use lys_core::Ed25519Identity;
+    use lys_identity::{
+        Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+    };
+    use lys_identity_server::routes::open_directory;
+    use std::sync::Arc;
+    let broker = identity_contract::app_custody::start().await?;
+    identity_contract::harness::Service::start_adjusted(
+        model,
+        None,
+        None,
+        None,
+        move |config| {
+            config.requests_dir = None;
+            config.certificates_dir = None;
+            config.network_file = None;
+            config.roles_file = None;
+            config.provisioning_file = None;
+            config.runtime_dir = None;
+            config.teams_dir = None;
+            config.stops_dir = None;
+            config.budgets_dir = None;
+            config.policies_dir = None;
+            config.goals_dir = None;
+            config.reviews_dir = None;
+            config.secrets = Some(lys_identity_server::secrets_api::SecretsSettings {
+                broker,
+                service: "identity".to_owned(),
+                service_key_file: config.event_key_file.clone(),
+            });
+        },
+        |config| {
+            let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+            let actor = Actor::new(
+                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                Provenance::new(AuthMethod::Oidc, 1),
+            );
+            let mut directory = open_directory(config)?;
+            let (owner, _) = directory.setup_person(
+                actor.clone(),
+                OperationId::generate()?,
+                Profile::new("Owner")?,
+                1,
+            )?;
+            let (bea, _) = directory.register_person(
+                actor.clone(),
+                OperationId::generate()?,
+                Profile::new("Person")?,
+                2,
+            )?;
+            directory.bind_login(
+                actor.clone(),
+                OperationId::generate()?,
+                bea,
+                LoginBinding::new(&config.issuer, BEA)?,
+                3,
+            )?;
+            directory.transition(
+                actor,
+                OperationId::generate()?,
+                IdentityId::Person(bea),
+                Transition::Activate,
+                "",
+                4,
+            )?;
+            drop(
+                lys_identity_server::service_accounts_store::ServiceAccountStore::open(
+                    config
+                        .service_accounts_dir
+                        .as_deref()
+                        .ok_or("accounts directory missing")?,
+                    Arc::clone(&key),
+                )?,
+            );
+            drop(
+                lys_identity_server::configuration_store::ConfigurationStore::open(
+                    &config.log_dir.with_file_name("organisation"),
+                    Arc::clone(&key),
+                )?,
+            );
+            drop(lys_identity_server::runner_acts::ActStore::open(
+                &config.log_dir.with_file_name("runner-acts"),
+                Arc::clone(&key),
+            )?);
+            drop(lys_identity::start::LaunchRecords::open(
+                &config.log_dir.with_file_name("launch-records"),
+                Ed25519Identity::load(&config.event_key_file)?,
+            )?);
+            drop(lys_identity_server::apps_api::opened(
+                config,
+                Arc::clone(&key),
+                &|_| {},
+            )?);
+            Ok(owner.to_string())
+        },
+    )
+    .await
 }

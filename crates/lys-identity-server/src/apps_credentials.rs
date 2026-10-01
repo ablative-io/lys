@@ -42,7 +42,7 @@ pub(crate) async fn save(
     })?;
     with_apps(&state, |apps, projection| {
         acting(&state, apps.held(), &headers, projection)?.administrator()?;
-        app_acting(apps.held(), &app, &sha256_hex(&body.client_secret))?;
+        app_acting(&state, apps.held(), &app, &sha256_hex(&body.client_secret))?;
         Ok(())
     })?;
     let owner = crate::secrets_api::person(&state, &headers)?;
