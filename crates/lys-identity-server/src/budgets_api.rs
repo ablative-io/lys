@@ -317,15 +317,15 @@ async fn set_team_budget(
 pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, ServerError> {
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let sessions = crate::runtime_api::session_agents(state)?;
     let held = with_budgets(state, |store| Ok(store.held().clone()))?;
     let at_ms = jiff::Timestamp::now().as_millisecond();
     let collection = held.limit_set(holder);
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
     let agents = crate::budgets_members::covered(holder, &standings);
+    let sessions = crate::runtime_api::session_agents(state, &agents)?;
     let used = effective
         .iter()
-        .map(|limit| current_usage(&held, limit, &agents, &zone, at_ms, sessions.as_deref()))
+        .map(|limit| current_usage(&held, limit, &agents, &zone, at_ms, sessions.as_ref()))
         .collect::<Result<Vec<_>, _>>()?;
     let mut unavailable = source_gaps(&held, &agents, &zone, at_ms)?;
     if let Some(reason) = used.iter().find_map(|used| {
@@ -364,12 +364,15 @@ pub(crate) fn view(state: &AppState, holder: &Holder) -> Result<BudgetsView, Ser
                     id: team.created.id.clone(),
                 };
                 let agents = crate::budgets_members::covered(&holder, &standings);
+                let sessions = crate::runtime_api::session_agents(state, &agents)?;
                 let limits = held
                     .limit_set(&holder)
                     .map_or_else(Vec::new, |limits| held.effective_limits(limits));
                 let used = limits
                     .iter()
-                    .map(|limit| current_usage(&held, limit, &agents, &zone, at_ms, sessions.as_deref()))
+                    .map(|limit| {
+                        current_usage(&held, limit, &agents, &zone, at_ms, sessions.as_ref())
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Within {
                     team: holder.id,

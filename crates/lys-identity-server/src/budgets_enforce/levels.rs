@@ -51,10 +51,26 @@ pub(super) fn levels(
             missing: None,
         }));
     }
-    let before = crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, usage.at_ms, None, sessions)
-        .map_err(unavailable)?;
-    let after = crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, usage.at_ms, Some(usage), sessions)
-        .map_err(unavailable)?;
+    let before = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        None,
+        sessions,
+    )
+    .map_err(unavailable)?;
+    let after = crate::budgets_usage::figure_with_sessions(
+        held,
+        limit,
+        agents,
+        zone,
+        usage.at_ms,
+        Some(usage),
+        sessions,
+    )
+    .map_err(unavailable)?;
     let Some(figure) = after.figure else {
         return Ok(None);
     };

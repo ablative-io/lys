@@ -1,6 +1,6 @@
 //! A known threshold crossing asks each covered agent's act under a durable identity.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use serde_json::Number;
@@ -104,7 +104,8 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         return Err(ServerError::AgentNotVisible);
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
-    let sessions = crate::runtime_api::session_agents(state)?;
+    let selected = session_coverage(state, &usage.agent, &standings)?;
+    let sessions = crate::runtime_api::session_agents(state, &selected)?;
     let mut targets = BTreeMap::new();
     for standing in &standings {
         let live = if state.runtime.is_some() {
@@ -130,7 +131,14 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         if store.held().charged.contains(&usage.event) {
             return Ok(());
         }
-        let assessed = crossings(store.held(), &usage, &standings, &targets, &zone, sessions.as_deref())?;
+        let assessed = crossings(
+            store.held(),
+            &usage,
+            &standings,
+            &targets,
+            &zone,
+            sessions.as_ref(),
+        )?;
         let mut usage = usage;
         if let Some(reason) = assessed.missing
             && !usage
@@ -150,6 +158,23 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
         Ok(())
     })?;
     crate::budgets_act::settle(state).await
+}
+
+fn session_coverage(
+    state: &AppState,
+    agent: &str,
+    standings: &[Standing],
+) -> Result<BTreeSet<String>, ServerError> {
+    with_budgets(state, |store| {
+        Ok(store
+            .held()
+            .limit_sets
+            .iter()
+            .map(|collection| crate::budgets_members::covered(&collection.holder, standings))
+            .filter(|agents| agents.contains(agent))
+            .flatten()
+            .collect())
+    })
 }
 
 struct Assessment {
@@ -321,7 +346,8 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
     }
     let zone = crate::configuration_api::organisation(state)?.zone;
     let standings = crate::budgets_members::standings(state)?;
-    let sessions = crate::runtime_api::session_agents(state)?;
+    let selected = session_coverage(state, agent, &standings)?;
+    let sessions = crate::runtime_api::session_agents(state, &selected)?;
     with_budgets(state, |store| {
         for collection in &store.held().limit_sets {
             let agents = crate::budgets_members::covered(&collection.holder, &standings);
@@ -339,7 +365,7 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
                     &zone,
                     at_ms,
                     None,
-                    sessions.as_deref(),
+                    sessions.as_ref(),
                 )
                 .map_err(unavailable)?;
                 let figure = match used.figure {

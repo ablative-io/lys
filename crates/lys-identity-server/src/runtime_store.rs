@@ -20,6 +20,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use lys_core::Ed25519Identity;
 use lys_identity::SNAPSHOT_EVERY;
@@ -46,7 +47,7 @@ pub struct RuntimeStore<S: LeafStore = FileLeafStore> {
     key: Arc<Ed25519Identity>,
     log: FrontierLog<S>,
     held: Held,
-    agents_with_sessions: Arc<BTreeMap<String, SessionActivity>>,
+    agents_with_sessions: SessionIndex,
     start: Start,
     since_snapshot: u64,
     snapshot_failure: Option<String>,
@@ -55,6 +56,22 @@ pub struct RuntimeStore<S: LeafStore = FileLeafStore> {
 
 /// A log opened and folded: the log, what it folds to, and how it started.
 type Opened<S> = (FrontierLog<S>, Held, Start);
+
+#[derive(Default)]
+struct SessionIndex {
+    agents: BTreeMap<String, SessionActivity>,
+    copies: Arc<AtomicUsize>,
+}
+
+impl Clone for SessionIndex {
+    fn clone(&self) -> Self {
+        self.copies.fetch_add(1, Ordering::Relaxed);
+        Self {
+            agents: self.agents.clone(),
+            copies: Arc::clone(&self.copies),
+        }
+    }
+}
 
 /// Derived session activity, bounded to one entry per agent.
 #[derive(Clone, Default)]
@@ -197,7 +214,7 @@ impl<S: LeafStore> RuntimeStore<S> {
 
     /// Append one report as one leaf. A failed append is settled by reading
     /// back: the report is kept only if the leaf store holds exactly it.
-    fn append(&mut self, report: Report, copies: &mut usize) -> Result<(), ServerError> {
+    fn append(&mut self, report: Report) -> Result<(), ServerError> {
         let bytes = serde_json::to_vec(&report).map_err(unavailable)?;
         let index = self.log.len();
         let Err(failure) = self.log.append(&bytes) else {
@@ -218,7 +235,7 @@ impl<S: LeafStore> RuntimeStore<S> {
                 return Err(unavailable(reason));
             }
             if let Some((agent, session, state, at)) = transition
-                && let Err(error) = self.session_transition(agent, session, state, at, copies)
+                && let Err(error) = self.session_transition(agent, session, state, at)
             {
                 self.uncertain = true;
                 return Err(error);
@@ -245,12 +262,24 @@ impl<S: LeafStore> RuntimeStore<S> {
         &self.held.sessions
     }
 
-    /// Agents with a durably recorded session, shared without copying their history.
+    /// Selected agents' activity, detached from the mutable index and report history.
     pub fn agents_with_sessions(
         &mut self,
-    ) -> Result<Arc<BTreeMap<String, SessionActivity>>, ServerError> {
+        selected: &BTreeSet<String>,
+    ) -> Result<BTreeMap<String, SessionActivity>, ServerError> {
         self.settle()?;
-        Ok(Arc::clone(&self.agents_with_sessions))
+        Ok(selected
+            .iter()
+            .map(|agent| {
+                (
+                    agent.clone(),
+                    self.agents_with_sessions
+                        .agents
+                        .get(agent)
+                        .map_or_else(SessionActivity::default, Clone::clone),
+                )
+            })
+            .collect())
     }
 
     fn session_transition(
@@ -259,16 +288,8 @@ impl<S: LeafStore> RuntimeStore<S> {
         session: String,
         state: Reported,
         at: u64,
-        copies: &mut usize,
     ) -> Result<(), ServerError> {
-        if Arc::strong_count(&self.agents_with_sessions) > 1 {
-            *copies = copies
-                .checked_add(1)
-                .ok_or_else(|| unavailable("session index copy count overflows"))?;
-        }
-        let activity = Arc::make_mut(&mut self.agents_with_sessions)
-            .entry(agent)
-            .or_default();
+        let activity = self.agents_with_sessions.agents.entry(agent).or_default();
         match state {
             Reported::Starting => {
                 if !activity.sessions.insert(session) {
@@ -306,26 +327,6 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// the same words it is kept once; the same operation in other words is
     /// refused, and so is a report the session as it stands does not take.
     pub fn report(&mut self, report: Report) -> Result<Tracked, ServerError> {
-        self.report_observing(report, |_| {})
-    }
-
-    /// Keep one report and observe the full index copies caused by it.
-    pub fn report_observing(
-        &mut self,
-        report: Report,
-        copied: impl FnOnce(usize),
-    ) -> Result<Tracked, ServerError> {
-        let mut copies = 0;
-        let result = self.report_counting(report, &mut copies);
-        copied(copies);
-        result
-    }
-
-    fn report_counting(
-        &mut self,
-        report: Report,
-        copies: &mut usize,
-    ) -> Result<Tracked, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&report.operation) {
             if !same_words(kept, &report) {
@@ -370,8 +371,26 @@ impl<S: LeafStore> RuntimeStore<S> {
             }
         }
         let session = report.session.clone();
-        self.append(report, copies)?;
+        self.append(report)?;
         self.standing(&session)
+    }
+
+    /// Observe whole-index copies; the private index is updated in place.
+    pub fn report_observing(
+        &mut self,
+        report: Report,
+        copied: impl FnOnce(usize),
+    ) -> Result<Tracked, ServerError> {
+        self.settle()?;
+        let counter = Arc::clone(&self.agents_with_sessions.copies);
+        let before = counter.load(Ordering::Relaxed);
+        let result = self.report(report);
+        let copies = counter
+            .load(Ordering::Relaxed)
+            .checked_sub(before)
+            .ok_or_else(|| unavailable("session index copy count overflows"))?;
+        copied(copies);
+        result
     }
 
     fn standing(&self, session: &str) -> Result<Tracked, ServerError> {
@@ -382,7 +401,7 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 }
 
-fn session_agents(held: &Held) -> Result<Arc<BTreeMap<String, SessionActivity>>, ServerError> {
+fn session_agents(held: &Held) -> Result<SessionIndex, ServerError> {
     let mut agents: BTreeMap<String, SessionActivity> = BTreeMap::new();
     for tracked in &held.sessions {
         let Some(agent) = &tracked.agent else {
@@ -410,7 +429,10 @@ fn session_agents(held: &Held) -> Result<Arc<BTreeMap<String, SessionActivity>>,
                 .ok_or_else(|| unavailable("live session count overflows"))?;
         }
     }
-    Ok(Arc::new(agents))
+    Ok(SessionIndex {
+        agents,
+        ..SessionIndex::default()
+    })
 }
 
 /// Open the log from its snapshot, or from every leaf when the snapshot or

@@ -132,6 +132,13 @@ pub(crate) fn figure_with_sessions(
     incoming: Option<&Usage>,
     sessions: Option<&BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Used, String> {
+    if let Some(known) = sessions
+        && let Some(agent) = agents.iter().find(|agent| !known.contains_key(*agent))
+    {
+        return Err(format!(
+            "session activity was not selected for agent {agent}"
+        ));
+    }
     Reading {
         held,
         limit,

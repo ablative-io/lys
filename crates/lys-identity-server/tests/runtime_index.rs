@@ -177,7 +177,7 @@ fn a_budget_view_retains_a_selected_snapshot_without_whole_map_copies() -> TestR
         }
     }
     let selected = BTreeSet::from(["agent-0".to_owned()]);
-    let view = store.agents_with_sessions()?;
+    let view = store.agents_with_sessions(&selected)?;
     let initial: BTreeSet<_> = (0..SESSIONS_PER_AGENT)
         .map(|index| format!("session-0-{index}"))
         .collect();
@@ -219,7 +219,7 @@ fn a_budget_view_retains_a_selected_snapshot_without_whole_map_copies() -> TestR
         &initial,
         "the held view changed after reports"
     );
-    let fresh = store.agents_with_sessions()?;
+    let fresh = store.agents_with_sessions(&selected)?;
     let mut expected = initial;
     expected.extend((0..REPORTS / 2).map(|index| format!("reported-{index}")));
     assert_eq!(
