@@ -239,6 +239,7 @@ pub(crate) struct AgentRegistration {
 
 fn registration_person(
     projection: &lys_identity::projection::Projection,
+    operation: OperationId,
     own: PersonId,
     requested: Option<&str>,
     may_choose: bool,
@@ -251,6 +252,9 @@ fn registration_person(
         return Err(ServerError::NotAdmitted {
             reason: "only an administrator may register an agent under another person",
         });
+    }
+    if projection.operation(operation).is_some() {
+        return Ok(responsible);
     }
     let record = projection
         .record(IdentityId::Person(responsible))
@@ -313,7 +317,7 @@ pub(crate) async fn register_agent(
                 }
             };
             let responsible =
-                registration_person(projection, own, body.answers_to.as_deref(), true)?;
+                registration_person(projection, op, own, body.answers_to.as_deref(), true)?;
             let (id, receipt) = directory.register_agent(actor, op, responsible, profile, now())?;
             Ok(Json(AgentRegistered {
                 agent: id.to_string(),
@@ -332,6 +336,7 @@ pub(crate) async fn register_agent(
         let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
         let responsible = registration_person(
             directory.projection()?,
+            op,
             responsible,
             body.answers_to.as_deref(),
             false,
