@@ -89,6 +89,7 @@ impl Sessions {
                 None
             }
         };
+        session.leader_start = session.guard.leader.clone();
         let generation = session.generation;
         let (reader, child) = (spawned.reader, spawned.child);
         let pumped = Arc::clone(self);
@@ -205,6 +206,7 @@ impl Sessions {
             at,
             status,
             signal,
+            reason: None,
         };
         session.ended = Some(ended.clone());
         if let Some(follower) = session.follower.take() {

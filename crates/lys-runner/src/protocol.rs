@@ -299,6 +299,9 @@ pub struct Ended {
     pub status: Option<u32>,
     /// The signal that ended it, when one did.
     pub signal: Option<String>,
+    /// Why a restart did not signal a group it could not prove it owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Output read from a session.
