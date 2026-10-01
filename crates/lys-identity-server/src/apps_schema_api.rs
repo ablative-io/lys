@@ -195,7 +195,7 @@ async fn change(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    let answer = with_grants(&state, |judged| {
+    let answer = crate::grants::with_schema_grants(&state, |judged| {
         let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         may_change(&who, &id)?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
@@ -287,7 +287,7 @@ async fn approve(
 ) -> Result<Json<SchemaChanged>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    let answer = with_grants(&state, |judged| {
+    let answer = crate::grants::with_schema_grants(&state, |judged| {
         let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         who.administrator()?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
