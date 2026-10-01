@@ -77,6 +77,10 @@ pub(crate) struct Live {
 #[path = "../tests/input_no_screen/shared_lock.rs"]
 mod input_no_screen;
 
+#[cfg(test)]
+#[path = "../tests/durable/cases.rs"]
+mod durable_tests;
+
 impl Live {
     /// End the process and everything it started, naming a failure in the
     /// runner's log: the exit, when it comes, is what answers.

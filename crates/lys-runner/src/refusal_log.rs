@@ -182,7 +182,12 @@ fn lifted(
 
 /// Append `record` before answering; a failed append denies all the same,
 /// and holds the gap for the page to show.
-fn keep(sessions: &Sessions, session: &str, attempt: &str, record: &RefusalRecord) -> Verdict {
+pub(crate) fn keep(
+    sessions: &Sessions,
+    session: &str,
+    attempt: &str,
+    record: &RefusalRecord,
+) -> Verdict {
     let mut table = sessions.lock();
     let commit = Commit {
         source: None,
