@@ -376,7 +376,8 @@ fn target_of(asked: &Asked<'_>) -> Target {
 /// `given`, resolved against `cwd`: dot segments removed, every existing
 /// component resolved through its links, the rest appended as written.
 /// Refused, by reason, when it is empty, carries a NUL or a leading `~`,
-/// has no absolute base, or an existing component cannot be read.
+/// has no absolute base, an existing component cannot be read, or a parent
+/// traversal follows a missing component.
 pub fn resolve(cwd: &Path, given: &str) -> Result<PathBuf, String> {
     if given.is_empty() || given.contains('\0') || given.starts_with('~') {
         return Err("the path is empty or not literal".to_owned());
@@ -394,6 +395,9 @@ pub fn resolve(cwd: &Path, given: &str) -> Result<PathBuf, String> {
         match part {
             Component::RootDir | Component::CurDir => {}
             Component::ParentDir => {
+                if beyond {
+                    return Err("the path traverses a parent after a missing component".to_owned());
+                }
                 resolved.pop();
             }
             Component::Normal(name) => {
@@ -428,18 +432,18 @@ fn summary(tool: &str, target: &Target) -> String {
 }
 
 /// Whether `rule` covers the call to `tool` with `target`.
-fn covers(rule: &Rule, tool: &str, target: &Target) -> bool {
+fn covers(rule: &Rule, tool: &str, target: &Target) -> Result<bool, String> {
     if rule.tool != tool {
-        return false;
+        return Ok(false);
     }
-    match (rule.kind, rule.target.as_deref(), target) {
+    Ok(match (rule.kind, rule.target.as_deref(), target) {
         (RuleKind::Tool, _, _) => true,
         (RuleKind::PathPrefix, Some(prefix), Target::Path(path)) => {
-            resolve(Path::new("/"), prefix).is_ok_and(|prefix| path.starts_with(prefix))
+            path.starts_with(resolve(Path::new("/"), prefix)?)
         }
         (RuleKind::Host, Some(host), Target::Host(named)) => host == named,
         _ => false,
-    }
+    })
 }
 
 /// The judgement of `policy` on `asked`.
@@ -456,11 +460,20 @@ pub fn judge(policy: &Policy, asked: &Asked<'_>) -> Judgement {
         target: shown.clone(),
         words,
     };
-    let matched: Vec<&Rule> = policy
-        .rules
-        .iter()
-        .filter(|rule| covers(rule, asked.tool, &target))
-        .collect();
+    let mut matched = Vec::new();
+    for rule in &policy.rules {
+        match covers(rule, asked.tool, &target) {
+            Ok(true) => matched.push(rule),
+            Ok(false) => {}
+            Err(reason) => {
+                return deny(
+                    "policy_target_ambiguous",
+                    Some(rule),
+                    format!("rule `{}` has an unresolved path prefix: {reason}", rule.id),
+                );
+            }
+        }
+    }
     if let Some(hard) = matched
         .iter()
         .find(|rule| rule.authority == Authority::Hard)
