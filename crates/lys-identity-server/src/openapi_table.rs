@@ -76,7 +76,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown", "NotHolder", "IdentityNotActive"]];
     GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]];
     POST "/grants/{id}/revoke" "Revoke a grant and all it derives" S [GRANT_READ, RECORDED, &["GrantUnknown", "RevokeRefused"]];
-    GET "/receipts/{index}" "A directory receipt, publicly" P [&["RequestMalformed"]];
+    GET "/receipts/{index}" "A directory receipt, publicly" P [&["RequestMalformed", "InstallEntry"]];
     GET "/service-key" "The service's public key" P [];
     GET "/reviews" "The grants due for review" S [SIGNED, &["NoPerson"]];
     POST "/reviews/{grant}/keep" "Keep a grant under review" S [SIGNED_BODY, &["GrantNotDue", "GrantNotVisible", "ReviewReused"], &["NoPerson", "ReviewerOnly"]];

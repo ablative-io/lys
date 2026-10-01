@@ -158,7 +158,21 @@ pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, Serve
     })?;
     lys_identity::directory_migration::migrate(store, &key)?;
     let reopen = Box::new(move || FileLeafStore::open(&log_dir));
-    Ok(Directory::open(reopen, key)?)
+    let mut directory = Directory::open(reopen, key)?;
+    if let Some(from) = &config.issuer_moved_from
+        && directory.record_issuer_move(
+            from,
+            &config.issuer,
+            crate::read_api::BUILD,
+            crate::session::now(),
+        )?
+    {
+        println!(
+            "lys-identity-server recorded the issuer move from {from} to {}",
+            config.issuer
+        );
+    }
+    Ok(directory)
 }
 
 fn malformed(reason: String) -> ServerError {

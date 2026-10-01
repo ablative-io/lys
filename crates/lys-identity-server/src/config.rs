@@ -75,6 +75,12 @@ pub struct Config {
     pub administrator: Option<ConfiguredLogin>,
     /// The authenticated link-audit source, by issuer and subject (R4).
     pub link_audit_source: ConfiguredLogin,
+    /// The issuer this install's logins were bound under before an upgrade
+    /// moved the sign-in service to `issuer`, as the upgrade hands it over.
+    /// The directory records the move once, at start; the sign-in check
+    /// compares against `issuer` alone.
+    #[serde(default)]
+    pub issuer_moved_from: Option<String>,
     /// How long a session lives, in seconds.
     pub session_seconds: u64,
     /// The file the signed-in sessions are kept in, so a restart leaves

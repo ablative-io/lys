@@ -382,6 +382,7 @@ impl Service {
             operator_upgrade_file: None,
             administrator: Some(configured(ADMINISTRATOR)),
             link_audit_source: configured(LINK_AUDIT_SOURCE),
+            issuer_moved_from: None,
             session_seconds: 600,
             sessions_file: Some(dir.path().join("sessions.json")),
             secure_cookie: false,
@@ -566,18 +567,17 @@ impl Service {
         answer(request.send().await?).await
     }
 
-    /// The directory log's size as the public receipt route shows it: the
-    /// first index it holds no leaf at, so a test can prove a refused call
-    /// logged nothing without a session.
+    /// The directory log's size as the public receipt route's checkpoint
+    /// names it, so a test can prove a refused call logged nothing without
+    /// a session. The checkpoint counts every leaf, an install event's too.
     pub async fn log_size(&self) -> Result<u64, Box<dyn Error>> {
-        let mut size = 0;
-        loop {
-            let (status, _) = self.get(&format!("/receipts/{size}"), None).await?;
-            if status != 200 {
-                return Ok(size);
-            }
-            size += 1;
+        let (status, first) = self.get("/receipts/0", None).await?;
+        if status != 200 {
+            return Ok(0);
         }
+        first["checkpoint"]["tree_size"]
+            .as_u64()
+            .ok_or_else(|| format!("the first receipt names no tree size: {first}").into())
     }
 
     /// POST the JSON `body` bytes to `path` carrying the header `name: value`
