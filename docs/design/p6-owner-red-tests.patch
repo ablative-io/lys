@@ -1,0 +1,147 @@
+crates/lys-identity-server/tests/restart_api.rs --- Rust
+220 220     )
+221 221     .await?;
+222 222     assert!(held.status(new)?.ended.is_none());
+... 223     let kept: Value =
+... 224         serde_json::from_slice(&std::fs::read(held.dir.path().join("state/sessions.json"))?)?;
+... 225     assert_eq!(
+... 226         kept["responsible"][old],
+... 227         held.seeded.people[0].id.to_string()
+... 228     );
+... 229     assert_eq!(
+... 230         kept["responsible"][new],
+... 231         held.seeded.people[0].id.to_string()
+... 232     );
+... 233     assert_eq!(
+... 234         held.client()
+... 235             .ask(&Act::InputBytes {
+... 236                 session: new.to_owned(),
+... 237                 data: b"must not be injected".to_vec(),
+... 238             })
+... 239             .expect_err("restart must keep input gated")
+... 240             .name(),
+... 241         "SessionInputContextMissing",
+... 242     );
+223 243     let replayed = held.ok(&path, &body).await?;
+224 244     assert_eq!(replayed["session"], started["session"]);
+225 245     assert_eq!(replayed["template_sha256"], started["template_sha256"]);
+
+crates/lys-identity-server/tests/runner_start.rs --- 1/2 --- Rust
+51 51     assert_eq!(started["executed"], false, "the service itself ran nothing");
+52 52     assert_eq!(started["runner"]["state"], "running", "{started}");
+53 53     let session = started["session"].as_str().ok_or("no session")?;
+.. 54     let (status, me) = table.service.get("/me", Some(&table.ada)).await?;
+.. 55     assert_eq!(status, 200, "{me}");
+.. 56     let kept: serde_json::Value = serde_json::from_slice(&std::fs::read(
+.. 57         table.dir.path().join("runner-state/sessions.json"),
+.. 58     )?)?;
+.. 59     assert_eq!(kept["responsible"][session], me["person"]["id"]);
+.. 60     let refused = Client::new(
+.. 61         table.dir.path().join("runner.sock"),
+.. 62         Arc::clone(&table.server_key),
+.. 63     )
+.. 64     .ask(&Act::InputBytes {
+.. 65         session: session.to_owned(),
+.. 66         data: b"must not reach the terminal".to_vec(),
+.. 67     })
+.. 68     .expect_err("owned production start requires an input context");
+.. 69     assert_eq!(refused.name(), "SessionInputContextMissing");
+54 70 
+55 71     let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
+56 72     let listed = live["sessions"]
+
+crates/lys-identity-server/tests/runner_start.rs --- 2/2 --- Rust
+124 140     table.close()
+125 141 }
+... 142 
+... 143 #[tokio::test(flavor = "multi_thread")]
+... 144 async fn a_start_with_a_cookie_and_signature_is_refused_before_recording() -> TestResult {
+... 145     let table = Table::set().await?;
+... 146     let machine = table
+... 147         .machine(&machine_body(&table)?, Some(json!({ "kind": "lys" })))
+... 148         .await?;
+... 149     let path = format!("/agents/{}/start-command", table.agent());
+... 150     let body = start_body(&machine)?;
+... 151     let before = runtime_bytes(&table.service.dir.path().join("runtime"))?;
+... 152     let response = reqwest::Client::new()
+... 153         .post(format!("{}{path}", table.service.base))
+... 154         .header(reqwest::header::COOKIE, &table.ada)
+... 155         .header(lys_identity_server::agent_signature::HEADER, "present")
+... 156         .json(&body)
+... 157         .send()
+... 158         .await?;
+... 159     assert_eq!(response.status(), 401);
+... 160     let refusal: serde_json::Value = response.json().await?;
+... 161     assert_eq!(refusal["refusal"], "AgentSignatureRefused");
+... 162     assert_eq!(
+... 163         runtime_bytes(&table.service.dir.path().join("runtime"))?,
+... 164         before
+... 165     );
+... 166     table.close()
+... 167 }
+126 168 
+127 169 #[tokio::test(flavor = "multi_thread")]
+128 170 async fn the_start_carries_the_agents_policy_and_the_runner_holds_its_digest() -> TestResult {
+
+crates/lys-runner/tests/injection/cases.rs --- 1/2 --- Rust
+65             rotation: None,          65             rotation: None,
+66             policy: None,            66             policy: None,
+67         };                           67         };
+..                                      68         let mut start = serde_json::
+..                                      .. json!({"act": "start", "launch": lau
+..                                      .. nch});
+68         if owned {                   69         if owned {
+..                                      70             start["responsible"] = s
+..                                      .. erde_json::json!("person.owner");
+..                                      71         }
+..                                      72         let act = serde_json::from_v
+..                                      .. alue(start)?;
+..                                      73         let server = lys_core::Ed255
+..                                      .. 19Identity::ephemeral();
+..                                      74         let greeting = crate::protoc
+..                                      .. ol::Greeting::fresh(&crate::protocol
+..                                      .. ::hex(
+..                                      75             &server.public_key_bytes
+..                                      .. (),
+..                                      76         ));
+69             sessions.start_for(launc 77         let line = crate::protocol::
+.. h, "person.owner")?;                 .. sign_request(&server, &greeting, &ac
+..                                      .. t)?;
+70         } else {                     78         let answer = crate::socket::
+..                                      .. dispatch(
+..                                      79             &sessions,
+..                                      80             &server.public_key_bytes
+..                                      .. (),
+..                                      81             &greeting,
+..                                      82             &line,
+..                                      83             &std::sync::atomic::Atom
+..                                      .. icBool::new(false),
+..                                      84         );
+..                                      85         if !matches!(answer, crate::
+..                                      .. protocol::Answer::Started { .. }) {
+71             sessions.start(launch)?; 86             return Err(format!("real
+..                                      ..  start refused: {answer:?}").into())
+..                                      .. ;
+72         }                            87         }
+73         let bytes = Arc::new(Mutex:: 88         let bytes = Arc::new(Mutex::
+.. new(Vec::new()));                    .. new(Vec::new()));
+74         let terminal = {             89         let terminal = {
+75             let mut table = sessions 90             let mut table = sessions
+   .lock()?;                               .lock()?;
+
+crates/lys-runner/tests/injection/cases.rs --- 2/2 --- Rust
+160 175     fixture.end()
+161 176 }
+... 177 
+... 178 #[test]
+... 179 fn old_start_line_without_responsible_remains_unowned() -> TestResult {
+... 180     let fixture = Fixture::new()?;
+... 181     let record: serde_json::Value =
+... 182         serde_json::from_slice(&std::fs::read(fixture.dir.path().join("sessions.json"))?)?;
+... 183     assert_eq!(record["responsible"], serde_json::json!({}));
+... 184     fixture.end()
+... 185 }
+162 186 
+163 187 #[test]
+164 188 fn old_session_record_migrates_with_explicitly_absent_responsibility() -> TestResult {
+
