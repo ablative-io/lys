@@ -22,7 +22,7 @@ use std::thread::JoinHandle;
 
 use crate::admitted::Admitted;
 use crate::error::RunnerError;
-use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_request};
+use crate::protocol::{Act, Answer, Greeting, Output, reply_line, verify_parsed};
 use crate::scrollback::whole_text;
 use crate::session::Sessions;
 
@@ -388,7 +388,7 @@ async fn departed(stream: &tokio::net::UnixStream) -> Result<(), RunnerError> {
 }
 
 enum Command {
-    Peer(String),
+    Peer(crate::peer::PeerRequest),
     Server(Act),
 }
 
@@ -448,10 +448,14 @@ impl DispatchPermit {
 }
 
 fn command(line: String, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
-    if crate::peer::is_peer(&line) {
-        Ok(Command::Peer(line))
-    } else {
-        verify_request(line.trim_end(), server, greeting).map(Command::Server)
+    match crate::peer::parse(line.trim_end())? {
+        crate::peer::ParsedRequest::Peer(request) => Ok(Command::Peer(request)),
+        crate::peer::ParsedRequest::Server(request) => {
+            verify_parsed(request, server, greeting).map(Command::Server)
+        }
+        crate::peer::ParsedRequest::Versioned { .. } => Err(RunnerError::Malformed {
+            reason: "the request shape was not decoded".to_owned(),
+        }),
     }
 }
 
@@ -513,7 +517,7 @@ async fn execute(
     let proved = Arc::clone(proof);
     let mut task = tokio::task::spawn_blocking(move || {
         let answer = match command {
-            Command::Peer(line) => crate::peer::answer(&held, &proved, line.trim_end(), &flag),
+            Command::Peer(request) => crate::peer::answer_parsed(&held, &proved, request, &flag),
             Command::Server(act) => {
                 perform(&held, act, &flag).unwrap_or_else(|error| Answer::refusal(&error))
             }
