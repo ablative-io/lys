@@ -218,6 +218,11 @@ impl Sessions {
                     Ok(_) => {
                         self.persist_logged(&table);
                         drop(table);
+                        if let Err(error) = self.writer.barrier() {
+                            crate::error::said(&format!(
+                                "session {id}: rotation_record_failed: {error}"
+                            ));
+                        }
                         self.wake();
                         return;
                     }
@@ -253,6 +258,9 @@ impl Sessions {
         crate::operations::ended(&mut table, id, &ended);
         self.persist_logged(&table);
         drop(table);
+        if let Err(error) = self.writer.barrier() {
+            crate::error::said(&format!("session {id}: exit_record_failed: {error}"));
+        }
         self.wake();
     }
 
@@ -369,12 +377,14 @@ impl Sessions {
                 source: Some(source),
                 attempt: None,
             };
-            if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
+            let appended = table.feed.append(id, now_ms(), bodies, commit);
+            drop(table);
+            if let Err(error) = appended.and_then(|_| self.writer.barrier()) {
                 crate::error::said(&format!(
                     "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
                 ));
+                return;
             }
-            drop(table);
             self.wake();
             if !more {
                 return;

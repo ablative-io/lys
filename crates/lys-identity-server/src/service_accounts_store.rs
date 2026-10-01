@@ -193,6 +193,10 @@ impl<S: LeafStore> ServiceAccountStore<S> {
         &self.held.accounts
     }
 
+    pub(crate) fn held(&self) -> &Held {
+        &self.held
+    }
+
     /// The service account named `id`.
     pub fn account(&self, id: &str) -> Option<&Account> {
         self.held.account(id)

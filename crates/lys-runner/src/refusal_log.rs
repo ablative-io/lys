@@ -76,11 +76,9 @@ pub fn answer(
         return Verdict::pass(None);
     };
     let attempt = attempt_of(&session, asked);
-    match sessions
-        .lock()
-        .feed
-        .attempt(&attempt_key(&session, &attempt))
-    {
+    let key = attempt_key(&session, &attempt);
+    let reader = sessions.lock().feed.attempt_reader(&key);
+    match reader.map_or(Ok(None), |reader| reader.attempt(&key)) {
         Ok(Some(record)) => return Verdict::of(&record, "reused"),
         Ok(None) => {}
         Err(unread) => crate::error::said(&format!(
@@ -189,6 +187,20 @@ pub(crate) fn keep(
     record: &RefusalRecord,
 ) -> Verdict {
     let mut table = sessions.lock();
+    let key = attempt_key(session, attempt);
+    if let Some(reader) = table.feed.attempt_reader(&key) {
+        drop(table);
+        match reader.attempt(&key) {
+            Ok(Some(held)) => return Verdict::of(&held, "reused"),
+            Ok(None) => {}
+            Err(error) => {
+                let mut verdict = Verdict::of(record, "incomplete");
+                verdict.reason = format!("{} (audit_incomplete: {error})", verdict.reason);
+                return verdict;
+            }
+        }
+        table = sessions.lock();
+    }
     let commit = Commit {
         source: None,
         attempt: Some(attempt.to_owned()),
@@ -199,13 +211,15 @@ pub(crate) fn keep(
         vec![Body::Refusal(record.clone())],
         commit,
     );
+    drop(table);
+    let appended = appended.and_then(|_| sessions.writer.barrier());
     match appended {
-        Ok(_) => {
-            drop(table);
+        Ok(()) => {
             sessions.wake();
             Verdict::of(record, "recorded")
         }
         Err(error) => {
+            let mut table = sessions.lock();
             let gap = table.gaps.entry(session.to_owned()).or_default();
             gap.lost += 1;
             gap.since.get_or_insert(record.at);

@@ -77,6 +77,7 @@ pub struct StateFile {
     path: PathBuf,
     runner: String,
     lock: fs::File,
+    writer: Option<crate::durable::Writer>,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> RunnerError {
@@ -102,12 +103,17 @@ impl StateFile {
             path: dir.join("sessions.json"),
             runner: runner_id(&dir.join("runner.id"))?,
             lock: held,
+            writer: None,
         })
     }
 
     /// The runner's own id.
     pub fn runner(&self) -> &str {
         &self.runner
+    }
+
+    pub(crate) fn writer(&mut self, writer: crate::durable::Writer) {
+        self.writer = Some(writer);
     }
 
     /// The record, empty when none was written.
@@ -158,6 +164,9 @@ impl StateFile {
     /// Replace the record with `kept`, durably.
     pub fn write(&self, kept: &Kept) -> Result<(), RunnerError> {
         let bytes = serde_json::to_vec_pretty(kept).map_err(unavailable)?;
+        if let Some(writer) = &self.writer {
+            return writer.replace(&self.path, bytes);
+        }
         replace(&self.path, &bytes)
             .map_err(|error| unavailable(format!("writing {}: {error}", self.path.display())))
     }
