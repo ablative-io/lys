@@ -19,6 +19,7 @@ struct Table {
     service: Service,
     cookie: String,
     agents: Vec<String>,
+    sessions: Vec<String>,
 }
 
 impl Table {
@@ -27,9 +28,14 @@ impl Table {
     }
 
     async fn with_session(has_session: bool) -> TestResult<Self> {
-        let (service, seeded) = Service::start_with(move |config| {
+        Self::with_sessions(usize::from(has_session)).await
+    }
+
+    async fn with_sessions(count: usize) -> TestResult<Self> {
+        let (service, (seeded, sessions)) = Service::start_with(move |config| {
             let seeded = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
-            if has_session {
+            let mut sessions = Vec::with_capacity(count);
+            if count > 0 {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let mut runtime = RuntimeStore::open(
                     config
@@ -38,20 +44,24 @@ impl Table {
                         .ok_or("no runtime directory")?,
                     key,
                 )?;
-                runtime.report(Report {
-                    operation: OperationId::generate()?.to_string(),
-                    session: OperationId::generate()?.to_string(),
-                    agent: Some(seeded.people[0].agents[2].id.to_string()),
-                    machine: OperationId::generate()?.to_string(),
-                    state: Reported::Starting,
-                    what: "tracked session".to_owned(),
-                    confirmation: String::new(),
-                    reported_by: seeded.people[0].id.to_string(),
-                    at: 1,
-                    launch: None,
-                })?;
+                for _ in 0..count {
+                    let session = OperationId::generate()?.to_string();
+                    runtime.report(Report {
+                        operation: OperationId::generate()?.to_string(),
+                        session: session.clone(),
+                        agent: Some(seeded.people[0].agents[2].id.to_string()),
+                        machine: OperationId::generate()?.to_string(),
+                        state: Reported::Starting,
+                        what: "tracked session".to_owned(),
+                        confirmation: String::new(),
+                        reported_by: seeded.people[0].id.to_string(),
+                        at: 1,
+                        launch: None,
+                    })?;
+                    sessions.push(session);
+                }
             }
-            Ok(seeded)
+            Ok((seeded, sessions))
         })
         .await?;
         let cookie = service
@@ -68,6 +78,7 @@ impl Table {
                 .iter()
                 .map(|agent| agent.id.to_string())
                 .collect(),
+            sessions,
         })
     }
     async fn post(&self, path: &str, body: &Value) -> TestResult<Value> {
@@ -233,6 +244,59 @@ async fn a_member_with_a_session_and_no_dollar_report_refuses_both_starts() -> T
         let reason = refused["reason"].as_str().ok_or("no refusal reason")?;
         assert!(
             reason.contains("dollars") && reason.contains(member),
+            "{route}: {refused}"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_reported_live_session_does_not_hide_an_unreported_live_session() -> TestResult {
+    let table = Table::with_sessions(2).await?;
+    let (parent, child, limits) = table.charged_team().await?;
+    let path = format!("/teams/{parent}/budget");
+    let (status, answer) = send(
+        &table.service,
+        reqwest::Method::PUT,
+        &path,
+        Auth::Cookie(&table.cookie),
+        Some(&json!({"limits": limits, "warn_at": null, "version": 0})),
+    )
+    .await?;
+    assert_eq!(status, 200, "{answer}");
+    let member = &table.agents[2];
+    let reported = table.sessions.first().ok_or("no reported session")?;
+    let missing = table.sessions.get(1).ok_or("no unreported session")?;
+    let at = jiff::Timestamp::now().as_millisecond();
+    table.post(&format!("/agents/{member}/usage"), &json!({
+        "event": "known-live-cost", "session": reported, "at_ms": at,
+        "dollars_micros": 25_000_000, "account": "shared-account",
+        "plan_windows": [{"duration_minutes": 10_080, "used_percent": 50, "resets_at_ms": at + 604_800_000}]
+    })).await?;
+    table.member(&child, member).await?;
+    let unknown = table.get(&path).await?;
+    let starts = [
+        ("start-command", table.start(member, "start-command").await?),
+        ("start", table.start(member, "start").await?),
+    ];
+    assert_eq!(unknown["used"][2]["figure"], Value::Null, "{unknown}");
+    let reason = unknown["used"][2]["unavailable"]
+        .as_str()
+        .ok_or("no dollar gap")?;
+    assert!(
+        reason.contains(member) && reason.contains(missing),
+        "{unknown}"
+    );
+    assert_eq!(unknown["used"][3]["figure"], 50, "{unknown}");
+    for (route, (status, refused)) in starts {
+        assert_eq!(status, 503, "{route}: {refused}");
+        assert_eq!(
+            refused["refusal"], "BudgetsUnavailable",
+            "{route}: {refused}"
+        );
+        assert_eq!(
+            refused["reason"],
+            format!("BudgetsUnavailable: {reason}"),
             "{route}: {refused}"
         );
     }
