@@ -233,6 +233,7 @@ fn kept(state: OperationState, id: &str) -> OperationOutcome {
 fn leave(state_dir: &Path, operations: &[OperationOutcome]) -> TestResult {
     std::fs::create_dir_all(state_dir)?;
     let record = serde_json::json!({ "format": FORMAT, "operations": operations });
+    std::fs::remove_file(state_dir.join("operations.jsonl"))?;
     std::fs::write(state_dir.join("operations.json"), record.to_string())?;
     Ok(())
 }

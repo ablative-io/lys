@@ -19,9 +19,19 @@ pub(crate) fn begin_restart(
         }
         return Ok((held.clone(), false));
     }
-    if table.operations.held.iter().any(|held| {
-        held.session == id && held.request == "restart" && held.state == OperationState::Delivering
-    }) {
+    if table
+        .operations
+        .active
+        .get(id)
+        .into_iter()
+        .flatten()
+        .filter_map(|operation| table.operations.get(operation))
+        .any(|held| {
+            held.session == id
+                && held.request == "restart"
+                && held.state == OperationState::Delivering
+        })
+    {
         return Err(RunnerError::refused(
             "session_restarting",
             format!("session {id} is already restarting"),
@@ -37,8 +47,7 @@ pub(crate) fn begin_restart(
         text: None,
         ended: None,
     };
-    table.operations.held.push(outcome.clone());
-    table.operations.persist()?;
+    table.operations.record(outcome.clone())?;
     feed(table, &outcome);
     Ok((outcome, true))
 }
@@ -48,11 +57,10 @@ pub(crate) fn finish_restart(
     operation: &str,
     result: Result<Ended, RunnerError>,
 ) -> Result<OperationOutcome, RunnerError> {
-    let held = table
+    let mut held = table
         .operations
-        .held
-        .iter_mut()
-        .find(|held| held.operation == operation)
+        .get(operation)
+        .cloned()
         .ok_or_else(|| super::unavailable(format!("no restart {operation} is held")))?;
     match result {
         Ok(ended) => {
@@ -72,7 +80,7 @@ pub(crate) fn finish_restart(
     }
     held.at = now_ms();
     let outcome = held.clone();
-    table.operations.persist()?;
+    table.operations.record(outcome.clone())?;
     feed(table, &outcome);
     Ok(outcome)
 }

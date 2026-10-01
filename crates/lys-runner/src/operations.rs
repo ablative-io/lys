@@ -18,7 +18,8 @@
 //! exit is seen. The record keeps each outcome and a digest of its text,
 //! never the text itself.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Weak, atomic::AtomicBool};
 
@@ -164,7 +165,9 @@ struct Kept {
 /// in memory only.
 pub(crate) struct Operations {
     path: PathBuf,
-    held: Vec<OperationOutcome>,
+    held: HashMap<String, OperationOutcome>,
+    accepted: BTreeMap<String, VecDeque<String>>,
+    active: BTreeMap<String, BTreeSet<String>>,
     texts: BTreeMap<String, String>,
     compacting: BTreeSet<String>,
 }
@@ -179,20 +182,90 @@ impl Operations {
     /// The operations recorded in `dir`. One a stopped runner left being
     /// typed is uncertain; one it left waiting is refused, its session gone.
     pub(crate) fn open(dir: &Path) -> Result<Self, RunnerError> {
-        let path = dir.join("operations.json");
-        let mut held = match std::fs::read(&path) {
-            Ok(bytes) => {
-                let kept: Kept = serde_json::from_slice(&bytes).map_err(unavailable)?;
-                if kept.format != FORMAT {
-                    return Err(unavailable(format!("in format {}", kept.format)));
+        let path = dir.join("operations.jsonl");
+        let old = dir.join("operations.json");
+        if !path.exists() {
+            let outcomes = match std::fs::read(&old) {
+                Ok(bytes) => {
+                    let kept: Kept = serde_json::from_slice(&bytes).map_err(unavailable)?;
+                    if kept.format != FORMAT {
+                        return Err(unavailable(format!("in format {}", kept.format)));
+                    }
+                    kept.operations
                 }
-                kept.operations
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                Err(error) => return Err(unavailable(error)),
+            };
+            let mut bytes = Vec::new();
+            for outcome in outcomes {
+                serde_json::to_writer(&mut bytes, &outcome).map_err(unavailable)?;
+                bytes.push(b'\n');
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(error) => return Err(unavailable(error)),
+            crate::state::replace(&path, &bytes).map_err(unavailable)?;
+        }
+        let mut operations = Self {
+            path,
+            held: HashMap::new(),
+            accepted: BTreeMap::new(),
+            active: BTreeMap::new(),
+            texts: BTreeMap::new(),
+            compacting: BTreeSet::new(),
         };
-        let at = now_ms();
-        for outcome in &mut held {
+        let file = std::fs::File::open(&operations.path).map_err(unavailable)?;
+        let length = file.metadata().map_err(unavailable)?.len();
+        let mut reader = BufReader::new(file);
+        let mut committed = 0;
+        loop {
+            let mut line = Vec::new();
+            let read = reader
+                .by_ref()
+                .take(1_048_577)
+                .read_until(b'\n', &mut line)
+                .map_err(unavailable)?;
+            if read == 0 {
+                break;
+            }
+            if line.len() > 1_048_576 {
+                return Err(unavailable("operation_record_too_large"));
+            }
+            if line.last() != Some(&b'\n') {
+                break;
+            }
+            let outcome: OperationOutcome = serde_json::from_slice(&line).map_err(unavailable)?;
+            operations.fold(outcome);
+            committed += read as u64;
+        }
+        if committed < length {
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&operations.path)
+                .map_err(unavailable)?;
+            file.set_len(committed)
+                .and_then(|()| file.sync_all())
+                .map_err(unavailable)?;
+            crate::error::said(
+                "operations_tail_incomplete: the uncommitted last record was removed",
+            );
+        }
+        match std::fs::remove_file(&old) {
+            Ok(()) => std::fs::File::open(dir)
+                .and_then(|file| file.sync_all())
+                .map_err(unavailable)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(unavailable(error)),
+        }
+        let interrupted = operations
+            .held
+            .values()
+            .filter(|outcome| {
+                matches!(
+                    outcome.state,
+                    OperationState::Accepted | OperationState::Delivering
+                )
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        for mut outcome in interrupted {
             let (state, words) = match outcome.state {
                 OperationState::Delivering => (
                     OperationState::Uncertain,
@@ -205,31 +278,52 @@ impl Operations {
                 _ => continue,
             };
             outcome.state = state;
-            outcome.at = at;
+            outcome.at = now_ms();
             words.clone_into(&mut outcome.words);
+            operations.record(outcome)?;
         }
-        let operations = Self {
-            path,
-            held,
-            texts: BTreeMap::new(),
-            compacting: BTreeSet::new(),
-        };
-        operations.persist()?;
         Ok(operations)
     }
 
-    fn persist(&self) -> Result<(), RunnerError> {
-        let kept = Kept {
-            format: FORMAT.to_owned(),
-            operations: self.held.clone(),
-        };
-        let bytes = serde_json::to_vec(&kept).map_err(unavailable)?;
-        crate::state::replace(&self.path, &bytes).map_err(unavailable)
+    fn fold(&mut self, outcome: OperationOutcome) {
+        let id = outcome.operation.clone();
+        if outcome.state == OperationState::Accepted && !self.held.contains_key(&id) {
+            self.accepted
+                .entry(outcome.session.clone())
+                .or_default()
+                .push_back(id.clone());
+        }
+        let active = self.active.entry(outcome.session.clone()).or_default();
+        if matches!(
+            outcome.state,
+            OperationState::Accepted | OperationState::Delivering
+        ) || outcome.state == OperationState::Delivered
+            && matches!(outcome.request.as_str(), "stop" | "compact")
+        {
+            active.insert(id.clone());
+        } else {
+            active.remove(&id);
+        }
+        self.held.insert(id, outcome);
+    }
+
+    fn record(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
+        let mut bytes = serde_json::to_vec(&outcome).map_err(unavailable)?;
+        bytes.push(b'\n');
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&self.path)
+            .map_err(unavailable)?;
+        file.write_all(&bytes)
+            .and_then(|()| file.sync_data())
+            .map_err(unavailable)?;
+        self.fold(outcome);
+        Ok(())
     }
 
     /// The outcome of `operation`.
     pub(crate) fn get(&self, operation: &str) -> Option<&OperationOutcome> {
-        self.held.iter().find(|held| held.operation == operation)
+        self.held.get(operation)
     }
 
     fn set(
@@ -238,17 +332,15 @@ impl Operations {
         state: OperationState,
         words: String,
     ) -> Result<OperationOutcome, RunnerError> {
-        let outcome = self
-            .held
-            .iter_mut()
-            .find(|held| held.operation == operation)
+        let mut outcome = self
+            .get(operation)
+            .cloned()
             .ok_or_else(|| unavailable(format!("no operation {operation} is held")))?;
         outcome.state = state;
         outcome.at = now_ms();
         outcome.words = words;
-        let changed = outcome.clone();
-        self.persist()?;
-        Ok(changed)
+        self.record(outcome.clone())?;
+        Ok(outcome)
     }
 }
 
@@ -313,8 +405,7 @@ pub(crate) fn accept(
         text: operation.request.text().map(TextDigest::of),
         ended: None,
     };
-    table.operations.held.push(outcome.clone());
-    table.operations.persist()?;
+    table.operations.record(outcome.clone())?;
     feed(table, &outcome);
     if state == OperationState::Refused {
         return Ok(outcome);
@@ -368,12 +459,9 @@ fn stop(table: &mut Table, id: &str, operation: &str) -> Result<OperationOutcome
 pub(crate) fn deliver(table: &mut Table, id: &str) {
     let next = table
         .operations
-        .held
-        .iter()
-        .find(|held| {
-            held.session == id && held.state == OperationState::Accepted && held.request != "stop"
-        })
-        .map(|held| held.operation.clone());
+        .accepted
+        .get_mut(id)
+        .and_then(VecDeque::pop_front);
     let Some(operation) = next else {
         return;
     };
@@ -463,8 +551,11 @@ fn finish(table: &mut Table, operation: &str, result: Result<(), RunnerError>) {
 pub(crate) fn compacting(table: &mut Table, id: &str) {
     let delivered: Vec<(String, OperationState)> = table
         .operations
-        .held
-        .iter()
+        .active
+        .get(id)
+        .into_iter()
+        .flatten()
+        .filter_map(|operation| table.operations.get(operation))
         .filter(|held| {
             held.session == id
                 && held.request == "compact"
@@ -496,8 +587,11 @@ pub(crate) fn compacting(table: &mut Table, id: &str) {
 pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
     let open: Vec<(String, OperationState, String)> = table
         .operations
-        .held
-        .iter()
+        .active
+        .get(id)
+        .into_iter()
+        .flatten()
+        .filter_map(|operation| table.operations.get(operation))
         .filter(|held| held.session == id && held.request != "restart")
         .map(|held| (held.operation.clone(), held.state, held.request.clone()))
         .collect();
@@ -530,21 +624,13 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
             });
         match changed {
             Ok(outcome) => {
-                if let Some(held) = table
-                    .operations
-                    .held
-                    .iter_mut()
-                    .find(|held| held.operation == operation)
-                {
-                    held.ended.clone_from(&outcome.ended);
+                if let Err(error) = table.operations.record(outcome.clone()) {
+                    crate::error::said(&format!("operation {operation}: {error}"));
                 }
                 feed(table, &outcome);
             }
             Err(error) => crate::error::said(&format!("operation {operation}: {error}")),
         }
-    }
-    if let Err(error) = table.operations.persist() {
-        crate::error::said(&format!("the operations record was not written: {error}"));
     }
 }
 
