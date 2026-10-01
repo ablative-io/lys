@@ -26,6 +26,12 @@ use crate::identity::install::services;
 /// A test's result.
 pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+fn create_pipe(path: &Path) -> TestResult {
+    let mode = nix::sys::stat::Mode::from_bits_truncate(0o666);
+    nix::unistd::mkfifo(path, mode)
+        .map_err(|error| format!("upgrade_fixture_pipe_create_failed: {error}").into())
+}
+
 /// Build A's commit.
 pub const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 /// Build B's commit.
@@ -208,8 +214,9 @@ impl Scratch {
             std::fs::write(&rendered.target, rendered.bytes.as_slice())?;
         }
         let hold = work.join("hold");
-        let made = Command::new("mkfifo").arg(&hold).status()?;
-        assert!(made.success(), "mkfifo failed");
+        let made = create_pipe(&hold);
+        assert!(made.is_ok(), "mkfifo failed: {made:?}");
+        made?;
         let units = BINARIES
             .into_iter()
             .zip(["secrets", "identity"])
@@ -337,4 +344,94 @@ pub fn ready_lines(commit: &str) -> Vec<String> {
         .iter()
         .map(|name| format!("{name} {commit} ready"))
         .collect()
+}
+
+#[test]
+fn upgrade_fixture_pipe_needs_no_command_on_path() -> TestResult {
+    let output = Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "identity::upgrade::scratch::upgrade_fixture_pipe_child",
+            "--nocapture",
+        ])
+        .env("PATH", "")
+        .env("LYS_UPGRADE_PIPE_CHILD", "1")
+        .output()?;
+    assert!(
+        output.status.success(),
+        "pipe fixture child failed: {} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("upgrade_fixture_pipe_proved"));
+    Ok(())
+}
+
+#[test]
+fn upgrade_fixture_pipe_child() -> TestResult {
+    use std::io::{Read, Write};
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+
+    use nix::fcntl::{FcntlArg, OFlag, fcntl};
+
+    if std::env::var_os("LYS_UPGRADE_PIPE_CHILD").is_none() {
+        return Ok(());
+    }
+    let scratch = Scratch::laid_out()?;
+    let path = scratch.work().join("hold");
+    assert!(std::fs::metadata(&path)?.file_type().is_fifo());
+    let mut pipe = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(OFlag::O_NONBLOCK.bits())
+        .open(&path)?;
+    let mut writer = std::fs::OpenOptions::new().write(true).open(path)?;
+    let mut byte = [0];
+    let empty = pipe
+        .read(&mut byte)
+        .err()
+        .ok_or("the empty FIFO did not wait for a writer")?;
+    assert_eq!(empty.kind(), std::io::ErrorKind::WouldBlock);
+    fcntl(pipe.as_raw_fd(), FcntlArg::F_SETFL(OFlag::empty()))?;
+    let reader = std::thread::spawn(move || {
+        pipe.read_exact(&mut byte)?;
+        Ok::<_, std::io::Error>(byte)
+    });
+    let sent = writer.write_all(b"x");
+    drop(writer);
+    let read = reader.join();
+    sent?;
+    let received = read.map_err(|payload| {
+        let detail = if let Some(message) = payload.downcast_ref::<&str>() {
+            (*message).to_owned()
+        } else if let Some(message) = payload.downcast_ref::<String>() {
+            message.clone()
+        } else {
+            format!(
+                "non-string panic payload ({:?})",
+                payload.as_ref().type_id()
+            )
+        };
+        format!("upgrade_fixture_pipe_reader_panicked: {detail}")
+    })??;
+    assert_eq!(received, *b"x");
+    println!("upgrade_fixture_pipe_proved");
+    Ok(())
+}
+
+#[test]
+fn upgrade_fixture_pipe_refuses_to_replace_an_existing_file() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("hold");
+    std::fs::write(&path, b"retained")?;
+    let error = create_pipe(&path)
+        .err()
+        .ok_or("pipe creation replaced an existing file")?;
+    assert!(
+        error
+            .to_string()
+            .contains("upgrade_fixture_pipe_create_failed")
+    );
+    assert_eq!(std::fs::read(path)?, b"retained");
+    Ok(())
 }
