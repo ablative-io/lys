@@ -1,21 +1,21 @@
 #!/bin/sh
-# The gates lys runs before any commit: CLAUDE.md's "Gates before any commit" list,
-# and the ast-grep scan of sgconfig.yml's rules. repo_land runs this file as the whole gate when it stands here. Every leg
-# runs even after a red one, so the log covers all of them; the exit status is red if
-# any leg was.
+# Every leg finishes so a failure carries every independent finding.
+# Independent checks run together after the shared compile checks.
 set -u
+PATH="$(pwd -P)/target/land-tools/bin:$PATH"
+export PATH
 status=0
 leg() {
+  started=$(date +%s)
   echo "--- $* ---"
   "$@"
   code=$?
   echo "--- status $code: $* ---"
+  echo "--- seconds $(( $(date +%s) - started )): $* ---"
   [ "$code" -eq 0 ] || status=1
 }
-# The identity leg runs the container-backed identity targets, which are declared
-# test = false so cargo test --workspace stays hermetic. It runs on every lys landing
-# and is never scoped away. Without a container runtime it fails by name; it never
-# skips. It lints every identity target before it runs any of them.
+# Container-backed targets are selected explicitly because the workspace suite
+# excludes them by default. Missing prerequisites fail rather than skip a test.
 identity_leg() {
   if ! docker info >/dev/null 2>&1; then
     echo "container_runtime_missing: the identity leg needs a container runtime answering docker info"
@@ -30,7 +30,7 @@ identity_leg() {
     echo "identity_lint_failed: an identity target has a lint warning; no identity test was run"
     return 1
   fi
-  cargo test -p lys --all-features --no-fail-fast --test 'identity_*'
+  cargo nextest run -p lys --all-features --tests --no-fail-fast --retries 0 --no-tests fail -E 'binary(~identity_)'
 }
 # The surface leg installs dependencies, checks types and runs the identity tests:
 # npm ci, npm run typecheck and npm test,
@@ -44,15 +44,48 @@ surface_leg() {
   fi
   (cd surface/identity && npm ci && npm run typecheck && npm test)
 }
-leg sh scripts/design/gate.sh
-leg cargo fmt --check
+parallel() {
+  job_index=$((job_index + 1))
+  (status=0; leg "$@"; exit "$status") > "$gate_logs/$job_index" 2>&1 &
+  gate_pids="$gate_pids $!"
+}
+finish_parallel() {
+  finished_index=0
+  for gate_pid in $gate_pids; do
+    finished_index=$((finished_index + 1))
+    if wait "$gate_pid"; then
+      :
+    else
+      status=1
+    fi
+    if ! cat "$gate_logs/$finished_index"; then
+      echo "gate_log_unreadable: parallel leg $finished_index did not yield its log"
+      status=1
+    fi
+  done
+}
+source_changed() {
+  if ! git diff --quiet HEAD --; then
+    echo "source_changed: formatting changed tracked source"
+    return 1
+  fi
+}
+leg cargo fmt --all
+leg source_changed
 leg cargo clippy --all-targets --all-features -- -D warnings
 leg cargo clippy --all-targets -- -D warnings
-leg cargo test --workspace --all-features --no-fail-fast
-leg cargo doc --no-deps --all-features
-leg cargo doc --no-deps
-leg ast-grep scan --config sgconfig.yml
-leg sh scripts/file-length.sh
+mkdir -p target || exit 1
+gate_logs=$(mktemp -d target/land-logs.XXXXXX) || exit 1
+trap 'rm -rf "$gate_logs"' EXIT
+job_index=0
+gate_pids=""
+parallel sh scripts/design/gate.sh
+parallel cargo doc --no-deps --all-features
+parallel ast-grep scan --config sgconfig.yml
+parallel sh scripts/file-length.sh
+parallel surface_leg
+leg cargo nextest run --workspace --all-features --no-fail-fast --retries 0 --no-tests fail
+leg cargo test --doc --workspace --all-features
 leg identity_leg
-leg surface_leg
+finish_parallel
 exit "$status"
