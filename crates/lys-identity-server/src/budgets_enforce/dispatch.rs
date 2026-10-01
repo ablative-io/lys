@@ -46,15 +46,15 @@ pub(super) fn notice(
 }
 
 pub(super) struct Dispatch<'a> {
-    collection: &'a Limits,
-    limit: &'a Limit,
-    index: usize,
-    figure: Option<&'a Number>,
-    missing: Option<&'a str>,
-    account: Option<&'a str>,
-    act: Act,
-    is_warning: bool,
-    mark: &'a str,
+    pub(super) collection: &'a Limits,
+    pub(super) limit: &'a Limit,
+    pub(super) index: usize,
+    pub(super) figure: Option<&'a Number>,
+    pub(super) missing: Option<&'a str>,
+    pub(super) account: Option<&'a str>,
+    pub(super) act: Act,
+    pub(super) is_warning: bool,
+    pub(super) mark: &'a str,
 }
 
 pub(super) fn dispatch(
