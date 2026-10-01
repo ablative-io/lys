@@ -7,6 +7,11 @@ use crate::error::RunnerError;
 use crate::tracking::{Figures, Reading, UsageRecord};
 use crate::tracking_store::{Body, SourceState};
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static BEFORE_END: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
 pub(crate) struct PendingStatus {
     record: UsageRecord,
     path: String,
@@ -186,11 +191,15 @@ impl Sessions {
             };
             let pending =
                 PendingStatus::new(record.clone(), &source, session.pending_status.as_ref());
-            let leader = crate::session::window_limit(
-                &mut table,
-                id,
-                std::slice::from_ref(&Body::Usage(record)),
-            );
+            let leader = if pending.is_ok() {
+                crate::session::window_limit(
+                    &mut table,
+                    id,
+                    std::slice::from_ref(&Body::Usage(record)),
+                )
+            } else {
+                None
+            };
             let message = pending.and_then(|pending| {
                 table
                     .sessions
@@ -203,13 +212,23 @@ impl Sessions {
         } else {
             (Ok("the snapshot repeats the last one held"), None)
         };
-        drop(table);
-        if let Some(leader) = result.1 {
-            crate::pty::end(&leader)?;
+        let stopping = result.1.is_some();
+        if stopping {
+            flush_status(&mut table, id)?;
         }
-        if flushed {
+        drop(table);
+        if stopping || flushed {
             self.writer.barrier()?;
             self.wake();
+        }
+        if let Some(leader) = result.1 {
+            #[cfg(test)]
+            BEFORE_END.with(|probe| {
+                if let Some(probe) = probe.borrow_mut().take() {
+                    probe();
+                }
+            });
+            crate::pty::end(&leader)?;
         }
         result.0.map(str::to_owned)
     }

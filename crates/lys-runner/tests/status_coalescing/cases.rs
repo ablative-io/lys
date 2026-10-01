@@ -105,6 +105,52 @@ fn tick(
 }
 
 #[test]
+fn a_full_window_is_on_disk_before_the_leader_is_signalled() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let sessions = tracked(dir.path())?;
+    sessions
+        .lock()
+        .sessions
+        .get_mut("session")
+        .ok_or("session missing")?
+        .rotation = Some(crate::rotation::RotationState::new(
+        crate::rotation::Rotation {
+            accounts: vec!["account".to_owned()],
+            variable: "ACCOUNT".to_owned(),
+            limit: crate::rotation::Limit::PlanWindow,
+            resume_arguments: Vec::new(),
+        },
+    )?);
+    let path = dir.path().join("state/feed.jsonl");
+    let (observed, evidence) = std::sync::mpsc::channel();
+    super::status::BEFORE_END.with(|probe| {
+        *probe.borrow_mut() = Some(Box::new(move || {
+            observed
+                .send(std::fs::read_to_string(&path))
+                .expect("probe receiver left");
+        }));
+    });
+    let result = sessions.collect(
+        "session",
+        &Collected::StatusLine {
+            input: serde_json::json!({
+                "session_id":"native", "rate_limits":{"five_hour":{"used_percentage":100,
+                "resets_at":crate::session::now_ms()/1000 + 3600}}
+            }),
+        },
+    );
+    let disk = evidence.recv()?;
+    sessions.stop_all();
+    result?;
+    let records = disk?
+        .lines()
+        .map(serde_json::from_str::<crate::tracking_store::FeedEntry>)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert!(records.iter().any(|record| matches!(&record.body, Body::Usage(usage) if usage.measure == crate::tracking::Measure::Snapshot && usage.figures.plan_windows.iter().any(|window| window.used_percent == serde_json::Number::from(100)))));
+    Ok(())
+}
+
+#[test]
 fn overflow_is_named_and_leaves_the_prior_snapshot_available() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let sessions = tracked(dir.path())?;
