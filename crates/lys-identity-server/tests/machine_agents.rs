@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
-use lys_identity::OperationId;
+use lys_identity::{AgentId, OperationId};
 use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::network_store::{Machine, NetworkStore, TeamRecorded};
 use lys_identity_server::runner_client::RunnerRecord;
@@ -223,6 +223,33 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
         unchanged(&table.path, &table.before, inode)?;
     }
 
+    for (machine, agent, status, name) in [
+        (
+            table.machine.id.clone(),
+            AgentId::generate()?.to_string(),
+            404,
+            "AgentNotVisible",
+        ),
+        (
+            table.machine.id.clone(),
+            table.seeded.people[0].id.to_string(),
+            400,
+            "IdentifierMalformed",
+        ),
+        (operation()?, table.agent(), 404, "MachineUnknown"),
+    ] {
+        let answer = table
+            .service
+            .post(
+                &format!("/network/machines/{machine}/agents"),
+                Some(&table.ada),
+                &json!({"operation": operation()?, "agent": agent, "allow": true}),
+            )
+            .await?;
+        refused(&answer, status, name);
+        unchanged(&table.path, &table.before, inode)?;
+    }
+
     let first = table.sent(&path, &grant).await?;
     assert_eq!(first["recorded"]["operation"], grant["operation"]);
     assert_eq!(first["recorded"]["machine"], table.machine.id);
@@ -296,6 +323,20 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     refused(&answer, 409, "MachineAgentsReused");
     unchanged(&table.path, &written, inode)?;
     table.creation_replays(true).await?;
+    table.profile().await?;
+    let admitted = table
+        .service
+        .post(
+            &format!("/agents/{}/start-command", table.agent()),
+            Some(&table.ada),
+            &json!({"operation": operation()?, "machine": table.machine.id}),
+        )
+        .await?;
+    refused(&admitted, 503, "SecretsUnavailable");
+    assert_ne!(
+        admitted.1["refusal"], "MachineNotForAgent",
+        "grant did not admit past placement"
+    );
 
     let removal = json!({"operation": operation()?, "agent": table.agent(), "allow": false});
     let removed = table.sent(&path, &removal).await?;
@@ -318,7 +359,6 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     assert_eq!(table.sent(&path, &removal).await?, removed);
     unchanged(&table.path, &bytes, inode)?;
     table.creation_replays(false).await?;
-    table.profile().await?;
     let answer = table
         .service
         .post(
@@ -345,6 +385,24 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
         held["machines"][0]["may_reach"],
         json!(table.machine.may_reach)
     );
+    table
+        .sent(
+            &format!("/network/machines/{}/retire", table.other),
+            &json!({}),
+        )
+        .await?;
+    let bytes = std::fs::read(&table.path)?;
+    let inode = std::fs::metadata(&table.path)?.ino();
+    let retired = table
+        .service
+        .post(
+            &format!("/network/machines/{}/agents", table.other),
+            Some(&table.ada),
+            &json!({"operation": operation()?, "agent": table.agent(), "allow": true}),
+        )
+        .await?;
+    refused(&retired, 409, "MachineRetired");
+    unchanged(&table.path, &bytes, inode)?;
     Ok(())
 }
 
