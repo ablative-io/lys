@@ -283,7 +283,7 @@ async fn an_agent_without_a_grant_is_refused_on_teams() -> TestResult {
     ] {
         let (status, answer) = table.signed(&path, &body, true).await?;
         assert_eq!(
-            status, 403,
+            status, 401,
             "a signed agent cannot carry an administrator cookie: {answer}"
         );
         assert_eq!(answer["refusal"], "AgentSignatureRefused", "{answer}");
