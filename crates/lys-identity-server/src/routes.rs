@@ -300,7 +300,7 @@ pub(crate) async fn register_agent(
             };
             let target = registration_target(own, body.answers_to.as_deref(), true)?;
             let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
-            crate::reporting_api::registered(answer).map(Json)
+            crate::reporting_api::registered(&answer).map(Json)
         });
     }
     let (op, profile) = (
@@ -313,7 +313,7 @@ pub(crate) async fn register_agent(
         let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
         let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
         let answer = directory.register_reporting_agent(actor, op, target, profile, now())?;
-        crate::reporting_api::registered(answer).map(Json)
+        crate::reporting_api::registered(&answer).map(Json)
     })
 }
 

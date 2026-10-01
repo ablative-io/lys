@@ -101,7 +101,7 @@ impl IntoResponse for ServerError {
                     body["state"] = serde_json::json!(state.to_string());
                 }
                 IdentityError::AnswersToUnknown { identity } => {
-                    body["identity"] = serde_json::json!(identity)
+                    body["identity"] = serde_json::json!(identity);
                 }
                 _ => {}
             }

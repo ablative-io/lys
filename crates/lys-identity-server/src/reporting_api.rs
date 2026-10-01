@@ -22,7 +22,7 @@ pub(crate) struct ReportsToBody {
 }
 
 pub(crate) fn registered(
-    answer: lys_identity::directory::reporting::Registered,
+    answer: &lys_identity::directory::reporting::Registered,
 ) -> Result<AgentRegistered, ServerError> {
     Ok(AgentRegistered {
         agent: answer.agent.to_string(),

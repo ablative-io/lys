@@ -344,7 +344,7 @@ impl Projection {
                 self.register_reporting(identity, record, *reports_to)?;
             }
             Change::ReportsToChanged { to, .. } => {
-                self.apply_reporting_change(identity, *to, index)?
+                self.apply_reporting_change(identity, *to, index)?;
             }
             Change::ChangeProfile { profile } => {
                 let record = self.held(identity)?;
