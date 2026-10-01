@@ -112,16 +112,66 @@ describe('Add and run on the first computer', () => {
     expect(requests.filter((path) => path === '/network')).toHaveLength(1);
   });
 
-  it('offers its one button when a computer is already in use', async () => {
+  it('names the served repair steps instead of adding a second roleless computer', async () => {
     const server = service();
     const existing = { id: 'machine-existing', name: 'Front desk', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [], named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: 1 };
     server.routes['/network'] = ok({ machines: [existing], reports_served: true });
     const { posted } = await open(server.routes);
-    await names();
-    const button = $('form button[type="submit"]') as HTMLButtonElement;
-    expect(button.disabled).toBe(false);
-    expect(button.textContent).toBe('Add Clover and run it on this computer');
+    await type($('[name="display_name"]'), 'Clover');
+    expect($('[name="computer_name"]')).toBeNull();
+    expect($('form button[type="submit"]')?.textContent).not.toContain('and run');
+    expect(document.body.textContent).toContain('Front desk runs only the agents named when it was added. To add and run from here, add this computer again in Network with a role, then retire Front desk.');
+    expect($('a[href="#/network"]')).not.toBeNull();
     expect(posted).toEqual([]);
+    await submit();
+    expect(posted.filter((entry) => entry.path === '/network/machines' || entry.path.endsWith('/start-command'))).toEqual([]);
+  });
+
+  it.each([
+    { grantTemplates: [] },
+    { grantTemplates: [{ resource: { kind: 'project', id: 'records' }, relation: 'editor', days: null }] },
+  ])('does not assign a computer role when its actual grants are not served', async ({ grantTemplates }) => {
+    const server = service();
+    const role = 'role-' + 'a'.repeat(32);
+    const existing = { id: 'op-' + 'b'.repeat(32), name: 'Front desk', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [role], may_reach: [], named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: 1 };
+    server.routes['/network'] = ok({ machines: [existing], reports_served: true });
+    server.routes['/network/machines/' + existing.id + '/runner'] = ok({ machine: existing.id, runner: { kind: 'lys' } });
+    server.routes['/roles'] = ok({ roles: [{ id: role, name: 'Computer operator', latest: 1, policy: 'stays_until_moved', holders: [], versions: [{ number: 1, responsibilities: '', goals: '', practice: '', profile: '', grant_templates: grantTemplates, note: '', made_by: ADA, made_at: 1 }] }] });
+    const { posted } = await open(server.routes);
+    await type($('[name="display_name"]'), 'Clover');
+    expect($('[name="computer_name"]')).toBeNull();
+    expect($('form button[type="submit"]')?.textContent).not.toContain('and run');
+    expect(document.body.textContent).toContain("Lys cannot confirm what Front desk's roles grant, so it won't give one to Clover. Add the agent here, then start it from its page once it is admitted to Front desk.");
+    expect(document.body.textContent).not.toContain('Front desk runs only the agents named');
+    expect(posted).toEqual([]);
+    await submit();
+    expect(posted.filter((entry) => entry.path === '/network/machines' || entry.path.endsWith('/holders') || entry.path.endsWith('/start-command'))).toEqual([]);
+  });
+
+  it('keeps the typed name path when every recorded computer is retired', async () => {
+    const server = service();
+    server.routes['/network'] = ok({ machines: [{ id: 'op-' + 'c'.repeat(32), name: 'Old computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [], named_by: ADA, named_at: 1, state: 'retired', retired_at: 1, last_report_at: null }], reports_served: true });
+    const { posted } = await open(server.routes);
+    expect(($('[name="computer_name"]') as HTMLInputElement).value).toBe('');
+    await names(); await submit();
+    expect(posted).toHaveLength(7);
+    expect(posted[4].body).toMatchObject({ name: 'Ward computer', may_run: [agent] });
+    expect(document.body.textContent).toContain('Running, as its runner last reported');
+  });
+
+  it('holds an earlier planned computer addition when another computer is now in use', async () => {
+    const server = service('profile');
+    await open(server.routes); await names(); await submit();
+    const saved = sessionStorage.getItem(key);
+    expect(saved).not.toBeNull();
+    server.routes['/network'] = ok({ machines: [{ id: 'op-' + 'd'.repeat(32), name: 'Front desk', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [], named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: 1 }], reports_served: true });
+    const next = await remount(server.routes);
+    expect(document.body.textContent).toContain('RetainedComputerAdditionHeld');
+    expect(document.body.textContent).toContain('This saved request would add a second computer; it has not been sent.');
+    await submit();
+    expect(next.posted).toEqual([]);
+    expect(sessionStorage.getItem(key)).toBe(saved);
+    expect(location.hash).toBe('#/agents/new');
   });
 
   it('records all seven stages in order and lands on the real running session', async () => {
