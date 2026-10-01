@@ -40,8 +40,8 @@ pub(crate) async fn save(
     let Json(body) = body.map_err(|_error| ServerError::RequestMalformed {
         reason: "expected the issued client_secret and no other fields".to_owned(),
     })?;
-    with_apps(&state, |apps| {
-        acting(&state, apps.held(), &headers)?.administrator()?;
+    with_apps(&state, |apps, projection| {
+        acting(&state, apps.held(), &headers, projection)?.administrator()?;
         app_acting(apps.held(), &app, &sha256_hex(&body.client_secret))?;
         Ok(())
     })?;
@@ -125,8 +125,8 @@ pub(crate) fn pending(
     id: &str,
     operation: &str,
 ) -> Result<bool, ServerError> {
-    with_apps(state, |apps| {
-        acting(state, apps.held(), headers)?.administrator()?;
+    with_apps(state, |apps, projection| {
+        acting(state, apps.held(), headers, projection)?.administrator()?;
         if let Some(line) = apps.held().operation(operation) {
             return match line {
                 Line::Approved(approved) if approved.app == id => Ok(false),

@@ -77,19 +77,22 @@ pub(crate) fn with_policies<T>(
 }
 
 /// The policy a launch of `agent` carries: its latest version with the
-/// digest the runner checks, or none when it has none or the configuration
-/// keeps no policies.
+/// digest the runner checks. A missing policy refuses the launch.
 pub(crate) fn launch_policy(
     state: &AppState,
     agent: &str,
 ) -> Result<Option<Box<lys_runner::admitted::Admitted>>, ServerError> {
     if state.policies.is_none() {
-        return Ok(None);
+        return Err(ServerError::AgentHasNoPolicy {
+            agent: agent.to_owned(),
+        });
     }
-    let latest = with_policies(state, |store| Ok(store.held().latest(agent).cloned()))?;
-    latest
-        .map(|policy| lys_runner::admitted::Admitted::of(policy).map(Box::new))
-        .transpose()
+    let latest = with_policies(state, |store| Ok(store.held().latest(agent).cloned()))?
+        .ok_or_else(|| ServerError::AgentHasNoPolicy {
+            agent: agent.to_owned(),
+        })?;
+    lys_runner::admitted::Admitted::of(latest)
+        .map(|policy| Some(Box::new(policy)))
         .map_err(|error| ServerError::PolicyUnavailable {
             reason: error.to_string(),
         })

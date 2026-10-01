@@ -36,7 +36,7 @@ async fn configuration(
     headers: HeaderMap,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let issuer = crate::connections_api::origin(state.oidc.issuer(), "sign-in provider")?;
     Ok(Json(json!({
         "source": "startup_configuration",
@@ -92,7 +92,7 @@ async fn set_zone(
     body: Result<Json<ZoneBody>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<crate::configuration_store::Zone>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|error| {
         ServerError::Budget(BudgetError::BudgetRefused {
             refusal: "ConfigurationMalformed",

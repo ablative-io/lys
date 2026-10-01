@@ -539,7 +539,7 @@ async fn name_runner(
     given: Result<Json<RunnerBody>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let runner = body(given)?.runner.map(RunnerRecord::checked).transpose()?;
     with_network(&state, |store| store.name_runner(&id, runner.clone()))?;
     Ok(Json(json!({ "machine": id, "runner": runner })))

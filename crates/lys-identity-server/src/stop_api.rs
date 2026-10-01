@@ -150,7 +150,7 @@ fn admitted(
     id: &str,
 ) -> Result<(AgentId, String, LifecycleState), ServerError> {
     let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
-    let administrator = state.admission.administrator(actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, actor)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, actor)?;

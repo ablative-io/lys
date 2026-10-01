@@ -181,8 +181,8 @@ fn malformed(reason: impl Into<String>) -> ServerError {
 
 /// Who acts on a bench: the administrator for any app, an app for its own.
 fn bencher(state: &AppState, headers: &HeaderMap, app: Option<&str>) -> Result<By, ServerError> {
-    with_apps(state, |apps| {
-        let who = acting(state, apps.held(), headers)?;
+    with_apps(state, |apps, projection| {
+        let who = acting(state, apps.held(), headers, projection)?;
         match &who {
             Acting::Administrator(_) => Ok(who.by()),
             Acting::App { app: own, .. } if app.is_none_or(|app| app == own) => Ok(who.by()),

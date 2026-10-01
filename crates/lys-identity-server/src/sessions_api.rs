@@ -203,7 +203,7 @@ async fn person_sessions(
     Path(id): Path<String>,
 ) -> Result<Json<SessionsView>, ServerError> {
     let (actor, current) = caller(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let person = PersonId::from_str(&id)?;
     sessions_of(&state, &current, |projection| {
         named_person(projection, person)
@@ -221,7 +221,7 @@ async fn end_persons(
     Path((id, session)): Path<(String, String)>,
 ) -> Result<Response, ServerError> {
     let (actor, current) = caller(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let person = PersonId::from_str(&id)?;
     end_session(&state, &actor, &current, &session, |projection| {
         named_person(projection, person)

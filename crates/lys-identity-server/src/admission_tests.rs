@@ -22,7 +22,7 @@ fn an_unavailable_administrator_store_is_refused_by_name() -> Result<(), Box<dyn
     assert!(failure.is_err());
     let actor = Actor::new(login, Provenance::new(AuthMethod::Oidc, 1));
     let refused = admission
-        .administrator(&actor)
+        .is_administrator(&lys_identity::projection::Projection::default(), &actor)
         .err()
         .ok_or("unavailable store admitted administrator")?;
     assert_eq!(refused.name(), "DirectoryUnavailable");

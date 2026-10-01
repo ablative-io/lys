@@ -170,7 +170,7 @@ async fn check(
 ) -> Result<Json<SchemaCheck>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     with_grants(&state, |judged| {
-        let who = acting(&state, judged.apps.held(), &headers)?;
+        let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         may_change(&who, &id)?;
         let (old, version) = current(judged.apps, &id)?;
         let new = AppSchema::parse(&id, &body.schema).map_err(AppError::from)?;
@@ -196,7 +196,7 @@ async fn change(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
     with_grants(&state, |judged| {
-        let who = acting(&state, judged.apps.held(), &headers)?;
+        let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         may_change(&who, &id)?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
             return answer_kept(judged.apps, &id, &operation, &kept);
@@ -287,7 +287,7 @@ async fn approve(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
     with_grants(&state, |judged| {
-        let who = acting(&state, judged.apps.held(), &headers)?;
+        let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         who.administrator()?;
         if let Some(kept) = judged.apps.held().operation(&operation) {
             return answer_kept(judged.apps, &id, &operation, &kept);
@@ -330,8 +330,8 @@ async fn decline(
 ) -> Result<Json<AppView>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    crate::apps_api::with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    crate::apps_api::with_apps(&state, |apps, projection| {
+        let who = acting(&state, apps.held(), &headers, projection)?;
         who.administrator()?;
         apps.keep(Line::ChangeDeclined(Decided {
             operation,
@@ -351,8 +351,8 @@ async fn version(
     Path(id): Path<String>,
     Query(query): Query<VersionQuery>,
 ) -> Result<Json<SchemaVersionView>, ServerError> {
-    crate::apps_api::with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    crate::apps_api::with_apps(&state, |apps, projection| {
+        let who = acting(&state, apps.held(), &headers, projection)?;
         let unknown = || AppError::AppUnknown { app: id.clone() };
         let app = apps.app(&id).ok_or_else(unknown)?;
         let visible = match &who {
@@ -396,8 +396,8 @@ async fn place(
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let child = Resource::new(&body.child.kind, &body.child.id)?;
     let parent = Resource::new(&body.parent.kind, &body.parent.id)?;
-    crate::apps_api::with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    crate::apps_api::with_apps(&state, |apps, projection| {
+        let who = acting(&state, apps.held(), &headers, projection)?;
         may_change(&who, &id)?;
         for kind in [child.kind(), parent.kind()] {
             if owner_of(kind) != id {

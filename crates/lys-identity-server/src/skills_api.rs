@@ -103,7 +103,7 @@ async fn keep(
     body: Result<Json<SkillBody>, JsonRejection>,
 ) -> Result<Json<SkillsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let name = name(&body.name)?;
     if body.text.trim().is_empty() || body.text.len() > TEXT_MAX || body.text.contains('\0') {

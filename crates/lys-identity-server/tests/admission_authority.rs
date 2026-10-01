@@ -21,7 +21,11 @@ fn actor() -> Result<Actor, Box<dyn Error>> {
 fn a_configured_login_without_a_person_has_no_administrator_authority() -> TestResult {
     let actor = actor()?;
     let admission = Admission::new(Some(actor.binding().clone()), actor.binding().clone());
-    assert!(admission.administrator(&actor).is_err());
+    assert!(
+        admission
+            .administrator(&lys_identity::projection::Projection::default(), &actor)
+            .is_err()
+    );
     Ok(())
 }
 
@@ -37,7 +41,7 @@ fn a_suspended_administrator_has_no_administrator_authority() -> TestResult {
         Profile::new("Authority")?,
         1,
     )?;
-    admission.administrator(&actor)?;
+    admission.administrator(directory.projection()?, &actor)?;
     directory.transition(
         actor.clone(),
         OperationId::generate()?,
@@ -47,7 +51,7 @@ fn a_suspended_administrator_has_no_administrator_authority() -> TestResult {
         2,
     )?;
     let error = admission
-        .administrator(&actor)
+        .administrator(directory.projection()?, &actor)
         .err()
         .ok_or("suspended administrator admitted")?;
     assert_eq!(error.name(), "inactive");

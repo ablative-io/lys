@@ -141,6 +141,7 @@ impl ServerError {
             | Self::TokenUnknown => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled => StatusCode::TOO_MANY_REQUESTS,
             Self::Inactive { .. }
+            | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
             | Self::NoPerson
             | Self::SetupRequired
