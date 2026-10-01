@@ -309,3 +309,27 @@ fn settled_crossings_do_not_multiply_pending_work_after_reopen() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn an_agent_retry_visits_only_its_pending_crossings() -> TestResult {
+    let mut held = crossing_history()?;
+    held.hold(Leaf::Used(Usage {
+        event: "other-pending".to_owned(),
+        agent: "unrelated".to_owned(),
+        crossed: vec![crossing("other-pending".to_owned(), "unrelated")],
+        ..Usage::default()
+    }))?;
+    reset();
+    assert_eq!(held.crossings.unsettled_for("covered").len(), 1);
+    assert_eq!(count(Work::Crossing), 1);
+    held.hold(Leaf::Acted(crate::budgets_crossing::Acted {
+        operation: "current".to_owned(),
+        stands: crate::budgets_crossing::Stands::Confirmed,
+        words: "exit confirmed".to_owned(),
+        at_ms: NOW,
+        ended: None,
+    }))?;
+    assert!(held.crossings.unsettled_for("covered").is_empty());
+    assert_eq!(held.crossings.unsettled_for("unrelated").len(), 1);
+    Ok(())
+}
