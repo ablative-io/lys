@@ -8,6 +8,21 @@ impl<P: PermissionCheck> Broker<P> {
     /// # Errors
     /// Refuses conflicting entries and propagates store/audit failures.
     pub fn prepare_app(&mut self, app: &str, owner: &str) -> Result<String, SecretsError> {
+        lys_identity::grants::schema::app_id(app).map_err(|error| match error {
+            lys_identity::grants::schema::SchemaError::AppIdInvalid { id, reason } => {
+                SecretsError::InvalidName {
+                    what: "app",
+                    name: id,
+                    reason,
+                }
+            }
+            error @ lys_identity::grants::schema::SchemaError::Invalid { .. } => {
+                SecretsError::Encoding {
+                    context: "validate app id",
+                    reason: error.to_string(),
+                }
+            }
+        })?;
         let prefix = format!("lys-app-{owner}-{app}");
         let client = format!("{prefix}-client");
         let value = if let Some(entry) = self.store.entry(&client) {

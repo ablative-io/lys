@@ -139,6 +139,7 @@ pub(crate) struct Session {
     pub(crate) ending: bool,
     pub(crate) guard: Guard,
     pub(crate) follower: Option<mpsc::Sender<Wake>>,
+    pub(crate) pending_status: Option<crate::collector::status::PendingStatus>,
 }
 
 impl Session {
@@ -314,6 +315,7 @@ impl Sessions {
                     ending: false,
                     guard: Guard::default(),
                     follower: None,
+                    pending_status: None,
                 },
             );
         }
@@ -493,6 +495,7 @@ impl Sessions {
                 idle: true,
             },
             follower: None,
+            pending_status: None,
         };
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;
