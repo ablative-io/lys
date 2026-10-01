@@ -3,6 +3,11 @@
 //! and cursors belong to one route and its search and team filters.
 
 use std::collections::BTreeSet;
+use std::ops::Bound;
+
+#[cfg(test)]
+#[path = "list_page_tests.rs"]
+mod tests;
 
 use axum::extract::Query;
 use axum::extract::rejection::QueryRejection;
@@ -71,6 +76,8 @@ fn subtree(teams: &[Team], root: &str) -> Result<BTreeSet<String>, ServerError> 
     loop {
         let before = ids.len();
         for team in teams {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Team);
             if team
                 .parent
                 .as_ref()
@@ -168,6 +175,37 @@ impl Page {
             .as_deref()
             .map(|root| with_teams(state, |store| subtree(store.teams(), root)))
             .transpose()
+    }
+
+    pub(crate) fn after(&self) -> Bound<&str> {
+        self.last
+            .as_deref()
+            .map_or(Bound::Unbounded, Bound::Excluded)
+    }
+
+    pub(crate) fn filtered(&self) -> bool {
+        self.query.q.is_some() || self.query.team.is_some()
+    }
+
+    pub(crate) fn select<'a, T: 'a, V>(
+        &self,
+        rows: impl Iterator<Item = &'a T>,
+        total: Option<usize>,
+        matches: impl Fn(&T) -> Result<bool, ServerError>,
+        id: impl Fn(&T) -> &str,
+        view: impl Fn(&T) -> Result<V, ServerError>,
+    ) -> Result<(Vec<V>, Totals), ServerError> {
+        let mut selected = Vec::new();
+        for row in rows {
+            if matches(row)? {
+                selected.push((id(row).to_owned(), view(row)?));
+            }
+        }
+        let mut totals = self.finish(&mut selected, |row| &row.0)?;
+        if let Some(total) = total {
+            totals.total = total;
+        }
+        Ok((selected.into_iter().map(|(_, view)| view).collect(), totals))
     }
 
     pub(crate) fn finish<T>(

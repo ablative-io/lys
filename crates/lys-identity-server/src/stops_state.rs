@@ -75,21 +75,30 @@ struct Sealed {
 impl Held {
     /// The stop kept under `operation`.
     pub fn operation(&self, operation: &str) -> Option<&Stop> {
-        self.stops.iter().find(|stop| stop.operation == operation)
+        self.stops.iter().find(|stop| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Stop);
+            stop.operation == operation
+        })
     }
 
     /// Every stop kept on `agent`, in the order kept.
     pub fn of_agent<'a>(&'a self, agent: &'a str) -> impl Iterator<Item = &'a Stop> + 'a {
-        self.stops.iter().filter(move |stop| stop.agent == agent)
+        self.stops.iter().filter(move |stop| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Stop);
+            stop.agent == agent
+        })
     }
 
     /// Fold one stop. A second stop under an operation already kept is
     /// refused, since every kept stop was checked against what came before.
     pub fn hold(&mut self, stop: Stop) -> Result<(), String> {
-        let held = self
-            .stops
-            .iter_mut()
-            .find(|held| held.operation == stop.operation);
+        let held = self.stops.iter_mut().find(|held| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Stop);
+            held.operation == stop.operation
+        });
         match held {
             None => self.stops.push(stop),
             Some(asked) if !asked.done && stop.done && asked.same_words(&stop) => *asked = stop,

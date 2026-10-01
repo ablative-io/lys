@@ -55,12 +55,20 @@ struct Sealed {
 impl Held {
     /// The decision recorded under `operation`.
     pub fn operation(&self, operation: &str) -> Option<&Kept> {
-        self.kept.iter().find(|kept| kept.operation == operation)
+        self.kept.iter().find(|kept| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Review);
+            kept.operation == operation
+        })
     }
 
     /// The latest decision to keep `grant`.
     pub fn last_for(&self, grant: &str) -> Option<&Kept> {
-        self.kept.iter().rev().find(|kept| kept.grant == grant)
+        self.kept.iter().rev().find(|kept| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Review);
+            kept.grant == grant
+        })
     }
 
     /// Fold one decision. A second decision under an operation already

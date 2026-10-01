@@ -112,14 +112,18 @@ struct Sealed {
 impl Held {
     /// The service account named `id`.
     pub fn account(&self, id: &str) -> Option<&Account> {
-        self.accounts
-            .iter()
-            .find(|account| account.created.id == id)
+        self.accounts.iter().find(|account| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Account);
+            account.created.id == id
+        })
     }
 
     /// The line kept under `operation`, whichever kind it is.
     pub fn operation(&self, operation: &str) -> Option<Line> {
         self.accounts.iter().find_map(|account| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Account);
             if account.created.id == operation {
                 return Some(Line::Created(account.created.clone()));
             }

@@ -1,0 +1,105 @@
+//! Paging bounds view construction without changing exact filtered totals.
+
+use std::cell::Cell;
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::ops::Bound;
+
+use axum::extract::Query;
+
+use super::{ListQuery, Page, subtree};
+use crate::folded_work::{Work, count, reset};
+
+type TestResult = Result<(), Box<dyn Error>>;
+
+fn page(q: Option<String>, after: Option<String>) -> Result<Page, Box<dyn Error>> {
+    Page::read(
+        Ok(Query(ListQuery {
+            q,
+            after,
+            limit: Some(5),
+            team: None,
+        })),
+        "/network",
+    )?
+    .ok_or_else(|| "no page".into())
+}
+
+#[test]
+fn unfiltered_page_reads_only_limit_plus_one_index_rows() -> TestResult {
+    let rows: BTreeMap<_, _> = (0..512)
+        .map(|n| (format!("id-{n:04}"), format!("id-{n:04}")))
+        .collect();
+    let mut query = page(None, None)?;
+    for first in [0, 5] {
+        let touched = Cell::new(0);
+        let built = Cell::new(0);
+        let (selected, totals) = query.select(
+            rows.range::<str, _>((query.after(), Bound::Unbounded))
+                .map(|(_, row)| row)
+                .inspect(|_| touched.set(touched.get() + 1)),
+            Some(rows.len()),
+            |_| Ok(true),
+            String::as_str,
+            |row| {
+                built.set(built.get() + 1);
+                Ok(row.clone())
+            },
+        )?;
+        assert_eq!(totals.total, 512);
+        assert_eq!(selected[0], format!("id-{first:04}"));
+        assert_eq!(selected.len(), 5);
+        assert_eq!(touched.get(), 6);
+        assert_eq!(built.get(), 6);
+        query = page(None, totals.next)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn filtered_page_counts_exactly_and_builds_only_limit_plus_one_views() -> TestResult {
+    let rows: BTreeMap<_, _> = (0..512)
+        .map(|n| (format!("id-{n:04}"), format!("id-{n:04}")))
+        .collect();
+    let query = page(Some("id-0".to_owned()), None)?;
+    assert!(query.filtered());
+    let built = Cell::new(0);
+    let (selected, totals) = query.select(
+        rows.values(),
+        None,
+        |row| Ok(query.matches([row.as_str()])),
+        String::as_str,
+        |row| {
+            built.set(built.get() + 1);
+            Ok(row.clone())
+        },
+    )?;
+    assert_eq!(totals.total, 512);
+    assert_eq!(selected.len(), 5);
+    assert_eq!(built.get(), 6);
+    let query = page(Some("id-0".to_owned()), totals.next)?;
+    let (_, totals) = query.select(
+        rows.values(),
+        None,
+        |row| Ok(query.matches([row.as_str()])),
+        String::as_str,
+        |row| Ok(row.clone()),
+    )?;
+    assert_eq!(totals.total, 512);
+    Ok(())
+}
+
+#[test]
+fn subtree_visits_each_descendant_once_without_unrelated_teams() -> TestResult {
+    let mut teams = Vec::new();
+    for n in (0..64).rev() {
+        teams.push(serde_json::from_value(serde_json::json!({
+            "created": {"id": format!("team-{n}"), "owner":"person", "name":"team", "description":"", "by":{"provider":"issuer","subject":"person"},"at":1},
+            "parent": (n > 0).then(|| format!("team-{}", n - 1)), "members":[], "retired":null, "changes":[]
+        }))?);
+    }
+    reset();
+    assert_eq!(subtree(&teams, "team-0")?.len(), 64);
+    assert!(count(Work::Team) <= 64);
+    Ok(())
+}
