@@ -70,6 +70,7 @@ lys-log-store.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+rustix.workspace = true
 # A base64 codec the tests drive themselves, so what a bundle carries can be
 # read back by something other than the encoder that wrote it. A
 # dev-dependency: nothing in this crate's own code encodes base64, because the

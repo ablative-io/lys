@@ -30,11 +30,9 @@ fn target_tmp() -> Result<PathBuf, Box<dyn Error>> {
 
 fn toolchain() -> Result<Option<PathBuf>, Box<dyn Error>> {
     if let Some(overridden) = std::env::var_os("LYS_GO_BIN") {
-        return Ok(Some(PathBuf::from(
-            overridden
-                .into_string()
-                .map_err(|_| "go_fixture_toolchain_not_utf8")?,
-        )));
+        return Ok(Some(PathBuf::from(overridden.into_string().map_err(
+            |value| format!("go_fixture_toolchain_not_utf8: {}", value.to_string_lossy()),
+        )?)));
     }
     if Path::new("/usr/local/go/bin/go")
         .try_exists()

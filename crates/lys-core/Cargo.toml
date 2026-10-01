@@ -78,6 +78,7 @@ x509-parser.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+rustix.workspace = true
 coset.workspace = true
 serde_json.workspace = true
 signed_note = "0.2.0"
