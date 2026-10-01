@@ -422,13 +422,9 @@ impl Sessions {
         policy: Option<Policy>,
         tracking: Option<Tracking>,
     ) -> Result<(u32, u64), RunnerError> {
-        let launched = match &tracking {
-            Some(tracking) => {
-                tracking.checked()?;
-                Some(lifecycle::launched(&launch, tracking)?)
-            }
-            None => None,
-        };
+        if let Some(tracking) = &tracking {
+            tracking.checked()?;
+        }
         if !valid_id(&launch.session) {
             return Err(RunnerError::refused(
                 "session_invalid",
@@ -460,6 +456,10 @@ impl Sessions {
             id: launch.session.clone(),
         };
         drop(table);
+        let launched = tracking
+            .as_ref()
+            .map(|tracking| lifecycle::launched(&launch, tracking))
+            .transpose()?;
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
@@ -511,7 +511,7 @@ impl Sessions {
                 .and_then(|()| lifecycle::tracking_started(&mut table, &id, &executable, &version));
         }
         drop(table);
-        self.activate(&id, pending);
+        self.activate(&id, pending)?;
         drop(reservation);
         recorded?;
         self.writer.barrier()?;

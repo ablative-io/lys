@@ -248,7 +248,7 @@ impl Sessions {
             boundary("session_start", None),
         ];
         append(table, id, bodies, Some(source))?;
-        self.follow(table, id);
+        self.follow(table, id)?;
         Ok(words)
     }
 

@@ -55,6 +55,13 @@ impl Clone for Index {
 }
 
 impl Index {
+    pub(crate) fn last_reported(&self, agent: &str) -> Option<i64> {
+        self.agents
+            .get(agent)
+            .and_then(|agent| agent.periods.last_key_value())
+            .map(|((at, _), _)| *at)
+    }
+
     pub(crate) fn has_usage(&self, agent: &str) -> bool {
         self.agents.contains_key(agent)
     }

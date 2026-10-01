@@ -41,7 +41,9 @@ use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioIo};
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
+use tokio::task::JoinSet;
 
 use crate::proxy::capture::{Call, Slots};
 use crate::proxy::error::ProxyError;
@@ -51,6 +53,13 @@ use crate::record::{Home, fresh_id, now};
 
 /// The body type both directions are carried in.
 pub type ProxyBody = UnsyncBoxBody<Bytes, hyper::Error>;
+
+/// The maximum number of accepted HTTP connections held by one listener.
+pub const CONNECTION_LIMIT: usize = 64;
+
+#[cfg(test)]
+#[path = "admission_tests.rs"]
+mod admission_tests;
 
 /// An upstream base: an absolute `http` or `https` URL, with or without a
 /// path of its own, onto which a request's path and query are joined.
@@ -247,28 +256,45 @@ pub fn refusal(status: StatusCode, reason: &str) -> Response<ProxyBody> {
     response
 }
 
-/// Accept connections on `listener` and answer each request with `handle`,
-/// one task per connection, for as long as the listener accepts.
+/// Answer requests on at most [`CONNECTION_LIMIT`] accepted connections.
+/// A connection over the bound is answered 503 by name and closed, without
+/// calling `handle`. Idle connections hold a slot until the peer closes.
 pub async fn serve<H, F>(listener: TcpListener, handle: H) -> Result<(), ProxyError>
 where
     H: Fn(Request<Incoming>) -> F + Send + Sync + 'static,
     F: Future<Output = Response<ProxyBody>> + Send + 'static,
 {
     let handle = Arc::new(handle);
+    let mut connections = JoinSet::new();
     loop {
-        let (stream, _) = listener
-            .accept()
-            .await
-            .map_err(|source| ProxyError::Accept { source })?;
+        let (mut stream, _) = tokio::select! {
+            biased;
+            finished = connections.join_next(), if !connections.is_empty() => {
+                if let Some(Err(error)) = finished {
+                    eprintln!("lys-proxy: proxy_connection_task_failed: {error}");
+                }
+                continue;
+            }
+            accepted = listener.accept() => {
+                accepted.map_err(|source| ProxyError::Accept { source })?
+            }
+        };
+        if connections.len() == CONNECTION_LIMIT {
+            let answer = b"HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 23\r\n\r\nproxy_connections_full\n";
+            if let Err(error) = stream.write_all(answer).await {
+                eprintln!("lys-proxy: proxy_connections_full: refusal_write_failed: {error}");
+            }
+            continue;
+        }
         let handle = Arc::clone(&handle);
-        tokio::spawn(async move {
+        connections.spawn(async move {
             let service = service_fn(move |request| {
                 let answer = handle(request);
                 async move { Ok::<_, Infallible>(answer.await) }
             });
             let connection = http1::Builder::new().serve_connection(TokioIo::new(stream), service);
             if let Err(error) = Box::pin(connection).await {
-                eprintln!("lys-proxy: a connection ended with an error: {error}");
+                eprintln!("lys-proxy: proxy_connection_failed: {error}");
             }
         });
     }

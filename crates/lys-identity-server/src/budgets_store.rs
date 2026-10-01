@@ -211,6 +211,10 @@ impl<S: LeafStore> BudgetStore<S> {
         }
     }
 
+    pub(crate) fn revision(&self) -> u64 {
+        self.log.len()
+    }
+
     /// The budgets as held.
     pub fn held(&self) -> &Held {
         &self.held

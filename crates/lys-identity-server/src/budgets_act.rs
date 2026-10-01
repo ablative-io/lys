@@ -113,7 +113,7 @@ async fn read(
     Path(agent): Path<String>,
 ) -> Result<Json<UsageView>, ServerError> {
     operator(&state, &headers, &agent, "usage")?;
-    settle(&state).await?;
+    settle_for(&state, &agent).await?;
     view(&state, &agent)
 }
 
@@ -129,13 +129,7 @@ fn view(state: &AppState, agent: &str) -> Result<Json<UsageView>, ServerError> {
         Ok(Json(UsageView {
             agent: agent.to_owned(),
             receipts: store.held().crossings.of_agent(agent),
-            last_reported_ms: store
-                .held()
-                .uses
-                .iter()
-                .filter(|usage| usage.agent == agent)
-                .map(|usage| usage.at_ms)
-                .max(),
+            last_reported_ms: store.held().index.last_reported(agent),
             used: budget.used,
         }))
     })
@@ -156,6 +150,23 @@ pub async fn settle(state: &Arc<AppState>) -> Result<(), ServerError> {
         return Ok(());
     }
     let unsettled = with_budgets(state, |store| Ok(store.held().crossings.unsettled()))?;
+    settle_crossings(state, unsettled).await
+}
+
+pub(crate) async fn settle_for(state: &Arc<AppState>, agent: &str) -> Result<(), ServerError> {
+    if state.budgets.is_none() {
+        return Ok(());
+    }
+    let unsettled = with_budgets(state, |store| {
+        Ok(store.held().crossings.unsettled_for(agent))
+    })?;
+    settle_crossings(state, unsettled).await
+}
+
+pub(crate) async fn settle_crossings(
+    state: &Arc<AppState>,
+    unsettled: Vec<Crossing>,
+) -> Result<(), ServerError> {
     for crossing in unsettled {
         if let Some(acted) = act(state, &crossing).await {
             with_budgets_mut(state, |store| store.acted(acted))?;
