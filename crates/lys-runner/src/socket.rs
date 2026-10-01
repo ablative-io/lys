@@ -447,11 +447,11 @@ impl DispatchPermit {
     }
 }
 
-fn command(line: String, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
+fn command(line: &str, server: &[u8; 32], greeting: &Greeting) -> Result<Command, RunnerError> {
     match crate::peer::parse(line.trim_end())? {
         crate::peer::ParsedRequest::Peer(request) => Ok(Command::Peer(request)),
         crate::peer::ParsedRequest::Server(request) => {
-            verify_parsed(request, server, greeting).map(Command::Server)
+            verify_parsed(&request, server, greeting).map(Command::Server)
         }
         crate::peer::ParsedRequest::Versioned { .. } => Err(RunnerError::Malformed {
             reason: "the request shape was not decoded".to_owned(),
@@ -619,7 +619,7 @@ async fn connection(
             },
             changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
         };
-        let command = match command(line, &server, &greeting) {
+        let command = match command(&line, &server, &greeting) {
             Ok(command) if pending.is_empty() => command,
             Ok(_) => {
                 response(

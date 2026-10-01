@@ -662,12 +662,12 @@ pub fn verify_request(
     let request: Request = serde_json::from_str(line).map_err(|error| RunnerError::Malformed {
         reason: format!("the request does not read: {error}"),
     })?;
-    verify_parsed(request, server, greeting)
+    verify_parsed(&request, server, greeting)
 }
 
 /// Verify a decoded server request without reparsing its outer JSON.
 pub fn verify_parsed(
-    request: Request,
+    request: &Request,
     server: &[u8; 32],
     greeting: &Greeting,
 ) -> Result<Act, RunnerError> {

@@ -268,7 +268,7 @@ impl Sessions {
                 );
             }
         };
-        let watched = Arc::clone(self);
+        let observer = Arc::clone(self);
         let owned = id.to_owned();
         let watched_output = Arc::clone(&output);
         let held_permit = Arc::clone(&permit);
@@ -278,10 +278,10 @@ impl Sessions {
             .spawn(move || {
                 match delivered.recv() {
                     Ok((child, pump)) => {
-                        watched.watch(&owned, generation, &watched_output, child, pump)
+                        observer.watch(&owned, generation, &watched_output, child, pump);
                     }
                     Err(error) => {
-                        crate::error::said(&format!("session_exit_worker_failed: {error}"))
+                        crate::error::said(&format!("session_exit_worker_failed: {error}"));
                     }
                 }
                 drop(held_permit);
@@ -362,7 +362,7 @@ impl Sessions {
                 .as_ref()
                 .ok()
                 .filter(|exit| exit.signal().is_none())
-                .map(|exit| exit.exit_code()),
+                .map(portable_pty::ExitStatus::exit_code),
             signal: waited
                 .as_ref()
                 .ok()
