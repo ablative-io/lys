@@ -176,29 +176,31 @@ pub(crate) fn with_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants(state, |_, judged| act(judged))
+    with_directory_grants(state, act, |_, answer| Ok(answer))
 }
 
 /// Hold the directory and grants together for a directory mutation whose
 /// caller must first exercise an ordinary grant. No lock is reacquired.
-pub(crate) fn with_directory_grants<T>(
+pub(crate) fn with_directory_grants<A, T>(
     state: &AppState,
-    act: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, Judged<'_>) -> Result<T, ServerError>,
+    judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, true, act)
+    with_directory_grants_model(state, true, judge, apply)
 }
 
 pub(crate) fn with_schema_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, false, |_, judged| act(judged))
+    with_directory_grants_model(state, false, act, |_, answer| Ok(answer))
 }
 
-fn with_directory_grants_model<T>(
+fn with_directory_grants_model<A, T>(
     state: &AppState,
     require_model: bool,
-    act: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, Judged<'_>) -> Result<T, ServerError>,
+    judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = crate::service_account_grants::projection(state, directory.projection()?)?;
@@ -227,15 +229,14 @@ fn with_directory_grants_model<T>(
             (state.say)(&format!("grant log {}", opened.ledger().start()));
             slot.insert(opened)
         };
-        act(
-            directory,
-            Judged {
-                directory: &projection,
-                grants,
-                root,
-                apps: &mut apps,
-            },
-        )
+        let authorized = judge(Judged {
+            directory: &projection,
+            grants,
+            root,
+            apps: &mut apps,
+        })?;
+        drop(projection);
+        apply(directory, authorized)
     })
 }
 

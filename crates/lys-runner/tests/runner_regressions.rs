@@ -153,7 +153,7 @@ fn malformed_rollout_metadata_names_the_json_error() -> TestResult {
     let date = home.path().join("sessions/2026/10/01");
     std::fs::create_dir_all(&date)?;
     std::fs::write(date.join("rollout-2026-10-01-thread.jsonl"), b"{broken\n")?;
-    let error = lys_runner::collector::rollout(home.path(), "thread")
+    let error = fixture_rollout(home.path(), "thread")
         .err()
         .ok_or("malformed rollout accepted")?;
     assert!(error.to_string().contains("rollout_unreadable"), "{error}");
@@ -168,9 +168,24 @@ fn malformed_rollout_metadata_names_the_json_error() -> TestResult {
 fn unreadable_rollout_directories_are_not_reported_as_missing_threads() -> TestResult {
     let home = tempfile::tempdir()?;
     std::fs::write(home.path().join("sessions"), b"not a directory")?;
-    let error = lys_runner::collector::rollout(home.path(), "thread")
+    let error = fixture_rollout(home.path(), "thread")
         .err()
         .ok_or("unreadable directory accepted")?;
     assert!(error.to_string().contains("rollout_unreadable"), "{error}");
     Ok(())
+}
+
+fn fixture_rollout(
+    home: &std::path::Path,
+    thread: &str,
+) -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let instant = u64::try_from(
+        jiff::civil::date(2026, 10, 1)
+            .to_zoned(jiff::tz::TimeZone::try_system()?)?
+            .timestamp()
+            .as_millisecond(),
+    )?;
+    Ok(lys_runner::collector::rollout_since(
+        home, thread, instant, instant,
+    )?)
 }
