@@ -98,7 +98,6 @@ pub(super) fn plan(session: &Session, resumed: bool) -> Result<SpawnPlan, Runner
 pub(super) struct Prepared {
     spawned: Option<crate::pty::Spawned>,
     leader: Leader,
-    permit: Arc<tokio::sync::OwnedSemaphorePermit>,
 }
 
 impl Drop for Prepared {
@@ -124,7 +123,6 @@ pub(super) struct Pending {
     reader: Box<dyn Read + Send>,
     child: Box<dyn Child + Send + Sync>,
     output: Arc<super::output::OutputHandle>,
-    permit: Arc<tokio::sync::OwnedSemaphorePermit>,
 }
 
 struct FailedActivation {
@@ -147,9 +145,6 @@ impl Pending {
 impl Sessions {
     /// Prepare a verified child without owning the session table.
     pub(super) fn run(&self, plan: &SpawnPlan) -> Result<Prepared, RunnerError> {
-        let permit = Arc::new(Arc::clone(&self.generations).try_acquire_owned().map_err(
-            |error| RunnerError::refused("runner_lifecycle_workers_full", error.to_string()),
-        )?);
         self.writer.barrier()?;
         #[cfg(test)]
         if let Some(probe) = self
@@ -185,12 +180,10 @@ impl Sessions {
         Ok(Prepared {
             spawned: Some(spawned),
             leader,
-            permit,
         })
     }
 
     pub(super) fn install(
-        &self,
         session: &mut Session,
         mut prepared: Prepared,
     ) -> Result<Pending, RunnerError> {
@@ -215,7 +208,7 @@ impl Sessions {
         session.guard.leader = Some(prepared.leader.clone());
         session.leader_start = Some(prepared.leader.clone());
         session.live = Some(Live {
-            writer: crate::input::Input::bounded(spawned.writer, Arc::clone(&self.inputs)),
+            writer: crate::input::Input::new(spawned.writer),
             master: spawned.master,
             pid: spawned.pid,
             leader: Some(prepared.leader.clone()),
@@ -226,7 +219,6 @@ impl Sessions {
             reader: spawned.reader,
             child: spawned.child,
             output: Arc::clone(&session.output),
-            permit: Arc::clone(&prepared.permit),
         })
     }
 
@@ -242,7 +234,6 @@ impl Sessions {
             reader,
             child,
             output,
-            permit,
         } = pending;
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
@@ -271,20 +262,16 @@ impl Sessions {
         let observer = Arc::clone(self);
         let owned = id.to_owned();
         let watched_output = Arc::clone(&output);
-        let held_permit = Arc::clone(&permit);
         let (deliver, delivered) = mpsc::channel();
         let watcher = match std::thread::Builder::new()
             .name("runner-process-exit".to_owned())
-            .spawn(move || {
-                match delivered.recv() {
-                    Ok((child, pump)) => {
-                        observer.watch(&owned, generation, &watched_output, child, pump);
-                    }
-                    Err(error) => {
-                        crate::error::said(&format!("session_exit_worker_failed: {error}"));
-                    }
+            .spawn(move || match delivered.recv() {
+                Ok((child, pump)) => {
+                    observer.watch(&owned, generation, &watched_output, child, pump);
                 }
-                drop(held_permit);
+                Err(error) => {
+                    crate::error::said(&format!("session_exit_worker_failed: {error}"));
+                }
             }) {
             Ok(watcher) => watcher,
             Err(error) => {
@@ -392,7 +379,6 @@ impl Sessions {
             if let Some(follower) = session.follower.take() {
                 stop_follower(id, &follower);
             }
-            table.running.remove(id);
             crate::operations::ended(&mut table, id, &ended);
             recorded = self.persist(&table);
         }
@@ -419,7 +405,6 @@ impl Sessions {
         if table.stopping || session.generation != generation {
             return Ok(false);
         }
-        table.reserve_capacity(id)?;
         if !table.starting.insert(id.to_owned()) {
             return Err(RunnerError::refused(
                 "session_starting",
@@ -441,7 +426,7 @@ impl Sessions {
         }
         crate::collector::status::flush_status(&mut table, id)?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        let pending = self.install(session, prepared)?;
+        let pending = Self::install(session, prepared)?;
         session.ended = None;
         session.ending = false;
         session.guard.idle = true;
@@ -453,7 +438,6 @@ impl Sessions {
         } else {
             Ok(())
         };
-        table.running.insert(id.to_owned());
         let recorded = self.persist(&table);
         drop(table);
         self.activate(id, pending)?;
@@ -650,7 +634,6 @@ impl Sessions {
         if let Some(follower) = session.follower.take() {
             stop_follower(id, &follower);
         }
-        table.running.remove(id);
         if table
             .sessions
             .get(id)
@@ -690,16 +673,8 @@ impl Sessions {
         if let Some(old) = session.follower.take() {
             stop_follower(id, &old);
         }
-        let permit = Arc::new(
-            Arc::clone(&self.followers)
-                .try_acquire_owned()
-                .map_err(|error| {
-                    RunnerError::refused("runner_followers_full", error.to_string())
-                })?,
-        );
         let (wake, woken) = mpsc::channel();
-        // The callback owns the same permit until the notifier's event loop exits.
-        let notices = Arc::new((wake.clone(), Arc::clone(&permit)));
+        let notices = wake.clone();
         let notifier = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
             let next = match event {
                 Ok(event) if event.need_rescan() => {
@@ -708,7 +683,7 @@ impl Sessions {
                 Ok(_) => Wake::Changed,
                 Err(error) => Wake::Lost(error.to_string()),
             };
-            if let Err(gone) = notices.0.send(next) {
+            if let Err(gone) = notices.send(next) {
                 crate::error::said(&format!("a stream follower had ended: {gone}"));
             }
         });
@@ -754,7 +729,6 @@ impl Sessions {
                     }
                 }
                 drop(watcher);
-                drop(permit);
             })
             .map_err(|error| RunnerError::refused("transcript_worker_failed", error.to_string()))?;
         session.follower = Some(wake);

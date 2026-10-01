@@ -64,8 +64,6 @@ pub(crate) use lifecycle::{Wake, accounts, append, transcript_parent, window_lim
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
 
-const MAX_SESSIONS: usize = 16;
-
 /// Milliseconds since the Unix epoch.
 pub fn now_ms() -> u64 {
     SystemTime::now()
@@ -194,35 +192,11 @@ pub(crate) struct Table {
     pub(crate) owner: Weak<Sessions>,
     pub(crate) sessions: BTreeMap<String, Session>,
     starting: BTreeSet<String>,
-    running: BTreeSet<String>,
-    restarting: BTreeSet<String>,
     stopping: bool,
     pub(crate) feed: Feed,
     pub(crate) desk: Desk,
     pub(crate) gaps: BTreeMap<String, AuditGap>,
     pub(crate) operations: Operations,
-}
-
-impl Table {
-    fn reserve_capacity(&self, id: &str) -> Result<(), RunnerError> {
-        if !self.running.contains(id)
-            && !self.starting.contains(id)
-            && !self.restarting.contains(id)
-            && self.running.union(&self.starting).count()
-                + self
-                    .restarting
-                    .iter()
-                    .filter(|id| !self.running.contains(*id) && !self.starting.contains(*id))
-                    .count()
-                >= MAX_SESSIONS
-        {
-            return Err(RunnerError::refused(
-                "runner_sessions_full",
-                "all sixteen session slots are occupied or starting",
-            ));
-        }
-        Ok(())
-    }
 }
 
 /// The sessions a runner holds, and what wakes those waiting on them.
@@ -233,9 +207,6 @@ pub struct Sessions {
     state_dir: PathBuf,
     scrollback: usize,
     pub(crate) writer: crate::durable::Writer,
-    generations: Arc<tokio::sync::Semaphore>,
-    followers: Arc<tokio::sync::Semaphore>,
-    inputs: Arc<tokio::sync::Semaphore>,
     #[cfg(test)]
     spawn_probe: Mutex<Option<SpawnProbe>>,
 }
@@ -243,18 +214,6 @@ pub struct Sessions {
 pub(super) struct Starting {
     sessions: Arc<Sessions>,
     id: String,
-}
-
-pub(super) struct Restarting {
-    sessions: Arc<Sessions>,
-    id: String,
-}
-
-impl Drop for Restarting {
-    fn drop(&mut self) {
-        self.sessions.lock().restarting.remove(&self.id);
-        self.sessions.wake();
-    }
 }
 
 impl Drop for Starting {
@@ -320,8 +279,6 @@ impl Sessions {
             owner: Weak::new(),
             sessions: BTreeMap::new(),
             starting: BTreeSet::new(),
-            running: BTreeSet::new(),
-            restarting: BTreeSet::new(),
             stopping: false,
             feed: Feed::open(state_dir)?,
             desk: Desk::default(),
@@ -378,9 +335,6 @@ impl Sessions {
                 state_dir,
                 scrollback,
                 writer,
-                generations: Arc::new(tokio::sync::Semaphore::new(32)),
-                followers: Arc::new(tokio::sync::Semaphore::new(32)),
-                inputs: Arc::new(tokio::sync::Semaphore::new(32)),
                 #[cfg(test)]
                 spawn_probe: Mutex::new(None),
             }
@@ -496,7 +450,6 @@ impl Sessions {
                 format!("session {} is already held", launch.session),
             ));
         }
-        table.reserve_capacity(&launch.session)?;
         table.starting.insert(launch.session.clone());
         let reservation = Starting {
             sessions: Arc::clone(self),
@@ -534,7 +487,7 @@ impl Sessions {
             pending_status: None,
         };
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
-        let pending = self.install(&mut session, prepared)?;
+        let pending = Self::install(&mut session, prepared)?;
         let pid = session.pid.ok_or_else(|| {
             RunnerError::refused(
                 "spawn_install_failed",
@@ -552,7 +505,6 @@ impl Sessions {
             ));
         }
         table.sessions.insert(id.clone(), session);
-        table.running.insert(id.clone());
         let mut recorded = self.persist(&table);
         if let Some((executable, version)) = launched {
             recorded = recorded
@@ -714,7 +666,6 @@ impl Sessions {
             }
         }
         while !table.starting.is_empty()
-            || !table.restarting.is_empty()
             || table
                 .sessions
                 .values()
