@@ -385,11 +385,11 @@ impl<S: LeafStore> RuntimeStore<S> {
         let counter = Arc::clone(&self.agents_with_sessions.copies);
         let before = counter.load(Ordering::Relaxed);
         let result = self.report(report);
-        let copies = counter
+        let copy_count = counter
             .load(Ordering::Relaxed)
             .checked_sub(before)
             .ok_or_else(|| unavailable("session index copy count overflows"))?;
-        copied(copies);
+        copied(copy_count);
         result
     }
 
