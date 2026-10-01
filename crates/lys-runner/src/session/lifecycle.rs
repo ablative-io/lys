@@ -266,6 +266,7 @@ impl Sessions {
             drop(prepared);
             return Ok(false);
         }
+        crate::collector::status::flush_status(&mut table, id)?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
         let pending = Self::install(session, prepared)?;
         session.ended = None;
@@ -388,6 +389,12 @@ impl Sessions {
         }
         self.read_source(id, None);
         let mut table = self.lock();
+        let status_flushed = crate::collector::status::flush_status(&mut table, id);
+        if let Err(error) = &status_flushed {
+            crate::error::said(&format!(
+                "session {id}: final_status_record_failed: {error}"
+            ));
+        }
         let Some(session) = table
             .sessions
             .get_mut(id)
@@ -408,7 +415,8 @@ impl Sessions {
                 (None, None)
             }
         };
-        let limit = !session.ending
+        let limit = status_flushed.is_ok()
+            && !session.ending
             && session
                 .rotation
                 .as_ref()
@@ -606,6 +614,21 @@ impl Sessions {
             if table.feed.source(id) != Some(&before) {
                 drop(table);
                 continue;
+            }
+            if source.generation != before.generation {
+                if let Err(error) = crate::collector::status::flush_status(&mut table, id) {
+                    crate::error::said(&format!(
+                        "session {id}: source_status_record_failed: {error}"
+                    ));
+                    return;
+                }
+                if let Some(committed) = table.feed.source(id) {
+                    source.snapshot.clone_from(&committed.snapshot);
+                    source
+                        .snapshot_account
+                        .clone_from(&committed.snapshot_account);
+                    source.reported_cost_micros = committed.reported_cost_micros;
+                }
             }
             let commit = Commit {
                 source: Some(source),

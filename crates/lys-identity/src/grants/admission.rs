@@ -134,6 +134,41 @@ fn responsible_is(
     }
 }
 
+/// Admit a holder, or the active person answering for a boss and its direct child.
+pub fn delegation_authority(
+    directory: &Projection,
+    source: &Grant,
+    caller: IdentityId,
+    recipient: IdentityId,
+) -> Result<(), GrantError> {
+    if source.holder() == caller {
+        return Ok(());
+    }
+    let refused = || GrantError::NotHolder {
+        caller: caller.to_string(),
+        grant: source.id().to_string(),
+    };
+    let (IdentityId::Person(person), IdentityId::Agent(_), IdentityId::Agent(_)) =
+        (caller, source.holder(), recipient)
+    else {
+        return Err(refused());
+    };
+    if source.responsible() != person
+        || directory
+            .record(source.holder())
+            .and_then(crate::projection::Record::responsible)
+            != Some(person)
+        || !directory.record(recipient).is_some_and(|child| {
+            child.responsible() == Some(person) && child.reports_to() == Some(source.holder())
+        })
+    {
+        return Err(refused());
+    }
+    active(directory, caller)?;
+    active(directory, source.holder())?;
+    Ok(())
+}
+
 /// The checked ancestry of `grant`, refused unless every grant on it is
 /// unrevoked, started and unended at `at`, held by an active identity and
 /// answered for by the person the directory records.
@@ -152,6 +187,16 @@ pub fn effective(
         })?;
         active(directory, held.holder())?;
         responsible_is(directory, held.holder(), held.responsible())?;
+        if let Source::Grant(source) = held.source() {
+            let source = book
+                .grant(source)
+                .ok_or_else(|| GrantError::SourceUnknown {
+                    grant: source.to_string(),
+                })?;
+            if held.parts().issuer != source.holder() {
+                delegation_authority(directory, source, held.parts().issuer, held.holder())?;
+            }
+        }
     }
     Ok(lineage)
 }
@@ -203,12 +248,7 @@ pub fn judge_delegation(
         .ok_or_else(|| GrantError::SourceUnknown {
             grant: request.source.to_string(),
         })?;
-    if source.holder() != request.caller {
-        return Err(GrantError::NotHolder {
-            caller: request.caller.to_string(),
-            grant: request.source.to_string(),
-        });
-    }
+    delegation_authority(directory, source, request.caller, request.recipient)?;
     let lineage = effective(book, directory, request.source, at)?;
     let PassOn::To {
         actions: passable,
