@@ -121,38 +121,63 @@ fn selected<'a>(
         .ok_or_else(|| unavailable("a change names a machine that is not in its snapshot"))
 }
 
-pub(super) fn read(path: &Path) -> Result<(Kept, bool), ServerError> {
+pub(super) fn read(path: &Path) -> Result<(Kept, bool, u64), ServerError> {
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok((Kept::default(), false));
+            return Ok((Kept::default(), false, 0));
         }
         Err(error) => return Err(unavailable(format!("reading {}: {error}", path.display()))),
     };
     let Some(records) = bytes.strip_prefix(HEADER) else {
         return serde_json::from_slice(&bytes)
-            .map(|kept| (kept, false))
+            .map(|kept| (kept, false, 0))
             .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())));
     };
-    if !records.ends_with(b"\n") {
-        return Err(unavailable(format!(
-            "{} has an incomplete change record",
-            path.display()
-        )));
-    }
-    let mut lines = records[..records.len() - 1].split(|byte| *byte == b'\n');
+    let end = records
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .ok_or_else(|| unavailable("network_snapshot_incomplete: no complete snapshot"))?;
+    let mut lines = records[..end].split(|byte| *byte == b'\n');
     let snapshot = lines
         .next()
         .ok_or_else(|| unavailable("a network journal has no snapshot"))?;
     let mut kept: Kept = serde_json::from_slice(snapshot).map_err(unavailable)?;
     let mut original = original_agents(&kept)?;
     let mut index = ordered(&kept);
+    let mut replayed = 0_u64;
     for line in lines {
+        #[cfg(test)]
+        super::journal_tests::replayed();
         let change: Change = serde_json::from_slice(line)
             .map_err(|error| unavailable(format!("a network change does not read: {error}")))?;
         change.apply(&mut kept, &mut original, &mut index)?;
+        replayed = replayed
+            .checked_add(1)
+            .ok_or_else(|| unavailable("network_replay_count_overflow"))?;
     }
-    Ok((kept, true))
+    if end + 1 < records.len() {
+        let retained = u64::try_from(HEADER.len() + end + 1).map_err(unavailable)?;
+        let file = OpenOptions::new()
+            .write(true)
+            .open(path)
+            .map_err(|error| unavailable(format!("network_torn_tail_recovery: {error}")))?;
+        file.set_len(retained)
+            .and_then(|()| file.sync_all())
+            .map_err(|error| unavailable(format!("network_torn_tail_recovery: {error}")))?;
+        #[cfg(test)]
+        super::journal_tests::recovered();
+        tracing::warn!(retained, "network_torn_tail_recovered");
+    }
+    Ok((kept, true, replayed))
+}
+
+pub(super) fn snapshot(path: &Path, kept: &Kept) -> Result<(), ServerError> {
+    let mut bytes = HEADER.to_vec();
+    serde_json::to_writer(&mut bytes, kept)
+        .map_err(|error| unavailable(format!("network_snapshot_write: {error}")))?;
+    bytes.push(b'\n');
+    replace(path, &bytes).map_err(|error| unavailable(format!("network_snapshot_write: {error}")))
 }
 
 pub(super) fn write(

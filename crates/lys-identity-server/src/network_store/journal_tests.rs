@@ -11,10 +11,20 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 thread_local! {
     static WRITE_BYTES: Cell<usize> = const { Cell::new(0) };
+    static REPLAYED: Cell<u64> = const { Cell::new(0) };
+    static TAIL_RECOVERIES: Cell<u64> = const { Cell::new(0) };
 }
 
 pub(super) fn written(bytes: usize) {
     WRITE_BYTES.with(|count| count.set(count.get() + bytes));
+}
+
+pub(super) fn replayed() {
+    REPLAYED.with(|count| count.set(count.get() + 1));
+}
+
+pub(super) fn recovered() {
+    TAIL_RECOVERIES.with(|count| count.set(count.get() + 1));
 }
 
 fn machine(position: usize) -> Machine {
@@ -215,27 +225,171 @@ fn every_change_reopens_with_its_receipt_and_machine_state() -> TestResult {
 }
 
 #[test]
-fn an_incomplete_or_malformed_change_is_refused_without_discarding_it() -> TestResult {
+fn a_torn_tail_is_synced_back_to_the_complete_prefix_before_appending() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("network.json");
     let mut store = NetworkStore::open(&path)?;
     store.name(machine(0))?;
     drop(store);
     let original = fs::read(&path)?;
-    for suffix in [b"{\"change\":\"team\"".as_slice(), b"{}\n".as_slice()] {
+    for suffix in [b"{\"change\":\"team\"".as_slice(), b"{}".as_slice()] {
         let mut incomplete = original.clone();
         incomplete.extend(suffix);
         fs::write(&path, &incomplete)?;
+        TAIL_RECOVERIES.with(|count| count.set(0));
+        let mut store = NetworkStore::open(&path)?;
+        assert_eq!(
+            TAIL_RECOVERIES.with(Cell::get),
+            1,
+            "recovery is counted only after set_len and sync succeed"
+        );
+        assert_eq!(
+            fs::read(&path)?,
+            original,
+            "only the incomplete final record is removed"
+        );
+        let change = ownership("after-recovery", Some("team-a"));
+        store.assign_team(change.clone())?;
+        drop(store);
+        let store = NetworkStore::open(&path)?;
+        assert_eq!(store.team_recorded(&change.operation), Some(&change));
+    }
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn a_complete_malformed_record_or_incomplete_snapshot_remains_a_refusal() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("network.json");
+    let mut store = NetworkStore::open(&path)?;
+    store.name(machine(0))?;
+    drop(store);
+    let mut malformed = fs::read(&path)?;
+    malformed.extend(b"{}\n");
+    for bytes in [malformed, b"LYS-NETWORK-1\n{\"machines\":[".to_vec()] {
+        fs::write(&path, &bytes)?;
         assert!(matches!(
             NetworkStore::open(&path),
             Err(ServerError::NetworkUnavailable { .. })
         ));
         assert_eq!(
             fs::read(&path)?,
-            incomplete,
-            "an unreadable change must not be discarded"
+            bytes,
+            "a complete malformed record or incomplete snapshot is not recovery data"
         );
     }
+    directory.close()?;
+    Ok(())
+}
+
+fn journal_fixture(path: &std::path::Path, appends: u64) -> TestResult {
+    let kept = Kept {
+        machines: vec![machine(0)],
+        ..Kept::default()
+    };
+    let mut bytes = b"LYS-NETWORK-1\n".to_vec();
+    serde_json::to_writer(&mut bytes, &kept)?;
+    bytes.push(b'\n');
+    for position in 0..appends {
+        let change = super::journal::Change::Team {
+            recorded: ownership(&format!("seeded-{position}"), None),
+        };
+        serde_json::to_writer(&mut bytes, &change)?;
+        bytes.push(b'\n');
+    }
+    fs::write(path, bytes)?;
+    Ok(())
+}
+
+#[test]
+fn a_start_after_the_snapshot_boundary_replays_only_the_bounded_tail() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("network.json");
+    let interval = lys_identity::SNAPSHOT_EVERY.get();
+    journal_fixture(&path, interval - 1)?;
+    let mut store = NetworkStore::open(&path)?;
+    store.assign_team(ownership("at-boundary", Some("team-a")))?;
+    assert_eq!(store.since_snapshot, 0);
+    for position in 0..5 {
+        store.assign_team(ownership(&format!("after-boundary-{position}"), None))?;
+    }
+    drop(store);
+    REPLAYED.with(|count| count.set(0));
+    let store = NetworkStore::open(&path)?;
+    assert_eq!(
+        REPLAYED.with(Cell::get),
+        5,
+        "count actual decoded and applied change records"
+    );
+    assert!(REPLAYED.with(Cell::get) <= interval);
+    assert_eq!(store.team_records().count(), usize::try_from(interval + 5)?);
+    assert!(store.team_recorded("seeded-0").is_some());
+    assert!(store.team_recorded("at-boundary").is_some());
+    assert!(store.team_recorded("after-boundary-4").is_some());
+    drop(store);
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn a_start_at_the_snapshot_boundary_checkpoints_before_the_next_append() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("network.json");
+    let interval = lys_identity::SNAPSHOT_EVERY.get();
+    journal_fixture(&path, interval)?;
+    let mut store = NetworkStore::open(&path)?;
+    assert_eq!(store.since_snapshot, 0);
+    store.assign_team(ownership("after-interrupted-checkpoint", None))?;
+    drop(store);
+    REPLAYED.with(|count| count.set(0));
+    let store = NetworkStore::open(&path)?;
+    assert_eq!(REPLAYED.with(Cell::get), 1);
+    assert_eq!(store.team_records().count(), usize::try_from(interval + 1)?);
+    drop(store);
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn a_failed_checkpoint_refuses_the_next_append_until_reconciled() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("network.json");
+    let interval = lys_identity::SNAPSHOT_EVERY.get();
+    journal_fixture(&path, interval - 1)?;
+    let mut store = NetworkStore::open(&path)?;
+    let writing = path.with_extension("writing");
+    fs::create_dir(&writing)?;
+    let boundary = ownership("at-failed-checkpoint", Some("team-a"));
+    assert!(matches!(
+        store.assign_team(boundary.clone()),
+        Err(ServerError::NetworkUnavailable { .. })
+    ));
+    let committed = fs::read(&path)?;
+    assert!(matches!(
+        NetworkStore::open(&path),
+        Err(ServerError::NetworkUnavailable { .. })
+    ));
+    let next = ownership("after-failed-checkpoint", None);
+    assert!(matches!(
+        store.assign_team(next.clone()),
+        Err(ServerError::NetworkUnavailable { .. })
+    ));
+    assert_eq!(
+        fs::read(&path)?,
+        committed,
+        "no append is admitted after the bounded tail is full"
+    );
+    fs::remove_dir(&writing)?;
+    assert_eq!(store.assign_team(boundary.clone())?, boundary);
+    assert_eq!(store.since_snapshot, 0);
+    assert_eq!(store.assign_team(next.clone())?, next);
+    drop(store);
+    REPLAYED.with(|count| count.set(0));
+    let store = NetworkStore::open(&path)?;
+    assert_eq!(REPLAYED.with(Cell::get), 1);
+    assert_eq!(store.team_records().count(), usize::try_from(interval + 1)?);
+    drop(store);
     directory.close()?;
     Ok(())
 }

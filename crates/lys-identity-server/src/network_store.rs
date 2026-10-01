@@ -30,6 +30,7 @@ use crate::runner_client::RunnerRecord;
 mod journal;
 
 use journal::Change;
+use lys_identity::SNAPSHOT_EVERY;
 
 /// A machine's retirement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +138,7 @@ pub struct NetworkStore {
     uncertain: bool,
     ordered: Arc<BTreeMap<String, usize>>,
     journal: bool,
+    since_snapshot: u64,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
@@ -199,9 +201,13 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl NetworkStore {
     /// The machines kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
-        let (kept, is_journal) = journal::read(path)?;
+        let (kept, is_journal, mut since_snapshot) = journal::read(path)?;
         let original_agents = original_agents(&kept)?;
         let ordered = Arc::new(ordered(&kept));
+        if since_snapshot >= SNAPSHOT_EVERY.get() {
+            journal::snapshot(path, &kept)?;
+            since_snapshot = 0;
+        }
         Ok(Self {
             path: path.to_owned(),
             kept,
@@ -209,13 +215,14 @@ impl NetworkStore {
             ordered,
             uncertain: false,
             journal: is_journal,
+            since_snapshot,
         })
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (kept, is_journal) = journal::read(&self.path)?;
+            let (kept, is_journal, mut since_snapshot) = journal::read(&self.path)?;
             let original_agents = original_agents(&kept)?;
             match fs::File::open(&self.path) {
                 Ok(file) => file.sync_all().map_err(unavailable)?,
@@ -229,11 +236,16 @@ impl NetworkStore {
                     .and_then(|directory| directory.sync_all())
                     .map_err(unavailable)?;
             }
+            if since_snapshot >= SNAPSHOT_EVERY.get() {
+                journal::snapshot(&self.path, &kept)?;
+                since_snapshot = 0;
+            }
             self.ordered = Arc::new(ordered(&kept));
             self.kept = kept;
             self.original_agents = original_agents;
             self.uncertain = false;
             self.journal = is_journal;
+            self.since_snapshot = since_snapshot;
         }
         Ok(())
     }
@@ -257,6 +269,18 @@ impl NetworkStore {
             self.uncertain = true;
             self.settle()?;
             return Err(error);
+        }
+        self.since_snapshot = self
+            .since_snapshot
+            .checked_add(1)
+            .ok_or_else(|| unavailable("network_append_count_overflow"))?;
+        if self.since_snapshot >= SNAPSHOT_EVERY.get() {
+            if let Err(error) = journal::snapshot(&self.path, &self.kept) {
+                self.uncertain = true;
+                self.settle()?;
+                return Err(error);
+            }
+            self.since_snapshot = 0;
         }
         Ok(())
     }
