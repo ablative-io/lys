@@ -318,3 +318,86 @@ async fn a_code_exchanged_for_another_redirect_is_refused_and_not_used_up() -> T
     );
     Ok(())
 }
+
+async fn userinfo_with(service: &Service, token: &str) -> Result<(u16, Value), Box<dyn Error>> {
+    let response = reqwest::Client::new()
+        .get(format!("{}/oauth/userinfo", service.base))
+        .bearer_auth(token)
+        .send()
+        .await?;
+    Ok((response.status().as_u16(), response.json().await?))
+}
+
+async fn end_current_session(service: &Service, cookie: &str) -> TestResult {
+    let (status, sessions) = service.get("/sessions", Some(cookie)).await?;
+    assert_eq!(status, 200, "{sessions}");
+    let id = sessions["sessions"]
+        .as_array()
+        .ok_or("sessions is not an array")?
+        .iter()
+        .find(|session| session["current"] == true)
+        .and_then(|session| session["id"].as_str())
+        .ok_or("current session is absent")?;
+    let (status, ended) = service
+        .post(&format!("/sessions/{id}/end"), Some(cookie), &json!({}))
+        .await?;
+    assert_eq!(status, 200, "{ended}");
+    let (status, ended) = service.get("/me", Some(cookie)).await?;
+    assert_eq!(status, 401, "{ended}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_product_token_stops_answering_when_its_lys_session_ends() -> TestResult {
+    let (service, cookie, person) = table(CODE_SECONDS).await?;
+    let verifier = "a-session-bound-verifier-of-enough-length-0123456789";
+    let issued = code(&service, &cookie, &challenge_of(verifier)).await?;
+    let (status, answer) = exchange(&service, &issued, verifier).await?;
+    assert_eq!(status, 200, "{answer}");
+    let token = answer["access_token"].as_str().ok_or("no access token")?;
+    let (status, active) = userinfo_with(&service, token).await?;
+    assert_eq!(status, 200, "{active}");
+    assert_eq!(active["sub"], person);
+    end_current_session(&service, &cookie).await?;
+    let (status, refused) = userinfo_with(&service, token).await?;
+    assert_eq!(status, 401, "{refused}");
+    assert_eq!(refused["refusal"], "TokenUnknown");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_code_from_an_ended_session_cannot_create_product_tokens() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let verifier = "an-ended-session-verifier-of-enough-length-0123456789";
+    let issued = code(&service, &cookie, &challenge_of(verifier)).await?;
+    end_current_session(&service, &cookie).await?;
+    let (status, refused) = exchange(&service, &issued, verifier).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "CodeExpired");
+    assert!(refused.get("access_token").is_none());
+    assert!(refused.get("id_token").is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_product_identity_token_has_a_short_validity_window() -> TestResult {
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let verifier = "a-short-lived-id-token-verifier-of-enough-length-0123456789";
+    let issued = code(&service, &cookie, &challenge_of(verifier)).await?;
+    let (status, answer) = exchange(&service, &issued, verifier).await?;
+    assert_eq!(status, 200, "{answer}");
+    let jwt = answer["id_token"].as_str().ok_or("no identity token")?;
+    let claims = jwt
+        .split('.')
+        .nth(1)
+        .ok_or("identity token has no claims")?;
+    let claims: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(claims)?)?;
+    let issued = claims["iat"].as_u64().ok_or("no issue instant")?;
+    let expires = claims["exp"].as_u64().ok_or("no expiry instant")?;
+    assert!(expires > issued);
+    assert!(
+        expires - issued <= 300,
+        "identity token outlives five minutes"
+    );
+    Ok(())
+}
