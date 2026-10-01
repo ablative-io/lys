@@ -36,6 +36,16 @@ impl Changes {
         self.generation.send_replace(next);
     }
 
+    async fn checked_after(
+        &self,
+        after: Option<OperationId>,
+        authorised: impl Fn() -> Result<(), ServerError>,
+    ) -> Result<OperationId, ServerError> {
+        let generation = self.after(after).await?;
+        authorised()?;
+        Ok(generation)
+    }
+
     async fn after(&self, after: Option<OperationId>) -> Result<OperationId, ServerError> {
         let mut current = self.generation.subscribe();
         let generation = *current.borrow_and_update();
@@ -85,8 +95,10 @@ async fn changed(
         .map_err(|error| ServerError::RequestMalformed {
             reason: error.to_string(),
         })?;
-    let generation = state.changes.after(after).await?;
-    signed_in(&state, &headers)?;
+    let generation = state
+        .changes
+        .checked_after(after, || signed_in(&state, &headers).map(|_| ()))
+        .await?;
     Ok(Json(Changed {
         generation: generation.to_string(),
     }))
@@ -145,8 +157,39 @@ pub(crate) async fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
     use std::future::Future;
     use std::task::{Context, Poll, Waker};
+
+    #[tokio::test]
+    async fn a_wait_rechecks_authority_after_the_change_signal()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let changes = Changes::new()?;
+        let first = changes.after(None).await?;
+        let admitted = Cell::new(true);
+        let checks = Cell::new(0);
+        let mut waiting = Box::pin(changes.checked_after(Some(first), || {
+            checks.set(checks.get() + 1);
+            if admitted.get() {
+                Ok(())
+            } else {
+                Err(ServerError::NotSignedIn)
+            }
+        }));
+        assert!(
+            waiting
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop()))
+                .is_pending()
+        );
+        assert_eq!(checks.get(), 0);
+        admitted.set(false);
+        changes.publish(OperationId::generate()?);
+        assert!(matches!(waiting.await, Err(ServerError::NotSignedIn)));
+        assert_eq!(checks.get(), 1);
+        assert_eq!(changes.waiting.available_permits(), 128);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn changes_wait_for_a_signal_coalesce_and_bound_waiters()
