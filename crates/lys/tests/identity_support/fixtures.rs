@@ -6,10 +6,13 @@
 //! real `lys identity prepare` for the test and discarded with it.
 
 use std::error::Error;
+use std::fmt::Write as _;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::{Ipv4Addr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::sync::Mutex;
+
+use nix::fcntl::{Flock, FlockArg};
 
 use super::compose;
 
@@ -30,11 +33,12 @@ pub fn free_port() -> TestResult<u16> {
 }
 
 /// The first three parts of a private /24 range, as `172.29.N.`, that no
-/// container network on this machine overlaps and no deployment earlier in
-/// this run was given: a deployment's compose network, whose gateway is the
-/// range's `.1`.
+/// container network on this machine overlaps and no live test process
+/// holds a claim on: a deployment's compose network, whose gateway is the
+/// range's `.1`. Nextest runs every test in a process of its own, so the
+/// claims are kept in one file every process reads and writes under an
+/// exclusive lock; a claim lasts as long as the process that made it.
 pub fn free_network() -> TestResult<String> {
-    static GIVEN: Mutex<Vec<u32>> = Mutex::new(Vec::new());
     let listed = Command::new("docker")
         .args(["network", "ls", "--quiet"])
         .output()?;
@@ -57,22 +61,60 @@ pub fn free_network() -> TestResult<String> {
                 .filter_map(ipv4_range),
         );
     }
-    let mut given = GIVEN
-        .lock()
-        .map_err(|error| format!("fixture_lock_poisoned: {error}"))?;
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(std::env::temp_dir().join("lys-identity-test-networks"))?;
+    let mut claims_file = Flock::lock(file, FlockArg::LockExclusive)
+        .map_err(|(_, errno)| format!("network_claims_unlocked: {errno}"))?;
+    let mut text = String::new();
+    claims_file.read_to_string(&mut text)?;
+    let mut claims: Vec<(u64, u32)> = Vec::new();
+    for line in text.lines() {
+        if let Some((third, pid)) = line.split_once(' ')
+            && let (Ok(third), Ok(pid)) = (third.parse(), pid.parse())
+            && alive(pid)?
+        {
+            claims.push((third, pid));
+        }
+    }
     let base = u64::from(u32::from(Ipv4Addr::new(172, 29, 0, 0)));
-    for third in 0..=255u64 {
+    let chosen = (0..=255u64).find(|third| {
         let start = base | (third << 8);
         let overlaps = used
             .iter()
             .any(|&(first, end)| first < start + 256 && start < end);
-        let first = u32::try_from(start)?;
-        if !overlaps && !given.contains(&first) {
-            given.push(first);
-            return Ok(format!("172.29.{third}."));
-        }
+        !overlaps && !claims.iter().any(|(claimed, _)| claimed == third)
+    });
+    let Some(third) = chosen else {
+        return Err(
+            "network_in_use: a container network or a live test overlaps every 172.29.N.0/24 range"
+                .into(),
+        );
+    };
+    claims.push((third, std::process::id()));
+    let mut written = String::new();
+    for (claimed, pid) in &claims {
+        writeln!(written, "{claimed} {pid}")?;
     }
-    Err("network_in_use: a container network overlaps every 172.29.N.0/24 range".into())
+    claims_file.set_len(0)?;
+    claims_file.seek(SeekFrom::Start(0))?;
+    claims_file.write_all(written.as_bytes())?;
+    Ok(format!("172.29.{third}."))
+}
+
+/// Whether process `pid` still runs: this process, or one `kill -0` reaches.
+fn alive(pid: u32) -> TestResult<bool> {
+    if pid == std::process::id() {
+        return Ok(true);
+    }
+    Ok(Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stderr(std::process::Stdio::null())
+        .status()?
+        .success())
 }
 
 /// The addresses an IPv4 range covers, first and one past the last.
