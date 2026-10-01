@@ -125,6 +125,7 @@ pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError
             crossed: assessed.crossed,
             ..usage
         })?;
+        store.reconcile_context(sessions.as_ref())?;
         Ok(())
     })?;
     crate::budgets_act::settle(state).await

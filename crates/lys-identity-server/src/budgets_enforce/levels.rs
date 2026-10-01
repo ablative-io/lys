@@ -25,6 +25,13 @@ pub(super) fn levels(
     sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Option<Levels>, ServerError> {
     if limit.unit == Measure::ContextPercent {
+        if let (Some(session), Some(sessions)) = (&usage.session, sessions)
+            && sessions
+                .get(&usage.agent)
+                .is_some_and(|activity| !activity.live_sessions().contains(session))
+        {
+            return Ok(None);
+        }
         let (Some(session), Some(context)) = (&usage.session, usage.context_percent) else {
             return Ok(Some(Levels {
                 before: None,

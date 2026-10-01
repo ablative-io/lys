@@ -42,12 +42,18 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         })
         .transpose()?;
     let (network, roles, provisioning) = crate::file_stores::opened(config, &*say)?;
-    let runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
+    let mut runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
     let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
     let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
     let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
-    let budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    let mut budgets =
+        crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    if let (Some(runtime), Some(budgets)) = (runtime.as_mut(), budgets.as_mut()) {
+        let agents = budgets.held().context_availability.agents();
+        let sessions = runtime.agents_with_sessions(&agents)?;
+        budgets.reconcile_context(Some(&sessions))?;
+    }
     let mut policies =
         crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
     if let Some(store) = policies.as_mut() {
