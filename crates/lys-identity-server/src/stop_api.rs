@@ -371,6 +371,7 @@ async fn stop(
         }
         (Err(other), _) => return Err(other.into()),
     }
+    crate::agent_pass::end_agent(&state, agent)?;
     // Asked only once the directory holds this operation's suspension, so a
     // refused stop leaves no asked line in other words behind it.
     if let Some(kept) = with_stops(&state, |store| store.ask(asked.clone()))? {

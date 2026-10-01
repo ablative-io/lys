@@ -109,6 +109,8 @@ pub struct AppState {
     pub apps: Mutex<crate::apps_store::AppStore>,
     /// Cached durable grant-bound credentials.
     pub grant_tokens: Mutex<crate::grant_token_store::Tokens>,
+    /// Cached digests for the agent runs this install starts.
+    pub agent_passes: Mutex<crate::agent_pass_store::Passes>,
     /// The schema builder's test benches, each a throwaway draft.
     pub benches: crate::apps_bench::Benches,
     /// The issuer's administration API the sign-in providers are set

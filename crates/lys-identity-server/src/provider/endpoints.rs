@@ -235,6 +235,7 @@ pub(super) fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::HoldingChanged
         | ServerError::LaunchRecordMissing
         | ServerError::OperatorRefused { .. }
+        | ServerError::AgentPassRefused { .. }
         | ServerError::AgentSignatureRefused { .. }
         | ServerError::AgentNotActive { .. }
         | ServerError::MachineCannotReach { .. }
