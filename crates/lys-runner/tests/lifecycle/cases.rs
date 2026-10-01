@@ -152,7 +152,7 @@ fn quoted_limit_words_with_a_forty_percent_status_do_not_rotate_claude() -> Test
 }
 
 #[test]
-fn an_ordinary_stop_counts_the_usage_written_on_term() -> TestResult {
+fn an_ordinary_stop_counts_the_usage_written_on_hang_up() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("stream.jsonl");
     std::fs::write(&path, b"")?;
@@ -161,7 +161,7 @@ fn an_ordinary_stop_counts_the_usage_written_on_term() -> TestResult {
             "cache_creation_input_tokens":0,"cache_read_input_tokens":0}
     }});
     let script = format!(
-        "trap 'printf '\\''%s\\n'\\'' '\\''{record}'\\'' >> \"$TRANSCRIPT\"; exit 0' TERM; printf 'ready\\n'; while IFS= read -r line; do :; done"
+        "trap 'printf '\\''%s\\n'\\'' '\\''{record}'\\'' >> \"$TRANSCRIPT\"; exit 0' HUP; printf 'ready\\n'; while IFS= read -r line; do :; done"
     );
     let sessions = tracked(dir.path(), &script, &path)?;
     let ended = sessions.end("session", &AtomicBool::new(false))?;

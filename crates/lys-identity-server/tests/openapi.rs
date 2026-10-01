@@ -68,8 +68,19 @@ fn declared() -> Result<Declared, Box<dyn Error>> {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut found = Declared::new();
     let mut read = 0;
-    for entry in std::fs::read_dir(&src)? {
-        let path = entry?.path();
+    let mut paths = Vec::new();
+    let mut dirs = vec![src.clone()];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else {
+                paths.push(path);
+            }
+        }
+    }
+    for path in paths {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
