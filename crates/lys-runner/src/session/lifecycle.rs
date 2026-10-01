@@ -13,7 +13,7 @@
 //! line is left for the next read, and a truncated or replaced file is a new
 //! generation, said by name.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
@@ -29,6 +29,10 @@ use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
 use crate::tracking_store::{Body, Commit, Coverage, SourceState};
 
 pub use crate::peer::Collected;
+
+#[cfg(test)]
+#[path = "../../tests/lifecycle/cases.rs"]
+mod io_tests;
 
 /// What wakes a session's stream follower.
 #[derive(Debug)]
@@ -142,11 +146,38 @@ impl Sessions {
     ) {
         let waited = child.wait();
         let at = now_ms();
+        let cleanup = self
+            .lock()
+            .sessions
+            .get(id)
+            .filter(|session| session.generation == generation)
+            .filter(|session| {
+                session.ending
+                    || session
+                        .rotation
+                        .as_ref()
+                        .is_some_and(crate::rotation::RotationState::tripped)
+            })
+            .and_then(|session| session.guard.leader.clone());
+        if let Some(leader) = cleanup {
+            match crate::pty::end_left_group(&leader) {
+                Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => {}
+                Ok(left) => {
+                    crate::error::said(&format!(
+                        "session {id}: group_cleanup_incomplete: {left:?}"
+                    ));
+                }
+                Err(error) => {
+                    crate::error::said(&format!("session {id}: group_cleanup_failed: {error}"));
+                }
+            }
+        }
         if pump.join().is_err() {
             crate::error::said(&format!(
                 "session {id}: the thread keeping its output ended abnormally"
             ));
         }
+        self.read_source(id, None);
         let mut table = self.lock();
         let Some(session) = table
             .sessions
@@ -212,6 +243,13 @@ impl Sessions {
         if let Some(follower) = session.follower.take() {
             stop_follower(id, &follower);
         }
+        if table
+            .sessions
+            .get(id)
+            .is_some_and(|session| session.guard.tracking.is_some())
+        {
+            crate::collector::flushed(&mut table, self.runner(), id, "session_end");
+        }
         crate::operations::ended(&mut table, id, &ended);
         self.persist_logged(&table);
         drop(table);
@@ -271,7 +309,7 @@ impl Sessions {
             for next in woken {
                 match next {
                     Wake::Changed => sessions.read_source(&owned, None),
-                    Wake::Lost(reason) => sessions.read_source(&owned, Some(reason)),
+                    Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
                     Wake::Stop => break,
                 }
             }
@@ -281,50 +319,67 @@ impl Sessions {
 
     /// Read session `id`'s stream from its saved cursor to its last whole
     /// line, and keep what it yields with the new cursor as one unit.
-    pub(crate) fn read_source(&self, id: &str, lost: Option<String>) {
-        let mut guard = self.lock();
-        let table = &mut *guard;
-        let Some(session) = table.sessions.get(id) else {
-            return;
-        };
-        let Some(tracking) = session.guard.tracking.as_ref() else {
-            return;
-        };
-        let Some(mut source) = table.feed.source(id).cloned() else {
-            return;
-        };
-        let reading = Reading {
-            runner: self.state.runner(),
-            session: id,
-            tracking,
-            accounts: accounts(session, tracking),
-            now: now_ms(),
-        };
-        let mut bodies = Vec::new();
-        if let Some(reason) = lost {
-            bodies.push(Body::Coverage(Coverage::of(
+    pub(crate) fn read_source(&self, id: &str, lost: Option<&str>) {
+        loop {
+            let table = self.lock();
+            let Some(session) = table.sessions.get(id) else {
+                return;
+            };
+            let Some(tracking) = session.guard.tracking.clone() else {
+                return;
+            };
+            let Some(mut source) = table.feed.source(id).cloned() else {
+                return;
+            };
+            let evidence = accounts(session, &tracking);
+            let current = evidence.current.map(str::to_owned);
+            let moves = evidence.moves.to_vec();
+            drop(table);
+            let reading = Reading {
+                runner: self.state.runner(),
+                session: id,
+                tracking: &tracking,
+                accounts: Accounts {
+                    current: current.as_deref(),
+                    moves: &moves,
+                    declared: tracking.account.as_deref(),
+                },
+                now: now_ms(),
+            };
+            let mut bodies = Vec::new();
+            if let Some(reason) = &lost {
+                bodies.push(Body::Coverage(Coverage::of(
                 "coverage_incomplete",
                 &source,
                 Some(source.offset),
                 format!("change notices were lost ({reason}): the stream is read again from its saved cursor"),
             )));
+            }
+            let before = source.clone();
+            let more = read_lines(&reading, &mut source, &mut bodies);
+            if bodies.is_empty() && source == before {
+                return;
+            }
+            let mut table = self.lock();
+            if table.feed.source(id) != Some(&before) {
+                drop(table);
+                continue;
+            }
+            let commit = Commit {
+                source: Some(source),
+                attempt: None,
+            };
+            if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
+                crate::error::said(&format!(
+                    "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
+                ));
+            }
+            drop(table);
+            self.wake();
+            if !more {
+                return;
+            }
         }
-        let before = source.clone();
-        read_lines(&reading, &mut source, &mut bodies);
-        if bodies.is_empty() && source == before {
-            return;
-        }
-        let commit = Commit {
-            source: Some(source),
-            attempt: None,
-        };
-        if let Err(error) = table.feed.append(id, now_ms(), bodies, commit) {
-            crate::error::said(&format!(
-                "session {id}: coverage_incomplete: what its stream yielded was not kept, and is read again from the saved cursor: {error}"
-            ));
-        }
-        drop(guard);
-        self.wake();
     }
 }
 
@@ -365,14 +420,14 @@ pub(crate) fn accounts<'a>(session: &'a Session, tracking: &'a Tracking) -> Acco
 }
 
 /// Read `source` from its offset to its last whole line into `bodies`.
-fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<Body>) {
+fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<Body>) -> bool {
     let opened = std::fs::File::open(&source.path).and_then(|file| {
         let metadata = file.metadata()?;
         Ok((file, metadata))
     });
     let (mut file, metadata) = match opened {
         Ok(opened) => opened,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,
         Err(error) => {
             bodies.push(Body::Coverage(Coverage::of(
                 "source_refused",
@@ -380,7 +435,7 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
                 Some(source.offset),
                 format!("the stream cannot be read: {error}"),
             )));
-            return;
+            return false;
         }
     };
     let identity = format!("{}:{}", metadata.dev(), metadata.ino());
@@ -409,25 +464,43 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         )));
     }
     source.identity = Some(identity);
-    let mut bytes = Vec::new();
-    let read = file
-        .seek(SeekFrom::Start(source.offset))
-        .and_then(|_| file.read_to_end(&mut bytes));
-    if let Err(error) = read {
+    if let Err(error) = file.seek(SeekFrom::Start(source.offset)) {
         bodies.push(Body::Coverage(Coverage::of(
             "source_refused",
             source,
             Some(source.offset),
             format!("the stream cannot be read: {error}"),
         )));
-        return;
+        return false;
     }
+    let mut reader = BufReader::new(file);
+    let beginning = source.offset;
     let mut at = source.offset;
-    for line in bytes.split_inclusive(|byte| *byte == b'\n') {
-        if line.last() != Some(&b'\n') {
-            break;
+    loop {
+        let mut line = Vec::new();
+        let read = reader.by_ref().take(1_048_577).read_until(b'\n', &mut line);
+        if let Err(error) = read {
+            bodies.push(Body::Coverage(Coverage::of(
+                "source_refused",
+                source,
+                Some(at),
+                error.to_string(),
+            )));
+            return false;
         }
-        match serde_json::from_slice::<Value>(line) {
+        if line.len() > 1_048_576 {
+            bodies.push(Body::Coverage(Coverage::of(
+                "record_too_large",
+                source,
+                Some(at),
+                "a transcript record exceeds 1048576 bytes".to_owned(),
+            )));
+            return false;
+        }
+        if line.last() != Some(&b'\n') {
+            return false;
+        }
+        match serde_json::from_slice::<Value>(&line) {
             Ok(record) => bodies.extend(match reading.tracking.harness {
                 Harness::ClaudeCode => reading.claude(source, at, &record),
                 Harness::Codex => reading.codex(source, at, &record),
@@ -441,6 +514,9 @@ fn read_lines(reading: &Reading<'_>, source: &mut SourceState, bodies: &mut Vec<
         }
         at += line.len() as u64;
         source.offset = at;
+        if at - beginning >= 1_048_576 {
+            return true;
+        }
     }
 }
 
@@ -535,6 +611,14 @@ pub(crate) fn tracking_started(table: &mut Table, id: &str, executable: &str, ve
 /// Mark the session's usage-limit words seen in the last `read` bytes, and
 /// end its process so its exit moves it to the next account.
 fn trip_on_words(session: &mut Session, read: usize) {
+    if session
+        .guard
+        .tracking
+        .as_ref()
+        .is_some_and(|tracking| tracking.harness == Harness::ClaudeCode)
+    {
+        return;
+    }
     let Some(rotation) = session.rotation.as_mut() else {
         return;
     };

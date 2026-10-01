@@ -23,7 +23,7 @@ use std::process::{Command, Stdio};
 
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::super::install::exit_wait;
-use super::super::install::layout::Layout;
+use super::super::install::layout::{BINARIES, Layout};
 use super::super::install::services;
 use super::{BuildRecord, Unit, launch, record_build, swap, version};
 
@@ -344,12 +344,15 @@ fn started_word(started: bool, replace: bool) -> &'static str {
 /// Places each binary `bin/` lacks from `source`, then starts the units in
 /// order, each waited on for ready: one whose binary was just placed, or
 /// every one when `changed` says the configuration changed, is stopped and
-/// started again. Records and returns the build that then runs.
+/// started again. A placed screen package reloads the service's immutable
+/// cache; a screen-only change leaves the broker running. Records and
+/// returns the build that then runs.
 pub fn settle(
     layout: &Layout,
     units: &[Unit],
     source: &dyn Fn(&str) -> IdentityResult<PathBuf>,
     changed: bool,
+    screens_placed: bool,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
     swap::ensure_bin(layout)?;
@@ -367,7 +370,9 @@ pub fn settle(
         placed.push(unit.binary);
     }
     for unit in units {
-        let replace = changed || placed.contains(&unit.binary);
+        let replace = changed
+            || placed.contains(&unit.binary)
+            || (screens_placed && unit.binary == BINARIES[1]);
         if replace {
             stop(unit, say)?;
         }

@@ -304,3 +304,26 @@ pub fn end_group(pid: u32) -> Result<(), RunnerError> {
         RunnerError::refused("end_failed", format!("process group {pid}: {error}"))
     })
 }
+
+/// Ask the recorded leader to flush and exit. Its owner waits on the child's
+/// exit, then ends verified remnants with [`end_left_group`].
+///
+/// # Errors
+/// Refuses a reused leader or a failure to read or signal it.
+pub fn end(leader: &crate::peer::Leader) -> Result<(), RunnerError> {
+    let pid = group(leader.pid)?;
+    match crate::peer::present_start(leader.pid)? {
+        None => return Ok(()),
+        Some(start) if start == leader.start => {}
+        Some(_) => {
+            return Err(RunnerError::refused(
+                "process_start_mismatch",
+                "the session leader was reused",
+            ));
+        }
+    }
+    match kill_process(pid, Signal::TERM) {
+        Ok(()) | Err(rustix::io::Errno::SRCH) => Ok(()),
+        Err(error) => Err(RunnerError::refused("end_failed", error.to_string())),
+    }
+}

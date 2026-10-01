@@ -2,6 +2,7 @@
 //! the log's signed snapshot so a start reads only the leaves after it.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use lys_log_store::{Frontier, LeafStore, PinnedRoot, StoreError, StoreResult, Tail};
 use serde::{Deserialize, Serialize};
@@ -15,11 +16,42 @@ const FORMAT: &str = "lys-requests-state/v1";
 
 /// The requests as their log folds them.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub(crate) struct Held {
     pub(crate) asked: Vec<Asked>,
     pub(crate) intended: BTreeMap<String, Intended>,
     pub(crate) decided: BTreeMap<String, Decided>,
+    #[serde(skip)]
+    pub(crate) ordered: Arc<BTreeMap<String, Vec<usize>>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    asked: Vec<Asked>,
+    intended: BTreeMap<String, Intended>,
+    decided: BTreeMap<String, Decided>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut ordered: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for (position, asked) in records.asked.iter().enumerate() {
+            ordered.entry(asked.id.clone()).or_default().push(position);
+        }
+        Self {
+            asked: records.asked,
+            intended: records.intended,
+            decided: records.decided,
+            ordered: Arc::new(ordered),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -33,7 +65,13 @@ impl Held {
     /// Fold one line.
     pub(crate) fn hold(&mut self, line: Line) {
         match line {
-            Line::Asked(asked) => self.asked.push(asked),
+            Line::Asked(asked) => {
+                Arc::make_mut(&mut self.ordered)
+                    .entry(asked.id.clone())
+                    .or_default()
+                    .push(self.asked.len());
+                self.asked.push(asked);
+            }
             Line::Intended(intended) => {
                 self.intended.insert(intended.id.clone(), intended);
             }
@@ -65,9 +103,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub(crate) fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("requests state: {error}"))
     }

@@ -260,13 +260,11 @@ impl<S: LeafStore> ServiceAccountStore<S> {
         refused: ImportRefused,
     ) -> Result<ImportRefused, ServerError> {
         self.settle()?;
-        let account = self
-            .account(&refused.account)
+        self.account(&refused.account)
             .ok_or(ServerError::ServiceAccountUnknown)?;
-        if let Some(kept) = account
-            .import_refusals
-            .iter()
-            .find(|kept| kept.operation == refused.operation && kept.refusal == refused.refusal)
+        if let Some(kept) =
+            self.held
+                .import_refusal(&refused.account, &refused.operation, &refused.refusal)
         {
             return Ok(kept.clone());
         }

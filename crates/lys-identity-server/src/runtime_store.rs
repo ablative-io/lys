@@ -267,6 +267,16 @@ impl<S: LeafStore> RuntimeStore<S> {
         &self.held.sessions
     }
 
+    /// Live agent sessions in identifier order, starting after the supplied identifier.
+    pub fn live_ordered(&self, after: std::ops::Bound<&str>) -> impl Iterator<Item = &Tracked> {
+        self.held.live_ordered(after)
+    }
+
+    /// The maintained number of live agent sessions.
+    pub fn live_count(&self) -> usize {
+        self.held.live_count()
+    }
+
     /// Selected agents' activity, detached from the mutable index and report history.
     pub fn agents_with_sessions(
         &mut self,

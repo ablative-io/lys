@@ -14,6 +14,10 @@ use crate::session::{Sessions, Table, accounts, append, now_ms};
 use crate::tracking::{Harness, Reading};
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
+#[cfg(test)]
+#[path = "../tests/collector_binding/cases.rs"]
+mod binding_tests;
+
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -142,7 +146,7 @@ impl Sessions {
             append(&mut table, id, vec![Body::Coverage(coverage)], None);
             return Err(unbound(words));
         }
-        Ok(self.bind(&mut table, id, (given, claude), false))
+        self.bind(&mut table, id, (given, claude), false)
     }
 
     /// Bind session `id` to the stream at `path` as the harness's `bound`
@@ -153,15 +157,36 @@ impl Sessions {
         id: &str,
         (path, bound): (&str, &str),
         from_start: bool,
-    ) -> String {
+    ) -> Result<String, RunnerError> {
         let held = table.feed.source(id).cloned();
         if held.as_ref().is_some_and(|held| held.path == path) {
-            return format!("{path} is already bound");
+            return Ok(format!("{path} is already bound"));
         }
         let offset = if from_start {
             0
         } else {
-            std::fs::metadata(path).map_or(0, |metadata| metadata.len())
+            match std::fs::metadata(path) {
+                Ok(metadata) => metadata.len(),
+                Err(error) => {
+                    let words = format!("{path} cannot be read: {error}");
+                    let refused = SourceState {
+                        path: path.to_owned(),
+                        ..SourceState::default()
+                    };
+                    append(
+                        table,
+                        id,
+                        vec![Body::Coverage(Coverage::of(
+                            "source_refused",
+                            &refused,
+                            None,
+                            words.clone(),
+                        ))],
+                        None,
+                    );
+                    return Err(RunnerError::refused("transcript_unreadable", words));
+                }
+            }
         };
         let source = SourceState {
             path: path.to_owned(),
@@ -184,7 +209,7 @@ impl Sessions {
         ];
         append(table, id, bodies, Some(source));
         self.follow(table, id);
-        words
+        Ok(words)
     }
 
     fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
@@ -254,7 +279,7 @@ impl Sessions {
                     )
                 })?;
             let path = rollout(Path::new(&home), thread)?.display().to_string();
-            self.bind(&mut table, id, (&path, thread), true);
+            self.bind(&mut table, id, (&path, thread), true)?;
         }
         drop(table);
         self.read_source(id, None);
@@ -272,7 +297,7 @@ impl Sessions {
 
 /// Keep boundary `name` for session `id`, with the response its stream
 /// held pending, now shown whole.
-fn flushed(table: &mut Table, runner: &str, id: &str, name: &str) {
+pub(crate) fn flushed(table: &mut Table, runner: &str, id: &str, name: &str) {
     let source = table.feed.source(id).cloned();
     let pending = table.sessions.get(id).and_then(|session| {
         let tracking = session.guard.tracking.as_ref()?;
@@ -310,17 +335,13 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
     let mut dirs = vec![home.join("sessions")];
     let mut found = None;
     while let Some(dir) = dirs.pop() {
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(error) => {
-                crate::error::said(&format!(
-                    "{} is not searched for rollouts: {error}",
-                    dir.display()
-                ));
-                continue;
-            }
-        };
-        for entry in entries.flatten() {
+        let entries = std::fs::read_dir(&dir).map_err(|error| {
+            RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|error| {
+                RunnerError::refused("rollout_unreadable", format!("{}: {error}", dir.display()))
+            })?;
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().into_owned();
             if path.is_dir() {
@@ -342,7 +363,12 @@ pub fn rollout(home: &Path, thread: &str) -> Result<std::path::PathBuf, RunnerEr
             std::io::BufRead::read_line(&mut std::io::BufReader::new(file), &mut first)
         })
         .map_err(|error| RunnerError::refused("transcript_unbound", error.to_string()))?;
-    let meta: Value = serde_json::from_str(first.trim_end()).unwrap_or(Value::Null);
+    let meta: Value = serde_json::from_str(first.trim_end()).map_err(|error| {
+        RunnerError::refused(
+            "rollout_unreadable",
+            format!("the first line is not JSON: {error}"),
+        )
+    })?;
     let named = meta
         .get("payload")
         .and_then(|payload| payload.get("id"))

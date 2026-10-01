@@ -16,6 +16,8 @@
 //! snapshot and only the leaves after it. A snapshot refused, or a state that
 //! does not read back, sends the start to every leaf, by name, never silently.
 
+use std::collections::BTreeSet;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -220,6 +222,18 @@ impl<S: LeafStore> TeamStore<S> {
     /// The team named `id`.
     pub fn team(&self, id: &str) -> Option<&Team> {
         self.overlay.as_ref().unwrap_or(&self.held).team(id)
+    }
+
+    /// A team and each descendant under the current migration overlay.
+    pub fn subtree(&self, root: &str) -> Result<BTreeSet<String>, ServerError> {
+        self.overlay
+            .as_ref()
+            .unwrap_or(&self.held)
+            .subtree(root)
+            .map_err(|reason| match reason {
+                Refused::Unknown => ServerError::Team(TeamError::Unknown),
+                other => unavailable(format!("team subtree refused: {other:?}")),
+            })
     }
 
     /// The line first kept under `operation`.

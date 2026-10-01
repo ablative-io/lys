@@ -22,6 +22,7 @@
 //! null until it does. Each route answers its type from `read_views`.
 
 use std::collections::HashMap;
+use std::ops::Bound;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -228,18 +229,82 @@ async fn every_person(
     crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
-        let mut grouped = agents_by_person(projection)?;
-        let people = projection
-            .records()
-            .filter_map(|(id, record)| match id {
-                IdentityId::Person(person) => {
-                    let agents = grouped.remove(person).unwrap_or_default();
-                    Some(person_view(*person, record, agents))
+        let page = crate::list_page::Page::read(query, "/directory/people")?;
+        let Some(page) = page else {
+            let mut grouped = agents_by_person(projection)?;
+            let people = projection
+                .records()
+                .filter_map(|(id, record)| match id {
+                    IdentityId::Person(person) => Some(person_view(
+                        *person,
+                        record,
+                        grouped.remove(person).unwrap_or_default(),
+                    )),
+                    IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => None,
+                })
+                .collect();
+            return Ok(Json(PeopleView {
+                scope: "directory".to_owned(),
+                people,
+                page: None,
+                agents_total: None,
+            }));
+        };
+        let members = page.members(&state)?;
+        let filtered = page.filtered();
+        let mut agents_total = 0;
+        let after = if filtered {
+            Bound::Unbounded
+        } else {
+            page.after()
+        };
+        let rows = projection.people(after);
+        let (people, totals) = page.select(
+            rows,
+            (!filtered).then_some(projection.people_count()),
+            |(_, person)| {
+                if !filtered {
+                    return Ok(true);
                 }
-                IdentityId::Agent(_) | IdentityId::ServiceAccount(_) => None,
-            })
-            .collect();
-        people_page(&state, "directory", people, query, "/directory/people")
+                let record = person_record(projection, *person)?;
+                let agents = projection
+                    .agents_of(*person)
+                    .collect::<Result<Vec<_>, _>>()?;
+                let in_team = crate::list_page::member(members.as_ref(), &person.to_string(), None)
+                    || agents.iter().any(|(id, _)| {
+                        crate::list_page::member(members.as_ref(), &id.to_string(), None)
+                    });
+                let matched = in_team
+                    && page.matches(
+                        std::iter::once(record.profile().display_name()).chain(
+                            agents
+                                .iter()
+                                .map(|(_, record)| record.profile().display_name()),
+                        ),
+                    );
+                if matched {
+                    agents_total += projection.person_agents_count(*person);
+                }
+                Ok(matched)
+            },
+            |(id, _)| id,
+            |(_, person)| {
+                Ok(person_view(
+                    *person,
+                    person_record(projection, *person)?,
+                    agents_of(projection, *person)?,
+                ))
+            },
+        )?;
+        if !filtered {
+            agents_total = projection.people_agents_count();
+        }
+        Ok(Json(PeopleView {
+            scope: "directory".to_owned(),
+            people,
+            page: Some(totals),
+            agents_total: Some(agents_total),
+        }))
     })
 }
 

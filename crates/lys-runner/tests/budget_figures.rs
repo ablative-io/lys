@@ -302,7 +302,7 @@ fn codex_reads_explicit_window_durations_without_a_token_increase() -> TestResul
         },
         now: 1_800_000_000_000,
     };
-    let input = json!({"type": "event_msg", "payload": {"type": "token_count", "info": null, "rate_limits": {
+    let input = json!({"type": "event_msg", "timestamp": "2027-01-15T08:00:00Z", "payload": {"type": "token_count", "info": null, "rate_limits": {
         "primary": {"used_percent": 50, "window_minutes": 10_080, "resets_at": 1_800_604_800},
         "secondary": {"used_percent": 25, "window_minutes": 300, "resets_at": 1_800_003_600}
     }}});

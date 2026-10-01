@@ -22,7 +22,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use axum::extract::rejection::FormRejection;
 use axum::extract::{Form, Query, RawQuery, State};
@@ -35,13 +35,17 @@ use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use lys_core::Ed25519Identity;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
 use crate::routes::{AppState, cookie_header, hex, with_directory};
 use crate::session::now;
+
+#[path = "provider_tokens.rs"]
+mod token_store;
+use token_store::Tokens;
 
 /// How long a code lives when the configuration says nothing, in seconds:
 /// the ten minutes RFC 6749 (section 4.1.2) recommends as a code's longest
@@ -94,9 +98,12 @@ struct Grant {
     /// When the Lys sign-in the code states ends; its tokens end with it.
     sign_in_ends_at: u64,
     used: bool,
+    issued_access: Option<String>,
 }
 
 /// An access token Lys issued, for the user information route.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct Access {
     session_id: String,
     subject: String,
@@ -111,7 +118,7 @@ pub struct OpenIdProvider {
     clients: Vec<ProductClient>,
     code_seconds: u64,
     codes: Mutex<HashMap<String, Grant>>,
-    tokens: Mutex<HashMap<String, Access>>,
+    tokens: Mutex<Tokens>,
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
@@ -120,8 +127,9 @@ fn unavailable(reason: impl Into<String>) -> ServerError {
     }
 }
 
-fn held<T>(slot: &Mutex<T>) -> MutexGuard<'_, T> {
-    slot.lock().unwrap_or_else(PoisonError::into_inner)
+fn held<T>(slot: &Mutex<T>) -> Result<MutexGuard<'_, T>, ServerError> {
+    slot.lock()
+        .map_err(|error| unavailable(format!("the provider state lock is poisoned: {error}")))
 }
 
 /// `N` bytes from the secure random source, base64url.
@@ -177,7 +185,10 @@ impl OpenIdProvider {
             clients: settings.clients.clone(),
             code_seconds: settings.code_seconds,
             codes: Mutex::new(HashMap::new()),
-            tokens: Mutex::new(HashMap::new()),
+            tokens: Mutex::new(Tokens::open(
+                settings.key_file.with_extension("tokens.json"),
+                now(),
+            )?),
         })
     }
 
@@ -328,7 +339,7 @@ async fn authorize(
     let code = random::<32>()?;
     let at = now();
     {
-        let mut codes = held(&provider.codes);
+        let mut codes = held(&provider.codes)?;
         codes.retain(|_, grant| grant.expires_at > at);
         codes.insert(
             code.clone(),
@@ -343,6 +354,7 @@ async fn authorize(
                 expires_at: at.saturating_add(provider.code_seconds),
                 sign_in_ends_at: session.ends_at,
                 used: false,
+                issued_access: None,
             },
         );
     }
@@ -394,7 +406,117 @@ fn oauth_refusal(error: &ServerError) -> Response {
         | ServerError::VerifierWrong
         | ServerError::RedirectUnregistered => "invalid_grant",
         ServerError::RequestMalformed { .. } => "invalid_request",
-        _ => "server_error",
+        ServerError::Team(..)
+        | ServerError::Budget(..)
+        | ServerError::HarnessCatalogueUnreadable { .. }
+        | ServerError::Identity(..)
+        | ServerError::Grant(..)
+        | ServerError::App(..)
+        | ServerError::Goal(..)
+        | ServerError::Inactive { .. }
+        | ServerError::NotSignedIn
+        | ServerError::NotAdmitted { .. }
+        | ServerError::NoPerson
+        | ServerError::SetupRequired
+        | ServerError::AgentNotVisible
+        | ServerError::GrantNotVisible
+        | ServerError::Withheld { .. }
+        | ServerError::SessionUnknown
+        | ServerError::SignInStateUnknown
+        | ServerError::SignInRefused
+        | ServerError::SignInThrottled
+        | ServerError::SecondFactorUnsupported
+        | ServerError::SetupClosed
+        | ServerError::SetupCodeRefused
+        | ServerError::SetupUnavailable { .. }
+        | ServerError::AccountRefused { .. }
+        | ServerError::SignInFailed { .. }
+        | ServerError::ConfigInvalid { .. }
+        | ServerError::SecretsUnavailable { .. }
+        | ServerError::SecretsRefused { .. }
+        | ServerError::RequestsUnavailable { .. }
+        | ServerError::McpRequestsUnavailable { .. }
+        | ServerError::McpServerUnknown { .. }
+        | ServerError::McpServerHeld { .. }
+        | ServerError::McpBeyondRemit { .. }
+        | ServerError::RequestUnknown
+        | ServerError::RequestDecided { .. }
+        | ServerError::RequestHeld { .. }
+        | ServerError::RequestReused { .. }
+        | ServerError::NetworkUnavailable { .. }
+        | ServerError::LoginUnbound
+        | ServerError::MachineUnknown
+        | ServerError::MachineReused { .. }
+        | ServerError::MachineTeamReused { .. }
+        | ServerError::MachineAgentsReused { .. }
+        | ServerError::SessionsUnavailable { .. }
+        | ServerError::MemoryUnavailable { .. }
+        | ServerError::ProvisioningUnavailable { .. }
+        | ServerError::ProvisioningChanged { .. }
+        | ServerError::ProvisioningReused { .. }
+        | ServerError::ProfileVersionUnknown { .. }
+        | ServerError::ProfileVersionReplaced { .. }
+        | ServerError::ProfileNotReviewed { .. }
+        | ServerError::CertificatesUnavailable { .. }
+        | ServerError::CertificateUnknown { .. }
+        | ServerError::CertificateReused { .. }
+        | ServerError::CertificateWithdrawn { .. }
+        | ServerError::RolesUnavailable { .. }
+        | ServerError::RoleUnknown
+        | ServerError::RoleVersionUnknown
+        | ServerError::HolderUnknown
+        | ServerError::RoleReused { .. }
+        | ServerError::RoleHeld { .. }
+        | ServerError::HoldingOver { .. }
+        | ServerError::HoldingChanged
+        | ServerError::LaunchRecordMissing
+        | ServerError::OperatorRefused { .. }
+        | ServerError::AgentSignatureRefused { .. }
+        | ServerError::AgentNotActive { .. }
+        | ServerError::MachineCannotReach { .. }
+        | ServerError::MachineRetired
+        | ServerError::MachineNotForAgent
+        | ServerError::MachineWithoutRuntime
+        | ServerError::MachineWithoutRunner
+        | ServerError::SkillUnknown { .. }
+        | ServerError::PolicyUnrepresentable { .. }
+        | ServerError::ModelUnrepresentable { .. }
+        | ServerError::HarnessUndeclared { .. }
+        | ServerError::LaunchUnrenderable { .. }
+        | ServerError::McpCredentialInline { .. }
+        | ServerError::McpSettingUnrepresentable { .. }
+        | ServerError::McpHandleUnsupported { .. }
+        | ServerError::RuntimeUnavailable { .. }
+        | ServerError::RuntimeSessionUnknown
+        | ServerError::RuntimeSessionStarted { .. }
+        | ServerError::RuntimeSessionStopped { .. }
+        | ServerError::RuntimeReportReused { .. }
+        | ServerError::ServiceAccountsUnavailable { .. }
+        | ServerError::ServiceAccountUnknown
+        | ServerError::ServiceAccountReused { .. }
+        | ServerError::ServiceAccountRetired { .. }
+        | ServerError::ServiceAccountOwnerRetired { .. }
+        | ServerError::PolicyUnavailable { .. }
+        | ServerError::PolicyVersionConflict { .. }
+        | ServerError::PolicyRefused { .. }
+        | ServerError::StopsUnavailable { .. }
+        | ServerError::StopReused { .. }
+        | ServerError::ReviewsUnavailable { .. }
+        | ServerError::ReviewerOnly
+        | ServerError::GrantNotDue { .. }
+        | ServerError::ReviewReused { .. }
+        | ServerError::DirectoryUnavailable { .. }
+        | ServerError::SignInProvidersUnavailable { .. }
+        | ServerError::ProviderUnavailable { .. }
+        | ServerError::TokenUnknown
+        | ServerError::ProviderRefused { .. }
+        | ServerError::SignInProvidersRefused { .. }
+        | ServerError::NotPermitted { .. }
+        | ServerError::NoLiveSession { .. }
+        | ServerError::RunnerAbsent { .. }
+        | ServerError::Runner { .. }
+        | ServerError::DialRefused { .. }
+        | ServerError::DialStale { .. } => "server_error",
     };
     let body = json!({
         "error": code,
@@ -441,13 +563,16 @@ fn exchange(
     let (client_id, secret) = presented(headers, &form).ok_or(ServerError::ClientUnknown)?;
     let client = provider.authenticated(&client_id, &secret)?;
     let at = now();
+    let mut codes = held(&provider.codes)?;
+    let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
     let (subject, nonce, authenticated_at, expires_at, session_id) = {
-        let mut codes = held(&provider.codes);
-        let grant = codes.get_mut(&form.code).ok_or(ServerError::CodeUnknown)?;
         if grant.client_id != client.client_id {
             return Err(ServerError::CodeUnknown);
         }
         if grant.used {
+            if let Some(key) = &grant.issued_access {
+                held(&provider.tokens)?.revoke(key)?;
+            }
             return Err(ServerError::CodeUsed);
         }
         if at >= grant.expires_at || at >= grant.sign_in_ends_at {
@@ -484,18 +609,20 @@ fn exchange(
         claims["nonce"] = Value::String(nonce);
     }
     let access = random::<32>()?;
+    let lookup = hex(&Sha256::digest(access.as_bytes()));
     {
-        let mut tokens = held(&provider.tokens);
-        tokens.retain(|_, token| token.expires_at > at);
+        let mut tokens = held(&provider.tokens)?;
         tokens.insert(
-            access.clone(),
+            lookup.clone(),
             Access {
                 session_id,
                 subject,
                 expires_at,
             },
-        );
+            at,
+        )?;
     }
+    grant.issued_access = Some(lookup);
     Ok(json!({
         "access_token": access,
         "token_type": "Bearer",
@@ -515,11 +642,8 @@ async fn userinfo(
         .and_then(|value| value.strip_prefix("Bearer "))
         .ok_or(ServerError::TokenUnknown)?;
     let (subject, session_id) = {
-        let tokens = held(&provider.tokens);
-        let access = tokens
-            .get(bearer.trim())
-            .filter(|access| access.expires_at > now())
-            .ok_or(ServerError::TokenUnknown)?;
+        let tokens = held(&provider.tokens)?;
+        let access = tokens.get(&hex(&Sha256::digest(bearer.trim().as_bytes())), now())?;
         (access.subject.clone(), access.session_id.clone())
     };
     if !state.sessions.is_live(&session_id)? {

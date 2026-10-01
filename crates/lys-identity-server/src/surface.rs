@@ -7,34 +7,45 @@
 //! reads, so it is answered with the page. A path that steps outside the
 //! directory is never read.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::{Path as UrlPath, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+
+use crate::error::ServerError;
+
+#[path = "surface_cache.rs"]
+mod cache;
+use cache::Screens;
 
 /// The page every screen route is answered with.
 pub const PAGE: &str = "index.html";
 
 /// `api` under `/api`, and the screens in `dir` at the root.
-pub fn serving(dir: PathBuf, api: Router) -> Router {
+pub fn serving(dir: &Path, api: Router) -> Result<Router, ServerError> {
+    let installed = Arc::new(Screens::load(dir)?);
     let screens = Router::new()
         .route("/", get(page))
         .route("/{*path}", get(file))
-        .with_state(Arc::<Path>::from(dir));
+        .with_state(installed);
     // Reserve the whole API mount, including unknown paths. A route-only nest
     // can otherwise lose an unknown API path to the public screen wildcard.
-    Router::new().nest_service("/api", api).merge(screens)
+    Ok(Router::new().nest_service("/api", api).merge(screens))
 }
 
-async fn page(State(dir): State<Arc<Path>>) -> Response {
-    answer(&dir, Path::new(PAGE))
+async fn page(State(screens): State<Arc<Screens>>, headers: HeaderMap) -> Response {
+    answer(&screens, Path::new(PAGE), &headers)
 }
 
-async fn file(State(dir): State<Arc<Path>>, UrlPath(path): UrlPath<String>) -> Response {
+async fn file(
+    State(screens): State<Arc<Screens>>,
+    UrlPath(path): UrlPath<String>,
+    headers: HeaderMap,
+) -> Response {
     let relative = Path::new(&path);
     let inside = relative
         .components()
@@ -43,27 +54,56 @@ async fn file(State(dir): State<Arc<Path>>, UrlPath(path): UrlPath<String>) -> R
         return StatusCode::NOT_FOUND.into_response();
     }
     if relative.extension().is_some() {
-        return answer(&dir, relative);
+        return answer(&screens, relative, &headers);
     }
-    answer(&dir, Path::new(PAGE))
+    answer(&screens, Path::new(PAGE), &headers)
 }
 
-fn answer(dir: &Path, relative: &Path) -> Response {
-    match std::fs::read(dir.join(relative)) {
-        Ok(bytes) => (
-            [
-                (header::CONTENT_TYPE, content_type(relative)),
-                (header::CACHE_CONTROL, cache_control(relative)),
-            ],
-            bytes,
-        )
-            .into_response(),
-        Err(_) if relative == Path::new(PAGE) => (
+fn answer(screens: &Screens, relative: &Path, headers: &HeaderMap) -> Response {
+    match screens.get(relative) {
+        Some(asset) => {
+            let mut matched = false;
+            for value in headers.get_all(header::IF_NONE_MATCH) {
+                let Ok(value) = value.to_str() else {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        "ScreenEtagMalformed: the conditional tag is not text",
+                    )
+                        .into_response();
+                };
+                matched |= value.split(',').any(|tag| {
+                    let tag = tag.trim();
+                    let tag = match tag.strip_prefix("W/") {
+                        Some(tag) => tag,
+                        None => tag,
+                    };
+                    tag == "*" || asset.etag == tag
+                });
+            }
+            let mut answer = if matched {
+                StatusCode::NOT_MODIFIED.into_response()
+            } else {
+                asset.bytes.clone().into_response()
+            };
+            answer.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static(content_type(relative)),
+            );
+            answer.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static(cache_control(relative)),
+            );
+            answer
+                .headers_mut()
+                .insert(header::ETAG, asset.etag.clone());
+            answer
+        }
+        None if relative == Path::new(PAGE) => (
             StatusCode::NOT_FOUND,
             "the screens are not installed; run lys identity install with --surface",
         )
             .into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 

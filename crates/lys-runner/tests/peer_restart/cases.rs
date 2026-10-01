@@ -188,9 +188,17 @@ fn a_replayed_operation_answers_the_kept_restart_once() -> Result<(), Box<dyn Er
     )?;
     assert_eq!(again, first);
     assert_eq!(held.leader("own")?, after);
-    let record: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(held.dir.path().join("operations.json"))?)?;
-    let operations = record["operations"].as_array().ok_or("no operations")?;
+    let text = std::fs::read_to_string(held.dir.path().join("operations.jsonl"))?;
+    let mut folded = BTreeMap::new();
+    for line in text.lines() {
+        let record: serde_json::Value = serde_json::from_str(line)?;
+        let id = record["operation"]
+            .as_str()
+            .ok_or("no operation id")?
+            .to_owned();
+        folded.insert(id, record);
+    }
+    let operations = folded.into_values().collect::<Vec<_>>();
     assert_eq!(operations.len(), 1);
     assert_eq!(operations[0]["operation"], "restart-own");
     assert_eq!(operations[0]["state"], "confirmed");

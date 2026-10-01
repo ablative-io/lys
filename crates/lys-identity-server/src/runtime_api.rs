@@ -404,6 +404,66 @@ pub(crate) fn visible_sessions(
     })
 }
 
+/// A queried live list builds only the selected views; visibility still narrows metadata.
+pub(crate) fn live_page(
+    state: &AppState,
+    headers: &HeaderMap,
+    page: &crate::list_page::Page,
+) -> Result<(Vec<SessionView>, crate::list_page::Totals), ServerError> {
+    let actor = signed_in(state, headers)?;
+    let members = page.members(state)?;
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let asker = caller(state, headers, projection)?;
+        let administrator = state.admission.administrator(&actor).is_ok();
+        let filtered = page.filtered() || !administrator;
+        let after = if filtered {
+            std::ops::Bound::Unbounded
+        } else {
+            page.after()
+        };
+        with_runtime(state, |store| {
+            page.select(
+                store.live_ordered(after),
+                (!filtered).then_some(store.live_count()),
+                |tracked| {
+                    if !filtered {
+                        return Ok(true);
+                    }
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    if !sees(projection, administrator, asker, agent) {
+                        return Ok(false);
+                    }
+                    let id = agent.parse::<AgentId>()?;
+                    let record = projection
+                        .record(IdentityId::Agent(id))
+                        .ok_or(ServerError::AgentNotVisible)?;
+                    let person = record.responsible().map(|person| person.to_string());
+                    Ok(
+                        crate::list_page::member(members.as_ref(), agent, person.as_deref())
+                            && page.matches([record.profile().display_name()]),
+                    )
+                },
+                |tracked| &tracked.session,
+                |tracked| {
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    let id = agent.parse::<AgentId>()?;
+                    if projection.record(IdentityId::Agent(id)).is_none() {
+                        return Err(ServerError::AgentNotVisible);
+                    }
+                    view(state, tracked).ok_or(ServerError::RuntimeSessionUnknown)
+                },
+            )
+        })
+    })
+}
+
 async fn sessions(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
