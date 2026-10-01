@@ -1,3 +1,5 @@
+//! Prepare shared offline conformance tools before their tests run.
+
 #[path = "../tests/harness/cache.rs"]
 mod cache;
 
