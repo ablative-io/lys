@@ -37,35 +37,26 @@
 //! screen renders the service's judgement and walks no chain of its own. A
 //! refusal that stops a grant standing is read as the caller may read it.
 
-use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use axum::extract::{Path, Query, State};
+use axum::Router;
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
-use axum::{Json, Router};
 use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
 use lys_identity::projection::Projection;
 use lys_identity::signer::load_service_key;
-use lys_identity::{IdentityError, IdentityId, PersonId};
+use lys_identity::{IdentityId, PersonId};
 use lys_log_store::{FileLeafStore, LeafStore};
 
 use crate::apps_store::AppStore;
 use crate::error::ServerError;
-use crate::grant_contract::{
-    ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
-    ModelView, PAGE_MAX, PermitView, RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
-    grant_id,
-};
 pub(crate) use crate::grant_sight::grant_view;
-use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
 use crate::routes::{AppState, signed_in, with_directory};
-use crate::session::now;
 use crate::spicedb::{Relationships, SpiceDb, SpiceDbEngine};
 
 mod handlers;
-use handlers::*;
+use handlers::{cannot_give, check, list, model, read, revoke, who, why};
 pub(crate) use handlers::{delegate, issue_root};
 
 /// The grants as the service holds them.

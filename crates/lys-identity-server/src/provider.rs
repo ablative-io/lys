@@ -22,16 +22,10 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 
-use axum::extract::rejection::FormRejection;
-use axum::extract::{Form, Query, RawQuery, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
-use axum::{Json, Router};
 use base64::Engine;
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_core::Ed25519Identity;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
@@ -40,7 +34,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::routes::{AppState, cookie_header, hex, with_directory};
+use crate::routes::hex;
 use crate::session::now;
 
 #[path = "provider_tokens.rs"]
@@ -49,7 +43,6 @@ use token_store::Tokens;
 
 mod endpoints;
 pub use endpoints::routes;
-use endpoints::*;
 
 /// How long a code lives when the configuration says nothing, in seconds:
 /// the ten minutes RFC 6749 (section 4.1.2) recommends as a code's longest

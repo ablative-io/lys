@@ -1,8 +1,7 @@
 //! The grant routes' handlers: list, read, issue, pass on, revoke, check,
 //! and the questions why, who and what cannot be given.
 
-use super::*;
-use crate::apps_store::AppStore;
+use super::{Decision, Judged, decide, grant_view, with_grants};
 use crate::error::ServerError;
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, CannotGiveBody, DelegateBody, GrantList, GrantView, HolderView,
@@ -10,21 +9,15 @@ use crate::grant_contract::{
     grant_id,
 };
 use crate::grant_sight::{as_seen_by, sees, sees_identity, sees_with, visible_or};
-use crate::routes::{AppState, signed_in, with_directory};
+use crate::routes::{AppState, signed_in};
 use crate::session::now;
-use crate::spicedb::{Relationships, SpiceDb, SpiceDbEngine};
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use lys_identity::grants::{ExerciseRequest, GrantError, Grants, MemoryRelationships, Model};
-use lys_identity::projection::Projection;
-use lys_identity::signer::load_service_key;
-use lys_identity::{IdentityError, IdentityId, PersonId};
-use lys_log_store::{FileLeafStore, LeafStore};
+use lys_identity::grants::{ExerciseRequest, GrantError};
+use lys_identity::{IdentityError, IdentityId};
 use std::collections::{BTreeSet, HashMap};
-use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub(super) async fn list(
     State(state): State<Arc<AppState>>,

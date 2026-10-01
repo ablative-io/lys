@@ -19,7 +19,7 @@ use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 mod dispatch;
-use dispatch::*;
+use dispatch::{Dispatch, dispatch};
 
 fn unavailable(reason: impl std::fmt::Display) -> ServerError {
     ServerError::Budget(BudgetError::BudgetsUnavailable {

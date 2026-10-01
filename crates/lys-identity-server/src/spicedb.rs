@@ -22,7 +22,6 @@
 //! call, where the scope is applied, so no other part of the engine knows it.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use lys_identity::IdentityId;
@@ -30,13 +29,11 @@ use lys_identity::grants::{
     Action, GrantError, KindModel, MemoryRelationships, Model, ObjectRef, Relationship,
     RelationshipStore, Resource, SCHEMA, placement,
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::spicedb_apps::{app_definition, app_definitions, definition};
 
 mod credential;
-use credential::*;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 
 #[path = "spicedb_scope.rs"]

@@ -1,18 +1,13 @@
 //! What a crossing does to the session it covers: the notice it types, and
 //! the tell or stop sent to the runner.
 
-use super::*;
-use crate::budgets_api::{with_budgets, with_budgets_mut};
+use super::{Target, unavailable};
 use crate::budgets_crossing::Crossing;
 use crate::budgets_limits::{Limit, Limits};
-use crate::budgets_state::{Act, Held, Measure, Standing, Usage};
+use crate::budgets_state::{Act, Held, Measure, Usage};
 use crate::error::ServerError;
-use crate::error_budget::BudgetError;
-use crate::routes::AppState;
-use levels::{Levels, levels};
 use serde_json::Number;
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::collections::BTreeMap;
 
 pub(super) fn notice(
     limit: &Limit,

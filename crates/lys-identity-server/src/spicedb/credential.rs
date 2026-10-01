@@ -1,16 +1,9 @@
 //! Where the permission engine is, and its credential: read once, on the
 //! first call that needs it, and never printed.
 
-use super::*;
-use crate::spicedb_apps::{app_definition, app_definitions, definition};
-use lys_identity::IdentityId;
-use lys_identity::grants::{
-    Action, GrantError, KindModel, MemoryRelationships, Model, ObjectRef, Relationship,
-    RelationshipStore, Resource, SCHEMA, placement,
-};
+use super::{KEY_LINE, engine_name, unavailable};
+use lys_identity::grants::GrantError;
 use serde::Deserialize;
-use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 

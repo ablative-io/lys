@@ -19,7 +19,7 @@ use lys_identity::{Actor, AgentId, IdentityId};
 use serde::{Deserialize, Serialize};
 
 use crate::budgets_limits::{Limit, Limits};
-use crate::budgets_state::{Act, Budget, Holder, HolderKind, Length, Measure};
+use crate::budgets_state::{Holder, HolderKind, Measure};
 use crate::budgets_store::BudgetStore;
 use crate::budgets_usage::Used;
 use crate::error::ServerError;
@@ -30,7 +30,7 @@ use crate::session::now;
 
 mod confirm;
 pub(crate) use confirm::ConfirmBody;
-use confirm::*;
+use confirm::{confirm, source_gaps};
 
 /// A budget to set on a holder.
 #[derive(Deserialize, utoipa::ToSchema)]

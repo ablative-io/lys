@@ -10,7 +10,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_core::Ed25519Identity;
 use serde_json::json;
 
-use super::{Exchange, OpenIdProvider, ProviderSettings, encoded, presented, same};
+use super::endpoints::{Exchange, presented};
+use super::{OpenIdProvider, ProviderSettings, encoded, same};
 
 #[test]
 fn a_query_value_is_percent_encoded_except_its_unreserved_characters() {

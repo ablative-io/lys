@@ -1,7 +1,9 @@
 //! The provider's endpoints: discovery, keys, authorize, the token exchange
 //! and userinfo, each refusal answered in OAuth's own words.
 
-use super::*;
+use super::{
+    Access, Grant, ID_TOKEN_SECONDS, OpenIdProvider, encoded, held, random, same, unavailable,
+};
 use crate::error::ServerError;
 use crate::routes::{AppState, cookie_header, hex, with_directory};
 use crate::session::now;
@@ -13,16 +15,10 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
-use lys_core::Ed25519Identity;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
-use token_store::Tokens;
+use std::sync::Arc;
 
 /// The provider's routes, at Lys's own origin beside the screens.
 pub fn routes(state: Arc<AppState>) -> Router {

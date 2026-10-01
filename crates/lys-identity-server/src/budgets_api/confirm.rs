@@ -1,24 +1,18 @@
 //! Confirming a legacy budget version, and the sources whose usage is not
 //! yet reported.
 
-use super::*;
-use crate::budgets_limits::{Limit, Limits};
+use super::{UnitUnavailable, authorised, with_budgets_mut};
+use crate::budgets_limits::Limit;
 use crate::budgets_state::{Act, Budget, Holder, HolderKind, Length, Measure};
-use crate::budgets_store::BudgetStore;
-use crate::budgets_usage::Used;
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
-use crate::read_api::own_person;
-use crate::routes::{AppState, signed_in, with_directory};
+use crate::routes::{AppState, signed_in};
 use crate::session::now;
+use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use lys_identity::{Actor, AgentId, IdentityId};
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use serde::Deserialize;
 use std::sync::Arc;
 
 /// The exact legacy budget version an administrator confirms.
