@@ -13,11 +13,10 @@
 //! A start removes every namespace an earlier run left, since no bench
 //! outlives the process that opened it.
 //!
-//! When the service runs its grants on `SpiceDB`, a question is asked under
-//! the service's grants' lock, since the scratch scope it writes shares the
-//! engine's one schema with the service's. Every scratch scope the engine
-//! holds when a question begins is one an earlier question could not remove,
-//! and is removed first.
+//! A bench-only lock serializes scratch cleanup and questions. Schema writes
+//! share the engine's schema writer lock with live grants, while network
+//! calls hold no live grants lock. An answer is refused if its captured
+//! grant or model revision changed during the call.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -61,6 +60,7 @@ pub(crate) const BENCH: &[&str] = &[
 pub struct Benches {
     dir: PathBuf,
     open: Mutex<BTreeMap<String, Bench>>,
+    asking: Mutex<()>,
 }
 
 impl Benches {
@@ -76,6 +76,7 @@ impl Benches {
         Ok(Self {
             dir,
             open: Mutex::new(BTreeMap::new()),
+            asking: Mutex::new(()),
         })
     }
 
@@ -241,54 +242,99 @@ async fn ask(
     let bench = bench(&state, &id, &by)?;
     let (asking, _) = new_secret()?;
     let engine = state.grant_setup.spicedb.as_ref();
-    let draft = Draft {
-        app: &bench.app,
-        schema: &bench.schema,
-        by: &bench.opened_by,
-        lys: &state.grant_setup.model(),
-        engine,
-    };
     let examples = Examples {
         holdings: &body.holdings,
         placements: &body.placements,
         question: &body.question,
     };
-    let Some(settings) = engine else {
-        return answer_in(&bench.dir.join(asking), &draft, &examples).map(Json);
-    };
-    with_engine(&state.grants, &state.grant_setup, |model| {
+    let answer = |model: &Model| {
         let draft = Draft {
+            app: &bench.app,
+            schema: &bench.schema,
+            by: &bench.opened_by,
             lys: model,
-            ..draft
+            engine,
         };
-        let left = SpiceDb::clear_scratch(settings).map_err(|error| AppError::AppsUnavailable {
-            reason: format!(
-                "the scratch scopes an earlier question left could not be removed: {error}"
-            ),
-        })?;
-        if left > 0 {
-            tracing::warn!(
-                scopes = left,
-                "scratch scopes an earlier question left were removed"
-            );
-        }
-        answer_in(&bench.dir.join(asking), &draft, &examples)
-    })
+        answer_in(&bench.dir.join(&asking), &draft, &examples)
+    };
+    let Some(settings) = engine else {
+        return answer(&state.grant_setup.model()).map(Json);
+    };
+    with_engine(
+        &state.benches.asking,
+        &state.grants,
+        &state.grant_setup,
+        |model| {
+            let left =
+                SpiceDb::clear_scratch(settings).map_err(|error| AppError::AppsUnavailable {
+                    reason: format!(
+                        "the scratch scopes an earlier question left could not be removed: {error}"
+                    ),
+                })?;
+            if left > 0 {
+                tracing::warn!(
+                    scopes = left,
+                    "scratch scopes an earlier question left were removed"
+                );
+            }
+            answer(model)
+        },
+    )
     .map(Json)
 }
 
+fn unavailable(reason: impl Into<String>) -> ServerError {
+    AppError::AppsUnavailable {
+        reason: reason.into(),
+    }
+    .into()
+}
+
 fn with_engine<T>(
+    asking: &Mutex<()>,
     grants: &Mutex<Option<GrantState>>,
     setup: &GrantSetup,
     call: impl FnOnce(&Model) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    let held = grants.lock().map_err(|error| AppError::AppsUnavailable {
-        reason: format!("the bench's grants are unavailable: {error}"),
+    let question = asking.try_lock().map_err(|error| {
+        unavailable(format!(
+            "the bench engine is unavailable: {error}; retry this question"
+        ))
     })?;
-    let model = setup.model();
-    let answered = call(&model);
+    let (revision, model_revision, model) = {
+        let held = grants
+            .lock()
+            .map_err(|error| unavailable(format!("the bench's grants are unavailable: {error}")))?;
+        let model = setup
+            .model
+            .read()
+            .map_err(|error| unavailable(format!("the bench's model is unavailable: {error}")))?
+            .clone();
+        (
+            held.as_ref().map(GrantState::revision),
+            setup
+                .model_revision
+                .load(std::sync::atomic::Ordering::Acquire),
+            model,
+        )
+    };
+    let answered = call(&model)?;
+    let held = grants
+        .lock()
+        .map_err(|error| unavailable(format!("the bench's grants are unavailable: {error}")))?;
+    if held.as_ref().map(GrantState::revision) != revision
+        || setup
+            .model_revision
+            .load(std::sync::atomic::Ordering::Acquire)
+            != model_revision
+    {
+        return Err(unavailable(
+            "the grants or app model changed during the bench question; retry this question",
+        ));
+    }
     drop(held);
-    answered
+    drop(question);
+    Ok(answered)
 }
 
 async fn close(
