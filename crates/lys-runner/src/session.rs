@@ -46,6 +46,12 @@ use crate::state::{Kept, KeptSession, StateFile};
 use crate::tracking::Tracking;
 use crate::tracking_store::Feed;
 
+mod control;
+use control::*;
+
+mod peer_view;
+use peer_view::*;
+
 mod lifecycle;
 pub(crate) mod output;
 mod restart;
@@ -362,59 +368,6 @@ impl Sessions {
         self.state.runner()
     }
 
-    pub(crate) fn peer_leader(
-        &self,
-        pid: u32,
-    ) -> Result<Option<(String, u64, Leader)>, RunnerError> {
-        let table = self.read_lock()?;
-        if table.stopping {
-            return Ok(None);
-        }
-        Ok(table.sessions.iter().find_map(|(id, session)| {
-            let leader = session.guard.leader.as_ref()?;
-            (session.ended.is_none()
-                && !session.ending
-                && session.live.is_some()
-                && leader.pid == pid)
-                .then(|| (id.clone(), session.generation, leader.clone()))
-        }))
-    }
-
-    pub(crate) fn peer_matches(
-        &self,
-        id: &str,
-        generation: u64,
-        leader: &Leader,
-    ) -> Result<bool, RunnerError> {
-        let table = self.read_lock()?;
-        Ok(!table.stopping
-            && table.sessions.get(id).is_some_and(|session| {
-                session.ended.is_none()
-                    && !session.ending
-                    && session.live.is_some()
-                    && session.generation == generation
-                    && session.guard.leader.as_ref() == Some(leader)
-            }))
-    }
-
-    pub(crate) fn peer_guard(
-        &self,
-        id: &str,
-        generation: u64,
-        leader: &Leader,
-    ) -> Result<Option<Guard>, RunnerError> {
-        let table = self.read_lock()?;
-        Ok(table.sessions.get(id).and_then(|session| {
-            (!table.stopping
-                && session.ended.is_none()
-                && !session.ending
-                && session.live.is_some()
-                && session.generation == generation
-                && session.guard.leader.as_ref() == Some(leader))
-            .then(|| session.guard.clone())
-        }))
-    }
-
     pub(crate) fn read_lock(&self) -> Result<MutexGuard<'_, Table>, RunnerError> {
         #[cfg(test)]
         lifecycle::output_tests::table_locked();
@@ -602,166 +555,5 @@ impl Sessions {
         self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
-    }
-
-    /// Run `check` on the table each time it changes, until it answers, the
-    /// caller leaves, or the runner stops.
-    pub(crate) fn until_any<T>(
-        &self,
-        left: &AtomicBool,
-        mut check: impl FnMut(&mut Table) -> Option<T>,
-    ) -> Result<T, RunnerError> {
-        let mut table = self.lock()?;
-        loop {
-            if let Some(answer) = check(&mut table) {
-                return Ok(answer);
-            }
-            if left.load(Ordering::SeqCst) {
-                return Err(RunnerError::refused(
-                    "caller_left",
-                    "the caller closed the request",
-                ));
-            }
-            if table.stopping {
-                return Err(RunnerError::refused(
-                    "runner_stopping",
-                    "the runner is stopping",
-                ));
-            }
-            table = self.wait(table)?;
-        }
-    }
-
-    /// Type `bytes` into session `id`.
-    pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
-        let writer = {
-            let mut table = self.lock()?;
-            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-            session.live(id)?.writer.clone()
-        };
-        writer.write(bytes.to_vec())
-    }
-
-    /// Type `text`, then Enter when asked.
-    pub fn input(&self, id: &str, text: &str, enter: bool) -> Result<(), RunnerError> {
-        let mut bytes = text.as_bytes().to_vec();
-        if enter {
-            bytes.extend_from_slice(Key::Enter.bytes());
-        }
-        self.write(id, &bytes)
-    }
-
-    /// Send `keys`, in order.
-    pub fn keys(&self, id: &str, keys: &[Key]) -> Result<(), RunnerError> {
-        let bytes: Vec<u8> = keys
-            .iter()
-            .flat_map(|key| key.bytes().iter().copied())
-            .collect();
-        self.write(id, &bytes)
-    }
-
-    /// Resize session `id`'s terminal.
-    pub fn resize(&self, id: &str, columns: u16, rows: u16) -> Result<(), RunnerError> {
-        let mut table = self.lock()?;
-        let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        crate::pty::resize(&*session.live(id)?.master, columns, rows)?;
-        session.columns = columns;
-        session.rows = rows;
-        Ok(())
-    }
-
-    /// Run `check` on session `id` each time its output changes, until it
-    /// answers, the caller leaves, or the runner stops.
-    pub(crate) fn until<T>(
-        &self,
-        id: &str,
-        left: &AtomicBool,
-        check: impl FnMut(&mut output::OutputState, &str) -> Option<Result<T, RunnerError>>,
-    ) -> Result<T, RunnerError> {
-        let output = Arc::clone(
-            &self
-                .lock()?
-                .sessions
-                .get(id)
-                .ok_or_else(|| unknown(id))?
-                .output,
-        );
-        output.until(id, left, check)
-    }
-
-    /// End session `id`'s process and answer once its exit is seen.
-    pub fn end(&self, id: &str, left: &AtomicBool) -> Result<Ended, RunnerError> {
-        {
-            let mut table = self.lock()?;
-            let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-            if session.ended.is_none() {
-                session.ending = true;
-                if let Some(live) = &session.live {
-                    live.end()?;
-                }
-            }
-        }
-        let ended = self.until(id, left, |session, _| session.ended().map(Ok))?;
-        self.writer.barrier()?;
-        Ok(ended)
-    }
-
-    /// What the runner holds: every session, or the one named.
-    pub fn status(&self, only: Option<&str>) -> Result<StatusView, RunnerError> {
-        let table = self.lock()?;
-        let sessions = match only {
-            Some(id) => vec![
-                table
-                    .sessions
-                    .get(id)
-                    .ok_or_else(|| unknown(id))?
-                    .view(id)?,
-            ],
-            None => table
-                .sessions
-                .iter()
-                .map(|(id, session)| session.view(id))
-                .collect::<Result<Vec<_>, _>>()?,
-        };
-        Ok(StatusView {
-            runner: RUNNER.to_owned(),
-            protocol: crate::protocol::PROTOCOL_VERSION,
-            sessions,
-        })
-    }
-
-    /// End every running session and answer once each exit is seen; the
-    /// runner then starts nothing more.
-    pub fn stop_all(&self) -> Result<(), RunnerError> {
-        let mut table = self.lock()?;
-        table.stopping = true;
-        for (id, session) in &mut table.sessions {
-            if let Err(error) = session.output.stop() {
-                crate::error::said(&format!("session {id}: shutdown_wake_failed: {error}"));
-            }
-            if session.ended.is_none() {
-                session.ending = true;
-                if let Some(live) = &session.live {
-                    if let Err(error) = live.end() {
-                        crate::error::said(&format!(
-                            "session {id}: shutdown_signal_failed: {error}"
-                        ));
-                    }
-                }
-            }
-        }
-        while !table.starting.is_empty()
-            || table
-                .sessions
-                .values()
-                .any(|session| session.ended.is_none())
-        {
-            table = self.wait(table)?;
-        }
-        let persisted = self.persist(&table);
-        drop(table);
-        let flushed = self.writer.barrier();
-        self.wake();
-        persisted.and(flushed)
     }
 }
