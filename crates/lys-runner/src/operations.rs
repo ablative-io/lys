@@ -18,7 +18,7 @@
 //! exit is seen. The record keeps each outcome and a digest of its text,
 //! never the text itself.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Weak, atomic::AtomicBool};
@@ -39,6 +39,7 @@ pub(crate) use restart::{begin_restart, finish_restart};
 
 /// The format of the record of operations.
 pub const FORMAT: &str = "lys-runner-operations/v1";
+const RETAIN_MS: u64 = 24 * 60 * 60 * 1000;
 
 /// What an operation asks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,6 +167,8 @@ struct Kept {
 pub(crate) struct Operations {
     path: PathBuf,
     held: HashMap<String, OperationOutcome>,
+    seen: HashSet<String>,
+    expires: BTreeSet<(u64, String)>,
     accepted: BTreeMap<String, VecDeque<String>>,
     active: BTreeMap<String, BTreeSet<String>>,
     texts: BTreeMap<String, String>,
@@ -179,10 +182,22 @@ fn unavailable(what: impl std::fmt::Display) -> RunnerError {
     }
 }
 
+fn terminal(outcome: &OperationOutcome) -> bool {
+    !matches!(
+        outcome.state,
+        OperationState::Accepted | OperationState::Delivering
+    ) && !(outcome.state == OperationState::Delivered
+        && matches!(outcome.request.as_str(), "stop" | "compact"))
+}
+
 impl Operations {
     /// The operations recorded in `dir`. One a stopped runner left being
     /// typed is uncertain; one it left waiting is refused, its session gone.
     pub(crate) fn open(dir: &Path) -> Result<Self, RunnerError> {
+        Self::open_at(dir, now_ms())
+    }
+
+    fn open_at(dir: &Path, now: u64) -> Result<Self, RunnerError> {
         let path = dir.join("operations.jsonl");
         let old = dir.join("operations.json");
         if !path.exists() {
@@ -207,6 +222,8 @@ impl Operations {
         let mut operations = Self {
             path,
             held: HashMap::new(),
+            seen: HashSet::new(),
+            expires: BTreeSet::new(),
             accepted: BTreeMap::new(),
             active: BTreeMap::new(),
             texts: BTreeMap::new(),
@@ -234,7 +251,7 @@ impl Operations {
                 break;
             }
             let outcome: OperationOutcome = serde_json::from_slice(&line).map_err(unavailable)?;
-            operations.fold(outcome);
+            operations.fold(outcome, now);
             committed += read as u64;
         }
         if committed < length {
@@ -291,8 +308,13 @@ impl Operations {
         self.writer = Some(writer);
     }
 
-    fn fold(&mut self, outcome: OperationOutcome) {
+    fn fold(&mut self, outcome: OperationOutcome, now: u64) {
         let id = outcome.operation.clone();
+        self.seen.insert(id.clone());
+        if let Some(previous) = self.held.get(&id).filter(|held| terminal(held)) {
+            self.expires
+                .remove(&(previous.at.saturating_add(RETAIN_MS), id.clone()));
+        }
         if outcome.state == OperationState::Accepted
             && outcome.request != "stop"
             && !self.held.contains_key(&id)
@@ -302,18 +324,44 @@ impl Operations {
                 .or_default()
                 .push_back(id.clone());
         }
-        let active = self.active.entry(outcome.session.clone()).or_default();
-        if matches!(
-            outcome.state,
-            OperationState::Accepted | OperationState::Delivering
-        ) || outcome.state == OperationState::Delivered
-            && matches!(outcome.request.as_str(), "stop" | "compact")
-        {
-            active.insert(id.clone());
+        if terminal(&outcome) {
+            if let Some(active) = self.active.get_mut(&outcome.session) {
+                active.remove(&id);
+                if active.is_empty() {
+                    self.active.remove(&outcome.session);
+                }
+            }
+            self.expires
+                .insert((outcome.at.saturating_add(RETAIN_MS), id.clone()));
         } else {
-            active.remove(&id);
+            self.active
+                .entry(outcome.session.clone())
+                .or_default()
+                .insert(id.clone());
         }
         self.held.insert(id, outcome);
+        self.prune(now);
+    }
+
+    pub(crate) fn prune(&mut self, now: u64) {
+        while self.expires.first().is_some_and(|(at, _)| *at <= now) {
+            let Some((_, id)) = self.expires.pop_first() else {
+                break;
+            };
+            self.held.remove(&id);
+            self.texts.remove(&id);
+            self.compacting.remove(&id);
+        }
+    }
+
+    fn repeated(&self, id: &str) -> Result<(), RunnerError> {
+        if self.seen.contains(id) {
+            return Err(RunnerError::refused(
+                "operation_repeated",
+                format!("operation {id} was already used; its terminal outcome has expired"),
+            ));
+        }
+        Ok(())
     }
 
     fn record(&mut self, outcome: OperationOutcome) -> Result<(), RunnerError> {
@@ -330,7 +378,7 @@ impl Operations {
                 .and_then(|()| file.sync_data())
                 .map_err(unavailable)?;
         }
-        self.fold(outcome);
+        self.fold(outcome, now_ms());
         Ok(())
     }
 
@@ -383,6 +431,7 @@ pub(crate) fn accept(
     table: &mut Table,
     operation: Operation,
 ) -> Result<OperationOutcome, RunnerError> {
+    table.operations.prune(now_ms());
     if let Some(held) = table.operations.get(&operation.operation) {
         let same = held.session == operation.session
             && held.request == operation.request.name()
@@ -398,6 +447,7 @@ pub(crate) fn accept(
         }
         return Ok(held.clone());
     }
+    table.operations.repeated(&operation.operation)?;
     let session = table.sessions.get(&operation.session).ok_or_else(|| {
         RunnerError::refused(
             "session_unknown",

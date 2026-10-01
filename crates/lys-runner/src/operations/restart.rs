@@ -10,6 +10,7 @@ pub(crate) fn begin_restart(
     id: &str,
     operation: &str,
 ) -> Result<(OperationOutcome, bool), RunnerError> {
+    table.operations.prune(now_ms());
     if let Some(held) = table.operations.get(operation) {
         if held.session != id || held.request != "restart" {
             return Err(RunnerError::refused(
@@ -19,6 +20,7 @@ pub(crate) fn begin_restart(
         }
         return Ok((held.clone(), false));
     }
+    table.operations.repeated(operation)?;
     if table
         .operations
         .active
