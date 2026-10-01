@@ -371,7 +371,7 @@ async fn name(
     body: Result<Json<NameBody>, JsonRejection>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
     body.team = body.team.as_deref().map(team_id).transpose()?;
     with_directory(&state, |directory| {
@@ -422,7 +422,7 @@ async fn assign_team(
     body: Result<Json<TeamBody>, JsonRejection>,
 ) -> Result<Json<MachineTeamChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -474,7 +474,7 @@ async fn change_agent(
     body: Result<Json<AgentBody>, JsonRejection>,
 ) -> Result<Json<MachineAgentsChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -530,7 +530,7 @@ async fn retire(
     Path(id): Path<String>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();

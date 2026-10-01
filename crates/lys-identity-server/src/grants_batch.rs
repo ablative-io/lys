@@ -16,7 +16,7 @@
 //! decision is refused `StaleDecision` rather than made before it.
 
 use std::collections::BTreeSet;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
@@ -149,8 +149,9 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
 /// Who asks: the administrator, or an app for its own kinds, as the app
 /// they act for.
 fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, ServerError> {
-    let apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
-    let who = acting(state, apps.held(), headers)?;
+    let who = crate::apps_api::with_apps(state, |apps, projection| {
+        acting(state, apps.held(), headers, projection)
+    })?;
     match who {
         Acting::Administrator(_) => Ok(None),
         Acting::App { app, .. } => Ok(Some(app)),

@@ -150,9 +150,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/agents/{id}/policy" "Set an agent's tool-boundary policy, from its next launch" S [SIGNED_BODY, &["not_permitted", "PolicyVersionConflict"], &["policy_invalid", "policy_rule_duplicate", "policy_target_ambiguous"]];
     GET "/.well-known/openid-configuration" "The issuer's discovery document" P [];
     GET "/oauth/authorize" "Begin an authorization" P [&["RedirectUnregistered"]];
-    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "SessionsUnavailable"]];
+    POST "/oauth/token" "Exchange a code for tokens" P [&["CodeExpired", "CodeUsed", "RedirectUnregistered", "VerifierWrong", "ProviderUnavailable", "SessionsUnavailable"]];
     GET "/oauth/jwks" "The issuer's signing keys" P [];
-    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "SessionsUnavailable"]];
+    GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable"]];
     POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "SignInThrottled"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [];
@@ -205,8 +205,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]];
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]];
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn"], &["CertificateWithdrawn"]];
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET];
-    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY];
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable"]];
+    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable"]];
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY];
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED];
     GET "/openapi.json" "This document" P [];

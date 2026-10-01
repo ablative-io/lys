@@ -115,7 +115,7 @@ pub(crate) fn caller(
     | Acting::App {
         service_account: Some(account),
         ..
-    }) = acting(state, judged.apps.held(), headers)?
+    }) = acting(state, judged.apps.held(), headers, judged.directory)?
     else {
         return Err(ServerError::NotAdmitted {
             reason: "the credential names no service account",

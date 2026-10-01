@@ -1,0 +1,121 @@
+#![cfg(test)]
+
+use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
+
+use serde_json::json;
+
+use super::{Access, FORMAT, LIMIT, Tokens};
+use crate::error::ServerError;
+
+fn access(ends: u64) -> Access {
+    Access {
+        session_id: "a".repeat(32),
+        subject: format!("person-{}", "b".repeat(32)),
+        expires_at: ends,
+    }
+}
+
+#[test]
+fn an_old_key_only_install_gains_private_persistent_access_and_durable_revocation()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    std::fs::write(dir.path().join("provider.key"), [7u8; 32])?;
+    let file = dir.path().join("provider.tokens.json");
+    let key = "c".repeat(64);
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    tokens.insert(key.clone(), access(100), 10)?;
+    assert_eq!(
+        std::fs::metadata(&file)?.permissions().mode() & 0o777,
+        0o600
+    );
+    drop(tokens);
+    let mut restarted = Tokens::open(file.clone(), 10)?;
+    assert_eq!(restarted.get(&key, 10)?.session_id, "a".repeat(32));
+    restarted.revoke(&key)?;
+    drop(restarted);
+    assert!(matches!(
+        Tokens::open(file, 10)?.get(&key, 10),
+        Err(ServerError::TokenUnknown)
+    ));
+    assert_eq!(std::fs::read_dir(dir.path())?.count(), 2);
+    Ok(())
+}
+
+#[test]
+fn capacity_is_bounded_and_expiry_frees_space_without_waiting() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("access.json");
+    let entries: Vec<_> = (0..LIMIT)
+        .map(|index| json!({ "key": format!("{index:064x}"), "access": access(20) }))
+        .collect();
+    std::fs::write(
+        &file,
+        serde_json::to_vec(&json!({"format": FORMAT, "tokens": entries}))?,
+    )?;
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    assert!(matches!(
+        tokens.insert("f".repeat(64), access(40), 10),
+        Err(ServerError::ProviderUnavailable { .. })
+    ));
+    tokens.insert("f".repeat(64), access(40), 20)?;
+    assert_eq!(tokens.live.len(), 1);
+    assert!(matches!(
+        tokens.get(&"f".repeat(64), 40),
+        Err(ServerError::TokenUnknown)
+    ));
+    assert!(Tokens::open(file, 40)?.live.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_failed_durable_revoke_refuses_reads_instead_of_exposing_the_token()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("access.json");
+    let key = "c".repeat(64);
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    tokens.insert(key.clone(), access(100), 10)?;
+    std::fs::remove_file(&file)?;
+    std::fs::create_dir(&file)?;
+    assert!(matches!(
+        tokens.revoke(&key),
+        Err(ServerError::ProviderUnavailable { .. })
+    ));
+    assert!(matches!(
+        tokens.get(&key, 10),
+        Err(ServerError::ProviderUnavailable { .. })
+    ));
+    assert!(matches!(
+        tokens.insert("d".repeat(64), access(100), 10),
+        Err(ServerError::ProviderUnavailable { .. })
+    ));
+    assert_eq!(std::fs::read_dir(dir.path())?.count(), 1);
+    Ok(())
+}
+
+#[test]
+fn malformed_or_duplicate_stored_entries_are_refused_without_echoing_input()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("access.json");
+    let token = json!({"key": "c".repeat(64), "access": access(100)});
+    std::fs::write(
+        &file,
+        serde_json::to_vec(&json!({"format": FORMAT, "tokens": [token.clone(), token]}))?,
+    )?;
+    assert!(matches!(
+        Tokens::open(file.clone(), 10),
+        Err(ServerError::ProviderUnavailable { .. })
+    ));
+    std::fs::write(
+        &file,
+        br#"{"format":"lys-provider-access/v1","tokens":["sensitive-input"]}"#,
+    )?;
+    let Err(error) = Tokens::open(file, 10) else {
+        return Err("malformed table was accepted".into());
+    };
+    assert_eq!(error.name(), "ProviderUnavailable");
+    assert!(!error.to_string().contains("sensitive-input"));
+    Ok(())
+}

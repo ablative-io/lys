@@ -85,6 +85,18 @@ async fn a_registrar_registers_apps_and_a_person_or_a_wrong_credential_does_not(
     )?;
     refusals += 1;
     assert_eq!(refusals, 3);
+    ok(post(
+        &service,
+        &format!("/service-accounts/{account}/retire"),
+        Auth::Cookie(&admin),
+        &json!({"operation": op()?}),
+    )
+    .await?)?;
+    refused(
+        &get(&service, "/apps", Auth::Bearer(&credential)).await?,
+        401,
+        "credential_refused",
+    )?;
     Ok(())
 }
 
@@ -114,5 +126,17 @@ async fn approval_binds_the_service_account_the_registration_names() -> TestResu
     let credential = identity_contract::app_custody::credential(NOTES);
     let me = ok(get(&service, "/apps/me", Auth::Bearer(&credential)).await?)?;
     assert_eq!(me["service_account"], account.as_str());
+    ok(post(
+        &service,
+        &format!("/service-accounts/{account}/retire"),
+        Auth::Cookie(&admin),
+        &json!({"operation": op()?}),
+    )
+    .await?)?;
+    refused(
+        &get(&service, "/apps/me", Auth::Bearer(&credential)).await?,
+        401,
+        "credential_refused",
+    )?;
     Ok(())
 }

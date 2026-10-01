@@ -120,7 +120,7 @@ fn holder(
     id: &str,
 ) -> Result<(Holder, String), ServerError> {
     let actor = signed_in(state, headers)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, &actor)?;
     let person = with_directory(state, |directory| {
         own_person(directory.projection()?, &actor)
     })?;
@@ -339,7 +339,10 @@ pub(crate) fn asker(
 ) -> Result<IdentityId, ServerError> {
     with_directory(state, |directory| {
         let projection = directory.projection()?;
-        match signed_agent(state, projection, headers, ("POST", uri.path(), bytes))? {
+        let target = uri
+            .path_and_query()
+            .map_or(uri.path(), |target| target.as_str());
+        match signed_agent(state, projection, headers, ("POST", target, bytes))? {
             Some(agent) => Ok(IdentityId::Agent(agent)),
             None => caller(state, headers, projection),
         }

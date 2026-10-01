@@ -263,7 +263,7 @@ pub(crate) fn change(
     made: impl FnOnce(String, Login) -> Result<Line, ServerError>,
 ) -> Result<TeamChanged, ServerError> {
     crate::teams_migration::advance(state)?;
-    let administrator = state.admission.administrator(actor).is_ok();
+    let administrator = crate::routes::is_administrator(state, actor)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
         let own = if administrator {
@@ -306,7 +306,7 @@ fn may_add(
         return crate::runner_sessions::operator(state, headers, member, "add to a team")
             .map(|_caller| ());
     }
-    if state.admission.administrator(actor).is_ok() {
+    if crate::routes::is_administrator(state, actor)? {
         return Ok(());
     }
     let own = with_directory(state, |directory| {
@@ -436,7 +436,7 @@ async fn confirm(
     body: Result<Json<RetireBody>, JsonRejection>,
 ) -> Result<Json<TeamChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     crate::teams_migration::require_committed(&state)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = team_id(&id)?;

@@ -428,7 +428,7 @@ async fn account_of(
     Path(person): Path<String>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     shown(api(&state)?, &id).await
 }
@@ -447,7 +447,7 @@ async fn set_email(
     body: Result<Json<NewEmail>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     let email = check_email(&body_of(body)?.email)?.to_owned();
     let api = api(&state)?;
@@ -473,7 +473,7 @@ async fn reset_password(
     body: Result<Json<Reset>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     let api = api(&state)?;
     set_password(api, &id, &body_of(body)?.password).await?;
@@ -494,7 +494,7 @@ async fn set_enabled(
     body: Result<Json<Enabled>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     if actor.binding().subject() == id {
         return Err(refused(

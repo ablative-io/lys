@@ -111,6 +111,7 @@ pub struct Held {
 struct Index {
     accounts: HashMap<String, usize>,
     operations: HashMap<String, (usize, bool)>,
+    refusals: HashMap<String, HashMap<String, HashMap<String, usize>>>,
 }
 
 #[derive(Deserialize)]
@@ -131,6 +132,16 @@ impl From<Records> for Held {
                 .operations
                 .entry(account.created.id.clone())
                 .or_insert((position, false));
+            for (refusal_position, refused) in account.import_refusals.iter().enumerate() {
+                index
+                    .refusals
+                    .entry(account.created.id.clone())
+                    .or_default()
+                    .entry(refused.operation.clone())
+                    .or_default()
+                    .entry(refused.refusal.clone())
+                    .or_insert(refusal_position);
+            }
             if let Some(retired) = &account.retired {
                 index
                     .operations
@@ -181,6 +192,24 @@ impl Held {
         }
     }
 
+    /// The first refusal for this account, operation and named outcome.
+    pub fn import_refusal(
+        &self,
+        account: &str,
+        operation: &str,
+        refusal: &str,
+    ) -> Option<&ImportRefused> {
+        let position = self
+            .index
+            .refusals
+            .get(account)?
+            .get(operation)?
+            .get(refusal)?;
+        #[cfg(test)]
+        crate::folded_work::visit(crate::folded_work::Work::Refusal);
+        self.account(account)?.import_refusals.get(*position)
+    }
+
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
@@ -190,14 +219,20 @@ impl Held {
                 .accounts
                 .get(&refused.account)
                 .ok_or_else(|| "import refusal names no existing account".to_owned())?;
-            let account = &mut self.accounts[*position];
-            if account
-                .import_refusals
-                .iter()
-                .any(|kept| kept.operation == refused.operation && kept.refusal == refused.refusal)
+            if self
+                .import_refusal(&refused.account, &refused.operation, &refused.refusal)
+                .is_some()
             {
                 return Err("import refusal already recorded".to_owned());
             }
+            let account = &mut self.accounts[*position];
+            Arc::make_mut(&mut self.index)
+                .refusals
+                .entry(refused.account.clone())
+                .or_default()
+                .entry(refused.operation.clone())
+                .or_default()
+                .insert(refused.refusal.clone(), account.import_refusals.len());
             account.import_refusals.push(refused);
             return Ok(());
         }

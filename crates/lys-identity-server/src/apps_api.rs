@@ -153,12 +153,12 @@ fn malformed(reason: impl Into<String>) -> ServerError {
 /// lock order, the apps settled first.
 pub(crate) fn with_apps<T>(
     state: &AppState,
-    act: impl FnOnce(&mut AppStore) -> Result<T, ServerError>,
+    act: impl FnOnce(&mut AppStore, &lys_identity::projection::Projection) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory(state, |_| {
+    with_directory(state, |directory| {
         let mut apps = state.apps.lock().unwrap_or_else(PoisonError::into_inner);
         apps.settle()?;
-        act(&mut apps)
+        act(&mut apps, directory.projection()?)
     })
 }
 
@@ -258,7 +258,7 @@ pub(crate) async fn register(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
     crate::grants::with_grants(&state, |mut judged| {
-        let who = acting(&state, judged.apps.held(), &headers)?;
+        let who = acting(&state, judged.apps.held(), &headers, judged.directory)?;
         if matches!(who, Acting::Registrar { .. }) {
             let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
             crate::service_account_grants::admit(&mut judged, caller, "apps")?;
@@ -339,8 +339,8 @@ async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<AppsView>, ServerError> {
-    with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    with_apps(&state, |apps, projection| {
+        let who = acting(&state, apps.held(), &headers, projection)?;
         Ok(AppsView {
             apps: apps
                 .held()
@@ -359,8 +359,8 @@ async fn one(
     headers: HeaderMap,
     UrlPath(id): UrlPath<String>,
 ) -> Result<Json<AppView>, ServerError> {
-    with_apps(&state, |apps| {
-        let who = acting(&state, apps.held(), &headers)?;
+    with_apps(&state, |apps, projection| {
+        let who = acting(&state, apps.held(), &headers, projection)?;
         apps.app(&id)
             .filter(|app| sees(&who, app))
             .map(AppView::from)
@@ -374,8 +374,8 @@ async fn me(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<AppView>, ServerError> {
-    with_apps(&state, |apps| {
-        match acting(&state, apps.held(), &headers)? {
+    with_apps(&state, |apps, projection| {
+        match acting(&state, apps.held(), &headers, projection)? {
             Acting::App { app, .. } => view(apps, &app),
             _ => Err(AppError::CredentialRefused {
                 reason: "the request carries no app credential",
@@ -391,8 +391,9 @@ fn administrator(
     state: &AppState,
     apps: &AppStore,
     headers: &HeaderMap,
+    projection: &lys_identity::projection::Projection,
 ) -> Result<By, ServerError> {
-    let who = acting(state, apps.held(), headers)?;
+    let who = acting(state, apps.held(), headers, projection)?;
     who.administrator()?;
     Ok(who.by())
 }
@@ -413,8 +414,8 @@ async fn approve(
     } else {
         None
     };
-    with_apps(&state, |apps| {
-        let by = administrator(&state, apps, &headers)?;
+    with_apps(&state, |apps, projection| {
+        let by = administrator(&state, apps, &headers, projection)?;
         if let Some(Line::Approved(approved)) = apps.held().operation(&operation) {
             if approved.app != id {
                 return Err(AppError::AppOperationReused { operation }.into());
@@ -477,8 +478,8 @@ fn decided(
 ) -> Result<AppView, ServerError> {
     let operation = OperationId::from_str(&body.operation)?.to_string();
     let reason = words("reason", &body.reason)?;
-    with_apps(state, |apps| {
-        let by = administrator(state, apps, headers)?;
+    with_apps(state, |apps, projection| {
+        let by = administrator(state, apps, headers, projection)?;
         let line = made(Decided {
             operation,
             app: id.to_owned(),
@@ -529,8 +530,8 @@ async fn registrar(
 ) -> Result<Json<RegistrarIssued>, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_apps(&state, |apps| {
-        let by = administrator(&state, apps, &headers)?;
+    with_apps(&state, |apps, projection| {
+        let by = administrator(&state, apps, &headers, projection)?;
         if let Some(Line::Registrar(made)) = apps.held().operation(&operation) {
             if made.service_account != body.service_account {
                 return Err(AppError::AppOperationReused { operation }.into());

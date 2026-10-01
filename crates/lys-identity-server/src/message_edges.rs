@@ -195,7 +195,7 @@ async fn read(
         let directory = store.projection()?;
         let person = crate::read_api::own_person(directory, &actor)?;
         let caller = IdentityId::Person(person);
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         let visible: BTreeSet<String> = directory
             .records()
             .filter(|(id, record)| {

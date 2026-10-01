@@ -146,7 +146,7 @@ async fn create(
 ) -> Result<Json<ServiceAccountView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     let id = OperationId::from_str(&body.operation)?.to_string();
     let name = words("name", &body.name, NAME_MAX)?;
     if name.is_empty() {
@@ -197,7 +197,7 @@ async fn retire(
 ) -> Result<Json<ServiceAccountView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     let account = OperationId::from_str(&id)
         .ok()
         .ok_or(ServerError::ServiceAccountUnknown)?
@@ -236,7 +236,7 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<ServiceAccountsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let own = if administrator {
             None

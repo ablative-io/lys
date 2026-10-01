@@ -204,7 +204,7 @@ fn parent_owned(state: &AppState, actor: &Actor, parent: Option<&str>) -> Result
     let Some(parent) = parent else {
         return Ok(());
     };
-    if state.admission.administrator(actor).is_ok() {
+    if crate::routes::is_administrator(state, actor)? {
         return Ok(());
     }
     with_directory(state, |directory| {
