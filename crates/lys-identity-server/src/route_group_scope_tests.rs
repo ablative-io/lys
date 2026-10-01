@@ -37,6 +37,27 @@ scopes! {
     network: "GET", "/network/machines/one/runner", "machine", "one", "read";
     account_email: "POST", "/directory/people/one/account/email", "account", "one", "person.email.set";
     account_password: "POST", "/directory/people/one/account/password", "account", "one", "person.password.set";
+    people_list: "GET", "/people", "person", "all", "read";
+    people_create: "POST", "/people", "person", "all", "person.create";
+    directory_people: "GET", "/directory/people", "person", "all", "read";
+    identities_list: "GET", "/identities", "identity", "all", "read";
+    agents_create: "POST", "/agents", "agent", "all", "agent.create";
+    agent_goals: "GET", "/agents/one/goals", "agent", "one", "read";
+    grant_token_revoke: "POST", "/grants/one/tokens/two/revoke", "grant", "one", "grant.revoke";
+    network_list: "GET", "/network", "machine", "all", "read";
+    machines_create: "POST", "/network/machines", "machine", "all", "machine.create";
+    runtime_sessions: "GET", "/runtime/sessions", "runtime-session", "all", "read";
+    runtime_edges: "GET", "/runtime/message-edges", "runtime-session", "all", "read";
+    runtime_found: "GET", "/runtime/found", "runtime-session", "all", "read";
+    runtime_live: "GET", "/runtime/live", "runtime-session", "all", "read";
+    team_budget: "GET", "/teams/one/budget", "team", "one", "read";
+    team_budget_set: "PUT", "/teams/one/budget", "team", "one", "team.budget.set";
+    team_goals: "GET", "/teams/one/goals", "team", "one", "read";
+    service_accounts_list: "GET", "/service-accounts", "service-account", "all", "read";
+    service_accounts_create: "POST", "/service-accounts", "service-account", "all", "service-account.create";
+    tree: "GET", "/tree", "team", "all", "read";
+    teams_list: "GET", "/teams", "team", "all", "read";
+    teams_create: "POST", "/teams", "team", "all", "team.create";
 }
 
 #[test]
