@@ -116,3 +116,92 @@ fn service_account_operations_do_not_scan_other_accounts() -> TestResult {
     assert!(count(Work::Account) <= 2);
     Ok(())
 }
+
+#[test]
+fn import_refusal_duplicates_do_not_visit_refusal_history() -> TestResult {
+    use service_accounts_state::{Created, Held, ImportRefused, Line};
+    let mut held = Held::default();
+    held.hold(Line::Created(Created {
+        id: "account".to_owned(),
+        owner: "person".to_owned(),
+        name: "service".to_owned(),
+        description: String::new(),
+        by: login(),
+        at: 1,
+    }))?;
+    for n in 0..512 {
+        held.hold(Line::ImportRefused(ImportRefused {
+            account: "account".to_owned(),
+            operation: format!("import-{n}"),
+            entry: "entry".to_owned(),
+            refusal: "not_admitted".to_owned(),
+            at: 1,
+        }))?;
+    }
+    let bytes = held.encode()?;
+    let mut held = Held::decode(&bytes)?;
+    reset();
+    let refused = ImportRefused {
+        account: "account".to_owned(),
+        operation: "import-511".to_owned(),
+        entry: "changed".to_owned(),
+        refusal: "not_admitted".to_owned(),
+        at: 2,
+    };
+    assert!(held.hold(Line::ImportRefused(refused.clone())).is_err());
+    assert_eq!(held.encode()?, bytes);
+    assert!(held.operation(&refused.operation).is_none());
+    held.hold(Line::ImportRefused(ImportRefused {
+        refusal: "different".to_owned(),
+        ..refused
+    }))?;
+    assert!(
+        count(Work::Refusal) <= 1,
+        "duplicate detection scanned refusal history"
+    );
+    Ok(())
+}
+
+#[test]
+fn team_operations_do_not_visit_change_history() -> TestResult {
+    use crate::teams_state::{Changed, Created, Held, Line};
+    let mut held = Held::default();
+    held.hold(Line::Created(Created {
+        id: "team".to_owned(),
+        owner: "person".to_owned(),
+        name: "team".to_owned(),
+        description: String::new(),
+        by: login(),
+        at: 1,
+    }))?;
+    for n in 0..512 {
+        held.hold(Line::Added(Changed {
+            operation: format!("add-{n}"),
+            team: "team".to_owned(),
+            member: format!("member-{n}"),
+            by: login(),
+            at: 1,
+        }))?;
+    }
+    let bytes = held.encode()?;
+    let mut held = Held::decode(&bytes)?;
+    reset();
+    assert!(matches!(held.operation("add-511"), Some(Line::Added(_))));
+    assert!(held.operation("missing").is_none());
+    assert!(
+        held.hold(Line::Added(Changed {
+            operation: "add-511".to_owned(),
+            team: "team".to_owned(),
+            member: "other".to_owned(),
+            by: login(),
+            at: 2
+        }))
+        .is_err()
+    );
+    assert_eq!(held.encode()?, bytes);
+    assert!(
+        count(Work::TeamOperation) <= 2,
+        "operation lookup scanned team history"
+    );
+    Ok(())
+}

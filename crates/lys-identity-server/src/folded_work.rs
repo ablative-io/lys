@@ -10,10 +10,12 @@ pub(crate) enum Work {
     Review,
     Account,
     Team,
+    Refusal,
+    TeamOperation,
 }
 
 thread_local! {
-    static COUNTS: Cell<[usize; 4]> = const { Cell::new([0; 4]) };
+    static COUNTS: Cell<[usize; 6]> = const { Cell::new([0; 6]) };
 }
 
 pub(crate) fn visit(work: Work) {
@@ -25,7 +27,7 @@ pub(crate) fn visit(work: Work) {
 }
 
 pub(crate) fn reset() {
-    COUNTS.set([0; 4]);
+    COUNTS.set([0; 6]);
 }
 
 pub(crate) fn count(work: Work) -> usize {
