@@ -81,28 +81,22 @@ pub fn go_or_skip(gate: &str) -> Option<PathBuf> {
 /// that is present but broken is deliberately a hard failure, never a skip.
 pub fn build_go_tool(go: &Path, out: &Path) {
     let scaffold_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cose-conformance");
-    cache::build(
-        go,
-        &scaffold_dir,
-        out,
-        Path::new(env!("CARGO_TARGET_TMPDIR")),
-        |executable, gocache| {
-            let status = Command::new(go)
-                .arg("build")
-                .arg("-o")
-                .arg(executable)
-                .arg(".")
-                .current_dir(&scaffold_dir)
-                .env("GOFLAGS", "-mod=vendor")
-                .env("GOPROXY", "off")
-                .env("GOTOOLCHAIN", "local")
-                .env("GOWORK", "off")
-                .env("GOCACHE", gocache)
-                .status()
-                .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
-            assert!(status.success(), "go build of the conformance tool failed");
-        },
-    );
+    cache::build(go, &scaffold_dir, out, |executable, gocache| {
+        let status = Command::new(go)
+            .arg("build")
+            .arg("-o")
+            .arg(executable)
+            .arg(".")
+            .current_dir(&scaffold_dir)
+            .env("GOFLAGS", "-mod=vendor")
+            .env("GOPROXY", "off")
+            .env("GOTOOLCHAIN", "local")
+            .env("GOWORK", "off")
+            .env("GOCACHE", gocache)
+            .status()
+            .expect("failed to spawn the Go toolchain (present but broken is a hard failure)");
+        assert!(status.success(), "go build of the conformance tool failed");
+    });
 }
 
 /// Runs the pre-built tool with `input` on stdin; returns `(exit_success,
@@ -117,7 +111,6 @@ pub fn build_go_tool(go: &Path, out: &Path) {
 ///
 /// Panics if the built tool cannot be spawned or its stdin cannot be written.
 pub fn run_built_tool<S: AsRef<OsStr>>(bin: &Path, args: &[S], input: &[u8]) -> (bool, Vec<u8>) {
-    let started = std::time::Instant::now();
     let mut child = Command::new(bin)
         .args(args)
         .stdin(Stdio::piped())
@@ -134,6 +127,5 @@ pub fn run_built_tool<S: AsRef<OsStr>>(bin: &Path, args: &[S], input: &[u8]) -> 
     let output = child
         .wait_with_output()
         .expect("failed to wait for the tool");
-    cache::profile("exec", started);
     (output.status.success(), output.stdout)
 }
