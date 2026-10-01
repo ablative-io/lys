@@ -2,21 +2,15 @@
 //! executable and version checked before it runs, that start said in the
 //! feed, and the leader a full plan window stops.
 
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, mpsc};
+use std::path::Path;
 
-use portable_pty::Child;
-use serde_json::Value;
-
-use super::super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
-use super::{Wake, accounts, append, plan, stop_follower, transcript_parent};
+use super::super::{Table, now_ms};
+use super::append;
 use crate::error::RunnerError;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch};
-use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
-use crate::tracking_store::{Body, Commit, Coverage, SourceState};
+use crate::protocol::Launch;
+use crate::tracking::{Tracking, version_in};
+use crate::tracking_store::{Body, Coverage};
 
 /// The directory a session is bound to: `directory` resolved, or as given
 /// when it cannot be.

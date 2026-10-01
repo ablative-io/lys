@@ -13,20 +13,17 @@
 //! line is left for the next read, and a truncated or replaced file is a new
 //! generation, said by name.
 
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
 
 use portable_pty::Child;
-use serde_json::Value;
 
-use super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
+use super::{Live, Session, Sessions, Starting, now_ms, unknown};
 use crate::error::RunnerError;
 use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch};
-use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
-use crate::tracking_store::{Body, Commit, Coverage, SourceState};
+use crate::protocol::{Ended, EndedHow};
+use crate::tracking::Harness;
 
 pub use crate::peer::Collected;
 

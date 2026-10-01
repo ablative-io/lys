@@ -4,18 +4,15 @@
 
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 
-use portable_pty::Child;
 use serde_json::Value;
 
-use super::super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
+use super::super::{Session, Sessions, Table, now_ms};
 use super::{Wake, transcript_parent, window_limit};
 use crate::error::RunnerError;
-use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch};
-use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
+use crate::tracking::{Accounts, Harness, Reading, Tracking};
 use crate::tracking_store::{Body, Commit, Coverage, SourceState};
 
 impl Sessions {

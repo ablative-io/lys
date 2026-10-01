@@ -1,21 +1,14 @@
 //! A session generation's terminal: its output kept as it comes, and its
 //! process's exit seen, moved to the next account or recorded as its end.
 
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, mpsc};
+use std::io::Read;
+use std::sync::Arc;
 
 use portable_pty::Child;
-use serde_json::Value;
 
-use super::super::{Live, Session, Sessions, Starting, Table, now_ms, unknown};
-use super::{Wake, accounts, append, plan, stop_follower, transcript_parent, window_limit};
-use crate::error::RunnerError;
-use crate::peer::Leader;
-use crate::protocol::{Ended, EndedHow, Launch};
-use crate::tracking::{Accounts, Harness, Reading, Tracking, version_in};
-use crate::tracking_store::{Body, Commit, Coverage, SourceState};
+use super::super::{Sessions, now_ms};
+use super::{plan, stop_follower};
+use crate::protocol::{Ended, EndedHow};
 
 impl Sessions {
     /// Keep the output of generation `generation` of session `id` until its
