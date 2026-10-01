@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! A start reads the audit log's signed snapshot and only the lines after
 //! it. What the broker holds after such a start is what it holds after a
 //! start from the whole log. A snapshot that cannot be believed is refused
@@ -82,8 +84,12 @@ fn relation(secret: &str) -> SecretRelation {
 
 fn granted() -> LocalGrants {
     let grants = LocalGrants::new();
-    grants.grant(relation("token"));
-    grants.grant_as(Relation::Read, relation("notes"));
+    grants
+        .grant(relation("token"))
+        .expect("local grants lock must be healthy");
+    grants
+        .grant_as(Relation::Read, relation("notes"))
+        .expect("local grants lock must be healthy");
     grants
 }
 
@@ -256,7 +262,8 @@ fn a_resumed_start_holds_what_a_start_from_the_whole_log_holds() -> TestResult {
     assert_eq!(calls(&world, &mut again, &leases.busy, 1)?, 900 - 9 - 5 - 1);
     again
         .permissions()
-        .revoke_as(Relation::Read, "agent:noor", "notes");
+        .revoke_as(Relation::Read, "agent:noor", "notes")
+        .expect("local grants lock must be healthy");
     assert_eq!(
         refusal(again.read_record("agent:noor", "notes", None)),
         "RelationRemoved"

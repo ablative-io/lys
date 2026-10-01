@@ -12,7 +12,7 @@
 //! the admission and, asked again, to the forward boundary. So a slow answer
 //! holds up its own call and no other route.
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -143,10 +143,15 @@ where
 {
     let shared = Arc::clone(shared);
     blocking(move || {
-        let mut broker = shared.broker.lock().unwrap_or_else(PoisonError::into_inner);
-        work(&mut broker)
+        let mut broker = shared
+            .broker
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
+        Ok(work(&mut broker))
     })
-    .await
+    .await?
 }
 
 /// Runs `work` on the blocking pool.

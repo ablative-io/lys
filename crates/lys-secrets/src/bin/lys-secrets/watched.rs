@@ -17,7 +17,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use lys_secrets::SecretsError;
@@ -56,7 +56,12 @@ impl<T: Default> Watched<T> {
         &self,
         parse: impl FnOnce(&[u8]) -> Result<T, SecretsError>,
     ) -> Result<Arc<T>, SecretsError> {
-        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = self
+            .held
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
         let Some(now) = stamp(&self.path) else {
             *held = None;
             return Ok(Arc::new(T::default()));
@@ -79,7 +84,12 @@ impl<T: Default> Watched<T> {
 
     /// Writes `bytes` as the file, and lets go of what was held.
     pub fn write(&self, bytes: &[u8]) -> Result<(), SecretsError> {
-        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = self
+            .held
+            .lock()
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?;
         *held = None;
         let failure = |source| SecretsError::Io {
             context: format!("writing {}", self.path.display()),
@@ -108,5 +118,33 @@ impl<T: Default> Watched<T> {
         fs::File::open(directory)
             .and_then(|file| file.sync_all())
             .map_err(failure)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poisoned_watched_file_refuses_cached_read_and_write()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("watched");
+        fs::write(&path, b"durable")?;
+        let watched = Watched::<Vec<u8>>::new(path.clone());
+        let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _answer = watched.get(|_| panic!("interrupted file parse"));
+        }));
+        assert!(interrupted.is_err());
+        assert!(matches!(
+            watched.get(|bytes| Ok(bytes.to_vec())),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        assert!(matches!(
+            watched.write(b"replacement"),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        assert_eq!(fs::read(path)?, b"durable");
+        Ok(())
     }
 }

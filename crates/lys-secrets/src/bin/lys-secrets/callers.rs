@@ -3,7 +3,7 @@
 //! service vouches for, with the service's signature over that very
 //! request. Either way the route answers as that one identity.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use axum::http::StatusCode;
 use axum::http::request::Parts;
@@ -130,7 +130,11 @@ fn on_behalf(shared: &Shared, parts: &Parts, body: &[u8]) -> Result<Caller, (Sta
     )
     .map_err(|error| refused(&error))?;
     let trusted = shared.layout.services().map_err(|error| refused(&error))?;
-    let mut window = shared.window.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut window = shared.window.lock().map_err(|error| {
+        refused(&SecretsError::StatePoisoned {
+            reason: error.to_string(),
+        })
+    })?;
     let identity = window
         .admit(&trusted, &asked, now_ms())
         .map_err(|error| refused(&error))?;

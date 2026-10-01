@@ -58,7 +58,7 @@ impl SecretsError {
             Self::MemoryNotUsable { .. } => "MemoryNotUsable",
             Self::ReservationMissing { .. } => "ReservationMissing",
             Self::StoreLocked { .. } => "StoreLocked",
-            Self::StatePoisoned => "StatePoisoned",
+            Self::StatePoisoned { .. } => "StatePoisoned",
             Self::Grants(_) => "Grants",
             Self::Identity(_) => "Identity",
             Self::Random { .. } => "Random",

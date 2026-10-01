@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
 use crate::error::SecretsError;
 use crate::fsutil::io;
@@ -28,20 +28,29 @@ struct Claim(PathBuf);
 impl Claim {
     /// Enter `path` in the registry, or `None` when a broker in this process
     /// already holds it.
-    fn enter(path: PathBuf) -> Option<Self> {
+    fn enter(path: PathBuf) -> Result<Option<Self>, SecretsError> {
         let entered = HELD
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?
             .insert(path.clone());
-        entered.then(|| Self(path))
+        Ok(entered.then(|| Self(path)))
     }
 }
 
 impl Drop for Claim {
     fn drop(&mut self) {
-        HELD.lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .remove(&self.0);
+        match HELD.lock() {
+            Ok(mut held) => {
+                held.remove(&self.0);
+            }
+            Err(error) => {
+                eprintln!(
+                    "lys-secrets: StatePoisoned: store lock registry: {error}; restart the process"
+                );
+            }
+        }
     }
 }
 
@@ -72,7 +81,7 @@ impl StoreLock {
         let resolved = std::fs::canonicalize(dir)
             .map_err(io(format!("resolving {}", dir.display())))?
             .join(LOCK);
-        let claim = Claim::enter(resolved).ok_or_else(locked)?;
+        let claim = Claim::enter(resolved)?.ok_or_else(locked)?;
         let path = dir.join(LOCK);
         let file = File::options()
             .create(true)

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! A holder moves its secret to the next account with its own handle: the
 //! ask is checked as a use is, counts no use, and a refused ask moves
 //! nothing.
@@ -30,11 +32,13 @@ fn the_holder_moves_to_the_next_account_and_a_thief_or_a_dropped_handle_cannot()
         anchor: keys.join("audit.anchor"),
     };
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "token".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "token".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal("token", "person:tom", &Secret::from_slice(b"first"))?;
     broker.add_account("token", "second", &Secret::from_slice(b"second"))?;
@@ -85,11 +89,13 @@ fn each_spawn_takes_the_next_login_and_the_log_names_the_seat() -> TestResult {
     };
     let grants = LocalGrants::new();
     for seat in ["seat:one", "seat:two", "seat:three"] {
-        grants.grant(SecretRelation {
-            identity: seat.to_owned(),
-            secret: "logins".to_owned(),
-            granted_by: Some("person:tom".to_owned()),
-        });
+        grants
+            .grant(SecretRelation {
+                identity: seat.to_owned(),
+                secret: "logins".to_owned(),
+                granted_by: Some("person:tom".to_owned()),
+            })
+            .expect("local grants lock must be healthy");
     }
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal("logins", "person:tom", &Secret::from_slice(b"login-a"))?;

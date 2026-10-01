@@ -132,7 +132,8 @@ pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Ans
         let broker: &Broker<Grants> = broker;
         let held = broker
             .permissions()
-            .pinned(|| broker.held_by(&identity, &asked.holder));
+            .pinned(|| broker.held_by(&identity, &asked.holder))
+            .map_err(|error| failed(&error))?;
         let handles: Vec<Value> = held
             .into_iter()
             .map(|held| {
@@ -156,10 +157,10 @@ pub async fn handles(State(shared): State<Arc<Shared>>, request: Request) -> Ans
                 })
             })
             .collect();
-        Json(json!({ "holder": asked.holder, "handles": handles }))
+        Ok(Json(json!({ "holder": asked.holder, "handles": handles })))
     })
     .await
-    .map_err(|error| failed(&error))
+    .map_err(|error| failed(&error))?
 }
 
 pub async fn grants(State(shared): State<Arc<Shared>>, request: Request) -> Answer {
@@ -184,7 +185,7 @@ fn grants_seen(broker: &Broker<Grants>, identity: &str) -> Answer {
                 json!({ "identity": identity, "secret": secret, "relation": relation, "granted_by": granted_by })
             })
             .collect()
-    });
+    }).map_err(|error| failed(&error))?;
     Ok(Json(json!({ "grants": grants })))
 }
 
@@ -233,33 +234,36 @@ pub(crate) fn audit_window(broker: &Broker<Grants>, identity: &str, before: Opti
     let from = lines
         .first()
         .map_or(size.min(before.unwrap_or(size)), |first| first.index);
-    let lines: Vec<Value> = broker.permissions().pinned(|| {
-        let mut discovery = broker.discovery(identity);
-        lines
-            .into_iter()
-            .filter(|recorded| {
-                recorded
-                    .line
-                    .secret
-                    .as_deref()
-                    .is_some_and(|secret| discovery.discovers(secret))
-            })
-            .map(|recorded| {
-                let line = recorded.line;
-                json!({
-                    "index": recorded.index,
-                    "kind": line.kind.label(),
-                    "at_ms": line.at_ms,
-                    "handle": line.handle,
-                    "identity": line.identity,
-                    "secret": line.secret,
-                    "operation": line.operation,
-                    "uses": line.uses,
-                    "outcome": line.outcome,
+    let lines: Vec<Value> = broker
+        .permissions()
+        .pinned(|| {
+            let mut discovery = broker.discovery(identity);
+            lines
+                .into_iter()
+                .filter(|recorded| {
+                    recorded
+                        .line
+                        .secret
+                        .as_deref()
+                        .is_some_and(|secret| discovery.discovers(secret))
                 })
-            })
-            .collect()
-    });
+                .map(|recorded| {
+                    let line = recorded.line;
+                    json!({
+                        "index": recorded.index,
+                        "kind": line.kind.label(),
+                        "at_ms": line.at_ms,
+                        "handle": line.handle,
+                        "identity": line.identity,
+                        "secret": line.secret,
+                        "operation": line.operation,
+                        "uses": line.uses,
+                        "outcome": line.outcome,
+                    })
+                })
+                .collect()
+        })
+        .map_err(|error| failed(&error))?;
     Ok(Json(json!({
         "verified_by": lys_secrets::to_hex(&broker.audit().verifying_key()),
         "size": size,

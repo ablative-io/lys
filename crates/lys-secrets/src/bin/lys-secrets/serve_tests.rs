@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::sync::{Arc, Condvar, Mutex};
 
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -139,16 +139,13 @@ struct Gate {
 
 impl Gate {
     fn held(&self) -> std::sync::MutexGuard<'_, Held> {
-        self.held.lock().unwrap_or_else(PoisonError::into_inner)
+        self.held.lock().expect("test state lock poisoned")
     }
 
     fn wait_entered(&self) {
         let mut held = self.held();
         while !held.entered {
-            held = self
-                .changed
-                .wait(held)
-                .unwrap_or_else(PoisonError::into_inner);
+            held = self.changed.wait(held).expect("test state lock poisoned");
         }
     }
 
@@ -175,10 +172,7 @@ impl PermissionCheck for Gate {
         held.entered = true;
         self.changed.notify_all();
         while !held.released {
-            held = self
-                .changed
-                .wait(held)
-                .unwrap_or_else(PoisonError::into_inner);
+            held = self.changed.wait(held).expect("test state lock poisoned");
         }
         Ok(Permitted {
             person: PERSON.to_owned(),

@@ -437,10 +437,11 @@ pub enum SecretsError {
         path: PathBuf,
     },
     /// The broker's state lock was poisoned by a panic in another thread.
-    #[error(
-        "StatePoisoned: a thread panicked while holding the broker's state (act: restart the broker)"
-    )]
-    StatePoisoned,
+    #[error("StatePoisoned: {reason} (act: restart the broker)")]
+    StatePoisoned {
+        /// The lock failure.
+        reason: String,
+    },
     /// The permission check could not be set up or changed.
     #[error("Grants: {0} (act: correct the grant request)")]
     Grants(Box<lys_identity::grants::GrantError>),

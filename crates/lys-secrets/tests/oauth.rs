@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! OAuth grants: neither token prints, a refresh keeps the client and the
 //! selected subject, the broker reseals a refreshed grant so the next call
 //! opens the new token, a refresh naming a new client is refused until the
@@ -51,11 +53,13 @@ fn broker_at(root: &Path) -> Result<(Broker<LocalGrants>, Ed25519Identity), Secr
         anchor: keys.join("audit.anchor"),
     };
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "github".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "github".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     let broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     let agent = Ed25519Identity::load_or_generate(&keys.join("agent.key"))?;
     Ok((broker, agent))
@@ -168,11 +172,13 @@ fn a_refreshed_grant_is_resealed_and_revocation_is_recorded() -> TestResult {
         anchor: keys.join("audit.anchor"),
     };
     let grants = LocalGrants::new();
-    grants.grant(SecretRelation {
-        identity: "agent:noor".to_owned(),
-        secret: "github".to_owned(),
-        granted_by: Some("person:tom".to_owned()),
-    });
+    grants
+        .grant(SecretRelation {
+            identity: "agent:noor".to_owned(),
+            secret: "github".to_owned(),
+            granted_by: Some("person:tom".to_owned()),
+        })
+        .expect("local grants lock must be healthy");
     let mut broker = Broker::create(&paths, grants, Box::new(|| 1_000))?;
     broker.seal_oauth("github", "person:tom", &grant(1_000))?;
     let agent = Ed25519Identity::load_or_generate(&keys.join("agent.key"))?;

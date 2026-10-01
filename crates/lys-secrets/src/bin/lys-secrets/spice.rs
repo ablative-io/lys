@@ -161,10 +161,10 @@ pub enum Grants {
 impl Grants {
     /// Runs `work`, one request's checks, with the grants file read at
     /// most once. The directory's engine is asked afresh by every check.
-    pub fn pinned<T>(&self, work: impl FnOnce() -> T) -> T {
+    pub fn pinned<T>(&self, work: impl FnOnce() -> T) -> Result<T, SecretsError> {
         match self {
             Self::File(file) => file.pinned(work),
-            Self::Directory(_) => work(),
+            Self::Directory(_) => Ok(work()),
         }
     }
 

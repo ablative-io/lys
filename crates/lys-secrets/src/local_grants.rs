@@ -3,8 +3,9 @@
 //! check does.
 
 use std::collections::BTreeMap;
-use std::sync::{PoisonError, RwLock};
+use std::sync::RwLock;
 
+use crate::SecretsError;
 use crate::permission::{Denied, PermissionCheck, Permitted, Relation};
 
 /// One relation: `identity` may use `secret`, granted by `granted_by`.
@@ -40,22 +41,38 @@ impl LocalGrants {
     }
 
     /// Records the `use` relation, replacing any earlier grant of the pair.
-    pub fn grant(&self, relation: SecretRelation) {
-        self.grant_as(Relation::Use, relation);
+    ///
+    /// # Errors
+    /// Returns `StatePoisoned` when a panic interrupted the grant state.
+    pub fn grant(&self, relation: SecretRelation) -> Result<(), SecretsError> {
+        self.grant_as(Relation::Use, relation)
     }
 
     /// Records `kind` for the relation's pair, replacing any earlier grant.
-    pub fn grant_as(&self, kind: Relation, relation: SecretRelation) {
-        self.grant_until(kind, relation, None);
+    ///
+    /// # Errors
+    /// Returns `StatePoisoned` when a panic interrupted the grant state.
+    pub fn grant_as(&self, kind: Relation, relation: SecretRelation) -> Result<(), SecretsError> {
+        self.grant_until(kind, relation, None)
     }
 
     /// Records `kind` for the relation's pair as a grant whose window ends
     /// at `ends_at_ms`, replacing any earlier grant. A lease cut under it
     /// may end no later than that.
-    pub fn grant_until(&self, kind: Relation, relation: SecretRelation, ends_at_ms: Option<i64>) {
+    ///
+    /// # Errors
+    /// Returns `StatePoisoned` when a panic interrupted the grant state.
+    pub fn grant_until(
+        &self,
+        kind: Relation,
+        relation: SecretRelation,
+        ends_at_ms: Option<i64>,
+    ) -> Result<(), SecretsError> {
         self.relations
             .write()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?
             .insert(
                 (relation.identity, relation.secret, kind),
                 Held {
@@ -63,28 +80,46 @@ impl LocalGrants {
                     ends_at_ms,
                 },
             );
+        Ok(())
     }
 
     /// Removes the `use` relation; the next check refuses. Answers whether
     /// one was held.
-    pub fn revoke(&self, identity: &str, secret: &str) -> bool {
+    ///
+    /// # Errors
+    /// Returns `StatePoisoned` when a panic interrupted the grant state.
+    pub fn revoke(&self, identity: &str, secret: &str) -> Result<bool, SecretsError> {
         self.revoke_as(Relation::Use, identity, secret)
     }
 
     /// Removes `kind` for the pair. Answers whether one was held.
-    pub fn revoke_as(&self, kind: Relation, identity: &str, secret: &str) -> bool {
-        self.relations
+    ///
+    /// # Errors
+    /// Returns `StatePoisoned` when a panic interrupted the grant state.
+    pub fn revoke_as(
+        &self,
+        kind: Relation,
+        identity: &str,
+        secret: &str,
+    ) -> Result<bool, SecretsError> {
+        Ok(self
+            .relations
             .write()
-            .unwrap_or_else(PoisonError::into_inner)
+            .map_err(|error| SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            })?
             .remove(&(identity.to_owned(), secret.to_owned(), kind))
-            .is_some()
+            .is_some())
     }
 
     fn check(&self, kind: Relation, identity: &str, secret: &str) -> Result<Permitted, Denied> {
-        let relations = self
-            .relations
-            .read()
-            .unwrap_or_else(PoisonError::into_inner);
+        let relations = self.relations.read().map_err(|error| Denied {
+            reason: SecretsError::StatePoisoned {
+                reason: error.to_string(),
+            }
+            .to_string(),
+            no_person_root: false,
+        })?;
         match relations.get(&(identity.to_owned(), secret.to_owned(), kind)) {
             Some(Held {
                 granted_by: Some(person),
@@ -122,5 +157,48 @@ impl PermissionCheck for LocalGrants {
 
     fn member_of(&self, identity: &str, target: &str) -> Result<Permitted, Denied> {
         self.check(Relation::Member, identity, target)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poisoned_local_grants_refuse_reads_and_changes() -> Result<(), SecretsError> {
+        let grants = LocalGrants::new();
+        let relation = SecretRelation {
+            identity: "agent".to_owned(),
+            secret: "secret".to_owned(),
+            granted_by: Some("person".to_owned()),
+        };
+        grants.grant(relation.clone())?;
+        let interrupted = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let mut relations = grants
+                        .relations
+                        .write()
+                        .expect("healthy initial grant lock");
+                    relations.clear();
+                    panic!("interrupted grant mutation");
+                })
+                .join()
+        });
+        assert!(interrupted.is_err());
+        assert!(matches!(
+            grants.grant(relation),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        assert!(matches!(
+            grants.revoke("agent", "secret"),
+            Err(SecretsError::StatePoisoned { .. })
+        ));
+        let denied = grants
+            .may_use("agent", "secret")
+            .expect_err("poisoned grant cannot authorise");
+        assert!(denied.reason.starts_with("StatePoisoned:"));
+        assert!(!denied.no_person_root);
+        Ok(())
     }
 }
