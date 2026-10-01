@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
@@ -148,7 +149,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
 
 export function People() {
   const shell = useShell();
-  const load = useLoad(async () => ({ view: await api.people(), me: await api.me(), teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
+  const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
   if (shell.filterKind === 'teams' || shell.filterKind === 'found') {
     return (
       <div className="page fill">

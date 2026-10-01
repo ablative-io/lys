@@ -46,6 +46,7 @@ mod certificate_keys;
 pub mod certificates_api;
 mod certificates_issue;
 pub mod certificates_store;
+mod changes;
 pub mod config;
 pub mod configuration_api;
 pub mod configuration_store;

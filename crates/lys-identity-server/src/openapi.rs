@@ -115,13 +115,24 @@ pub fn document() -> Result<Value, ServerError> {
         "x-lys-answers-to".to_owned(),
         serde_json::json!(["person", "agent"]),
     );
+    document["paths"]["/changes"]["get"]["parameters"] = serde_json::json!([{
+        "name": "after", "in": "query", "required": false,
+        "description": "The generation last received; wait until it changes.",
+        "schema": {"type": "string"}
+    }]);
     Ok(document)
 }
 
 /// The document's route: public, since the document describes the API and
 /// grants nothing to whoever reads it.
+#[path = "openapi_surface.rs"]
+pub(crate) mod surface;
+
+/// Serve the full API document and the compact surface contract.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/openapi.json", get(served))
+    Router::new()
+        .route("/openapi.json", get(served))
+        .route("/surface-contract", get(surface::served))
 }
 
 static DOCUMENT: OnceLock<Result<Bytes, String>> = OnceLock::new();

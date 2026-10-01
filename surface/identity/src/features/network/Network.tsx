@@ -1,3 +1,4 @@
+import { readBounded, readTogether } from '../../reads';
 /** The computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -23,9 +24,11 @@ export interface Computer { machine: Machine; runner: RunnerRecord | null; runni
 type Show = 'all' | 'attention';
 
 async function readComputers(): Promise<Computer[]> {
-  const view = await request<NetworkView>('/network');
-  const runners = await Promise.all(view.machines.map((machine) => request<{ runner: RunnerRecord | null }>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then((answer) => answer.runner)));
-  const live = await request<{ sessions: RuntimeSession[] }>('/runtime/live').then((answer) => answer.sessions, () => null);
+  const { view, live } = await readTogether({
+    view: request<NetworkView>('/network'),
+    live: request<{ sessions: RuntimeSession[] }>('/runtime/live').then((answer) => answer.sessions, () => null),
+  });
+  const runners = await readBounded(view.machines, (machine) => request<{ runner: RunnerRecord | null }>('/network/machines/' + encodeURIComponent(machine.id) + '/runner').then((answer) => answer.runner));
   return view.machines.map((machine, index) => ({ machine, runner: runners[index], reports: view.reports_served, running: live?.filter((session) => session.machine === machine.id && session.shown !== 'stopped') ?? null }));
 }
 
@@ -41,9 +44,9 @@ function inScope(whose: Whose, teams: OrgTeam[], me: string, people: PeopleView,
 export function Network() {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
-  const load = useLoad(async () => ({
-    computers: await readComputers(), people: await api.people(), me: await api.me(),
-    teams: await readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
+  const load = useLoad(() => readTogether({
+    computers: readComputers(), people: api.people(), me: api.me(),
+    teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
   }), 'network:' + revision);
   return <div className="page fill">
     <Gate load={load} title="Computers" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} notice={notice} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />

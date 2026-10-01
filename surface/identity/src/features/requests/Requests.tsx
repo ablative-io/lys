@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** Requests use the service's visibility and approval decisions, never an inferred permission. A queue, oldest first, grouped by the asker's team; one request opens beside it. */
 import { useState } from 'react';
 import { Link } from 'react-router';
@@ -30,9 +31,9 @@ function waited(asked: number): string {
 export function Requests() {
   const [confirmed, setConfirmed] = useState<Record<string, AccessRequest>>({});
   const changed = (answer: AccessRequest) => setConfirmed((held) => ({ ...held, [answer.id]: answer }));
-  const load = useLoad(async () => ({
-    list: await request<{ requests: AccessRequest[] }>('/requests'), people: await api.people(),
-    teams: await readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
+  const load = useLoad(() => readTogether({
+    list: request<{ requests: AccessRequest[] }>('/requests'), people: api.people(),
+    teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'requests');
   const choices = useLoad(async () => {
     const [me, grants, model] = await Promise.all([api.me(), api.grants(), api.model()]);

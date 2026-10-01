@@ -1,3 +1,4 @@
+import { readTogether } from '../../reads';
 /** The team's owner or administrator manages named membership; no inherited permissions are implied. */
 import { useState } from 'react';
 import { api, operationId, request, useLoad } from '../../api';
@@ -17,7 +18,7 @@ export async function readTeams(): Promise<Team[]> {
 }
 
 export function Teams() {
-  const load = useLoad(async () => ({ teams: await readTeams(), me: await api.me(), people: await api.people() }), 'teams');
+  const load = useLoad(() => readTogether({ teams: readTeams(), me: api.me(), people: api.people() }), 'teams');
   return <Gate load={load} title="Teams" ok={({ teams, me, people }) => <TeamList initial={teams} me={me} people={people} />} />;
 }
 
