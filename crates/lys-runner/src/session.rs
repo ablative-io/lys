@@ -199,6 +199,7 @@ pub struct Sessions {
     state: StateFile,
     state_dir: PathBuf,
     scrollback: usize,
+    pub(crate) writer: crate::durable::Writer,
 }
 
 pub(crate) fn unknown(id: &str) -> RunnerError {
@@ -251,7 +252,7 @@ impl Sessions {
                 "a session's scrollback keeps at least one byte",
             ));
         }
-        let state = StateFile::open(state_dir)?;
+        let mut state = StateFile::open(state_dir)?;
         let found_at = now_ms();
         let mut table = Table {
             owner: Weak::new(),
@@ -298,6 +299,10 @@ impl Sessions {
         let state_dir = state_dir
             .canonicalize()
             .map_err(|error| RunnerError::refused("launch_config_refused", error.to_string()))?;
+        let writer = crate::durable::Writer::new()?;
+        state.writer(writer.clone());
+        table.feed.writer(writer.clone());
+        table.operations.writer(writer.clone());
         let sessions = Arc::new_cyclic(|owner| {
             table.owner = Weak::clone(owner);
             Self {
@@ -306,11 +311,13 @@ impl Sessions {
                 state,
                 state_dir,
                 scrollback,
+                writer,
             }
         });
         let table = sessions.lock();
         sessions.persist(&table)?;
         drop(table);
+        sessions.writer.barrier()?;
         Ok(sessions)
     }
 
@@ -439,6 +446,7 @@ impl Sessions {
             lifecycle::tracking_started(&mut table, &id, &executable, &version);
         }
         drop(table);
+        self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
     }
@@ -552,7 +560,9 @@ impl Sessions {
                 }
             }
         }
-        self.until(id, left, |session, _| session.ended.clone().map(Ok))
+        let ended = self.until(id, left, |session, _| session.ended.clone().map(Ok))?;
+        self.writer.barrier()?;
+        Ok(ended)
     }
 
     /// What the runner holds: every session, or the one named.
@@ -595,6 +605,9 @@ impl Sessions {
         }
         self.persist_logged(&table);
         drop(table);
+        if let Err(error) = self.writer.barrier() {
+            crate::error::said(&format!("runner_shutdown_record_failed: {error}"));
+        }
         self.wake();
     }
 }

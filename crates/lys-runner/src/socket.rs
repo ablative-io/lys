@@ -348,7 +348,8 @@ fn perform(sessions: &Arc<Sessions>, act: Act, left: &AtomicBool) -> Result<Answ
                         .map_or(Some(()), |more| more.then_some(()))
                 })?;
             }
-            let page = sessions.lock().feed.page(cursor.as_deref())?;
+            let reader = sessions.lock().feed.reader();
+            let page = reader.page(cursor.as_deref())?;
             Ok(Answer::Feed { page })
         }
         Act::GrantChannel => Err(RunnerError::refused(

@@ -44,11 +44,13 @@ impl Sessions {
         id: &str,
         collected: &Collected,
     ) -> Result<String, RunnerError> {
-        match collected {
+        let result = match collected {
             Collected::Hook { event, input } => self.hook(id, event, input),
             Collected::StatusLine { input } => self.status_line(id, input),
             Collected::Notify { notification } => self.notified(id, notification),
-        }
+        };
+        self.writer.barrier()?;
+        result
     }
 
     fn hook(self: &Arc<Self>, id: &str, event: &str, input: &Value) -> Result<String, RunnerError> {
