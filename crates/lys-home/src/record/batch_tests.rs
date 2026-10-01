@@ -203,9 +203,8 @@ fn append_batch_child() -> Gate {
     use crate::record::batch::BatchStep;
     use std::io::{Read, Write};
 
-    let file = match std::env::var_os("LYS_BATCH_CHILD_FILE") {
-        Some(file) => file,
-        None => return Ok(()),
+    let Some(file) = std::env::var_os("LYS_BATCH_CHILD_FILE") else {
+        return Ok(());
     };
     let boundary = std::env::var("LYS_BATCH_CHILD_BOUNDARY")?;
     let mut session = Session::open(std::path::PathBuf::from(file))?;
