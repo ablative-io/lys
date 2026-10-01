@@ -23,7 +23,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
@@ -70,10 +70,60 @@ fn default_mirror() -> String {
     "grants".to_owned()
 }
 
+/// An engine connection whose credential is loaded explicitly before serving.
+#[derive(Clone)]
+pub struct SpiceDbConnection {
+    endpoint: String,
+    key: Arc<str>,
+    mirror: String,
+}
+
+impl std::fmt::Debug for SpiceDbConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpiceDbConnection")
+            .field("endpoint", &self.endpoint)
+            .field("mirror", &self.mirror)
+            .finish_non_exhaustive()
+    }
+}
+
+impl SpiceDbConnection {
+    pub(crate) fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    /// Read the configured credential once. Load a new connection to reload it;
+    /// existing engines retain the credential they were opened with.
+    pub fn load(settings: &SpiceDbSettings) -> Result<Self, GrantError> {
+        let text = std::fs::read_to_string(&settings.key_file).map_err(|error| {
+            unavailable(format!(
+                "the permission engine's key file {} could not be read: {}",
+                settings.key_file.display(),
+                error.kind()
+            ))
+        })?;
+        let key = text
+            .lines()
+            .find_map(|line| line.strip_prefix(KEY_LINE))
+            .unwrap_or(&text)
+            .trim()
+            .to_owned();
+        if key.is_empty() {
+            return Err(unavailable("the permission engine's key file is empty"));
+        }
+        engine_name("mirror name", &settings.mirror)?;
+        Ok(Self {
+            endpoint: settings.endpoint.clone(),
+            key: Arc::from(key),
+            mirror: settings.mirror.clone(),
+        })
+    }
+}
+
 /// The permission engine, reached over its gateway.
 pub struct SpiceDb {
     endpoint: String,
-    key: String,
+    key: Arc<str>,
     mirror: String,
     relations: BTreeMap<String, BTreeSet<String>>,
     app_kinds: Mutex<BTreeMap<String, KindModel>>,
@@ -165,47 +215,33 @@ impl SpiceDb {
     /// Reach the engine `settings` names and write the schema `model` gives,
     /// keeping every resource kind the engine already holds.
     pub fn open(settings: &SpiceDbSettings, model: &Model) -> Result<Self, GrantError> {
-        Self::open_in(settings, model, None)
+        Self::open_connected(&SpiceDbConnection::load(settings)?, model)
     }
 
-    /// Reach the engine `settings` names as the scratch scope `scope`, and
+    /// Open the live engine with an already loaded connection.
+    pub fn open_connected(
+        connection: &SpiceDbConnection,
+        model: &Model,
+    ) -> Result<Self, GrantError> {
+        Self::open_in(connection, model, None)
+    }
+
+    /// Reach the engine `connection` names as the scratch scope `scope`, and
     /// write the schema `model` gives under the scope's prefix, beside every
     /// name the engine holds outside it.
     pub(crate) fn open_scratch(
-        settings: &SpiceDbSettings,
+        connection: &SpiceDbConnection,
         model: &Model,
         scope: &str,
     ) -> Result<Self, GrantError> {
-        Self::open_in(settings, model, Some(scope.to_owned()))
-    }
-
-    fn key(settings: &SpiceDbSettings) -> Result<String, GrantError> {
-        let text = std::fs::read_to_string(&settings.key_file).map_err(|error| {
-            unavailable(format!(
-                "the permission engine's key file {} could not be read: {}",
-                settings.key_file.display(),
-                error.kind()
-            ))
-        })?;
-        let key = text
-            .lines()
-            .find_map(|line| line.strip_prefix(KEY_LINE))
-            .unwrap_or(&text)
-            .trim()
-            .to_owned();
-        if key.is_empty() {
-            return Err(unavailable("the permission engine's key file is empty"));
-        }
-        Ok(key)
+        Self::open_in(connection, model, Some(scope.to_owned()))
     }
 
     fn open_in(
-        settings: &SpiceDbSettings,
+        connection: &SpiceDbConnection,
         model: &Model,
         scope: Option<String>,
     ) -> Result<Self, GrantError> {
-        let key = Self::key(settings)?;
-        engine_name("mirror name", &settings.mirror)?;
         let mut relations = BTreeMap::new();
         for (relation, actions) in model.relations() {
             let relation = relation.to_string();
@@ -217,9 +253,9 @@ impl SpiceDb {
             relations.insert(relation, actions);
         }
         let engine = Self {
-            endpoint: settings.endpoint.clone(),
-            key,
-            mirror: settings.mirror.clone(),
+            endpoint: connection.endpoint.clone(),
+            key: Arc::clone(&connection.key),
+            mirror: connection.mirror.clone(),
             relations,
             app_kinds: Mutex::new(model.kinds().clone()),
             scope,
@@ -285,7 +321,7 @@ impl SpiceDb {
     pub(crate) fn schema_writer(&self) -> Result<Self, GrantError> {
         Ok(Self {
             endpoint: self.endpoint.clone(),
-            key: self.key.clone(),
+            key: Arc::clone(&self.key),
             mirror: self.mirror.clone(),
             relations: self.relations.clone(),
             scope: self.scope.clone(),
@@ -590,3 +626,7 @@ mod upgrade_tests;
 #[cfg(test)]
 #[path = "spicedb_calls_tests.rs"]
 mod calls_tests;
+
+#[cfg(test)]
+#[path = "spicedb_key_tests.rs"]
+mod key_tests;

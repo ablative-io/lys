@@ -49,7 +49,7 @@ use crate::grants::{GrantState, Judged};
 use crate::grants_batch::{CheckWire, one};
 use crate::session::now;
 use crate::spicedb::scope::scope_for;
-use crate::spicedb::{Relationships, SpiceDb, SpiceDbSettings};
+use crate::spicedb::{Relationships, SpiceDb, SpiceDbConnection};
 
 /// The issuer the scratch directory's example logins are bound at. It names
 /// no real issuer and no one signs in through it.
@@ -70,7 +70,7 @@ pub struct Draft<'a> {
     pub lys: &'a Model,
     /// The permission engine the service runs its grants on, when it is
     /// `SpiceDB`; none for the in-process engine.
-    pub engine: Option<&'a SpiceDbSettings>,
+    pub engine: Option<&'a SpiceDbConnection>,
 }
 
 /// The examples one question is asked over.
