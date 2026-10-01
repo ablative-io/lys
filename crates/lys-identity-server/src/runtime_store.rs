@@ -94,6 +94,11 @@ impl SessionActivity {
             .map(String::as_str)
     }
 
+    /// Whether the runtime has never reported a session for this agent.
+    pub(crate) fn never_ran(&self) -> bool {
+        self.live == 0 && self.sessions.is_empty() && self.stopped_at.is_none()
+    }
+
     pub(crate) fn active_since(&self, since_ms: Option<i64>) -> bool {
         self.live > 0
             || since_ms.is_none_or(|since| {

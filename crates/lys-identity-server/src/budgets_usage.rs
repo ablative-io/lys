@@ -218,8 +218,11 @@ impl Reading<'_> {
             })
             .collect();
         let never_run = |agent: &str| {
-            sessions.is_some_and(|known| !known.contains_key(agent))
-                && !usage_agents.contains(agent)
+            sessions.is_some_and(|known| {
+                known
+                    .get(agent)
+                    .is_some_and(crate::runtime_store::SessionActivity::never_ran)
+            }) && !usage_agents.contains(agent)
         };
         if limit.unit == Measure::PlanPercent {
             return plan(limit, agents, &uses, at_ms, purpose, &never_run);
