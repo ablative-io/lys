@@ -268,3 +268,22 @@ async fn a_valid_agent_signature_cannot_bypass_a_bad_operator_header() -> TestRe
     assert_eq!(accepted.0, 200, "{}", accepted.1);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_runtime_signature_covers_the_query_as_well_as_the_path() -> TestResult {
+    let table = Table::set().await?;
+    let path = table.path(&operation()?);
+    let body = table.body()?;
+    let header = table.header(&path, &body, now_ms()?, &nonce(44));
+    refused(
+        &table
+            .send(&format!("{path}?scope=changed"), &header, body.clone())
+            .await?,
+        "does not verify",
+    );
+    let target = format!("{path}?scope=original");
+    let header = table.header(&target, &body, now_ms()?, &nonce(45));
+    let accepted = table.send(&target, &header, body).await?;
+    assert_eq!(accepted.0, 200, "{}", accepted.1);
+    Ok(())
+}
