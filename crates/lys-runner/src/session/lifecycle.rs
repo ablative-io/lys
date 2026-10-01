@@ -163,10 +163,12 @@ impl Sessions {
             match crate::pty::end_left_group(&leader) {
                 Ok(crate::pty::Left::Gone | crate::pty::Left::Ended { reason: None }) => {}
                 Ok(left) => {
-                    crate::error::said(&format!("session {id}: group_cleanup_incomplete: {left:?}"))
+                    crate::error::said(&format!(
+                        "session {id}: group_cleanup_incomplete: {left:?}"
+                    ));
                 }
                 Err(error) => {
-                    crate::error::said(&format!("session {id}: group_cleanup_failed: {error}"))
+                    crate::error::said(&format!("session {id}: group_cleanup_failed: {error}"));
                 }
             }
         }
@@ -307,7 +309,7 @@ impl Sessions {
             for next in woken {
                 match next {
                     Wake::Changed => sessions.read_source(&owned, None),
-                    Wake::Lost(reason) => sessions.read_source(&owned, Some(reason)),
+                    Wake::Lost(reason) => sessions.read_source(&owned, Some(&reason)),
                     Wake::Stop => break,
                 }
             }
@@ -317,7 +319,7 @@ impl Sessions {
 
     /// Read session `id`'s stream from its saved cursor to its last whole
     /// line, and keep what it yields with the new cursor as one unit.
-    pub(crate) fn read_source(&self, id: &str, lost: Option<String>) {
+    pub(crate) fn read_source(&self, id: &str, lost: Option<&str>) {
         loop {
             let table = self.lock();
             let Some(session) = table.sessions.get(id) else {
