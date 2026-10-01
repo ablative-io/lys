@@ -52,6 +52,13 @@ use crate::record::{Home, fresh_id, now};
 /// The body type both directions are carried in.
 pub type ProxyBody = UnsyncBoxBody<Bytes, hyper::Error>;
 
+/// The maximum number of accepted HTTP connections held by one listener.
+pub const CONNECTION_LIMIT: usize = 64;
+
+#[cfg(test)]
+#[path = "admission_tests.rs"]
+mod admission_tests;
+
 /// An upstream base: an absolute `http` or `https` URL, with or without a
 /// path of its own, onto which a request's path and query are joined.
 #[derive(Clone, Debug)]
