@@ -230,7 +230,10 @@ impl<S: LeafStore> TeamStore<S> {
             .as_ref()
             .unwrap_or(&self.held)
             .subtree(root)
-            .map_err(|_| ServerError::Team(TeamError::Unknown))
+            .map_err(|reason| match reason {
+                Refused::Unknown => ServerError::Team(TeamError::Unknown),
+                other => unavailable(format!("team subtree refused: {other:?}")),
+            })
     }
 
     /// The line first kept under `operation`.

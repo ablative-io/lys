@@ -175,7 +175,7 @@ impl Held {
         crate::folded_work::visit(crate::folded_work::Work::Account);
         let account = self.accounts.get(*position)?;
         if *retired {
-            account.retired.as_ref().cloned().map(Line::Retired)
+            account.retired.clone().map(Line::Retired)
         } else {
             Some(Line::Created(account.created.clone()))
         }

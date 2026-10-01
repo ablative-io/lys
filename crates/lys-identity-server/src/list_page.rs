@@ -225,7 +225,7 @@ impl Page {
         rows.sort_by(|left, right| id(left).cmp(id(right)));
         let total = rows.len();
         if let Some(last) = &self.last {
-            rows.retain(|row| id(&row) > last.as_str());
+            rows.retain(|row| id(row) > last.as_str());
         }
         let limit = self.query.limit.unwrap_or(50).min(200);
         let more = rows.len() > limit;
