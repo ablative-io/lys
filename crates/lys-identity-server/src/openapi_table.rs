@@ -123,9 +123,9 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]];
     POST "/budgets/person/{id}/confirm" "Confirm a legacy personal budget" S [ADMIN_BODY, &["BudgetsUnavailable", "BudgetVersionConflict", "budget_invalid", "not_permitted"]];
     GET "/budgets/{kind}/{id}" "A holder's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
+    PUT "/budgets/{kind}/{id}" "Replace a holder's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
     GET "/teams/{id}/budget" "A team's limits and measured usage" S [SIGNED, BUDGET_READ];
-    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET];
+    PUT "/teams/{id}/budget" "Replace a team's limit collection" S [SIGNED_BODY, BUDGET_READ, BUDGET_SET, AGENT, GRANT_ASKED, UNANSWERED, &["HoldingNotHeld", "NotHeld", "Revoked"]];
     POST "/runtime/sessions/{id}/input" "Type into a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
     GET "/agents/{id}/refusals" "An agent's refused tool calls" S [SIGNED, &["AgentNotVisible", "not_permitted"]];
     POST "/runtime/sessions/{id}/input-bytes" "Write exact bytes to a session" S [SIGNED_BODY, &["RuntimeSessionUnknown", "AgentNotVisible", "not_permitted", "session_ended"]];
