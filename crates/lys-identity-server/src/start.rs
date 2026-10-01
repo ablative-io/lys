@@ -54,6 +54,9 @@ use serde_json::Value;
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in, with_directory};
 
+#[path = "start_pass_state.rs"]
+mod pass_state;
+
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
     /// Refuse unavailable admission state before a start reads authority.
@@ -131,7 +134,7 @@ pub struct StartService {
     launches: Mutex<LaunchRecords>,
     clock: fn() -> u64,
     launcher: Option<Box<dyn Launcher>>,
-    pass_state: Option<Arc<AppState>>,
+    pass_state: Option<Arc<Mutex<crate::agent_pass_store::Passes>>>,
 }
 
 impl StartService {
@@ -608,13 +611,13 @@ pub fn directory_service(
             credential_id,
         },
     };
-    let mut service = StartService::new(
+    let service = StartService::new_with_passes(
         owners,
         Box::new(Directory(Arc::clone(state))),
         launches,
         crate::session::now,
+        Arc::clone(&state.agent_passes),
     );
-    service.pass_state = Some(Arc::clone(state));
     let runs = crate::runner_sessions::DirectoryLauncher(Arc::clone(state));
     Ok(Arc::new(service.with_launcher(Box::new(runs))))
 }

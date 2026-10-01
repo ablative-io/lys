@@ -150,9 +150,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         configuration: Mutex::new(configuration),
         policies: policies.map(Mutex::new),
         goals: goals.map(crate::goals_store::Goals::new),
-        agent_passes: Mutex::new(crate::agent_pass_store::Passes::open(
+        agent_passes: Arc::new(Mutex::new(crate::agent_pass_store::Passes::open(
             config.log_dir.with_file_name("agent-passes.json"),
-        )?),
+        )?)),
         grant_tokens: Mutex::new(
             crate::grant_token_store::Tokens::open(
                 config.log_dir.with_file_name("grant-tokens.json"),

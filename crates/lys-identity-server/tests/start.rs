@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 
 use axum::http::HeaderMap;
 use lys_core::Ed25519Identity;
-use lys_identity::LifecycleState;
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
 use lys_identity::start::credentials::{HandleAnswer, HandleRecords, HeldCredential};
@@ -24,6 +23,8 @@ use lys_identity::start::profile_review::{ProfileReviews, Review};
 use lys_identity::start::request::{AgentRecord, AgentRecords};
 use lys_identity::start::state::{SessionReport, SessionReports};
 use lys_identity::start::{Grammars, LaunchRecords, give};
+use lys_identity::{AgentId, LifecycleState};
+use lys_identity_server::agent_pass_store::Passes;
 use lys_identity_server::routes::start::{Callers, StartOwners, StartService, routes};
 use serde_json::Value;
 
@@ -181,6 +182,7 @@ struct Served {
     base: String,
     world: Arc<World>,
     service: Arc<StartService>,
+    passes: Arc<Mutex<Passes>>,
     client: reqwest::Client,
 }
 
@@ -223,7 +225,16 @@ impl Served {
         };
         let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
         let launches = LaunchRecords::open(&dir.path().join("launch-records"), key)?;
-        let service = Arc::new(StartService::new(owners, callers, launches, clock));
+        let passes = Arc::new(Mutex::new(Passes::open(
+            dir.path().join("agent-passes.json"),
+        )?));
+        let service = Arc::new(StartService::new_with_passes(
+            owners,
+            callers,
+            launches,
+            clock,
+            Arc::clone(&passes),
+        ));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let base = format!("http://{}", listener.local_addr()?);
         let app = routes(Arc::clone(&service));
@@ -233,6 +244,7 @@ impl Served {
             base,
             world,
             service,
+            passes,
             client: reqwest::Client::new(),
         })
     }
@@ -328,6 +340,8 @@ async fn a_start_is_withdrawn_given_again_and_read() -> TestResult {
     let served = Served::start().await?;
     let (_, body) = served.start_agent("admin-fixture").await?;
     let l1 = launch_record(&body)?;
+    lock(&served.passes).issue(AgentId::generate()?, &l1, "withdrawal-session")?;
+    assert!(lock(&served.passes).has_session("withdrawal-session")?);
     let state = format!("/launch-records/{l1}/state");
     let (_, read) = served.send(false, &state, "admin-fixture", "").await?;
     assert_eq!(parsed(&read)?["state"], "unconfirmed");
@@ -337,6 +351,7 @@ async fn a_start_is_withdrawn_given_again_and_read() -> TestResult {
     assert_eq!(status, 200, "{withdrawn}");
     let withdrawn = parsed(&withdrawn)?;
     assert_eq!(withdrawn["state"], "withdrawn");
+    assert!(!lock(&served.passes).has_session("withdrawal-session")?);
     assert_eq!(withdrawn["withdrawal"]["by"], "admin-fixture");
     let (_, read) = served.send(false, &state, "admin-fixture", "").await?;
     assert_eq!(parsed(&read)?["state"], "withdrawn");
@@ -436,7 +451,9 @@ fn the_route_holds_no_start_logic_and_reads_the_door_through_the_seam() {
     assert!(!ROUTE.contains("DoorHandles") && !ROUTE.contains("door_handles"));
     assert!(ROUTES.contains("let handles = door_handles::DoorHandles::unconfigured();"));
     assert!(ROUTES.contains("Box::new(handles),\n        door_handles::credential_id,"));
-    assert!(ROUTES.contains("let starts = start::routes(start_service(config, &state)?);"));
+    assert!(ROUTES.contains("let start_service = start_service(config, &state)?;"));
+    assert!(ROUTES.contains("let starts = start::routes(start_service);"));
+    assert!(ROUTE.contains("StartService::new_with_passes("));
 }
 
 #[tokio::test]
