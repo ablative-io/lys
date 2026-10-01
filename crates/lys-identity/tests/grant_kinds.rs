@@ -44,6 +44,12 @@ fn a_plain_check_spends_a_one_time_grant_and_the_second_exercise_is_refused() ->
         .ok_or("the grant is kept")?;
     let revocation = record.revoked().ok_or("a spent grant is revoked")?;
     assert_eq!(revocation.reason, ONE_TIME_SPENT);
+    // The use that spends it is the revocation: one append, so no failure
+    // between two appends can leave it spendable.
+    let lys_identity::grants::LastUse::Seen { index, .. } = record.last_use() else {
+        return Err("the use is recorded".into());
+    };
+    assert_eq!(revocation.index, index, "spent by the same leaf as its use");
     world.reopen(MemoryRelationships::default())?;
     assert_eq!(
         world.exercise(agent, "read", Route::Tool),

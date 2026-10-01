@@ -301,11 +301,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         self.delegate_as(directory, request, at, true)
     }
 
-    fn one_time_issuer(&self, grant: GrantId) -> Option<IdentityId> {
-        self.book
-            .grant(grant)
-            .filter(|grant| grant.is_once())
-            .map(|grant| grant.parts().issuer)
+    fn is_one_time(&self, grant: GrantId) -> bool {
+        self.book.grant(grant).is_some_and(super::types::Grant::is_once)
     }
 
     fn delegate_as(
@@ -414,19 +411,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
         }
-        if let Some(issuer) = self.one_time_issuer(permit.grant) {
-            // A one-time grant admits only an exercise whose use is recorded,
-            // and is revoked by its issuer before this answers.
+        if self.is_one_time(permit.grant) {
+            // A one-time grant admits only an exercise whose use is recorded;
+            // that one leaf spends it.
             used.clone()?;
-            self.commit(GrantEvent::new(
-                OperationId::generate()?,
-                issuer,
-                at,
-                GrantChange::Revoke {
-                    grant: permit.grant,
-                    reason: ONE_TIME_SPENT.to_owned(),
-                },
-            )?)?;
         }
         permit.use_event = Some(used);
         Ok(permit)
