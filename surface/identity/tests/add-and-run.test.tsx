@@ -414,7 +414,7 @@ describe('Add and run on an existing computer', () => {
     };
     expect($('[name="computer_name"]')).toBeNull();
     expect(document.body.textContent).toContain(computer.name);
-    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
     await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect($('form button[type="submit"]')?.textContent).toBe('Add Clover and run it on this computer');
