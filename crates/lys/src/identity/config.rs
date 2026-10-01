@@ -453,3 +453,7 @@ pub fn is_email(text: &str) -> bool {
 #[cfg(test)]
 #[path = "config_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "config_move_tests.rs"]
+mod move_tests;

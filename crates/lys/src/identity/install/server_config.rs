@@ -64,6 +64,10 @@ pub struct Carried {
     pub message_service: Option<Value>,
     /// Explicit front-proxy trust, absent unless an operator configured it.
     pub trusted_proxies: Option<Value>,
+    /// The issuer an earlier configuration named.
+    pub issuer: Option<String>,
+    /// The issuer move an earlier configuration handed over.
+    pub issuer_moved_from: Option<String>,
 }
 
 /// The configuration as the service reads it, with the screens served when
@@ -145,8 +149,26 @@ pub fn render(
         "reviews_dir": dir("reviews"),
         "runner_socket": layout.runner_socket().display().to_string(),
     });
+    // When the issuer an earlier configuration named is not this one, the
+    // sign-in service moved: the service is handed the earlier issuer and
+    // records the move in the directory once, and the administrator's login
+    // moves with every other. A move handed over before is handed over
+    // again, which the directory finds already recorded.
+    let moved_from = carried
+        .issuer
+        .clone()
+        .filter(|earlier| *earlier != issuer)
+        .or_else(|| carried.issuer_moved_from.clone())
+        .filter(|earlier| *earlier != issuer);
     if let Some(administrator) = &carried.administrator {
-        rendered["administrator"] = administrator.clone();
+        let mut administrator = administrator.clone();
+        if moved_from.is_some() && administrator["issuer"].as_str() == moved_from.as_deref() {
+            administrator["issuer"] = Value::String(issuer);
+        }
+        rendered["administrator"] = administrator;
+    }
+    if let Some(from) = moved_from {
+        rendered["issuer_moved_from"] = Value::String(from);
     }
     if let Some(bridge) = &carried.message_service {
         rendered[MESSAGE_SERVICE] = bridge.clone();
@@ -182,6 +204,9 @@ pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
         products: named(earlier.pointer("/provider/clients")),
         message_service: message_service(&earlier, &path)?,
         trusted_proxies: named(earlier.get("trusted_proxies")),
+        issuer: named(earlier.get("issuer")).and_then(|issuer| issuer.as_str().map(str::to_owned)),
+        issuer_moved_from: named(earlier.get("issuer_moved_from"))
+            .and_then(|issuer| issuer.as_str().map(str::to_owned)),
     }))
 }
 

@@ -1,0 +1,47 @@
+# Written by `lys identity install`. Addresses, names and choices only; every
+# credential lives in an owner-only file under state.
+
+[deployment]
+network = "172.29.47.0/24"
+node = "this-machine"
+project = "lys-identity"
+state_dir = "state"
+admin_email = "administrator@example.test"
+
+[issuer]
+public_origin = "http://localhost:18080"
+listen_port = 18080
+admin_url = "http://127.0.0.1:18080"
+trusted_proxies = []
+
+[database]
+bundled = true
+host = "postgres"
+port = 5432
+name = "identity"
+tls = "disable"
+check_address = "127.0.0.1:55432"
+publish_port = 55432
+
+[spicedb]
+grpc_port = 58051
+http_port = 58443
+
+[credentials]
+source = "generate"
+
+[clients.platform]
+id = "lys-platform"
+name = "Lys Identity"
+redirect_uris = ["http://localhost:8490/api/callback"]
+post_logout_redirect_uris = ["http://localhost:8490/"]
+token_alg = "EdDSA"
+challenges = ["S256"]
+
+[clients.app]
+id = "cambium"
+name = "Cambium"
+redirect_uris = ["http://localhost:8400/auth/oidc/callback"]
+post_logout_redirect_uris = ["http://localhost:8400/"]
+token_alg = "RS256"
+challenges = []

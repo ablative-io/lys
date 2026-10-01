@@ -12,7 +12,9 @@ use std::path::Path;
 use toml::Table;
 
 use super::refuse;
+use super::validate::network_gateway;
 use crate::identity::error::{ErrorKind, IdentityError, IdentityResult};
+use crate::identity::install::layout::SERVICE_PORT;
 
 /// The compose network range an install is given when its file names none:
 /// the range the install template writes.
@@ -20,6 +22,31 @@ pub const DEFAULT_NETWORK: &str = "172.29.47.0/24";
 
 const APP_CLIENT_HEADER: &str = "[clients.app]";
 const DEPLOYMENT_HEADER: &str = "[deployment]";
+const ISSUER_HEADER: &str = "[issuer]";
+
+/// Whether the issuer table is the shape an install wrote before the
+/// sign-in service's public address became Lys's own origin: its public
+/// origin is the sign-in service's own loopback port. Such a sign-in
+/// service names itself, and sends a person back from a provider, on a
+/// port Lys does not serve, so a provider sign-in never finishes through Lys.
+fn earlier_origin(table: &Table) -> bool {
+    let Some(issuer) = table.get("issuer").and_then(toml::Value::as_table) else {
+        return false;
+    };
+    let (Some(origin), Some(port)) = (
+        issuer.get("public_origin").and_then(toml::Value::as_str),
+        issuer.get("listen_port").and_then(toml::Value::as_integer),
+    ) else {
+        return false;
+    };
+    let origin = origin.trim_end_matches('/');
+    origin == format!("http://localhost:{port}") || origin == format!("http://127.0.0.1:{port}")
+}
+
+/// The key a `key = value` line sets, if it is one.
+fn key_of(line: &str) -> Option<&str> {
+    line.split_once('=').map(|(key, _)| key.trim())
+}
 
 /// The text brought forward, or `None` when it is already in this build's
 /// shape.
@@ -43,15 +70,50 @@ pub fn bring_forward(text: &str) -> IdentityResult<Option<String>> {
         .get("deployment")
         .and_then(toml::Value::as_table)
         .is_none_or(|deployment| deployment.contains_key("network"));
-    if earlier_app_client.is_none() && names_network {
+    let earlier_origin = earlier_origin(&table);
+    if earlier_app_client.is_none() && names_network && !earlier_origin {
         return Ok(None);
     }
+    // The sign-in service's gateway on the compose network is the one
+    // address the directory service reaches it from, as the template names.
+    let network = table
+        .get("deployment")
+        .and_then(toml::Value::as_table)
+        .and_then(|deployment| deployment.get("network"))
+        .and_then(toml::Value::as_str)
+        .unwrap_or(DEFAULT_NETWORK);
+    let gateway = network_gateway(network)?;
+    let no_proxies = table
+        .get("issuer")
+        .and_then(toml::Value::as_table)
+        .and_then(|issuer| issuer.get("trusted_proxies"))
+        .and_then(toml::Value::as_array)
+        .is_some_and(Vec::is_empty);
     let mut lines = Vec::new();
+    let mut section = String::new();
     for line in text.lines() {
         let header = line.trim();
+        if header.starts_with('[') {
+            header.clone_into(&mut section);
+        }
         if earlier_app_client.as_deref() == Some(header) {
             lines.push(APP_CLIENT_HEADER.to_string());
             continue;
+        }
+        if earlier_origin && section == ISSUER_HEADER {
+            match key_of(line) {
+                Some("public_origin") => {
+                    lines.push(format!(
+                        "public_origin = \"http://localhost:{SERVICE_PORT}\""
+                    ));
+                    continue;
+                }
+                Some("trusted_proxies") if no_proxies => {
+                    lines.push(format!("trusted_proxies = [\"{gateway}/32\"]"));
+                    continue;
+                }
+                _ => {}
+            }
         }
         lines.push(line.to_string());
         if !names_network && header == DEPLOYMENT_HEADER {
@@ -74,7 +136,8 @@ pub fn bring_forward(text: &str) -> IdentityResult<Option<String>> {
 
 /// Replaces the file at `path` with `text` durably, keeping its permissions:
 /// the whole new text is synced beside it and renamed over it, so a crash
-/// leaves either the earlier file or the brought-forward one.
+/// leaves either the earlier file or the brought-forward one. The file it
+/// replaces is kept beside it first, named for when it was replaced.
 pub fn write_back(path: &Path, text: &str) -> IdentityResult<()> {
     let io = |operation: &'static str, at: &Path, error: &std::io::Error| {
         IdentityError::new(
@@ -88,6 +151,13 @@ pub fn write_back(path: &Path, text: &str) -> IdentityResult<()> {
     let permissions = fs::metadata(path)
         .map_err(|error| io("read permissions", path, &error))?
         .permissions();
+    let mut kept = path.file_name().unwrap_or_default().to_os_string();
+    let replaced_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    kept.push(format!(".before-{replaced_at}"));
+    let kept = path.with_file_name(kept);
+    fs::copy(path, &kept).map_err(|error| io("keep", &kept, &error))?;
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".forward");
     let partial = path.with_file_name(name);
