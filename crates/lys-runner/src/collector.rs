@@ -146,7 +146,7 @@ impl Sessions {
             append(&mut table, id, vec![Body::Coverage(coverage)], None);
             return Err(unbound(words));
         }
-        Ok(self.bind(&mut table, id, (given, claude), false))
+        self.bind(&mut table, id, (given, claude), false)
     }
 
     /// Bind session `id` to the stream at `path` as the harness's `bound`
@@ -157,15 +157,36 @@ impl Sessions {
         id: &str,
         (path, bound): (&str, &str),
         from_start: bool,
-    ) -> String {
+    ) -> Result<String, RunnerError> {
         let held = table.feed.source(id).cloned();
         if held.as_ref().is_some_and(|held| held.path == path) {
-            return format!("{path} is already bound");
+            return Ok(format!("{path} is already bound"));
         }
         let offset = if from_start {
             0
         } else {
-            std::fs::metadata(path).map_or(0, |metadata| metadata.len())
+            match std::fs::metadata(path) {
+                Ok(metadata) => metadata.len(),
+                Err(error) => {
+                    let words = format!("{path} cannot be read: {error}");
+                    let refused = SourceState {
+                        path: path.to_owned(),
+                        ..SourceState::default()
+                    };
+                    append(
+                        table,
+                        id,
+                        vec![Body::Coverage(Coverage::of(
+                            "source_refused",
+                            &refused,
+                            None,
+                            words.clone(),
+                        ))],
+                        None,
+                    );
+                    return Err(RunnerError::refused("transcript_unreadable", words));
+                }
+            }
         };
         let source = SourceState {
             path: path.to_owned(),
@@ -188,7 +209,7 @@ impl Sessions {
         ];
         append(table, id, bodies, Some(source));
         self.follow(table, id);
-        words
+        Ok(words)
     }
 
     fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
@@ -258,7 +279,7 @@ impl Sessions {
                     )
                 })?;
             let path = rollout(Path::new(&home), thread)?.display().to_string();
-            self.bind(&mut table, id, (&path, thread), true);
+            self.bind(&mut table, id, (&path, thread), true)?;
         }
         drop(table);
         self.read_source(id, None);
