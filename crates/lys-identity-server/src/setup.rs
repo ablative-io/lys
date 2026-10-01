@@ -47,6 +47,10 @@ use crate::routes::{AppState, hex, signed_in, with_directory};
 use crate::session::now;
 use crate::sign_in::{Attempt, begin_session};
 
+#[cfg(test)]
+#[path = "setup_durability_tests.rs"]
+mod durability_tests;
+
 /// Where first-run setup reads its code and records its administrator.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -148,6 +152,40 @@ fn read_administrator(path: &Path) -> Result<Option<LoginBinding>, ServerError> 
 }
 
 fn record_administrator(path: &Path, login: &LoginBinding) -> Result<(), ServerError> {
+    let file = prepare_administrator(path, login)?;
+    file.persist(path).map_err(|error| {
+        unavailable(format!(
+            "{} could not be published: {error}",
+            path.display()
+        ))
+    })?;
+    std::fs::File::open(administrator_parent(path)?)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| {
+            unavailable(format!(
+                "{} parent could not be synced: {error}",
+                path.display()
+            ))
+        })
+}
+
+fn administrator_parent(path: &Path) -> Result<&Path, ServerError> {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .ok_or_else(|| {
+            unavailable(format!(
+                "{} names no administrator directory",
+                path.display()
+            ))
+        })
+}
+
+fn prepare_administrator(
+    path: &Path,
+    login: &LoginBinding,
+) -> Result<tempfile::NamedTempFile, ServerError> {
+    use std::os::unix::fs::PermissionsExt;
+
     let recorded = RecordedAdministrator {
         issuer: login.issuer().to_owned(),
         subject: login.subject().to_owned(),
@@ -157,9 +195,13 @@ fn record_administrator(path: &Path, login: &LoginBinding) -> Result<(), ServerE
     let fail = |error: std::io::Error| {
         unavailable(format!("{} could not be written: {error}", path.display()))
     };
-    let mut file = std::fs::File::create(path).map_err(fail)?;
+    let mut file = tempfile::NamedTempFile::new_in(administrator_parent(path)?).map_err(fail)?;
+    file.as_file()
+        .set_permissions(std::fs::Permissions::from_mode(0o600))
+        .map_err(fail)?;
     file.write_all(&text).map_err(fail)?;
-    file.sync_all().map_err(fail)
+    file.as_file().sync_all().map_err(fail)?;
+    Ok(file)
 }
 
 fn settings(state: &AppState) -> Result<&SetupSettings, ServerError> {
@@ -426,7 +468,7 @@ pub async fn finish(
     body: Result<Json<SetupRequest>, JsonRejection>,
 ) -> Result<Json<PersonRegistered>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    state.admission.configured_administrator(&actor)?;
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let operation = OperationId::from_str(&body.operation)?;
     let profile = Profile::new(&body.display_name)?;

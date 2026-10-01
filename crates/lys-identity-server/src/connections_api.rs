@@ -59,7 +59,7 @@ async fn connections(
     headers: HeaderMap,
 ) -> Result<Json<ConnectionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let issuer = origin(state.oidc.issuer(), "sign-in provider")?;
     let projection = state
         .grant_setup

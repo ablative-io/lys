@@ -30,6 +30,10 @@ use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, LoginBinding};
 
 use crate::error::ServerError;
 
+#[cfg(test)]
+#[path = "admission_tests.rs"]
+mod tests;
+
 /// What step 1 lets the administrator do, shown to every caller before they act.
 pub const AUTHORITY: &str = "Step 1 of the directory has one administrator, configured by issuer and subject. The administrator may register people, register agents under themselves, change profiles, bind logins and record lifecycle states. Every other caller may read only their own person, sign-in identities and agents, and changes no directory record. Grants are the one other write. The person bound to the administrator's login issues root grants, a holder passes on only what their grant lets them pass on, a grant is revoked by its issuer, by a holder it derives from or by the root authority, and any signed-in person may ask why they may act and who can. A grant held by an identity that is not active permits nothing.";
 
@@ -76,14 +80,51 @@ impl Admission {
     }
 
     /// Admit `actor` as the administrator, or refuse by name.
-    pub fn administrator(&self, actor: &Actor) -> Result<(), ServerError> {
+    pub fn administrator(&self, directory: &Projection, actor: &Actor) -> Result<(), ServerError> {
+        self.configured_administrator(actor)?;
+        let Some(person) = directory.person_for(actor.binding()) else {
+            return Ok(());
+        };
+        let record = directory
+            .record(IdentityId::Person(person))
+            .ok_or(ServerError::NoPerson)?;
+        if record.state() != LifecycleState::Active {
+            return Err(ServerError::Inactive {
+                identity: person.to_string(),
+                state: record.state(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Whether the caller is an active administrator, preserving operational refusals.
+    pub fn is_administrator(
+        &self,
+        directory: &Projection,
+        actor: &Actor,
+    ) -> Result<bool, ServerError> {
+        match self.administrator(directory, actor) {
+            Ok(()) => Ok(true),
+            Err(ServerError::NotAdmitted { .. }) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Admit the configured login to first-run setup before a person exists.
+    pub(crate) fn configured_administrator(&self, actor: &Actor) -> Result<(), ServerError> {
         if actor.provenance().service_account().is_some() {
             return Err(ServerError::NotAdmitted {
                 reason: "a service account is not its owner's administrator sign-in",
             });
         }
-        match self.administrator_login() {
-            Some(login) if actor.binding() == &login => Ok(()),
+        let held =
+            self.administrator
+                .read()
+                .map_err(|error| ServerError::DirectoryUnavailable {
+                    reason: format!("the administrator store is unavailable: {error}"),
+                })?;
+        match held.as_ref() {
+            Some(login) if actor.binding() == login => Ok(()),
             Some(_) => Err(ServerError::NotAdmitted {
                 reason: "only the administrator may do this in step 1",
             }),
@@ -112,6 +153,18 @@ impl Admission {
         directory: &Projection,
         agent: AgentId,
     ) -> Result<&LoginBinding, ServerError> {
+        let record =
+            directory
+                .record(IdentityId::Agent(agent))
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "the link-audit signing agent is not registered",
+                })?;
+        if record.state() != LifecycleState::Active {
+            return Err(ServerError::Inactive {
+                identity: agent.to_string(),
+                state: record.state(),
+            });
+        }
         let responsible = directory
             .record(IdentityId::Agent(agent))
             .and_then(Record::responsible)
@@ -127,9 +180,7 @@ impl Admission {
         Ok(&self.link_audit_source)
     }
 
-    /// Refuse by name when the person who holds the link-audit source login
-    /// is suspended or retired. A login no person holds has no holder to
-    /// refuse.
+    /// Only an active person may hold the link-audit source's authority.
     pub fn link_audit_holder(&self, directory: &Projection) -> Result<(), ServerError> {
         let state = directory
             .person_for(&self.link_audit_source)
@@ -142,7 +193,10 @@ impl Admission {
             Some(LifecycleState::Retired) => Err(ServerError::NotAdmitted {
                 reason: "the person who holds the link-audit source login is retired and answers for no link-audit request (act: bind that login to a person who may act)",
             }),
-            Some(LifecycleState::Registered | LifecycleState::Active) | None => Ok(()),
+            Some(LifecycleState::Active) => Ok(()),
+            Some(LifecycleState::Registered) | None => Err(ServerError::NotAdmitted {
+                reason: "the link-audit source login is not held by an active person",
+            }),
         }
     }
 }

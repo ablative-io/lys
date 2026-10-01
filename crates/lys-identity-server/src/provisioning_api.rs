@@ -424,7 +424,7 @@ async fn set(
     body: Result<Json<SetBody>, JsonRejection>,
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
@@ -482,8 +482,8 @@ async fn review(
             .record(IdentityId::Agent(agent))
             .ok_or(ServerError::AgentNotVisible)?;
         let person = own_person(directory, &actor)?;
-        let answers =
-            state.admission.administrator(&actor).is_ok() || record.responsible() == Some(person);
+        let answers = state.admission.is_administrator(directory, &actor)?
+            || record.responsible() == Some(person);
         if !answers {
             return Err(ServerError::NotAdmitted {
                 reason: "only the person responsible for the agent or the administrator reviews its profile",

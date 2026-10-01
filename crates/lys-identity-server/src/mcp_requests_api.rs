@@ -244,8 +244,7 @@ pub(crate) struct McpApproveBody {
 }
 
 fn declaration(
-    state: &AppState,
-    headers: &HeaderMap,
+    administrator: bool,
     profiles: &ProvisioningStore,
     by: IdentityId,
     asked: &McpRequest,
@@ -262,14 +261,7 @@ fn declaration(
                         .find(|server| server.name == asked.server)
                 })
         }
-        IdentityId::Person(_)
-            if state
-                .admission
-                .administrator(&signed_in(state, headers)?)
-                .is_ok() =>
-        {
-            profiles.declared_server(&asked.server)
-        }
+        IdentityId::Person(_) if administrator => profiles.declared_server(&asked.server),
         IdentityId::Person(_) | IdentityId::ServiceAccount(_) => None,
     };
     server.cloned().ok_or_else(|| ServerError::McpBeyondRemit {
@@ -294,6 +286,8 @@ async fn approve(
         .map_or(uri.path(), axum::http::uri::PathAndQuery::as_str);
     let (seen, by) =
         crate::mcp_approval_sight::seen_target(&state, &headers, &id, ("POST", path, &bytes))?;
+    let administrator = matches!(by, IdentityId::Person(_))
+        && crate::routes::is_administrator(&state, &signed_in(&state, &headers)?)?;
     let agent = seen.agent.to_string();
     let body: McpApproveBody =
         serde_json::from_slice(&bytes).map_err(|error| ServerError::RequestMalformed {
@@ -332,7 +326,7 @@ async fn approve(
             if profiles.named(&operation).is_some() {
                 return Err(ServerError::ProvisioningReused { operation });
             }
-            let server = declaration(&state, &headers, profiles, by, &asked)?;
+            let server = declaration(administrator, profiles, by, &asked)?;
             let profile = profiles.profile(&agent);
             let from_version = profile.map_or(0, Profile::latest);
             let mut version = profiles.latest_reviewed(&agent).cloned().ok_or(

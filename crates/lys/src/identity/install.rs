@@ -14,7 +14,8 @@
 //! Invariants: install first ends an upgrade stopped part-way. It refuses,
 //! before stopping anything, to run from a build other than the one placed.
 //! A process is restarted when its configuration changed or its binary was
-//! just placed, so `install/build.json` always names what runs.
+//! just placed. A placed screen package also restarts the directory service
+//! to reload its immutable cache.
 //!
 //! The install makes no administrator and fills nothing about a person from
 //! the machine. While no administrator exists it writes a one-time setup
@@ -299,9 +300,16 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         setup_code::write_pending(&config.state_dir(), first_run, code.expose())?;
         Some(code)
     };
-    let build = adopt::settle(&layout, &units, &services::sibling, changed, &mut |line| {
-        emitter.note(line);
-    })?;
+    let build = adopt::settle(
+        &layout,
+        &units,
+        &services::sibling,
+        changed,
+        options.surface.is_some(),
+        &mut |line| {
+            emitter.note(line);
+        },
+    )?;
     let build = serde_json::to_value(&build).map_err(|error| {
         IdentityError::new(
             ErrorKind::RenderFailed,

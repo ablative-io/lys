@@ -10,6 +10,7 @@
 //! machine has one; the answer says so in `reports_served`, and never shows
 //! a machine as reporting.
 
+use std::ops::Bound;
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -259,24 +260,38 @@ async fn list(
             .flatten();
         let last = last_reports(&state)?;
         with_network(&state, |store| {
-            let mut machines: Vec<_> = store
-                .machines()
-                .iter()
-                .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
-                .collect::<Result<_, _>>()?;
-            let totals = if let Some(page) = &page {
-                machines.retain(|machine| {
-                    page.matches([machine.name.as_str()])
-                        && teams.as_ref().is_none_or(|teams| {
-                            machine
-                                .team
-                                .as_ref()
-                                .is_some_and(|team| teams.contains(team))
-                        })
-                });
-                Some(page.finish(&mut machines, |machine| &machine.id)?)
+            let (machines, totals) = if let Some(page) = &page {
+                let filtered = page.filtered();
+                let after = if filtered {
+                    Bound::Unbounded
+                } else {
+                    page.after()
+                };
+                let (machines, totals) = page.select(
+                    store.machines_ordered(after),
+                    (!filtered).then_some(store.machines().len()),
+                    |machine| {
+                        Ok(page.matches([machine.name.as_str()])
+                            && teams.as_ref().is_none_or(|teams| {
+                                machine
+                                    .team
+                                    .as_ref()
+                                    .is_some_and(|team| teams.contains(team))
+                            }))
+                    },
+                    |machine| &machine.id,
+                    |machine| view(directory, machine, last.get(&machine.id).copied()),
+                )?;
+                (machines, Some(totals))
             } else {
-                None
+                (
+                    store
+                        .machines()
+                        .iter()
+                        .map(|machine| view(directory, machine, last.get(&machine.id).copied()))
+                        .collect::<Result<_, _>>()?,
+                    None,
+                )
             };
             Ok(Json(NetworkView {
                 machines,
@@ -356,7 +371,7 @@ async fn name(
     body: Result<Json<NameBody>, JsonRejection>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
     body.team = body.team.as_deref().map(team_id).transpose()?;
     with_directory(&state, |directory| {
@@ -407,7 +422,7 @@ async fn assign_team(
     body: Result<Json<TeamBody>, JsonRejection>,
 ) -> Result<Json<MachineTeamChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    let administrator = state.admission.administrator(&actor).is_ok();
+    let administrator = crate::routes::is_administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -459,7 +474,7 @@ async fn change_agent(
     body: Result<Json<AgentBody>, JsonRejection>,
 ) -> Result<Json<MachineAgentsChanged>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let id = OperationId::from_str(&id)
         .map_err(|error| malformed(format!("computer id does not read: {error}")))?
@@ -515,7 +530,7 @@ async fn retire(
     Path(id): Path<String>,
 ) -> Result<Json<MachineView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let by = own_person(directory, &actor)?.to_string();

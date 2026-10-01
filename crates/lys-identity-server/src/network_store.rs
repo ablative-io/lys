@@ -18,7 +18,9 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
+use std::ops::Bound;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -129,6 +131,7 @@ pub struct NetworkStore {
     kept: Kept,
     original_agents: BTreeMap<String, Vec<String>>,
     uncertain: bool,
+    ordered: Arc<BTreeMap<String, usize>>,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
@@ -197,10 +200,18 @@ impl NetworkStore {
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let kept = read(path)?;
         let original_agents = original_agents(&kept)?;
+        let ordered = Arc::new(
+            kept.machines
+                .iter()
+                .enumerate()
+                .map(|(position, machine)| (machine.id.clone(), position))
+                .collect(),
+        );
         Ok(Self {
             path: path.to_owned(),
             kept,
             original_agents,
+            ordered,
             uncertain: false,
         })
     }
@@ -210,6 +221,13 @@ impl NetworkStore {
         if self.uncertain {
             let kept = read(&self.path)?;
             let original_agents = original_agents(&kept)?;
+            self.ordered = Arc::new(
+                kept.machines
+                    .iter()
+                    .enumerate()
+                    .map(|(position, machine)| (machine.id.clone(), position))
+                    .collect(),
+            );
             self.kept = kept;
             self.original_agents = original_agents;
             self.uncertain = false;
@@ -227,8 +245,26 @@ impl NetworkStore {
                 self.path.display()
             )));
         }
+        if next.machines.len() > self.kept.machines.len() {
+            let index = Arc::make_mut(&mut self.ordered);
+            for (position, machine) in next
+                .machines
+                .iter()
+                .enumerate()
+                .skip(self.kept.machines.len())
+            {
+                index.insert(machine.id.clone(), position);
+            }
+        }
         self.kept = next;
         Ok(())
+    }
+
+    /// Machines in identifier order, starting after the supplied identifier.
+    pub fn machines_ordered(&self, after: Bound<&str>) -> impl Iterator<Item = &Machine> {
+        self.ordered
+            .range::<str, _>((after, Bound::Unbounded))
+            .map(|(_, position)| &self.kept.machines[*position])
     }
 
     /// Every machine, in the order named.

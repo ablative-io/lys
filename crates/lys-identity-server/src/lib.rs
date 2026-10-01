@@ -56,6 +56,8 @@ mod error_status;
 pub mod error_team;
 mod estate_api;
 pub mod file_stores;
+#[cfg(test)]
+mod folded_work;
 pub mod goals_api;
 pub mod goals_edit;
 pub mod goals_state;

@@ -281,7 +281,8 @@ async fn report_agent(
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let signed = signed_agent(&state, directory, &headers, ("POST", uri.path(), &bytes))?;
+        let target = uri.path_and_query().map_or(uri.path(), |target| target.as_str());
+        let signed = signed_agent(&state, directory, &headers, ("POST", target, &bytes))?;
         let asker = match signed {
             Some(own) => IdentityId::Agent(own),
             None => caller(&state, &headers, directory)?,
@@ -294,8 +295,7 @@ async fn report_agent(
                 IdentityId::ServiceAccount(_) => false,
             IdentityId::Person(person) => {
                 record.responsible() == Some(person)
-                    || signed_in(&state, &headers)
-                        .is_ok_and(|actor| state.admission.administrator(&actor).is_ok())
+                    || state.admission.is_administrator(directory, &signed_in(&state, &headers)?)?
             }
         };
         if !answers {
@@ -355,7 +355,7 @@ async fn agent_sessions(
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(&state, &headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         if directory.record(IdentityId::Agent(agent)).is_none() {
             return Err(ServerError::AgentNotVisible);
         }
@@ -387,7 +387,7 @@ pub(crate) fn visible_sessions(
     with_directory(state, |directory| {
         let directory = directory.projection()?;
         let asker = caller(state, headers, directory)?;
-        let administrator = state.admission.administrator(&actor).is_ok();
+        let administrator = state.admission.is_administrator(directory, &actor)?;
         with_runtime(state, |store| {
             Ok(store
                 .sessions()
@@ -400,6 +400,66 @@ pub(crate) fn visible_sessions(
                 })
                 .cloned()
                 .collect())
+        })
+    })
+}
+
+/// A queried live list builds only the selected views; visibility still narrows metadata.
+pub(crate) fn live_page(
+    state: &AppState,
+    headers: &HeaderMap,
+    page: &crate::list_page::Page,
+) -> Result<(Vec<SessionView>, crate::list_page::Totals), ServerError> {
+    let actor = signed_in(state, headers)?;
+    let members = page.members(state)?;
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let asker = caller(state, headers, projection)?;
+        let administrator = state.admission.is_administrator(projection, &actor)?;
+        let filtered = page.filtered() || !administrator;
+        let after = if filtered {
+            std::ops::Bound::Unbounded
+        } else {
+            page.after()
+        };
+        with_runtime(state, |store| {
+            page.select(
+                store.live_ordered(after),
+                (!filtered).then_some(store.live_count()),
+                |tracked| {
+                    if !filtered {
+                        return Ok(true);
+                    }
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    if !sees(projection, administrator, asker, agent) {
+                        return Ok(false);
+                    }
+                    let id = agent.parse::<AgentId>()?;
+                    let record = projection
+                        .record(IdentityId::Agent(id))
+                        .ok_or(ServerError::AgentNotVisible)?;
+                    let person = record.responsible().map(|person| person.to_string());
+                    Ok(
+                        crate::list_page::member(members.as_ref(), agent, person.as_deref())
+                            && page.matches([record.profile().display_name()]),
+                    )
+                },
+                |tracked| &tracked.session,
+                |tracked| {
+                    let agent = tracked
+                        .agent
+                        .as_deref()
+                        .ok_or(ServerError::RuntimeSessionUnknown)?;
+                    let id = agent.parse::<AgentId>()?;
+                    if projection.record(IdentityId::Agent(id)).is_none() {
+                        return Err(ServerError::AgentNotVisible);
+                    }
+                    view(state, tracked).ok_or(ServerError::RuntimeSessionUnknown)
+                },
+            )
         })
     })
 }
@@ -420,7 +480,7 @@ async fn found(
     headers: HeaderMap,
 ) -> Result<Json<SessionsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    state.admission.administrator(&actor)?;
+    crate::routes::administrator(&state, &actor)?;
     with_runtime(&state, |store| {
         Ok(SessionsView {
             sessions: store

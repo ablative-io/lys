@@ -1,6 +1,9 @@
 //! What the review decisions' log folds to, and how that fold is sealed in
 //! the log's signed snapshot so a start reads only the leaves after it.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 /// The snapshot domain the decisions' folded state is sealed under.
@@ -39,10 +42,47 @@ impl Kept {
 
 /// The decisions as their log folds them, in the order recorded.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, from = "Records")]
 pub struct Held {
     /// The decisions.
     pub kept: Vec<Kept>,
+    #[serde(skip)]
+    index: Arc<Index>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Index {
+    operations: HashMap<String, usize>,
+    grants: HashMap<String, usize>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Records {
+    kept: Vec<Kept>,
+}
+
+impl From<Records> for Held {
+    fn from(records: Records) -> Self {
+        let mut index = Index::default();
+        for (position, kept) in records.kept.iter().enumerate() {
+            index
+                .operations
+                .entry(kept.operation.clone())
+                .or_insert(position);
+            index.grants.insert(kept.grant.clone(), position);
+        }
+        Self {
+            kept: records.kept,
+            index: Arc::new(index),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct Sealing<'a> {
+    format: &'static str,
+    held: &'a Held,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,24 +95,35 @@ struct Sealed {
 impl Held {
     /// The decision recorded under `operation`.
     pub fn operation(&self, operation: &str) -> Option<&Kept> {
-        self.kept.iter().find(|kept| kept.operation == operation)
+        self.index.operations.get(operation).and_then(|position| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Review);
+            self.kept.get(*position)
+        })
     }
 
     /// The latest decision to keep `grant`.
     pub fn last_for(&self, grant: &str) -> Option<&Kept> {
-        self.kept.iter().rev().find(|kept| kept.grant == grant)
+        self.index.grants.get(grant).and_then(|position| {
+            #[cfg(test)]
+            crate::folded_work::visit(crate::folded_work::Work::Review);
+            self.kept.get(*position)
+        })
     }
 
-    /// Fold one decision. A second decision under an operation already
-    /// recorded is refused by reason, since every kept decision was checked
-    /// against what came before.
+    /// Fold one decision, refusing an operation already recorded.
     pub fn hold(&mut self, kept: Kept) -> Result<(), String> {
-        if self.operation(&kept.operation).is_some() {
+        if self.index.operations.contains_key(&kept.operation) {
             return Err(format!(
                 "operation `{}` already names a recorded decision",
                 kept.operation
             ));
         }
+        let index = Arc::make_mut(&mut self.index);
+        index
+            .operations
+            .insert(kept.operation.clone(), self.kept.len());
+        index.grants.insert(kept.grant.clone(), self.kept.len());
         self.kept.push(kept);
         Ok(())
     }
@@ -90,9 +141,9 @@ impl Held {
 
     /// The state a snapshot seals.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        serde_json::to_vec(&Sealed {
-            format: FORMAT.to_owned(),
-            held: self.clone(),
+        serde_json::to_vec(&Sealing {
+            format: FORMAT,
+            held: self,
         })
         .map_err(|error| format!("review decisions state: {error}"))
     }
