@@ -1,6 +1,6 @@
-//! The roles as they are kept: one file holding every role, its versions and
-//! its holdings as they stand, replaced whole and atomically at each change.
-//! A start reads that one file and nothing else, whatever was changed before.
+//! The roles as they are kept: an initial snapshot and durable changes in
+//! one file. Ordinary changes append only their own records. An existing
+//! snapshot is migrated atomically with the first change.
 //!
 //! A change is written before it is answered. When a write fails, what the
 //! file holds is read again before anything else is answered, so memory
@@ -14,14 +14,26 @@
 //! or last moved to until someone moves it, and the end of a holding is set
 //! when it is assigned and changed by nothing after.
 
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 use crate::roles_records::{Ending, Holding, Move, Role, Version, Words};
+
+#[path = "roles_changes.rs"]
+mod changes;
+
+#[path = "roles_persistence.rs"]
+mod persistence;
+
+use changes::Change;
+use persistence::Persistence;
+
+#[cfg(test)]
+std::thread_local! {
+    static WRITTEN_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,7 +43,7 @@ struct Kept {
 
 /// The roles, read from their file and written to it.
 pub struct RolesStore {
-    path: PathBuf,
+    persistence: Persistence,
     kept: Kept,
     uncertain: bool,
 }
@@ -69,39 +81,17 @@ fn reused(operation: &str) -> ServerError {
     }
 }
 
-fn read(path: &Path) -> Result<Kept, ServerError> {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(Kept::default());
-        }
-        Err(error) => {
-            return Err(unavailable(format!("reading {}: {error}", path.display())));
-        }
-    };
-    serde_json::from_slice(&bytes)
-        .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())))
-}
-
-fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let beside = path.with_extension("writing");
-    let mut file = fs::File::create(&beside)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    drop(file);
-    fs::rename(&beside, path)?;
-    match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => fs::File::open(parent)?.sync_all(),
-        _ => Ok(()),
-    }
-}
+#[cfg(test)]
+#[path = "roles_persistence_tests.rs"]
+mod persistence_tests;
 
 impl RolesStore {
     /// The roles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
+        let (persistence, kept) = Persistence::open(path)?;
         Ok(Self {
-            path: path.to_owned(),
-            kept: read(path)?,
+            persistence,
+            kept,
             uncertain: false,
         })
     }
@@ -109,24 +99,24 @@ impl RolesStore {
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            self.kept = read(&self.path)?;
+            self.kept = self.persistence.read()?;
             self.uncertain = false;
         }
         Ok(())
     }
 
-    fn write(&mut self, roles: Vec<Role>) -> Result<(), ServerError> {
-        let next = Kept { roles };
-        let bytes = serde_json::to_vec_pretty(&next).map_err(unavailable)?;
-        if let Err(failure) = replace(&self.path, &bytes) {
+    fn write(&mut self, change: Change) -> Result<(), ServerError> {
+        change.validate(&self.kept)?;
+        if let Err(failure) = self.persistence.append(&self.kept, &change) {
             self.uncertain = true;
             self.settle()?;
-            return Err(unavailable(format!(
-                "writing {}: {failure}",
-                self.path.display()
-            )));
+            return Err(failure);
         }
-        self.kept = next;
+        if let Err(failure) = change.apply(&mut self.kept) {
+            self.uncertain = true;
+            self.settle()?;
+            return Err(failure);
+        }
         Ok(())
     }
 
@@ -155,19 +145,12 @@ impl RolesStore {
         })
     }
 
-    /// The roles with the role `id` changed by `change`, written.
-    fn change(
-        &mut self,
-        id: &str,
-        change: impl FnOnce(&mut Role) -> Result<(), ServerError>,
-    ) -> Result<(), ServerError> {
-        let mut roles = self.kept.roles.clone();
-        let role = roles
-            .iter_mut()
-            .find(|role| role.id == id)
-            .ok_or(ServerError::RoleUnknown)?;
-        change(role)?;
-        self.write(roles)
+    fn role_position(&self, id: &str) -> Result<usize, ServerError> {
+        self.kept
+            .roles
+            .iter()
+            .position(|role| role.id == id)
+            .ok_or(ServerError::RoleUnknown)
     }
 
     /// Keep a new role at its first version. Made again in the same words it
@@ -185,14 +168,14 @@ impl RolesStore {
         if self.names(&id) {
             return Err(reused(&id));
         }
-        let mut roles = self.kept.roles.clone();
-        roles.push(Role {
-            id,
-            name,
-            versions: vec![first],
-            holdings: Vec::new(),
-        });
-        self.write(roles)
+        self.write(Change::Make {
+            role: Role {
+                id,
+                name,
+                versions: vec![first],
+                holdings: Vec::new(),
+            },
+        })
     }
 
     /// Keep the next version of the role `id`, and answer its number. No
@@ -222,7 +205,10 @@ impl RolesStore {
         if self.names(operation) {
             return Err(reused(operation));
         }
-        let number = role.latest() + 1;
+        let number = role
+            .latest()
+            .checked_add(1)
+            .ok_or_else(|| unavailable("role version number overflow"))?;
         let version = Version {
             number,
             operation: operation.to_owned(),
@@ -230,9 +216,9 @@ impl RolesStore {
             made_by: by.to_owned(),
             made_at: at,
         };
-        self.change(id, |role| {
-            role.versions.push(version);
-            Ok(())
+        self.write(Change::Revise {
+            role: self.role_position(id)?,
+            version,
         })?;
         Ok(number)
     }
@@ -270,9 +256,9 @@ impl RolesStore {
             version: role.latest(),
             ..holding
         };
-        self.change(id, |role| {
-            role.holdings.push(holding);
-            Ok(())
+        self.write(Change::Assign {
+            role: self.role_position(id)?,
+            holding,
         })
     }
 
@@ -316,16 +302,15 @@ impl RolesStore {
                 ),
             });
         }
-        let operation = kept.operation.clone();
-        self.change(id, |role| {
-            let holding = role
-                .holdings
-                .iter_mut()
-                .find(|holding| holding.operation == operation)
-                .ok_or(ServerError::HolderUnknown)?;
-            holding.version = to;
-            holding.moves.push(moved);
-            Ok(())
+        let holding = role
+            .holdings
+            .iter()
+            .position(|holding| holding.operation == kept.operation)
+            .ok_or(ServerError::HolderUnknown)?;
+        self.write(Change::Move {
+            role: self.role_position(id)?,
+            holding,
+            moved,
         })
     }
 
@@ -348,15 +333,15 @@ impl RolesStore {
         if !stands_last(role, holder, assignment) {
             return Err(ServerError::HoldingChanged);
         }
-        let operation = kept.operation.clone();
-        self.change(id, |role| {
-            let holding = role
-                .holdings
-                .iter_mut()
-                .find(|holding| holding.operation == operation)
-                .ok_or(ServerError::HolderUnknown)?;
-            holding.ended = Some(ending);
-            Ok(())
+        let holding = role
+            .holdings
+            .iter()
+            .position(|holding| holding.operation == kept.operation)
+            .ok_or(ServerError::HolderUnknown)?;
+        self.write(Change::End {
+            role: self.role_position(id)?,
+            holding,
+            ending,
         })
     }
 }
