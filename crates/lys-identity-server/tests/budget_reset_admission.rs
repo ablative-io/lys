@@ -50,6 +50,16 @@ impl Table {
         has_session: bool,
         length: Length,
     ) -> TestResult<Self> {
+        Self::with_session_history(measure, uses, has_session, length, false).await
+    }
+
+    async fn with_session_history(
+        measure: Measure,
+        uses: Vec<Usage>,
+        has_session: bool,
+        length: Length,
+        stopped: bool,
+    ) -> TestResult<Self> {
         let (service, agent) = Service::start_with(move |config| {
             let seed = seed_configured(config, [ADMINISTRATOR, "other-subject"])?;
             let agent = seed.people[0].agents[0].id.to_string();
@@ -62,7 +72,7 @@ impl Table {
                         .ok_or("no runtime directory")?,
                     Arc::clone(&key),
                 )?;
-                runtime.report(Report {
+                let first = Report {
                     operation: OperationId::generate()?.to_string(),
                     session: OperationId::generate()?.to_string(),
                     agent: Some(agent.clone()),
@@ -73,7 +83,17 @@ impl Table {
                     reported_by: seed.people[0].id.to_string(),
                     at: 1,
                     launch: None,
-                })?;
+                };
+                runtime.report(first.clone())?;
+                if stopped {
+                    runtime.report(Report {
+                        operation: OperationId::generate()?.to_string(),
+                        state: Reported::Stopped,
+                        at: 2,
+                        confirmation: "session stopped".to_owned(),
+                        ..first
+                    })?;
+                }
             }
             let mut store = BudgetStore::open(
                 config
@@ -284,12 +304,21 @@ async fn a_fresh_agent_has_explicit_zero_spend_and_passes_start_admission() -> T
 
 #[tokio::test]
 async fn a_prior_day_dollar_report_leaves_today_empty_and_admits_both_starts() -> TestResult {
+    prior_day_spend(false).await
+}
+
+#[tokio::test]
+async fn a_closed_prior_session_leaves_today_empty_and_admits_both_starts() -> TestResult {
+    prior_day_spend(true).await
+}
+
+async fn prior_day_spend(has_session: bool) -> TestResult {
     let since = Period {
         length: Length::Day,
         zone: "UTC".to_owned(),
     }
     .start_of(jiff::Timestamp::now().as_millisecond())?;
-    let table = Table::with_period(
+    let table = Table::with_session_history(
         Measure::Dollars,
         vec![Usage {
             event: "yesterday-cost".to_owned(),
@@ -299,8 +328,9 @@ async fn a_prior_day_dollar_report_leaves_today_empty_and_admits_both_starts() -
             native_snapshot: true,
             ..Usage::default()
         }],
-        false,
+        has_session,
         Length::Day,
+        has_session,
     )
     .await?;
     let (command_status, command) = table.start("start-command").await?;
@@ -308,7 +338,9 @@ async fn a_prior_day_dollar_report_leaves_today_empty_and_admits_both_starts() -
     let used = table.figure().await?;
     assert_eq!(used["figure"], 0, "{used}");
     assert_eq!(used["unavailable"], Value::Null, "{used}");
-    assert_eq!(used["since_ms"], since, "{used}");
+    let shown_since = used["since_ms"].as_i64().ok_or("no dollar period start")?;
+    assert!(shown_since >= since, "{used}");
+    assert_eq!(shown_since.rem_euclid(86_400_000), 0, "{used}");
     assert_eq!(command_status, 404, "{command}");
     assert_eq!(command["refusal"], "LaunchRecordMissing", "{command}");
     assert_eq!(start_status, 409, "{answer}");

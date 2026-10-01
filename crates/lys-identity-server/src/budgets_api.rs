@@ -404,7 +404,7 @@ fn current_usage(
     agents: &std::collections::BTreeSet<String>,
     zone: &str,
     at_ms: i64,
-    sessions: Option<&std::collections::BTreeSet<String>>,
+    sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Used, ServerError> {
     if limit.unit == Measure::ContextPercent {
         return Ok(held.context_availability.used(limit, agents, at_ms));

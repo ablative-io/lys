@@ -169,7 +169,7 @@ fn crossings(
     standings: &[Standing],
     targets: &BTreeMap<String, Target>,
     zone: &str,
-    sessions: Option<&std::collections::BTreeSet<String>>,
+    sessions: Option<&std::collections::BTreeMap<String, crate::runtime_store::SessionActivity>>,
 ) -> Result<Assessment, ServerError> {
     let mut assessed = Assessment {
         crossed: Vec::new(),
