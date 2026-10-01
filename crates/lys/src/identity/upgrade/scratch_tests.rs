@@ -401,7 +401,19 @@ fn upgrade_fixture_pipe_child() -> TestResult {
     drop(writer);
     let read = reader.join();
     sent?;
-    let received = read.map_err(|_| "the FIFO reader panicked")??;
+    let received = read.map_err(|payload| {
+        let detail = if let Some(message) = payload.downcast_ref::<&str>() {
+            (*message).to_owned()
+        } else if let Some(message) = payload.downcast_ref::<String>() {
+            message.clone()
+        } else {
+            format!(
+                "non-string panic payload ({:?})",
+                payload.as_ref().type_id()
+            )
+        };
+        format!("upgrade_fixture_pipe_reader_panicked: {detail}")
+    })??;
     assert_eq!(received, *b"x");
     println!("upgrade_fixture_pipe_proved");
     Ok(())
