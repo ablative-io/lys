@@ -22,32 +22,54 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+/// A planted broker value that must never reach a rendered start.
+pub const PLANTED: &str = "sk-planted-credential-value";
+
 async fn broker(request: Request) -> Response {
     if request.uri().path() != "/_lys/handles" {
         return axum::Json(json!({})).into_response();
     }
     axum::Json(json!({ "holder": "any", "handles": [
         { "id": "h-live", "secret": "git-host token", "max_uses": 10, "used": 1,
-          "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0, "parent": null },
+          "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0,
+          "parent": null, "value": PLANTED, "token": PLANTED },
+        { "id": "h-gone", "secret": "old key", "max_uses": 1, "used": 1,
+          "not_after_ms": 0, "dropped": true, "spend_cap": null, "settled": 0,
+          "parent": null },
     ]}))
     .into_response()
 }
 
+/// A fresh operation for a fixture request.
 pub fn operation() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
 }
 
+/// One service, broker and real runner shared by a scenario.
 pub struct Table {
+    /// The directory service.
     pub service: Service,
     seeded: Seeded,
+    /// The administrator session.
     pub ada: String,
+    /// The declared program and runner storage.
     pub dir: tempfile::TempDir,
+    /// The runner serving its socket.
     pub serving: Option<Serving>,
+    /// The key used to ask the runner directly.
     pub server_key: Arc<Ed25519Identity>,
 }
 
 impl Table {
+    /// Start with a reviewed profile for the declared fixture program.
     pub async fn set() -> Result<Self, Box<dyn Error>> {
+        let table = Self::unprofiled().await?;
+        table.profile().await?;
+        Ok(table)
+    }
+
+    /// Start once, leaving the scenario to record and review its own profile.
+    pub async fn unprofiled() -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
@@ -95,14 +117,16 @@ impl Table {
             serving: Some(serving),
             server_key,
         };
-        table.profile().await?;
+        table.declare_program()?;
         Ok(table)
     }
 
+    /// The seeded agent that the administrator answers for.
     pub fn agent(&self) -> String {
         self.seeded.people[0].agents[0].id.to_string()
     }
 
+    /// Send a setup request and propagate any refusal.
     pub async fn ok(&self, path: &str, body: &Value) -> Result<Value, Box<dyn Error>> {
         let (status, answer) = self.service.post(path, Some(&self.ada), body).await?;
         if status != 200 {
@@ -111,16 +135,27 @@ impl Table {
         Ok(answer)
     }
 
-    pub async fn profile(&self) -> TestResult {
-        let path = format!("/agents/{}/provisioning", self.agent());
+    fn declare_program(&self) -> TestResult {
         let program = self.dir.path().join("declared-harness");
         std::fs::write(
             &program,
             "#!/bin/sh\nprintf 'declared-program\\n'\nprintf '%s\\n' \"$@\"\ncat \"$CLAUDE_CONFIG_DIR/settings.json\" \"$CLAUDE_CONFIG_DIR/mcp.json\" \"$CLAUDE_CONFIG_DIR/instructions.txt\"\nprintf '\\nprofile-read\\n'\nexec cat\n",
         )?;
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
+        Ok(())
+    }
+
+    /// The declared harness with the exact executable created for this scenario.
+    pub fn harness(&self) -> Value {
         let mut harness = harness_description::declared();
-        harness["program"] = json!(program);
+        harness["program"] = json!(self.dir.path().join("declared-harness"));
+        harness
+    }
+
+    /// Record and review the default profile once.
+    pub async fn profile(&self) -> TestResult {
+        let path = format!("/agents/{}/provisioning", self.agent());
+        let harness = self.harness();
         let body = json!({
             "operation": operation()?, "from_version": 0,
             "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
@@ -136,15 +171,16 @@ impl Table {
         Ok(())
     }
 
-    /// Name a machine that runs the agent's shell, with `runner` as its
-    /// runner when one is given.
-    pub async fn machine(&self, runner: Option<Value>) -> Result<String, Box<dyn Error>> {
-        let id = operation()?;
-        let body = json!({
-            "operation": id, "name": "Box", "kind": "laptop", "runtime": "sh",
-            "slots": 1, "may_run": [self.agent()], "may_reach": [],
-        });
-        self.ok("/network/machines", &body).await?;
+    /// Name the requested machine, recording its runner when one is given.
+    pub async fn machine(
+        &self,
+        body: &Value,
+        runner: Option<Value>,
+    ) -> Result<String, Box<dyn Error>> {
+        let id = body["operation"]
+            .as_str()
+            .ok_or("machine body has no operation")?;
+        self.ok("/network/machines", body).await?;
         if let Some(runner) = runner {
             self.ok(
                 &format!("/network/machines/{id}/runner"),
@@ -152,15 +188,16 @@ impl Table {
             )
             .await?;
         }
-        Ok(id)
+        Ok(id.to_owned())
     }
 
-    pub async fn start(&self, machine: &str) -> Result<(u16, Value), Box<dyn Error>> {
-        let path = format!("/agents/{}/start-command", self.agent());
-        let body = json!({ "machine": machine, "operation": operation()? });
-        self.service.post(&path, Some(&self.ada), &body).await
+    /// Send the exact start request for the given agent.
+    pub async fn start(&self, agent: &str, body: &Value) -> Result<(u16, Value), Box<dyn Error>> {
+        let path = format!("/agents/{agent}/start-command");
+        self.service.post(&path, Some(&self.ada), body).await
     }
 
+    /// Stop the runner and propagate any shutdown error.
     pub fn close(mut self) -> TestResult {
         if let Some(serving) = self.serving.take() {
             serving.stop()?;
