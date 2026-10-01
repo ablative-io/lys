@@ -272,3 +272,7 @@ fn unchunk(mut rest: &[u8]) -> Result<Vec<u8>, RunnerError> {
             .ok_or_else(|| failed("a chunk does not end its line"))?;
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/transport/cases.rs"]
+mod tests;
