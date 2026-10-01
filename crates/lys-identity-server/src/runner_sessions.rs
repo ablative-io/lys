@@ -6,7 +6,6 @@
 //! and stopped only once its runner said the process ended: each is kept as
 //! the runtime report the runner's answer confirms, never inferred.
 
-use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -314,26 +313,16 @@ pub async fn run_on_runner(
         runner: runner.clone(),
     };
     let session = launch.session.clone();
-    let already_issued = crate::agent_pass::store(state)?.has_session(&session)?;
-    let act = if already_issued {
-        Act::Status {
-            session: Some(session.clone()),
-        }
-    } else {
-        let agent_id = AgentId::from_str(agent)?;
-        let record = launch
-            .environment
-            .get("LYS_LAUNCH_RECORD")
-            .map_or(session.as_str(), String::as_str);
-        let pass = crate::agent_pass::store(state)?.issue(agent_id, record, &session)?;
-        Act::Start {
-            launch: Box::new(launch),
-            lys_mcp: Some(lys_runner::protocol::LysMcp {
-                url: format!("{}/api/mcp", state.oidc.public_origin()),
-                pass: pass.to_string(),
-            }),
-        }
+    let act = {
+        let mut passes = crate::agent_pass::store(state)?;
+        crate::runner_start_pass::act(
+            &mut passes,
+            AgentId::from_str(agent)?,
+            state.oidc.public_origin(),
+            launch,
+        )?
     };
+    let missing_config = matches!(&act, Act::Start { lys_mcp: None, .. });
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
     let answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
@@ -344,26 +333,35 @@ pub async fn run_on_runner(
         }
         other => other,
     };
-    if answer.is_err() {
-        crate::agent_pass::end_session(state, &session)?;
-    }
+    let ending = if answer.is_err() {
+        crate::agent_pass::end_session(state, &session)
+    } else {
+        Ok(())
+    };
     let outcome = answer
         .as_ref()
         .map_or_else(ServerError::name, |answer| kind(answer).to_owned());
-    keep_act(
-        state,
-        RunnerAct {
-            act: "start".to_owned(),
-            caller: caller.to_owned(),
-            session: driven.session.clone(),
-            agent: agent.to_owned(),
-            machine: machine.to_owned(),
-            at: now(),
-            text: None,
-            keys: Vec::new(),
-            outcome,
-        },
-    )?;
+    let outcome = if missing_config {
+        format!("{outcome}; LysMcpConfigMissing")
+    } else {
+        outcome
+    };
+    crate::runner_start_pass::record_after_end(ending, || {
+        keep_act(
+            state,
+            RunnerAct {
+                act: "start".to_owned(),
+                caller: caller.to_owned(),
+                session: driven.session.clone(),
+                agent: agent.to_owned(),
+                machine: machine.to_owned(),
+                at: now(),
+                text: None,
+                keys: Vec::new(),
+                outcome,
+            },
+        )
+    })?;
     let (pid, started_at, ended) = match answer? {
         Answer::Started {
             pid, started_at, ..
@@ -466,35 +464,34 @@ impl Launcher for DirectoryLauncher {
                 machine: record.machine.clone(),
                 runner,
             };
-            let rotation = match crate::runner_api::session_settings(&self.0, &record.agent) {
-                Ok(settings) => settings.and_then(|settings| settings.accounts),
-                Err(refused) => return Some(Err(refused)),
-            };
             let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
                 Ok(policy) => policy,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let runtime = match crate::network_api::with_network(&self.0, |store| {
+                store
+                    .machine(&record.machine)
+                    .and_then(|machine| machine.runtime.clone())
+                    .ok_or(ServerError::MachineWithoutRuntime)
+            }) {
+                Ok(runtime) => runtime,
+                Err(refused) => return Some(Err(refused)),
+            };
+            let launch = match crate::provisioning_api::with_provisioning(&self.0, |store| {
+                crate::launch_record_config::build(
+                    store,
+                    record,
+                    driven.session.clone(),
+                    &runtime,
+                    policy,
+                )
+            }) {
+                Ok(launch) => launch,
                 Err(refused) => return Some(Err(refused)),
             };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
-            let environment = BTreeMap::from([
-                ("LYS_AGENT".to_owned(), record.agent.clone()),
-                ("LYS_SESSION".to_owned(), driven.session.clone()),
-                ("LYS_LAUNCH_RECORD".to_owned(), record.id.clone()),
-                ("LYS_HANDLES".to_owned(), record.credential_ids.join(",")),
-            ]);
-            let launch = Launch {
-                session: driven.session,
-                program: record.executable.clone(),
-                arguments: record.arguments.clone(),
-                directory: record.working_directory.clone(),
-                environment,
-                config: None,
-                columns: COLUMNS,
-                rows: ROWS,
-                rotation,
-                policy,
-            };
             Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
         })
     }
