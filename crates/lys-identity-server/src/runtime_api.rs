@@ -16,7 +16,7 @@
 //! nothing since `starting` is shown `unconfirmed`, however long ago that
 //! was: nothing is inferred from the clock.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::{Arc, PoisonError};
 
@@ -37,7 +37,7 @@ use crate::launch_api::placed;
 use crate::network_api::with_network;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_state::{Report, Reported, Tracked};
-use crate::runtime_store::RuntimeStore;
+use crate::runtime_store::{RuntimeStore, SessionActivity};
 use crate::session::now;
 
 /// The most characters a runtime's words carry.
@@ -143,7 +143,7 @@ pub(crate) fn with_runtime<T>(
 /// Lifetime session knowledge; absent when no runtime history is configured.
 pub(crate) fn session_agents(
     state: &AppState,
-) -> Result<Option<Arc<BTreeSet<String>>>, ServerError> {
+) -> Result<Option<Arc<BTreeMap<String, SessionActivity>>>, ServerError> {
     if state.runtime.is_none() {
         return Ok(None);
     }
