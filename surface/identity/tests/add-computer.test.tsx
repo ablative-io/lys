@@ -95,6 +95,46 @@ describe('Naming the computer Lys runs on', () => {
     expect(document.body.textContent).toContain('Ward computer was added.');
   });
 
+  it.each([
+    { status: 400, code: 'RequestMalformed' },
+    { status: 403, code: 'NotAdmitted' },
+    { status: 409, code: 'MachineReused' },
+  ])('releases a definite first machine rejection $code and permits a corrected request', async ({ status, code }) => {
+    const routes = service();
+    const nameMachine = routes['POST /network/machines'];
+    routes['POST /network/machines'] = refused(status, code, 'The computer request was rejected');
+    const { posted } = await open(routes); await submit();
+    expect(posted).toHaveLength(1);
+    expect(sessionStorage.getItem(pendingKey)).toBeNull();
+    expect($('fieldset')?.hasAttribute('disabled')).toBe(false);
+    expect(document.body.textContent).not.toContain('Ward computer was added.');
+    plain(code);
+    routes['POST /network/machines'] = nameMachine;
+    await submit('Corrected computer');
+    expect(posted).toHaveLength(3);
+    expect(posted[1].body).toMatchObject({ name: 'Corrected computer' });
+    expect((posted[1].body as NameMachine).operation).not.toBe((posted[0].body as NameMachine).operation);
+    expect(sessionStorage.getItem(pendingKey)).toBeNull();
+    expect(document.body.textContent).toContain('Corrected computer was added.');
+  });
+
+  it('retains a runner-phase rejection and retries only the same runner request', async () => {
+    const routes = service(refused(403, 'NotAdmitted', 'The runner request was rejected'));
+    const { posted } = await open(routes); await submit();
+    expect(posted).toHaveLength(2);
+    expect(sessionStorage.getItem(pendingKey)).not.toBeNull();
+    expect($('fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(document.body.textContent).not.toContain('Ward computer was added.');
+    plain('NotAdmitted');
+    const original = posted[1];
+    const computer = (posted[0].body as NameMachine).operation;
+    routes['POST ' + original.path] = (body) => ok({ machine: computer, ...(body as object) });
+    await retry();
+    expect(posted).toEqual([posted[0], original, original]);
+    expect(sessionStorage.getItem(pendingKey)).toBeNull();
+    expect(document.body.textContent).toContain('Ward computer was added.');
+  });
+
   it('keeps an unconfirmed local-runner phase across remount and does not name the machine twice', async () => {
     const routes = service(refused(503, 'RunnerUnavailable', 'The runner recording outcome is unknown'));
     const first = await open(routes); await submit();
