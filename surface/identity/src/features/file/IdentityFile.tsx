@@ -109,7 +109,6 @@ function File({ data, tab, reload, stop, stopped }: { data: FileData; tab: strin
                 <>
                   {' · answers to '}
                   <Pill x={person} />
-                  {agent?.needs_new_person ? <span style={{ color: 'var(--warn)' }}> {person.state}: needs a new person</span> : null}
                 </>
               ) : null}{' '}
               {since ? <span className="dim">· since {day(since)}</span> : null}
